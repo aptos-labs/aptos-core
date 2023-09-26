@@ -23,7 +23,7 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-pub use error::Error;
+pub use error::{ExecutorError, ExecutorResult};
 pub use executed_chunk::ExecutedChunk;
 pub use ledger_update_output::LedgerUpdateOutput;
 pub use parsed_transaction_output::ParsedTransactionOutput;
@@ -97,7 +97,7 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<StateComputeResult, Error> {
+    ) -> ExecutorResult<StateComputeResult> {
         let block_id = block.block_id;
         let state_checkpoint_output =
             self.execute_and_state_checkpoint(block, parent_block_id, maybe_block_gas_limit)?;
@@ -110,14 +110,14 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<StateCheckpointOutput, Error>;
+    ) -> ExecutorResult<StateCheckpointOutput>;
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
         state_checkpoint_output: StateCheckpointOutput,
-    ) -> Result<StateComputeResult, Error>;
+    ) -> ExecutorResult<StateComputeResult>;
 
     /// Saves eligible blocks to persistent storage.
     /// If we have multiple blocks and not all of them have signatures, we may send them to storage
@@ -133,13 +133,13 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<(), Error>;
+    ) -> ExecutorResult<()>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,

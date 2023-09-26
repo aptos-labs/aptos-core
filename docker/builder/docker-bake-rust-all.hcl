@@ -69,7 +69,7 @@ group "forge-images" {
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    debian = "docker-image://debian:bullseye@sha256:7ac88cb3b95d347e89126a46696374fab97153b63d25995a5c6e75b5e98a0c79"
+    debian = "docker-image://debian:bullseye@sha256:eeb0fbb4bbde2b41055caeb458c43f0f4fbe33d01500360e0e6cbd69fb21ea05"
   }
 }
 

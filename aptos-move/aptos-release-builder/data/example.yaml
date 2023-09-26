@@ -1,15 +1,6 @@
 ---
 remote_endpoint: ~
 proposals:
-  - name: custom
-    metadata:
-      title: ""
-      description: ""
-      source_code_url: ""
-      discussion_url: ""
-    execution_mode: SingleStep
-    update_sequence:
-      - RawScript: data/example_proposals/empty.move
   - name: framework
     metadata:
       title: ""

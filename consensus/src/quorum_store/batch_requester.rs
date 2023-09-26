@@ -18,7 +18,7 @@ use tokio::{sync::oneshot, time};
 struct BatchRequesterState {
     signers: Vec<PeerId>,
     next_index: usize,
-    ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+    ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
     num_retries: usize,
     retry_limit: usize,
 }
@@ -26,7 +26,7 @@ struct BatchRequesterState {
 impl BatchRequesterState {
     fn new(
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, aptos_executor_types::Error>>,
+        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
         retry_limit: usize,
     ) -> Self {
         Self {
@@ -81,7 +81,11 @@ impl BatchRequesterState {
         } else {
             counters::RECEIVED_BATCH_REQUEST_TIMEOUT_COUNT.inc();
             debug!("QS: batch timed out, digest {}", digest);
-            if self.ret_tx.send(Err(Error::CouldNotGetData)).is_err() {
+            if self
+                .ret_tx
+                .send(Err(ExecutorError::CouldNotGetData))
+                .is_err()
+            {
                 debug!(
                     "Receiver of requested batch not available for timed out digest {}",
                     digest
@@ -126,7 +130,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         &self,
         digest: HashValue,
         signers: Vec<PeerId>,
-        ret_tx: oneshot::Sender<Result<Vec<SignedTransaction>, Error>>,
+        ret_tx: oneshot::Sender<ExecutorResult<Vec<SignedTransaction>>>,
     ) {
         let mut request_state = BatchRequesterState::new(signers, ret_tx, self.retry_limit);
         let network_sender = self.network_sender.clone();

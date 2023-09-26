@@ -5,8 +5,8 @@ use aptos_types::{
     account_view::AccountView,
     state_store::{state_key::StateKey, state_value::StateValue},
 };
+use bytes::Bytes;
 use std::collections::HashMap;
-
 pub struct AccountWithStateCache<'a> {
     account_address: &'a AccountAddress,
     state_cache: &'a HashMap<StateKey, StateValue>,
@@ -25,8 +25,11 @@ impl<'a> AccountWithStateCache<'a> {
 }
 
 impl<'a> AccountView for AccountWithStateCache<'a> {
-    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
-        Ok(self.state_cache.get(state_key).map(|x| x.bytes().to_vec()))
+    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
+        Ok(self
+            .state_cache
+            .get(state_key)
+            .map(|val| val.bytes().clone()))
     }
 
     fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>> {

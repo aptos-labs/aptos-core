@@ -12,6 +12,7 @@ use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdate
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
@@ -22,7 +23,7 @@ use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -182,6 +183,20 @@ pub fn start_peer_monitoring_service(
 
     // Return the runtime
     peer_monitoring_service_runtime
+}
+
+pub fn start_netbench_service(
+    node_config: &NodeConfig,
+    network_interfaces: ApplicationNetworkInterfaces<NetbenchMessage>,
+    runtime: &Handle,
+) {
+    let network_client = network_interfaces.network_client;
+    runtime.spawn(run_netbench_service(
+        node_config.clone(),
+        network_client,
+        network_interfaces.network_service_events,
+        TimeService::real(),
+    ));
 }
 
 /// Starts the telemetry service and grabs the build information

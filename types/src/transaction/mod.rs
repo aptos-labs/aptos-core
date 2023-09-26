@@ -1057,6 +1057,15 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    // This is a special function to update the total supply in the write set. 'TransactionOutput'
+    // already has materialized write set, but in case of sharding support for total_supply, we
+    // want to update the total supply in the write set by aggregating the total supply deltas from
+    // each shard. However, is costly to materialize the entire write set again, hence we have this
+    // inplace update hack.
+    pub fn update_total_supply(&mut self, value: u128) {
+        self.write_set.update_total_supply(value);
+    }
+
     pub fn events(&self) -> &[ContractEvent] {
         &self.events
     }

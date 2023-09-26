@@ -23,7 +23,7 @@ use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
 };
 use aptos_vm::{
-    data_cache::StorageAdapter,
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
     AptosVM, VMExecutor,
 };
@@ -72,33 +72,36 @@ impl AptosDebugger {
             .check_signature()
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
-        let (status, output, gas_profiler) =
-            AptosVM::execute_user_transaction_with_custom_gas_meter(
-                &state_view,
-                &txn,
-                &log_context,
-                |gas_feature_version, gas_params, storage_gas_params, balance| {
-                    let gas_meter =
-                        MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                            gas_feature_version,
-                            gas_params,
-                            storage_gas_params,
-                            balance,
-                        )));
-                    let gas_profiler = match txn.payload() {
-                        TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                        TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                            gas_meter,
-                            entry_func.module().clone(),
-                            entry_func.function().to_owned(),
-                            entry_func.ty_args().to_vec(),
-                        ),
-                        TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
-                        TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-                    };
-                    Ok(gas_profiler)
-                },
-            )?;
+        // TODO(Gas): revisit this.
+        let vm = AptosVM::new_from_state_view(&state_view);
+        let resolver = state_view.as_move_resolver();
+
+        let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
+            &resolver,
+            &txn,
+            &log_context,
+            |gas_feature_version, gas_params, storage_gas_params, balance| {
+                let gas_meter =
+                    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                        gas_feature_version,
+                        gas_params,
+                        storage_gas_params,
+                        balance,
+                    )));
+                let gas_profiler = match txn.payload() {
+                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                        gas_meter,
+                        entry_func.module().clone(),
+                        entry_func.function().to_owned(),
+                        entry_func.ty_args().to_vec(),
+                    ),
+                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
+                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                };
+                Ok(gas_profiler)
+            },
+        )?;
 
         Ok((status, output, gas_profiler.finish()))
     }
@@ -175,7 +178,7 @@ impl AptosDebugger {
         version: Version,
     ) -> Result<Option<AnnotatedAccountStateBlob>> {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = StorageAdapter::new(&state_view);
+        let remote_storage = state_view.as_move_resolver();
         let annotator = AptosValueAnnotator::new(&remote_storage);
         Ok(
             match self
@@ -195,7 +198,7 @@ impl AptosDebugger {
     ) -> Result<Vec<(AccountAddress, AnnotatedAccountStateBlob)>> {
         let accounts = self.debugger.get_admin_accounts(version).await?;
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let remote_storage = StorageAdapter::new(&state_view);
+        let remote_storage = state_view.as_move_resolver();
         let annotator = AptosValueAnnotator::new(&remote_storage);
 
         let mut result = vec![];
@@ -224,7 +227,7 @@ impl AptosDebugger {
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
     {
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        let state_view_storage = StorageAdapter::new(&state_view);
+        let state_view_storage = state_view.as_move_resolver();
         let features = Features::fetch_config(&state_view_storage).unwrap_or_default();
         let move_vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -233,6 +236,7 @@ impl AptosDebugger {
             ChainId::test().id(),
             features,
             TimedFeatures::enable_all(),
+            &state_view_storage,
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);

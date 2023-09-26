@@ -400,14 +400,6 @@ async fn execute_release(
 
                 network_config.set_fast_resolve(43200).await?;
             },
-            ExecutionMode::SingleStep => {
-                network_config.set_fast_resolve(30).await?;
-                // Single step governance proposal;
-                network_config
-                    .submit_and_execute_proposal(&proposal.metadata, script_paths)
-                    .await?;
-                network_config.set_fast_resolve(43200).await?;
-            },
             ExecutionMode::RootSigner => {
                 for entry in script_paths {
                     println!("Executing: {:?}", entry);

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::loader::Loader;
+use bytes::Bytes;
 use move_binary_format::errors::*;
 use move_core_types::{
     account_address::AccountAddress,
@@ -23,7 +24,7 @@ use std::collections::btree_map::BTreeMap;
 
 pub struct AccountDataCache {
     data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
-    module_map: BTreeMap<Identifier, (Vec<u8>, bool)>,
+    module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
@@ -68,13 +69,15 @@ impl<'r> TransactionDataCache<'r> {
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
     pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<ChangeSet> {
-        let resource_converter =
-            |value: Value, layout: MoveTypeLayout| -> PartialVMResult<Vec<u8>> {
-                value.simple_serialize(&layout).ok_or_else(|| {
+        let resource_converter = |value: Value, layout: MoveTypeLayout| -> PartialVMResult<Bytes> {
+            value
+                .simple_serialize(&layout)
+                .map(Into::into)
+                .ok_or_else(|| {
                     PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                         .with_message(format!("Error when serializing resource {}.", value))
                 })
-            };
+        };
         self.into_custom_effects(&resource_converter, loader)
     }
 
@@ -84,7 +87,7 @@ impl<'r> TransactionDataCache<'r> {
         self,
         resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
         loader: &Loader,
-    ) -> PartialVMResult<Changes<Vec<u8>, Resource>> {
+    ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
@@ -219,7 +222,7 @@ impl<'r> TransactionDataCache<'r> {
         ))
     }
 
-    pub(crate) fn load_module(&self, module_id: &ModuleId) -> VMResult<Vec<u8>> {
+    pub(crate) fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
         if let Some(account_cache) = self.account_map.get(module_id.address()) {
             if let Some((blob, _is_republishing)) = account_cache.module_map.get(module_id.name()) {
                 return Ok(blob.clone());
@@ -228,7 +231,10 @@ impl<'r> TransactionDataCache<'r> {
         match self.remote.get_module(module_id) {
             Ok(Some(bytes)) => Ok(bytes),
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!("Cannot find {:?} in data cache", module_id))
+                .with_message(format!(
+                    "Linker Error: Cannot find {:?} in data cache",
+                    module_id
+                ))
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
@@ -252,7 +258,7 @@ impl<'r> TransactionDataCache<'r> {
 
         account_cache
             .module_map
-            .insert(module_id.name().to_owned(), (blob, is_republishing));
+            .insert(module_id.name().to_owned(), (blob.into(), is_republishing));
 
         Ok(())
     }

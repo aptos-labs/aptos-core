@@ -233,11 +233,19 @@ pub fn arb_blocks_to_commit(
 pub fn arb_blocks_to_commit_with_block_nums(
     min_blocks: usize,
     max_blocks: usize,
-) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
-    arb_blocks_to_commit_impl(
-        5, /* num_accounts */
-        2, /* max_user_txn_per_block */
-        min_blocks, max_blocks,
+) -> impl Strategy<
+    Value = (
+        Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+        bool,
+    ),
+> {
+    (
+        arb_blocks_to_commit_impl(
+            5, /* num_accounts */
+            2, /* max_user_txn_per_block */
+            min_blocks, max_blocks,
+        ),
+        proptest::bool::ANY,
     )
 }
 
@@ -897,7 +905,7 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();

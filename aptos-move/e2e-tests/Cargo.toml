@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-abstract-gas-usage = { workspace = true }
+aptos-aggregator = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages ={ workspace = true }
@@ -35,6 +36,7 @@ aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 goldenfile = { workspace = true }
 hex = { workspace = true }
 move-binary-format = { workspace = true }

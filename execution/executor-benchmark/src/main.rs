@@ -2,7 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
+use aptos_block_partitioner::{
+    pre_partition::{
+        connected_component::config::ConnectedComponentPartitionerConfig,
+        default_pre_partitioner_config, uniform_partitioner::config::UniformPartitionerConfig,
+        PrePartitionerConfig,
+    },
+    v2::config::PartitionerV2Config,
+};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
@@ -107,6 +114,12 @@ pub struct PipelineOpt {
     max_partitioning_rounds: usize,
     #[clap(long, default_value = "0.90")]
     partitioner_cross_shard_dep_avoid_threshold: f32,
+    #[clap(long)]
+    partitioner_version: Option<String>,
+    #[clap(long)]
+    pre_partitioner: Option<String>,
+    #[clap(long, default_value = "2.0")]
+    load_imbalance_tolerance: f32,
     #[clap(long, default_value = "8")]
     partitioner_v2_num_threads: usize,
     #[clap(long, default_value = "64")]
@@ -128,14 +141,33 @@ impl PipelineOpt {
         }
     }
 
-    fn partitioner_config(&self) -> PartitionerConfig {
-        PartitionerConfig::V2(PartitionerV2Config {
-            num_threads: self.partitioner_v2_num_threads,
-            max_partitioning_rounds: self.max_partitioning_rounds,
-            cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
-            dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
-            partition_last_round: !self.use_global_executor,
-        })
+    fn pre_partitioner_config(&self) -> Box<dyn PrePartitionerConfig> {
+        match self.pre_partitioner.as_deref() {
+            None => default_pre_partitioner_config(),
+            Some("uniform") => Box::new(UniformPartitionerConfig {}),
+            Some("connected-component") => Box::new(ConnectedComponentPartitionerConfig {
+                load_imbalance_tolerance: self.load_imbalance_tolerance,
+            }),
+            _ => panic!("Unknown PrePartitioner: {:?}", self.pre_partitioner),
+        }
+    }
+
+    fn partitioner_config(&self) -> PartitionerV2Config {
+        match self.partitioner_version.as_deref() {
+            Some("v2") => PartitionerV2Config {
+                num_threads: self.partitioner_v2_num_threads,
+                max_partitioning_rounds: self.max_partitioning_rounds,
+                cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
+                dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
+                partition_last_round: !self.use_global_executor,
+                pre_partitioner_config: self.pre_partitioner_config(),
+            },
+            None => PartitionerV2Config::default(),
+            _ => panic!(
+                "Unknown partitioner version: {:?}",
+                self.partitioner_version
+            ),
+        }
     }
 }
 

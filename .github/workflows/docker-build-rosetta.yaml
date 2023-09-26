@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: ./.github/actions/buildx-setup
+      - uses: aptos-labs/aptos-core/.github/actions/buildx-setup@main
 
       - name: Build rosetta
         run: GIT_REF=main docker/rosetta/docker-build-rosetta.sh

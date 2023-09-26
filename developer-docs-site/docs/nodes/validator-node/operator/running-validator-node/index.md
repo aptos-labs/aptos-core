@@ -35,7 +35,7 @@ Similarly, conduct [delegation pool operations](../delegation-pool-operations.md
 
 ## Test Validator node
 
-After your nodes are deployed and configure, make sure they meet [node liveness criteria](../node-liveness-criteria.md).
+After your nodes are deployed and configured, make sure they meet [node liveness criteria](../node-liveness-criteria.md).
 
 ## Install Validator fullnode
 
@@ -44,5 +44,4 @@ Note that many of the same instructions can be used to run a validator fullnode 
 -  If you use the provided reference Kubernetes deployments (i.e. for cloud-managed kubernetes on AWS, Azure, or GCP), then one validator node and one validator fullnode are deployed by default.
 - When using the Docker or the source code, the `fullnode.yaml` will enable you to run a validator fullnode. 
   - See [Step 11](./using-docker.md#docker-vfn) in the Docker-based instructions. 
-  - Similarly, if you use source code, see from [Step 13](./using-source-code.md#source-code-vfn) in the source code instructions. 
-:::
+  - Similarly, if you use source code, see [Step 9](./using-source-code.md#source-code-vfn) in the source code instructions.
