@@ -1073,7 +1073,7 @@ fn sequence(context: &mut Context, seq: N::Sequence) -> T::Sequence {
     resulting_sequence
 }
 
-fn sequence_type(seq: &T::Sequence) -> &Type {
+pub fn sequence_type(seq: &T::Sequence) -> &Type {
     use T::SequenceItem_ as TS;
     match seq.back().unwrap() {
         sp!(_, TS::Bind(_, _, _)) | sp!(_, TS::Declare(_)) => {
