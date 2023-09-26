@@ -30,7 +30,7 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 
 ## The Fee Statement
 
-Starting from Aptos Framework release 1.7, the break down of the fee charges and refund relavent to a user transaction is represented by struct `0x1::transaction_fee::FeeStatement` and emitted as a module event.
+Starting from Aptos Framework release 1.7, the breakdown of fee charges and refunds relevant to a user transaction is represented by struct `0x1::transaction_fee::FeeStatement` and emitted as a module event.
 
 ```Rust
     #[event]
