@@ -23,7 +23,9 @@ use move_vm_types::{
 use std::collections::{btree_map::BTreeMap, hash_map::HashMap};
 
 pub struct AccountDataCache {
-    data_map: HashMap<Type, (MoveTypeLayout, GlobalValue)>,
+    // The bool flag in the `data_map` indicates whether the resource contains
+    // an aggregator or snapshot.
+    data_map: HashMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
     module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
@@ -69,15 +71,16 @@ impl<'r> TransactionDataCache<'r> {
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
     pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<ChangeSet> {
-        let resource_converter = |value: Value, layout: MoveTypeLayout| -> PartialVMResult<Bytes> {
-            value
-                .simple_serialize(&layout)
-                .map(Into::into)
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
-                })
-        };
+        let resource_converter =
+            |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
+                value
+                    .simple_serialize(&layout)
+                    .map(Into::into)
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                            .with_message(format!("Error when serializing resource {}.", value))
+                    })
+            };
         self.into_custom_effects(&resource_converter, loader)
     }
 
@@ -85,10 +88,10 @@ impl<'r> TransactionDataCache<'r> {
     /// produced effects for resources.
     pub(crate) fn into_custom_effects<Resource>(
         self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout) -> PartialVMResult<Resource>,
+        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         loader: &Loader,
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
-        let mut change_set = Changes::new();
+        let mut change_set = Changes::<Bytes, Resource>::new();
         for (addr, account_data_cache) in self.account_map.into_iter() {
             let mut modules = BTreeMap::new();
             for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
@@ -101,7 +104,7 @@ impl<'r> TransactionDataCache<'r> {
             }
 
             let mut resources = BTreeMap::new();
-            for (ty, (layout, gv)) in account_data_cache.data_map {
+            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
                 if let Some(op) = gv.into_effect_with_layout(layout) {
                     let struct_tag = match loader.type_to_type_tag(&ty)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
@@ -109,7 +112,9 @@ impl<'r> TransactionDataCache<'r> {
                     };
                     resources.insert(
                         struct_tag,
-                        op.and_then(|(value, layout)| resource_converter(value, layout))?,
+                        op.and_then(|(value, layout)| {
+                            resource_converter(value, layout, has_aggregator_lifting)
+                        })?,
                     );
                 }
             }
@@ -130,7 +135,7 @@ impl<'r> TransactionDataCache<'r> {
         // The sender's account will always be mutated.
         let mut total_mutated_accounts: u64 = 1;
         for (addr, entry) in self.account_map.iter() {
-            if addr != sender && entry.data_map.values().any(|(_, v)| v.is_mutated()) {
+            if addr != sender && entry.data_map.values().any(|(_, v, _)| v.is_mutated()) {
                 total_mutated_accounts += 1;
             }
         }
@@ -218,14 +223,16 @@ impl<'r> TransactionDataCache<'r> {
                 None => GlobalValue::none(),
             };
 
-            account_cache.data_map.insert(ty.clone(), (ty_layout, gv));
+            account_cache
+                .data_map
+                .insert(ty.clone(), (ty_layout, gv, has_aggregator_lifting));
         }
 
         Ok((
             account_cache
                 .data_map
                 .get_mut(ty)
-                .map(|(_ty_layout, gv)| gv)
+                .map(|(_ty_layout, gv, _has_aggregator_lifting)| gv)
                 .expect("global value must exist"),
             load_res,
         ))

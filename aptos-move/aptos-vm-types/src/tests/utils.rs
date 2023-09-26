@@ -21,11 +21,12 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_core_types::{
+    value::MoveTypeLayout,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     vm_status::VMStatus,
 };
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct MockChangeSetChecker;
 
@@ -81,6 +82,34 @@ pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
     (as_state_key!(k), WriteOp::Deletion)
 }
 
+pub(crate) fn mock_create_with_layout(
+    k: impl ToString,
+    v: u128,
+    layout: Option<Arc<MoveTypeLayout>>,
+) -> (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)) {
+    (
+        as_state_key!(k),
+        (WriteOp::Creation(as_bytes!(v).into()), layout),
+    )
+}
+
+pub(crate) fn mock_modify_with_layout(
+    k: impl ToString,
+    v: u128,
+    layout: Option<Arc<MoveTypeLayout>>,
+) -> (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)) {
+    (
+        as_state_key!(k),
+        (WriteOp::Modification(as_bytes!(v).into()), layout),
+    )
+}
+
+pub(crate) fn mock_delete_with_layout(
+    k: impl ToString,
+) -> (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)) {
+    (as_state_key!(k), (WriteOp::Deletion, None))
+}
+
 pub(crate) fn mock_add(k: impl ToString, v: u128) -> (StateKey, DeltaOp) {
     const DUMMY_LIMIT: u128 = 1000;
     (as_state_key!(k), delta_add(v, DUMMY_LIMIT))
@@ -114,7 +143,7 @@ pub(crate) fn mock_tag_2() -> StructTag {
 }
 
 pub(crate) fn build_change_set(
-    resource_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
     resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
@@ -136,7 +165,7 @@ pub(crate) fn build_change_set(
 
 // For testing, output has always a success execution status and uses 100 gas units.
 pub(crate) fn build_vm_output(
-    resource_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
+    resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
     resource_group_write_set: impl IntoIterator<Item = (StateKey, GroupWrite)>,
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
