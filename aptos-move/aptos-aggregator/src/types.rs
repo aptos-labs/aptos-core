@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::bounded_math::code_invariant_error;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::account_address::AccountAddress;
 
 pub type AggregatorResult<T> = Result<T, AggregatorError>;
@@ -56,6 +58,104 @@ impl TryFrom<AggregatorVersionedID> for StateKey {
         match vid {
             AggregatorVersionedID::V1(state_key) => Ok(state_key),
             AggregatorVersionedID::V2(_) => Err(AggregatorError::WrongVersionID),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AggregatorValue {
+    Aggregator(u128),
+    Snapshot(u128),
+    Derived(Vec<u8>),
+}
+
+impl AggregatorValue {
+    pub fn into_aggregator_value(self) -> PartialVMResult<u128> {
+        match self {
+            AggregatorValue::Aggregator(value) => Ok(value),
+            AggregatorValue::Snapshot(_) => Err(code_invariant_error(
+                "Tried calling into_aggregator_value on Snapshot value",
+            )),
+            AggregatorValue::Derived(_) => Err(code_invariant_error(
+                "Tried calling into_aggregator_value on String SnapshotValue",
+            )),
+        }
+    }
+
+    pub fn into_snapshot_value(self) -> PartialVMResult<u128> {
+        match self {
+            AggregatorValue::Snapshot(value) => Ok(value),
+            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
+                "Tried calling into_snapshot_value on Aggregator value",
+            )),
+            AggregatorValue::Derived(_) => Err(code_invariant_error(
+                "Tried calling into_snapshot_value on String SnapshotValue",
+            )),
+        }
+    }
+
+    pub fn into_derived_value(self) -> PartialVMResult<Vec<u8>> {
+        match self {
+            AggregatorValue::Derived(value) => Ok(value),
+            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
+                "Tried calling into_derived_value on Aggregator value",
+            )),
+            AggregatorValue::Snapshot(_) => Err(code_invariant_error(
+                "Tried calling into_derived_value on Snapshot value",
+            )),
+        }
+    }
+}
+
+// TODO see if we need both AggregatorValue and SnapshotValue. Also, maybe they should be nested
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SnapshotValue {
+    Integer(u128),
+    String(Vec<u8>),
+}
+
+impl SnapshotValue {
+    pub fn into_aggregator_value(self) -> PartialVMResult<u128> {
+        match self {
+            SnapshotValue::Integer(value) => Ok(value),
+            SnapshotValue::String(_) => Err(code_invariant_error(
+                "Tried calling into_aggregator_value on String SnapshotValue",
+            )),
+        }
+    }
+}
+
+impl TryFrom<AggregatorValue> for SnapshotValue {
+    type Error = PartialVMError;
+
+    fn try_from(value: AggregatorValue) -> PartialVMResult<SnapshotValue> {
+        match value {
+            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
+                "Tried calling SnapshotValue::try_from on AggregatorValue(Aggregator)",
+            )),
+            AggregatorValue::Snapshot(v) => Ok(SnapshotValue::Integer(v)),
+            AggregatorValue::Derived(v) => Ok(SnapshotValue::String(v)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SnapshotToStringFormula {
+    Concat { prefix: Vec<u8>, suffix: Vec<u8> },
+}
+
+impl SnapshotToStringFormula {
+    pub fn apply(&self, base: u128) -> Vec<u8> {
+        match self {
+            SnapshotToStringFormula::Concat { prefix, suffix } => {
+                let middle_string = base.to_string();
+                let middle = middle_string.as_bytes();
+                let mut result = Vec::with_capacity(prefix.len() + middle.len() + suffix.len());
+                result.extend(prefix);
+                result.extend(middle);
+                result.extend(suffix);
+                result
+            },
         }
     }
 }
