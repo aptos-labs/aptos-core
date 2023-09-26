@@ -1300,11 +1300,11 @@ impl AptosVM {
         let has_new_block_event = change_set
             .events()
             .iter()
-            .any(|e| e.event_key() == Some(&new_block_event_key()));
+            .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
         let has_new_epoch_event = change_set
             .events()
             .iter()
-            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
+            .any(|(e, _)| e.event_key() == Some(&new_epoch_event_key()));
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -1698,7 +1698,7 @@ impl VMAdapter for AptosVM {
             .change_set()
             .events()
             .iter()
-            .any(|event| event.event_key() == Some(&new_epoch_event_key))
+            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
 
     fn execute_single_transaction(

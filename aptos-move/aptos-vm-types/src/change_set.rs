@@ -15,10 +15,16 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use move_binary_format::errors::Location;
-use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
-use std::collections::{
-    hash_map::Entry::{Occupied, Vacant},
-    HashMap,
+use move_core_types::{
+    value::MoveTypeLayout,
+    vm_status::{err_msg, StatusCode, VMStatus},
+};
+use std::{
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        HashMap,
+    },
+    sync::Arc,
 };
 
 /// A change set produced by the VM.
@@ -27,12 +33,12 @@ use std::collections::{
 /// VM. For storage backends, use `ChangeSet`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
-    resource_write_set: HashMap<StateKey, WriteOp>,
+    resource_write_set: HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     module_write_set: HashMap<StateKey, WriteOp>,
     aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
     aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange>,
-    events: Vec<ContractEvent>,
+    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
 macro_rules! squash_writes_pair {
@@ -64,12 +70,12 @@ impl VMChangeSet {
     }
 
     pub fn new(
-        resource_write_set: HashMap<StateKey, WriteOp>,
+        resource_write_set: HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         module_write_set: HashMap<StateKey, WriteOp>,
         aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
         aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange>,
-        events: Vec<ContractEvent>,
+        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
         let change_set = Self {
@@ -110,10 +116,14 @@ impl VMChangeSet {
                 // TODO(aggregator) While everything else must be a resource, first
                 // version of aggregators is implemented as a table item. Revisit when
                 // we split MVHashMap into data and aggregators.
-                resource_write_set.insert(state_key, write_op);
+                // TODO: Currently using MoveTypeLayout as None indicating no aggregators are in
+                // the resource value. Check if this causes any issues.
+                resource_write_set.insert(state_key, (write_op, None));
             }
         }
-
+        // TODO: Currently using MoveTypeLayout as None indicating no aggregators are in
+        // the event. Check if this causes any issues.
+        let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
             resource_write_set,
             module_write_set,
@@ -137,10 +147,11 @@ impl VMChangeSet {
         } = self;
 
         let mut write_set_mut = WriteSetMut::default();
-        write_set_mut.extend(resource_write_set);
+        write_set_mut.extend(resource_write_set.into_iter().map(|(k, (v, _))| (k, v)));
         write_set_mut.extend(module_write_set);
         write_set_mut.extend(aggregator_v1_write_set);
 
+        let events = events.into_iter().map(|(e, _)| e).collect();
         let write_set = write_set_mut
             .freeze()
             .expect("Freezing a WriteSet does not fail.");
@@ -165,6 +176,7 @@ impl VMChangeSet {
     pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
         self.resource_write_set()
             .iter()
+            .map(|(k, (v, _))| (k, v))
             .chain(self.module_write_set().iter())
             .chain(self.aggregator_v1_write_set().iter())
     }
@@ -178,11 +190,12 @@ impl VMChangeSet {
     pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, &mut WriteOp)> {
         self.resource_write_set
             .iter_mut()
+            .map(|(k, (v, _))| (k, v))
             .chain(self.module_write_set.iter_mut())
             .chain(self.aggregator_v1_write_set.iter_mut())
     }
 
-    pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
+    pub fn resource_write_set(&self) -> &HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         &self.resource_write_set
     }
 
@@ -211,7 +224,7 @@ impl VMChangeSet {
         &self.aggregator_v2_change_set
     }
 
-    pub fn events(&self) -> &[ContractEvent] {
+    pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         &self.events
     }
 
@@ -341,7 +354,7 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_writes(
+    fn squash_additional_module_writes(
         write_set: &mut HashMap<StateKey, WriteOp>,
         additional_write_set: HashMap<StateKey, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
@@ -352,6 +365,44 @@ impl VMChangeSet {
                 },
                 Vacant(entry) => {
                     entry.insert(additional_write_op);
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn squash_additional_resource_writes(
+        write_set: &mut HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+        additional_write_set: HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    ) -> anyhow::Result<(), VMStatus> {
+        for (key, additional_entry) in additional_write_set.into_iter() {
+            match write_set.entry(key.clone()) {
+                Occupied(mut entry) => {
+                    // Squash entry and addtional entries if type layouts match
+                    let (additional_write_op, additional_type_layout) = additional_entry;
+                    let (write_op, type_layout) = entry.get_mut();
+                    if *type_layout != additional_type_layout {
+                        return Err(VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            err_msg(format!(
+                                "Cannot squash two writes with different type layouts.
+                                key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
+                                key, type_layout, additional_type_layout
+                            )),
+                        ));
+                    }
+                    let noop = !WriteOp::squash(write_op, additional_write_op).map_err(|e| {
+                        VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            err_msg(format!("Error while squashing two write ops: {}.", e)),
+                        )
+                    })?;
+                    if noop {
+                        entry.remove();
+                    }
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_entry);
                 },
             }
         }
@@ -381,11 +432,14 @@ impl VMChangeSet {
         if !additional_aggregator_v2_change_set.is_empty() {
             unimplemented!("Aggregator v2 change sets are not supported yet.");
         }
-        Self::squash_additional_writes(
+        Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
         )?;
-        Self::squash_additional_writes(&mut self.module_write_set, additional_module_write_set)?;
+        Self::squash_additional_module_writes(
+            &mut self.module_write_set,
+            additional_module_write_set,
+        )?;
         self.events.extend(additional_events);
 
         checker.check_change_set(self)

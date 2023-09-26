@@ -32,13 +32,17 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use std::{cell::RefCell, fmt::Debug, sync::atomic::AtomicU32};
+use std::{
+    cell::RefCell,
+    fmt::Debug,
+    sync::{atomic::AtomicU32, Arc},
+};
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
 #[derive(Debug)]
 pub(crate) enum ReadResult {
-    Value(Option<StateValue>),
+    Value(Option<StateValue>, Option<Arc<MoveTypeLayout>>),
     Metadata(Option<StateValueMetadataKind>),
     Exists(bool),
     Uninitialized,
@@ -52,9 +56,10 @@ pub(crate) enum ReadResult {
 impl ReadResult {
     fn from_data_read<V: TransactionWrite>(data: DataRead<V>) -> Self {
         match data {
-            DataRead::Versioned(_, v) => ReadResult::Value(v.as_state_value()),
+            DataRead::Versioned(_, v, layout) => ReadResult::Value(v.as_state_value(), layout),
             DataRead::Resolved(v) => {
-                ReadResult::Value(Some(StateValue::new_legacy(serialize(&v).into())))
+                // TODO confirm None layout for V1 aggregators is OK
+                ReadResult::Value(Some(StateValue::new_legacy(serialize(&v).into())), None)
             },
             DataRead::Metadata(maybe_metadata) => ReadResult::Metadata(maybe_metadata),
             DataRead::Exists(exists) => ReadResult::Exists(exists),
@@ -153,8 +158,8 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 
         loop {
             match self.versioned_map.data().fetch_data(key, txn_idx) {
-                Ok(Versioned(version, v)) => {
-                    let data_read = DataRead::Versioned(version, v.clone())
+                Ok(Versioned(version, v, layout)) => {
+                    let data_read = DataRead::Versioned(version, v.clone(), layout)
                         .downcast(target_kind)
                         .expect("Downcast from Versioned must succeed");
 
@@ -324,7 +329,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     |v| Ok(v.as_state_value()),
                 );
                 ret.map(|maybe_state_value| match kind {
-                    ReadKind::Value => ReadResult::Value(maybe_state_value),
+                    // TODO: check if we need to track layout for unsync
+                    ReadKind::Value => ReadResult::Value(maybe_state_value, None),
                     ReadKind::Metadata => {
                         ReadResult::Metadata(maybe_state_value.map(StateValue::into_metadata))
                     },
@@ -348,7 +354,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     ) -> anyhow::Result<Option<StateValue>> {
         self.get_resource_state_value_impl(state_key, ReadKind::Value)
             .map(|res| {
-                if let ReadResult::Value(v) = res {
+                if let ReadResult::Value(v, _layout) = res {
                     v
                 } else {
                     unreachable!("Read result must be Value kind")
