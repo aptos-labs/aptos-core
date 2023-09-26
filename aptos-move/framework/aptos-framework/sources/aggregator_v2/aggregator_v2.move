@@ -22,9 +22,9 @@ module aptos_framework::aggregator_v2 {
     /// across multiple transactions. See the module description for more details.
     ///
     /// Currently supported types for Element are u64 and u128.
-    struct Aggregator<Element> has store {
-        value: Element,
-        max_value: Element,
+    struct Aggregator<IntElement> has store {
+        value: IntElement,
+        max_value: IntElement,
     }
 
     struct AggregatorSnapshot<Element> has store, drop {
@@ -32,7 +32,7 @@ module aptos_framework::aggregator_v2 {
     }
 
     /// Returns `max_value` exceeding which aggregator overflows.
-    public fun max_value<Element: copy + drop>(aggregator: &Aggregator<Element>): Element {
+    public fun max_value<IntElement: copy + drop>(aggregator: &Aggregator<IntElement>): IntElement {
         aggregator.max_value
     }
 
@@ -40,32 +40,32 @@ module aptos_framework::aggregator_v2 {
     ///
     /// Currently supported types for Element are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
-    public native fun create_aggregator<Element: copy + drop>(max_value: Element): Aggregator<Element>;
+    public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
 
     /// Adds `value` to aggregator.
     /// If addition would exceed the max_value, `false` is returned, and aggregator value is left unchanged.
-    public native fun try_add<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
+    public native fun try_add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
 
     // Adds `value` to aggregator, uncoditionally.
     // If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown
-    public fun add<Element>(aggregator: &mut Aggregator<Element>, value: Element) {
+    public fun add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_add(aggregator, value), error::out_of_range(EAGGREGATOR_OVERFLOW));
     }
 
     /// Subtracts `value` from aggregator.
     /// If subtraction would result in a negative value, `false` is returned, and aggregator value is left unchanged.
-    public native fun try_sub<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
+    public native fun try_sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
 
     // Adds `value` to aggregator, uncoditionally.
     // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown
-    public fun sub<Element>(aggregator: &mut Aggregator<Element>, value: Element) {
+    public fun sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
     /// Returns a value stored in this aggregator.
-    public native fun read<Element>(aggregator: &Aggregator<Element>): Element;
+    public native fun read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement;
 
-    public native fun snapshot<Element>(aggregator: &Aggregator<Element>): AggregatorSnapshot<Element>;
+    public native fun snapshot<IntElement>(aggregator: &Aggregator<IntElement>): AggregatorSnapshot<IntElement>;
 
     public native fun create_snapshot<Element: copy + drop>(value: Element): AggregatorSnapshot<Element>;
 
@@ -73,7 +73,10 @@ module aptos_framework::aggregator_v2 {
 
     public native fun read_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): Element;
 
-    public native fun string_concat<Element>(before: String, snapshot: &AggregatorSnapshot<Element>, after: String): AggregatorSnapshot<String>;
+    /// Concatenates `before`, `snapshot` and `after` into a single string.
+    /// snapshot passed needs to have integer type - currently supported types are u64 and u128.
+    /// raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
+    public native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): AggregatorSnapshot<String>;
 
     // #[test(fx = @std)]
     // public fun test_correct_read(fx: &signer) {

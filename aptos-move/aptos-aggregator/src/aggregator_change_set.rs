@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_extension::DerivedFormula,
     bounded_math::{code_invariant_error, expect_ok, BoundedMath, SignedU128},
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
-    types::AggregatorID,
+    types::{AggregatorID, SnapshotToStringFormula},
 };
 use move_binary_format::errors::PartialVMResult;
 
@@ -27,7 +26,7 @@ pub enum AggregatorChange {
     SnapshotDelta {
         delta: SignedU128,
         base_aggregator: AggregatorID,
-        formula: DerivedFormula,
+        formula: SnapshotToStringFormula,
     },
 }
 

@@ -3,7 +3,10 @@
 
 use super::helpers_v1::set_aggregator_field;
 use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
-use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorID};
+use aptos_aggregator::{
+    aggregator_extension::extension_error,
+    types::{AggregatorID, SnapshotValue},
+};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use move_vm_types::values::{Struct, StructRef, Value};
@@ -13,14 +16,34 @@ use move_vm_types::values::{Struct, StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
+pub fn u128_to_u64(value: u128) -> PartialVMResult<u64> {
+    u64::try_from(value).map_err(|_| {
+        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            .with_message("Cannot cast u128 into u64".to_string())
+    })
+}
+
 pub(crate) fn aggregator_value_field_as_id(value: u128) -> PartialVMResult<AggregatorID> {
-    if value > u64::MAX as u128 {
-        return Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Aggregator identifier is too small".to_string()),
-        );
+    u128_to_u64(value).map(AggregatorID::new)
+}
+
+pub(crate) fn aggregator_snapshot_value_field_as_id(
+    value: SnapshotValue,
+) -> PartialVMResult<AggregatorID> {
+    match value {
+        SnapshotValue::Integer(v) => aggregator_value_field_as_id(v),
+        SnapshotValue::String(v) => Ok(String::from_utf8(v)
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("Unable to convert bytes to string: {}", e))
+            })?
+            .parse::<u64>()
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("Unable to parse string as u64: {}", e))
+            })?)
+        .map(AggregatorID::new),
     }
-    Ok(AggregatorID::new(value as u64))
 }
 
 /// Given a reference to `Aggregator` Move struct, returns a tuple of its
@@ -44,33 +67,10 @@ pub fn get_aggregator_fields_u64(aggregator: &StructRef) -> PartialVMResult<(u64
 }
 
 /// Returns ID of aggregator snapshot based on a reference to `AggregatorSnapshot` Move struct.
-pub(crate) fn aggregator_snapshot_value_as_u128(
+pub(crate) fn aggregator_snapshot_field_value(
     aggregator_snapshot: &StructRef,
-) -> PartialVMResult<u128> {
-    let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u128>()?;
-    Ok(value)
-}
-
-/// Returns ID of aggregator snapshot based on a reference to `AggregatorSnapshot` Move struct.
-pub(crate) fn aggregator_snapshot_value_as_u64(
-    aggregator_snapshot: &StructRef,
-) -> PartialVMResult<u64> {
-    let value = get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?.value_as::<u64>()?;
-    Ok(value)
-}
-
-pub(crate) fn aggregator_snapshot_value_as_bytes(
-    aggregator_snapshot: &StructRef,
-) -> PartialVMResult<Vec<u8>> {
-    get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)?
-        .value_as::<Struct>()?
-        .unpack()?
-        .collect::<Vec<Value>>()
-        .pop()
-        .map_or(
-            Err(extension_error("unable to pop string field in snapshot")),
-            |v| v.value_as::<Vec<u8>>(),
-        )
+) -> PartialVMResult<Value> {
+    get_aggregator_field(aggregator_snapshot, VALUE_FIELD_INDEX)
 }
 
 pub(crate) fn string_to_bytes(string_value: Struct) -> PartialVMResult<Vec<u8>> {

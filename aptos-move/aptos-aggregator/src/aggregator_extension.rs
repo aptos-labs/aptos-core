@@ -5,12 +5,12 @@ use crate::{
     bounded_math::{code_invariant_error, expect_ok, ok_overflow, BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::{AggregatorReadMode, AggregatorResolver},
-    types::{AggregatorID, AggregatorVersionedID},
+    types::{AggregatorID, AggregatorVersionedID, SnapshotToStringFormula, SnapshotValue},
 };
 use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use claims::assert_matches;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 /// Describes how the `speculative_start_value` in `AggregatorState` was obtained.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,8 +63,8 @@ impl SpeculativeStartValue {
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AggregatorState {
-    // If aggregator stores a known value.
-    Data {
+    // If aggregator is created in this transaction.
+    Create {
         value: u128,
     },
     Delta {
@@ -74,32 +74,24 @@ pub enum AggregatorState {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SnapshotValue {
-    Integer(u128),
-    String(Vec<u8>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DerivedFormula {
-    Identity,
-    Concat { prefix: Vec<u8>, suffix: Vec<u8> },
-}
-
 // Aggregator snapshot is immutable struct, once created - value is fixed.
 // If we want to provide mutability APIs in the future, it should be
 // copy-on-write - i.e. a new aggregator_id should be created for it.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AggregatorSnapshotState {
     // Created in this transaction, with explicit value
-    Data {
+    Create {
         value: SnapshotValue,
     },
     // Created in this transaction, via snapshot(&aggregator)
     Delta {
         base_aggregator: AggregatorID,
         delta: SignedU128,
-        formula: DerivedFormula,
+    },
+    // Created in this transaction, via string_concat(prefix, &snapshot, suffix)
+    Derived {
+        base_snapshot: AggregatorID,
+        formula: SnapshotToStringFormula,
     },
     // Accessed in this transaction, based on the ID
     Reference {
@@ -114,7 +106,6 @@ pub struct AggregatorSnapshot {
     #[allow(dead_code)]
     id: AggregatorID,
 
-    #[allow(dead_code)]
     state: AggregatorSnapshotState,
 }
 
@@ -131,16 +122,16 @@ pub struct Aggregator {
     id: AggregatorVersionedID,
     // Describes an upper bound of an aggregator. If value of the aggregator
     // exceeds it, the aggregator overflows.
-    max_value: u128,
+    pub max_value: u128,
     // Describes a state of an aggregator.
-    state: AggregatorState,
+    pub state: AggregatorState,
 }
 
 impl Aggregator {
     #[cfg(test)]
     pub fn get_history(&self) -> Option<&DeltaHistory> {
         match &self.state {
-            AggregatorState::Data { .. } => None,
+            AggregatorState::Create { .. } => None,
             AggregatorState::Delta { history, .. } => Some(history),
         }
     }
@@ -163,7 +154,7 @@ impl Aggregator {
         let math = BoundedMath::new(self.max_value);
         self.read_last_committed_aggregator_value(resolver)?;
         match &mut self.state {
-            AggregatorState::Data { value } => {
+            AggregatorState::Create { value } => {
                 // If aggregator knows the value, add directly and keep the state.
                 match math.unsigned_add(*value, input) {
                     Ok(new_value) => {
@@ -220,7 +211,7 @@ impl Aggregator {
         let math = BoundedMath::new(self.max_value);
         self.read_last_committed_aggregator_value(resolver)?;
         match &mut self.state {
-            AggregatorState::Data { value } => {
+            AggregatorState::Create { value } => {
                 // If aggregator knows the value, add directly and keep the state.
                 match math.unsigned_subtract(*value, input) {
                     Ok(new_value) => {
@@ -258,6 +249,32 @@ impl Aggregator {
         }
     }
 
+    fn get_aggregator_value_from_storage(
+        id: &AggregatorVersionedID,
+        resolver: &dyn AggregatorResolver,
+        mode: AggregatorReadMode,
+    ) -> PartialVMResult<u128> {
+        let maybe_value_from_storage = match id {
+            AggregatorVersionedID::V1(state_key) => {
+                resolver.get_aggregator_v1_value(state_key, mode)
+            },
+            AggregatorVersionedID::V2(id) => resolver
+                .get_aggregator_v2_value(id, mode)
+                .and_then(|v| Ok(v.into_aggregator_value()?))
+                .map(Some),
+        };
+        maybe_value_from_storage
+            .map_err(|e| {
+                extension_error(format!("Could not find the value of the aggregator: {}", e))
+            })?
+            .ok_or_else(|| {
+                extension_error(format!(
+                    "Could not read from deleted aggregator at {:?}",
+                    id
+                ))
+            })
+    }
+
     /// Implements logic for doing a "cheap read" of an aggregator.
     /// Reads the last committed value of the aggregator that's known at the
     /// time of the call, and as such, can be computed efficiently (i.e. no
@@ -279,32 +296,17 @@ impl Aggregator {
         {
             // If value is Unset, we read it
             if let SpeculativeStartValue::Unset = speculative_start_value {
-                if *delta != SignedU128::Positive(0) || !history.is_empty() {
+                if !delta.is_zero() || !history.is_empty() {
                     return Err(code_invariant_error(
                         "Delta or history not empty with Unset speculative value",
                     ));
                 }
 
-                let maybe_value_from_storage = match &self.id {
-                    AggregatorVersionedID::V1(state_key) => resolver
-                        .get_aggregator_v1_value(state_key, AggregatorReadMode::LastCommitted),
-                    AggregatorVersionedID::V2(id) => resolver
-                        .get_aggregator_v2_value(id, AggregatorReadMode::LastCommitted)
-                        .map(Some),
-                };
-                let value_from_storage = maybe_value_from_storage
-                    .map_err(|e| {
-                        extension_error(format!(
-                            "Could not find the value of the aggregator: {}",
-                            e
-                        ))
-                    })?
-                    .ok_or_else(|| {
-                        extension_error(format!(
-                            "Could not read from deleted aggregator at {:?}",
-                            self.id
-                        ))
-                    })?;
+                let value_from_storage = Self::get_aggregator_value_from_storage(
+                    &self.id,
+                    resolver,
+                    AggregatorReadMode::LastCommitted,
+                )?;
 
                 *speculative_start_value =
                     SpeculativeStartValue::LastCommittedValue(value_from_storage)
@@ -321,12 +323,12 @@ impl Aggregator {
     /// `LastCommittedValue` variant.
     /// Both `get_any_value()` and `get_value_for_read()` are guaranteed to succeed
     /// after this call.
-    pub fn read_most_recent_aggregator_value(
+    pub fn read_aggregated_aggregator_value(
         &mut self,
         resolver: &dyn AggregatorResolver,
     ) -> PartialVMResult<u128> {
         match &mut self.state {
-            AggregatorState::Data { value } => {
+            AggregatorState::Create { value } => {
                 // If aggregator knows the value, return it.
                 Ok(*value)
             },
@@ -341,29 +343,20 @@ impl Aggregator {
                 {
                     return Ok(math.unsigned_add_delta(*start_value, delta)?);
                 }
+                if let SpeculativeStartValue::Unset = speculative_start_value {
+                    if !delta.is_zero() || !history.is_empty() {
+                        return Err(code_invariant_error(
+                            "Delta or history not empty with Unset speculative value",
+                        ));
+                    }
+                }
 
                 // Otherwise, we have to go to storage and read the value.
-                let maybe_value_from_storage = match &self.id {
-                    AggregatorVersionedID::V1(state_key) => {
-                        resolver.get_aggregator_v1_value(state_key, AggregatorReadMode::Aggregated)
-                    },
-                    AggregatorVersionedID::V2(id) => resolver
-                        .get_aggregator_v2_value(id, AggregatorReadMode::Aggregated)
-                        .map(Some),
-                };
-                let value_from_storage = maybe_value_from_storage
-                    .map_err(|e| {
-                        extension_error(format!(
-                            "Could not find the value of the aggregator: {}",
-                            e
-                        ))
-                    })?
-                    .ok_or_else(|| {
-                        extension_error(format!(
-                            "Could not read from deleted aggregator at {:?}",
-                            self.id
-                        ))
-                    })?;
+                let value_from_storage = Self::get_aggregator_value_from_storage(
+                    &self.id,
+                    resolver,
+                    AggregatorReadMode::Aggregated,
+                )?;
 
                 // Validate history.
                 history.validate_against_base_value(value_from_storage, self.max_value)?;
@@ -410,7 +403,8 @@ impl AggregatorData {
     }
 
     /// Returns a mutable reference to an aggregator with `id` and a `max_value`.
-    /// If transaction that is currently executing did not initialize it, a new aggregator instance is created.
+    /// If transaction that is currently executing did not initialize it,
+    /// a new aggregator instance is created.
     /// Note: when we say "aggregator instance" here we refer to Rust struct and
     /// not to the Move aggregator.
     pub fn get_aggregator(
@@ -418,15 +412,24 @@ impl AggregatorData {
         id: AggregatorVersionedID,
         max_value: u128,
     ) -> PartialVMResult<&mut Aggregator> {
-        let aggregator = self.aggregators.entry(id.clone()).or_insert(Aggregator {
-            id,
-            state: AggregatorState::Delta {
-                speculative_start_value: SpeculativeStartValue::Unset,
-                delta: SignedU128::Positive(0),
-                history: DeltaHistory::new(),
-            },
-            max_value,
-        });
+        let aggregator = self
+            .aggregators
+            .entry(id.clone())
+            .or_insert_with(|| Aggregator {
+                id: id.clone(),
+                state: AggregatorState::Delta {
+                    speculative_start_value: SpeculativeStartValue::Unset,
+                    delta: SignedU128::Positive(0),
+                    history: DeltaHistory::new(),
+                },
+                max_value,
+            });
+        if aggregator.max_value != max_value {
+            return Err(code_invariant_error(format!(
+                "Max value for the aggregator changed ({} -> {})",
+                aggregator.max_value, max_value
+            )));
+        }
         Ok(aggregator)
     }
 
@@ -441,7 +444,7 @@ impl AggregatorData {
     pub fn create_new_aggregator(&mut self, id: AggregatorVersionedID, max_value: u128) {
         let aggregator = Aggregator {
             id: id.clone(),
-            state: AggregatorState::Data { value: 0 },
+            state: AggregatorState::Create { value: 0 },
             max_value,
         };
         self.aggregators.insert(id.clone(), aggregator);
@@ -465,25 +468,28 @@ impl AggregatorData {
         }
     }
 
-    pub fn snapshot(&mut self, id: AggregatorID) -> PartialVMResult<AggregatorID> {
-        let snapshot_id = self.generate_id();
-        let aggregator = self
-            .aggregators
-            .get(&AggregatorVersionedID::V2(id))
-            .ok_or_else(|| code_invariant_error("Aggregator ID not found"))?;
+    pub fn snapshot(
+        &mut self,
+        aggregator_id: AggregatorID,
+        aggregator_max_value: u128,
+    ) -> PartialVMResult<AggregatorID> {
+        let aggregator = self.get_aggregator(
+            AggregatorVersionedID::V2(aggregator_id),
+            aggregator_max_value,
+        )?;
 
         let snapshot_state = match aggregator.state {
-            // If aggregator is in Data state, we don't need to depend on it, and can just take the value.
-            AggregatorState::Data { value } => AggregatorSnapshotState::Data {
+            // If aggregator is in Create state, we don't need to depend on it, and can just take the value.
+            AggregatorState::Create { value } => AggregatorSnapshotState::Create {
                 value: SnapshotValue::Integer(value),
             },
             AggregatorState::Delta { delta, .. } => AggregatorSnapshotState::Delta {
-                base_aggregator: id,
+                base_aggregator: aggregator_id,
                 delta,
-                formula: DerivedFormula::Identity,
             },
         };
 
+        let snapshot_id = self.generate_id();
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
                 id: snapshot_id,
@@ -492,8 +498,101 @@ impl AggregatorData {
         Ok(snapshot_id)
     }
 
-    pub fn read_snapshot(&self, _id: AggregatorVersionedID) -> PartialVMResult<u128> {
-        unimplemented!();
+    pub fn create_new_snapshot(&mut self, value: SnapshotValue) -> AggregatorID {
+        let snapshot_state = AggregatorSnapshotState::Create { value };
+        let snapshot_id = self.generate_id();
+
+        self.aggregator_snapshots
+            .insert(snapshot_id, AggregatorSnapshot {
+                id: snapshot_id,
+                state: snapshot_state,
+            });
+        snapshot_id
+    }
+
+    pub fn read_snapshot(
+        &mut self,
+        snapshot_id: AggregatorID,
+        resolver: &dyn AggregatorResolver,
+    ) -> PartialVMResult<SnapshotValue> {
+        // Since we need the value - if it is not present, we need to do the "aggregated read" to get it.
+        // need to clone here, so we can call self.read_snapshot below.
+        let snapshot_state = match self.aggregator_snapshots.entry(snapshot_id) {
+            Entry::Vacant(entry) => {
+                let value_from_storage = resolver
+                    .get_aggregator_v2_value(&snapshot_id, AggregatorReadMode::Aggregated)
+                    .map_err(|e| {
+                        extension_error(format!(
+                            "Could not find the value of the aggregator: {}",
+                            e
+                        ))
+                    })?;
+                entry
+                    .insert(AggregatorSnapshot {
+                        id: snapshot_id,
+                        state: AggregatorSnapshotState::Reference {
+                            speculative_value: SnapshotValue::try_from(value_from_storage)?,
+                        },
+                    })
+                    .state
+                    .clone()
+            },
+            Entry::Occupied(entry) => entry.get().state.clone(),
+        };
+        match snapshot_state {
+            AggregatorSnapshotState::Create { value } => Ok(value),
+            AggregatorSnapshotState::Delta {
+                base_aggregator,
+                delta,
+            } => match self
+                .aggregators
+                .get_mut(&AggregatorVersionedID::V2(base_aggregator))
+            {
+                Some(aggregator) => {
+                    let value = aggregator.read_aggregated_aggregator_value(resolver)?;
+                    Ok(SnapshotValue::Integer(expect_ok(
+                        BoundedMath::new(aggregator.max_value).unsigned_add_delta(value, &delta),
+                    )?))
+                },
+                None => Err(code_invariant_error(
+                    "AggregatorSnapshotState::Delta without base aggregator being set",
+                )),
+            },
+            AggregatorSnapshotState::Derived {
+                base_snapshot,
+                formula,
+            } => {
+                let base = self.read_snapshot(base_snapshot, resolver)?;
+                match base {
+                    SnapshotValue::Integer(v) => Ok(SnapshotValue::String(formula.apply(v))),
+                    SnapshotValue::String(_) => Err(code_invariant_error(
+                        "Tried calling concat on String SnapshotValue",
+                    )),
+                }
+            },
+            AggregatorSnapshotState::Reference { speculative_value } => Ok(speculative_value),
+        }
+    }
+
+    pub fn string_concat(
+        &mut self,
+        id: AggregatorID,
+        prefix: Vec<u8>,
+        suffix: Vec<u8>,
+    ) -> AggregatorID {
+        let new_id = self.generate_id();
+
+        let snapshot_state = AggregatorSnapshotState::Derived {
+            base_snapshot: id,
+            formula: SnapshotToStringFormula::Concat { prefix, suffix },
+        };
+
+        self.aggregator_snapshots
+            .insert(new_id, AggregatorSnapshot {
+                id: new_id,
+                state: snapshot_state,
+            });
+        new_id
     }
 
     pub fn generate_id(&mut self) -> AggregatorID {
@@ -543,7 +642,7 @@ mod test {
             .get_aggregator(aggregator_v1_id_for_test(300), 700)
             .unwrap();
         assert_err!(aggregator.read_last_committed_aggregator_value(&*TEST_RESOLVER));
-        assert_err!(aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER));
+        assert_err!(aggregator.read_aggregated_aggregator_value(&*TEST_RESOLVER));
         assert_err!(aggregator.try_add(&*TEST_RESOLVER, 100));
         assert_err!(aggregator.try_sub(&*TEST_RESOLVER, 1));
     }
@@ -557,17 +656,17 @@ mod test {
             .get_aggregator(aggregator_v1_id_for_test(200), 200)
             .expect("Get aggregator failed");
 
-        assert_eq!(aggregator.state, AggregatorState::Data { value: 0 });
+        assert_eq!(aggregator.state, AggregatorState::Create { value: 0 });
         assert_ok!(aggregator.try_add(&*TEST_RESOLVER, 100));
-        assert_eq!(aggregator.state, AggregatorState::Data { value: 100 });
+        assert_eq!(aggregator.state, AggregatorState::Create { value: 100 });
         assert!(aggregator.try_sub(&*TEST_RESOLVER, 50).unwrap());
-        assert_eq!(aggregator.state, AggregatorState::Data { value: 50 });
+        assert_eq!(aggregator.state, AggregatorState::Create { value: 50 });
         assert!(!aggregator.try_sub(&*TEST_RESOLVER, 70).unwrap());
-        assert_eq!(aggregator.state, AggregatorState::Data { value: 50 });
+        assert_eq!(aggregator.state, AggregatorState::Create { value: 50 });
         assert!(!aggregator.try_add(&*TEST_RESOLVER, 170).unwrap());
-        assert_eq!(aggregator.state, AggregatorState::Data { value: 50 });
+        assert_eq!(aggregator.state, AggregatorState::Create { value: 50 });
         assert_ok_eq!(
-            aggregator.read_most_recent_aggregator_value(&*TEST_RESOLVER),
+            aggregator.read_aggregated_aggregator_value(&*TEST_RESOLVER),
             50
         );
     }
@@ -614,7 +713,7 @@ mod test {
             }
         });
         assert_ok_eq!(
-            aggregator.read_most_recent_aggregator_value(&sample_resolver),
+            aggregator.read_aggregated_aggregator_value(&sample_resolver),
             30
         );
         assert_eq!(aggregator.state, AggregatorState::Delta {
