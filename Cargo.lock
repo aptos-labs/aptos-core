@@ -278,7 +278,7 @@ dependencies = [
  "move-vm-runtime",
  "once_cell",
  "poem",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "self_update",
@@ -316,7 +316,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-types",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -380,7 +380,7 @@ dependencies = [
  "poem",
  "poem-openapi",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde",
@@ -421,7 +421,7 @@ dependencies = [
  "poem",
  "poem-openapi",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde",
@@ -450,7 +450,7 @@ dependencies = [
  "move-core-types",
  "once_cell",
  "prometheus",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "tokio",
@@ -520,7 +520,7 @@ dependencies = [
  "once_cell",
  "pin-project",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde",
@@ -598,7 +598,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
 ]
@@ -620,7 +620,7 @@ dependencies = [
  "jemallocator",
  "move-core-types",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
 ]
@@ -713,7 +713,7 @@ dependencies = [
  "mirai-annotations",
  "num_cpus",
  "poem-openapi",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_merge",
  "serde_yaml 0.8.26",
@@ -780,7 +780,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_bytes",
@@ -825,7 +825,7 @@ dependencies = [
  "itertools",
  "mirai-annotations",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
@@ -875,7 +875,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "ring",
  "serde",
@@ -931,7 +931,7 @@ dependencies = [
  "itertools",
  "maplit",
  "mockall",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "thiserror",
  "tokio",
@@ -958,7 +958,7 @@ dependencies = [
  "enum_dispatch",
  "futures",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "thiserror",
  "tokio",
@@ -1007,7 +1007,7 @@ dependencies = [
  "owo-colors",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "static_assertions",
@@ -1059,7 +1059,7 @@ dependencies = [
  "num-derive",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
 ]
 
@@ -1209,7 +1209,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
 ]
@@ -1253,7 +1253,7 @@ dependencies = [
  "move-core-types",
  "num_cpus",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "tokio",
@@ -1283,7 +1283,7 @@ dependencies = [
  "dashmap",
  "itertools",
  "num_cpus",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
@@ -1310,7 +1310,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
- "rand 0.7.3",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -1368,7 +1368,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "ouroboros 0.15.6",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
@@ -1431,7 +1431,7 @@ dependencies = [
  "once_cell",
  "poem",
  "poem-openapi",
- "rand 0.7.3",
+ "rand 0.8.5",
  "redis",
  "reqwest",
  "serde",
@@ -1524,7 +1524,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "prometheus-http-query",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "regex",
  "reqwest",
@@ -1557,7 +1557,7 @@ dependencies = [
  "clap 4.3.21",
  "futures",
  "jemallocator",
- "rand 0.7.3",
+ "rand 0.8.5",
  "random_word",
  "reqwest",
  "serde_yaml 0.8.26",
@@ -1627,7 +1627,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "rayon",
  "ripemd",
@@ -1687,7 +1687,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rusty-fork",
  "sha-1",
  "stats_alloc",
@@ -1813,7 +1813,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "bcs 0.1.4",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_yaml 0.8.26",
 ]
@@ -2006,7 +2006,7 @@ dependencies = [
  "move-core-types",
  "move-package",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "serde",
  "serde_json",
@@ -2196,7 +2196,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "thiserror",
@@ -2208,7 +2208,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-crypto",
  "aptos-types",
- "rand 0.7.3",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -2250,7 +2250,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
 ]
@@ -2349,7 +2349,7 @@ dependencies = [
  "maplit",
  "once_cell",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
@@ -2534,7 +2534,7 @@ dependencies = [
  "pin-project",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "serde",
  "serde_bytes",
@@ -2560,7 +2560,7 @@ dependencies = [
  "bytes",
  "futures",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "tokio",
 ]
@@ -2585,7 +2585,7 @@ dependencies = [
  "bcs 0.1.4",
  "futures",
  "maplit",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "tokio",
 ]
@@ -2628,7 +2628,7 @@ dependencies = [
  "bcs 0.1.4",
  "futures",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde_yaml 0.8.26",
  "tokio",
  "url",
@@ -2723,7 +2723,7 @@ dependencies = [
  "hex",
  "jemallocator",
  "maplit",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
@@ -2859,7 +2859,7 @@ dependencies = [
  "futures",
  "maplit",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "thiserror",
@@ -2893,7 +2893,7 @@ dependencies = [
  "maplit",
  "mockall",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "thiserror",
  "tokio",
@@ -3158,7 +3158,7 @@ dependencies = [
  "criterion",
  "once_cell",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rusty-fork",
  "serde",
  "serde_json",
@@ -3196,7 +3196,7 @@ dependencies = [
  "jemallocator",
  "once_cell",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "thiserror",
 ]
@@ -3217,7 +3217,7 @@ dependencies = [
  "ed25519-dalek-bip32",
  "move-core-types",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "serde",
  "tiny-bip39",
@@ -3278,7 +3278,7 @@ dependencies = [
  "bcs 0.1.4",
  "chrono",
  "enum_dispatch",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "thiserror",
@@ -3353,7 +3353,7 @@ dependencies = [
  "move-core-types",
  "ntest",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "thiserror",
  "tokio",
@@ -3459,7 +3459,7 @@ dependencies = [
  "maplit",
  "mockall",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "thiserror",
  "tokio",
@@ -3478,7 +3478,7 @@ dependencies = [
  "claims",
  "num-traits",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "thiserror",
 ]
@@ -3527,7 +3527,7 @@ dependencies = [
  "httpmock",
  "once_cell",
  "prometheus",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "reqwest",
  "reqwest-middleware",
@@ -3569,7 +3569,7 @@ dependencies = [
  "jsonwebtoken 8.1.1",
  "once_cell",
  "prometheus",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "reqwest",
  "reqwest-middleware",
@@ -3591,7 +3591,7 @@ name = "aptos-temppath"
 version = "0.1.0"
 dependencies = [
  "hex",
- "rand 0.7.3",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -3618,7 +3618,7 @@ dependencies = [
  "futures",
  "hex",
  "itertools",
- "rand 0.7.3",
+ "rand 0.8.5",
  "reqwest",
  "serde_json",
  "tokio",
@@ -3675,7 +3675,7 @@ dependencies = [
  "aptos-transaction-emitter-lib",
  "clap 4.3.21",
  "futures",
- "rand 0.7.3",
+ "rand 0.8.5",
  "tokio",
 ]
 
@@ -3699,7 +3699,7 @@ dependencies = [
  "futures",
  "itertools",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "reqwest",
  "serde",
@@ -3720,7 +3720,7 @@ dependencies = [
  "clap 4.3.21",
  "move-binary-format",
  "once_cell",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "serde",
 ]
@@ -3748,7 +3748,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rayon",
  "regex",
  "serde",
@@ -3848,7 +3848,7 @@ dependencies = [
  "once_cell",
  "ouroboros 0.15.6",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "rayon",
  "serde",
@@ -3894,7 +3894,7 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
 ]
 
@@ -3981,7 +3981,7 @@ dependencies = [
  "aptos-vm-genesis",
  "fail 0.5.0",
  "move-core-types",
- "rand 0.7.3",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -6175,7 +6175,7 @@ dependencies = [
  "once_cell",
  "project-root",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "rstest",
  "serde",
  "tempfile",
@@ -6960,7 +6960,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.3.21",
  "move-core-types",
- "rand 0.7.3",
+ "rand 0.8.5",
  "serde",
  "serde-reflection",
  "serde_yaml 0.8.26",
@@ -11463,7 +11463,6 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rand_core 0.5.1",
  "rand_hc",
- "rand_pcg",
 ]
 
 [[package]]
@@ -11520,15 +11519,6 @@ name = "rand_hc"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
-dependencies = [
- "rand_core 0.5.1",
-]
-
-[[package]]
-name = "rand_pcg"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
 dependencies = [
  "rand_core 0.5.1",
 ]
@@ -12828,7 +12818,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "proptest",
- "rand 0.7.3",
+ "rand 0.8.5",
  "regex",
  "reqwest",
  "serde_json",
