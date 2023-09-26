@@ -14,6 +14,7 @@ use aptos_types::{
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
+use move_core_types::value::MoveTypeLayout;
 use std::{
     fmt::Debug,
     iter::{empty, Iterator},
@@ -313,17 +314,28 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
     pub(crate) fn events(
         &self,
         txn_idx: TxnIndex,
-    ) -> Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>> {
+    ) -> Box<
+        dyn Iterator<
+            Item = (
+                <<T as TransactionOutput>::Txn as Transaction>::Event,
+                Option<MoveTypeLayout>,
+            ),
+        >,
+    > {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
-            Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
+            Box::new(empty::<(
+                <<T as TransactionOutput>::Txn as Transaction>::Event,
+                Option<MoveTypeLayout>,
+            )>()),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_) => {
-                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>())
-                },
+                ExecutionStatus::Abort(_) => Box::new(empty::<(
+                    <<T as TransactionOutput>::Txn as Transaction>::Event,
+                    Option<MoveTypeLayout>,
+                )>()),
             },
         )
     }

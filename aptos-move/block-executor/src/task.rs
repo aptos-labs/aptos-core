@@ -13,7 +13,7 @@ use aptos_types::{
 use aptos_vm_types::resolver::TExecutorView;
 use move_core_types::value::MoveTypeLayout;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -100,7 +100,13 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// aggregator_v1.
     fn resource_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> HashMap<
+        <Self::Txn as Transaction>::Key,
+        (
+            <Self::Txn as Transaction>::Value,
+            Option<Arc<MoveTypeLayout>>,
+        ),
+    >;
 
     fn module_write_set(
         &self,
@@ -114,7 +120,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
     /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;
+    fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
