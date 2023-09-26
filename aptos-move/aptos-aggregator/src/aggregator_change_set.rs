@@ -74,7 +74,7 @@ impl AggregatorApplyChange {
                 AggregatorValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
             },
             SnapshotDerived { formula, .. } => {
-                AggregatorValue::Derived(formula.apply(base_value.into_snapshot_value()?))
+                AggregatorValue::Derived(formula.apply_to(base_value.into_snapshot_value()?))
             },
         })
     }
@@ -104,11 +104,12 @@ impl AggregatorChange {
     }
 
     /// Applies next AggregatorChange on top of the previous state.
-    /// prev_change is AggregatorChange for the same AggregatorID
-    /// prev_dependent_change is AggregatorChange for the get_merge_dependent_id()
+    /// If get_merge_dependent_id() returns some add, prev_change passed in should be
+    /// for that particular AggregatorID.
+    /// If get_merge_dependent_id() returns None, prev_change is required to be for the
+    /// same AggregatorID as next_change.
     pub fn merge_two_changes(
         prev_change: Option<&AggregatorChange>,
-        prev_dependent_change: Option<&AggregatorChange>,
         next_change: &AggregatorChange,
     ) -> PartialVMResult<AggregatorChange> {
         use AggregatorApplyChange::*;
@@ -119,45 +120,37 @@ impl AggregatorChange {
         // - next_change being AggregatorDelta, and prev_change being Aggregator Create or Delta
         // - next_change being SnapshotDelta, and prev_dependent_change being Aggregator Create or Delta
         // everything else is invalid for various reasons
-        match (&prev_change, &prev_dependent_change, next_change) {
-            (None, None, v) => Ok(v.clone()),
-            (_ , _, Create(_)) => Err(code_invariant_error(
+        match (&prev_change, next_change) {
+            (None, v) => Ok(v.clone()),
+            (_, Create(_)) => Err(code_invariant_error(
                 "Trying to merge Create with an older change. Create should always be the first change.",
             )),
 
             // Aggregators:
-            (Some(Create(Aggregator(prev_value))), None, Apply(AggregatorDelta { delta: next_delta })) => {
+            (Some(Create(Aggregator(prev_value))), Apply(AggregatorDelta { delta: next_delta })) => {
                 let new_data = next_delta.apply_to(*prev_value)?;
                 Ok(Create(Aggregator(new_data)))
             },
-            (Some(Apply(AggregatorDelta { delta: prev_delta })), None, Apply(AggregatorDelta { delta: next_delta })) => {
+            (Some(Apply(AggregatorDelta { delta: prev_delta })), Apply(AggregatorDelta { delta: next_delta })) => {
                 let new_delta = DeltaOp::create_merged_delta(prev_delta, next_delta)?;
                 Ok(Apply(AggregatorDelta { delta: new_delta }))
             },
 
             // Snapshots:
-            (Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _, _) => Err(code_invariant_error(
+            (Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _) => Err(code_invariant_error(
                 "Snapshots are immutable, previous change cannot be any of the snapshots type",
             )),
-            (_, Some(_), Apply(AggregatorDelta { .. } | SnapshotDerived { .. })) =>
-                unreachable!("Only SnapshotDelta should have merge dependent changes"),
-            (_, _, Apply(SnapshotDerived { .. })) => Err(code_invariant_error(
+            (_, Apply(SnapshotDerived { .. })) => Err(code_invariant_error(
                 "Trying to merge SnapshotDerived with an older change. Snapshots are immutable, should only ever have one change.",
             )),
-            (Some(_), _, Apply(SnapshotDelta { .. })) => Err(code_invariant_error(
-                "Trying to merge Snapshot (delta or derived) with an older change on the same ID. Snapshots are immutable, should only ever have one change - that creates them",
-            )),
-            (None, Some(Create(Aggregator(prev_value))), Apply(SnapshotDelta { delta: next_delta, .. })) => {
+            (Some(Create(Aggregator(prev_value))), Apply(SnapshotDelta { delta: next_delta, .. })) => {
                 let new_data = next_delta.apply_to(*prev_value)?;
                 Ok(Create(Snapshot(new_data)))
-            }
-            (None, Some(Apply(AggregatorDelta { delta: prev_delta })), Apply(SnapshotDelta { delta: next_delta, base_aggregator })) => {
+            },
+            (Some(Apply(AggregatorDelta { delta: prev_delta })), Apply(SnapshotDelta { delta: next_delta, base_aggregator })) => {
                 let new_delta = DeltaOp::create_merged_delta(prev_delta, next_delta)?;
                 Ok(Apply(SnapshotDelta { delta: new_delta, base_aggregator: *base_aggregator }))
-            }
-            (None, Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), Apply(SnapshotDelta { .. })) => Err(code_invariant_error(
-                "Trying to merge SnapshotDelta with dependent change of wrong type",
-            )),
+            },
         }
     }
 }
@@ -192,18 +185,14 @@ mod test {
             }),
         });
 
-        let result = AggregatorChange::merge_two_changes(
-            Some(&aggregator_change1),
-            None,
-            &aggregator_change2,
-        );
+        let result =
+            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
         let merged = result.unwrap();
 
         assert_eq!(merged, Create(Aggregator(30)));
         assert_err!(AggregatorChange::merge_two_changes(
             Some(&merged),
-            None,
             &aggregator_change3
         ));
     }
@@ -216,12 +205,10 @@ mod test {
 
         assert_err!(AggregatorChange::merge_two_changes(
             Some(&aggregator_change1),
-            None,
             &aggregator_change2
         ));
         assert_err!(AggregatorChange::merge_two_changes(
             Some(&aggregator_change2),
-            None,
             &aggregator_change3
         ));
     }
@@ -245,11 +232,8 @@ mod test {
             }),
         });
 
-        let result = AggregatorChange::merge_two_changes(
-            Some(&aggregator_change1),
-            None,
-            &aggregator_change2,
-        );
+        let result =
+            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
 
         assert_eq!(
@@ -284,11 +268,8 @@ mod test {
             }),
         });
 
-        let result_1 = AggregatorChange::merge_two_changes(
-            Some(&aggregator_change1),
-            None,
-            &aggregator_change2,
-        );
+        let result_1 =
+            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result_1);
         let merged_1 = result_1.unwrap();
 
@@ -312,8 +293,7 @@ mod test {
             }),
         });
 
-        let result_2 =
-            AggregatorChange::merge_two_changes(Some(&merged_1), None, &aggregator_change3);
+        let result_2 = AggregatorChange::merge_two_changes(Some(&merged_1), &aggregator_change3);
         assert_ok!(&result_2);
 
         assert_eq!(
@@ -347,11 +327,8 @@ mod test {
                 max_underflow_negative_delta: None,
             }),
         });
-        let result = AggregatorChange::merge_two_changes(
-            Some(&aggregator_change1),
-            None,
-            &aggregator_change2,
-        );
+        let result =
+            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
 
         assert_eq!(
@@ -385,11 +362,8 @@ mod test {
                 max_underflow_negative_delta: Some(90),
             }),
         });
-        let result = AggregatorChange::merge_two_changes(
-            Some(&aggregator_change1),
-            None,
-            &aggregator_change2,
-        );
+        let result =
+            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
 
         assert_eq!(
@@ -425,11 +399,8 @@ mod test {
             }),
         });
 
-        let result = AggregatorChange::merge_two_changes(
-            None,
-            Some(&aggregator_change1),
-            &snapshot_change_2,
-        );
+        let result =
+            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &snapshot_change_2);
         assert_ok!(&result);
 
         assert_eq!(

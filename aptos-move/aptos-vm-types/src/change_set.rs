@@ -4,6 +4,7 @@
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
+    bounded_math::code_invariant_error,
     delta_change_set::{serialize, DeltaOp},
     resolver::{AggregatorReadMode, AggregatorResolver},
     types::AggregatorID,
@@ -361,15 +362,24 @@ impl VMChangeSet {
         let merged_changes = additional_change_set
             .into_iter()
             .map(|(id, additional_change)| {
+                let prev_change =
+                    if let Some(dependent_id) = additional_change.get_merge_dependent_id() {
+                        if change_set.contains_key(&id) {
+                            return (
+                                id,
+                                Err(code_invariant_error(format!(
+                                "Aggregator change set contains both {:?} and its dependent {:?}",
+                                id, dependent_id
+                            ))),
+                            );
+                        }
+                        change_set.get(&dependent_id)
+                    } else {
+                        change_set.get(&id)
+                    };
                 (
                     id,
-                    AggregatorChange::merge_two_changes(
-                        change_set.get(&id),
-                        additional_change
-                            .get_merge_dependent_id()
-                            .and_then(|id| change_set.get(&id)),
-                        &additional_change,
-                    ),
+                    AggregatorChange::merge_two_changes(prev_change, &additional_change),
                 )
             })
             .collect::<Vec<_>>();
