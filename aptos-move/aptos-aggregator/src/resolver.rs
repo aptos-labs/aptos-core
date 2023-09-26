@@ -3,7 +3,7 @@
 
 use crate::{
     delta_change_set::{serialize, DeltaOp},
-    types::AggregatorID,
+    types::{AggregatorID, AggregatorValue},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -78,7 +78,7 @@ pub trait TAggregatorView {
         &self,
         _id: &Self::IdentifierV2,
         _mode: AggregatorReadMode,
-    ) -> anyhow::Result<u128> {
+    ) -> anyhow::Result<AggregatorValue> {
         unimplemented!("Aggregator V2 is not yet supported")
     }
 
