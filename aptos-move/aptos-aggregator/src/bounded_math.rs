@@ -178,6 +178,13 @@ impl PartialEq for SignedU128 {
 impl Eq for SignedU128 {}
 
 impl SignedU128 {
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Self::Positive(value) => *value == 0,
+            Self::Negative(value) => *value == 0,
+        }
+    }
+
     pub fn delta(&self, positive: u128, negative: u128) -> Self {
         if positive >= negative {
             Self::Positive(positive - negative)
