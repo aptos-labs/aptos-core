@@ -162,12 +162,14 @@ impl SnapshotType {
         match (self, value) {
             (SnapshotType::U128, SnapshotValue::Integer(v)) => Ok(Value::u128(v)),
             (SnapshotType::U64, SnapshotValue::Integer(v)) => Ok(Value::u64(u128_to_u64(v)?)),
-            (SnapshotType::String, value) => Ok(Value::struct_(Struct::pack(vec![Value::vector_u8(
-                match value {
-                    SnapshotValue::String(v) => v,
-                    SnapshotValue::Integer(v) => v.to_string().into_bytes(),
-                },
-            )]))),
+            (SnapshotType::String, value) => {
+                Ok(Value::struct_(Struct::pack(vec![Value::vector_u8(
+                    match value {
+                        SnapshotValue::String(v) => v,
+                        SnapshotValue::Integer(v) => v.to_string().into_bytes(),
+                    },
+                )])))
+            },
             // ty_arg cannot be Integer, if value is String
             _ => Err(SafeNativeError::Abort {
                 abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
@@ -369,14 +371,11 @@ fn native_create_snapshot(
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
     let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
-
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
 
     let result_value = if context.aggregator_execution_enabled() {
         let (_, mut aggregator_data) = get_context_data(context);
-
         let snapshot_id = aggregator_data.create_new_snapshot(input);
-
         SnapshotValue::Integer(snapshot_id.id() as u128)
     } else {
         input

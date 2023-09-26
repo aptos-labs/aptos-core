@@ -249,6 +249,32 @@ impl Aggregator {
         }
     }
 
+    fn get_aggregator_value_from_storage(
+        id: &AggregatorVersionedID,
+        resolver: &dyn AggregatorResolver,
+        mode: AggregatorReadMode,
+    ) -> PartialVMResult<u128> {
+        let maybe_value_from_storage = match id {
+            AggregatorVersionedID::V1(state_key) => {
+                resolver.get_aggregator_v1_value(state_key, mode)
+            },
+            AggregatorVersionedID::V2(id) => resolver
+                .get_aggregator_v2_value(id, mode)
+                .and_then(|v| Ok(v.into_aggregator_value()?))
+                .map(Some),
+        };
+        maybe_value_from_storage
+            .map_err(|e| {
+                extension_error(format!("Could not find the value of the aggregator: {}", e))
+            })?
+            .ok_or_else(|| {
+                extension_error(format!(
+                    "Could not read from deleted aggregator at {:?}",
+                    id
+                ))
+            })
+    }
+
     /// Implements logic for doing a "cheap read" of an aggregator.
     /// Reads the last committed value of the aggregator that's known at the
     /// time of the call, and as such, can be computed efficiently (i.e. no
@@ -276,27 +302,11 @@ impl Aggregator {
                     ));
                 }
 
-                let maybe_value_from_storage = match &self.id {
-                    AggregatorVersionedID::V1(state_key) => resolver
-                        .get_aggregator_v1_value(state_key, AggregatorReadMode::LastCommitted),
-                    AggregatorVersionedID::V2(id) => resolver
-                        .get_aggregator_v2_value(id, AggregatorReadMode::LastCommitted)
-                        .and_then(|v| Ok(v.into_aggregator_value()?))
-                        .map(Some),
-                };
-                let value_from_storage = maybe_value_from_storage
-                    .map_err(|e| {
-                        extension_error(format!(
-                            "Could not find the value of the aggregator: {}",
-                            e
-                        ))
-                    })?
-                    .ok_or_else(|| {
-                        extension_error(format!(
-                            "Could not read from deleted aggregator at {:?}",
-                            self.id
-                        ))
-                    })?;
+                let value_from_storage = Self::get_aggregator_value_from_storage(
+                    &self.id,
+                    resolver,
+                    AggregatorReadMode::LastCommitted,
+                )?;
 
                 *speculative_start_value =
                     SpeculativeStartValue::LastCommittedValue(value_from_storage)
@@ -333,30 +343,20 @@ impl Aggregator {
                 {
                     return Ok(math.unsigned_add_delta(*start_value, delta)?);
                 }
+                if let SpeculativeStartValue::Unset = speculative_start_value {
+                    if !delta.is_zero() || !history.is_empty() {
+                        return Err(code_invariant_error(
+                            "Delta or history not empty with Unset speculative value",
+                        ));
+                    }
+                }
 
                 // Otherwise, we have to go to storage and read the value.
-                let maybe_value_from_storage = match &self.id {
-                    AggregatorVersionedID::V1(state_key) => {
-                        resolver.get_aggregator_v1_value(state_key, AggregatorReadMode::Aggregated)
-                    },
-                    AggregatorVersionedID::V2(id) => resolver
-                        .get_aggregator_v2_value(id, AggregatorReadMode::Aggregated)
-                        .and_then(|v| Ok(v.into_aggregator_value()?))
-                        .map(Some),
-                };
-                let value_from_storage = maybe_value_from_storage
-                    .map_err(|e| {
-                        extension_error(format!(
-                            "Could not find the value of the aggregator: {}",
-                            e
-                        ))
-                    })?
-                    .ok_or_else(|| {
-                        extension_error(format!(
-                            "Could not read from deleted aggregator at {:?}",
-                            self.id
-                        ))
-                    })?;
+                let value_from_storage = Self::get_aggregator_value_from_storage(
+                    &self.id,
+                    resolver,
+                    AggregatorReadMode::Aggregated,
+                )?;
 
                 // Validate history.
                 history.validate_against_base_value(value_from_storage, self.max_value)?;
@@ -468,8 +468,15 @@ impl AggregatorData {
         }
     }
 
-    pub fn snapshot(&mut self, id: AggregatorID, max_value: u128) -> PartialVMResult<AggregatorID> {
-        let aggregator = self.get_aggregator(AggregatorVersionedID::V2(id), max_value)?;
+    pub fn snapshot(
+        &mut self,
+        aggregator_id: AggregatorID,
+        aggregator_max_value: u128,
+    ) -> PartialVMResult<AggregatorID> {
+        let aggregator = self.get_aggregator(
+            AggregatorVersionedID::V2(aggregator_id),
+            aggregator_max_value,
+        )?;
 
         let snapshot_state = match aggregator.state {
             // If aggregator is in Create state, we don't need to depend on it, and can just take the value.
@@ -477,7 +484,7 @@ impl AggregatorData {
                 value: SnapshotValue::Integer(value),
             },
             AggregatorState::Delta { delta, .. } => AggregatorSnapshotState::Delta {
-                base_aggregator: id,
+                base_aggregator: aggregator_id,
                 delta,
             },
         };
@@ -505,15 +512,15 @@ impl AggregatorData {
 
     pub fn read_snapshot(
         &mut self,
-        id: AggregatorID,
+        snapshot_id: AggregatorID,
         resolver: &dyn AggregatorResolver,
     ) -> PartialVMResult<SnapshotValue> {
+        // Since we need the value - if it is not present, we need to do the "aggregated read" to get it.
         // need to clone here, so we can call self.read_snapshot below.
-        let snapshot_state = match self.aggregator_snapshots.entry(id) {
+        let snapshot_state = match self.aggregator_snapshots.entry(snapshot_id) {
             Entry::Vacant(entry) => {
-                // Otherwise, we have to go to storage and read the value.
                 let value_from_storage = resolver
-                    .get_aggregator_v2_value(&id, AggregatorReadMode::Aggregated)
+                    .get_aggregator_v2_value(&snapshot_id, AggregatorReadMode::Aggregated)
                     .map_err(|e| {
                         extension_error(format!(
                             "Could not find the value of the aggregator: {}",
@@ -522,7 +529,7 @@ impl AggregatorData {
                     })?;
                 entry
                     .insert(AggregatorSnapshot {
-                        id,
+                        id: snapshot_id,
                         state: AggregatorSnapshotState::Reference {
                             speculative_value: SnapshotValue::try_from(value_from_storage)?,
                         },
@@ -563,9 +570,7 @@ impl AggregatorData {
                     )),
                 }
             },
-            AggregatorSnapshotState::Reference { speculative_value } => {
-                Ok(speculative_value.clone())
-            },
+            AggregatorSnapshotState::Reference { speculative_value } => Ok(speculative_value),
         }
     }
 

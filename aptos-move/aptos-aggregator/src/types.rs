@@ -148,8 +148,11 @@ impl SnapshotToStringFormula {
     pub fn apply(&self, base: u128) -> Vec<u8> {
         match self {
             SnapshotToStringFormula::Concat { prefix, suffix } => {
-                let mut result = prefix.clone();
-                result.extend(base.to_string().as_bytes());
+                let middle_string = base.to_string();
+                let middle = middle_string.as_bytes();
+                let mut result = Vec::with_capacity(prefix.len() + middle.len() + suffix.len());
+                result.extend(prefix);
+                result.extend(middle);
                 result.extend(suffix);
                 result
             },
