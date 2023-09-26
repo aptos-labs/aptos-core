@@ -6,6 +6,7 @@ use aptos_types::write_set::TransactionWrite;
 use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
+use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{
     collections::{btree_map::BTreeMap, HashMap},
@@ -15,18 +16,20 @@ use std::{
 };
 
 struct GroupEntry<V> {
+    incarnation: Incarnation,
     // Note: can be a raw pointer (different data-structure holds the value during the
     // lifetime), but would require unsafe access.
     value: Arc<V>,
-    incarnation: Incarnation,
+    layout: Option<Arc<MoveTypeLayout>>,
     flag: Flag,
 }
 
 impl<V: TransactionWrite> GroupEntry<V> {
-    fn new(value: Arc<V>, incarnation: Incarnation) -> Self {
+    fn new(incarnation: Incarnation, value: Arc<V>, layout: Option<Arc<MoveTypeLayout>>) -> Self {
         Self {
-            value,
             incarnation,
+            value,
+            layout,
             flag: Flag::Done,
         }
     }
@@ -78,6 +81,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         &mut self,
         shifted_idx: ShiftedTxnIndex,
         incarnation: Incarnation,
+        // TODO add layout to values
         values: impl IntoIterator<Item = (T, V)>,
     ) {
         let arc_map = values
@@ -89,7 +93,8 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 let tag_entry = self.versioned_map.entry(tag.clone()).or_default();
                 tag_entry.insert(
                     shifted_idx.clone(),
-                    CachePadded::new(GroupEntry::new(arc_v.clone(), incarnation)),
+                    // TODO layout shouldn't be none
+                    CachePadded::new(GroupEntry::new(incarnation, arc_v.clone(), None)),
                 );
 
                 (tag, arc_v)
@@ -167,7 +172,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         &self,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> Result<(Version, Arc<V>), MVGroupError> {
+    ) -> Result<(Version, Arc<V>, Option<Arc<MoveTypeLayout>>), MVGroupError> {
         let common_error = || -> MVGroupError {
             if self.idx_to_update.contains_key(&ShiftedTxnIndex::zero()) {
                 MVGroupError::TagNotFound
@@ -194,6 +199,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                             Ok((
                                 idx.idx().map(|idx| (idx, entry.incarnation)),
                                 entry.value.clone(),
+                                entry.layout.clone(),
                             ))
                         }
                     },
@@ -293,7 +299,7 @@ impl<
         key: &K,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Version, Arc<V>), MVGroupError> {
+    ) -> anyhow::Result<(Version, Arc<V>, Option<Arc<MoveTypeLayout>>), MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -399,7 +405,7 @@ mod test {
         assert_eq!(
             map.read_from_group(&ap_1, &1, 4).unwrap(),
             // Arc compares by value, no return size, incarnation.
-            (Ok((3, 1)), Arc::new(TestValue::with_len(1)))
+            (Ok((3, 1)), Arc::new(TestValue::with_len(1)), None)
         );
         // ap_0 should still be uninitialized.
         assert_matches!(
@@ -436,11 +442,11 @@ mod test {
         // vs finding a versioned entry from txn 4, vs from storage.
         assert_eq!(
             map.read_from_group(&ap_2, &2, 5).unwrap(),
-            (Ok((4, 0)), Arc::new(TestValue::with_len(4)))
+            (Ok((4, 0)), Arc::new(TestValue::with_len(4)), None)
         );
         assert_eq!(
             map.read_from_group(&ap_2, &0, 5).unwrap(),
-            (Err(StorageVersion), Arc::new(TestValue::with_len(2)))
+            (Err(StorageVersion), Arc::new(TestValue::with_len(2)), None)
         );
     }
 
@@ -459,7 +465,7 @@ mod test {
         );
         assert_eq!(
             map.read_from_group(&ap, &1, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
         );
         map.write(
             ap.clone(),
@@ -470,7 +476,7 @@ mod test {
         );
         assert_eq!(
             map.read_from_group(&ap, &1, 12).unwrap(),
-            (Ok((10, 1)), Arc::new(TestValue::new(vec![10, 1])))
+            (Ok((10, 1)), Arc::new(TestValue::new(vec![10, 1])), None)
         );
 
         map.mark_estimate(&ap, 10);
@@ -479,17 +485,17 @@ mod test {
         assert_matches!(map.read_from_group(&ap, &3, 12), Err(Uninitialized));
         assert_eq!(
             map.read_from_group(&ap, &0, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
         );
 
         map.delete(&ap, 10);
         assert_eq!(
             map.read_from_group(&ap, &0, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
         );
         assert_eq!(
             map.read_from_group(&ap, &1, 12).unwrap(),
-            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])), None)
         );
     }
 

@@ -21,20 +21,26 @@ use aptos_types::{
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, VMResult};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChangeSet, ChangeSet as MoveChangeSet, Op as MoveStorageOp},
+    effects::{AccountChanges, Changes, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
+    value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+
+type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
+type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
+pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -146,7 +152,23 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
-        let (change_set, mut extensions) = self.inner.finish_with_extensions()?;
+
+        let resource_converter = |value: Value,
+                                  layout: MoveTypeLayout,
+                                  has_aggregator_lifting: bool|
+         -> PartialVMResult<BytesWithResourceLayout> {
+            value
+                .simple_serialize(&layout)
+                .map(Into::into)
+                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
+                .ok_or_else(|| {
+                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("Error when serializing resource {}.", value))
+                })
+        };
+        let (change_set, mut extensions) = self
+            .inner
+            .finish_with_extensions_with_custom_effects(&resource_converter)?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set, ap_cache)?;
@@ -205,12 +227,16 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data does't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
+    /// TODO: Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
     fn split_and_merge_resource_groups<C: AccessPathCache>(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
-        change_set: MoveChangeSet,
+        change_set: ChangeSet,
         ap_cache: &mut C,
-    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Bytes>>)> {
+    ) -> VMResult<(
+        ChangeSet,
+        HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
+    )> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -218,7 +244,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .with_message("split_and_merge_resource_groups error".to_string())
                 .finish(Location::Undefined)
         };
-        let mut change_set_filtered = MoveChangeSet::new();
+        let mut change_set_filtered = ChangeSet::new();
 
         let mut resource_group_change_set = HashMap::new();
         let mut resource_group_cache = remote.release_resource_group_cache();
@@ -264,11 +290,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                         MoveStorageOp::Delete => {
                             source_data.remove(&struct_tag).ok_or_else(common_error)?;
                         },
-                        MoveStorageOp::Modify(new_data) => {
+                        MoveStorageOp::Modify((new_data, _)) => {
                             let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
                             *data = new_data;
                         },
-                        MoveStorageOp::New(data) => {
+                        MoveStorageOp::New((data, _)) => {
                             let data = source_data.insert(struct_tag, data);
                             if data.is_some() {
                                 return Err(common_error());
@@ -280,17 +306,19 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let op = if source_data.is_empty() {
                     MoveStorageOp::Delete
                 } else if create {
-                    MoveStorageOp::New(
+                    MoveStorageOp::New((
                         bcs::to_bytes(&source_data)
                             .map_err(|_| common_error())?
                             .into(),
-                    )
+                        None,
+                    ))
                 } else {
-                    MoveStorageOp::Modify(
+                    MoveStorageOp::Modify((
                         bcs::to_bytes(&source_data)
                             .map_err(|_| common_error())?
                             .into(),
-                    )
+                        None,
+                    ))
                 };
                 resource_group_change_set.insert(state_key, op);
             }
@@ -301,9 +329,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
-        change_set: MoveChangeSet,
-        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Bytes>>,
-        events: Vec<ContractEvent>,
+        change_set: ChangeSet,
+        resource_group_change_set: HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
+        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
@@ -317,11 +345,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
-            for (struct_tag, blob_op) in resources {
+            for (struct_tag, blob_and_layout_op) in resources {
                 let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
                 let op = woc.convert_resource(
                     &state_key,
-                    blob_op,
+                    blob_and_layout_op,
                     configs.legacy_resource_creation_as_modification(),
                 )?;
 

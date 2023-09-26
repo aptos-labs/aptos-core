@@ -160,9 +160,12 @@ pub trait AptosGasMeter: MoveGasMeter {
 
             write_fee += slot_fee + bytes_fee
         }
-        let event_fee = change_set.events().iter().fold(Fee::new(0), |acc, event| {
-            acc + self.storage_fee_per_event(event)
-        });
+        let event_fee = change_set
+            .events()
+            .iter()
+            .fold(Fee::new(0), |acc, (event, _)| {
+                acc + self.storage_fee_per_event(event)
+            });
         let event_discount = self.storage_discount_for_events(event_fee);
         let event_net_fee = event_fee
             .checked_sub(event_discount)
