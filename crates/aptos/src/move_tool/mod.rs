@@ -1701,6 +1701,7 @@ fn txn_arg_parser<T: serde::de::DeserializeOwned>(
 }
 
 /// Identifier of a module member (function or struct).
+/// Duplicated from aptos_types, as we also need to load_account_arg from the CLI.
 #[derive(Debug, Clone)]
 pub struct MemberId {
     pub module_id: ModuleId,
