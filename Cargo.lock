@@ -6361,7 +6361,7 @@ dependencies = [
  "impl-codec 0.6.0",
  "impl-rlp",
  "impl-serde",
- "scale-info 1.0.0",
+ "scale-info 2.9.0",
  "tiny-keccak",
 ]
 
@@ -6430,7 +6430,7 @@ dependencies = [
  "impl-rlp",
  "impl-serde",
  "primitive-types 0.11.1",
- "scale-info 1.0.0",
+ "scale-info 2.9.0",
  "uint",
 ]
 
@@ -7293,9 +7293,9 @@ dependencies = [
 
 [[package]]
 name = "handlebars"
-version = "4.3.3"
+version = "4.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "360d9740069b2f6cbb63ce2dbaa71a20d3185350cbb990d7bebeb9318415eb17"
+checksum = "c39b3bc2a8f715298032cf5087e58573809374b08160aa7d750582bdb82d2683"
 dependencies = [
  "log",
  "pest",
@@ -11086,7 +11086,7 @@ dependencies = [
  "impl-codec 0.6.0",
  "impl-rlp",
  "impl-serde",
- "scale-info 1.0.0",
+ "scale-info 2.9.0",
  "uint",
 ]
 
