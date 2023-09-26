@@ -152,6 +152,13 @@ codes!(
         UnboundVariable: { msg: "unbound variable", severity: BlockingError },
         UnboundField: { msg: "unbound field", severity: BlockingError },
         ReservedName: { msg: "invalid use of reserved name", severity: BlockingError },
+
+        DeprecatedAddressBlock: { msg: "Use of deprecated address block", severity: Warning },
+        DeprecatedModule: { msg: "Use of deprecated module", severity: Warning },
+        DeprecatedMember: { msg: "Use of deprecated member", severity: Warning },
+        DeprecatedStruct: { msg: "Use of deprecated struct", severity: Warning },
+        DeprecatedFunction: { msg: "Use of deprecated function", severity: Warning },
+        DeprecatedConstant: { msg: "Use of deprecated constant", severity: Warning },
     ],
     // errors for typing rules. mostly typing/translate
     TypeSafety: [

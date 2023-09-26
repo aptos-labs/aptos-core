@@ -546,7 +546,7 @@ pub mod known_attributes {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum DeprecationAttribute {
-        // Marks deprecated funcitons whose use causes warnings
+        // Marks deprecated functions, types, modules, constants, addresses whose use causes warnings
         Deprecated,
     }
 
@@ -759,6 +759,7 @@ pub mod known_attributes {
 
     impl DeprecationAttribute {
         const ALL_ATTRIBUTE_NAMES: [&'static str; 1] = [Self::DEPRECATED_NAME];
+        pub const DEPRECATED_HELP: &'static str = "help";
         pub const DEPRECATED_NAME: &'static str = "deprecated";
     }
 
