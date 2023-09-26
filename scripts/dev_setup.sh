@@ -283,7 +283,8 @@ function install_awscli {
       TMPFILE=$(mktemp)
       rm "$TMPFILE"
       mkdir -p "$TMPFILE"/work/
-      curl -sL -o "$TMPFILE"/aws.zip  "https://awscli.amazonaws.com/awscli-exe-$(uname -s | tr '[:upper:]' '[:lower:]')-${MACHINE}.zip"
+      # curl -sL -o "$TMPFILE"/aws.zip  "https://awscli.amazonaws.com/awscli-exe-$(uname -s | tr '[:upper:]' '[:lower:]')-${MACHINE}.zip"
+      curl -sL -o "$TMPFILE"/aws.zip  "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.13.13.zip"
       unzip -qq -d "$TMPFILE"/work/ "$TMPFILE"/aws.zip
       TARGET_DIR="${HOME}"/.local/
       if [[ "$OPT_DIR" == "true" ]]; then
