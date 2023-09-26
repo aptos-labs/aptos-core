@@ -14,6 +14,7 @@ use aptos_types::{
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
+use move_core_types::value::MoveTypeLayout;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -229,15 +230,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn events(&self, txn_idx: TxnIndex) -> Box<dyn Iterator<Item = T::Event>> {
+    pub(crate) fn events(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
-            Box::new(empty::<T::Event>()),
+            Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_) => Box::new(empty::<T::Event>()),
+                ExecutionStatus::Abort(_) => {
+                    Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
+                },
             },
         )
     }

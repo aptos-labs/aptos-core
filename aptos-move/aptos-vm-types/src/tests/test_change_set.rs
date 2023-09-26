@@ -4,7 +4,8 @@
 use crate::{
     change_set::VMChangeSet,
     tests::utils::{
-        build_change_set, mock_add, mock_create, mock_delete, mock_modify, MockChangeSetChecker,
+        build_change_set, mock_add, mock_create, mock_create_with_layout, mock_delete,
+        mock_delete_with_layout, mock_modify, mock_modify_with_layout, MockChangeSetChecker,
     },
 };
 use aptos_types::{
@@ -57,7 +58,22 @@ use std::collections::HashMap;
 /// *--------------*----------------*----------------*-----------------*
 /// ```
 
-macro_rules! write_set_1 {
+macro_rules! resource_write_set_1 {
+    ($d:ident) => {
+        vec![
+            mock_create_with_layout(format!("0{}", $d), 0, None),
+            mock_modify_with_layout(format!("1{}", $d), 1, None),
+            mock_delete_with_layout(format!("2{}", $d)),
+            mock_create_with_layout(format!("7{}", $d), 7, None),
+            mock_create_with_layout(format!("8{}", $d), 8, None),
+            mock_modify_with_layout(format!("10{}", $d), 10, None),
+            mock_modify_with_layout(format!("11{}", $d), 11, None),
+            mock_delete_with_layout(format!("12{}", $d)),
+        ]
+    };
+}
+
+macro_rules! module_write_set_1 {
     ($d:ident) => {
         vec![
             mock_create(format!("0{}", $d), 0),
@@ -72,7 +88,22 @@ macro_rules! write_set_1 {
     };
 }
 
-macro_rules! write_set_2 {
+macro_rules! resource_write_set_2 {
+    ($d:ident) => {
+        vec![
+            mock_create_with_layout(format!("3{}", $d), 103, None),
+            mock_modify_with_layout(format!("4{}", $d), 104, None),
+            mock_delete_with_layout(format!("5{}", $d)),
+            mock_modify_with_layout(format!("7{}", $d), 107, None),
+            mock_delete_with_layout(format!("8{}", $d)),
+            mock_modify_with_layout(format!("10{}", $d), 110, None),
+            mock_delete_with_layout(format!("11{}", $d)),
+            mock_create_with_layout(format!("12{}", $d), 112, None),
+        ]
+    };
+}
+
+macro_rules! module_write_set_2 {
     ($d:ident) => {
         vec![
             mock_create(format!("3{}", $d), 103),
@@ -86,8 +117,24 @@ macro_rules! write_set_2 {
         ]
     };
 }
+macro_rules! expected_resource_write_set {
+    ($d:ident) => {
+        HashMap::from([
+            mock_create_with_layout(format!("0{}", $d), 0, None),
+            mock_modify_with_layout(format!("1{}", $d), 1, None),
+            mock_delete_with_layout(format!("2{}", $d)),
+            mock_create_with_layout(format!("3{}", $d), 103, None),
+            mock_modify_with_layout(format!("4{}", $d), 104, None),
+            mock_delete_with_layout(format!("5{}", $d)),
+            mock_create_with_layout(format!("7{}", $d), 107, None),
+            mock_modify_with_layout(format!("10{}", $d), 110, None),
+            mock_delete_with_layout(format!("11{}", $d)),
+            mock_modify_with_layout(format!("12{}", $d), 112, None),
+        ])
+    };
+}
 
-macro_rules! expected_write_set {
+macro_rules! expected_module_write_set {
     ($d:ident) => {
         HashMap::from([
             mock_create(format!("0{}", $d), 0),
@@ -108,9 +155,9 @@ macro_rules! expected_write_set {
 // errors because we test them separately.
 fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     let mut descriptor = "r";
-    let resource_write_set_1 = write_set_1!(descriptor);
+    let resource_write_set_1 = resource_write_set_1!(descriptor);
     descriptor = "m";
-    let module_write_set_1 = write_set_1!(descriptor);
+    let module_write_set_1 = module_write_set_1!(descriptor);
     let aggregator_write_set_1 = vec![mock_create("18a", 18), mock_modify("19a", 19)];
     let aggregator_delta_set_1 = vec![
         mock_add("15a", 15),
@@ -128,9 +175,9 @@ fn build_change_sets_for_test() -> (VMChangeSet, VMChangeSet) {
     );
 
     descriptor = "r";
-    let resource_write_set_2 = write_set_2!(descriptor);
+    let resource_write_set_2 = resource_write_set_2!(descriptor);
     descriptor = "m";
-    let module_write_set_2 = write_set_2!(descriptor);
+    let module_write_set_2 = module_write_set_2!(descriptor);
     let aggregator_write_set_2 = vec![mock_modify("22a", 122), mock_delete("23a")];
     let aggregator_delta_set_2 = vec![
         mock_add("16a", 116),
@@ -160,12 +207,12 @@ fn test_successful_squash() {
     let mut descriptor = "r";
     assert_eq!(
         change_set.resource_write_set(),
-        &expected_write_set!(descriptor)
+        &expected_resource_write_set!(descriptor)
     );
     descriptor = "m";
     assert_eq!(
         change_set.module_write_set(),
-        &expected_write_set!(descriptor)
+        &expected_module_write_set!(descriptor)
     );
 
     let expected_aggregator_write_set = HashMap::from([
@@ -190,7 +237,7 @@ fn test_successful_squash() {
 }
 
 macro_rules! assert_invariant_violation {
-    ($w1:ident, $w2:ident) => {
+    ($w1:ident, $w2:ident, $w3:ident, $w4:ident) => {
         let check = |res: anyhow::Result<(), VMStatus>| {
             assert_matches!(
                 res,
@@ -206,12 +253,12 @@ macro_rules! assert_invariant_violation {
         let cs2 = build_change_set($w2.clone(), vec![], vec![], vec![], vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = build_change_set(vec![], vec![], $w1.clone(), vec![], vec![], vec![]);
-        let cs2 = build_change_set(vec![], vec![], $w2.clone(), vec![], vec![], vec![]);
+        let mut cs1 = build_change_set(vec![], vec![], $w3.clone(), vec![], vec![], vec![]);
+        let cs2 = build_change_set(vec![], vec![], $w4.clone(), vec![], vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
-        let mut cs1 = build_change_set(vec![], vec![], vec![], $w1.clone(), vec![], vec![]);
-        let cs2 = build_change_set(vec![], vec![], vec![], $w2.clone(), vec![], vec![]);
+        let mut cs1 = build_change_set(vec![], vec![], vec![], $w3.clone(), vec![], vec![]);
+        let cs2 = build_change_set(vec![], vec![], vec![], $w4.clone(), vec![], vec![]);
         let res = cs1.squash_additional_change_set(cs2, &MockChangeSetChecker);
         check(res);
     };
@@ -220,33 +267,41 @@ macro_rules! assert_invariant_violation {
 #[test]
 fn test_unsuccessful_squash_create_create() {
     // create 6 + create 106 throws an error
-    let write_set_1 = vec![mock_create("6", 6)];
-    let write_set_2 = vec![mock_create("6", 106)];
-    assert_invariant_violation!(write_set_1, write_set_2);
+    let write_set_1 = vec![mock_create_with_layout("6", 6, None)];
+    let write_set_2 = vec![mock_create_with_layout("6", 106, None)];
+    let write_set_3 = vec![mock_create("6", 6)];
+    let write_set_4 = vec![mock_create("6", 106)];
+    assert_invariant_violation!(write_set_1, write_set_2, write_set_3, write_set_4);
 }
 
 #[test]
 fn test_unsuccessful_squash_modify_create() {
     // modify 9 + create 109 throws an error
-    let write_set_1 = vec![mock_modify("9", 9)];
-    let write_set_2 = vec![mock_create("9", 109)];
-    assert_invariant_violation!(write_set_1, write_set_2);
+    let write_set_1 = vec![mock_modify_with_layout("9", 9, None)];
+    let write_set_2 = vec![mock_create_with_layout("9", 109, None)];
+    let write_set_3 = vec![mock_modify("9", 9)];
+    let write_set_4 = vec![mock_create("9", 109)];
+    assert_invariant_violation!(write_set_1, write_set_2, write_set_3, write_set_4);
 }
 
 #[test]
 fn test_unsuccessful_squash_delete_modify() {
     // delete + modify 113 throws an error
-    let write_set_1 = vec![mock_delete("13")];
-    let write_set_2 = vec![mock_modify("13", 113)];
-    assert_invariant_violation!(write_set_1, write_set_2);
+    let write_set_1 = vec![mock_delete_with_layout("13")];
+    let write_set_2 = vec![mock_modify_with_layout("13", 113, None)];
+    let write_set_3 = vec![mock_delete("13")];
+    let write_set_4 = vec![mock_modify("13", 113)];
+    assert_invariant_violation!(write_set_1, write_set_2, write_set_3, write_set_4);
 }
 
 #[test]
 fn test_unsuccessful_squash_delete_delete() {
     // delete + delete throws an error
-    let write_set_1 = vec![mock_delete("14")];
-    let write_set_2 = vec![mock_delete("14")];
-    assert_invariant_violation!(write_set_1, write_set_2);
+    let write_set_1 = vec![mock_delete_with_layout("14")];
+    let write_set_2 = vec![mock_delete_with_layout("14")];
+    let write_set_3 = vec![mock_delete("14")];
+    let write_set_4 = vec![mock_delete("14")];
+    assert_invariant_violation!(write_set_1, write_set_2, write_set_3, write_set_4);
 }
 
 #[test]
@@ -347,7 +402,7 @@ fn test_roundtrip_to_storage_change_set() {
 
 #[test]
 fn test_failed_conversion_to_change_set() {
-    let resource_write_set = vec![mock_delete("a")];
+    let resource_write_set = vec![mock_delete_with_layout("a")];
     let aggregator_delta_set = vec![mock_add("b", 100)];
     let change_set = build_change_set(
         resource_write_set,

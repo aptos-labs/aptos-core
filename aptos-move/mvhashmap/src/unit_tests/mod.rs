@@ -17,6 +17,7 @@ use aptos_aggregator::{
 };
 use aptos_types::executable::ExecutableTestType;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
+use std::sync::Arc;
 mod proptest_types;
 
 fn match_unresolved(
@@ -39,10 +40,10 @@ fn unsync_map_data_basic() {
     assert_none!(map.fetch_data(&ap));
     // Ensure write registers the new value.
     map.write(ap.clone(), value_for(10, 1));
-    assert_some_eq!(map.fetch_data(&ap), arc_value_for(10, 1));
+    assert_some_eq!(map.fetch_data(&ap), Arc::new(value_for(10, 1)));
     // Ensure the next write overwrites the value.
     map.write(ap.clone(), value_for(14, 1));
-    assert_some_eq!(map.fetch_data(&ap), arc_value_for(14, 1));
+    assert_some_eq!(map.fetch_data(&ap), Arc::new(value_for(14, 1)));
 }
 
 #[test]
@@ -61,7 +62,9 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Err(Uninitialized), r_db);
 
     // Write by txn 10.
-    mvtbl.data().write(ap1.clone(), 10, 1, value_for(10, 1));
+    mvtbl
+        .data()
+        .write(ap1.clone(), 10, 1, (value_for(10, 1), None));
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 9);
@@ -72,7 +75,7 @@ fn create_write_read_placeholder_struct() {
 
     // Reads for a higher txn return the entry written by txn 10.
     let r_10 = mvtbl.data().fetch_data(&ap1, 15);
-    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1))), r_10);
+    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1), None)), r_10);
 
     // More deltas.
     mvtbl
@@ -90,16 +93,20 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - (61 + 13))), r_sum);
 
     // More writes.
-    mvtbl.data().write(ap1.clone(), 12, 0, value_for(12, 0));
-    mvtbl.data().write(ap1.clone(), 8, 3, value_for(8, 3));
+    mvtbl
+        .data()
+        .write(ap1.clone(), 12, 0, (value_for(12, 0), None));
+    mvtbl
+        .data()
+        .write(ap1.clone(), 8, 3, (value_for(8, 3), None));
 
     // Verify reads.
     let r_12 = mvtbl.data().fetch_data(&ap1, 15);
     assert_eq!(Ok(Resolved(u128_for(12, 0) - (61 + 13))), r_12);
     let r_10 = mvtbl.data().fetch_data(&ap1, 11);
-    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1))), r_10);
+    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1), None)), r_10);
     let r_8 = mvtbl.data().fetch_data(&ap1, 10);
-    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3))), r_8);
+    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3), None)), r_8);
 
     // Mark the entry written by 10 as an estimate.
     mvtbl.data().mark_estimate(&ap1, 10);
@@ -114,19 +121,25 @@ fn create_write_read_placeholder_struct() {
 
     // Delete the entry written by 10, write to a different ap.
     mvtbl.data().delete(&ap1, 10);
-    mvtbl.data().write(ap2.clone(), 10, 2, value_for(10, 2));
+    mvtbl
+        .data()
+        .write(ap2.clone(), 10, 2, (value_for(10, 2), None));
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.data().fetch_data(&ap1, 11);
-    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3))), r_8);
+    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3), None)), r_8);
 
     // Reads, writes for ap2 and ap3.
-    mvtbl.data().write(ap2.clone(), 5, 0, value_for(5, 0));
-    mvtbl.data().write(ap3.clone(), 20, 4, value_for(20, 4));
+    mvtbl
+        .data()
+        .write(ap2.clone(), 5, 0, (value_for(5, 0), None));
+    mvtbl
+        .data()
+        .write(ap3.clone(), 20, 4, (value_for(20, 4), None));
     let r_5 = mvtbl.data().fetch_data(&ap2, 10);
-    assert_eq!(Ok(Versioned(Ok((5, 0)), arc_value_for(5, 0))), r_5);
+    assert_eq!(Ok(Versioned(Ok((5, 0)), arc_value_for(5, 0), None)), r_5);
     let r_20 = mvtbl.data().fetch_data(&ap3, 21);
-    assert_eq!(Ok(Versioned(Ok((20, 4)), arc_value_for(20, 4))), r_20);
+    assert_eq!(Ok(Versioned(Ok((20, 4)), arc_value_for(20, 4), None)), r_20);
 
     // Clear ap1 and ap3.
     mvtbl.data().delete(&ap1, 12);
@@ -143,7 +156,7 @@ fn create_write_read_placeholder_struct() {
 
     // Read entry by txn 10 at ap2.
     let r_10 = mvtbl.data().fetch_data(&ap2, 15);
-    assert_eq!(Ok(Versioned(Ok((10, 2)), arc_value_for(10, 2))), r_10);
+    assert_eq!(Ok(Versioned(Ok((10, 2)), arc_value_for(10, 2), None)), r_10);
 
     // Both delta-write and delta-delta application failures are detected.
     mvtbl.data().add_delta(ap1.clone(), 30, delta_add(30, 32));
@@ -154,7 +167,7 @@ fn create_write_read_placeholder_struct() {
     let val = value_for(10, 3);
     // sub base sub_for for which should underflow.
     let sub_base = val.as_u128().unwrap().unwrap();
-    mvtbl.data().write(ap2.clone(), 10, 3, val);
+    mvtbl.data().write(ap2.clone(), 10, 3, (val, None));
     mvtbl
         .data()
         .add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));
