@@ -13,7 +13,7 @@ use aptos_types::contract_event::ContractEvent;
 use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
+use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
@@ -24,11 +24,11 @@ use std::collections::VecDeque;
 /// Cached emitted module events.
 #[derive(Default, Tid)]
 pub struct NativeEventContext {
-    events: Vec<ContractEvent>,
+    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
 impl NativeEventContext {
-    pub fn into_events(self) -> Vec<ContractEvent> {
+    pub fn into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
         self.events
     }
 
@@ -36,7 +36,7 @@ impl NativeEventContext {
     fn emitted_v1_events(&self, event_key: &EventKey, ty_tag: &TypeTag) -> Vec<&[u8]> {
         let mut events = vec![];
         for event in self.events.iter() {
-            if let ContractEvent::V1(e) = event {
+            if let (ContractEvent::V1(e), _) = event {
                 if e.key() == event_key && e.type_tag() == ty_tag {
                     events.push(e.event_data());
                 }
@@ -49,7 +49,7 @@ impl NativeEventContext {
     fn emitted_v2_events(&self, ty_tag: &TypeTag) -> Vec<&[u8]> {
         let mut events = vec![];
         for event in self.events.iter() {
-            if let ContractEvent::V2(e) = event {
+            if let (ContractEvent::V2(e), _) = event {
                 if e.type_tag() == ty_tag {
                     events.push(e.event_data());
                 }
@@ -85,7 +85,8 @@ fn native_write_to_event_store(
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
     )?;
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout(&ty)?;
+    let (ty_layout, has_aggregator_lifting) =
+        context.type_to_type_layout_with_aggregator_lifting(&ty)?;
     let blob = msg.simple_serialize(&ty_layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -96,8 +97,9 @@ fn native_write_to_event_store(
     })?;
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
+    let ty_layout = has_aggregator_lifting.then_some(ty_layout);
     ctx.events
-        .push(ContractEvent::new_v1(key, seq_num, ty_tag, blob));
+        .push((ContractEvent::new_v1(key, seq_num, ty_tag, blob), ty_layout));
     Ok(smallvec![])
 }
 
@@ -225,14 +227,18 @@ fn native_write_module_event_to_store(
         }
     }
     let layout = context.type_to_type_layout(&ty)?;
+    let (ty_layout, has_aggregator_lifting) =
+        context.type_to_type_layout_with_aggregator_lifting(&ty)?;
     let blob = msg.simple_serialize(&layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Event serialization failure".to_string()),
         )
     })?;
+    let ty_layout = has_aggregator_lifting.then_some(ty_layout);
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
-    ctx.events.push(ContractEvent::new_v2(type_tag, blob));
+    ctx.events
+        .push((ContractEvent::new_v2(type_tag, blob), ty_layout));
 
     Ok(smallvec![])
 }

@@ -3,7 +3,7 @@
 
 use crate::{
     output::VMOutput,
-    tests::utils::{as_state_key, build_vm_output, mock_add, mock_create, mock_modify},
+    tests::utils::{as_state_key, build_vm_output, mock_add, mock_create_with_layout, mock_modify},
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
@@ -34,7 +34,7 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
 fn test_ok_output_equality_no_deltas() {
     let state_view = FakeDataStore::default();
     let vm_output = build_vm_output(
-        vec![mock_create("0", 0)],
+        vec![mock_create_with_layout("0", 0, None)],
         vec![],
         vec![mock_modify("1", 1)],
         vec![mock_modify("2", 2)],
@@ -67,7 +67,7 @@ fn test_ok_output_equality_with_deltas() {
     state_view.set_legacy(as_state_key!(delta_key), serialize(&100));
 
     let vm_output = build_vm_output(
-        vec![mock_create("0", 0)],
+        vec![mock_create_with_layout("0", 0, None)],
         vec![],
         vec![mock_modify("1", 1)],
         vec![mock_modify("2", 2)],
