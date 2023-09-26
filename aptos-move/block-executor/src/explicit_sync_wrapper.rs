@@ -5,7 +5,7 @@ use std::cell::UnsafeCell;
 
 // Parallel algorithms often guarantee a sequential use of certain
 // data structures, or parts of the data-structures (like elements of
-// a vector).  The rust compiler can not profe the safety of even
+// a vector).  The rust compiler can not prove the safety of even
 // slightly complex parallel algorithms.
 
 /// ExplicitSyncWrapper is meant to be used in parallel algorithms

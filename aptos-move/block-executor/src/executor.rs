@@ -237,7 +237,7 @@ where
         }
     }
 
-    fn queue_ready_commits(
+    fn prepare_and_queue_commit_ready_txns(
         &self,
         maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
@@ -250,9 +250,8 @@ where
         )>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            let shared_commit_state_tuple = shared_commit_state.get_mut();
             let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
-                shared_commit_state_tuple;
+                shared_commit_state.get_mut();
 
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
@@ -328,18 +327,10 @@ where
                 );
                 break;
             }
-
-            // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
-            // will be properly handled by the threads. For instance, it is possible that the committing
-            // thread holds an execution task of ExecutionTaskType::Wakeup(DependencyCondvar) for some
-            // other thread pending on the dependency conditional variable from the last iteration. If
-            // the committing thread early halts BlockSTM and resets its scheduler_task to be Done, the
-            // pending thread will be pending on read forever. In other words, we rely on the committing
-            // thread to wake up the pending execution thread, if the committing thread holds the Wakeup task.
         }
     }
 
-    fn commit_epilogue(
+    fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
@@ -440,7 +431,7 @@ where
         loop {
             // Priorotize committing validated transactions
             while scheduler.should_coordinate_commits() {
-                self.queue_ready_commits(
+                self.prepare_and_queue_commit_ready_txns(
                     self.maybe_block_gas_limit,
                     scheduler,
                     &mut scheduler_task,
@@ -452,7 +443,7 @@ where
 
             {
                 while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                    self.commit_epilogue(
+                    self.materialize_txn_commit(
                         txn_idx,
                         versioned_cache,
                         last_input_output,
@@ -498,7 +489,7 @@ where
                 SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
                     while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                        self.commit_epilogue(
+                        self.materialize_txn_commit(
                             txn_idx,
                             versioned_cache,
                             last_input_output,
@@ -581,8 +572,8 @@ where
             drop(versioned_cache);
         });
 
-        let maybe_error = shared_commit_state.into_inner();
-        match maybe_error.2 {
+        let (_, _, maybe_error) = shared_commit_state.into_inner();
+        match maybe_error {
             Some(err) => Err(err),
             None => Ok(final_results.into_inner()),
         }
