@@ -112,7 +112,7 @@ enum SnapshotType {
 }
 
 impl SnapshotType {
-    fn from_ty_args(context: &SafeNativeContext, ty_arg: &Type) -> SafeNativeResult<Self> {
+    fn from_ty_arg(context: &SafeNativeContext, ty_arg: &Type) -> SafeNativeResult<Self> {
         match ty_arg {
             Type::U128 => Ok(Self::U128),
             Type::U64 => Ok(Self::U64),
@@ -155,18 +155,16 @@ impl SnapshotType {
 
     pub fn parse_snapshot_value_by_type(&self, value: Value) -> SafeNativeResult<SnapshotValue> {
         // Simpler to wrap to be able to reuse safely_pop_arg functions
-        let mut dummy_args = VecDeque::new();
-        dummy_args.push_back(value);
-        self.pop_snapshot_value_by_type(&mut dummy_args)
+        self.pop_snapshot_value_by_type(&mut VecDeque::from([value]))
     }
 
-    pub fn create_snapshot_value_by_type(&self, value: &SnapshotValue) -> SafeNativeResult<Value> {
+    pub fn create_snapshot_value_by_type(&self, value: SnapshotValue) -> SafeNativeResult<Value> {
         match (self, value) {
-            (SnapshotType::U128, SnapshotValue::Integer(v)) => Ok(Value::u128(*v)),
-            (SnapshotType::U64, SnapshotValue::Integer(v)) => Ok(Value::u64(u128_to_u64(*v)?)),
-            (SnapshotType::String, _) => Ok(Value::struct_(Struct::pack(vec![Value::vector_u8(
+            (SnapshotType::U128, SnapshotValue::Integer(v)) => Ok(Value::u128(v)),
+            (SnapshotType::U64, SnapshotValue::Integer(v)) => Ok(Value::u64(u128_to_u64(v)?)),
+            (SnapshotType::String, value) => Ok(Value::struct_(Struct::pack(vec![Value::vector_u8(
                 match value {
-                    SnapshotValue::String(v) => v.clone(),
+                    SnapshotValue::String(v) => v,
                     SnapshotValue::Integer(v) => v.to_string().into_bytes(),
                 },
             )]))),
@@ -370,15 +368,14 @@ fn native_create_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
-    let snapshot_type = SnapshotType::from_ty_args(context, &ty_args[0])?;
+    let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
 
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
 
     let result_value = if context.aggregator_execution_enabled() {
         let (_, mut aggregator_data) = get_context_data(context);
 
-        let snapshot_id = aggregator_data.generate_id();
-        aggregator_data.create_new_snapshot(snapshot_id, input);
+        let snapshot_id = aggregator_data.create_new_snapshot(input);
 
         SnapshotValue::Integer(snapshot_id.id() as u128)
     } else {
@@ -386,7 +383,7 @@ fn native_create_snapshot(
     };
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        snapshot_type.create_snapshot_value_by_type(&result_value)?
+        snapshot_type.create_snapshot_value_by_type(result_value)?
     ]))])
 }
 
@@ -407,7 +404,7 @@ fn native_copy_snapshot(
     // debug_assert_eq!(args.len(), 1);
     // context.charge(AGGREGATOR_V2_COPY_SNAPSHOT_BASE)?;
 
-    // let snapshot_type = SnapshotType::from_ty_args(context, &ty_args[0])?;
+    // let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     // let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
     // let result_value = if context.aggregator_execution_enabled() {
@@ -420,7 +417,7 @@ fn native_copy_snapshot(
     // };
 
     // Ok(smallvec![Value::struct_(Struct::pack(vec![
-    //     snapshot_type.create_snapshot_value_by_type(&result_value)?
+    //     snapshot_type.create_snapshot_value_by_type(result_value)?
     // ]))])
 }
 
@@ -437,7 +434,7 @@ fn native_read_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
-    let snapshot_type = SnapshotType::from_ty_args(context, &ty_args[0])?;
+    let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
     let result_value = if context.aggregator_execution_enabled() {
@@ -450,7 +447,7 @@ fn native_read_snapshot(
     };
 
     Ok(smallvec![
-        snapshot_type.create_snapshot_value_by_type(&result_value)?
+        snapshot_type.create_snapshot_value_by_type(result_value)?
     ])
 }
 
@@ -467,11 +464,11 @@ fn native_string_concat(
     debug_assert_eq!(args.len(), 3);
     context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
 
-    let snapshot_input_type = SnapshotType::from_ty_args(context, &ty_args[0])?;
+    let snapshot_input_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
 
     // Concat works only with integer snapshot types
     // This is to avoid unnecessary recursive snapshot dependencies
-    if let SnapshotType::String = snapshot_input_type {
+    if !matches!(snapshot_input_type, SnapshotType::U128 | SnapshotType::U64) {
         return Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
         });
@@ -505,7 +502,7 @@ fn native_string_concat(
     };
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        SnapshotType::String.create_snapshot_value_by_type(&result_value)?
+        SnapshotType::String.create_snapshot_value_by_type(result_value)?
     ]))])
 }
 
