@@ -95,7 +95,7 @@ When running tests, every test will either `PASS`, `FAIL`, or `TIMEOUT`. If a te
 
 A test will be marked as timing out if it exceeds the maximum number of instructions that can be executed for any single test. This bound can be changed using the options below, and its default value is set to 5000 instructions. Additionally, while the result of a test is always deterministic, tests are run in parallel by default, so the ordering of test results in a test run is non-deterministic unless running with only one thread (see `OPTIONS` below).
 
-There are also a number of options that can be passed to the unit testing binary to fine-tune testing and to help debug failing tests. These can be found using the the help flag:
+There are also a number of options that can be passed to the unit testing binary to fine-tune testing and to help debug failing tests. These can be found using the help flag:
 
 ```
 $ aptos move test -h
@@ -220,7 +220,7 @@ Module 0000000000000000000000000000000000000000000000000000000000000001::my_modu
 Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package
 ```
 
-Then by running `aptos move coverage`, we can get more detailed coverage information. These can be found using the the help flag:
+Then by running `aptos move coverage`, we can get more detailed coverage information. These can be found using the help flag:
 
 ```
 $ aptos move coverage -h

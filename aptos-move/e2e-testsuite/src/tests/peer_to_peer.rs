@@ -54,7 +54,10 @@ fn single_peer_to_peer_with_event() {
     let rec_ev_path = receiver.received_events_key();
     let sent_ev_path = sender.sent_events_key();
     for event in output.events() {
-        assert!(rec_ev_path == event.key() || sent_ev_path == event.key());
+        let event_key = event.event_key();
+        if let Some(event_key) = event_key {
+            assert!(rec_ev_path == event_key || sent_ev_path == event_key);
+        }
     }
 }
 
@@ -94,7 +97,7 @@ fn few_peer_to_peer_with_event() {
                 }
                 assert_eq!(transfer_amount, payload.amount());
             } else {
-                panic!("Unexpected Event Type")
+                assert!(event.v2().is_ok());
             }
         }
 

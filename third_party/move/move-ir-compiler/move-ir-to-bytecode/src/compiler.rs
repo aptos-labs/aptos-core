@@ -1523,6 +1523,10 @@ fn compile_call(
                     function_frame.pop()?;
                     function_frame.push()?;
                 },
+                Builtin::Nop => {
+                    push_instr!(call.loc, Bytecode::Nop);
+                    function_frame.pop()?;
+                },
             }
         },
         FunctionCall_::ModuleFunctionCall {

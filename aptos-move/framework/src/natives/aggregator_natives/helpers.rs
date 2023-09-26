@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
-use aptos_table_natives::TableHandle;
-use aptos_types::account_address::AccountAddress;
+use aptos_types::{account_address::AccountAddress, state_store::table::TableHandle};
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::values::{Reference, Struct, StructRef, Value};
 
@@ -40,7 +39,7 @@ pub(crate) fn get_aggregator_field(aggregator: &StructRef, index: usize) -> Part
     field_ref.read_ref()
 }
 
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
     let (handle, key, limit) = get_aggregator_fields(aggregator)?;
     Ok((AggregatorID::new(handle, key), limit))

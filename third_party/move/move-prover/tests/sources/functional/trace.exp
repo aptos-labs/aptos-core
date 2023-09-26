@@ -27,7 +27,7 @@ error: global memory invariant does not hold
    │
    = Related Global Memory:
    =         Resource name: TestTracing_R
-   =         Values:  {Address(0): <redacted>, Default: empty}
+   =         Values:  {Address(0): <redacted>, Default: TestTracing.R{x = 5}}
    =     at tests/sources/functional/trace.move:29: publish_invalid
    =     at tests/sources/functional/trace.move:33: publish_invalid (spec)
    =         `let addr = signer::address_of(s);` = <redacted>
@@ -45,7 +45,7 @@ error: post-condition does not hold
    │
    = Related Global Memory:
    =         Resource name: TestTracing_R
-   =         Values:  {Address(18467): <redacted>, Default: empty}
+   =         Values:  {Address(18467): <redacted>, Default: TestTracing.R{x = 4}}
    = Related Bindings:
    =         addr = <redacted>
    =         exists<R>(addr) = <redacted>

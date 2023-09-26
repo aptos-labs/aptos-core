@@ -155,7 +155,7 @@ These are read by the example and published to the Aptos blockchain:
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/your-coin.py publish
+:!: static/sdks/python/examples/your_coin.py publish
 ```
 
   </TabItem>

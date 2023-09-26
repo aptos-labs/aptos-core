@@ -66,6 +66,12 @@ return true.
 -  [Function `auids_enabled`](#0x1_features_auids_enabled)
 -  [Function `get_bulletproofs_feature`](#0x1_features_get_bulletproofs_feature)
 -  [Function `bulletproofs_enabled`](#0x1_features_bulletproofs_enabled)
+-  [Function `get_signer_native_format_fix_feature`](#0x1_features_get_signer_native_format_fix_feature)
+-  [Function `signer_native_format_fix_enabled`](#0x1_features_signer_native_format_fix_enabled)
+-  [Function `get_module_event_feature`](#0x1_features_get_module_event_feature)
+-  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
+-  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
+-  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -74,6 +80,7 @@ return true.
     -  [Resource `Features`](#@Specification_1_Features)
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
+    -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
     -  [Function `set`](#@Specification_1_set)
@@ -117,6 +124,17 @@ The enabled features, represented by a bitset stored on chain.
 <a name="@Constants_0"></a>
 
 ## Constants
+
+
+<a name="0x1_features_AGGREGATOR_SNAPSHOTS"></a>
+
+Whether the aggregator snapshots feature is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>: u64 = 30;
+</code></pre>
+
 
 
 <a name="0x1_features_APTOS_STD_CHAIN_ID_NATIVES"></a>
@@ -278,6 +296,18 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_MODULE_EVENT"></a>
+
+Whether emit function in <code>event.<b>move</b></code> are enabled for module events.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>: u64 = 26;
+</code></pre>
+
+
+
 <a name="0x1_features_MULTISIG_ACCOUNTS"></a>
 
 Whether multisig accounts (different from accounts with multi-ed25519 auth keys) are enabled.
@@ -341,6 +371,28 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SHA_512_AND_RIPEMD_160_NATIVES">SHA_512_AND_RIPEMD_160_NATIVES</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_features_SIGNATURE_CHECKER_V2_SCRIPT_FIX"></a>
+
+Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SIGNATURE_CHECKER_V2_SCRIPT_FIX">SIGNATURE_CHECKER_V2_SCRIPT_FIX</a>: u64 = 29;
+</code></pre>
+
+
+
+<a name="0x1_features_SIGNER_NATIVE_FORMAT_FIX"></a>
+
+Fix the native formatter for signer.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
 </code></pre>
 
 
@@ -1188,6 +1240,144 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_signer_native_format_fix_feature"></a>
+
+## Function `get_signer_native_format_fix_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_signer_native_format_fix_feature">get_signer_native_format_fix_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_signer_native_format_fix_feature">get_signer_native_format_fix_feature</a>(): u64 { <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_signer_native_format_fix_enabled"></a>
+
+## Function `signer_native_format_fix_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_signer_native_format_fix_enabled">signer_native_format_fix_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_signer_native_format_fix_enabled">signer_native_format_fix_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_module_event_feature"></a>
+
+## Function `get_module_event_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_feature">get_module_event_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_module_event_feature">get_module_event_feature</a>(): u64 { <a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_module_event_enabled"></a>
+
+## Function `module_event_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_enabled">module_event_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_enabled">module_event_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_aggregator_snapshots_feature"></a>
+
+## Function `get_aggregator_snapshots_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_aggregator_snapshots_enabled"></a>
+
+## Function `aggregator_snapshots_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1208,7 +1398,7 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
     <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a>{<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[]})
+        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
     };
     <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
     <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
@@ -1242,7 +1432,7 @@ Check whether the feature is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_is_enabled">is_enabled</a>(feature: u64): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) &&
-    <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
+        <a href="features.md#0x1_features_contains">contains</a>(&<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>, feature)
 }
 </code></pre>
 
@@ -1389,6 +1579,24 @@ Helper to check whether a feature flag is enabled.
 
 
 
+<a name="@Specification_1_module_event_enabled"></a>
+
+### Function `module_event_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_enabled">module_event_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_module_event_enabled">spec_module_event_enabled</a>();
+</code></pre>
+
+
+
 <a name="@Specification_1_change_feature_flags"></a>
 
 ### Function `change_feature_flags`
@@ -1462,6 +1670,17 @@ Helper to check whether a feature flag is enabled.
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">spec_collect_and_distribute_gas_fees_enabled</a>(): bool {
    <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES">COLLECT_AND_DISTRIBUTE_GAS_FEES</a>)
+}
+</code></pre>
+
+
+
+
+<a name="0x1_features_spec_module_event_enabled"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_module_event_enabled">spec_module_event_enabled</a>(): bool {
+   <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>)
 }
 </code></pre>
 

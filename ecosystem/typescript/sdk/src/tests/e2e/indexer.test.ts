@@ -129,6 +129,17 @@ describe("Indexer", () => {
       expect(ledgerInfo.ledger_infos[0].chain_id).toBeGreaterThan(1);
     });
 
+    // OBJECTS //
+
+    it(
+      "gets account owned objects data",
+      async () => {
+        const accountObjects = await indexerClient.getAccountOwnedObjects(alice.address().hex());
+        expect(accountObjects.current_objects.length).toBe(2);
+      },
+      longTestTimeout,
+    );
+
     // TOKENS //
 
     it(
@@ -359,7 +370,16 @@ describe("Indexer", () => {
       "gets account coin data",
       async () => {
         const accountCoinData = await indexerClient.getAccountCoinsData(alice.address().hex());
-        expect(accountCoinData.current_coin_balances[0].coin_type).toEqual("0x1::aptos_coin::AptosCoin");
+        expect(accountCoinData.current_fungible_asset_balances[0].asset_type).toEqual("0x1::aptos_coin::AptosCoin");
+      },
+      longTestTimeout,
+    );
+
+    it(
+      "gets account coin data count",
+      async () => {
+        const accountCoinDataCount = await indexerClient.getAccountCoinsDataCount(alice.address().hex());
+        expect(accountCoinDataCount.current_fungible_asset_balances_aggregate.aggregate?.count).toEqual(1);
       },
       longTestTimeout,
     );

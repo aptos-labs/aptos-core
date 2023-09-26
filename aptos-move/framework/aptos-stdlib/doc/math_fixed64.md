@@ -15,7 +15,6 @@ Standard math utilities missing in the Move Language.
 -  [Function `mul_div`](#0x1_math_fixed64_mul_div)
 -  [Function `exp_raw`](#0x1_math_fixed64_exp_raw)
 -  [Function `pow_raw`](#0x1_math_fixed64_pow_raw)
--  [Function `assert_approx_the_same`](#0x1_math_fixed64_assert_approx_the_same)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -284,39 +283,6 @@ Specialized function for x * y / z that omits intermediate shifting
         x = (x * x) &gt;&gt; 64;
     };
     res
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_math_fixed64_assert_approx_the_same"></a>
-
-## Function `assert_approx_the_same`
-
-For functions that approximate a value it's useful to test a value is close
-to the most correct value up to last digit
-
-
-<pre><code>#[testonly]
-<b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_assert_approx_the_same">assert_approx_the_same</a>(x: u256, y: u256, precission: u128) {
-    <b>if</b> (x &lt; y) {
-        <b>let</b> tmp = x;
-        x = y;
-        y = tmp;
-    };
-    <b>let</b> mult = (<a href="math128.md#0x1_math128_pow">math128::pow</a>(10, precission) <b>as</b> u256);
-    <b>assert</b>!((x - y) * mult &lt; x, 0);
 }
 </code></pre>
 

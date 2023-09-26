@@ -4,7 +4,7 @@ use crate::StateView;
 use aptos_types::{
     account_address::AccountAddress, account_view::AccountView, state_store::state_key::StateKey,
 };
-
+use bytes::Bytes;
 pub struct AccountWithStateView<'a> {
     account_address: &'a AccountAddress,
     state_view: &'a dyn StateView,
@@ -20,7 +20,7 @@ impl<'a> AccountWithStateView<'a> {
 }
 
 impl<'a> AccountView for AccountWithStateView<'a> {
-    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
         self.state_view.get_state_value_bytes(state_key)
     }
 

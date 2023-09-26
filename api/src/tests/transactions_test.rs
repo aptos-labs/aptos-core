@@ -329,7 +329,7 @@ async fn test_multi_ed25519_signed_transaction() {
     let auth_key = AuthenticationKey::multi_ed25519(&public_key);
 
     let factory = context.transaction_factory();
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     // TODO: migrate once multi-ed25519 is supported
     let create_account_txn = root_account.sign_with_transaction_builder(
         factory.create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key()),
@@ -666,7 +666,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
     let context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
     let txn = root_account.sign_with_transaction_builder(
         context
@@ -881,7 +881,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     let script =
         hex::decode("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102")
             .unwrap();
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
@@ -893,7 +893,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
 
 async fn test_submit_entry_function_api_validation(
     mut context: TestContext,
-    mut account: LocalAccount,
+    account: LocalAccount,
     address: &str,
     module_id: &str,
     func: &str,
@@ -937,7 +937,7 @@ async fn test_submit_entry_function_api_validation(
 
 async fn test_get_txn_execute_failed_by_invalid_entry_function(
     context: TestContext,
-    mut account: LocalAccount,
+    account: LocalAccount,
     address: &str,
     module_id: &str,
     func: &str,

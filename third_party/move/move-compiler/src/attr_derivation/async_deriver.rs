@@ -18,13 +18,40 @@ use move_core_types::account_address::AccountAddress;
 use move_ir_types::location::{sp, Loc};
 use move_symbol_pool::Symbol;
 use sha3::{Digest, Sha3_256};
-use std::convert::TryInto;
+use std::{collections::BTreeSet, convert::TryInto};
 
 const ACTOR_ATTR: &str = "actor";
 const STATE_ATTR: &str = "state";
 const INIT_ATTR: &str = "init";
 const MESSAGE_ATTR: &str = "message";
+
+const CONT_ATTR: &str = "cont";
+const EVENT_ATTR: &str = "event"; // "message" is mysteriously transformed into "event"
+const RPC_ATTR: &str = "rpc";
+
+const GENERATED_CONT_ATTR: &str = "_generated_cont";
+const GENERATED_RPC_ATTR: &str = "_generated_rpc";
+const GENERATED_SEND_ATTR: &str = "_generated_send";
+
 const MAX_SEND_PARAM_COUNT: usize = 8;
+
+pub(crate) fn add_attributes_for_async(attributes: &mut BTreeSet<String>) {
+    const ALL_ATTRIBUTE_NAMES: [&str; 10] = [
+        ACTOR_ATTR,
+        CONT_ATTR,
+        EVENT_ATTR,
+        INIT_ATTR,
+        MESSAGE_ATTR,
+        RPC_ATTR,
+        STATE_ATTR,
+        GENERATED_CONT_ATTR,
+        GENERATED_RPC_ATTR,
+        GENERATED_SEND_ATTR,
+    ];
+    ALL_ATTRIBUTE_NAMES.into_iter().for_each(|elt| {
+        attributes.insert(elt.to_string());
+    });
+}
 
 pub(crate) fn derive_for_async(
     env: &mut CompilationEnv,

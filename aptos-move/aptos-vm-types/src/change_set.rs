@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::check_change_set::CheckChangeSet;
-use aptos_aggregator::delta_change_set::{deserialize, serialize, DeltaOp};
-use aptos_state_view::StateView;
+use aptos_aggregator::{
+    delta_change_set::{serialize, DeltaOp},
+    resolver::{AggregatorReadMode, AggregatorResolver},
+};
 use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
@@ -13,8 +15,8 @@ use aptos_types::{
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 use std::collections::{
-    btree_map::Entry::{Occupied, Vacant},
-    BTreeMap,
+    hash_map::Entry::{Occupied, Vacant},
+    HashMap,
 };
 
 /// A change set produced by the VM.
@@ -23,10 +25,10 @@ use std::collections::{
 /// VM. For storage backends, use `ChangeSet`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
-    resource_write_set: BTreeMap<StateKey, WriteOp>,
-    module_write_set: BTreeMap<StateKey, WriteOp>,
-    aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-    aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+    resource_write_set: HashMap<StateKey, WriteOp>,
+    module_write_set: HashMap<StateKey, WriteOp>,
+    aggregator_write_set: HashMap<StateKey, WriteOp>,
+    aggregator_delta_set: HashMap<StateKey, DeltaOp>,
     events: Vec<ContractEvent>,
 }
 
@@ -49,19 +51,19 @@ macro_rules! squash_writes_pair {
 impl VMChangeSet {
     pub fn empty() -> Self {
         Self {
-            resource_write_set: BTreeMap::new(),
-            module_write_set: BTreeMap::new(),
-            aggregator_write_set: BTreeMap::new(),
-            aggregator_delta_set: BTreeMap::new(),
+            resource_write_set: HashMap::new(),
+            module_write_set: HashMap::new(),
+            aggregator_write_set: HashMap::new(),
+            aggregator_delta_set: HashMap::new(),
             events: vec![],
         }
     }
 
     pub fn new(
-        resource_write_set: BTreeMap<StateKey, WriteOp>,
-        module_write_set: BTreeMap<StateKey, WriteOp>,
-        aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+        resource_write_set: HashMap<StateKey, WriteOp>,
+        module_write_set: HashMap<StateKey, WriteOp>,
+        aggregator_write_set: HashMap<StateKey, WriteOp>,
+        aggregator_delta_set: HashMap<StateKey, DeltaOp>,
         events: Vec<ContractEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -92,8 +94,8 @@ impl VMChangeSet {
 
         // There should be no aggregator writes if we have a change set from
         // storage.
-        let mut resource_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
+        let mut resource_write_set = HashMap::new();
+        let mut module_write_set = HashMap::new();
 
         for (state_key, write_op) in write_set {
             if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
@@ -109,8 +111,8 @@ impl VMChangeSet {
         let change_set = Self {
             resource_write_set,
             module_write_set,
-            aggregator_write_set: BTreeMap::new(),
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_write_set: HashMap::new(),
+            aggregator_delta_set: HashMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -153,17 +155,30 @@ impl VMChangeSet {
     }
 
     pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.resource_write_set
+        self.resource_write_set()
             .iter()
-            .chain(self.module_write_set.iter())
-            .chain(self.aggregator_write_set.iter())
+            .chain(self.module_write_set().iter())
+            .chain(self.aggregator_v1_write_set().iter())
     }
 
-    pub fn resource_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn num_write_ops(&self) -> usize {
+        self.resource_write_set().len()
+            + self.module_write_set().len()
+            + self.aggregator_v1_write_set().len()
+    }
+
+    pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, &mut WriteOp)> {
+        self.resource_write_set
+            .iter_mut()
+            .chain(self.module_write_set.iter_mut())
+            .chain(self.aggregator_write_set.iter_mut())
+    }
+
+    pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
         &self.resource_write_set
     }
 
-    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn module_write_set(&self) -> &HashMap<StateKey, WriteOp> {
         &self.module_write_set
     }
 
@@ -176,11 +191,11 @@ impl VMChangeSet {
             .extend(additional_aggregator_writes)
     }
 
-    pub fn aggregator_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn aggregator_v1_write_set(&self) -> &HashMap<StateKey, WriteOp> {
         &self.aggregator_write_set
     }
 
-    pub fn aggregator_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
+    pub fn aggregator_v1_delta_set(&self) -> &HashMap<StateKey, DeltaOp> {
         &self.aggregator_delta_set
     }
 
@@ -190,7 +205,10 @@ impl VMChangeSet {
 
     /// Materializes this change set: all deltas are converted into writes and
     /// are combined with existing aggregator writes.
-    pub fn try_materialize(self, state_view: &impl StateView) -> anyhow::Result<Self, VMStatus> {
+    pub fn try_materialize(
+        self,
+        resolver: &impl AggregatorResolver,
+    ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             module_write_set,
@@ -201,7 +219,10 @@ impl VMChangeSet {
 
         let into_write =
             |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
-                let write = delta.try_into_write_op(state_view, &state_key)?;
+                // Materialization is needed when committing a transaction, so
+                // we need precise mode to compute the true value of an
+                // aggregator.
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Precise)?;
                 Ok((state_key, write))
             };
 
@@ -209,29 +230,29 @@ impl VMChangeSet {
             aggregator_delta_set
                 .into_iter()
                 .map(into_write)
-                .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
+                .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
         aggregator_write_set.extend(materialized_aggregator_delta_set.into_iter());
 
         Ok(Self {
             resource_write_set,
             module_write_set,
             aggregator_write_set,
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_delta_set: HashMap::new(),
             events,
         })
     }
 
     fn squash_additional_aggregator_changes(
-        aggregator_write_set: &mut BTreeMap<StateKey, WriteOp>,
-        aggregator_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
-        additional_aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+        aggregator_write_set: &mut HashMap<StateKey, WriteOp>,
+        aggregator_delta_set: &mut HashMap<StateKey, DeltaOp>,
+        additional_aggregator_write_set: HashMap<StateKey, WriteOp>,
+        additional_aggregator_delta_set: HashMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
         use WriteOp::*;
 
         // First, squash deltas.
-        for (key, additional_delta_op) in additional_aggregator_delta_set {
-            if let Some(write_op) = aggregator_write_set.get_mut(&key) {
+        for (state_key, additional_delta_op) in additional_aggregator_delta_set {
+            if let Some(write_op) = aggregator_write_set.get_mut(&state_key) {
                 // In this case, delta follows a write op.
                 match write_op {
                     Creation(data)
@@ -239,11 +260,14 @@ impl VMChangeSet {
                     | CreationWithMetadata { data, .. }
                     | ModificationWithMetadata { data, .. } => {
                         // Apply delta on top of creation or modification.
-                        let base: u128 = deserialize(data);
+                        // TODO(aggregator): This will not be needed anymore once aggregator
+                        // change sets carry non-serialized information.
+                        let base: u128 = bcs::from_bytes(data)
+                            .expect("Deserializing into an aggregator value always succeeds");
                         let value = additional_delta_op
                             .apply_to(base)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                        *data = serialize(&value);
+                        *data = serialize(&value).into();
                     },
                     Deletion | DeletionWithMetadata { .. } => {
                         // This case (applying a delta to deleted item) should
@@ -258,7 +282,7 @@ impl VMChangeSet {
             } else {
                 // Otherwise, this is a either a new delta or an additional delta
                 // for the same state key.
-                match aggregator_delta_set.entry(key) {
+                match aggregator_delta_set.entry(state_key) {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming delta
                         // to the existing delta, ensuring the strict ordering.
@@ -277,8 +301,8 @@ impl VMChangeSet {
         }
 
         // Next, squash write ops.
-        for (key, additional_write_op) in additional_aggregator_write_set {
-            match aggregator_write_set.entry(key) {
+        for (state_key, additional_write_op) in additional_aggregator_write_set {
+            match aggregator_write_set.entry(state_key) {
                 Occupied(mut entry) => {
                     squash_writes_pair!(entry, additional_write_op);
                 },
@@ -305,8 +329,8 @@ impl VMChangeSet {
     }
 
     fn squash_additional_writes(
-        write_set: &mut BTreeMap<StateKey, WriteOp>,
-        additional_write_set: BTreeMap<StateKey, WriteOp>,
+        write_set: &mut HashMap<StateKey, WriteOp>,
+        additional_write_set: HashMap<StateKey, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
@@ -348,5 +372,11 @@ impl VMChangeSet {
         self.events.extend(additional_events);
 
         checker.check_change_set(self)
+    }
+
+    pub fn has_creation(&self) -> bool {
+        use WriteOp::*;
+        self.write_set_iter()
+            .any(|(_key, op)| matches!(op, Creation(..) | CreationWithMetadata { .. }))
     }
 }

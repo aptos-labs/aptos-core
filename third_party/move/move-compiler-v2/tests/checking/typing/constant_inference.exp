@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid call of `+`: expected `u16|u32|u64|u128|u256` but found `u8` for argument 2
+   ┌─ tests/checking/typing/constant_inference.move:19:27
+   │
+19 │         let error = 257 + r; // Should error
+   │                           ^

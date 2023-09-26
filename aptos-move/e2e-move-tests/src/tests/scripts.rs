@@ -5,10 +5,38 @@ use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::TransactionBuilder;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::CoinStoreResource,
     transaction::{Script, TransactionArgument},
 };
-use move_core_types::move_resource::MoveStructType;
+use move_core_types::language_storage::TypeTag;
+
+#[test]
+fn test_script_with_type_parameter() {
+    let mut h = MoveHarness::new();
+
+    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+
+    let package = aptos_framework::BuiltPackage::build(
+        common::test_dir_path("script_with_ty_param.data/pack"),
+        aptos_framework::BuildOptions::default(),
+    )
+    .expect("building package must succeed");
+
+    let code = package.extract_script_code().into_iter().next().unwrap();
+
+    let txn = TransactionBuilder::new(alice.clone())
+        .script(Script::new(
+            code,
+            std::iter::repeat_with(|| TypeTag::U64).take(33).collect(),
+            vec![],
+        ))
+        .sequence_number(10)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign();
+
+    let status = h.run(txn);
+    assert_success!(status);
+}
 
 #[test]
 fn test_two_to_two_transfer() {
@@ -76,7 +104,5 @@ fn test_two_to_two_transfer() {
 }
 
 fn read_coin(h: &MoveHarness, account: &AccountAddress) -> u64 {
-    h.read_resource::<CoinStoreResource>(account, CoinStoreResource::struct_tag())
-        .unwrap()
-        .coin()
+    h.read_aptos_balance(account)
 }

@@ -106,10 +106,7 @@ mod access_path_cache;
 pub mod counters;
 pub mod data_cache;
 
-#[cfg(feature = "mirai-contracts")]
-pub mod foreign_contracts;
-
-mod adapter_common;
+pub mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
@@ -117,7 +114,9 @@ mod errors;
 pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
+pub mod storage_adapter;
 pub mod system_module_names;
+pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
 mod verifier;

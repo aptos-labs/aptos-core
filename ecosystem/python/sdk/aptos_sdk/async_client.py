@@ -779,10 +779,16 @@ class FaucetClient:
 
     base_url: str
     rest_client: RestClient
+    headers: Dict[str, str]
 
-    def __init__(self, base_url: str, rest_client: RestClient):
+    def __init__(
+        self, base_url: str, rest_client: RestClient, auth_token: Optional[str] = None
+    ):
         self.base_url = base_url
         self.rest_client = rest_client
+        self.headers = {}
+        if auth_token:
+            self.headers["Authorization"] = f"Bearer {auth_token}"
 
     async def close(self):
         await self.rest_client.close()
@@ -790,13 +796,16 @@ class FaucetClient:
     async def fund_account(self, address: AccountAddress, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
-        response = await self.rest_client.client.post(
-            f"{self.base_url}/mint?amount={amount}&address={address}"
-        )
+        request = f"{self.base_url}/mint?amount={amount}&address={address}"
+        response = await self.rest_client.client.post(request, headers=self.headers)
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         for txn_hash in response.json():
             await self.rest_client.wait_for_transaction(txn_hash)
+
+    async def healthy(self) -> bool:
+        response = await self.rest_client.client.get(self.base_url)
+        return "tap:ok" == response.text
 
 
 class ApiError(Exception):

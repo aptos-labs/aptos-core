@@ -32,9 +32,9 @@ const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 /// A poller for storage summaries that is responsible for periodically refreshing
 /// the view of advertised data in the network.
 pub struct DataSummaryPoller {
-    data_client_config: AptosDataClientConfig, // The configuration for the data client
-    data_client: AptosDataClient,              // The data client through which to poll peers
-    poll_loop_interval: Duration,              // The interval between polling loop executions
+    data_client_config: Arc<AptosDataClientConfig>, // The configuration for the data client
+    data_client: AptosDataClient,                   // The data client through which to poll peers
+    poll_loop_interval: Duration,                   // The interval between polling loop executions
     runtime: Option<Handle>, // An optional runtime on which to spawn the poller threads
     storage: Arc<dyn DbReader>, // The reader interface to storage
     time_service: TimeService, // The service to monitor elapsed time
@@ -42,7 +42,7 @@ pub struct DataSummaryPoller {
 
 impl DataSummaryPoller {
     pub fn new(
-        data_client_config: AptosDataClientConfig,
+        data_client_config: Arc<AptosDataClientConfig>,
         data_client: AptosDataClient,
         poll_loop_interval: Duration,
         runtime: Option<Handle>,
@@ -63,7 +63,7 @@ impl DataSummaryPoller {
     pub async fn start_poller(self) {
         // Create and start the latency monitor
         start_latency_monitor(
-            self.data_client_config,
+            self.data_client_config.clone(),
             self.data_client.clone(),
             self.storage.clone(),
             self.time_service.clone(),
@@ -248,7 +248,7 @@ pub(crate) fn poll_peer(
 
 /// Spawns the dedicated latency monitor
 fn start_latency_monitor(
-    data_client_config: AptosDataClientConfig,
+    data_client_config: Arc<AptosDataClientConfig>,
     data_client: AptosDataClient,
     storage: Arc<dyn DbReader>,
     time_service: TimeService,

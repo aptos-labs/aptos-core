@@ -4,8 +4,8 @@ module 0x8675309::M {
         break;
         Tuple()
     }
-    private fun baz(x: u64) {
-        if Ge(x, 5) {
+    private fun baz(x: u64): u64 {
+        if Ge<u64>(x, 5) {
           break
         } else {
           Tuple()
@@ -22,4 +22,7 @@ module 0x8675309::M {
         };
         break
     }
+    spec fun $bar();
+    spec fun $baz(x: u64): u64;
+    spec fun $foo();
 } // end 0x8675309::M

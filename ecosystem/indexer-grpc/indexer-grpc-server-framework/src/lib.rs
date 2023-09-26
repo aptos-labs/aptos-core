@@ -24,9 +24,12 @@ impl ServerArgs {
         C: RunnableConfig,
     {
         // Set up the server.
-        setup_logging();
+        setup_logging(None);
         setup_panic_handler();
         let config = load::<GenericConfig<C>>(&self.config_path)?;
+        config
+            .validate()
+            .context("Config did not pass validation")?;
         run_server_with_config(config).await
     }
 }
@@ -44,13 +47,19 @@ where
     });
     let main_task_handler = runtime.spawn(async move { config.run().await });
     tokio::select! {
-        _ = task_handler => {
-            error!("Probes and metrics handler exited");
-            process::exit(1);
+        res = task_handler => {
+            if let Err(e) = res {
+                error!("Probes and metrics handler panicked or was shutdown: {:?}", e);
+                process::exit(1);
+            }
+            Ok(())
         },
-        _ = main_task_handler => {
-            error!("Main task exited");
-            process::exit(1);
+        res = main_task_handler => {
+            if let Err(e) = res {
+                error!("Main task panicked or was shutdown: {:?}", e);
+                process::exit(1);
+            }
+            Ok(())
         },
     }
 }
@@ -69,6 +78,10 @@ impl<T> RunnableConfig for GenericConfig<T>
 where
     T: RunnableConfig,
 {
+    fn validate(&self) -> Result<()> {
+        self.server_config.validate()
+    }
+
     async fn run(&self) -> Result<()> {
         self.server_config.run().await
     }
@@ -81,7 +94,15 @@ where
 /// RunnableConfig is a trait that all services must implement for their configuration.
 #[async_trait::async_trait]
 pub trait RunnableConfig: DeserializeOwned + Send + Sync + 'static {
+    // Validate the config.
+    fn validate(&self) -> Result<()> {
+        Ok(())
+    }
+
+    // Run something based on the config.
     async fn run(&self) -> Result<()>;
+
+    // Get the server name.
     fn get_server_name(&self) -> String;
 }
 
@@ -103,7 +124,7 @@ pub struct CrashInfo {
 
 /// Invoke to ensure process exits on a thread panic.
 ///
-/// Tokio's default behavior is to catch panics and ignore them.  Invoking this function will
+/// Tokio's default behavior is to catch panics and ignore them. Invoking this function will
 /// ensure that all subsequent thread panics (even Tokio threads) will report the
 /// details/backtrace and then exit.
 pub fn setup_panic_handler() {
@@ -127,20 +148,28 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
     process::exit(12);
 }
 
-/// Set up logging for the server.
-pub fn setup_logging() {
+/// Set up logging for the server. By default we don't set a writer, in which case it
+/// just logs to stdout. This can be overridden using the `make_writer` parameter.
+/// This can be helpful for custom logging, e.g. logging to different files based on
+/// the origin of the logging.
+pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>) {
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
-    tracing_subscriber::fmt()
+
+    let subscriber = tracing_subscriber::fmt()
         .json()
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)
         .with_target(false)
         .with_thread_names(true)
-        .with_env_filter(env_filter)
-        .init();
+        .with_env_filter(env_filter);
+
+    match make_writer {
+        Some(w) => subscriber.with_writer(w).init(),
+        None => subscriber.init(),
+    }
 }
 
 /// Register readiness and liveness probes and set up metrics endpoint.

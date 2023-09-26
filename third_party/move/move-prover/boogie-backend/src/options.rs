@@ -15,13 +15,20 @@ const DEFAULT_BOOGIE_FLAGS: &[&str] = &[
     "-printVerifiedProceduresCount:0",
     "-printModel:1",
     "-enhancedErrorMessages:1",
-    "-monomorphize",
     "-proverOpt:O:model_validate=true",
 ];
 
-const MIN_BOOGIE_VERSION: &str = "2.15.8";
-const MIN_Z3_VERSION: &str = "4.11.0";
-const MIN_CVC5_VERSION: &str = "0.0.3";
+/// Versions for boogie, z3, and cvc5. The upgrade of boogie and z3 is mostly backward compatible,
+/// but not always. Setting the max version allows Prover to warn users for the higher version of
+/// boogie and z3 because those may be incompatible.
+const MIN_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
+const MAX_BOOGIE_VERSION: Option<&str> = Some("3.0.1.0");
+
+const MIN_Z3_VERSION: Option<&str> = Some("4.11.2");
+const MAX_Z3_VERSION: Option<&str> = Some("4.11.2");
+
+const MIN_CVC5_VERSION: Option<&str> = Some("0.0.3");
+const MAX_CVC5_VERSION: Option<&str> = None;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum VectorTheory {
@@ -93,7 +100,7 @@ pub struct BoogieOptions {
     /// List of flags to pass on to boogie.
     pub boogie_flags: Vec<String>,
     /// Whether to use native array theory.
-    pub use_array_theory: bool,
+    pub use_smt_array_theory: bool,
     /// Whether to produce an SMT file for each verification problem.
     pub generate_smt: bool,
     /// Whether native instead of stratified equality should be used.
@@ -160,7 +167,7 @@ impl Default for BoogieOptions {
             cvc5_exe: read_env_var("CVC5_EXE"),
             boogie_flags: vec![],
             debug_trace: false,
-            use_array_theory: false,
+            use_smt_array_theory: false,
             generate_smt: false,
             native_equality: false,
             type_requires: "free requires".to_owned(),
@@ -195,7 +202,7 @@ impl BoogieOptions {
         use VectorTheory::*;
         self.native_equality = self.vector_theory.is_extensional();
         if matches!(self.vector_theory, SmtArray | SmtArrayExt) {
-            self.use_array_theory = true;
+            self.use_smt_array_theory = true;
         }
     }
 
@@ -223,12 +230,12 @@ impl BoogieOptions {
         } else {
             add(&[&format!("-proverOpt:PROVER_PATH={}", &self.z3_exe)]);
         }
-        if self.use_array_theory {
-            add(&["-useArrayTheory"]);
+        if self.use_smt_array_theory {
             if matches!(self.vector_theory, VectorTheory::SmtArray) {
                 add(&["/proverOpt:O:smt.array.extensional=false"])
             }
         } else {
+            add(&["-useArrayAxioms"]);
             add(&[&format!(
                 "-proverOpt:O:smt.QI.EAGER_THRESHOLD={}",
                 self.eager_threshold
@@ -306,17 +313,27 @@ impl BoogieOptions {
                 version_arg,
                 r"version ([0-9.]*)",
             )?;
-            Self::check_version_is_greater("boogie", &version, MIN_BOOGIE_VERSION)?;
+            Self::check_version_is_compatible(
+                "boogie",
+                &version,
+                MIN_BOOGIE_VERSION,
+                MAX_BOOGIE_VERSION,
+            )?;
         }
         if !self.z3_exe.is_empty() && !self.use_cvc5 {
             let version =
                 Self::get_version("z3", &self.z3_exe, &["--version"], r"version ([0-9.]*)")?;
-            Self::check_version_is_greater("z3", &version, MIN_Z3_VERSION)?;
+            Self::check_version_is_compatible("z3", &version, MIN_Z3_VERSION, MAX_Z3_VERSION)?;
         }
         if !self.cvc5_exe.is_empty() && self.use_cvc5 {
             let version =
                 Self::get_version("cvc5", &self.cvc5_exe, &["--version"], r"version ([0-9.]*)")?;
-            Self::check_version_is_greater("cvc5", &version, MIN_CVC5_VERSION)?;
+            Self::check_version_is_compatible(
+                "cvc5",
+                &version,
+                MIN_CVC5_VERSION,
+                MAX_CVC5_VERSION,
+            )?;
         }
         Ok(())
     }
@@ -340,29 +357,55 @@ impl BoogieOptions {
         }
     }
 
-    fn check_version_is_greater(tool: &str, given: &str, expected: &str) -> anyhow::Result<()> {
-        let given_parts = given.split('.').collect_vec();
-        let expected_parts = expected.split('.').collect_vec();
-        if given_parts.len() < expected_parts.len() {
+    fn check_version_is_compatible(
+        tool: &str,
+        given: &str,
+        expected_min: Option<&str>,
+        expected_max: Option<&str>,
+    ) -> anyhow::Result<()> {
+        if let Some(expected) = expected_min {
+            Self::check_version_le(expected, given, "least", expected, given, tool)?;
+        }
+        if let Some(expected) = expected_max {
+            Self::check_version_le(given, expected, "most", expected, given, tool)?;
+        }
+        Ok(())
+    }
+
+    // This function checks if expected_lesser is actually less than or equal to expected_greater
+    fn check_version_le(
+        expected_lesser: &str,
+        expected_greater: &str,
+        relative_term: &str,
+        expected_version: &str,
+        given_version: &str,
+        tool: &str,
+    ) -> anyhow::Result<()> {
+        let lesser_parts = expected_lesser.split('.').collect_vec();
+        let greater_parts = expected_greater.split('.').collect_vec();
+
+        if lesser_parts.len() < greater_parts.len() {
             return Err(anyhow!(
                 "version strings {} and {} for `{}` cannot be compared",
-                given,
-                expected,
-                tool,
+                given_version,
+                expected_version,
+                tool
             ));
         }
-        for (g, e) in given_parts.into_iter().zip(expected_parts.into_iter()) {
+
+        for (l, g) in lesser_parts.into_iter().zip(greater_parts.into_iter()) {
+            let ln = l.parse::<usize>()?;
             let gn = g.parse::<usize>()?;
-            let en = e.parse::<usize>()?;
-            if gn < en {
+            if gn < ln {
                 return Err(anyhow!(
-                    "expected at least version {} but found {} for `{}`",
-                    expected,
-                    given,
+                    "expected at {} version {} but found {} for `{}`",
+                    relative_term,
+                    expected_version,
+                    given_version,
                     tool
                 ));
             }
-            if gn > en {
+            if gn > ln {
                 break;
             }
         }

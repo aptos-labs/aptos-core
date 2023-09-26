@@ -4,7 +4,7 @@
 use crate::{
     diag,
     expansion::ast::{AbilitySet, ModuleIdent, ModuleIdent_, SpecId, Visibility},
-    inlining::visitor::{Dispatcher, TypedDispatcher, TypedVisitor, Visitor, VisitorContinuation},
+    inlining::visitor::{Dispatcher, Visitor, VisitorContinuation},
     naming,
     naming::ast::{
         FunctionSignature, StructDefinition, StructTypeParameter, TParam, TParamID, Type,
@@ -19,6 +19,7 @@ use crate::{
             SpecLambdaLiftedFunction, UnannotatedExp_,
         },
         core::{infer_abilities, InferAbilityContext, Subst},
+        translate::{lvalues_expected_types, sequence_type},
     },
 };
 use move_ir_types::location::{sp, Loc};
@@ -230,7 +231,8 @@ struct SubstitutionVisitor<'l, 'r> {
 
 impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
     fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
-        visit_type(&self.type_arguments, ty)
+        visit_type(&self.type_arguments, ty);
+        VisitorContinuation::Descend
     }
 
     fn exp(&mut self, ex: &mut Exp) -> VisitorContinuation {
@@ -264,7 +266,6 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
                     | BuiltinFunction_::Freeze(ty) => ty,
                     BuiltinFunction_::Assert(_) => return VisitorContinuation::Descend,
                 };
-                self.type_(ty);
                 self.check_resource_usage(ex.exp.loc, ty, true);
                 VisitorContinuation::Descend
             },
@@ -304,7 +305,7 @@ impl<'l, 'r> Visitor for SubstitutionVisitor<'l, 'r> {
         self.shadowed.pop_front();
     }
 
-    fn var_decl(&mut self, var: &mut Var) {
+    fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
         self.shadowed
             .front_mut()
             .expect("scoped")
@@ -375,7 +376,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
 
     fn check_resource_usage(&mut self, loc: Loc, ty: &mut Type, needs_key: bool) {
         match &mut ty.value {
-            Type_::Apply(abilties, n, _) => {
+            Type_::Apply(abilities, n, _) => {
                 if let TypeName_::ModuleType(m, s) = &n.value {
                     if Some(m.value) != self.inliner.current_module {
                         self.inliner.env.add_diag(diag!(Inlining::AfterExpansion,
@@ -383,7 +384,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         ));
                     }
                     if needs_key
-                        && !abilties
+                        && !abilities
                             .as_ref()
                             .map(|a| a.has_ability_(Ability_::Key))
                             .unwrap_or_default()
@@ -391,21 +392,30 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                         self.inliner.env.add_diag(diag!(Inlining::AfterExpansion,
                             (loc, format!("After inlining: invalid storage operation since type `{}::{}` has no `key`", m, s))
                         ));
-                    }
+                    };
+                }
+            },
+            Type_::Param(TParam {
+                user_specified_name,
+                abilities,
+                ..
+            }) => {
+                if needs_key && !abilities.iter().any(|a| a.value == Ability_::Key) {
+                    self.inliner.env.add_diag(diag!(Inlining::AfterExpansion,
+                                                    (loc, format!("After inlining: invalid storage operation since type `{}` has no `key`", user_specified_name))
+                    ));
                 }
             },
             Type_::Ref(_, bt) => self.check_resource_usage(loc, bt.as_mut(), needs_key),
-            Type_::Unit
-            | Type_::Param(_)
-            | Type_::Var(_)
-            | Type_::Anything
-            | Type_::UnresolvedError => {
+            Type_::Unit | Type_::Var(_) | Type_::Anything | Type_::UnresolvedError => {
                 self.inliner.env.add_diag(diag!(
                     Inlining::AfterExpansion,
                     (
                         loc,
-                        "After inlining: invalid storage operation as type is not a struct"
-                            .to_owned()
+                        format!(
+                            "After inlining: invalid storage operation as type {} is not a struct",
+                            ast_debug::display_verbose(ty),
+                        )
                     )
                 ));
             },
@@ -517,7 +527,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
         }
     }
 
-    fn var_decl(&mut self, var: &mut Var) {
+    fn var_decl(&mut self, _ty: &mut Type, var: &mut Var) {
         let new_name = Symbol::from(format!("{}#{}", var.0.value, self.inliner.rename_counter));
         self.inliner.rename_counter += 1;
         self.renamings
@@ -527,7 +537,7 @@ impl<'l, 'r> Visitor for RenamingVisitor<'l, 'r> {
         var.0.value = new_name;
     }
 
-    fn var_use(&mut self, var: &mut Var) {
+    fn var_use(&mut self, _ty: &mut Type, var: &mut Var) {
         for mapping in &self.renamings {
             if let Some(new_name) = mapping.get(&var.0.value) {
                 var.0.value = *new_name
@@ -548,8 +558,8 @@ struct SignatureExtractionVisitor<'l, 'r> {
     used_type_params: BTreeSet<TParam>,
 }
 
-impl<'l, 'r> TypedVisitor for SignatureExtractionVisitor<'l, 'r> {
-    fn ty(&mut self, t: &mut Type) -> VisitorContinuation {
+impl<'l, 'r> Visitor for SignatureExtractionVisitor<'l, 'r> {
+    fn type_(&mut self, t: &mut Type) -> VisitorContinuation {
         if let Type_::Param(param) = &t.value {
             self.used_type_params.insert(param.clone());
         }
@@ -634,23 +644,44 @@ impl<'l> Inliner<'l> {
                     mcall.name.0.value
                 ),
             };
-            let type_arguments = fdef
+            let type_arguments: BTreeMap<TParamID, Type> = fdef
                 .signature
                 .type_parameters
                 .iter()
                 .zip(mcall.type_arguments.iter())
                 .map(|(p, t)| (p.id, t.clone()))
                 .collect();
+
             let mut inliner_visitor = OuterVisitor { inliner: self };
             let mut inlined_args = mcall.arguments.clone();
             Dispatcher::new(&mut inliner_visitor).exp(&mut inlined_args);
-            let mapped_params = fdef
+
+            // Expand Type formal params in types of other params.
+            let mut param_visitor = TypeSubstitutionVisitor {
+                type_arguments: type_arguments.clone(),
+            };
+            let mut param_dispatcher = Dispatcher::new(&mut param_visitor);
+            let fix_types = |(var, mut spanned_type): (Var, Type)| {
+                param_dispatcher.type_(&mut spanned_type);
+                self.infer_abilities(&mut spanned_type);
+                (var, spanned_type)
+            };
+            let mapped_params: Vec<_> = fdef
                 .signature
                 .parameters
                 .iter()
                 .cloned()
-                .zip(get_args_from_exp(&inlined_args));
-            let (decls_for_let, bindings) = self.process_parameters(call_loc, mapped_params);
+                .map(fix_types)
+                .zip(get_args_from_exp(&inlined_args))
+                .collect();
+
+            let (decls_for_let, bindings) =
+                self.process_parameters(call_loc, mapped_params.into_iter());
+
+            // Expand Type formal params in result type
+            let mut result_type = fdef.signature.return_type.clone();
+            param_dispatcher.type_(&mut result_type);
+            self.infer_abilities(&mut result_type);
 
             // Expand the body in its own independent visitor
             self.inline_stack.push_front(global_name); // for cycle detection
@@ -662,21 +693,34 @@ impl<'l> Inliner<'l> {
             };
             Dispatcher::new(&mut sub_visitor).sequence(&mut seq);
             self.inline_stack.pop_front();
+
             // Construct the let
             for decl in decls_for_let.into_iter().rev() {
                 seq.push_front(decl)
             }
-            Some(UnannotatedExp_::Block(seq))
+
+            if seq.len() == 1 {
+                // special case a sequence with a single expression to reduce tree height
+                if let SequenceItem_::Seq(boxed_expr) = seq.pop_front().unwrap().value {
+                    let exp = boxed_expr.exp;
+                    return Some(exp.value);
+                }
+            }
+            let body_loc = fdef.body.loc;
+            let block_exp_type = sequence_type(&seq).clone();
+            let block_exp_ = UnannotatedExp_::Block(seq);
+            let res = make_unannotated_exp_of(block_exp_, block_exp_type, result_type, body_loc);
+            Some(res)
         } else {
             None
         }
     }
 
-    /// Process parameters, splitting them in those which are eagerly bound as regular
-    /// values and those which are lambdas which are going to be transitively inlined.
+    /// Process parameters, splitting them into (1) those which are eagerly evaluated and let-bound
+    /// as regular values, (2) those which are lambdas which are going to be transitively inlined.
     fn process_parameters(
         &mut self,
-        loc: Loc,
+        call_loc: Loc,
         params: impl Iterator<Item = ((Var, Type), Exp)>,
     ) -> (Vec<SequenceItem>, BTreeMap<Symbol, Exp>) {
         let mut bindings = BTreeMap::new();
@@ -685,38 +729,43 @@ impl<'l> Inliner<'l> {
         let mut tys = vec![];
         let mut exps = vec![];
 
-        for ((var, _), e) in params {
-            let ty = e.ty.clone();
+        for ((var, ty), e) in params {
             if ty.value.is_fun() {
                 bindings.insert(var.0.value, e);
             } else {
-                lvalues.push(sp(loc, LValue_::Var(var, Box::new(ty.clone()))));
-                tys.push(ty);
+                lvalues.push(sp(var.loc(), LValue_::Var(var, Box::new(ty.clone()))));
+                tys.push(ty.clone());
                 exps.push(e);
             }
         }
 
-        let opt_tys = tys.iter().map(|t| Some(t.clone())).collect();
-
         let exp = match exps.len() {
             0 => Exp {
-                ty: sp(loc, Type_::Unit),
-                exp: sp(loc, UnannotatedExp_::Unit { trailing: false }),
+                ty: sp(call_loc, Type_::Unit),
+                exp: sp(call_loc, UnannotatedExp_::Unit { trailing: false }),
             },
-            1 => exps.pop().unwrap(),
+            1 => {
+                let exp1 = exps.pop().unwrap();
+                let mut ty = tys.pop().unwrap();
+                self.infer_abilities(&mut ty);
+                make_annotated_exp_of(exp1, ty, call_loc)
+            },
             _ => {
-                let mut ty = Type_::multiple(loc, tys);
+                let mut ty = Type_::multiple(call_loc, tys.clone());
                 self.infer_abilities(&mut ty);
 
                 Exp {
                     ty,
                     exp: sp(
-                        loc,
+                        call_loc,
                         UnannotatedExp_::ExpList(
                             exps.into_iter()
-                                .map(|e| {
-                                    let ty = e.ty.clone();
-                                    ExpListItem::Single(e, Box::new(ty))
+                                .zip(tys.into_iter())
+                                .map(|(e, ty)| {
+                                    ExpListItem::Single(
+                                        make_annotated_exp_of(e, ty.clone(), call_loc),
+                                        Box::new(ty),
+                                    )
                                 })
                                 .collect(),
                         ),
@@ -725,11 +774,44 @@ impl<'l> Inliner<'l> {
             },
         };
 
+        let spanned_lvalues = sp(call_loc, lvalues);
+        let lvalue_ty = lvalues_expected_types(&spanned_lvalues);
+
         let decl = sp(
-            loc,
-            SequenceItem_::Bind(sp(loc, lvalues), opt_tys, Box::new(exp)),
+            call_loc,
+            SequenceItem_::Bind(spanned_lvalues, lvalue_ty, Box::new(exp)),
         );
         (vec![decl], bindings)
+    }
+}
+
+fn make_annotated_exp_of(exp: Exp, ty: Type, loc: Loc) -> Exp {
+    if ty != exp.ty {
+        Exp {
+            ty: ty.clone(),
+            exp: sp(loc, UnannotatedExp_::Annotate(Box::new(exp), Box::new(ty))),
+        }
+    } else {
+        exp
+    }
+}
+
+fn make_unannotated_exp_of(
+    exp_: UnannotatedExp_,
+    exp_ty: Type,
+    result_ty: Type,
+    loc: Loc,
+) -> UnannotatedExp_ {
+    if result_ty != exp_ty {
+        UnannotatedExp_::Annotate(
+            Box::new(Exp {
+                exp: sp(loc, exp_),
+                ty: exp_ty,
+            }),
+            Box::new(result_ty),
+        )
+    } else {
+        exp_
     }
 }
 
@@ -879,7 +961,7 @@ fn lift_lambda_as_function(
         used_local_vars: BTreeMap::new(),
         used_type_params: BTreeSet::new(),
     };
-    TypedDispatcher::new(&mut extraction_visitor).exp(&mut lambda);
+    Dispatcher::new(&mut extraction_visitor).exp(&mut lambda);
     let SignatureExtractionVisitor {
         inliner: _,
         declared_vars: _,
@@ -966,4 +1048,14 @@ fn visit_type(subs: &BTreeMap<TParamID, Type>, ty: &mut Type) -> VisitorContinua
         }
     }
     VisitorContinuation::Descend
+}
+
+struct TypeSubstitutionVisitor {
+    type_arguments: BTreeMap<TParamID, Type>,
+}
+
+impl Visitor for TypeSubstitutionVisitor {
+    fn type_(&mut self, ty: &mut Type) -> VisitorContinuation {
+        visit_type(&self.type_arguments, ty)
+    }
 }

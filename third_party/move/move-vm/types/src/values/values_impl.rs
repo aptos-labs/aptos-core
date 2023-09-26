@@ -1466,7 +1466,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Addition overflow".to_string())
+        })
     }
 
     pub fn sub_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1483,7 +1486,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Subtraction overflow".to_string())
+        })
     }
 
     pub fn mul_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1500,7 +1506,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Multiplication overflow".to_string())
+        })
     }
 
     pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1517,7 +1526,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Division by zero".to_string())
+        })
     }
 
     pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
@@ -1534,7 +1546,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Integer remainder by zero".to_string())
+        })
     }
 
     pub fn bit_or(self, other: Self) -> PartialVMResult<Self> {
@@ -1589,37 +1604,16 @@ impl IntegerValue {
         use IntegerValue::*;
 
         Ok(match self {
-            U8(x) => {
-                if n_bits >= 8 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U8(x << n_bits)
-            },
-            U16(x) => {
-                if n_bits >= 16 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U16(x << n_bits)
-            },
-            U32(x) => {
-                if n_bits >= 32 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U32(x << n_bits)
-            },
-            U64(x) => {
-                if n_bits >= 64 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U64(x << n_bits)
-            },
-            U128(x) => {
-                if n_bits >= 128 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U128(x << n_bits)
-            },
+            U8(x) if n_bits < 8 => IntegerValue::U8(x << n_bits),
+            U16(x) if n_bits < 16 => IntegerValue::U16(x << n_bits),
+            U32(x) if n_bits < 32 => IntegerValue::U32(x << n_bits),
+            U64(x) if n_bits < 64 => IntegerValue::U64(x << n_bits),
+            U128(x) if n_bits < 128 => IntegerValue::U128(x << n_bits),
             U256(x) => IntegerValue::U256(x << n_bits),
+            _ => {
+                return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                    .with_message("Shift Left overflow".to_string()));
+            },
         })
     }
 
@@ -1627,37 +1621,16 @@ impl IntegerValue {
         use IntegerValue::*;
 
         Ok(match self {
-            U8(x) => {
-                if n_bits >= 8 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U8(x >> n_bits)
-            },
-            U16(x) => {
-                if n_bits >= 16 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U16(x >> n_bits)
-            },
-            U32(x) => {
-                if n_bits >= 32 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U32(x >> n_bits)
-            },
-            U64(x) => {
-                if n_bits >= 64 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U64(x >> n_bits)
-            },
-            U128(x) => {
-                if n_bits >= 128 {
-                    return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR));
-                }
-                IntegerValue::U128(x >> n_bits)
-            },
+            U8(x) if n_bits < 8 => IntegerValue::U8(x >> n_bits),
+            U16(x) if n_bits < 16 => IntegerValue::U16(x >> n_bits),
+            U32(x) if n_bits < 32 => IntegerValue::U32(x >> n_bits),
+            U64(x) if n_bits < 64 => IntegerValue::U64(x >> n_bits),
+            U128(x) if n_bits < 128 => IntegerValue::U128(x >> n_bits),
             U256(x) => IntegerValue::U256(x >> n_bits),
+            _ => {
+                return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                    .with_message("Shift Right overflow".to_string()));
+            },
         })
     }
 
@@ -1966,9 +1939,9 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
 
         (Type::Vector(_), Container::Vec(_)) => Ok(()),
 
-        (Type::Struct(_), Container::Vec(_))
+        (Type::Struct { .. }, Container::Vec(_))
         | (Type::Signer, Container::Vec(_))
-        | (Type::StructInstantiation(_, _), Container::Vec(_)) => Ok(()),
+        | (Type::StructInstantiation { .. }, Container::Vec(_)) => Ok(()),
 
         (Type::Reference(_), _) | (Type::MutableReference(_), _) | (Type::TyParam(_), _) => Err(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1985,8 +1958,8 @@ fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
         | (Type::Address, _)
         | (Type::Signer, _)
         | (Type::Vector(_), _)
-        | (Type::Struct(_), _)
-        | (Type::StructInstantiation(_, _), _) => Err(PartialVMError::new(
+        | (Type::Struct { .. }, _)
+        | (Type::StructInstantiation { .. }, _) => Err(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         )
         .with_message(format!(
@@ -2196,11 +2169,16 @@ impl Vector {
                     .collect::<PartialVMResult<Vec<_>>>()?,
             ),
 
-            Type::Signer | Type::Vector(_) | Type::Struct(_) | Type::StructInstantiation(_, _) => {
-                Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                    elements.into_iter().map(|v| v.0).collect(),
-                )))))
-            },
+            Type::Signer
+            | Type::Vector(_)
+            | Type::Struct { .. }
+            | Type::StructInstantiation {
+                name: _,
+                ty_args: _,
+                ..
+            } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
+                elements.into_iter().map(|v| v.0).collect(),
+            ))))),
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -2779,7 +2757,7 @@ pub mod debug {
     }
 
     fn print_address<B: Write>(buf: &mut B, x: &AccountAddress) -> PartialVMResult<()> {
-        debug_write!(buf, "{}", x)
+        debug_write!(buf, "{}", x.to_hex())
     }
 
     fn print_value_impl<B: Write>(buf: &mut B, val: &ValueImpl) -> PartialVMResult<()> {
@@ -2995,7 +2973,6 @@ impl<'a, 'b> serde::Serialize for AnnotatedValue<'a, 'b, MoveTypeLayout, ValueIm
                 })
                 .serialize(serializer)
             },
-
             (MoveTypeLayout::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = &**layout;
                 match (layout, c) {

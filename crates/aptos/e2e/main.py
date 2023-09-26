@@ -30,9 +30,11 @@ import shutil
 import sys
 
 from cases.account import (
-    test_account_create,
+    test_account_create_and_transfer,
+    test_account_list,
     test_account_fund_with_faucet,
     test_account_lookup_address,
+    test_account_resource_account,
     test_account_rotate_key,
 )
 from cases.config import test_config_show_profiles
@@ -54,6 +56,7 @@ from cases.stake import (
     test_stake_create_staking_contract,
     test_stake_increase_lockup,
     test_stake_initialize_stake_owner,
+    test_stake_request_commission,
     test_stake_set_operator,
     test_stake_set_voter,
     test_stake_unlock_stake,
@@ -136,8 +139,10 @@ def run_tests(run_helper):
 
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
-    test_account_create(run_helper)
+    test_account_create_and_transfer(run_helper)
+    test_account_list(run_helper)
     test_account_lookup_address(run_helper)
+    test_account_resource_account(run_helper)
 
     # Make sure the aptos-cli header is included on the original request
     test_aptos_header_included(run_helper)
@@ -159,6 +164,7 @@ def run_tests(run_helper):
     test_stake_set_operator(run_helper)
     test_stake_set_voter(run_helper)
     test_stake_create_staking_contract(run_helper)
+    test_stake_request_commission(run_helper)
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)

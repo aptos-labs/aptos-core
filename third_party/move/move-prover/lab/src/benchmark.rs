@@ -14,7 +14,7 @@ use clap::{
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use itertools::Itertools;
 use log::LevelFilter;
-use move_compiler::shared::PackagePaths;
+use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_model::{
     model::{FunctionEnv, GlobalEnv, ModuleEnv, VerificationScope},
     parse_addresses_from_options, run_model_builder_with_options,
@@ -23,7 +23,7 @@ use move_prover::{
     check_errors, cli::Options, create_and_process_bytecode, create_init_num_operation_state,
     generate_boogie, verify_boogie,
 };
-use move_stackless_bytecode::options::ProverOptions;
+use move_prover_bytecode_pipeline::options::ProverOptions;
 use std::{
     fmt::Debug,
     fs::File,
@@ -150,6 +150,8 @@ fn run_benchmark(
     };
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
     options.move_deps.append(&mut dep_dirs.to_vec());
+    let skip_attribute_checks = true;
+    let known_attributes = KnownAttribute::get_all_attribute_names().clone();
     let env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
@@ -162,6 +164,8 @@ fn run_benchmark(
             named_address_map: addrs,
         }],
         options.model_builder.clone(),
+        skip_attribute_checks,
+        &known_attributes,
     )?;
     let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
 
@@ -182,7 +186,9 @@ fn run_benchmark(
     // Do not allow any benchmark to run longer than 60s. If this is exceeded it usually
     // indicates a bug in boogie or the solver, because we already propagate soft timeouts, but
     // they are ignored.
-    options.backend.hard_timeout_secs = 60;
+    options.backend.hard_timeout_secs = 400;
+    options.backend.global_timeout_overwrite = false;
+    options.backend.vc_timeout = 300;
 
     options.verbosity_level = LevelFilter::Warn;
     options.backend.proc_cores = 1;

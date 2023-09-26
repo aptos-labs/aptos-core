@@ -10,7 +10,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 pub(crate) struct MockChangeSetChecker;
 
@@ -34,11 +34,11 @@ macro_rules! as_bytes {
 }
 
 pub(crate) fn mock_create(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Creation(as_bytes!(v)))
+    (as_state_key!(k), WriteOp::Creation(as_bytes!(v).into()))
 }
 
 pub(crate) fn mock_modify(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Modification(as_bytes!(v)))
+    (as_state_key!(k), WriteOp::Modification(as_bytes!(v).into()))
 }
 
 pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
@@ -57,10 +57,10 @@ pub(crate) fn build_change_set(
     aggregator_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
 ) -> VMChangeSet {
     VMChangeSet::new(
-        BTreeMap::from_iter(resource_write_set),
-        BTreeMap::from_iter(module_write_set),
-        BTreeMap::from_iter(aggregator_write_set),
-        BTreeMap::from_iter(aggregator_delta_set),
+        HashMap::from_iter(resource_write_set),
+        HashMap::from_iter(module_write_set),
+        HashMap::from_iter(aggregator_write_set),
+        HashMap::from_iter(aggregator_delta_set),
         vec![],
         &MockChangeSetChecker,
     )

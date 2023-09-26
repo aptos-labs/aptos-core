@@ -37,6 +37,8 @@ aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
+claims = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
@@ -60,13 +62,14 @@ smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
 proptest = { workspace = true }
+rand_core = { workspace = true }
 
 [features]
 default = []
-mirai-contracts = []
 fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]

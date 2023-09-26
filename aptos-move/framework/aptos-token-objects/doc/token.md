@@ -479,7 +479,7 @@ additional specialization.
 
 ## Function `create_token_address`
 
-Generates the collections address based upon the creators address and the collection's name
+Generates the token's address based upon the creator's address, the collection's name and the token's name.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_token_address">create_token_address</a>(creator: &<b>address</b>, <a href="collection.md#0x4_collection">collection</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <b>address</b>
@@ -504,7 +504,7 @@ Generates the collections address based upon the creators address and the collec
 
 ## Function `create_token_seed`
 
-Named objects are derived from a seed, the collection's seed is its name.
+Named objects are derived from a seed, the token's seed is its name appended to the collection's name.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_create_token_seed">create_token_seed</a>(<a href="collection.md#0x4_collection">collection</a>: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, name: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;

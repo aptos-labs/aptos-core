@@ -13,4 +13,5 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+rayon = { workspace = true }
 tokio = { workspace = true }

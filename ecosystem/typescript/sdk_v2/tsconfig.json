@@ -14,7 +14,7 @@
     "outDir": "./dist",
     "sourceMap": true,
     "strict": true,
-    "target": "es6"
+    "target": "es2020"
   },
   "include": ["src", "tests"]
 }

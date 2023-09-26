@@ -20,7 +20,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, ContractEventV1},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeatures, APTOS_MAX_KNOWN_VERSION,
@@ -111,6 +111,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         ChainId::test().id(),
         Features::default(),
         TimedFeatures::enable_all(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -160,7 +161,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        change_set.aggregator_delta_set().is_empty(),
+        change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
     assert!(!change_set.write_set_iter().any(|(_, op)| op.is_deletion()));
@@ -219,6 +220,7 @@ pub fn encode_genesis_change_set(
         ChainId::test().id(),
         Features::default(),
         TimedFeatures::enable_all(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -270,7 +272,7 @@ pub fn encode_genesis_change_set(
     // not deltas. The second session only publishes the framework module bundle, which should not
     // produce deltas either.
     assert!(
-        change_set.aggregator_delta_set().is_empty(),
+        change_set.aggregator_v1_delta_set().is_empty(),
         "non-empty delta change set in genesis"
     );
 
@@ -410,14 +412,24 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::RESOURCE_GROUPS,
         FeatureFlag::MULTISIG_ACCOUNTS,
         FeatureFlag::DELEGATION_POOLS,
-        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
-        FeatureFlag::STRUCT_CONSTRUCTORS,
         FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
         FeatureFlag::BLS12_381_STRUCTURES,
+        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
+        FeatureFlag::STRUCT_CONSTRUCTORS,
+        FeatureFlag::SIGNATURE_CHECKER_V2,
+        FeatureFlag::STORAGE_SLOT_METADATA,
         FeatureFlag::CHARGE_INVARIANT_VIOLATION,
         FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
         FeatureFlag::GAS_PAYER_ENABLED,
         FeatureFlag::BULLETPROOFS_NATIVES,
+        FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+        FeatureFlag::MODULE_EVENT,
+        FeatureFlag::EMIT_FEE_STATEMENT,
+        FeatureFlag::STORAGE_DELETION_REFUND,
+        FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
+        FeatureFlag::AGGREGATOR_SNAPSHOTS,
+        FeatureFlag::SAFER_RESOURCE_GROUPS,
+        FeatureFlag::SAFER_METADATA,
     ]
 }
 
@@ -629,16 +641,22 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 
 /// Verify the consistency of the genesis `WriteSet`
 fn verify_genesis_write_set(events: &[ContractEvent]) {
-    let new_epoch_events: Vec<&ContractEvent> = events
+    let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
-        .filter(|e| e.key() == &NewEpochEvent::event_key())
+        .filter_map(|e| {
+            if e.event_key() == Some(&NewEpochEvent::event_key()) {
+                Some(e.v1().unwrap())
+            } else {
+                None
+            }
+        })
         .collect();
     assert_eq!(
         new_epoch_events.len(),
         1,
         "There should only be exactly one NewEpochEvent"
     );
-    assert_eq!(new_epoch_events[0].sequence_number(), 0,);
+    assert_eq!(new_epoch_events[0].sequence_number(), 0);
 }
 
 /// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions
@@ -888,6 +906,7 @@ pub fn test_genesis_module_publishing() {
         ChainId::test().id(),
         Features::default(),
         TimedFeatures::enable_all(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();

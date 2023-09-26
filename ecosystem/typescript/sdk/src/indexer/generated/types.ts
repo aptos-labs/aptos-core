@@ -80,10 +80,17 @@ export type String_Comparison_Exp = {
 export type Account_Transactions = {
   __typename?: 'account_transactions';
   account_address: Scalars['String'];
+  /** An array relationship */
   coin_activities: Array<Coin_Activities>;
+  /** An aggregate relationship */
   coin_activities_aggregate: Coin_Activities_Aggregate;
+  /** An array relationship */
   delegated_staking_activities: Array<Delegated_Staking_Activities>;
+  /** An array relationship */
+  fungible_asset_activities: Array<Fungible_Asset_Activities>;
+  /** An array relationship */
   token_activities: Array<Token_Activities>;
+  /** An aggregate relationship */
   token_activities_aggregate: Token_Activities_Aggregate;
   /** An array relationship */
   token_activities_v2: Array<Token_Activities_V2>;
@@ -120,6 +127,16 @@ export type Account_TransactionsDelegated_Staking_ActivitiesArgs = {
   offset?: InputMaybe<Scalars['Int']>;
   order_by?: InputMaybe<Array<Delegated_Staking_Activities_Order_By>>;
   where?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+};
+
+
+/** columns and relationships of "account_transactions" */
+export type Account_TransactionsFungible_Asset_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Fungible_Asset_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Fungible_Asset_Activities_Order_By>>;
+  where?: InputMaybe<Fungible_Asset_Activities_Bool_Exp>;
 };
 
 
@@ -206,6 +223,7 @@ export type Account_Transactions_Bool_Exp = {
   account_address?: InputMaybe<String_Comparison_Exp>;
   coin_activities?: InputMaybe<Coin_Activities_Bool_Exp>;
   delegated_staking_activities?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+  fungible_asset_activities?: InputMaybe<Fungible_Asset_Activities_Bool_Exp>;
   token_activities?: InputMaybe<Token_Activities_Bool_Exp>;
   token_activities_v2?: InputMaybe<Token_Activities_V2_Bool_Exp>;
   transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
@@ -230,6 +248,7 @@ export type Account_Transactions_Order_By = {
   account_address?: InputMaybe<Order_By>;
   coin_activities_aggregate?: InputMaybe<Coin_Activities_Aggregate_Order_By>;
   delegated_staking_activities_aggregate?: InputMaybe<Delegated_Staking_Activities_Aggregate_Order_By>;
+  fungible_asset_activities_aggregate?: InputMaybe<Fungible_Asset_Activities_Aggregate_Order_By>;
   token_activities_aggregate?: InputMaybe<Token_Activities_Aggregate_Order_By>;
   token_activities_v2_aggregate?: InputMaybe<Token_Activities_V2_Aggregate_Order_By>;
   transaction_version?: InputMaybe<Order_By>;
@@ -357,11 +376,20 @@ export type Address_Events_Summary_Stream_Cursor_Value_Input = {
 export type Address_Version_From_Events = {
   __typename?: 'address_version_from_events';
   account_address?: Maybe<Scalars['String']>;
+  /** An array relationship */
   coin_activities: Array<Coin_Activities>;
+  /** An aggregate relationship */
   coin_activities_aggregate: Coin_Activities_Aggregate;
+  /** An array relationship */
   delegated_staking_activities: Array<Delegated_Staking_Activities>;
+  /** An array relationship */
   token_activities: Array<Token_Activities>;
+  /** An aggregate relationship */
   token_activities_aggregate: Token_Activities_Aggregate;
+  /** An array relationship */
+  token_activities_v2: Array<Token_Activities_V2>;
+  /** An aggregate relationship */
+  token_activities_v2_aggregate: Token_Activities_V2_Aggregate;
   transaction_version?: Maybe<Scalars['bigint']>;
 };
 
@@ -415,6 +443,26 @@ export type Address_Version_From_EventsToken_Activities_AggregateArgs = {
   where?: InputMaybe<Token_Activities_Bool_Exp>;
 };
 
+
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_EventsToken_Activities_V2Args = {
+  distinct_on?: InputMaybe<Array<Token_Activities_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Token_Activities_V2_Order_By>>;
+  where?: InputMaybe<Token_Activities_V2_Bool_Exp>;
+};
+
+
+/** columns and relationships of "address_version_from_events" */
+export type Address_Version_From_EventsToken_Activities_V2_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Token_Activities_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Token_Activities_V2_Order_By>>;
+  where?: InputMaybe<Token_Activities_V2_Bool_Exp>;
+};
+
 /** aggregated selection of "address_version_from_events" */
 export type Address_Version_From_Events_Aggregate = {
   __typename?: 'address_version_from_events_aggregate';
@@ -457,6 +505,10 @@ export type Address_Version_From_Events_Bool_Exp = {
   _not?: InputMaybe<Address_Version_From_Events_Bool_Exp>;
   _or?: InputMaybe<Array<Address_Version_From_Events_Bool_Exp>>;
   account_address?: InputMaybe<String_Comparison_Exp>;
+  coin_activities?: InputMaybe<Coin_Activities_Bool_Exp>;
+  delegated_staking_activities?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+  token_activities?: InputMaybe<Token_Activities_Bool_Exp>;
+  token_activities_v2?: InputMaybe<Token_Activities_V2_Bool_Exp>;
   transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
 };
 
@@ -477,6 +529,10 @@ export type Address_Version_From_Events_Min_Fields = {
 /** Ordering options when selecting data from "address_version_from_events". */
 export type Address_Version_From_Events_Order_By = {
   account_address?: InputMaybe<Order_By>;
+  coin_activities_aggregate?: InputMaybe<Coin_Activities_Aggregate_Order_By>;
+  delegated_staking_activities_aggregate?: InputMaybe<Delegated_Staking_Activities_Aggregate_Order_By>;
+  token_activities_aggregate?: InputMaybe<Token_Activities_Aggregate_Order_By>;
+  token_activities_v2_aggregate?: InputMaybe<Token_Activities_V2_Aggregate_Order_By>;
   transaction_version?: InputMaybe<Order_By>;
 };
 
@@ -548,11 +604,20 @@ export type Address_Version_From_Events_Variance_Fields = {
 export type Address_Version_From_Move_Resources = {
   __typename?: 'address_version_from_move_resources';
   address?: Maybe<Scalars['String']>;
+  /** An array relationship */
   coin_activities: Array<Coin_Activities>;
+  /** An aggregate relationship */
   coin_activities_aggregate: Coin_Activities_Aggregate;
+  /** An array relationship */
   delegated_staking_activities: Array<Delegated_Staking_Activities>;
+  /** An array relationship */
   token_activities: Array<Token_Activities>;
+  /** An aggregate relationship */
   token_activities_aggregate: Token_Activities_Aggregate;
+  /** An array relationship */
+  token_activities_v2: Array<Token_Activities_V2>;
+  /** An aggregate relationship */
+  token_activities_v2_aggregate: Token_Activities_V2_Aggregate;
   transaction_version?: Maybe<Scalars['bigint']>;
 };
 
@@ -606,18 +671,96 @@ export type Address_Version_From_Move_ResourcesToken_Activities_AggregateArgs = 
   where?: InputMaybe<Token_Activities_Bool_Exp>;
 };
 
+
+/** columns and relationships of "address_version_from_move_resources" */
+export type Address_Version_From_Move_ResourcesToken_Activities_V2Args = {
+  distinct_on?: InputMaybe<Array<Token_Activities_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Token_Activities_V2_Order_By>>;
+  where?: InputMaybe<Token_Activities_V2_Bool_Exp>;
+};
+
+
+/** columns and relationships of "address_version_from_move_resources" */
+export type Address_Version_From_Move_ResourcesToken_Activities_V2_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Token_Activities_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Token_Activities_V2_Order_By>>;
+  where?: InputMaybe<Token_Activities_V2_Bool_Exp>;
+};
+
+/** aggregated selection of "address_version_from_move_resources" */
+export type Address_Version_From_Move_Resources_Aggregate = {
+  __typename?: 'address_version_from_move_resources_aggregate';
+  aggregate?: Maybe<Address_Version_From_Move_Resources_Aggregate_Fields>;
+  nodes: Array<Address_Version_From_Move_Resources>;
+};
+
+/** aggregate fields of "address_version_from_move_resources" */
+export type Address_Version_From_Move_Resources_Aggregate_Fields = {
+  __typename?: 'address_version_from_move_resources_aggregate_fields';
+  avg?: Maybe<Address_Version_From_Move_Resources_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Address_Version_From_Move_Resources_Max_Fields>;
+  min?: Maybe<Address_Version_From_Move_Resources_Min_Fields>;
+  stddev?: Maybe<Address_Version_From_Move_Resources_Stddev_Fields>;
+  stddev_pop?: Maybe<Address_Version_From_Move_Resources_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Address_Version_From_Move_Resources_Stddev_Samp_Fields>;
+  sum?: Maybe<Address_Version_From_Move_Resources_Sum_Fields>;
+  var_pop?: Maybe<Address_Version_From_Move_Resources_Var_Pop_Fields>;
+  var_samp?: Maybe<Address_Version_From_Move_Resources_Var_Samp_Fields>;
+  variance?: Maybe<Address_Version_From_Move_Resources_Variance_Fields>;
+};
+
+
+/** aggregate fields of "address_version_from_move_resources" */
+export type Address_Version_From_Move_Resources_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Address_Version_From_Move_Resources_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Address_Version_From_Move_Resources_Avg_Fields = {
+  __typename?: 'address_version_from_move_resources_avg_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
 /** Boolean expression to filter rows from the table "address_version_from_move_resources". All fields are combined with a logical 'AND'. */
 export type Address_Version_From_Move_Resources_Bool_Exp = {
   _and?: InputMaybe<Array<Address_Version_From_Move_Resources_Bool_Exp>>;
   _not?: InputMaybe<Address_Version_From_Move_Resources_Bool_Exp>;
   _or?: InputMaybe<Array<Address_Version_From_Move_Resources_Bool_Exp>>;
   address?: InputMaybe<String_Comparison_Exp>;
+  coin_activities?: InputMaybe<Coin_Activities_Bool_Exp>;
+  delegated_staking_activities?: InputMaybe<Delegated_Staking_Activities_Bool_Exp>;
+  token_activities?: InputMaybe<Token_Activities_Bool_Exp>;
+  token_activities_v2?: InputMaybe<Token_Activities_V2_Bool_Exp>;
   transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Address_Version_From_Move_Resources_Max_Fields = {
+  __typename?: 'address_version_from_move_resources_max_fields';
+  address?: Maybe<Scalars['String']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate min on columns */
+export type Address_Version_From_Move_Resources_Min_Fields = {
+  __typename?: 'address_version_from_move_resources_min_fields';
+  address?: Maybe<Scalars['String']>;
+  transaction_version?: Maybe<Scalars['bigint']>;
 };
 
 /** Ordering options when selecting data from "address_version_from_move_resources". */
 export type Address_Version_From_Move_Resources_Order_By = {
   address?: InputMaybe<Order_By>;
+  coin_activities_aggregate?: InputMaybe<Coin_Activities_Aggregate_Order_By>;
+  delegated_staking_activities_aggregate?: InputMaybe<Delegated_Staking_Activities_Aggregate_Order_By>;
+  token_activities_aggregate?: InputMaybe<Token_Activities_Aggregate_Order_By>;
+  token_activities_v2_aggregate?: InputMaybe<Token_Activities_V2_Aggregate_Order_By>;
   transaction_version?: InputMaybe<Order_By>;
 };
 
@@ -628,6 +771,24 @@ export enum Address_Version_From_Move_Resources_Select_Column {
   /** column name */
   TransactionVersion = 'transaction_version'
 }
+
+/** aggregate stddev on columns */
+export type Address_Version_From_Move_Resources_Stddev_Fields = {
+  __typename?: 'address_version_from_move_resources_stddev_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Address_Version_From_Move_Resources_Stddev_Pop_Fields = {
+  __typename?: 'address_version_from_move_resources_stddev_pop_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Address_Version_From_Move_Resources_Stddev_Samp_Fields = {
+  __typename?: 'address_version_from_move_resources_stddev_samp_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
 
 /** Streaming cursor of the table "address_version_from_move_resources" */
 export type Address_Version_From_Move_Resources_Stream_Cursor_Input = {
@@ -641,6 +802,30 @@ export type Address_Version_From_Move_Resources_Stream_Cursor_Input = {
 export type Address_Version_From_Move_Resources_Stream_Cursor_Value_Input = {
   address?: InputMaybe<Scalars['String']>;
   transaction_version?: InputMaybe<Scalars['bigint']>;
+};
+
+/** aggregate sum on columns */
+export type Address_Version_From_Move_Resources_Sum_Fields = {
+  __typename?: 'address_version_from_move_resources_sum_fields';
+  transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate var_pop on columns */
+export type Address_Version_From_Move_Resources_Var_Pop_Fields = {
+  __typename?: 'address_version_from_move_resources_var_pop_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Address_Version_From_Move_Resources_Var_Samp_Fields = {
+  __typename?: 'address_version_from_move_resources_var_samp_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Address_Version_From_Move_Resources_Variance_Fields = {
+  __typename?: 'address_version_from_move_resources_variance_fields';
+  transaction_version?: Maybe<Scalars['Float']>;
 };
 
 /** Boolean expression to compare columns of type "bigint". All fields are combined with logical 'AND'. */
@@ -760,7 +945,7 @@ export type Coin_Activities = {
   activity_type: Scalars['String'];
   amount: Scalars['numeric'];
   /** An array relationship */
-  aptos_names: Array<Current_Ans_Lookup>;
+  aptos_names: Array<Current_Aptos_Names>;
   block_height: Scalars['bigint'];
   /** An object relationship */
   coin_info?: Maybe<Coin_Infos>;
@@ -780,11 +965,11 @@ export type Coin_Activities = {
 
 /** columns and relationships of "coin_activities" */
 export type Coin_ActivitiesAptos_NamesArgs = {
-  distinct_on?: InputMaybe<Array<Current_Ans_Lookup_Select_Column>>;
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Current_Ans_Lookup_Order_By>>;
-  where?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
 };
 
 /** aggregated selection of "coin_activities" */
@@ -860,7 +1045,7 @@ export type Coin_Activities_Bool_Exp = {
   _or?: InputMaybe<Array<Coin_Activities_Bool_Exp>>;
   activity_type?: InputMaybe<String_Comparison_Exp>;
   amount?: InputMaybe<Numeric_Comparison_Exp>;
-  aptos_names?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  aptos_names?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
   block_height?: InputMaybe<Bigint_Comparison_Exp>;
   coin_info?: InputMaybe<Coin_Infos_Bool_Exp>;
   coin_type?: InputMaybe<String_Comparison_Exp>;
@@ -946,7 +1131,7 @@ export type Coin_Activities_Min_Order_By = {
 export type Coin_Activities_Order_By = {
   activity_type?: InputMaybe<Order_By>;
   amount?: InputMaybe<Order_By>;
-  aptos_names_aggregate?: InputMaybe<Current_Ans_Lookup_Aggregate_Order_By>;
+  aptos_names_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
   block_height?: InputMaybe<Order_By>;
   coin_info?: InputMaybe<Coin_Infos_Order_By>;
   coin_type?: InputMaybe<Order_By>;
@@ -1514,9 +1699,11 @@ export type Current_Ans_Lookup = {
   all_token_ownerships_aggregate: Current_Token_Ownerships_Aggregate;
   domain: Scalars['String'];
   expiration_timestamp: Scalars['timestamp'];
+  is_deleted: Scalars['Boolean'];
   last_transaction_version: Scalars['bigint'];
   registered_address?: Maybe<Scalars['String']>;
   subdomain: Scalars['String'];
+  token_name: Scalars['String'];
 };
 
 
@@ -1539,26 +1726,6 @@ export type Current_Ans_LookupAll_Token_Ownerships_AggregateArgs = {
   where?: InputMaybe<Current_Token_Ownerships_Bool_Exp>;
 };
 
-/** order by aggregate values of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Aggregate_Order_By = {
-  avg?: InputMaybe<Current_Ans_Lookup_Avg_Order_By>;
-  count?: InputMaybe<Order_By>;
-  max?: InputMaybe<Current_Ans_Lookup_Max_Order_By>;
-  min?: InputMaybe<Current_Ans_Lookup_Min_Order_By>;
-  stddev?: InputMaybe<Current_Ans_Lookup_Stddev_Order_By>;
-  stddev_pop?: InputMaybe<Current_Ans_Lookup_Stddev_Pop_Order_By>;
-  stddev_samp?: InputMaybe<Current_Ans_Lookup_Stddev_Samp_Order_By>;
-  sum?: InputMaybe<Current_Ans_Lookup_Sum_Order_By>;
-  var_pop?: InputMaybe<Current_Ans_Lookup_Var_Pop_Order_By>;
-  var_samp?: InputMaybe<Current_Ans_Lookup_Var_Samp_Order_By>;
-  variance?: InputMaybe<Current_Ans_Lookup_Variance_Order_By>;
-};
-
-/** order by avg() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Avg_Order_By = {
-  last_transaction_version?: InputMaybe<Order_By>;
-};
-
 /** Boolean expression to filter rows from the table "current_ans_lookup". All fields are combined with a logical 'AND'. */
 export type Current_Ans_Lookup_Bool_Exp = {
   _and?: InputMaybe<Array<Current_Ans_Lookup_Bool_Exp>>;
@@ -1567,27 +1734,11 @@ export type Current_Ans_Lookup_Bool_Exp = {
   all_token_ownerships?: InputMaybe<Current_Token_Ownerships_Bool_Exp>;
   domain?: InputMaybe<String_Comparison_Exp>;
   expiration_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  is_deleted?: InputMaybe<Boolean_Comparison_Exp>;
   last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
   registered_address?: InputMaybe<String_Comparison_Exp>;
   subdomain?: InputMaybe<String_Comparison_Exp>;
-};
-
-/** order by max() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Max_Order_By = {
-  domain?: InputMaybe<Order_By>;
-  expiration_timestamp?: InputMaybe<Order_By>;
-  last_transaction_version?: InputMaybe<Order_By>;
-  registered_address?: InputMaybe<Order_By>;
-  subdomain?: InputMaybe<Order_By>;
-};
-
-/** order by min() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Min_Order_By = {
-  domain?: InputMaybe<Order_By>;
-  expiration_timestamp?: InputMaybe<Order_By>;
-  last_transaction_version?: InputMaybe<Order_By>;
-  registered_address?: InputMaybe<Order_By>;
-  subdomain?: InputMaybe<Order_By>;
+  token_name?: InputMaybe<String_Comparison_Exp>;
 };
 
 /** Ordering options when selecting data from "current_ans_lookup". */
@@ -1595,9 +1746,11 @@ export type Current_Ans_Lookup_Order_By = {
   all_token_ownerships_aggregate?: InputMaybe<Current_Token_Ownerships_Aggregate_Order_By>;
   domain?: InputMaybe<Order_By>;
   expiration_timestamp?: InputMaybe<Order_By>;
+  is_deleted?: InputMaybe<Order_By>;
   last_transaction_version?: InputMaybe<Order_By>;
   registered_address?: InputMaybe<Order_By>;
   subdomain?: InputMaybe<Order_By>;
+  token_name?: InputMaybe<Order_By>;
 };
 
 /** select columns of table "current_ans_lookup" */
@@ -1607,27 +1760,16 @@ export enum Current_Ans_Lookup_Select_Column {
   /** column name */
   ExpirationTimestamp = 'expiration_timestamp',
   /** column name */
+  IsDeleted = 'is_deleted',
+  /** column name */
   LastTransactionVersion = 'last_transaction_version',
   /** column name */
   RegisteredAddress = 'registered_address',
   /** column name */
-  Subdomain = 'subdomain'
+  Subdomain = 'subdomain',
+  /** column name */
+  TokenName = 'token_name'
 }
-
-/** order by stddev() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Stddev_Order_By = {
-  last_transaction_version?: InputMaybe<Order_By>;
-};
-
-/** order by stddev_pop() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Stddev_Pop_Order_By = {
-  last_transaction_version?: InputMaybe<Order_By>;
-};
-
-/** order by stddev_samp() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Stddev_Samp_Order_By = {
-  last_transaction_version?: InputMaybe<Order_By>;
-};
 
 /** Streaming cursor of the table "current_ans_lookup" */
 export type Current_Ans_Lookup_Stream_Cursor_Input = {
@@ -1641,28 +1783,159 @@ export type Current_Ans_Lookup_Stream_Cursor_Input = {
 export type Current_Ans_Lookup_Stream_Cursor_Value_Input = {
   domain?: InputMaybe<Scalars['String']>;
   expiration_timestamp?: InputMaybe<Scalars['timestamp']>;
+  is_deleted?: InputMaybe<Scalars['Boolean']>;
   last_transaction_version?: InputMaybe<Scalars['bigint']>;
   registered_address?: InputMaybe<Scalars['String']>;
   subdomain?: InputMaybe<Scalars['String']>;
+  token_name?: InputMaybe<Scalars['String']>;
 };
 
-/** order by sum() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Sum_Order_By = {
+/** columns and relationships of "current_aptos_names" */
+export type Current_Aptos_Names = {
+  __typename?: 'current_aptos_names';
+  domain?: Maybe<Scalars['String']>;
+  expiration_timestamp?: Maybe<Scalars['timestamp']>;
+  is_primary?: Maybe<Scalars['Boolean']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  registered_address?: Maybe<Scalars['String']>;
+  subdomain?: Maybe<Scalars['String']>;
+  token_name?: Maybe<Scalars['String']>;
+};
+
+/** order by aggregate values of table "current_aptos_names" */
+export type Current_Aptos_Names_Aggregate_Order_By = {
+  avg?: InputMaybe<Current_Aptos_Names_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<Current_Aptos_Names_Max_Order_By>;
+  min?: InputMaybe<Current_Aptos_Names_Min_Order_By>;
+  stddev?: InputMaybe<Current_Aptos_Names_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<Current_Aptos_Names_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<Current_Aptos_Names_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<Current_Aptos_Names_Sum_Order_By>;
+  var_pop?: InputMaybe<Current_Aptos_Names_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<Current_Aptos_Names_Var_Samp_Order_By>;
+  variance?: InputMaybe<Current_Aptos_Names_Variance_Order_By>;
+};
+
+/** order by avg() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Avg_Order_By = {
   last_transaction_version?: InputMaybe<Order_By>;
 };
 
-/** order by var_pop() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Var_Pop_Order_By = {
+/** Boolean expression to filter rows from the table "current_aptos_names". All fields are combined with a logical 'AND'. */
+export type Current_Aptos_Names_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Aptos_Names_Bool_Exp>>;
+  _not?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Aptos_Names_Bool_Exp>>;
+  domain?: InputMaybe<String_Comparison_Exp>;
+  expiration_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  is_primary?: InputMaybe<Boolean_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  registered_address?: InputMaybe<String_Comparison_Exp>;
+  subdomain?: InputMaybe<String_Comparison_Exp>;
+  token_name?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** order by max() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Max_Order_By = {
+  domain?: InputMaybe<Order_By>;
+  expiration_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  registered_address?: InputMaybe<Order_By>;
+  subdomain?: InputMaybe<Order_By>;
+  token_name?: InputMaybe<Order_By>;
+};
+
+/** order by min() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Min_Order_By = {
+  domain?: InputMaybe<Order_By>;
+  expiration_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  registered_address?: InputMaybe<Order_By>;
+  subdomain?: InputMaybe<Order_By>;
+  token_name?: InputMaybe<Order_By>;
+};
+
+/** Ordering options when selecting data from "current_aptos_names". */
+export type Current_Aptos_Names_Order_By = {
+  domain?: InputMaybe<Order_By>;
+  expiration_timestamp?: InputMaybe<Order_By>;
+  is_primary?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  registered_address?: InputMaybe<Order_By>;
+  subdomain?: InputMaybe<Order_By>;
+  token_name?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_aptos_names" */
+export enum Current_Aptos_Names_Select_Column {
+  /** column name */
+  Domain = 'domain',
+  /** column name */
+  ExpirationTimestamp = 'expiration_timestamp',
+  /** column name */
+  IsPrimary = 'is_primary',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  RegisteredAddress = 'registered_address',
+  /** column name */
+  Subdomain = 'subdomain',
+  /** column name */
+  TokenName = 'token_name'
+}
+
+/** order by stddev() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Stddev_Order_By = {
   last_transaction_version?: InputMaybe<Order_By>;
 };
 
-/** order by var_samp() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Var_Samp_Order_By = {
+/** order by stddev_pop() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Stddev_Pop_Order_By = {
   last_transaction_version?: InputMaybe<Order_By>;
 };
 
-/** order by variance() on columns of table "current_ans_lookup" */
-export type Current_Ans_Lookup_Variance_Order_By = {
+/** order by stddev_samp() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Stddev_Samp_Order_By = {
+  last_transaction_version?: InputMaybe<Order_By>;
+};
+
+/** Streaming cursor of the table "current_aptos_names" */
+export type Current_Aptos_Names_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Aptos_Names_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Aptos_Names_Stream_Cursor_Value_Input = {
+  domain?: InputMaybe<Scalars['String']>;
+  expiration_timestamp?: InputMaybe<Scalars['timestamp']>;
+  is_primary?: InputMaybe<Scalars['Boolean']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  registered_address?: InputMaybe<Scalars['String']>;
+  subdomain?: InputMaybe<Scalars['String']>;
+  token_name?: InputMaybe<Scalars['String']>;
+};
+
+/** order by sum() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Sum_Order_By = {
+  last_transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by var_pop() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Var_Pop_Order_By = {
+  last_transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by var_samp() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Var_Samp_Order_By = {
+  last_transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by variance() on columns of table "current_aptos_names" */
+export type Current_Aptos_Names_Variance_Order_By = {
   last_transaction_version?: InputMaybe<Order_By>;
 };
 
@@ -2234,15 +2507,93 @@ export type Current_Delegated_Staking_Pool_Balances_Stream_Cursor_Value_Input = 
   total_shares?: InputMaybe<Scalars['numeric']>;
 };
 
+/** columns and relationships of "current_delegated_voter" */
+export type Current_Delegated_Voter = {
+  __typename?: 'current_delegated_voter';
+  delegation_pool_address: Scalars['String'];
+  delegator_address: Scalars['String'];
+  last_transaction_timestamp: Scalars['timestamp'];
+  last_transaction_version: Scalars['bigint'];
+  pending_voter?: Maybe<Scalars['String']>;
+  table_handle?: Maybe<Scalars['String']>;
+  voter?: Maybe<Scalars['String']>;
+};
+
+/** Boolean expression to filter rows from the table "current_delegated_voter". All fields are combined with a logical 'AND'. */
+export type Current_Delegated_Voter_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Delegated_Voter_Bool_Exp>>;
+  _not?: InputMaybe<Current_Delegated_Voter_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Delegated_Voter_Bool_Exp>>;
+  delegation_pool_address?: InputMaybe<String_Comparison_Exp>;
+  delegator_address?: InputMaybe<String_Comparison_Exp>;
+  last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  pending_voter?: InputMaybe<String_Comparison_Exp>;
+  table_handle?: InputMaybe<String_Comparison_Exp>;
+  voter?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "current_delegated_voter". */
+export type Current_Delegated_Voter_Order_By = {
+  delegation_pool_address?: InputMaybe<Order_By>;
+  delegator_address?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  pending_voter?: InputMaybe<Order_By>;
+  table_handle?: InputMaybe<Order_By>;
+  voter?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_delegated_voter" */
+export enum Current_Delegated_Voter_Select_Column {
+  /** column name */
+  DelegationPoolAddress = 'delegation_pool_address',
+  /** column name */
+  DelegatorAddress = 'delegator_address',
+  /** column name */
+  LastTransactionTimestamp = 'last_transaction_timestamp',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  PendingVoter = 'pending_voter',
+  /** column name */
+  TableHandle = 'table_handle',
+  /** column name */
+  Voter = 'voter'
+}
+
+/** Streaming cursor of the table "current_delegated_voter" */
+export type Current_Delegated_Voter_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Delegated_Voter_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Delegated_Voter_Stream_Cursor_Value_Input = {
+  delegation_pool_address?: InputMaybe<Scalars['String']>;
+  delegator_address?: InputMaybe<Scalars['String']>;
+  last_transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  pending_voter?: InputMaybe<Scalars['String']>;
+  table_handle?: InputMaybe<Scalars['String']>;
+  voter?: InputMaybe<Scalars['String']>;
+};
+
 /** columns and relationships of "current_delegator_balances" */
 export type Current_Delegator_Balances = {
   __typename?: 'current_delegator_balances';
+  /** An object relationship */
+  current_pool_balance?: Maybe<Current_Delegated_Staking_Pool_Balances>;
   delegator_address: Scalars['String'];
   last_transaction_version: Scalars['bigint'];
   parent_table_handle: Scalars['String'];
   pool_address: Scalars['String'];
   pool_type: Scalars['String'];
   shares: Scalars['numeric'];
+  /** An object relationship */
+  staking_pool_metadata?: Maybe<Current_Staking_Pool_Voter>;
   table_handle: Scalars['String'];
 };
 
@@ -2251,23 +2602,27 @@ export type Current_Delegator_Balances_Bool_Exp = {
   _and?: InputMaybe<Array<Current_Delegator_Balances_Bool_Exp>>;
   _not?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
   _or?: InputMaybe<Array<Current_Delegator_Balances_Bool_Exp>>;
+  current_pool_balance?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Bool_Exp>;
   delegator_address?: InputMaybe<String_Comparison_Exp>;
   last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
   parent_table_handle?: InputMaybe<String_Comparison_Exp>;
   pool_address?: InputMaybe<String_Comparison_Exp>;
   pool_type?: InputMaybe<String_Comparison_Exp>;
   shares?: InputMaybe<Numeric_Comparison_Exp>;
+  staking_pool_metadata?: InputMaybe<Current_Staking_Pool_Voter_Bool_Exp>;
   table_handle?: InputMaybe<String_Comparison_Exp>;
 };
 
 /** Ordering options when selecting data from "current_delegator_balances". */
 export type Current_Delegator_Balances_Order_By = {
+  current_pool_balance?: InputMaybe<Current_Delegated_Staking_Pool_Balances_Order_By>;
   delegator_address?: InputMaybe<Order_By>;
   last_transaction_version?: InputMaybe<Order_By>;
   parent_table_handle?: InputMaybe<Order_By>;
   pool_address?: InputMaybe<Order_By>;
   pool_type?: InputMaybe<Order_By>;
   shares?: InputMaybe<Order_By>;
+  staking_pool_metadata?: InputMaybe<Current_Staking_Pool_Voter_Order_By>;
   table_handle?: InputMaybe<Order_By>;
 };
 
@@ -2308,13 +2663,287 @@ export type Current_Delegator_Balances_Stream_Cursor_Value_Input = {
   table_handle?: InputMaybe<Scalars['String']>;
 };
 
+/** columns and relationships of "current_fungible_asset_balances" */
+export type Current_Fungible_Asset_Balances = {
+  __typename?: 'current_fungible_asset_balances';
+  amount: Scalars['numeric'];
+  asset_type: Scalars['String'];
+  is_frozen: Scalars['Boolean'];
+  is_primary: Scalars['Boolean'];
+  last_transaction_timestamp: Scalars['timestamp'];
+  last_transaction_version: Scalars['bigint'];
+  /** An object relationship */
+  metadata?: Maybe<Fungible_Asset_Metadata>;
+  owner_address: Scalars['String'];
+  storage_id: Scalars['String'];
+  token_standard: Scalars['String'];
+};
+
+/** aggregated selection of "current_fungible_asset_balances" */
+export type Current_Fungible_Asset_Balances_Aggregate = {
+  __typename?: 'current_fungible_asset_balances_aggregate';
+  aggregate?: Maybe<Current_Fungible_Asset_Balances_Aggregate_Fields>;
+  nodes: Array<Current_Fungible_Asset_Balances>;
+};
+
+/** aggregate fields of "current_fungible_asset_balances" */
+export type Current_Fungible_Asset_Balances_Aggregate_Fields = {
+  __typename?: 'current_fungible_asset_balances_aggregate_fields';
+  avg?: Maybe<Current_Fungible_Asset_Balances_Avg_Fields>;
+  count: Scalars['Int'];
+  max?: Maybe<Current_Fungible_Asset_Balances_Max_Fields>;
+  min?: Maybe<Current_Fungible_Asset_Balances_Min_Fields>;
+  stddev?: Maybe<Current_Fungible_Asset_Balances_Stddev_Fields>;
+  stddev_pop?: Maybe<Current_Fungible_Asset_Balances_Stddev_Pop_Fields>;
+  stddev_samp?: Maybe<Current_Fungible_Asset_Balances_Stddev_Samp_Fields>;
+  sum?: Maybe<Current_Fungible_Asset_Balances_Sum_Fields>;
+  var_pop?: Maybe<Current_Fungible_Asset_Balances_Var_Pop_Fields>;
+  var_samp?: Maybe<Current_Fungible_Asset_Balances_Var_Samp_Fields>;
+  variance?: Maybe<Current_Fungible_Asset_Balances_Variance_Fields>;
+};
+
+
+/** aggregate fields of "current_fungible_asset_balances" */
+export type Current_Fungible_Asset_Balances_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Current_Fungible_Asset_Balances_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
+/** aggregate avg on columns */
+export type Current_Fungible_Asset_Balances_Avg_Fields = {
+  __typename?: 'current_fungible_asset_balances_avg_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** Boolean expression to filter rows from the table "current_fungible_asset_balances". All fields are combined with a logical 'AND'. */
+export type Current_Fungible_Asset_Balances_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Fungible_Asset_Balances_Bool_Exp>>;
+  _not?: InputMaybe<Current_Fungible_Asset_Balances_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Fungible_Asset_Balances_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  asset_type?: InputMaybe<String_Comparison_Exp>;
+  is_frozen?: InputMaybe<Boolean_Comparison_Exp>;
+  is_primary?: InputMaybe<Boolean_Comparison_Exp>;
+  last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  metadata?: InputMaybe<Fungible_Asset_Metadata_Bool_Exp>;
+  owner_address?: InputMaybe<String_Comparison_Exp>;
+  storage_id?: InputMaybe<String_Comparison_Exp>;
+  token_standard?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** aggregate max on columns */
+export type Current_Fungible_Asset_Balances_Max_Fields = {
+  __typename?: 'current_fungible_asset_balances_max_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  asset_type?: Maybe<Scalars['String']>;
+  last_transaction_timestamp?: Maybe<Scalars['timestamp']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+  storage_id?: Maybe<Scalars['String']>;
+  token_standard?: Maybe<Scalars['String']>;
+};
+
+/** aggregate min on columns */
+export type Current_Fungible_Asset_Balances_Min_Fields = {
+  __typename?: 'current_fungible_asset_balances_min_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  asset_type?: Maybe<Scalars['String']>;
+  last_transaction_timestamp?: Maybe<Scalars['timestamp']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+  owner_address?: Maybe<Scalars['String']>;
+  storage_id?: Maybe<Scalars['String']>;
+  token_standard?: Maybe<Scalars['String']>;
+};
+
+/** Ordering options when selecting data from "current_fungible_asset_balances". */
+export type Current_Fungible_Asset_Balances_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  asset_type?: InputMaybe<Order_By>;
+  is_frozen?: InputMaybe<Order_By>;
+  is_primary?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  metadata?: InputMaybe<Fungible_Asset_Metadata_Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_fungible_asset_balances" */
+export enum Current_Fungible_Asset_Balances_Select_Column {
+  /** column name */
+  Amount = 'amount',
+  /** column name */
+  AssetType = 'asset_type',
+  /** column name */
+  IsFrozen = 'is_frozen',
+  /** column name */
+  IsPrimary = 'is_primary',
+  /** column name */
+  LastTransactionTimestamp = 'last_transaction_timestamp',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  OwnerAddress = 'owner_address',
+  /** column name */
+  StorageId = 'storage_id',
+  /** column name */
+  TokenStandard = 'token_standard'
+}
+
+/** aggregate stddev on columns */
+export type Current_Fungible_Asset_Balances_Stddev_Fields = {
+  __typename?: 'current_fungible_asset_balances_stddev_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_pop on columns */
+export type Current_Fungible_Asset_Balances_Stddev_Pop_Fields = {
+  __typename?: 'current_fungible_asset_balances_stddev_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate stddev_samp on columns */
+export type Current_Fungible_Asset_Balances_Stddev_Samp_Fields = {
+  __typename?: 'current_fungible_asset_balances_stddev_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** Streaming cursor of the table "current_fungible_asset_balances" */
+export type Current_Fungible_Asset_Balances_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Fungible_Asset_Balances_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Fungible_Asset_Balances_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']>;
+  asset_type?: InputMaybe<Scalars['String']>;
+  is_frozen?: InputMaybe<Scalars['Boolean']>;
+  is_primary?: InputMaybe<Scalars['Boolean']>;
+  last_transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  owner_address?: InputMaybe<Scalars['String']>;
+  storage_id?: InputMaybe<Scalars['String']>;
+  token_standard?: InputMaybe<Scalars['String']>;
+};
+
+/** aggregate sum on columns */
+export type Current_Fungible_Asset_Balances_Sum_Fields = {
+  __typename?: 'current_fungible_asset_balances_sum_fields';
+  amount?: Maybe<Scalars['numeric']>;
+  last_transaction_version?: Maybe<Scalars['bigint']>;
+};
+
+/** aggregate var_pop on columns */
+export type Current_Fungible_Asset_Balances_Var_Pop_Fields = {
+  __typename?: 'current_fungible_asset_balances_var_pop_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate var_samp on columns */
+export type Current_Fungible_Asset_Balances_Var_Samp_Fields = {
+  __typename?: 'current_fungible_asset_balances_var_samp_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** aggregate variance on columns */
+export type Current_Fungible_Asset_Balances_Variance_Fields = {
+  __typename?: 'current_fungible_asset_balances_variance_fields';
+  amount?: Maybe<Scalars['Float']>;
+  last_transaction_version?: Maybe<Scalars['Float']>;
+};
+
+/** columns and relationships of "current_objects" */
+export type Current_Objects = {
+  __typename?: 'current_objects';
+  allow_ungated_transfer: Scalars['Boolean'];
+  is_deleted: Scalars['Boolean'];
+  last_guid_creation_num: Scalars['numeric'];
+  last_transaction_version: Scalars['bigint'];
+  object_address: Scalars['String'];
+  owner_address: Scalars['String'];
+  state_key_hash: Scalars['String'];
+};
+
+/** Boolean expression to filter rows from the table "current_objects". All fields are combined with a logical 'AND'. */
+export type Current_Objects_Bool_Exp = {
+  _and?: InputMaybe<Array<Current_Objects_Bool_Exp>>;
+  _not?: InputMaybe<Current_Objects_Bool_Exp>;
+  _or?: InputMaybe<Array<Current_Objects_Bool_Exp>>;
+  allow_ungated_transfer?: InputMaybe<Boolean_Comparison_Exp>;
+  is_deleted?: InputMaybe<Boolean_Comparison_Exp>;
+  last_guid_creation_num?: InputMaybe<Numeric_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  object_address?: InputMaybe<String_Comparison_Exp>;
+  owner_address?: InputMaybe<String_Comparison_Exp>;
+  state_key_hash?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "current_objects". */
+export type Current_Objects_Order_By = {
+  allow_ungated_transfer?: InputMaybe<Order_By>;
+  is_deleted?: InputMaybe<Order_By>;
+  last_guid_creation_num?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  object_address?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  state_key_hash?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "current_objects" */
+export enum Current_Objects_Select_Column {
+  /** column name */
+  AllowUngatedTransfer = 'allow_ungated_transfer',
+  /** column name */
+  IsDeleted = 'is_deleted',
+  /** column name */
+  LastGuidCreationNum = 'last_guid_creation_num',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  ObjectAddress = 'object_address',
+  /** column name */
+  OwnerAddress = 'owner_address',
+  /** column name */
+  StateKeyHash = 'state_key_hash'
+}
+
+/** Streaming cursor of the table "current_objects" */
+export type Current_Objects_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Current_Objects_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Current_Objects_Stream_Cursor_Value_Input = {
+  allow_ungated_transfer?: InputMaybe<Scalars['Boolean']>;
+  is_deleted?: InputMaybe<Scalars['Boolean']>;
+  last_guid_creation_num?: InputMaybe<Scalars['numeric']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  object_address?: InputMaybe<Scalars['String']>;
+  owner_address?: InputMaybe<Scalars['String']>;
+  state_key_hash?: InputMaybe<Scalars['String']>;
+};
+
 /** columns and relationships of "current_staking_pool_voter" */
 export type Current_Staking_Pool_Voter = {
   __typename?: 'current_staking_pool_voter';
   last_transaction_version: Scalars['bigint'];
   operator_address: Scalars['String'];
   /** An array relationship */
-  operator_aptos_name: Array<Current_Ans_Lookup>;
+  operator_aptos_name: Array<Current_Aptos_Names>;
   staking_pool_address: Scalars['String'];
   voter_address: Scalars['String'];
 };
@@ -2322,11 +2951,11 @@ export type Current_Staking_Pool_Voter = {
 
 /** columns and relationships of "current_staking_pool_voter" */
 export type Current_Staking_Pool_VoterOperator_Aptos_NameArgs = {
-  distinct_on?: InputMaybe<Array<Current_Ans_Lookup_Select_Column>>;
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Current_Ans_Lookup_Order_By>>;
-  where?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
 };
 
 /** Boolean expression to filter rows from the table "current_staking_pool_voter". All fields are combined with a logical 'AND'. */
@@ -2336,7 +2965,7 @@ export type Current_Staking_Pool_Voter_Bool_Exp = {
   _or?: InputMaybe<Array<Current_Staking_Pool_Voter_Bool_Exp>>;
   last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
   operator_address?: InputMaybe<String_Comparison_Exp>;
-  operator_aptos_name?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  operator_aptos_name?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
   staking_pool_address?: InputMaybe<String_Comparison_Exp>;
   voter_address?: InputMaybe<String_Comparison_Exp>;
 };
@@ -2345,7 +2974,7 @@ export type Current_Staking_Pool_Voter_Bool_Exp = {
 export type Current_Staking_Pool_Voter_Order_By = {
   last_transaction_version?: InputMaybe<Order_By>;
   operator_address?: InputMaybe<Order_By>;
-  operator_aptos_name_aggregate?: InputMaybe<Current_Ans_Lookup_Aggregate_Order_By>;
+  operator_aptos_name_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
   staking_pool_address?: InputMaybe<Order_By>;
   voter_address?: InputMaybe<Order_By>;
 };
@@ -2635,6 +3264,10 @@ export type Current_Token_Datas_Stream_Cursor_Value_Input = {
 /** columns and relationships of "current_token_datas_v2" */
 export type Current_Token_Datas_V2 = {
   __typename?: 'current_token_datas_v2';
+  /** An object relationship */
+  aptos_name?: Maybe<Current_Aptos_Names>;
+  /** An object relationship */
+  cdn_token_uris?: Maybe<Nft_Metadata_Crawler_Parsed_Asset_Uris>;
   collection_id: Scalars['String'];
   /** An object relationship */
   current_collection?: Maybe<Current_Collections_V2>;
@@ -2663,6 +3296,8 @@ export type Current_Token_Datas_V2_Bool_Exp = {
   _and?: InputMaybe<Array<Current_Token_Datas_V2_Bool_Exp>>;
   _not?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   _or?: InputMaybe<Array<Current_Token_Datas_V2_Bool_Exp>>;
+  aptos_name?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+  cdn_token_uris?: InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   current_collection?: InputMaybe<Current_Collections_V2_Bool_Exp>;
   description?: InputMaybe<String_Comparison_Exp>;
@@ -2681,6 +3316,8 @@ export type Current_Token_Datas_V2_Bool_Exp = {
 
 /** Ordering options when selecting data from "current_token_datas_v2". */
 export type Current_Token_Datas_V2_Order_By = {
+  aptos_name?: InputMaybe<Current_Aptos_Names_Order_By>;
+  cdn_token_uris?: InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Order_By>;
   collection_id?: InputMaybe<Order_By>;
   current_collection?: InputMaybe<Current_Collections_V2_Order_By>;
   description?: InputMaybe<Order_By>;
@@ -2757,7 +3394,7 @@ export type Current_Token_Ownerships = {
   __typename?: 'current_token_ownerships';
   amount: Scalars['numeric'];
   /** An object relationship */
-  aptos_name?: Maybe<Current_Ans_Lookup>;
+  aptos_name?: Maybe<Current_Aptos_Names>;
   collection_data_id_hash: Scalars['String'];
   collection_name: Scalars['String'];
   creator_address: Scalars['String'];
@@ -2847,7 +3484,7 @@ export type Current_Token_Ownerships_Bool_Exp = {
   _not?: InputMaybe<Current_Token_Ownerships_Bool_Exp>;
   _or?: InputMaybe<Array<Current_Token_Ownerships_Bool_Exp>>;
   amount?: InputMaybe<Numeric_Comparison_Exp>;
-  aptos_name?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  aptos_name?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
   collection_data_id_hash?: InputMaybe<String_Comparison_Exp>;
   collection_name?: InputMaybe<String_Comparison_Exp>;
   creator_address?: InputMaybe<String_Comparison_Exp>;
@@ -2928,7 +3565,7 @@ export type Current_Token_Ownerships_Min_Order_By = {
 /** Ordering options when selecting data from "current_token_ownerships". */
 export type Current_Token_Ownerships_Order_By = {
   amount?: InputMaybe<Order_By>;
-  aptos_name?: InputMaybe<Current_Ans_Lookup_Order_By>;
+  aptos_name?: InputMaybe<Current_Aptos_Names_Order_By>;
   collection_data_id_hash?: InputMaybe<Order_By>;
   collection_name?: InputMaybe<Order_By>;
   creator_address?: InputMaybe<Order_By>;
@@ -3060,6 +3697,10 @@ export type Current_Token_Ownerships_Sum_Order_By = {
 export type Current_Token_Ownerships_V2 = {
   __typename?: 'current_token_ownerships_v2';
   amount: Scalars['numeric'];
+  /** An array relationship */
+  composed_nfts: Array<Current_Token_Ownerships_V2>;
+  /** An aggregate relationship */
+  composed_nfts_aggregate: Current_Token_Ownerships_V2_Aggregate;
   /** An object relationship */
   current_token_data?: Maybe<Current_Token_Datas_V2>;
   is_fungible_v2?: Maybe<Scalars['Boolean']>;
@@ -3073,6 +3714,26 @@ export type Current_Token_Ownerships_V2 = {
   token_data_id: Scalars['String'];
   token_properties_mutated_v1?: Maybe<Scalars['jsonb']>;
   token_standard: Scalars['String'];
+};
+
+
+/** columns and relationships of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2Composed_NftsArgs = {
+  distinct_on?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Ownerships_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
+};
+
+
+/** columns and relationships of "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2Composed_Nfts_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Token_Ownerships_V2_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Token_Ownerships_V2_Order_By>>;
+  where?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
 };
 
 
@@ -3111,6 +3772,21 @@ export type Current_Token_Ownerships_V2_Aggregate_FieldsCountArgs = {
   distinct?: InputMaybe<Scalars['Boolean']>;
 };
 
+/** order by aggregate values of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Aggregate_Order_By = {
+  avg?: InputMaybe<Current_Token_Ownerships_V2_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<Current_Token_Ownerships_V2_Max_Order_By>;
+  min?: InputMaybe<Current_Token_Ownerships_V2_Min_Order_By>;
+  stddev?: InputMaybe<Current_Token_Ownerships_V2_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<Current_Token_Ownerships_V2_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<Current_Token_Ownerships_V2_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<Current_Token_Ownerships_V2_Sum_Order_By>;
+  var_pop?: InputMaybe<Current_Token_Ownerships_V2_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<Current_Token_Ownerships_V2_Var_Samp_Order_By>;
+  variance?: InputMaybe<Current_Token_Ownerships_V2_Variance_Order_By>;
+};
+
 /** aggregate avg on columns */
 export type Current_Token_Ownerships_V2_Avg_Fields = {
   __typename?: 'current_token_ownerships_v2_avg_fields';
@@ -3119,12 +3795,20 @@ export type Current_Token_Ownerships_V2_Avg_Fields = {
   property_version_v1?: Maybe<Scalars['Float']>;
 };
 
+/** order by avg() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Avg_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+};
+
 /** Boolean expression to filter rows from the table "current_token_ownerships_v2". All fields are combined with a logical 'AND'. */
 export type Current_Token_Ownerships_V2_Bool_Exp = {
   _and?: InputMaybe<Array<Current_Token_Ownerships_V2_Bool_Exp>>;
   _not?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
   _or?: InputMaybe<Array<Current_Token_Ownerships_V2_Bool_Exp>>;
   amount?: InputMaybe<Numeric_Comparison_Exp>;
+  composed_nfts?: InputMaybe<Current_Token_Ownerships_V2_Bool_Exp>;
   current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   is_fungible_v2?: InputMaybe<Boolean_Comparison_Exp>;
   is_soulbound_v2?: InputMaybe<Boolean_Comparison_Exp>;
@@ -3153,6 +3837,19 @@ export type Current_Token_Ownerships_V2_Max_Fields = {
   token_standard?: Maybe<Scalars['String']>;
 };
 
+/** order by max() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Max_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  table_type_v1?: InputMaybe<Order_By>;
+  token_data_id?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+};
+
 /** aggregate min on columns */
 export type Current_Token_Ownerships_V2_Min_Fields = {
   __typename?: 'current_token_ownerships_v2_min_fields';
@@ -3167,9 +3864,23 @@ export type Current_Token_Ownerships_V2_Min_Fields = {
   token_standard?: Maybe<Scalars['String']>;
 };
 
+/** order by min() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Min_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  table_type_v1?: InputMaybe<Order_By>;
+  token_data_id?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+};
+
 /** Ordering options when selecting data from "current_token_ownerships_v2". */
 export type Current_Token_Ownerships_V2_Order_By = {
   amount?: InputMaybe<Order_By>;
+  composed_nfts_aggregate?: InputMaybe<Current_Token_Ownerships_V2_Aggregate_Order_By>;
   current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   is_fungible_v2?: InputMaybe<Order_By>;
   is_soulbound_v2?: InputMaybe<Order_By>;
@@ -3220,6 +3931,13 @@ export type Current_Token_Ownerships_V2_Stddev_Fields = {
   property_version_v1?: Maybe<Scalars['Float']>;
 };
 
+/** order by stddev() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Stddev_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+};
+
 /** aggregate stddev_pop on columns */
 export type Current_Token_Ownerships_V2_Stddev_Pop_Fields = {
   __typename?: 'current_token_ownerships_v2_stddev_pop_fields';
@@ -3228,12 +3946,26 @@ export type Current_Token_Ownerships_V2_Stddev_Pop_Fields = {
   property_version_v1?: Maybe<Scalars['Float']>;
 };
 
+/** order by stddev_pop() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Stddev_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+};
+
 /** aggregate stddev_samp on columns */
 export type Current_Token_Ownerships_V2_Stddev_Samp_Fields = {
   __typename?: 'current_token_ownerships_v2_stddev_samp_fields';
   amount?: Maybe<Scalars['Float']>;
   last_transaction_version?: Maybe<Scalars['Float']>;
   property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** order by stddev_samp() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Stddev_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
 };
 
 /** Streaming cursor of the table "current_token_ownerships_v2" */
@@ -3268,12 +4000,26 @@ export type Current_Token_Ownerships_V2_Sum_Fields = {
   property_version_v1?: Maybe<Scalars['numeric']>;
 };
 
+/** order by sum() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Sum_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+};
+
 /** aggregate var_pop on columns */
 export type Current_Token_Ownerships_V2_Var_Pop_Fields = {
   __typename?: 'current_token_ownerships_v2_var_pop_fields';
   amount?: Maybe<Scalars['Float']>;
   last_transaction_version?: Maybe<Scalars['Float']>;
   property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** order by var_pop() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Var_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
 };
 
 /** aggregate var_samp on columns */
@@ -3284,12 +4030,26 @@ export type Current_Token_Ownerships_V2_Var_Samp_Fields = {
   property_version_v1?: Maybe<Scalars['Float']>;
 };
 
+/** order by var_samp() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Var_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
+};
+
 /** aggregate variance on columns */
 export type Current_Token_Ownerships_V2_Variance_Fields = {
   __typename?: 'current_token_ownerships_v2_variance_fields';
   amount?: Maybe<Scalars['Float']>;
   last_transaction_version?: Maybe<Scalars['Float']>;
   property_version_v1?: Maybe<Scalars['Float']>;
+};
+
+/** order by variance() on columns of table "current_token_ownerships_v2" */
+export type Current_Token_Ownerships_V2_Variance_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  property_version_v1?: InputMaybe<Order_By>;
 };
 
 /** aggregate var_pop on columns */
@@ -3699,6 +4459,28 @@ export type Delegator_Distinct_Pool = {
   staking_pool_metadata?: Maybe<Current_Staking_Pool_Voter>;
 };
 
+/** aggregated selection of "delegator_distinct_pool" */
+export type Delegator_Distinct_Pool_Aggregate = {
+  __typename?: 'delegator_distinct_pool_aggregate';
+  aggregate?: Maybe<Delegator_Distinct_Pool_Aggregate_Fields>;
+  nodes: Array<Delegator_Distinct_Pool>;
+};
+
+/** aggregate fields of "delegator_distinct_pool" */
+export type Delegator_Distinct_Pool_Aggregate_Fields = {
+  __typename?: 'delegator_distinct_pool_aggregate_fields';
+  count: Scalars['Int'];
+  max?: Maybe<Delegator_Distinct_Pool_Max_Fields>;
+  min?: Maybe<Delegator_Distinct_Pool_Min_Fields>;
+};
+
+
+/** aggregate fields of "delegator_distinct_pool" */
+export type Delegator_Distinct_Pool_Aggregate_FieldsCountArgs = {
+  columns?: InputMaybe<Array<Delegator_Distinct_Pool_Select_Column>>;
+  distinct?: InputMaybe<Scalars['Boolean']>;
+};
+
 /** Boolean expression to filter rows from the table "delegator_distinct_pool". All fields are combined with a logical 'AND'. */
 export type Delegator_Distinct_Pool_Bool_Exp = {
   _and?: InputMaybe<Array<Delegator_Distinct_Pool_Bool_Exp>>;
@@ -3708,6 +4490,20 @@ export type Delegator_Distinct_Pool_Bool_Exp = {
   delegator_address?: InputMaybe<String_Comparison_Exp>;
   pool_address?: InputMaybe<String_Comparison_Exp>;
   staking_pool_metadata?: InputMaybe<Current_Staking_Pool_Voter_Bool_Exp>;
+};
+
+/** aggregate max on columns */
+export type Delegator_Distinct_Pool_Max_Fields = {
+  __typename?: 'delegator_distinct_pool_max_fields';
+  delegator_address?: Maybe<Scalars['String']>;
+  pool_address?: Maybe<Scalars['String']>;
+};
+
+/** aggregate min on columns */
+export type Delegator_Distinct_Pool_Min_Fields = {
+  __typename?: 'delegator_distinct_pool_min_fields';
+  delegator_address?: Maybe<Scalars['String']>;
+  pool_address?: Maybe<Scalars['String']>;
 };
 
 /** Ordering options when selecting data from "delegator_distinct_pool". */
@@ -3824,6 +4620,361 @@ export type Events_Stream_Cursor_Value_Input = {
   transaction_block_height?: InputMaybe<Scalars['bigint']>;
   transaction_version?: InputMaybe<Scalars['bigint']>;
   type?: InputMaybe<Scalars['String']>;
+};
+
+/** columns and relationships of "fungible_asset_activities" */
+export type Fungible_Asset_Activities = {
+  __typename?: 'fungible_asset_activities';
+  amount?: Maybe<Scalars['numeric']>;
+  asset_type: Scalars['String'];
+  block_height: Scalars['bigint'];
+  entry_function_id_str?: Maybe<Scalars['String']>;
+  event_index: Scalars['bigint'];
+  gas_fee_payer_address?: Maybe<Scalars['String']>;
+  is_frozen?: Maybe<Scalars['Boolean']>;
+  is_gas_fee: Scalars['Boolean'];
+  is_transaction_success: Scalars['Boolean'];
+  /** An object relationship */
+  metadata?: Maybe<Fungible_Asset_Metadata>;
+  owner_address: Scalars['String'];
+  /** An array relationship */
+  owner_aptos_names: Array<Current_Aptos_Names>;
+  storage_id: Scalars['String'];
+  token_standard: Scalars['String'];
+  transaction_timestamp: Scalars['timestamp'];
+  transaction_version: Scalars['bigint'];
+  type: Scalars['String'];
+};
+
+
+/** columns and relationships of "fungible_asset_activities" */
+export type Fungible_Asset_ActivitiesOwner_Aptos_NamesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+};
+
+/** order by aggregate values of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Aggregate_Order_By = {
+  avg?: InputMaybe<Fungible_Asset_Activities_Avg_Order_By>;
+  count?: InputMaybe<Order_By>;
+  max?: InputMaybe<Fungible_Asset_Activities_Max_Order_By>;
+  min?: InputMaybe<Fungible_Asset_Activities_Min_Order_By>;
+  stddev?: InputMaybe<Fungible_Asset_Activities_Stddev_Order_By>;
+  stddev_pop?: InputMaybe<Fungible_Asset_Activities_Stddev_Pop_Order_By>;
+  stddev_samp?: InputMaybe<Fungible_Asset_Activities_Stddev_Samp_Order_By>;
+  sum?: InputMaybe<Fungible_Asset_Activities_Sum_Order_By>;
+  var_pop?: InputMaybe<Fungible_Asset_Activities_Var_Pop_Order_By>;
+  var_samp?: InputMaybe<Fungible_Asset_Activities_Var_Samp_Order_By>;
+  variance?: InputMaybe<Fungible_Asset_Activities_Variance_Order_By>;
+};
+
+/** order by avg() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Avg_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** Boolean expression to filter rows from the table "fungible_asset_activities". All fields are combined with a logical 'AND'. */
+export type Fungible_Asset_Activities_Bool_Exp = {
+  _and?: InputMaybe<Array<Fungible_Asset_Activities_Bool_Exp>>;
+  _not?: InputMaybe<Fungible_Asset_Activities_Bool_Exp>;
+  _or?: InputMaybe<Array<Fungible_Asset_Activities_Bool_Exp>>;
+  amount?: InputMaybe<Numeric_Comparison_Exp>;
+  asset_type?: InputMaybe<String_Comparison_Exp>;
+  block_height?: InputMaybe<Bigint_Comparison_Exp>;
+  entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
+  event_index?: InputMaybe<Bigint_Comparison_Exp>;
+  gas_fee_payer_address?: InputMaybe<String_Comparison_Exp>;
+  is_frozen?: InputMaybe<Boolean_Comparison_Exp>;
+  is_gas_fee?: InputMaybe<Boolean_Comparison_Exp>;
+  is_transaction_success?: InputMaybe<Boolean_Comparison_Exp>;
+  metadata?: InputMaybe<Fungible_Asset_Metadata_Bool_Exp>;
+  owner_address?: InputMaybe<String_Comparison_Exp>;
+  owner_aptos_names?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+  storage_id?: InputMaybe<String_Comparison_Exp>;
+  token_standard?: InputMaybe<String_Comparison_Exp>;
+  transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  type?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** order by max() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Max_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  asset_type?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  entry_function_id_str?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  gas_fee_payer_address?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+  transaction_timestamp?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+  type?: InputMaybe<Order_By>;
+};
+
+/** order by min() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Min_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  asset_type?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  entry_function_id_str?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  gas_fee_payer_address?: InputMaybe<Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+  transaction_timestamp?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+  type?: InputMaybe<Order_By>;
+};
+
+/** Ordering options when selecting data from "fungible_asset_activities". */
+export type Fungible_Asset_Activities_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  asset_type?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  entry_function_id_str?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  gas_fee_payer_address?: InputMaybe<Order_By>;
+  is_frozen?: InputMaybe<Order_By>;
+  is_gas_fee?: InputMaybe<Order_By>;
+  is_transaction_success?: InputMaybe<Order_By>;
+  metadata?: InputMaybe<Fungible_Asset_Metadata_Order_By>;
+  owner_address?: InputMaybe<Order_By>;
+  owner_aptos_names_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
+  storage_id?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+  transaction_timestamp?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+  type?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "fungible_asset_activities" */
+export enum Fungible_Asset_Activities_Select_Column {
+  /** column name */
+  Amount = 'amount',
+  /** column name */
+  AssetType = 'asset_type',
+  /** column name */
+  BlockHeight = 'block_height',
+  /** column name */
+  EntryFunctionIdStr = 'entry_function_id_str',
+  /** column name */
+  EventIndex = 'event_index',
+  /** column name */
+  GasFeePayerAddress = 'gas_fee_payer_address',
+  /** column name */
+  IsFrozen = 'is_frozen',
+  /** column name */
+  IsGasFee = 'is_gas_fee',
+  /** column name */
+  IsTransactionSuccess = 'is_transaction_success',
+  /** column name */
+  OwnerAddress = 'owner_address',
+  /** column name */
+  StorageId = 'storage_id',
+  /** column name */
+  TokenStandard = 'token_standard',
+  /** column name */
+  TransactionTimestamp = 'transaction_timestamp',
+  /** column name */
+  TransactionVersion = 'transaction_version',
+  /** column name */
+  Type = 'type'
+}
+
+/** order by stddev() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Stddev_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_pop() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Stddev_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by stddev_samp() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Stddev_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** Streaming cursor of the table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Fungible_Asset_Activities_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Fungible_Asset_Activities_Stream_Cursor_Value_Input = {
+  amount?: InputMaybe<Scalars['numeric']>;
+  asset_type?: InputMaybe<Scalars['String']>;
+  block_height?: InputMaybe<Scalars['bigint']>;
+  entry_function_id_str?: InputMaybe<Scalars['String']>;
+  event_index?: InputMaybe<Scalars['bigint']>;
+  gas_fee_payer_address?: InputMaybe<Scalars['String']>;
+  is_frozen?: InputMaybe<Scalars['Boolean']>;
+  is_gas_fee?: InputMaybe<Scalars['Boolean']>;
+  is_transaction_success?: InputMaybe<Scalars['Boolean']>;
+  owner_address?: InputMaybe<Scalars['String']>;
+  storage_id?: InputMaybe<Scalars['String']>;
+  token_standard?: InputMaybe<Scalars['String']>;
+  transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  transaction_version?: InputMaybe<Scalars['bigint']>;
+  type?: InputMaybe<Scalars['String']>;
+};
+
+/** order by sum() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Sum_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by var_pop() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Var_Pop_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by var_samp() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Var_Samp_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** order by variance() on columns of table "fungible_asset_activities" */
+export type Fungible_Asset_Activities_Variance_Order_By = {
+  amount?: InputMaybe<Order_By>;
+  block_height?: InputMaybe<Order_By>;
+  event_index?: InputMaybe<Order_By>;
+  transaction_version?: InputMaybe<Order_By>;
+};
+
+/** columns and relationships of "fungible_asset_metadata" */
+export type Fungible_Asset_Metadata = {
+  __typename?: 'fungible_asset_metadata';
+  asset_type: Scalars['String'];
+  creator_address: Scalars['String'];
+  decimals: Scalars['Int'];
+  icon_uri?: Maybe<Scalars['String']>;
+  last_transaction_timestamp: Scalars['timestamp'];
+  last_transaction_version: Scalars['bigint'];
+  name: Scalars['String'];
+  project_uri?: Maybe<Scalars['String']>;
+  supply_aggregator_table_handle_v1?: Maybe<Scalars['String']>;
+  supply_aggregator_table_key_v1?: Maybe<Scalars['String']>;
+  symbol: Scalars['String'];
+  token_standard: Scalars['String'];
+};
+
+/** Boolean expression to filter rows from the table "fungible_asset_metadata". All fields are combined with a logical 'AND'. */
+export type Fungible_Asset_Metadata_Bool_Exp = {
+  _and?: InputMaybe<Array<Fungible_Asset_Metadata_Bool_Exp>>;
+  _not?: InputMaybe<Fungible_Asset_Metadata_Bool_Exp>;
+  _or?: InputMaybe<Array<Fungible_Asset_Metadata_Bool_Exp>>;
+  asset_type?: InputMaybe<String_Comparison_Exp>;
+  creator_address?: InputMaybe<String_Comparison_Exp>;
+  decimals?: InputMaybe<Int_Comparison_Exp>;
+  icon_uri?: InputMaybe<String_Comparison_Exp>;
+  last_transaction_timestamp?: InputMaybe<Timestamp_Comparison_Exp>;
+  last_transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
+  name?: InputMaybe<String_Comparison_Exp>;
+  project_uri?: InputMaybe<String_Comparison_Exp>;
+  supply_aggregator_table_handle_v1?: InputMaybe<String_Comparison_Exp>;
+  supply_aggregator_table_key_v1?: InputMaybe<String_Comparison_Exp>;
+  symbol?: InputMaybe<String_Comparison_Exp>;
+  token_standard?: InputMaybe<String_Comparison_Exp>;
+};
+
+/** Ordering options when selecting data from "fungible_asset_metadata". */
+export type Fungible_Asset_Metadata_Order_By = {
+  asset_type?: InputMaybe<Order_By>;
+  creator_address?: InputMaybe<Order_By>;
+  decimals?: InputMaybe<Order_By>;
+  icon_uri?: InputMaybe<Order_By>;
+  last_transaction_timestamp?: InputMaybe<Order_By>;
+  last_transaction_version?: InputMaybe<Order_By>;
+  name?: InputMaybe<Order_By>;
+  project_uri?: InputMaybe<Order_By>;
+  supply_aggregator_table_handle_v1?: InputMaybe<Order_By>;
+  supply_aggregator_table_key_v1?: InputMaybe<Order_By>;
+  symbol?: InputMaybe<Order_By>;
+  token_standard?: InputMaybe<Order_By>;
+};
+
+/** select columns of table "fungible_asset_metadata" */
+export enum Fungible_Asset_Metadata_Select_Column {
+  /** column name */
+  AssetType = 'asset_type',
+  /** column name */
+  CreatorAddress = 'creator_address',
+  /** column name */
+  Decimals = 'decimals',
+  /** column name */
+  IconUri = 'icon_uri',
+  /** column name */
+  LastTransactionTimestamp = 'last_transaction_timestamp',
+  /** column name */
+  LastTransactionVersion = 'last_transaction_version',
+  /** column name */
+  Name = 'name',
+  /** column name */
+  ProjectUri = 'project_uri',
+  /** column name */
+  SupplyAggregatorTableHandleV1 = 'supply_aggregator_table_handle_v1',
+  /** column name */
+  SupplyAggregatorTableKeyV1 = 'supply_aggregator_table_key_v1',
+  /** column name */
+  Symbol = 'symbol',
+  /** column name */
+  TokenStandard = 'token_standard'
+}
+
+/** Streaming cursor of the table "fungible_asset_metadata" */
+export type Fungible_Asset_Metadata_Stream_Cursor_Input = {
+  /** Stream column input with initial value */
+  initial_value: Fungible_Asset_Metadata_Stream_Cursor_Value_Input;
+  /** cursor ordering */
+  ordering?: InputMaybe<Cursor_Ordering>;
+};
+
+/** Initial value of the column from where the streaming should start */
+export type Fungible_Asset_Metadata_Stream_Cursor_Value_Input = {
+  asset_type?: InputMaybe<Scalars['String']>;
+  creator_address?: InputMaybe<Scalars['String']>;
+  decimals?: InputMaybe<Scalars['Int']>;
+  icon_uri?: InputMaybe<Scalars['String']>;
+  last_transaction_timestamp?: InputMaybe<Scalars['timestamp']>;
+  last_transaction_version?: InputMaybe<Scalars['bigint']>;
+  name?: InputMaybe<Scalars['String']>;
+  project_uri?: InputMaybe<Scalars['String']>;
+  supply_aggregator_table_handle_v1?: InputMaybe<Scalars['String']>;
+  supply_aggregator_table_key_v1?: InputMaybe<Scalars['String']>;
+  symbol?: InputMaybe<Scalars['String']>;
+  token_standard?: InputMaybe<Scalars['String']>;
 };
 
 /** columns and relationships of "indexer_status" */
@@ -4081,6 +5232,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions = {
   contract_address: Scalars['String'];
   current_bid_price?: Maybe<Scalars['numeric']>;
   current_bidder?: Maybe<Scalars['String']>;
+  /** An object relationship */
   current_token_data?: Maybe<Current_Token_Datas_V2>;
   entry_function_id_str: Scalars['String'];
   expiration_time: Scalars['numeric'];
@@ -4108,6 +5260,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Bool_Exp = {
   contract_address?: InputMaybe<String_Comparison_Exp>;
   current_bid_price?: InputMaybe<Numeric_Comparison_Exp>;
   current_bidder?: InputMaybe<String_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
   expiration_time?: InputMaybe<Numeric_Comparison_Exp>;
   fee_schedule_id?: InputMaybe<String_Comparison_Exp>;
@@ -4131,6 +5284,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Auctions_Order_By = {
   contract_address?: InputMaybe<Order_By>;
   current_bid_price?: InputMaybe<Order_By>;
   current_bidder?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
   expiration_time?: InputMaybe<Order_By>;
   fee_schedule_id?: InputMaybe<Order_By>;
@@ -4227,7 +5381,8 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers = {
   collection_id: Scalars['String'];
   collection_offer_id: Scalars['String'];
   contract_address: Scalars['String'];
-  current_collection?: Maybe<Current_Collections_V2>;
+  /** An object relationship */
+  current_collection_v2?: Maybe<Current_Collections_V2>;
   entry_function_id_str: Scalars['String'];
   expiration_time: Scalars['numeric'];
   fee_schedule_id: Scalars['String'];
@@ -4250,6 +5405,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Bool_Ex
   collection_id?: InputMaybe<String_Comparison_Exp>;
   collection_offer_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
+  current_collection_v2?: InputMaybe<Current_Collections_V2_Bool_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
   expiration_time?: InputMaybe<Numeric_Comparison_Exp>;
   fee_schedule_id?: InputMaybe<String_Comparison_Exp>;
@@ -4269,6 +5425,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Collection_Offers_Order_B
   collection_id?: InputMaybe<Order_By>;
   collection_offer_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
+  current_collection_v2?: InputMaybe<Current_Collections_V2_Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
   expiration_time?: InputMaybe<Order_By>;
   fee_schedule_id?: InputMaybe<Order_By>;
@@ -4348,6 +5505,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings = {
   coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   contract_address: Scalars['String'];
+  /** An object relationship */
   current_token_data?: Maybe<Current_Token_Datas_V2>;
   entry_function_id_str: Scalars['String'];
   fee_schedule_id: Scalars['String'];
@@ -4371,6 +5529,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Bool_Exp = {
   coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
   fee_schedule_id?: InputMaybe<String_Comparison_Exp>;
   is_deleted?: InputMaybe<Boolean_Comparison_Exp>;
@@ -4390,6 +5549,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Listings_Order_By = {
   coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
   fee_schedule_id?: InputMaybe<Order_By>;
   is_deleted?: InputMaybe<Order_By>;
@@ -4472,6 +5632,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers = {
   coin_type?: Maybe<Scalars['String']>;
   collection_id: Scalars['String'];
   contract_address: Scalars['String'];
+  /** An object relationship */
   current_token_data?: Maybe<Current_Token_Datas_V2>;
   entry_function_id_str: Scalars['String'];
   expiration_time: Scalars['numeric'];
@@ -4496,6 +5657,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Bool_Exp = {
   coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_id?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
   expiration_time?: InputMaybe<Numeric_Comparison_Exp>;
   fee_schedule_id?: InputMaybe<String_Comparison_Exp>;
@@ -4516,6 +5678,7 @@ export type Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers_Order_By = {
   coin_type?: InputMaybe<Order_By>;
   collection_id?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
   expiration_time?: InputMaybe<Order_By>;
   fee_schedule_id?: InputMaybe<Order_By>;
@@ -4603,6 +5766,7 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities = {
   collection_name: Scalars['String'];
   contract_address: Scalars['String'];
   creator_address: Scalars['String'];
+  /** An object relationship */
   current_token_data?: Maybe<Current_Token_Datas_V2>;
   entry_function_id_str: Scalars['String'];
   event_index: Scalars['bigint'];
@@ -4621,45 +5785,6 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities = {
   transaction_version: Scalars['bigint'];
 };
 
-/** aggregated selection of "nft_marketplace_v2.nft_marketplace_activities" */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Aggregate = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_aggregate';
-  aggregate?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Aggregate_Fields>;
-  nodes: Array<Nft_Marketplace_V2_Nft_Marketplace_Activities>;
-};
-
-/** aggregate fields of "nft_marketplace_v2.nft_marketplace_activities" */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Aggregate_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_aggregate_fields';
-  avg?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Avg_Fields>;
-  count: Scalars['Int'];
-  max?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Max_Fields>;
-  min?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Min_Fields>;
-  stddev?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Stddev_Fields>;
-  stddev_pop?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Stddev_Pop_Fields>;
-  stddev_samp?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Stddev_Samp_Fields>;
-  sum?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Sum_Fields>;
-  var_pop?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Var_Pop_Fields>;
-  var_samp?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Var_Samp_Fields>;
-  variance?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Variance_Fields>;
-};
-
-
-/** aggregate fields of "nft_marketplace_v2.nft_marketplace_activities" */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Aggregate_FieldsCountArgs = {
-  columns?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Select_Column>>;
-  distinct?: InputMaybe<Scalars['Boolean']>;
-};
-
-/** aggregate avg on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Avg_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_avg_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
-};
-
 /** Boolean expression to filter rows from the table "nft_marketplace_v2.nft_marketplace_activities". All fields are combined with a logical 'AND'. */
 export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp = {
   _and?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp>>;
@@ -4671,6 +5796,7 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp = {
   collection_name?: InputMaybe<String_Comparison_Exp>;
   contract_address?: InputMaybe<String_Comparison_Exp>;
   creator_address?: InputMaybe<String_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
   event_index?: InputMaybe<Bigint_Comparison_Exp>;
   event_type?: InputMaybe<String_Comparison_Exp>;
@@ -4688,58 +5814,6 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp = {
   transaction_version?: InputMaybe<Bigint_Comparison_Exp>;
 };
 
-/** aggregate max on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Max_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_max_fields';
-  buyer?: Maybe<Scalars['String']>;
-  coin_type?: Maybe<Scalars['String']>;
-  collection_id?: Maybe<Scalars['String']>;
-  collection_name?: Maybe<Scalars['String']>;
-  contract_address?: Maybe<Scalars['String']>;
-  creator_address?: Maybe<Scalars['String']>;
-  entry_function_id_str?: Maybe<Scalars['String']>;
-  event_index?: Maybe<Scalars['bigint']>;
-  event_type?: Maybe<Scalars['String']>;
-  fee_schedule_id?: Maybe<Scalars['String']>;
-  marketplace?: Maybe<Scalars['String']>;
-  offer_or_listing_id?: Maybe<Scalars['String']>;
-  price?: Maybe<Scalars['numeric']>;
-  property_version?: Maybe<Scalars['String']>;
-  seller?: Maybe<Scalars['String']>;
-  token_amount?: Maybe<Scalars['numeric']>;
-  token_data_id?: Maybe<Scalars['String']>;
-  token_name?: Maybe<Scalars['String']>;
-  token_standard?: Maybe<Scalars['String']>;
-  transaction_timestamp?: Maybe<Scalars['timestamptz']>;
-  transaction_version?: Maybe<Scalars['bigint']>;
-};
-
-/** aggregate min on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Min_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_min_fields';
-  buyer?: Maybe<Scalars['String']>;
-  coin_type?: Maybe<Scalars['String']>;
-  collection_id?: Maybe<Scalars['String']>;
-  collection_name?: Maybe<Scalars['String']>;
-  contract_address?: Maybe<Scalars['String']>;
-  creator_address?: Maybe<Scalars['String']>;
-  entry_function_id_str?: Maybe<Scalars['String']>;
-  event_index?: Maybe<Scalars['bigint']>;
-  event_type?: Maybe<Scalars['String']>;
-  fee_schedule_id?: Maybe<Scalars['String']>;
-  marketplace?: Maybe<Scalars['String']>;
-  offer_or_listing_id?: Maybe<Scalars['String']>;
-  price?: Maybe<Scalars['numeric']>;
-  property_version?: Maybe<Scalars['String']>;
-  seller?: Maybe<Scalars['String']>;
-  token_amount?: Maybe<Scalars['numeric']>;
-  token_data_id?: Maybe<Scalars['String']>;
-  token_name?: Maybe<Scalars['String']>;
-  token_standard?: Maybe<Scalars['String']>;
-  transaction_timestamp?: Maybe<Scalars['timestamptz']>;
-  transaction_version?: Maybe<Scalars['bigint']>;
-};
-
 /** Ordering options when selecting data from "nft_marketplace_v2.nft_marketplace_activities". */
 export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Order_By = {
   buyer?: InputMaybe<Order_By>;
@@ -4748,6 +5822,7 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Order_By = {
   collection_name?: InputMaybe<Order_By>;
   contract_address?: InputMaybe<Order_By>;
   creator_address?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
   event_index?: InputMaybe<Order_By>;
   event_type?: InputMaybe<Order_By>;
@@ -4811,33 +5886,6 @@ export enum Nft_Marketplace_V2_Nft_Marketplace_Activities_Select_Column {
   TransactionVersion = 'transaction_version'
 }
 
-/** aggregate stddev on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stddev_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_stddev_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
-};
-
-/** aggregate stddev_pop on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stddev_Pop_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_stddev_pop_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
-};
-
-/** aggregate stddev_samp on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stddev_Samp_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_stddev_samp_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
-};
-
 /** Streaming cursor of the table "nft_marketplace_v2_nft_marketplace_activities" */
 export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stream_Cursor_Input = {
   /** Stream column input with initial value */
@@ -4871,265 +5919,72 @@ export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Stream_Cursor_Value_In
   transaction_version?: InputMaybe<Scalars['bigint']>;
 };
 
-/** aggregate sum on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Sum_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_sum_fields';
-  event_index?: Maybe<Scalars['bigint']>;
-  price?: Maybe<Scalars['numeric']>;
-  token_amount?: Maybe<Scalars['numeric']>;
-  transaction_version?: Maybe<Scalars['bigint']>;
+/** columns and relationships of "nft_metadata_crawler.parsed_asset_uris" */
+export type Nft_Metadata_Crawler_Parsed_Asset_Uris = {
+  __typename?: 'nft_metadata_crawler_parsed_asset_uris';
+  asset_uri: Scalars['String'];
+  cdn_animation_uri?: Maybe<Scalars['String']>;
+  cdn_image_uri?: Maybe<Scalars['String']>;
+  cdn_json_uri?: Maybe<Scalars['String']>;
+  raw_animation_uri?: Maybe<Scalars['String']>;
+  raw_image_uri?: Maybe<Scalars['String']>;
 };
 
-/** aggregate var_pop on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Var_Pop_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_var_pop_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
+/** Boolean expression to filter rows from the table "nft_metadata_crawler.parsed_asset_uris". All fields are combined with a logical 'AND'. */
+export type Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp = {
+  _and?: InputMaybe<Array<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>>;
+  _not?: InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>;
+  _or?: InputMaybe<Array<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>>;
+  asset_uri?: InputMaybe<String_Comparison_Exp>;
+  cdn_animation_uri?: InputMaybe<String_Comparison_Exp>;
+  cdn_image_uri?: InputMaybe<String_Comparison_Exp>;
+  cdn_json_uri?: InputMaybe<String_Comparison_Exp>;
+  raw_animation_uri?: InputMaybe<String_Comparison_Exp>;
+  raw_image_uri?: InputMaybe<String_Comparison_Exp>;
 };
 
-/** aggregate var_samp on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Var_Samp_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_var_samp_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
+/** Ordering options when selecting data from "nft_metadata_crawler.parsed_asset_uris". */
+export type Nft_Metadata_Crawler_Parsed_Asset_Uris_Order_By = {
+  asset_uri?: InputMaybe<Order_By>;
+  cdn_animation_uri?: InputMaybe<Order_By>;
+  cdn_image_uri?: InputMaybe<Order_By>;
+  cdn_json_uri?: InputMaybe<Order_By>;
+  raw_animation_uri?: InputMaybe<Order_By>;
+  raw_image_uri?: InputMaybe<Order_By>;
 };
 
-/** aggregate variance on columns */
-export type Nft_Marketplace_V2_Nft_Marketplace_Activities_Variance_Fields = {
-  __typename?: 'nft_marketplace_v2_nft_marketplace_activities_variance_fields';
-  event_index?: Maybe<Scalars['Float']>;
-  price?: Maybe<Scalars['Float']>;
-  token_amount?: Maybe<Scalars['Float']>;
-  transaction_version?: Maybe<Scalars['Float']>;
-};
-
-/** columns and relationships of "nft_marketplace_v2_top_collections" */
-export type Nft_Marketplace_V2_Top_Collections = {
-  __typename?: 'nft_marketplace_v2_top_collections';
-  collection_id?: Maybe<Scalars['String']>;
-  current_collection?: Maybe<Current_Collections_V2>;
-  price?: Maybe<Scalars['numeric']>;
-};
-
-/** Boolean expression to filter rows from the table "nft_marketplace_v2_top_collections". All fields are combined with a logical 'AND'. */
-export type Nft_Marketplace_V2_Top_Collections_Bool_Exp = {
-  _and?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Bool_Exp>>;
-  _not?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Bool_Exp>;
-  _or?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Bool_Exp>>;
-  collection_id?: InputMaybe<String_Comparison_Exp>;
-  price?: InputMaybe<Numeric_Comparison_Exp>;
-};
-
-/** Ordering options when selecting data from "nft_marketplace_v2_top_collections". */
-export type Nft_Marketplace_V2_Top_Collections_Order_By = {
-  collection_id?: InputMaybe<Order_By>;
-  price?: InputMaybe<Order_By>;
-};
-
-/** select columns of table "nft_marketplace_v2_top_collections" */
-export enum Nft_Marketplace_V2_Top_Collections_Select_Column {
+/** select columns of table "nft_metadata_crawler.parsed_asset_uris" */
+export enum Nft_Metadata_Crawler_Parsed_Asset_Uris_Select_Column {
   /** column name */
-  CollectionId = 'collection_id',
+  AssetUri = 'asset_uri',
   /** column name */
-  Price = 'price'
+  CdnAnimationUri = 'cdn_animation_uri',
+  /** column name */
+  CdnImageUri = 'cdn_image_uri',
+  /** column name */
+  CdnJsonUri = 'cdn_json_uri',
+  /** column name */
+  RawAnimationUri = 'raw_animation_uri',
+  /** column name */
+  RawImageUri = 'raw_image_uri'
 }
 
-/** Streaming cursor of the table "nft_marketplace_v2_top_collections" */
-export type Nft_Marketplace_V2_Top_Collections_Stream_Cursor_Input = {
+/** Streaming cursor of the table "nft_metadata_crawler_parsed_asset_uris" */
+export type Nft_Metadata_Crawler_Parsed_Asset_Uris_Stream_Cursor_Input = {
   /** Stream column input with initial value */
-  initial_value: Nft_Marketplace_V2_Top_Collections_Stream_Cursor_Value_Input;
+  initial_value: Nft_Metadata_Crawler_Parsed_Asset_Uris_Stream_Cursor_Value_Input;
   /** cursor ordering */
   ordering?: InputMaybe<Cursor_Ordering>;
 };
 
 /** Initial value of the column from where the streaming should start */
-export type Nft_Marketplace_V2_Top_Collections_Stream_Cursor_Value_Input = {
-  collection_id?: InputMaybe<Scalars['String']>;
-  price?: InputMaybe<Scalars['numeric']>;
-};
-
-/** columns and relationships of "nft_marketplace_v2_top_collections_token_v1_24h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_24h = {
-  __typename?: 'nft_marketplace_v2_top_collections_token_v1_24h';
-  collection_id?: Maybe<Scalars['String']>;
-  current_collection?: Maybe<Current_Collections_V2>;
-  price?: Maybe<Scalars['numeric']>;
-};
-
-/** Boolean expression to filter rows from the table "nft_marketplace_v2_top_collections_token_v1_24h". All fields are combined with a logical 'AND'. */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp = {
-  _and?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp>>;
-  _not?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp>;
-  _or?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp>>;
-  collection_id?: InputMaybe<String_Comparison_Exp>;
-  price?: InputMaybe<Numeric_Comparison_Exp>;
-};
-
-/** Ordering options when selecting data from "nft_marketplace_v2_top_collections_token_v1_24h". */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Order_By = {
-  collection_id?: InputMaybe<Order_By>;
-  price?: InputMaybe<Order_By>;
-};
-
-/** select columns of table "nft_marketplace_v2_top_collections_token_v1_24h" */
-export enum Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Select_Column {
-  /** column name */
-  CollectionId = 'collection_id',
-  /** column name */
-  Price = 'price'
-}
-
-/** Streaming cursor of the table "nft_marketplace_v2_top_collections_token_v1_24h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Stream_Cursor_Input = {
-  /** Stream column input with initial value */
-  initial_value: Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Stream_Cursor_Value_Input;
-  /** cursor ordering */
-  ordering?: InputMaybe<Cursor_Ordering>;
-};
-
-/** Initial value of the column from where the streaming should start */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Stream_Cursor_Value_Input = {
-  collection_id?: InputMaybe<Scalars['String']>;
-  price?: InputMaybe<Scalars['numeric']>;
-};
-
-/** columns and relationships of "nft_marketplace_v2_top_collections_token_v1_48h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_48h = {
-  __typename?: 'nft_marketplace_v2_top_collections_token_v1_48h';
-  collection_id?: Maybe<Scalars['String']>;
-  current_collection?: Maybe<Current_Collections_V2>;
-  price?: Maybe<Scalars['numeric']>;
-};
-
-/** Boolean expression to filter rows from the table "nft_marketplace_v2_top_collections_token_v1_48h". All fields are combined with a logical 'AND'. */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp = {
-  _and?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp>>;
-  _not?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp>;
-  _or?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp>>;
-  collection_id?: InputMaybe<String_Comparison_Exp>;
-  price?: InputMaybe<Numeric_Comparison_Exp>;
-};
-
-/** Ordering options when selecting data from "nft_marketplace_v2_top_collections_token_v1_48h". */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Order_By = {
-  collection_id?: InputMaybe<Order_By>;
-  price?: InputMaybe<Order_By>;
-};
-
-/** select columns of table "nft_marketplace_v2_top_collections_token_v1_48h" */
-export enum Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Select_Column {
-  /** column name */
-  CollectionId = 'collection_id',
-  /** column name */
-  Price = 'price'
-}
-
-/** Streaming cursor of the table "nft_marketplace_v2_top_collections_token_v1_48h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Stream_Cursor_Input = {
-  /** Stream column input with initial value */
-  initial_value: Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Stream_Cursor_Value_Input;
-  /** cursor ordering */
-  ordering?: InputMaybe<Cursor_Ordering>;
-};
-
-/** Initial value of the column from where the streaming should start */
-export type Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Stream_Cursor_Value_Input = {
-  collection_id?: InputMaybe<Scalars['String']>;
-  price?: InputMaybe<Scalars['numeric']>;
-};
-
-/** columns and relationships of "nft_marketplace_v2_top_collections_token_v2_24h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_24h = {
-  __typename?: 'nft_marketplace_v2_top_collections_token_v2_24h';
-  collection_id?: Maybe<Scalars['String']>;
-  current_collection?: Maybe<Current_Collections_V2>;
-  price?: Maybe<Scalars['numeric']>;
-};
-
-/** Boolean expression to filter rows from the table "nft_marketplace_v2_top_collections_token_v2_24h". All fields are combined with a logical 'AND'. */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp = {
-  _and?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp>>;
-  _not?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp>;
-  _or?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp>>;
-  collection_id?: InputMaybe<String_Comparison_Exp>;
-  price?: InputMaybe<Numeric_Comparison_Exp>;
-};
-
-/** Ordering options when selecting data from "nft_marketplace_v2_top_collections_token_v2_24h". */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Order_By = {
-  collection_id?: InputMaybe<Order_By>;
-  price?: InputMaybe<Order_By>;
-};
-
-/** select columns of table "nft_marketplace_v2_top_collections_token_v2_24h" */
-export enum Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Select_Column {
-  /** column name */
-  CollectionId = 'collection_id',
-  /** column name */
-  Price = 'price'
-}
-
-/** Streaming cursor of the table "nft_marketplace_v2_top_collections_token_v2_24h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Stream_Cursor_Input = {
-  /** Stream column input with initial value */
-  initial_value: Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Stream_Cursor_Value_Input;
-  /** cursor ordering */
-  ordering?: InputMaybe<Cursor_Ordering>;
-};
-
-/** Initial value of the column from where the streaming should start */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Stream_Cursor_Value_Input = {
-  collection_id?: InputMaybe<Scalars['String']>;
-  price?: InputMaybe<Scalars['numeric']>;
-};
-
-/** columns and relationships of "nft_marketplace_v2_top_collections_token_v2_48h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_48h = {
-  __typename?: 'nft_marketplace_v2_top_collections_token_v2_48h';
-  collection_id?: Maybe<Scalars['String']>;
-  current_collection?: Maybe<Current_Collections_V2>;
-  price?: Maybe<Scalars['numeric']>;
-};
-
-/** Boolean expression to filter rows from the table "nft_marketplace_v2_top_collections_token_v2_48h". All fields are combined with a logical 'AND'. */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp = {
-  _and?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp>>;
-  _not?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp>;
-  _or?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp>>;
-  collection_id?: InputMaybe<String_Comparison_Exp>;
-  price?: InputMaybe<Numeric_Comparison_Exp>;
-};
-
-/** Ordering options when selecting data from "nft_marketplace_v2_top_collections_token_v2_48h". */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Order_By = {
-  collection_id?: InputMaybe<Order_By>;
-  price?: InputMaybe<Order_By>;
-};
-
-/** select columns of table "nft_marketplace_v2_top_collections_token_v2_48h" */
-export enum Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Select_Column {
-  /** column name */
-  CollectionId = 'collection_id',
-  /** column name */
-  Price = 'price'
-}
-
-/** Streaming cursor of the table "nft_marketplace_v2_top_collections_token_v2_48h" */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Stream_Cursor_Input = {
-  /** Stream column input with initial value */
-  initial_value: Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Stream_Cursor_Value_Input;
-  /** cursor ordering */
-  ordering?: InputMaybe<Cursor_Ordering>;
-};
-
-/** Initial value of the column from where the streaming should start */
-export type Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Stream_Cursor_Value_Input = {
-  collection_id?: InputMaybe<Scalars['String']>;
-  price?: InputMaybe<Scalars['numeric']>;
+export type Nft_Metadata_Crawler_Parsed_Asset_Uris_Stream_Cursor_Value_Input = {
+  asset_uri?: InputMaybe<Scalars['String']>;
+  cdn_animation_uri?: InputMaybe<Scalars['String']>;
+  cdn_image_uri?: InputMaybe<Scalars['String']>;
+  cdn_json_uri?: InputMaybe<Scalars['String']>;
+  raw_animation_uri?: InputMaybe<Scalars['String']>;
+  raw_image_uri?: InputMaybe<Scalars['String']>;
 };
 
 /** columns and relationships of "num_active_delegator_per_pool" */
@@ -5461,11 +6316,15 @@ export type Query_Root = {
   address_version_from_events_aggregate: Address_Version_From_Events_Aggregate;
   /** fetch data from the table: "address_version_from_move_resources" */
   address_version_from_move_resources: Array<Address_Version_From_Move_Resources>;
+  /** fetch aggregated fields from the table: "address_version_from_move_resources" */
+  address_version_from_move_resources_aggregate: Address_Version_From_Move_Resources_Aggregate;
   /** fetch data from the table: "block_metadata_transactions" */
   block_metadata_transactions: Array<Block_Metadata_Transactions>;
   /** fetch data from the table: "block_metadata_transactions" using primary key columns */
   block_metadata_transactions_by_pk?: Maybe<Block_Metadata_Transactions>;
+  /** An array relationship */
   coin_activities: Array<Coin_Activities>;
+  /** An aggregate relationship */
   coin_activities_aggregate: Coin_Activities_Aggregate;
   /** fetch data from the table: "coin_activities" using primary key columns */
   coin_activities_by_pk?: Maybe<Coin_Activities>;
@@ -5489,6 +6348,8 @@ export type Query_Root = {
   current_ans_lookup: Array<Current_Ans_Lookup>;
   /** fetch data from the table: "current_ans_lookup" using primary key columns */
   current_ans_lookup_by_pk?: Maybe<Current_Ans_Lookup>;
+  /** fetch data from the table: "current_aptos_names" */
+  current_aptos_names: Array<Current_Aptos_Names>;
   /** fetch data from the table: "current_coin_balances" */
   current_coin_balances: Array<Current_Coin_Balances>;
   /** fetch data from the table: "current_coin_balances" using primary key columns */
@@ -5509,10 +6370,24 @@ export type Query_Root = {
   current_delegated_staking_pool_balances: Array<Current_Delegated_Staking_Pool_Balances>;
   /** fetch data from the table: "current_delegated_staking_pool_balances" using primary key columns */
   current_delegated_staking_pool_balances_by_pk?: Maybe<Current_Delegated_Staking_Pool_Balances>;
+  /** fetch data from the table: "current_delegated_voter" */
+  current_delegated_voter: Array<Current_Delegated_Voter>;
+  /** fetch data from the table: "current_delegated_voter" using primary key columns */
+  current_delegated_voter_by_pk?: Maybe<Current_Delegated_Voter>;
   /** fetch data from the table: "current_delegator_balances" */
   current_delegator_balances: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_delegator_balances" using primary key columns */
   current_delegator_balances_by_pk?: Maybe<Current_Delegator_Balances>;
+  /** fetch data from the table: "current_fungible_asset_balances" */
+  current_fungible_asset_balances: Array<Current_Fungible_Asset_Balances>;
+  /** fetch aggregated fields from the table: "current_fungible_asset_balances" */
+  current_fungible_asset_balances_aggregate: Current_Fungible_Asset_Balances_Aggregate;
+  /** fetch data from the table: "current_fungible_asset_balances" using primary key columns */
+  current_fungible_asset_balances_by_pk?: Maybe<Current_Fungible_Asset_Balances>;
+  /** fetch data from the table: "current_objects" */
+  current_objects: Array<Current_Objects>;
+  /** fetch data from the table: "current_objects" using primary key columns */
+  current_objects_by_pk?: Maybe<Current_Objects>;
   /** fetch data from the table: "current_staking_pool_voter" */
   current_staking_pool_voter: Array<Current_Staking_Pool_Voter>;
   /** fetch data from the table: "current_staking_pool_voter" using primary key columns */
@@ -5545,6 +6420,7 @@ export type Query_Root = {
   current_token_pending_claims: Array<Current_Token_Pending_Claims>;
   /** fetch data from the table: "current_token_pending_claims" using primary key columns */
   current_token_pending_claims_by_pk?: Maybe<Current_Token_Pending_Claims>;
+  /** An array relationship */
   delegated_staking_activities: Array<Delegated_Staking_Activities>;
   /** fetch data from the table: "delegated_staking_activities" using primary key columns */
   delegated_staking_activities_by_pk?: Maybe<Delegated_Staking_Activities>;
@@ -5554,10 +6430,20 @@ export type Query_Root = {
   delegated_staking_pools_by_pk?: Maybe<Delegated_Staking_Pools>;
   /** fetch data from the table: "delegator_distinct_pool" */
   delegator_distinct_pool: Array<Delegator_Distinct_Pool>;
+  /** fetch aggregated fields from the table: "delegator_distinct_pool" */
+  delegator_distinct_pool_aggregate: Delegator_Distinct_Pool_Aggregate;
   /** fetch data from the table: "events" */
   events: Array<Events>;
   /** fetch data from the table: "events" using primary key columns */
   events_by_pk?: Maybe<Events>;
+  /** An array relationship */
+  fungible_asset_activities: Array<Fungible_Asset_Activities>;
+  /** fetch data from the table: "fungible_asset_activities" using primary key columns */
+  fungible_asset_activities_by_pk?: Maybe<Fungible_Asset_Activities>;
+  /** fetch data from the table: "fungible_asset_metadata" */
+  fungible_asset_metadata: Array<Fungible_Asset_Metadata>;
+  /** fetch data from the table: "fungible_asset_metadata" using primary key columns */
+  fungible_asset_metadata_by_pk?: Maybe<Fungible_Asset_Metadata>;
   /** fetch data from the table: "indexer_status" */
   indexer_status: Array<Indexer_Status>;
   /** fetch data from the table: "indexer_status" using primary key columns */
@@ -5588,20 +6474,12 @@ export type Query_Root = {
   nft_marketplace_v2_current_nft_marketplace_token_offers_by_pk?: Maybe<Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers>;
   /** fetch data from the table: "nft_marketplace_v2.nft_marketplace_activities" */
   nft_marketplace_v2_nft_marketplace_activities: Array<Nft_Marketplace_V2_Nft_Marketplace_Activities>;
-  /** fetch aggregated fields from the table: "nft_marketplace_v2.nft_marketplace_activities" */
-  nft_marketplace_v2_nft_marketplace_activities_aggregate: Nft_Marketplace_V2_Nft_Marketplace_Activities_Aggregate;
   /** fetch data from the table: "nft_marketplace_v2.nft_marketplace_activities" using primary key columns */
   nft_marketplace_v2_nft_marketplace_activities_by_pk?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections" */
-  nft_marketplace_v2_top_collections: Array<Nft_Marketplace_V2_Top_Collections>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v1_24h" */
-  nft_marketplace_v2_top_collections_token_v1_24h: Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v1_48h" */
-  nft_marketplace_v2_top_collections_token_v1_48h: Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v2_24h" */
-  nft_marketplace_v2_top_collections_token_v2_24h: Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v2_48h" */
-  nft_marketplace_v2_top_collections_token_v2_48h: Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h>;
+  /** fetch data from the table: "nft_metadata_crawler.parsed_asset_uris" */
+  nft_metadata_crawler_parsed_asset_uris: Array<Nft_Metadata_Crawler_Parsed_Asset_Uris>;
+  /** fetch data from the table: "nft_metadata_crawler.parsed_asset_uris" using primary key columns */
+  nft_metadata_crawler_parsed_asset_uris_by_pk?: Maybe<Nft_Metadata_Crawler_Parsed_Asset_Uris>;
   /** fetch data from the table: "num_active_delegator_per_pool" */
   num_active_delegator_per_pool: Array<Num_Active_Delegator_Per_Pool>;
   /** fetch data from the table: "processor_status" */
@@ -5622,7 +6500,9 @@ export type Query_Root = {
   table_metadatas: Array<Table_Metadatas>;
   /** fetch data from the table: "table_metadatas" using primary key columns */
   table_metadatas_by_pk?: Maybe<Table_Metadatas>;
+  /** An array relationship */
   token_activities: Array<Token_Activities>;
+  /** An aggregate relationship */
   token_activities_aggregate: Token_Activities_Aggregate;
   /** fetch data from the table: "token_activities" using primary key columns */
   token_activities_by_pk?: Maybe<Token_Activities>;
@@ -5703,6 +6583,15 @@ export type Query_RootAddress_Version_From_Events_AggregateArgs = {
 
 
 export type Query_RootAddress_Version_From_Move_ResourcesArgs = {
+  distinct_on?: InputMaybe<Array<Address_Version_From_Move_Resources_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Version_From_Move_Resources_Order_By>>;
+  where?: InputMaybe<Address_Version_From_Move_Resources_Bool_Exp>;
+};
+
+
+export type Query_RootAddress_Version_From_Move_Resources_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Address_Version_From_Move_Resources_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -5826,6 +6715,15 @@ export type Query_RootCurrent_Ans_Lookup_By_PkArgs = {
 };
 
 
+export type Query_RootCurrent_Aptos_NamesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+};
+
+
 export type Query_RootCurrent_Coin_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Coin_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -5901,6 +6799,21 @@ export type Query_RootCurrent_Delegated_Staking_Pool_Balances_By_PkArgs = {
 };
 
 
+export type Query_RootCurrent_Delegated_VoterArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegated_Voter_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegated_Voter_Order_By>>;
+  where?: InputMaybe<Current_Delegated_Voter_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Delegated_Voter_By_PkArgs = {
+  delegation_pool_address: Scalars['String'];
+  delegator_address: Scalars['String'];
+};
+
+
 export type Query_RootCurrent_Delegator_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -5915,6 +6828,43 @@ export type Query_RootCurrent_Delegator_Balances_By_PkArgs = {
   pool_address: Scalars['String'];
   pool_type: Scalars['String'];
   table_handle: Scalars['String'];
+};
+
+
+export type Query_RootCurrent_Fungible_Asset_BalancesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Fungible_Asset_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Fungible_Asset_Balances_Order_By>>;
+  where?: InputMaybe<Current_Fungible_Asset_Balances_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Fungible_Asset_Balances_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Fungible_Asset_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Fungible_Asset_Balances_Order_By>>;
+  where?: InputMaybe<Current_Fungible_Asset_Balances_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Fungible_Asset_Balances_By_PkArgs = {
+  storage_id: Scalars['String'];
+};
+
+
+export type Query_RootCurrent_ObjectsArgs = {
+  distinct_on?: InputMaybe<Array<Current_Objects_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Objects_Order_By>>;
+  where?: InputMaybe<Current_Objects_Bool_Exp>;
+};
+
+
+export type Query_RootCurrent_Objects_By_PkArgs = {
+  object_address: Scalars['String'];
 };
 
 
@@ -6081,6 +7031,15 @@ export type Query_RootDelegator_Distinct_PoolArgs = {
 };
 
 
+export type Query_RootDelegator_Distinct_Pool_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Delegator_Distinct_Pool_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Delegator_Distinct_Pool_Order_By>>;
+  where?: InputMaybe<Delegator_Distinct_Pool_Bool_Exp>;
+};
+
+
 export type Query_RootEventsArgs = {
   distinct_on?: InputMaybe<Array<Events_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -6094,6 +7053,35 @@ export type Query_RootEvents_By_PkArgs = {
   account_address: Scalars['String'];
   creation_number: Scalars['bigint'];
   sequence_number: Scalars['bigint'];
+};
+
+
+export type Query_RootFungible_Asset_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Fungible_Asset_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Fungible_Asset_Activities_Order_By>>;
+  where?: InputMaybe<Fungible_Asset_Activities_Bool_Exp>;
+};
+
+
+export type Query_RootFungible_Asset_Activities_By_PkArgs = {
+  event_index: Scalars['bigint'];
+  transaction_version: Scalars['bigint'];
+};
+
+
+export type Query_RootFungible_Asset_MetadataArgs = {
+  distinct_on?: InputMaybe<Array<Fungible_Asset_Metadata_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Fungible_Asset_Metadata_Order_By>>;
+  where?: InputMaybe<Fungible_Asset_Metadata_Bool_Exp>;
+};
+
+
+export type Query_RootFungible_Asset_Metadata_By_PkArgs = {
+  asset_type: Scalars['String'];
 };
 
 
@@ -6212,63 +7200,23 @@ export type Query_RootNft_Marketplace_V2_Nft_Marketplace_ActivitiesArgs = {
 };
 
 
-export type Query_RootNft_Marketplace_V2_Nft_Marketplace_Activities_AggregateArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp>;
-};
-
-
 export type Query_RootNft_Marketplace_V2_Nft_Marketplace_Activities_By_PkArgs = {
   event_index: Scalars['bigint'];
   transaction_version: Scalars['bigint'];
 };
 
 
-export type Query_RootNft_Marketplace_V2_Top_CollectionsArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Select_Column>>;
+export type Query_RootNft_Metadata_Crawler_Parsed_Asset_UrisArgs = {
+  distinct_on?: InputMaybe<Array<Nft_Metadata_Crawler_Parsed_Asset_Uris_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Bool_Exp>;
+  order_by?: InputMaybe<Array<Nft_Metadata_Crawler_Parsed_Asset_Uris_Order_By>>;
+  where?: InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>;
 };
 
 
-export type Query_RootNft_Marketplace_V2_Top_Collections_Token_V1_24hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp>;
-};
-
-
-export type Query_RootNft_Marketplace_V2_Top_Collections_Token_V1_48hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp>;
-};
-
-
-export type Query_RootNft_Marketplace_V2_Top_Collections_Token_V2_24hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp>;
-};
-
-
-export type Query_RootNft_Marketplace_V2_Top_Collections_Token_V2_48hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp>;
+export type Query_RootNft_Metadata_Crawler_Parsed_Asset_Uris_By_PkArgs = {
+  asset_uri: Scalars['String'];
 };
 
 
@@ -6482,6 +7430,8 @@ export type Subscription_Root = {
   address_version_from_events_stream: Array<Address_Version_From_Events>;
   /** fetch data from the table: "address_version_from_move_resources" */
   address_version_from_move_resources: Array<Address_Version_From_Move_Resources>;
+  /** fetch aggregated fields from the table: "address_version_from_move_resources" */
+  address_version_from_move_resources_aggregate: Address_Version_From_Move_Resources_Aggregate;
   /** fetch data from the table in a streaming manner : "address_version_from_move_resources" */
   address_version_from_move_resources_stream: Array<Address_Version_From_Move_Resources>;
   /** fetch data from the table: "block_metadata_transactions" */
@@ -6490,7 +7440,9 @@ export type Subscription_Root = {
   block_metadata_transactions_by_pk?: Maybe<Block_Metadata_Transactions>;
   /** fetch data from the table in a streaming manner : "block_metadata_transactions" */
   block_metadata_transactions_stream: Array<Block_Metadata_Transactions>;
+  /** An array relationship */
   coin_activities: Array<Coin_Activities>;
+  /** An aggregate relationship */
   coin_activities_aggregate: Coin_Activities_Aggregate;
   /** fetch data from the table: "coin_activities" using primary key columns */
   coin_activities_by_pk?: Maybe<Coin_Activities>;
@@ -6526,6 +7478,10 @@ export type Subscription_Root = {
   current_ans_lookup_by_pk?: Maybe<Current_Ans_Lookup>;
   /** fetch data from the table in a streaming manner : "current_ans_lookup" */
   current_ans_lookup_stream: Array<Current_Ans_Lookup>;
+  /** fetch data from the table: "current_aptos_names" */
+  current_aptos_names: Array<Current_Aptos_Names>;
+  /** fetch data from the table in a streaming manner : "current_aptos_names" */
+  current_aptos_names_stream: Array<Current_Aptos_Names>;
   /** fetch data from the table: "current_coin_balances" */
   current_coin_balances: Array<Current_Coin_Balances>;
   /** fetch data from the table: "current_coin_balances" using primary key columns */
@@ -6556,12 +7512,32 @@ export type Subscription_Root = {
   current_delegated_staking_pool_balances_by_pk?: Maybe<Current_Delegated_Staking_Pool_Balances>;
   /** fetch data from the table in a streaming manner : "current_delegated_staking_pool_balances" */
   current_delegated_staking_pool_balances_stream: Array<Current_Delegated_Staking_Pool_Balances>;
+  /** fetch data from the table: "current_delegated_voter" */
+  current_delegated_voter: Array<Current_Delegated_Voter>;
+  /** fetch data from the table: "current_delegated_voter" using primary key columns */
+  current_delegated_voter_by_pk?: Maybe<Current_Delegated_Voter>;
+  /** fetch data from the table in a streaming manner : "current_delegated_voter" */
+  current_delegated_voter_stream: Array<Current_Delegated_Voter>;
   /** fetch data from the table: "current_delegator_balances" */
   current_delegator_balances: Array<Current_Delegator_Balances>;
   /** fetch data from the table: "current_delegator_balances" using primary key columns */
   current_delegator_balances_by_pk?: Maybe<Current_Delegator_Balances>;
   /** fetch data from the table in a streaming manner : "current_delegator_balances" */
   current_delegator_balances_stream: Array<Current_Delegator_Balances>;
+  /** fetch data from the table: "current_fungible_asset_balances" */
+  current_fungible_asset_balances: Array<Current_Fungible_Asset_Balances>;
+  /** fetch aggregated fields from the table: "current_fungible_asset_balances" */
+  current_fungible_asset_balances_aggregate: Current_Fungible_Asset_Balances_Aggregate;
+  /** fetch data from the table: "current_fungible_asset_balances" using primary key columns */
+  current_fungible_asset_balances_by_pk?: Maybe<Current_Fungible_Asset_Balances>;
+  /** fetch data from the table in a streaming manner : "current_fungible_asset_balances" */
+  current_fungible_asset_balances_stream: Array<Current_Fungible_Asset_Balances>;
+  /** fetch data from the table: "current_objects" */
+  current_objects: Array<Current_Objects>;
+  /** fetch data from the table: "current_objects" using primary key columns */
+  current_objects_by_pk?: Maybe<Current_Objects>;
+  /** fetch data from the table in a streaming manner : "current_objects" */
+  current_objects_stream: Array<Current_Objects>;
   /** fetch data from the table: "current_staking_pool_voter" */
   current_staking_pool_voter: Array<Current_Staking_Pool_Voter>;
   /** fetch data from the table: "current_staking_pool_voter" using primary key columns */
@@ -6608,6 +7584,7 @@ export type Subscription_Root = {
   current_token_pending_claims_by_pk?: Maybe<Current_Token_Pending_Claims>;
   /** fetch data from the table in a streaming manner : "current_token_pending_claims" */
   current_token_pending_claims_stream: Array<Current_Token_Pending_Claims>;
+  /** An array relationship */
   delegated_staking_activities: Array<Delegated_Staking_Activities>;
   /** fetch data from the table: "delegated_staking_activities" using primary key columns */
   delegated_staking_activities_by_pk?: Maybe<Delegated_Staking_Activities>;
@@ -6621,6 +7598,8 @@ export type Subscription_Root = {
   delegated_staking_pools_stream: Array<Delegated_Staking_Pools>;
   /** fetch data from the table: "delegator_distinct_pool" */
   delegator_distinct_pool: Array<Delegator_Distinct_Pool>;
+  /** fetch aggregated fields from the table: "delegator_distinct_pool" */
+  delegator_distinct_pool_aggregate: Delegator_Distinct_Pool_Aggregate;
   /** fetch data from the table in a streaming manner : "delegator_distinct_pool" */
   delegator_distinct_pool_stream: Array<Delegator_Distinct_Pool>;
   /** fetch data from the table: "events" */
@@ -6629,6 +7608,18 @@ export type Subscription_Root = {
   events_by_pk?: Maybe<Events>;
   /** fetch data from the table in a streaming manner : "events" */
   events_stream: Array<Events>;
+  /** An array relationship */
+  fungible_asset_activities: Array<Fungible_Asset_Activities>;
+  /** fetch data from the table: "fungible_asset_activities" using primary key columns */
+  fungible_asset_activities_by_pk?: Maybe<Fungible_Asset_Activities>;
+  /** fetch data from the table in a streaming manner : "fungible_asset_activities" */
+  fungible_asset_activities_stream: Array<Fungible_Asset_Activities>;
+  /** fetch data from the table: "fungible_asset_metadata" */
+  fungible_asset_metadata: Array<Fungible_Asset_Metadata>;
+  /** fetch data from the table: "fungible_asset_metadata" using primary key columns */
+  fungible_asset_metadata_by_pk?: Maybe<Fungible_Asset_Metadata>;
+  /** fetch data from the table in a streaming manner : "fungible_asset_metadata" */
+  fungible_asset_metadata_stream: Array<Fungible_Asset_Metadata>;
   /** fetch data from the table: "indexer_status" */
   indexer_status: Array<Indexer_Status>;
   /** fetch data from the table: "indexer_status" using primary key columns */
@@ -6673,32 +7664,16 @@ export type Subscription_Root = {
   nft_marketplace_v2_current_nft_marketplace_token_offers_stream: Array<Nft_Marketplace_V2_Current_Nft_Marketplace_Token_Offers>;
   /** fetch data from the table: "nft_marketplace_v2.nft_marketplace_activities" */
   nft_marketplace_v2_nft_marketplace_activities: Array<Nft_Marketplace_V2_Nft_Marketplace_Activities>;
-  /** fetch aggregated fields from the table: "nft_marketplace_v2.nft_marketplace_activities" */
-  nft_marketplace_v2_nft_marketplace_activities_aggregate: Nft_Marketplace_V2_Nft_Marketplace_Activities_Aggregate;
   /** fetch data from the table: "nft_marketplace_v2.nft_marketplace_activities" using primary key columns */
   nft_marketplace_v2_nft_marketplace_activities_by_pk?: Maybe<Nft_Marketplace_V2_Nft_Marketplace_Activities>;
   /** fetch data from the table in a streaming manner : "nft_marketplace_v2.nft_marketplace_activities" */
   nft_marketplace_v2_nft_marketplace_activities_stream: Array<Nft_Marketplace_V2_Nft_Marketplace_Activities>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections" */
-  nft_marketplace_v2_top_collections: Array<Nft_Marketplace_V2_Top_Collections>;
-  /** fetch data from the table in a streaming manner : "nft_marketplace_v2_top_collections" */
-  nft_marketplace_v2_top_collections_stream: Array<Nft_Marketplace_V2_Top_Collections>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v1_24h" */
-  nft_marketplace_v2_top_collections_token_v1_24h: Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h>;
-  /** fetch data from the table in a streaming manner : "nft_marketplace_v2_top_collections_token_v1_24h" */
-  nft_marketplace_v2_top_collections_token_v1_24h_stream: Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v1_48h" */
-  nft_marketplace_v2_top_collections_token_v1_48h: Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h>;
-  /** fetch data from the table in a streaming manner : "nft_marketplace_v2_top_collections_token_v1_48h" */
-  nft_marketplace_v2_top_collections_token_v1_48h_stream: Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v2_24h" */
-  nft_marketplace_v2_top_collections_token_v2_24h: Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h>;
-  /** fetch data from the table in a streaming manner : "nft_marketplace_v2_top_collections_token_v2_24h" */
-  nft_marketplace_v2_top_collections_token_v2_24h_stream: Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h>;
-  /** fetch data from the table: "nft_marketplace_v2_top_collections_token_v2_48h" */
-  nft_marketplace_v2_top_collections_token_v2_48h: Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h>;
-  /** fetch data from the table in a streaming manner : "nft_marketplace_v2_top_collections_token_v2_48h" */
-  nft_marketplace_v2_top_collections_token_v2_48h_stream: Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h>;
+  /** fetch data from the table: "nft_metadata_crawler.parsed_asset_uris" */
+  nft_metadata_crawler_parsed_asset_uris: Array<Nft_Metadata_Crawler_Parsed_Asset_Uris>;
+  /** fetch data from the table: "nft_metadata_crawler.parsed_asset_uris" using primary key columns */
+  nft_metadata_crawler_parsed_asset_uris_by_pk?: Maybe<Nft_Metadata_Crawler_Parsed_Asset_Uris>;
+  /** fetch data from the table in a streaming manner : "nft_metadata_crawler.parsed_asset_uris" */
+  nft_metadata_crawler_parsed_asset_uris_stream: Array<Nft_Metadata_Crawler_Parsed_Asset_Uris>;
   /** fetch data from the table: "num_active_delegator_per_pool" */
   num_active_delegator_per_pool: Array<Num_Active_Delegator_Per_Pool>;
   /** fetch data from the table in a streaming manner : "num_active_delegator_per_pool" */
@@ -6729,7 +7704,9 @@ export type Subscription_Root = {
   table_metadatas_by_pk?: Maybe<Table_Metadatas>;
   /** fetch data from the table in a streaming manner : "table_metadatas" */
   table_metadatas_stream: Array<Table_Metadatas>;
+  /** An array relationship */
   token_activities: Array<Token_Activities>;
+  /** An aggregate relationship */
   token_activities_aggregate: Token_Activities_Aggregate;
   /** fetch data from the table: "token_activities" using primary key columns */
   token_activities_by_pk?: Maybe<Token_Activities>;
@@ -6843,6 +7820,15 @@ export type Subscription_RootAddress_Version_From_Events_StreamArgs = {
 
 
 export type Subscription_RootAddress_Version_From_Move_ResourcesArgs = {
+  distinct_on?: InputMaybe<Array<Address_Version_From_Move_Resources_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Address_Version_From_Move_Resources_Order_By>>;
+  where?: InputMaybe<Address_Version_From_Move_Resources_Bool_Exp>;
+};
+
+
+export type Subscription_RootAddress_Version_From_Move_Resources_AggregateArgs = {
   distinct_on?: InputMaybe<Array<Address_Version_From_Move_Resources_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
@@ -7022,6 +8008,22 @@ export type Subscription_RootCurrent_Ans_Lookup_StreamArgs = {
 };
 
 
+export type Subscription_RootCurrent_Aptos_NamesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Aptos_Names_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Aptos_Names_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+};
+
+
 export type Subscription_RootCurrent_Coin_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Coin_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -7132,6 +8134,28 @@ export type Subscription_RootCurrent_Delegated_Staking_Pool_Balances_StreamArgs 
 };
 
 
+export type Subscription_RootCurrent_Delegated_VoterArgs = {
+  distinct_on?: InputMaybe<Array<Current_Delegated_Voter_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Delegated_Voter_Order_By>>;
+  where?: InputMaybe<Current_Delegated_Voter_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Delegated_Voter_By_PkArgs = {
+  delegation_pool_address: Scalars['String'];
+  delegator_address: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Delegated_Voter_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Delegated_Voter_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Delegated_Voter_Bool_Exp>;
+};
+
+
 export type Subscription_RootCurrent_Delegator_BalancesArgs = {
   distinct_on?: InputMaybe<Array<Current_Delegator_Balances_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
@@ -7153,6 +8177,57 @@ export type Subscription_RootCurrent_Delegator_Balances_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Current_Delegator_Balances_Stream_Cursor_Input>>;
   where?: InputMaybe<Current_Delegator_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Fungible_Asset_BalancesArgs = {
+  distinct_on?: InputMaybe<Array<Current_Fungible_Asset_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Fungible_Asset_Balances_Order_By>>;
+  where?: InputMaybe<Current_Fungible_Asset_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Fungible_Asset_Balances_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Current_Fungible_Asset_Balances_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Fungible_Asset_Balances_Order_By>>;
+  where?: InputMaybe<Current_Fungible_Asset_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Fungible_Asset_Balances_By_PkArgs = {
+  storage_id: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Fungible_Asset_Balances_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Fungible_Asset_Balances_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Fungible_Asset_Balances_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_ObjectsArgs = {
+  distinct_on?: InputMaybe<Array<Current_Objects_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Objects_Order_By>>;
+  where?: InputMaybe<Current_Objects_Bool_Exp>;
+};
+
+
+export type Subscription_RootCurrent_Objects_By_PkArgs = {
+  object_address: Scalars['String'];
+};
+
+
+export type Subscription_RootCurrent_Objects_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Current_Objects_Stream_Cursor_Input>>;
+  where?: InputMaybe<Current_Objects_Bool_Exp>;
 };
 
 
@@ -7382,6 +8457,15 @@ export type Subscription_RootDelegator_Distinct_PoolArgs = {
 };
 
 
+export type Subscription_RootDelegator_Distinct_Pool_AggregateArgs = {
+  distinct_on?: InputMaybe<Array<Delegator_Distinct_Pool_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Delegator_Distinct_Pool_Order_By>>;
+  where?: InputMaybe<Delegator_Distinct_Pool_Bool_Exp>;
+};
+
+
 export type Subscription_RootDelegator_Distinct_Pool_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Delegator_Distinct_Pool_Stream_Cursor_Input>>;
@@ -7409,6 +8493,49 @@ export type Subscription_RootEvents_StreamArgs = {
   batch_size: Scalars['Int'];
   cursor: Array<InputMaybe<Events_Stream_Cursor_Input>>;
   where?: InputMaybe<Events_Bool_Exp>;
+};
+
+
+export type Subscription_RootFungible_Asset_ActivitiesArgs = {
+  distinct_on?: InputMaybe<Array<Fungible_Asset_Activities_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Fungible_Asset_Activities_Order_By>>;
+  where?: InputMaybe<Fungible_Asset_Activities_Bool_Exp>;
+};
+
+
+export type Subscription_RootFungible_Asset_Activities_By_PkArgs = {
+  event_index: Scalars['bigint'];
+  transaction_version: Scalars['bigint'];
+};
+
+
+export type Subscription_RootFungible_Asset_Activities_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Fungible_Asset_Activities_Stream_Cursor_Input>>;
+  where?: InputMaybe<Fungible_Asset_Activities_Bool_Exp>;
+};
+
+
+export type Subscription_RootFungible_Asset_MetadataArgs = {
+  distinct_on?: InputMaybe<Array<Fungible_Asset_Metadata_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Fungible_Asset_Metadata_Order_By>>;
+  where?: InputMaybe<Fungible_Asset_Metadata_Bool_Exp>;
+};
+
+
+export type Subscription_RootFungible_Asset_Metadata_By_PkArgs = {
+  asset_type: Scalars['String'];
+};
+
+
+export type Subscription_RootFungible_Asset_Metadata_StreamArgs = {
+  batch_size: Scalars['Int'];
+  cursor: Array<InputMaybe<Fungible_Asset_Metadata_Stream_Cursor_Input>>;
+  where?: InputMaybe<Fungible_Asset_Metadata_Bool_Exp>;
 };
 
 
@@ -7576,15 +8703,6 @@ export type Subscription_RootNft_Marketplace_V2_Nft_Marketplace_ActivitiesArgs =
 };
 
 
-export type Subscription_RootNft_Marketplace_V2_Nft_Marketplace_Activities_AggregateArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Nft_Marketplace_Activities_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Nft_Marketplace_Activities_Bool_Exp>;
-};
-
-
 export type Subscription_RootNft_Marketplace_V2_Nft_Marketplace_Activities_By_PkArgs = {
   event_index: Scalars['bigint'];
   transaction_version: Scalars['bigint'];
@@ -7598,83 +8716,24 @@ export type Subscription_RootNft_Marketplace_V2_Nft_Marketplace_Activities_Strea
 };
 
 
-export type Subscription_RootNft_Marketplace_V2_Top_CollectionsArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Select_Column>>;
+export type Subscription_RootNft_Metadata_Crawler_Parsed_Asset_UrisArgs = {
+  distinct_on?: InputMaybe<Array<Nft_Metadata_Crawler_Parsed_Asset_Uris_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Bool_Exp>;
+  order_by?: InputMaybe<Array<Nft_Metadata_Crawler_Parsed_Asset_Uris_Order_By>>;
+  where?: InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>;
 };
 
 
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_StreamArgs = {
+export type Subscription_RootNft_Metadata_Crawler_Parsed_Asset_Uris_By_PkArgs = {
+  asset_uri: Scalars['String'];
+};
+
+
+export type Subscription_RootNft_Metadata_Crawler_Parsed_Asset_Uris_StreamArgs = {
   batch_size: Scalars['Int'];
-  cursor: Array<InputMaybe<Nft_Marketplace_V2_Top_Collections_Stream_Cursor_Input>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V1_24hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V1_24h_StreamArgs = {
-  batch_size: Scalars['Int'];
-  cursor: Array<InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Stream_Cursor_Input>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_24h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V1_48hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V1_48h_StreamArgs = {
-  batch_size: Scalars['Int'];
-  cursor: Array<InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Stream_Cursor_Input>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V1_48h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V2_24hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V2_24h_StreamArgs = {
-  batch_size: Scalars['Int'];
-  cursor: Array<InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Stream_Cursor_Input>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_24h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V2_48hArgs = {
-  distinct_on?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Select_Column>>;
-  limit?: InputMaybe<Scalars['Int']>;
-  offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Order_By>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp>;
-};
-
-
-export type Subscription_RootNft_Marketplace_V2_Top_Collections_Token_V2_48h_StreamArgs = {
-  batch_size: Scalars['Int'];
-  cursor: Array<InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Stream_Cursor_Input>>;
-  where?: InputMaybe<Nft_Marketplace_V2_Top_Collections_Token_V2_48h_Bool_Exp>;
+  cursor: Array<InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Stream_Cursor_Input>>;
+  where?: InputMaybe<Nft_Metadata_Crawler_Parsed_Asset_Uris_Bool_Exp>;
 };
 
 
@@ -8103,9 +9162,9 @@ export type Timestamptz_Comparison_Exp = {
 export type Token_Activities = {
   __typename?: 'token_activities';
   /** An array relationship */
-  aptos_names_owner: Array<Current_Ans_Lookup>;
+  aptos_names_owner: Array<Current_Aptos_Names>;
   /** An array relationship */
-  aptos_names_to: Array<Current_Ans_Lookup>;
+  aptos_names_to: Array<Current_Aptos_Names>;
   coin_amount?: Maybe<Scalars['numeric']>;
   coin_type?: Maybe<Scalars['String']>;
   collection_data_id_hash: Scalars['String'];
@@ -8131,21 +9190,21 @@ export type Token_Activities = {
 
 /** columns and relationships of "token_activities" */
 export type Token_ActivitiesAptos_Names_OwnerArgs = {
-  distinct_on?: InputMaybe<Array<Current_Ans_Lookup_Select_Column>>;
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Current_Ans_Lookup_Order_By>>;
-  where?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
 };
 
 
 /** columns and relationships of "token_activities" */
 export type Token_ActivitiesAptos_Names_ToArgs = {
-  distinct_on?: InputMaybe<Array<Current_Ans_Lookup_Select_Column>>;
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
   limit?: InputMaybe<Scalars['Int']>;
   offset?: InputMaybe<Scalars['Int']>;
-  order_by?: InputMaybe<Array<Current_Ans_Lookup_Order_By>>;
-  where?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
 };
 
 /** aggregated selection of "token_activities" */
@@ -8221,8 +9280,8 @@ export type Token_Activities_Bool_Exp = {
   _and?: InputMaybe<Array<Token_Activities_Bool_Exp>>;
   _not?: InputMaybe<Token_Activities_Bool_Exp>;
   _or?: InputMaybe<Array<Token_Activities_Bool_Exp>>;
-  aptos_names_owner?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
-  aptos_names_to?: InputMaybe<Current_Ans_Lookup_Bool_Exp>;
+  aptos_names_owner?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+  aptos_names_to?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
   coin_amount?: InputMaybe<Numeric_Comparison_Exp>;
   coin_type?: InputMaybe<String_Comparison_Exp>;
   collection_data_id_hash?: InputMaybe<String_Comparison_Exp>;
@@ -8336,8 +9395,8 @@ export type Token_Activities_Min_Order_By = {
 
 /** Ordering options when selecting data from "token_activities". */
 export type Token_Activities_Order_By = {
-  aptos_names_owner_aggregate?: InputMaybe<Current_Ans_Lookup_Aggregate_Order_By>;
-  aptos_names_to_aggregate?: InputMaybe<Current_Ans_Lookup_Aggregate_Order_By>;
+  aptos_names_owner_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
+  aptos_names_to_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
   coin_amount?: InputMaybe<Order_By>;
   coin_type?: InputMaybe<Order_By>;
   collection_data_id_hash?: InputMaybe<Order_By>;
@@ -8525,7 +9584,13 @@ export type Token_Activities_Sum_Order_By = {
 export type Token_Activities_V2 = {
   __typename?: 'token_activities_v2';
   after_value?: Maybe<Scalars['String']>;
+  /** An array relationship */
+  aptos_names_from: Array<Current_Aptos_Names>;
+  /** An array relationship */
+  aptos_names_to: Array<Current_Aptos_Names>;
   before_value?: Maybe<Scalars['String']>;
+  /** An object relationship */
+  current_token_data?: Maybe<Current_Token_Datas_V2>;
   entry_function_id_str?: Maybe<Scalars['String']>;
   event_account_address: Scalars['String'];
   event_index: Scalars['bigint'];
@@ -8539,6 +9604,26 @@ export type Token_Activities_V2 = {
   transaction_timestamp: Scalars['timestamp'];
   transaction_version: Scalars['bigint'];
   type: Scalars['String'];
+};
+
+
+/** columns and relationships of "token_activities_v2" */
+export type Token_Activities_V2Aptos_Names_FromArgs = {
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+};
+
+
+/** columns and relationships of "token_activities_v2" */
+export type Token_Activities_V2Aptos_Names_ToArgs = {
+  distinct_on?: InputMaybe<Array<Current_Aptos_Names_Select_Column>>;
+  limit?: InputMaybe<Scalars['Int']>;
+  offset?: InputMaybe<Scalars['Int']>;
+  order_by?: InputMaybe<Array<Current_Aptos_Names_Order_By>>;
+  where?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
 };
 
 /** aggregated selection of "token_activities_v2" */
@@ -8609,7 +9694,10 @@ export type Token_Activities_V2_Bool_Exp = {
   _not?: InputMaybe<Token_Activities_V2_Bool_Exp>;
   _or?: InputMaybe<Array<Token_Activities_V2_Bool_Exp>>;
   after_value?: InputMaybe<String_Comparison_Exp>;
+  aptos_names_from?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
+  aptos_names_to?: InputMaybe<Current_Aptos_Names_Bool_Exp>;
   before_value?: InputMaybe<String_Comparison_Exp>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Bool_Exp>;
   entry_function_id_str?: InputMaybe<String_Comparison_Exp>;
   event_account_address?: InputMaybe<String_Comparison_Exp>;
   event_index?: InputMaybe<Bigint_Comparison_Exp>;
@@ -8702,7 +9790,10 @@ export type Token_Activities_V2_Min_Order_By = {
 /** Ordering options when selecting data from "token_activities_v2". */
 export type Token_Activities_V2_Order_By = {
   after_value?: InputMaybe<Order_By>;
+  aptos_names_from_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
+  aptos_names_to_aggregate?: InputMaybe<Current_Aptos_Names_Aggregate_Order_By>;
   before_value?: InputMaybe<Order_By>;
+  current_token_data?: InputMaybe<Current_Token_Datas_V2_Order_By>;
   entry_function_id_str?: InputMaybe<Order_By>;
   event_account_address?: InputMaybe<Order_By>;
   event_index?: InputMaybe<Order_By>;

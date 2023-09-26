@@ -4,32 +4,50 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
 use aptos_types::{
     contract_event::ReadWriteEvent,
     executable::ModulePath,
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
-use std::{fmt::Debug, hash::Hash};
+use aptos_vm_types::resolver::TExecutorView;
+use move_core_types::value::MoveTypeLayout;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
-pub enum ExecutionStatus<T, E> {
+pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully.
-    Success(T),
+    Success(O),
     /// Transaction hit a none recoverable error during execution, halt the execution and propagate
     /// the error back to the caller.
     Abort(E),
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
-    SkipRest(T),
+    SkipRest(O),
 }
 
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + Clone + 'static {
     type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
+    /// specifying a tag, and output requires merging all resources together (Note: this may change
+    /// in the future if write-set format changes to be per-resource, could be more performant).
+    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
+    type Tag: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + DeserializeOwned
+        + Serialize;
+    /// AggregatorV2 identifier type.
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
@@ -62,7 +80,11 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+        >,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
@@ -74,16 +96,22 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
 
-    /// Get the writes of a transaction from its output.
-    fn get_writes(
+    /// Get the writes of a transaction from its output, separately for resources, modules and
+    /// aggregator_v1.
+    fn resource_write_set(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )>;
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+
+    fn module_write_set(
+        &self,
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+
+    fn aggregator_v1_write_set(
+        &self,
+    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator deltas of a transaction from its output.
-    fn get_deltas(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
+    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;

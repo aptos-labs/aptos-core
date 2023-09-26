@@ -217,7 +217,7 @@ Key rotation is currently not implemented in any wallets. Mapping of rotated key
 
 Wallets that import a private key will have to do the following:
 1. Derive the authentication key.
-2. Lookup the authentication key onchain in the Account origination table
+2. Lookup the authentication key onchain in the Account origination table.
   - If the account doesn't exist, it's a new account. The address to be used is the authentication key.
   - If the account does exist, it's a rotated key account, and the address to be used will come from the table.
 

@@ -83,7 +83,7 @@ impl Default for MempoolConfig {
 
 impl ConfigSanitizer for MempoolConfig {
     fn sanitize(
-        _node_config: &mut NodeConfig,
+        _node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {

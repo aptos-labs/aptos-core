@@ -12,6 +12,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
+bytes = "1.4.0"
 memory-stats = "1.0.0"
 move-binary-format = { path = "../../move-binary-format" }
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
@@ -21,7 +22,7 @@ tempfile = "3.2.0"
 move-core-types = { path = "../../move-core/types" }
 move-stdlib = { path = "../../move-stdlib" }
 move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
-move-vm-runtime = { path = "../runtime" }
+move-vm-runtime = { path = "../runtime", features = ["testing"] }
 move-vm-test-utils = { path = "../test-utils" }
 move-vm-types = { path = "../types" }
 

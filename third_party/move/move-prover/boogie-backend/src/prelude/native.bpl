@@ -255,7 +255,7 @@ returns (dst: $Mutation ({{T}}), m': $Mutation (Vec ({{T}})))
         call $ExecFailureAbort();
         return;
     }
-    dst := $Mutation(l#$Mutation(m), ExtendVec(p#$Mutation(m), index), ReadVec(v, index));
+    dst := $Mutation(m->l, ExtendVec(m->p, index), ReadVec(v, index));
     m' := m;
 }
 
@@ -488,7 +488,7 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     if (!ContainsTable(t, enc_k)) {
         call $Abort($StdError(7/*INVALID_ARGUMENTS*/, 101/*ENOT_FOUND*/));
     } else {
-        dst := $Mutation(l#$Mutation(m), ExtendVec(p#$Mutation(m), enc_k), GetTable(t, enc_k));
+        dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
         m' := m;
     }
 }
@@ -505,9 +505,9 @@ returns (dst: $Mutation ({{V}}), m': $Mutation ({{Self}})) {
     if (!ContainsTable(t, enc_k)) {
         m' := $UpdateMutation(m, AddTable(t, enc_k, default));
         t' := $Dereference(m');
-        dst := $Mutation(l#$Mutation(m'), ExtendVec(p#$Mutation(m'), enc_k), GetTable(t', enc_k));
+        dst := $Mutation(m'->l, ExtendVec(m'->p, enc_k), GetTable(t', enc_k));
     } else {
-        dst := $Mutation(l#$Mutation(m), ExtendVec(p#$Mutation(m), enc_k), GetTable(t, enc_k));
+        dst := $Mutation(m->l, ExtendVec(m->p, enc_k), GetTable(t, enc_k));
         m' := m;
     }
 }
@@ -663,9 +663,9 @@ procedure {:inline 1} $1_event_destroy_handle{{S}}(handle: $1_event_EventHandle{
 
 function {:inline} $ExtendEventStore{{S}}(
         es: $EventStore, handle: $1_event_EventHandle{{S}}, msg: {{T}}): $EventStore {
-    (var stream := streams#$EventStore(es)[handle];
+    (var stream := es->streams[handle];
     (var stream_new := ExtendMultiset(stream, $ToEventRep{{S}}(msg));
-    $EventStore(counter#$EventStore(es)+1, streams#$EventStore(es)[handle := stream_new])))
+    $EventStore(es->counter+1, es->streams[handle := stream_new])))
 }
 
 function {:inline} $CondExtendEventStore{{S}}(

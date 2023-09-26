@@ -28,7 +28,7 @@
 //! those structs translate to tables and table specifications.
 
 use crate::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
     errors::{PartialVMError, PartialVMResult},
     file_format_common,
     internals::ModuleIndex,
@@ -382,9 +382,8 @@ pub struct StructDefinition {
 impl StructDefinition {
     pub fn declared_field_count(&self) -> PartialVMResult<MemberCount> {
         match &self.field_information {
-            // TODO we might want a more informative error here
             StructFieldInformation::Native => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message("Looking for field in native structure".to_string())),
+                .with_message("Looking for field in native structure. Native structures have no accessible fields.".to_string())),
             StructFieldInformation::Declared(fields) => Ok(fields.len() as u16),
         }
     }
@@ -1841,6 +1840,14 @@ pub struct CompiledScript {
 impl CompiledScript {
     /// Returns the index of `main` in case a script is converted to a module.
     pub const MAIN_INDEX: FunctionDefinitionIndex = FunctionDefinitionIndex(0);
+
+    /// Returns the code key of `module_handle`
+    pub fn module_id_for_handle(&self, module_handle: &ModuleHandle) -> ModuleId {
+        ModuleId::new(
+            *self.address_identifier_at(module_handle.address),
+            self.identifier_at(module_handle.name).to_owned(),
+        )
+    }
 }
 
 /// A `CompiledModule` defines the structure of a module which is the unit of published code.

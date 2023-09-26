@@ -120,7 +120,7 @@ Also learn how to run a public fullnode on a local network and connect to either
         <div class="card-body">
           <h2 class="card-title">Fullnode</h2>
           <p class="card-text">
-            A section with detailed, step-by-step instructions on everything related to Aptos fullnode. 
+            A section with detailed, step-by-step instructions on everything related to Aptos fullnode.
           </p>
         </div>
         <div class="list-group list-group-flush">
@@ -130,7 +130,7 @@ Also learn how to run a public fullnode on a local network and connect to either
             </div>
             <small>Follow this section to install a public fullnode.</small>
           </a>
-          <a href="./indexer-fullnode" class="list-group-item">
+          <a href="../indexer/legacy/indexer-fullnode" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Indexer fullnode</h4>
             </div>
@@ -202,7 +202,7 @@ Also learn how to run a public fullnode on a local network and connect to either
             </div>
             <small>All the files you need while deploying nodes, whether on mainnet, testnet or devnet.</small>
           </a>
-          <a href="../integration/indexing" class="list-group-item">
+          <a href="../indexer/indexer-landing" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
               <h4 class="mb-1">Indexing</h4>
             </div>

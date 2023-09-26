@@ -6,7 +6,7 @@ use crate::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -43,6 +43,7 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
+use crate::fee_statement::FeeStatement;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
@@ -1056,6 +1057,15 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    // This is a special function to update the total supply in the write set. 'TransactionOutput'
+    // already has materialized write set, but in case of sharding support for total_supply, we
+    // want to update the total supply in the write set by aggregating the total supply deltas from
+    // each shard. However, is costly to materialize the entire write set again, hence we have this
+    // inplace update hack.
+    pub fn update_total_supply(&mut self, value: u128) {
+        self.write_set.update_total_supply(value);
+    }
+
     pub fn events(&self) -> &[ContractEvent] {
         &self.events
     }
@@ -1137,6 +1147,16 @@ impl TransactionOutput {
         );
 
         Ok(())
+    }
+
+    pub fn try_extract_fee_statement(&self) -> Result<Option<FeeStatement>> {
+        // Look backwards since the fee statement is expected to be the last event.
+        for event in self.events.iter().rev() {
+            if let Some(fee_statement) = event.try_v2_typed(&FEE_STATEMENT_EVENT_TYPE)? {
+                return Ok(Some(fee_statement));
+            }
+        }
+        Ok(None)
     }
 }
 

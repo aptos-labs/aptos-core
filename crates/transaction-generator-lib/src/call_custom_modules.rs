@@ -18,7 +18,7 @@ use std::sync::Arc;
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
 pub type TransactionGeneratorWorker = dyn Fn(
-        &mut LocalAccount,
+        &LocalAccount,
         &Package,
         &LocalAccount,
         &TransactionFactory,
@@ -82,7 +82,7 @@ impl CustomModulesDelegationGenerator {
 impl TransactionGenerator for CustomModulesDelegationGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -135,8 +135,8 @@ impl CustomModulesDelegationGeneratorCreator {
                 2 * init_txn_factory.get_gas_unit_price() * init_txn_factory.get_max_gas_amount(),
             ));
 
-            let package = package_handler.pick_package(&mut rng, &mut publisher);
-            requests_publish.push(package.publish_transaction(&mut publisher, &init_txn_factory));
+            let package = package_handler.pick_package(&mut rng, &publisher);
+            requests_publish.push(package.publish_transaction(&publisher, &init_txn_factory));
 
             requests_initialize.append(&mut workload.initialize_package(
                 &package,

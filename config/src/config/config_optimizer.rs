@@ -3,17 +3,56 @@
 
 use crate::{
     config::{
-        node_config_loader::NodeType, utils::get_config_name, Error, InspectionServiceConfig,
-        LoggerConfig, MempoolConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig,
+        node_config_loader::NodeType, utils::get_config_name, Error, IndexerConfig,
+        InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
+        PeerMonitoringServiceConfig, PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
 };
-use aptos_types::chain_id::ChainId;
+use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
+use maplit::hashset;
 use serde_yaml::Value;
+use std::{collections::HashMap, str::FromStr};
 
 // Useful optimizer constants
 const OPTIMIZER_STRING: &str = "Optimizer";
+const ALL_NETWORKS_OPTIMIZER_NAME: &str = "AllNetworkConfigOptimizer";
+const PUBLIC_NETWORK_OPTIMIZER_NAME: &str = "PublicNetworkConfigOptimizer";
 const VALIDATOR_NETWORK_OPTIMIZER_NAME: &str = "ValidatorNetworkConfigOptimizer";
+
+// Mainnet seed peers. Each seed peer entry is a tuple
+// of (account address, public key, network address).
+const MAINNET_SEED_PEERS: [(&str, &str, &str); 1] = [(
+    "568fdb6acf26aae2a84419108ff13baa3ebf133844ef18e23a9f47b5af16b698",
+    "0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008",
+    "/dns/node1.cloud-b.mainnet.aptoslabs.com/tcp/6182/noise-ik/0x003cc2ed36e7d486539ac2c411b48d962f1ef17d884c3a7109cad43f16bd5008/handshake/0",
+)];
+
+// Testnet seed peers. Each seed peer entry is a tuple
+// of (account address, public key, network address).
+const TESTNET_SEED_PEERS: [(&str, &str, &str); 4] = [
+    (
+        "31e55012a7d439dcd16fee0509cd5855c1fbdc62057ba7fac3f7c88f5453dd8e",
+        "0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755",
+        "/dns/seed0.testnet.aptoslabs.com/tcp/6182/noise-ik/0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755/handshake/0",
+    ),
+    (
+        "116176e2af223a8b7f8db80dc52f7a423b4d7f8c0553a1747e92ef58849aff4f",
+        "0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64",
+        "/dns/seed1.testnet.aptoslabs.com/tcp/6182/noise-ik/0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64/handshake/0",
+    ),
+    (
+        "12000330d7cd8a748f46c25e6ce5d236a27e13d0b510d4516ac84ecc5fddd002",
+        "0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933",
+        "/dns/seed2.testnet.aptoslabs.com/tcp/6182/noise-ik/0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933/handshake/0",
+    ),
+    (
+        "03c04549114877c55f45649aba48ac0a4ff086ab7bdce3b8cc8d3d9947bc0d99",
+        "0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a",
+        "/dns/seed3.testnet.aptoslabs.com/tcp/6182/noise-ik/0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a/handshake/0",
+    ),
+];
 
 /// A trait for optimizing node configs (and their sub-configs) by tweaking
 /// config values based on node types, chain IDs and compiler features.
@@ -58,6 +97,9 @@ impl ConfigOptimizer for NodeConfig {
     ) -> Result<bool, Error> {
         // Optimize only the relevant sub-configs
         let mut optimizers_with_modifications = vec![];
+        if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(IndexerConfig::get_optimizer_name());
+        }
         if InspectionServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(InspectionServiceConfig::get_optimizer_name());
         }
@@ -78,6 +120,12 @@ impl ConfigOptimizer for NodeConfig {
         if StateSyncConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(StateSyncConfig::get_optimizer_name());
         }
+        if optimize_all_network_configs(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(ALL_NETWORKS_OPTIMIZER_NAME.to_string());
+        }
+        if optimize_public_network_config(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(PUBLIC_NETWORK_OPTIMIZER_NAME.to_string());
+        }
         if optimize_validator_network_config(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(VALIDATOR_NETWORK_OPTIMIZER_NAME.to_string());
         }
@@ -85,6 +133,64 @@ impl ConfigOptimizer for NodeConfig {
         // Return true iff any config modifications were made
         Ok(!optimizers_with_modifications.is_empty())
     }
+}
+
+/// Optimizes all network configs according to the node type and chain ID
+fn optimize_all_network_configs(
+    node_config: &mut NodeConfig,
+    _local_config_yaml: &Value,
+    _node_type: NodeType,
+    _chain_id: ChainId,
+) -> Result<bool, Error> {
+    let mut modified_config = false;
+
+    // Set the listener address and prepare the node identities for the validator network
+    if let Some(validator_network) = &mut node_config.validator_network {
+        validator_network.set_listen_address_and_prepare_identity()?;
+        modified_config = true;
+    }
+
+    // Set the listener address and prepare the node identities for the fullnode networks
+    for fullnode_network in &mut node_config.full_node_networks {
+        fullnode_network.set_listen_address_and_prepare_identity()?;
+        modified_config = true;
+    }
+
+    Ok(modified_config)
+}
+
+/// Optimize the public network config according to the node type and chain ID
+fn optimize_public_network_config(
+    node_config: &mut NodeConfig,
+    local_config_yaml: &Value,
+    node_type: NodeType,
+    chain_id: ChainId,
+) -> Result<bool, Error> {
+    // We only need to optimize the public network config for VFNs and PFNs
+    if node_type.is_validator() {
+        return Ok(false);
+    }
+
+    // Add seeds to the public network config
+    let mut modified_config = false;
+    for (index, fullnode_network_config) in node_config.full_node_networks.iter_mut().enumerate() {
+        let local_network_config_yaml = &local_config_yaml["full_node_networks"][index];
+
+        // Only add seeds to testnet and mainnet (as they are long living networks)
+        if fullnode_network_config.network_id == NetworkId::Public
+            && local_network_config_yaml["seeds"].is_null()
+        {
+            if chain_id.is_testnet() {
+                fullnode_network_config.seeds = create_seed_peers(TESTNET_SEED_PEERS.into())?;
+                modified_config = true;
+            } else if chain_id.is_mainnet() {
+                fullnode_network_config.seeds = create_seed_peers(MAINNET_SEED_PEERS.into())?;
+                modified_config = true;
+            }
+        }
+    }
+
+    Ok(modified_config)
 }
 
 /// Optimize the validator network config according to the node type and chain ID
@@ -115,10 +221,228 @@ fn optimize_validator_network_config(
     Ok(modified_config)
 }
 
+/// Creates and returns a set of seed peers from the given entries
+fn create_seed_peers(seed_peer_entries: Vec<(&str, &str, &str)>) -> Result<PeerSet, Error> {
+    // Create a map of seed peers
+    let mut seed_peers = HashMap::new();
+
+    // Add the seed peers
+    for (account_address, public_key, network_address) in seed_peer_entries {
+        let (peer_address, peer) = build_seed_peer(account_address, public_key, network_address)?;
+        seed_peers.insert(peer_address, peer);
+    }
+
+    Ok(seed_peers)
+}
+
+/// Builds a seed peer using the specified peer information
+fn build_seed_peer(
+    account_address_hex: &str,
+    public_key_hex: &str,
+    network_address_str: &str,
+) -> Result<(PeerId, Peer), Error> {
+    // Parse the account address
+    let account_address = PeerId::from_hex(account_address_hex).map_err(|error| {
+        Error::Unexpected(format!(
+            "Failed to parse peer account address: {:?}. Error: {:?}",
+            account_address_hex, error
+        ))
+    })?;
+
+    // Parse the x25519 public key
+    let public_key = x25519::PublicKey::from_encoded_string(public_key_hex).map_err(|error| {
+        Error::Unexpected(format!(
+            "Failed to parse peer public key: {:?}. Error: {:?}",
+            public_key_hex, error
+        ))
+    })?;
+
+    // Parse the network address string
+    let network_address = NetworkAddress::from_str(network_address_str).map_err(|error| {
+        Error::Unexpected(format!(
+            "Failed to parse peer network address: {:?}. Error: {:?}",
+            network_address_str, error
+        ))
+    })?;
+
+    // Build the peer struct
+    let peer = Peer {
+        addresses: vec![network_address],
+        keys: hashset! {public_key},
+        role: PeerRole::Upstream,
+    };
+
+    // Return the account address and peer
+    Ok((account_address, peer))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{config::NetworkConfig, network_id::NetworkId};
+    use aptos_types::account_address::AccountAddress;
+
+    #[test]
+    fn test_optimize_public_network_config_mainnet() {
+        // Create a public network config with no seeds
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![NetworkConfig {
+                network_id: NetworkId::Public,
+                seeds: HashMap::new(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Optimize the public network config and verify modifications are made
+        let modified_config = optimize_public_network_config(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::ValidatorFullnode,
+            ChainId::mainnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that the mainnet seed peers have been added to the config
+        let public_network_config = &node_config.full_node_networks[0];
+        let public_seeds = &public_network_config.seeds;
+        assert_eq!(public_seeds.len(), MAINNET_SEED_PEERS.len());
+
+        // Verify that the seed peers contain the expected values
+        for (account_address, public_key, network_address) in MAINNET_SEED_PEERS {
+            // Fetch the seed peer
+            let seed_peer = public_seeds
+                .get(&AccountAddress::from_hex(account_address).unwrap())
+                .unwrap();
+
+            // Verify the seed peer properties
+            assert_eq!(seed_peer.role, PeerRole::Upstream);
+            assert!(seed_peer
+                .addresses
+                .contains(&NetworkAddress::from_str(network_address).unwrap()));
+            assert!(seed_peer
+                .keys
+                .contains(&x25519::PublicKey::from_encoded_string(public_key).unwrap()));
+        }
+    }
+
+    #[test]
+    fn test_optimize_public_network_config_testnet() {
+        // Create a public network config with no seeds
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![NetworkConfig {
+                network_id: NetworkId::Public,
+                seeds: HashMap::new(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Optimize the public network config and verify modifications are made
+        let modified_config = optimize_public_network_config(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::PublicFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that the testnet seed peers have been added to the config
+        let public_network_config = &node_config.full_node_networks[0];
+        let public_seeds = &public_network_config.seeds;
+        assert_eq!(public_seeds.len(), TESTNET_SEED_PEERS.len());
+
+        // Verify that the seed peers contain the expected values
+        for (account_address, public_key, network_address) in TESTNET_SEED_PEERS {
+            // Fetch the seed peer
+            let seed_peer = public_seeds
+                .get(&AccountAddress::from_hex(account_address).unwrap())
+                .unwrap();
+
+            // Verify the seed peer properties
+            assert_eq!(seed_peer.role, PeerRole::Upstream);
+            assert!(seed_peer
+                .addresses
+                .contains(&NetworkAddress::from_str(network_address).unwrap()));
+            assert!(seed_peer
+                .keys
+                .contains(&x25519::PublicKey::from_encoded_string(public_key).unwrap()));
+        }
+    }
+
+    #[test]
+    fn test_optimize_public_network_config_no_override() {
+        // Create a public network config
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![NetworkConfig {
+                network_id: NetworkId::Public,
+                seeds: HashMap::new(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Create a local config with the public network having seed entries
+        let local_config_yaml = serde_yaml::from_str(
+            r#"
+            full_node_networks:
+                - network_id: "Public"
+                  seeds:
+                      bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a:
+                          addresses:
+                              - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
+                          role: "Upstream"
+            "#,
+        )
+            .unwrap();
+
+        // Optimize the public network config and verify no modifications are made
+        let modified_config = optimize_public_network_config(
+            &mut node_config,
+            &local_config_yaml,
+            NodeType::PublicFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(!modified_config);
+    }
+
+    #[test]
+    fn test_optimize_public_network_config_no_modifications() {
+        // Create a public network config with no seeds
+        let mut node_config = NodeConfig {
+            full_node_networks: vec![NetworkConfig {
+                network_id: NetworkId::Public,
+                seeds: HashMap::new(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Optimize the public network config and verify no modifications
+        // are made (the node is a validator).
+        let modified_config = optimize_public_network_config(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::Validator,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(!modified_config);
+
+        // Optimize the public network config and verify no modifications
+        // are made (the chain ID is not testnet or mainnet).
+        let modified_config = optimize_public_network_config(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::PublicFullnode,
+            ChainId::test(),
+        )
+        .unwrap();
+        assert!(!modified_config);
+    }
 
     #[test]
     fn test_optimize_validator_network_config() {

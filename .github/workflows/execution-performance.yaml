@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   schedule:
-    - cron: "0 12 * * *" # This runs every day at 12pm UTC.
+    - cron: "0 */4 * * *" # This runs every four hours
 
 jobs:
   execution-performance:
@@ -16,8 +16,9 @@ jobs:
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-execution-performance.yaml@main
+    uses: ./.github/workflows/workflow-run-execution-performance.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       RUNNER_NAME: executor-benchmark-runner
+      RUN_ONLY_SINGLE_NODE_PERF: ${{ github.event_name != 'schedule' }} # Run all tests on the scheduled cadence

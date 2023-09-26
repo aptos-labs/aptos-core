@@ -292,7 +292,7 @@ impl StorageConfig {
 
 impl ConfigSanitizer for StorageConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {

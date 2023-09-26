@@ -6,6 +6,7 @@ use anyhow::Result;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as AptosFeatures};
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -15,6 +16,35 @@ pub struct Features {
     pub enabled: Vec<FeatureFlag>,
     #[serde(default)]
     pub disabled: Vec<FeatureFlag>,
+}
+
+impl Features {
+    pub fn empty() -> Self {
+        Self {
+            enabled: vec![],
+            disabled: vec![],
+        }
+    }
+
+    pub fn squash(&mut self, rhs: Self) {
+        let mut enabled: HashSet<_> = self.enabled.iter().cloned().collect();
+        let mut disabled: HashSet<_> = self.disabled.iter().cloned().collect();
+        let to_enable: HashSet<_> = rhs.enabled.into_iter().collect();
+        let to_disable: HashSet<_> = rhs.disabled.into_iter().collect();
+
+        disabled = disabled.difference(&to_enable).cloned().collect();
+        enabled.extend(to_enable);
+
+        enabled = enabled.difference(&to_disable).cloned().collect();
+        disabled.extend(to_disable);
+
+        self.enabled = enabled.into_iter().collect();
+        self.disabled = disabled.into_iter().collect();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.enabled.is_empty() && self.disabled.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, EnumIter, PartialEq, Eq, Serialize, Hash)]
@@ -45,6 +75,14 @@ pub enum FeatureFlag {
     GasPayerEnabled,
     AptosUniqueIdentifiers,
     BulletproofsNatives,
+    SignerNativeFormatFix,
+    ModuleEvent,
+    EmitFeeStatement,
+    StorageDeletionRefund,
+    AggregatorSnapshots,
+    SignatureCheckerV2ScriptFix,
+    SaferResourceGroups,
+    SaferMetadata,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -168,6 +206,16 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::GasPayerEnabled => AptosFeatureFlag::GAS_PAYER_ENABLED,
             FeatureFlag::AptosUniqueIdentifiers => AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
             FeatureFlag::BulletproofsNatives => AptosFeatureFlag::BULLETPROOFS_NATIVES,
+            FeatureFlag::SignerNativeFormatFix => AptosFeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+            FeatureFlag::ModuleEvent => AptosFeatureFlag::MODULE_EVENT,
+            FeatureFlag::EmitFeeStatement => AptosFeatureFlag::EMIT_FEE_STATEMENT,
+            FeatureFlag::StorageDeletionRefund => AptosFeatureFlag::STORAGE_DELETION_REFUND,
+            FeatureFlag::AggregatorSnapshots => AptosFeatureFlag::AGGREGATOR_SNAPSHOTS,
+            FeatureFlag::SignatureCheckerV2ScriptFix => {
+                AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
+            },
+            FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
+            FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
         }
     }
 }
@@ -214,6 +262,16 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::GAS_PAYER_ENABLED => FeatureFlag::GasPayerEnabled,
             AptosFeatureFlag::APTOS_UNIQUE_IDENTIFIERS => FeatureFlag::AptosUniqueIdentifiers,
             AptosFeatureFlag::BULLETPROOFS_NATIVES => FeatureFlag::BulletproofsNatives,
+            AptosFeatureFlag::SIGNER_NATIVE_FORMAT_FIX => FeatureFlag::SignerNativeFormatFix,
+            AptosFeatureFlag::MODULE_EVENT => FeatureFlag::ModuleEvent,
+            AptosFeatureFlag::EMIT_FEE_STATEMENT => FeatureFlag::EmitFeeStatement,
+            AptosFeatureFlag::STORAGE_DELETION_REFUND => FeatureFlag::StorageDeletionRefund,
+            AptosFeatureFlag::AGGREGATOR_SNAPSHOTS => FeatureFlag::AggregatorSnapshots,
+            AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
+                FeatureFlag::SignatureCheckerV2ScriptFix
+            },
+            AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
+            AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
         }
     }
 }

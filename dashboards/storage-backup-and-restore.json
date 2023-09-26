@@ -55,7 +55,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 7, "w": 17, "x": 0, "y": 1 },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 1 },
       "id": 255,
       "options": {
         "displayMode": "lcd",
@@ -66,7 +66,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+      "pluginVersion": "10.2.0-60477",
       "repeatDirection": "h",
       "targets": [
         {
@@ -115,7 +115,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+      "pluginVersion": "10.2.0-60477",
       "repeatDirection": "h",
       "targets": [
         {
@@ -150,6 +150,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisShow": false,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -257,7 +258,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+      "pluginVersion": "10.2.0-60477",
       "repeatDirection": "h",
       "targets": [
         {
@@ -293,6 +294,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisShow": false,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -400,7 +402,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+      "pluginVersion": "10.2.0-60477",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -456,7 +458,7 @@
         "showUnfilled": true,
         "valueMode": "color"
       },
-      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+      "pluginVersion": "10.2.0-60477",
       "repeatDirection": "h",
       "targets": [
         {
@@ -492,6 +494,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisShow": false,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -608,7 +611,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
+      "pluginVersion": "10.2.0-60477",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -651,6 +654,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
+            "axisShow": false,
             "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 0,
@@ -734,7 +738,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 2 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
           "id": 3302,
           "options": {
             "displayMode": "lcd",
@@ -779,7 +783,7 @@
           "description": "Epoch of the epoch ending LedgerInfo verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 2 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 26 },
           "hiddenSeries": false,
           "id": 3292,
           "legend": {
@@ -836,7 +840,7 @@
           "description": "Version of the epoch ending LedgerInfo verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 2 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 26 },
           "hiddenSeries": false,
           "id": 3294,
           "legend": {
@@ -897,7 +901,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 34 },
           "id": 3301,
           "options": {
             "displayMode": "lcd",
@@ -942,7 +946,7 @@
           "description": "Version of the transaction verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 34 },
           "hiddenSeries": false,
           "id": 3293,
           "legend": {
@@ -999,7 +1003,7 @@
           "description": "The speed of transaction verification.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 34 },
           "hiddenSeries": false,
           "id": 3296,
           "legend": {
@@ -1060,7 +1064,7 @@
             },
             "overrides": []
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 18 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 42 },
           "id": 3303,
           "options": {
             "displayMode": "lcd",
@@ -1105,7 +1109,7 @@
           "description": "Version of the state snapshot being verified",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 18 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 42 },
           "hiddenSeries": false,
           "id": 3295,
           "legend": {
@@ -1197,7 +1201,7 @@
               }
             ]
           },
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 26 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 50 },
           "id": 3287,
           "options": {
             "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": false },
@@ -1256,7 +1260,7 @@
           "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 3 },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 27 },
           "hiddenSeries": false,
           "id": 867,
           "legend": {
@@ -1312,7 +1316,7 @@
           "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 10 },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 34 },
           "hiddenSeries": false,
           "id": 326,
           "legend": {
@@ -1389,7 +1393,7 @@
           },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 43 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 67 },
           "hiddenSeries": false,
           "id": 3286,
           "legend": {
@@ -1459,7 +1463,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 43 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 67 },
           "hiddenSeries": false,
           "id": 1106,
           "legend": {
@@ -1514,7 +1518,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 43 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 67 },
           "hiddenSeries": false,
           "id": 1107,
           "legend": {
@@ -1569,7 +1573,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 51 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 75 },
           "hiddenSeries": false,
           "id": 1105,
           "legend": {
@@ -1625,7 +1629,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 51 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 75 },
           "hiddenSeries": false,
           "id": 1092,
           "legend": {
@@ -1695,7 +1699,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 51 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 75 },
           "hiddenSeries": false,
           "id": 1093,
           "legend": {
@@ -1757,7 +1761,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 59 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 83 },
           "hiddenSeries": false,
           "id": 1103,
           "legend": {
@@ -1812,7 +1816,7 @@
           "fieldConfig": { "defaults": { "custom": {} }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 59 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 83 },
           "hiddenSeries": false,
           "id": 1104,
           "legend": {
@@ -1878,7 +1882,7 @@
           "description": "Right edge of the graph shows latest state of the restore job and when it entered such state.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 40 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 64 },
           "hiddenSeries": false,
           "id": 3290,
           "legend": {
@@ -1948,7 +1952,7 @@
           "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 40 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 64 },
           "hiddenSeries": false,
           "id": 1108,
           "legend": {
@@ -2017,7 +2021,7 @@
           "description": "",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 40 },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 64 },
           "hiddenSeries": false,
           "id": 1109,
           "legend": {
@@ -2079,7 +2083,7 @@
           "description": "save: Version of txn being saved without replaying\nreplay: Version of txn being replayed\ntarget: When \"replay\" hits this version, the restore is done.",
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 48 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 72 },
           "hiddenSeries": false,
           "id": 3304,
           "legend": {
@@ -2146,7 +2150,7 @@
           "fieldConfig": { "defaults": { "links": [] }, "overrides": [] },
           "fill": 0,
           "fillGradient": 0,
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 48 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 72 },
           "hiddenSeries": false,
           "id": 1086,
           "legend": {
@@ -2203,12 +2207,190 @@
       "targets": [{ "datasource": { "type": "prometheus", "uid": "${Datasource}" }, "refId": "A" }],
       "title": "Restore Status Monitoring",
       "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "id": 3305,
+      "panels": [],
+      "title": "Resource usage",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisShow": false,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "id": 3308,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "rate(container_cpu_usage_seconds_total{pod=~\".*backup-0.*\", job=\"kubernetes-cadvisor\",container=\"backup\",  chain_name=\"$chain_name\"})",
+          "instant": false,
+          "legendFormat": "{{cluster}}-{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Panel Title",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisShow": false,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "id": 3307,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "container_memory_working_set_bytes{pod=~\".*backup-0.*\", job=\"kubernetes-cadvisor\",container=\"backup\",  chain_name=\"$chain_name\"}",
+          "instant": false,
+          "legendFormat": "{{cluster}}-{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "backup memory",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisShow": false,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 49 },
+      "id": 3306,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "container_memory_working_set_bytes{pod=~\".*backup-verify.*\", job=\"kubernetes-cadvisor\",  chain_name=\"$chain_name\"}",
+          "instant": false,
+          "legendFormat": "{{cluster}}-{{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Backup-verify memory",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
   "revision": 1,
   "schemaVersion": 38,
-  "style": "dark",
   "tags": ["aptos-core"],
   "templating": {
     "list": [
@@ -2357,7 +2539,7 @@
         "multi": true,
         "name": "role",
         "options": [
-          { "selected": true, "text": "All", "value": "$__all" },
+          { "selected": false, "text": "All", "value": "$__all" },
           { "selected": false, "text": "fullnode", "value": "fullnode" },
           { "selected": false, "text": "validator_fullnode", "value": "validator_fullnode" }
         ],
@@ -2395,6 +2577,6 @@
   "timezone": "",
   "title": "storage-backup-and-restore",
   "uid": "9oXpx4n4z",
-  "version": 23,
+  "version": 39,
   "weekStart": ""
 }
