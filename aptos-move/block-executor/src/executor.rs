@@ -140,11 +140,12 @@ where
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| {
             // First, apply writes.
-            for (k, v) in output
-                .resource_write_set()
-                .into_iter()
-                .chain(output.aggregator_v1_write_set().into_iter())
-            {
+            for (k, v) in output.resource_write_set().into_iter().chain(
+                output
+                    .aggregator_v1_write_set()
+                    .into_iter()
+                    .map(|(state_key, write_op)| (state_key, (write_op, None))),
+            ) {
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
@@ -233,7 +234,7 @@ where
             }
 
             match versioned_cache.data().fetch_data(r.path(), idx_to_validate) {
-                Ok(Versioned(version, _)) => r.validate_versioned(version),
+                Ok(Versioned(version, _, _)) => r.validate_versioned(version),
                 Ok(Resolved(value)) => r.validate_resolved(value),
                 Err(Uninitialized) => {
                     // Can match the current behavior for modules: the path would be considered
@@ -673,6 +674,7 @@ where
                     for (key, write_op) in output
                         .resource_write_set()
                         .into_iter()
+                        .map(|(k, (v, _))| (k, v))
                         .chain(output.aggregator_v1_write_set().into_iter())
                         .chain(output.module_write_set().into_iter())
                     {
