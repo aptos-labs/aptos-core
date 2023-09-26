@@ -3849,6 +3849,7 @@ dependencies = [
  "ouroboros 0.15.6",
  "proptest",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "rayon",
  "serde",
  "serde_json",
