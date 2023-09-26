@@ -50,6 +50,7 @@ mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
+mod qc_aggregator;
 mod sender_aware_shuffler;
 mod transaction_deduper;
 mod transaction_shuffler;

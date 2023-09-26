@@ -3,11 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters,
     liveness::round_state::{
         ExponentialTimeInterval, NewRoundEvent, NewRoundReason, RoundState, RoundTimeInterval,
     },
     util::mock_time_service::SimulatedTimeService,
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
@@ -86,8 +89,19 @@ fn make_round_state() -> (RoundState, aptos_channels::Receiver<Round>) {
     let time_interval = Box::new(ExponentialTimeInterval::fixed(Duration::from_millis(2)));
     let simulated_time = SimulatedTimeService::auto_advance_until(Duration::from_millis(4));
     let (timeout_tx, timeout_rx) = aptos_channels::new_test(1_024);
+    let (round_manager_tx, _) = aptos_channel::new(
+        QueueStyle::LIFO,
+        1,
+        Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+    );
     (
-        RoundState::new(time_interval, Arc::new(simulated_time), timeout_tx),
+        RoundState::new(
+            time_interval,
+            Arc::new(simulated_time),
+            timeout_tx,
+            round_manager_tx,
+            QcAggregatorType::NoDelay,
+        ),
         timeout_rx,
     )
 }

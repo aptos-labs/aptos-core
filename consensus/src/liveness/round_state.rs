@@ -5,10 +5,16 @@
 use crate::{
     counters,
     pending_votes::{PendingVotes, VoteReceptionResult},
+    round_manager::VerifiedEvent,
     util::time_service::{SendTask, TimeService},
 };
+use aptos_channels::aptos_channel;
+use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
-    common::Round, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutWithPartialSignatures,
+    common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutWithPartialSignatures,
     vote::Vote,
 };
 use aptos_crypto::HashValue;
@@ -18,7 +24,7 @@ use aptos_types::{
 };
 use futures::future::AbortHandle;
 use serde::Serialize;
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, mem::Discriminant, sync::Arc, time::Duration};
 
 /// A reason for starting a new round: introduced for monitoring / debug purposes.
 #[derive(Serialize, Debug, PartialEq, Eq)]
@@ -161,6 +167,11 @@ pub struct RoundState {
     vote_sent: Option<Vote>,
     // The handle to cancel previous timeout task when moving to next round.
     abort_handle: Option<AbortHandle>,
+    // Self sender to send delayed QC aggregation events to the round manager.
+    round_manager_tx:
+        aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
+
+    qc_aggregator_type: QcAggregatorType,
 }
 
 #[derive(Default, Schema)]
@@ -189,12 +200,23 @@ impl RoundState {
         time_interval: Box<dyn RoundTimeInterval>,
         time_service: Arc<dyn TimeService>,
         timeout_sender: aptos_channels::Sender<Round>,
+        round_manager_tx: aptos_channel::Sender<
+            (Author, Discriminant<VerifiedEvent>),
+            (Author, VerifiedEvent),
+        >,
+        qc_aggregator_type: QcAggregatorType,
     ) -> Self {
         // Our counters are initialized lazily, so they're not going to appear in
         // Prometheus if some conditions never happen. Invoking get() function enforces creation.
         counters::QC_ROUNDS_COUNT.get();
         counters::TIMEOUT_ROUNDS_COUNT.get();
         counters::TIMEOUT_COUNT.get();
+
+        let pending_votes = PendingVotes::new(
+            time_service.clone(),
+            round_manager_tx.clone(),
+            qc_aggregator_type.clone(),
+        );
 
         Self {
             time_interval,
@@ -203,9 +225,11 @@ impl RoundState {
             current_round_deadline: time_service.get_current_timestamp(),
             time_service,
             timeout_sender,
-            pending_votes: PendingVotes::new(),
+            pending_votes,
             vote_sent: None,
             abort_handle: None,
+            round_manager_tx,
+            qc_aggregator_type,
         }
     }
 
@@ -248,7 +272,11 @@ impl RoundState {
 
             // Start a new round.
             self.current_round = new_round;
-            self.pending_votes = PendingVotes::new();
+            self.pending_votes = PendingVotes::new(
+                self.time_service.clone(),
+                self.round_manager_tx.clone(),
+                self.qc_aggregator_type.clone(),
+            );
             self.vote_sent = None;
             let timeout = self.setup_timeout(1);
             // The new round reason is QCReady in case both QC.round + 1 == new_round, otherwise
@@ -290,6 +318,16 @@ impl RoundState {
         if vote.vote_data().proposed().round() == self.current_round {
             self.vote_sent = Some(vote);
         }
+    }
+
+    pub async fn process_delayed_qc_msg(
+        &mut self,
+        validator_verifier: &ValidatorVerifier,
+        msg: DelayedQcMsg,
+    ) -> VoteReceptionResult {
+        let DelayedQcMsg { vote } = msg;
+        self.pending_votes
+            .process_delayed_qc(validator_verifier, vote)
     }
 
     pub fn vote_sent(&self) -> Option<Vote> {
