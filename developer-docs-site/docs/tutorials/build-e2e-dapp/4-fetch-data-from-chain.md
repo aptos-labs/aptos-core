@@ -57,12 +57,7 @@ function App (
 The `account` object is `null` if there is no account connected; when an account is connected, the `account` object holds the account information, including the account address.
 
 3. Next, we want to fetch the account’s TodoList resource.
-   Begin by importing `useEffect` by adding:
-
-```jsx
-import { useEffect } from "react";
-```
-
+   Begin by importing `useEffect` by using `jsx import useEffect from "react"; `
    Let’s add a `useEffect` hook to our file that would call a function to fetch the resource whenever our account address changes:
 
 ```jsx
@@ -75,17 +70,17 @@ function App() {
 }
 ```
 
-4. Before creating our `fetchList` function, let’s also create a local state to store whether the account has a list.
-   Import `useState` by using ```import { useState, useEffect } from "react"; ```
-   Next create a state variable `accountHasList` and its setter `setAccountHasList`
+4. Before creating our `fetchList` function, let’s also create a local state to store whether the account has a list:
 
-```jsx
+```js
 function App (
   ...
   const [accountHasList, setAccountHasList] = useState<boolean>(false);
   ...
 )
 ```
+also import `useEffect` using 
+```import { useState, useEffect } from "react"; ```
 
 5. Our `useEffect` hook is calling a `fetchList` function; let’s create it:
 
