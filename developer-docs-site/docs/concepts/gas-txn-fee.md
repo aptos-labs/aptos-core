@@ -11,8 +11,8 @@ Any transaction execution on the Aptos blockchain requires a processing fee. As 
   - It is measured in Gas Units whose price may fluctuate according to the load of the network. This allows execution & io costs to be low when the network is less busy.
 2. Storage fees
   - This covers the cost to persistently store validated record in the distributed blockchain storage.
-  - It is measured in fixed APT prices, so permanent storage cost stays stable while the gas unit price fluctuates with transient load of the network.
-  - Storage Fee is refundable upon deletion of the allocated storage space, fully or partially, depending on the size and age of the occupied storage space.
+  - It is measured in fixed APT prices, so the permanent storage cost stays stable even as the gas unit price fluctuates with the network's transient load.
+  - The storage fee can be refunded when the allocated storage space is deleted. The refund amount may be full or partial, based on the size and duration of the storage used.
 
 :::tip
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
