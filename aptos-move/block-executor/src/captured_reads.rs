@@ -12,6 +12,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use derivative::Derivative;
+use move_core_types::value::MoveTypeLayout;
 use std::{
     collections::{
         hash_map::{
@@ -47,6 +48,7 @@ pub(crate) enum DataRead<V> {
         // (version implies value equality, but not vice versa). TODO: when
         // comparing the instances of V is cheaper, compare those instead.
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
+        Option<Arc<MoveTypeLayout>>,
     ),
     Metadata(Option<StateValueMetadataKind>),
     Exists(bool),
@@ -75,7 +77,7 @@ impl<V: TransactionWrite> DataRead<V> {
     fn get_kind(&self) -> ReadKind {
         use DataRead::*;
         match self {
-            Versioned(_, _) | Resolved(_) => ReadKind::Value,
+            Versioned(_, _, _) | Resolved(_) => ReadKind::Value,
             Metadata(_) => ReadKind::Metadata,
             Exists(_) => ReadKind::Exists,
         }
@@ -117,11 +119,11 @@ impl<V: TransactionWrite> DataRead<V> {
         }
 
         (self_kind > kind).then(|| match (self, &kind) {
-            (DataRead::Versioned(_, v), ReadKind::Metadata) => {
+            (DataRead::Versioned(_, v, _), ReadKind::Metadata) => {
                 // For deletion, as_state_value_metadata returns None, also asserted by tests.
                 DataRead::Metadata(v.as_state_value_metadata())
             },
-            (DataRead::Versioned(_, v), ReadKind::Exists) => DataRead::Exists(!v.is_deletion()),
+            (DataRead::Versioned(_, v, _), ReadKind::Exists) => DataRead::Exists(!v.is_deletion()),
             (DataRead::Resolved(_), ReadKind::Metadata) => DataRead::Metadata(Some(None)),
             (DataRead::Resolved(_), ReadKind::Exists) => DataRead::Exists(true),
             (DataRead::Metadata(maybe_metadata), ReadKind::Exists) => {
@@ -301,9 +303,9 @@ impl<T: Transaction> CapturedReads<T> {
         use MVDataOutput::*;
         self.data_reads.iter().all(|(k, r)| {
             match data_map.fetch_data(k, idx_to_validate) {
-                Ok(Versioned(version, v)) => {
+                Ok(Versioned(version, v, layout)) => {
                     matches!(
-                        DataRead::Versioned(version, v).contains(r),
+                        DataRead::Versioned(version, v, layout).contains(r),
                         DataReadComparison::Contains
                     )
                 },
@@ -340,9 +342,9 @@ impl<T: Transaction> CapturedReads<T> {
             ret && group.inner_reads.iter().all(|(tag, r)| {
                 group_map
                     .read_from_group(key, tag, idx_to_validate)
-                    .is_ok_and(|(version, v)| {
+                    .is_ok_and(|(version, v, layout)| {
                         matches!(
-                            DataRead::Versioned(version, v).contains(r),
+                            DataRead::Versioned(version, v, layout).contains(r),
                             DataReadComparison::Contains
                         )
                     })
@@ -378,7 +380,8 @@ mod test {
         assert_eq!(
             DataRead::Versioned(
                 Err(StorageVersion),
-                Arc::new(ValueType::with_len_and_metadata(1, None))
+                Arc::new(ValueType::with_len_and_metadata(1, None)),
+                None,
             )
             .get_kind(),
             ReadKind::Value
@@ -443,14 +446,17 @@ mod test {
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(1, None)),
+            None,
         );
         let versioned_deletion = DataRead::Versioned(
             Ok((5, 1)),
             Arc::new(ValueType::with_len_and_metadata(0, None)),
+            None,
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
             Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
+            None,
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
@@ -515,7 +521,8 @@ mod test {
             versioned_legacy,
             DataRead::Versioned(
                 Err(StorageVersion),
-                Arc::new(ValueType::with_len_and_metadata(10, None))
+                Arc::new(ValueType::with_len_and_metadata(10, None)),
+                None,
             )
         );
     }
@@ -585,14 +592,17 @@ mod test {
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(1, None)),
+            None,
         );
         let versioned_deletion = DataRead::Versioned(
             Ok((5, 1)),
             Arc::new(ValueType::with_len_and_metadata(0, None)),
+            None,
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
             Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
+            None,
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
@@ -668,6 +678,7 @@ mod test {
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(1, None)),
+            None,
         );
         vec![exists, legacy_metadata, versioned_legacy]
     }
@@ -676,6 +687,7 @@ mod test {
         let versioned_deletion = DataRead::Versioned(
             Ok((5, 1)),
             Arc::new(ValueType::with_len_and_metadata(0, None)),
+            None,
         );
         let deletion_metadata = DataRead::Metadata(None);
         let not_exists = DataRead::Exists(false);
@@ -686,6 +698,7 @@ mod test {
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
             Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
+            None,
         );
         let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
@@ -831,6 +844,7 @@ mod test {
         let versioned_legacy = DataRead::Versioned(
             Err(StorageVersion),
             Arc::new(ValueType::with_len_and_metadata(1, None)),
+            None,
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let metadata = DataRead::Metadata(Some(raw_metadata(1)));

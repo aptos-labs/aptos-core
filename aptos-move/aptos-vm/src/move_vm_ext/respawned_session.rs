@@ -168,7 +168,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
+            Some((write_op, _)) => Ok(write_op.as_state_value()),
             None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
@@ -340,8 +340,8 @@ mod test {
         state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
 
         let resource_write_set = HashMap::from([
-            (key("resource_both"), write(80)),
-            (key("resource_write_set"), write(90)),
+            (key("resource_both"), (write(80), None)),
+            (key("resource_write_set"), (write(90), None)),
         ]);
 
         let module_write_set = HashMap::from([

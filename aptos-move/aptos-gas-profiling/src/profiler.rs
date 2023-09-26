@@ -600,7 +600,7 @@ where
         // Events
         let mut event_fee = Fee::new(0);
         let mut event_fees = vec![];
-        for event in change_set.events().iter() {
+        for (event, _) in change_set.events().iter() {
             let fee = self.storage_fee_per_event(event);
             event_fees.push(EventStorage {
                 ty: event.type_tag().clone(),
