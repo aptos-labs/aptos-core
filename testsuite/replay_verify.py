@@ -194,7 +194,7 @@ def main():
         runner_end = LATEST_VERSION
     print("runner start %d end %d" % (runner_start, runner_end))
     # run replay-verify in parallel
-    N = 16
+    N = 8
     PER_PARTITION = (runner_end - runner_start) // N
 
     with Pool(N) as p:
