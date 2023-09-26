@@ -22,31 +22,31 @@ pub trait TResourceView {
     ///   -  Err(...)         otherwise (e.g. storage error).
     fn get_resource_state_value(
         &self,
-        key: &Self::Key,
+        state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>>;
 
     fn get_resource_bytes(
         &self,
-        key: &Self::Key,
+        state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        let maybe_state_value = self.get_resource_state_value(key, maybe_layout)?;
+        let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
 
     fn get_resource_state_value_metadata(
         &self,
-        key: &Self::Key,
+        state_key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         // For metadata, layouts are not important.
-        let maybe_state_value = self.get_resource_state_value(key, None)?;
+        let maybe_state_value = self.get_resource_state_value(state_key, None)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn resource_exists(&self, key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
         // For existence, layouts are not important.
-        self.get_resource_state_value(key, None)
+        self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.is_some())
     }
 }
@@ -57,7 +57,7 @@ pub trait TResourceGroupView {
 
     fn get_resource_from_group(
         &self,
-        _key: &Self::Key,
+        _state_key: &Self::Key,
         _resource_tag: &Self::Tag,
     ) -> anyhow::Result<Option<Bytes>> {
         unimplemented!("TResourceGroupView not yet implemented");
@@ -73,7 +73,7 @@ pub trait TResourceGroupView {
         unimplemented!("TResourceGroupView not yet implemented");
     }
 
-    fn resource_group_exists(&self, _key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_group_exists(&self, _state_key: &Self::Key) -> anyhow::Result<bool> {
         unimplemented!("TResourceGroupView not yet implemented");
     }
 
@@ -90,7 +90,7 @@ pub trait TResourceGroupView {
     /// the parallel execution setting, as a wrong value will be (later) caught by validation.
     /// Thus, R/W conflicts are avoided, as long as the estimates are correct (e.g. updating
     /// struct members of a fixed size).
-    fn resource_group_size(&self, _key: &Self::Key) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
         unimplemented!("TResourceGroupView not yet implemented");
     }
 
@@ -106,7 +106,7 @@ pub trait TResourceGroupView {
     /// which in the context of parallel execution does not cause a full R/W conflict.
     fn resource_exists_in_group(
         &self,
-        _key: &Self::Key,
+        _state_key: &Self::Key,
         _resource_tag: &Self::Tag,
     ) -> anyhow::Result<bool> {
         unimplemented!("TResourceGroupView not yet implemented");
@@ -121,23 +121,23 @@ pub trait TModuleView {
     ///   -  Ok(None)         if the module is not in storage,
     ///   -  Ok(Some(...))    if the module exists in storage,
     ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
+    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_module_bytes(&self, key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
-        let maybe_state_value = self.get_module_state_value(key)?;
+    fn get_module_bytes(&self, state_key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
+        let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
 
     fn get_module_state_value_metadata(
         &self,
-        key: &Self::Key,
+        state_key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        let maybe_state_value = self.get_module_state_value(key)?;
+        let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn module_exists(&self, key: &Self::Key) -> anyhow::Result<bool> {
-        self.get_module_state_value(key)
+    fn module_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+        self.get_module_state_value(state_key)
             .map(|maybe_state_value| maybe_state_value.is_some())
     }
 }
