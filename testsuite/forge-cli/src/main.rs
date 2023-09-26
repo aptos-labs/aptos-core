@@ -1359,12 +1359,12 @@ fn gather_metrics() -> ForgeConfig {
         .add_network_test(GatherMetrics)
 }
 
-fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_200_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
-    netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 1000;
+    netbench_config.direct_send_data_size = 1000000;
+    netbench_config.direct_send_per_second = 200;
 }
 
 fn netbench_config_8_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
@@ -1381,7 +1381,7 @@ fn net_bench() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             let mut netbench_config = NetbenchConfig::default();
-            netbench_config_100_megabytes_per_sec(&mut netbench_config);
+            netbench_config_200_megabytes_per_sec(&mut netbench_config);
             config.netbench = Some(netbench_config);
         }))
 }
