@@ -46,6 +46,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object`](#0x1_object_create_object)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
+-  [Function `malloc_signer`](#0x1_object_malloc_signer)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
@@ -1003,6 +1004,40 @@ Same as <code>create_object</code> except the object to be created will be undel
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_sticky_object">create_sticky_object</a>(owner_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>();
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, unique_address, <b>false</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_object_malloc_signer"></a>
+
+## Function `malloc_signer`
+
+Allocate memory via a bare signer without an associated <code><a href="object.md#0x1_object_ObjectCore">ObjectCore</a></code> or <code><a href="object.md#0x1_object_TombStone">TombStone</a></code>.
+
+This is a convenience wrapper around existing public functions that can be chained together
+as follows in order to allocate new memory without any global storage overhead.
+
+To reduce per-item storage costs during the allocation transaction, use the <code><a href="object.md#0x1_object_ObjectGroup">ObjectGroup</a></code>
+resource group attribute for any <code>key</code>-able resources, as this will consolidate the
+<code><a href="object.md#0x1_object_ObjectCore">ObjectCore</a></code> existence check performed in <code><a href="object.md#0x1_object_create_object_internal">create_object_internal</a>()</code> to one storage slot.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_malloc_signer">malloc_signer</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="object.md#0x1_object_malloc_signer">malloc_signer</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
+    <b>let</b> constructor = <a href="object.md#0x1_object_create_object">create_object</a>(@0x0);
+    <a href="object.md#0x1_object_delete">delete</a>(<a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>(&constructor));
+    <a href="object.md#0x1_object_generate_signer">generate_signer</a>(&constructor)
 }
 </code></pre>
 
