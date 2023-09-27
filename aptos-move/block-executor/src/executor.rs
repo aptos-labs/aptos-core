@@ -15,7 +15,7 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
-use aptos_aggregator::delta_change_set::serialize;
+use aptos_aggregator::{aggregator_change_set::AggregatorChange, delta_change_set::serialize};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
@@ -32,7 +32,7 @@ use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     sync::{
         atomic::AtomicU32,
@@ -119,7 +119,7 @@ where
         incarnation: Incarnation,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
@@ -136,39 +136,61 @@ where
             .modified_keys(idx_to_execute)
             .map_or(HashMap::new(), |keys| keys.collect());
 
+        let mut prev_modified_aggregators = last_input_output
+            .aggregator_v2_keys(idx_to_execute)
+            .map_or(HashSet::new(), |keys| keys.collect());
+
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
-        let mut apply_updates = |output: &E::Output| {
-            // First, apply writes.
-            for (k, v) in output.resource_write_set().into_iter().chain(
-                output
-                    .aggregator_v1_write_set()
-                    .into_iter()
-                    .map(|(state_key, write_op)| (state_key, (write_op, None))),
-            ) {
-                if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+        let mut apply_updates =
+            |output: &E::Output| {
+                // First, apply writes.
+                for (k, v) in output.resource_write_set().into_iter().chain(
+                    output
+                        .aggregator_v1_write_set()
+                        .into_iter()
+                        .map(|(state_key, write_op)| (state_key, (write_op, None))),
+                ) {
+                    if prev_modified_keys.remove(&k).is_none() {
+                        updates_outside = true;
+                    }
+                    versioned_cache
+                        .data()
+                        .write(k, idx_to_execute, incarnation, v);
                 }
-                versioned_cache
-                    .data()
-                    .write(k, idx_to_execute, incarnation, v);
-            }
 
-            for (k, v) in output.module_write_set().into_iter() {
-                if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                for (k, v) in output.module_write_set().into_iter() {
+                    if prev_modified_keys.remove(&k).is_none() {
+                        updates_outside = true;
+                    }
+                    versioned_cache.modules().write(k, idx_to_execute, v);
                 }
-                versioned_cache.modules().write(k, idx_to_execute, v);
-            }
 
-            // Then, apply deltas.
-            for (k, d) in output.aggregator_v1_delta_set().into_iter() {
-                if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                // Then, apply deltas.
+                for (k, d) in output.aggregator_v1_delta_set().into_iter() {
+                    if prev_modified_keys.remove(&k).is_none() {
+                        updates_outside = true;
+                    }
+                    versioned_cache.data().add_delta(k, idx_to_execute, d);
                 }
-                versioned_cache.data().add_delta(k, idx_to_execute, d);
-            }
-        };
+
+                for (id, change) in output.aggregator_v2_change_set().into_iter() {
+                    if !prev_modified_aggregators.remove(&id) {
+                        updates_outside = true;
+                    }
+
+                    // TODO: figure out if change should update updates_outside
+                    // versioned_cache.aggregators().
+                    match change {
+                        AggregatorChange::Create(value) => versioned_cache
+                            .aggregators()
+                            .create_aggregator(id, idx_to_execute, value),
+                        AggregatorChange::Apply(apply) => versioned_cache
+                            .aggregators()
+                            .record_apply(id, idx_to_execute, apply),
+                    }
+                }
+            };
 
         let result = match execute_result {
             // These statuses are the results of speculative execution, so even for
@@ -217,7 +239,7 @@ where
         incarnation: Incarnation,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
@@ -350,7 +372,7 @@ where
     fn worker_commit_hook(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
     ) {
@@ -413,7 +435,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
