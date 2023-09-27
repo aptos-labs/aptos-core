@@ -1151,6 +1151,10 @@ module aptos_framework::stake {
         };
     }
 
+    public(friend) fun cur_validator_set(): ValidatorSet acquires ValidatorSet {
+        *borrow_global<ValidatorSet>(@aptos_framework)
+    }
+
     /// Compute the validator set for the next epoch.
     public(friend) fun next_validator_set(): ValidatorSet acquires StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         debug::print(&std::string::utf8(b"stake::next_validator_set() started."));

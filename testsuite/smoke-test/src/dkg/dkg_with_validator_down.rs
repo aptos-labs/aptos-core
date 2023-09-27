@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_epoch_fully_entered},
+    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::NodeExt;
@@ -24,10 +24,9 @@ async fn dkg_with_validator_down() {
 
     let client = swarm.validators().last().unwrap().rest_client();
     println!("Wait for an epoch start.");
-    let _dkg_state_0 = wait_for_epoch_fully_entered(&client, None, time_limit_secs).await;
-    let dkg_state_1 = wait_for_epoch_fully_entered(&client, None, time_limit_secs).await;
+    let dkg_session_1 = wait_for_dkg_finish(&client, None, time_limit_secs).await;
 
-    println!("Current epoch is {}.", dkg_state_1.target_epoch);
+    println!("Current epoch is {}.", dkg_session_1.target_epoch);
 
     println!("Take one validator down.");
     swarm.validators_mut().take(1).for_each(|v| {
@@ -36,16 +35,15 @@ async fn dkg_with_validator_down() {
 
     println!(
         "Wait until we fully entered epoch {}.",
-        dkg_state_1.target_epoch + 1
+        dkg_session_1.target_epoch + 1
     );
 
-    let dkg_state_2 =
-        wait_for_epoch_fully_entered(&client, Some(dkg_state_1.target_epoch + 1), time_limit_secs)
-            .await;
+    let dkg_session_2 = wait_for_dkg_finish(
+        &client,
+        Some(dkg_session_1.target_epoch + 1),
+        time_limit_secs,
+    )
+    .await;
 
-    assert!(verify_dkg_transcript(
-        &dkg_state_1,
-        &dkg_state_2,
-        &decrypt_key_map
-    ));
+    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map));
 }

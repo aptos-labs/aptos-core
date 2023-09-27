@@ -21,13 +21,20 @@ module aptos_framework::dkg {
         target_validator_set: ValidatorSet,
     }
 
-    struct DKGState has key {
+    /// The input and output of a DKG session.
+    /// The validator set of epoch `x` works together and outputs a transcript for the target validator set of epoch `y` (typically `x+1`).
+    struct DKGSessionState has copy, store, drop {
+        dealer_epoch: u64,
+        dealer_validator_set: ValidatorSet,
         target_epoch: u64,
-        state_id: u64, // 0: done, 1: in progress,
-        countdown: u64, // For debugging...
-        validator_set: Option<ValidatorSet>, // Keep a copy to make public verification easier.
-        /// DKG Transcript for current epoch.
+        target_validator_set: ValidatorSet,
         serialized_transcript: vector<u8>,
+    }
+
+    /// The complete and ongoing DKG sessions.
+    struct DKGState has key {
+        last_complete: Option<DKGSessionState>,
+        in_progress: Option<DKGSessionState>,
         events: event::EventHandle<StartDKGEvent>,
     }
 
@@ -37,72 +44,49 @@ module aptos_framework::dkg {
         move_to<DKGState>(
             aptos_framework,
             DKGState {
-                target_epoch: 1,
-                state_id: 0,
-                countdown: 0,
-                validator_set: std::option::none(),
-                serialized_transcript: vector[],
+                last_complete: std::option::none(),
+                in_progress: std::option::none(),
                 events: account::new_event_handle<StartDKGEvent>(aptos_framework),
             }
         );
     }
 
-    public (friend) fun get_state(): (u64, u64) acquires DKGState  {
+    /// Return the currently in-progress DKG session, if there is one.
+    public(friend) fun session_in_progress(): Option<DKGSessionState> acquires DKGState {
         let dkg_state = borrow_global<DKGState>(@aptos_framework);
-        (dkg_state.target_epoch, dkg_state.state_id)
+        dkg_state.in_progress
     }
 
-    public (friend) fun state_active(): u64 {
-        1
-    }
-
-    public (friend) fun state_inactive(): u64 {
-        0
-    }
-
-    public(friend) fun start(target_epoch: u64, new_validator_set: ValidatorSet) acquires DKGState {
-        debug::print(&utf8(b"dkg::start() started."));
+    /// Mark the start of a new DKG session by storing the input. Also emit the `StartDKGEvent`.
+    public(friend) fun start(dealer_epoch: u64, dealer_validator_set: ValidatorSet, target_epoch: u64, target_validator_set: ValidatorSet) acquires DKGState {
+        debug::print(&utf8(b"dkg::start() - Started."));
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        if (target_epoch == dkg_state.target_epoch + 1 && dkg_state.state_id == 0) {
-            dkg_state.target_epoch = target_epoch;
-            dkg_state.state_id = 1;
-            dkg_state.countdown = 999999999;
-            dkg_state.validator_set = std::option::some(new_validator_set);
-            event::emit_event<StartDKGEvent>(
-                &mut dkg_state.events,
-                StartDKGEvent {
-                    target_epoch,
-                    target_validator_set: new_validator_set,
-                },
-            );
-        } else {
-            debug::print(&utf8(b"unexpected dkg::start()..."));
-        };
-        debug::print(&utf8(b"dkg::start() finished."))
+        assert!(std::option::is_none(&dkg_state.in_progress), 1);
+        dkg_state.in_progress = std::option::some(DKGSessionState {
+            dealer_epoch,
+            dealer_validator_set,
+            target_epoch,
+            target_validator_set,
+            serialized_transcript: vector[],
+        });
+        event::emit_event<StartDKGEvent>(
+            &mut dkg_state.events,
+            StartDKGEvent {
+                target_epoch,
+                target_validator_set,
+            },
+        );
+        debug::print(&utf8(b"dkg::start() - Finished."))
     }
 
-    public(friend) fun on_potential_transcript(maybe_serialized_transcript: Option<vector<u8>>): bool acquires DKGState {
-        debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Started."));
-        let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(state_active() == dkg_state.state_id, 1);
-        let ret = if (std::option::is_some(&maybe_serialized_transcript)) {
-            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - A transcript is given!"));
-            dkg_state.state_id = 0;
-            dkg_state.countdown = 0;
-            dkg_state.serialized_transcript = std::option::extract(&mut maybe_serialized_transcript);
-            debug::print(&dkg_state.serialized_transcript);
-            true
-        } else if (dkg_state.countdown == 0) {
-            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Current DKG is taking too long. Aborting."));
-            dkg_state.state_id = 0;
-            dkg_state.serialized_transcript = vector[];
-            true
-        } else {
-            debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - No transcript is given. Hopefully next block."));
-            dkg_state.countdown = dkg_state.countdown - 1;
-            false
-        };
-        debug::print(&std::string::utf8(b"dkg::on_potential_transcript() - Finished."));
-        ret
+    /// Mark the ongoing DKG session complete.
+    public(friend) fun finish(serialized_transcript: vector<u8>) acquires DKGState {
+        debug::print(&std::string::utf8(b"dkg::finish() - Started."));
+        let session_in_progress = std::option::extract(&mut session_in_progress());
+        session_in_progress.serialized_transcript = serialized_transcript;
+        let state = borrow_global_mut<DKGState>(@aptos_framework);
+        state.last_complete = std::option::some(session_in_progress);
+        state.in_progress = std::option::none();
+        debug::print(&std::string::utf8(b"dkg::finish() - Finished."))
     }
 }

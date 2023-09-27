@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 #[tokio::test]
 async fn dkg_with_validator_join_leave() {
-    let epoch_duration_secs = 30;
-    let estimated_dkg_latency_secs = 40;
+    let epoch_duration_secs = 40;
+    let estimated_dkg_latency_secs = 80;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
     let mut swarm = SwarmBuilder::new_local(7)
@@ -30,28 +30,28 @@ async fn dkg_with_validator_join_leave() {
         .unwrap()
         .rest_api_endpoint();
     let client = aptos_rest_client::Client::new(client_endpoint.clone());
-    let dkg_state_1 = dkg::wait_for_epoch_fully_entered(&client, None, time_limit_secs).await;
+    let dkg_session_1 = dkg::wait_for_dkg_finish(&client, None, time_limit_secs).await;
     println!(
         "Current epoch is {}. Number of validators: {}.",
-        dkg_state_1.target_epoch,
-        dkg::num_validators(&dkg_state_1)
+        dkg_session_1.target_epoch,
+        dkg::num_validators(&dkg_session_1)
     );
 
     println!(
         "Wait until we fully entered epoch {}.",
-        dkg_state_1.target_epoch + 1
+        dkg_session_1.target_epoch + 1
     );
-    let dkg_state_2 = dkg::wait_for_epoch_fully_entered(
+    let dkg_session_2 = dkg::wait_for_dkg_finish(
         &client,
-        Some(dkg_state_1.target_epoch + 1),
+        Some(dkg_session_1.target_epoch + 1),
         time_limit_secs,
     )
     .await;
 
     println!(
         "Current epoch is {}. Number of validators: {}.",
-        dkg_state_2.target_epoch,
-        dkg::num_validators(&dkg_state_2)
+        dkg_session_2.target_epoch,
+        dkg::num_validators(&dkg_session_2)
     );
 
     println!("Letting one of the validators leave.");
@@ -69,7 +69,7 @@ async fn dkg_with_validator_join_leave() {
     println!("Give the victim some money so it can first send transactions.");
     let mut public_info = swarm.chain_info().into_aptos_public_info();
     public_info
-        .mint(victim_validator_addr, 1000000000000)
+        .mint(victim_validator_addr, 100000000000000)
         .await
         .unwrap();
 
@@ -87,29 +87,25 @@ async fn dkg_with_validator_join_leave() {
 
     println!(
         "Wait until we fully entered epoch {}.",
-        dkg_state_2.target_epoch + 1
+        dkg_session_2.target_epoch + 1
     );
-    let dkg_state_3 = dkg::wait_for_epoch_fully_entered(
+    let dkg_session_3 = dkg::wait_for_dkg_finish(
         &client,
-        Some(dkg_state_2.target_epoch + 1),
+        Some(dkg_session_2.target_epoch + 1),
         time_limit_secs,
     )
     .await;
 
     println!(
         "Current epoch is {}. Number of validators: {}.",
-        dkg_state_3.target_epoch,
-        dkg::num_validators(&dkg_state_3)
+        dkg_session_3.target_epoch,
+        dkg::num_validators(&dkg_session_3)
     );
 
-    assert!(dkg::verify_dkg_transcript(
-        &dkg_state_2,
-        &dkg_state_3,
-        &decrypt_key_map
-    ));
+    assert!(dkg::verify_dkg_transcript(&dkg_session_3, &decrypt_key_map));
     assert_eq!(
-        dkg::num_validators(&dkg_state_3),
-        dkg::num_validators(&dkg_state_2) - 1
+        dkg::num_validators(&dkg_session_3),
+        dkg::num_validators(&dkg_session_2) - 1
     );
 
     println!("Now re-join.");
@@ -117,28 +113,24 @@ async fn dkg_with_validator_join_leave() {
     println!("Txn result: {:?}", txn_result);
     println!(
         "Wait until we fully entered epoch {}.",
-        dkg_state_3.target_epoch + 1
+        dkg_session_3.target_epoch + 1
     );
-    let dkg_state_4 = dkg::wait_for_epoch_fully_entered(
+    let dkg_session_4 = dkg::wait_for_dkg_finish(
         &client,
-        Some(dkg_state_3.target_epoch + 1),
+        Some(dkg_session_3.target_epoch + 1),
         time_limit_secs,
     )
     .await;
 
     println!(
         "Current epoch is {}. Number of validators: {}.",
-        dkg_state_4.target_epoch,
-        dkg::num_validators(&dkg_state_4)
+        dkg_session_4.target_epoch,
+        dkg::num_validators(&dkg_session_4)
     );
 
-    assert!(dkg::verify_dkg_transcript(
-        &dkg_state_3,
-        &dkg_state_4,
-        &decrypt_key_map
-    ));
+    assert!(dkg::verify_dkg_transcript(&dkg_session_4, &decrypt_key_map));
     assert_eq!(
-        dkg::num_validators(&dkg_state_4),
-        dkg::num_validators(&dkg_state_3) + 1
+        dkg::num_validators(&dkg_session_4),
+        dkg::num_validators(&dkg_session_3) + 1
     );
 }

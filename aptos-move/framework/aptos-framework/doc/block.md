@@ -501,37 +501,20 @@ The runtime always runs this before executing the transactions in a block.
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() started."));
-        <b>let</b> (target_epoch, status) = <a href="dkg.md#0x1_dkg_get_state">dkg::get_state</a>();
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&cur_epoch);
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&target_epoch);
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&status);
-        <b>if</b> (target_epoch == cur_epoch && status == <a href="dkg.md#0x1_dkg_state_inactive">dkg::state_inactive</a>()) {
+        <b>let</b> dkg_session_in_progress = <a href="dkg.md#0x1_dkg_session_in_progress">dkg::session_in_progress</a>();
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&dkg_session_in_progress)) {
             <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"case 0."));
             <a href="staking_config.md#0x1_staking_config_lock">staking_config::lock</a>();
-            <b>let</b> new_validator_set = <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>();
-            <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch + 1, new_validator_set);
-        } <b>else</b> <b>if</b> (target_epoch == cur_epoch + 1 && status == <a href="dkg.md#0x1_dkg_state_active">dkg::state_active</a>()) {
-            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"case 1."));
-            <b>let</b> maybe_transcript = <b>if</b> (dkg_transcript_available) {
-                some(serialized_dkg_transcript)
-            } <b>else</b> {
-                none()
-            };
-            <b>let</b> proceed_to_new_epoch = <a href="dkg.md#0x1_dkg_on_potential_transcript">dkg::on_potential_transcript</a>(maybe_transcript);
-            <b>if</b> (proceed_to_new_epoch) {
-                <a href="staking_config.md#0x1_staking_config_unlock">staking_config::unlock</a>();
-                <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-            };
-        } <b>else</b> {
-            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"case 2. This should not happen."));
-            <b>abort</b>(1)
+            <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch, <a href="stake.md#0x1_stake_cur_validator_set">stake::cur_validator_set</a>(), cur_epoch + 1, <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>());
         };
         <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"on_expire() finished."));
-    } <b>else</b> {
-        <b>if</b> (dkg_transcript_available) {
-            <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"Probably a too late transcript."));
-        }
     };
+
+    <b>if</b> (dkg_transcript_available) {
+        <a href="dkg.md#0x1_dkg_finish">dkg::finish</a>(serialized_dkg_transcript);
+        <a href="staking_config.md#0x1_staking_config_unlock">staking_config::unlock</a>();
+        <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+    }
 }
 </code></pre>
 

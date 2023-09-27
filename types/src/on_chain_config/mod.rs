@@ -50,7 +50,7 @@ pub use self::{
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
-    dkg_state::DKGState,
+    dkg_state::{DKGSessionState, DKGState},
 };
 
 /// To register an on-chain config in Rust:

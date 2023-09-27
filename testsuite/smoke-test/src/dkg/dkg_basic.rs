@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_epoch_fully_entered},
+    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::NodeExt;
@@ -23,26 +23,8 @@ async fn dkg_basic() {
 
     let client = swarm.validators().next().unwrap().rest_client();
     println!("Wait for a moment when DKG is not running.");
-    let dkg_state_1 = wait_for_epoch_fully_entered(&client, None, time_limit_secs).await;
-
-    println!("Current epoch is {}.", dkg_state_1.target_epoch);
-    println!(
-        "Waiting until we fully entered epoch {}.",
-        dkg_state_1.target_epoch + 1
-    );
-
-    let dkg_state_2 =
-        wait_for_epoch_fully_entered(&client, Some(dkg_state_1.target_epoch + 1), time_limit_secs)
-            .await;
-    println!(
-        "Verifying the transcript generated for epoch {} by epoch {}.",
-        dkg_state_2.target_epoch, dkg_state_1.target_epoch
-    );
+    let dkg_session = wait_for_dkg_finish(&client, None, time_limit_secs).await;
 
     let decrypt_key_map = decrypt_key_map(&swarm);
-    assert!(verify_dkg_transcript(
-        &dkg_state_1,
-        &dkg_state_2,
-        &decrypt_key_map
-    ));
+    assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map));
 }

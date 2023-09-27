@@ -93,6 +93,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `is_current_epoch_validator`](#0x1_stake_is_current_epoch_validator)
 -  [Function `update_performance_statistics`](#0x1_stake_update_performance_statistics)
 -  [Function `on_new_epoch`](#0x1_stake_on_new_epoch)
+-  [Function `cur_validator_set`](#0x1_stake_cur_validator_set)
 -  [Function `next_validator_set`](#0x1_stake_next_validator_set)
 -  [Function `update_stake_pool`](#0x1_stake_update_stake_pool)
 -  [Function `calculate_rewards_amount`](#0x1_stake_calculate_rewards_amount)
@@ -3106,6 +3107,30 @@ power.
         // Update rewards rate after reward distribution.
         <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate">staking_config::calculate_and_save_latest_epoch_rewards_rate</a>();
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_stake_cur_validator_set"></a>
+
+## Function `cur_validator_set`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_set">cur_validator_set</a>(): <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_set">cur_validator_set</a>(): <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>acquires</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
+    *<b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework)
 }
 </code></pre>
 

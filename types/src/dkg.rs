@@ -67,10 +67,9 @@ pub struct DKGTranscriptWrapper {
 
 impl DKGTranscriptWrapper {
     pub fn verify(&self, dkg_pvss_config: &DKGPvssConfig, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        let dealers = self.verify_dealers(dkg_pvss_config.eks.len())?;
+        let dealers = self.verify_dealers(verifier.len())?;
 
         let all_eks = dkg_pvss_config.eks.clone();
-        let _eks = dealers.iter().filter_map(|&pos| all_eks.get(pos)).cloned().collect::<Vec<_>>();
 
         let addresses = verifier.get_ordered_account_addresses();
         let dealers_addresses = dealers.iter().filter_map(|&pos| addresses.get(pos)).cloned().collect::<Vec<_>>();

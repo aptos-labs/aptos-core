@@ -4,8 +4,6 @@ module aptos_framework::block {
     use std::features;
     use std::vector;
     use std::option;
-    use std::option::{some, none};
-    use std::string::utf8;
     use aptos_std::debug;
 
     use aptos_framework::account;
@@ -222,37 +220,20 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             debug::print(&std::string::utf8(b"on_expire() started."));
-            let (target_epoch, status) = dkg::get_state();
-            debug::print(&cur_epoch);
-            debug::print(&target_epoch);
-            debug::print(&status);
-            if (target_epoch == cur_epoch && status == dkg::state_inactive()) {
+            let dkg_session_in_progress = dkg::session_in_progress();
+            if (option::is_none(&dkg_session_in_progress)) {
                 debug::print(&std::string::utf8(b"case 0."));
                 staking_config::lock();
-                let new_validator_set = stake::next_validator_set();
-                dkg::start(cur_epoch + 1, new_validator_set);
-            } else if (target_epoch == cur_epoch + 1 && status == dkg::state_active()) {
-                debug::print(&std::string::utf8(b"case 1."));
-                let maybe_transcript = if (dkg_transcript_available) {
-                    some(serialized_dkg_transcript)
-                } else {
-                    none()
-                };
-                let proceed_to_new_epoch = dkg::on_potential_transcript(maybe_transcript);
-                if (proceed_to_new_epoch) {
-                    staking_config::unlock();
-                    reconfiguration::reconfigure();
-                };
-            } else {
-                debug::print(&utf8(b"case 2. This should not happen."));
-                abort(1)
+                dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
             };
             debug::print(&std::string::utf8(b"on_expire() finished."));
-        } else {
-            if (dkg_transcript_available) {
-                debug::print(&std::string::utf8(b"Probably a too late transcript."));
-            }
         };
+
+        if (dkg_transcript_available) {
+            dkg::finish(serialized_dkg_transcript);
+            staking_config::unlock();
+            reconfiguration::reconfigure();
+        }
     }
 
     #[view]

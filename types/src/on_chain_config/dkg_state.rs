@@ -5,13 +5,32 @@ use crate::on_chain_config::{OnChainConfig, ValidatorSet};
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DKGState {
+pub struct DKGSessionState {
+    pub dealer_epoch: u64,
+    pub dealer_validator_set: ValidatorSet,
     pub target_epoch: u64,
-    pub state_id: u64,
-    pub countdown: u64,
-    pub validator_set: Option<ValidatorSet>,
+    pub target_validator_set: ValidatorSet,
     pub serialized_transcript: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DKGState {
+    pub last_complete: Option<DKGSessionState>,
+    pub in_progress: Option<DKGSessionState>,
     pub events: EventHandle,
+}
+
+impl DKGState {
+    pub fn maybe_last_complete(&self, epoch: u64) -> Option<&DKGSessionState> {
+        match &self.last_complete {
+            Some(session) if session.target_epoch == epoch => Some(session),
+            _ => None,
+        }
+    }
+
+    pub fn last_complete(&self) -> &DKGSessionState {
+        self.last_complete.as_ref().unwrap()
+    }
 }
 
 impl OnChainConfig for DKGState {
