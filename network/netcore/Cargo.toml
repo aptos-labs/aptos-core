@@ -19,6 +19,9 @@ aptos-types = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
 pin-project = { workspace = true }
+quinn = { workspace = true }
+rcgen = { workspace = true }
+rustls = { workspace = true, features = ["dangerous_configuration"] } # Required for the dummy certificates
 serde = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
