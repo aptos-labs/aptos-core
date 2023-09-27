@@ -6,9 +6,9 @@ import { Deserializer } from "../bcs/deserializer";
 import { Serializer } from "../bcs/serializer";
 import { Hex } from "../core/hex";
 import { HexInput } from "../types";
-import * as asymmetric_crypto from "./asymmetric_crypto";
+import { PublicKey, PrivateKey, Signature } from "./asymmetric_crypto";
 
-export class PublicKey extends asymmetric_crypto.PublicKey {
+export class Ed25519PublicKey extends PublicKey {
   // Correct length of the public key in bytes (Uint8Array)
   static readonly LENGTH: number = 32;
 
@@ -25,8 +25,8 @@ export class PublicKey extends asymmetric_crypto.PublicKey {
 
     const { hexInput } = args;
     const hex = Hex.fromHexInput({ hexInput });
-    if (hex.toUint8Array().length !== PublicKey.LENGTH) {
-      throw new Error(`PublicKey length should be ${PublicKey.LENGTH}`);
+    if (hex.toUint8Array().length !== Ed25519PublicKey.LENGTH) {
+      throw new Error(`PublicKey length should be ${Ed25519PublicKey.LENGTH}`);
     }
     this.key = hex;
   }
@@ -54,7 +54,7 @@ export class PublicKey extends asymmetric_crypto.PublicKey {
    * @param args.data a signed message
    * @param args.signature the signature of the message
    */
-  verifySignature(args: { data: HexInput; signature: Signature }): boolean {
+  verifySignature(args: { data: HexInput; signature: Ed25519Signature }): boolean {
     const { data, signature } = args;
     const rawMessage = Hex.fromHexInput({ hexInput: data }).toUint8Array();
     const rawSignature = Hex.fromHexInput({ hexInput: signature.toUint8Array() }).toUint8Array();
@@ -66,17 +66,17 @@ export class PublicKey extends asymmetric_crypto.PublicKey {
   }
 
   // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): asymmetric_crypto.PublicKey {
+  deserialize(deserializer: Deserializer): PublicKey {
     throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): PublicKey {
     const value = deserializer.deserializeBytes();
-    return new PublicKey({ hexInput: value });
+    return new Ed25519PublicKey({ hexInput: value });
   }
 }
 
-export class PrivateKey extends asymmetric_crypto.PrivateKey {
+export class Ed25519PrivateKey extends PrivateKey {
   // Correct length of the private key in bytes (Uint8Array)
   static readonly LENGTH: number = 32;
 
@@ -93,12 +93,12 @@ export class PrivateKey extends asymmetric_crypto.PrivateKey {
 
     const { value } = args;
     const privateKeyHex = Hex.fromHexInput({ hexInput: value });
-    if (privateKeyHex.toUint8Array().length !== PrivateKey.LENGTH) {
-      throw new Error(`PrivateKey length should be ${PrivateKey.LENGTH}`);
+    if (privateKeyHex.toUint8Array().length !== Ed25519PrivateKey.LENGTH) {
+      throw new Error(`PrivateKey length should be ${Ed25519PrivateKey.LENGTH}`);
     }
 
     // Create keyPair from Private key in Uint8Array format
-    const keyPair = nacl.sign.keyPair.fromSeed(privateKeyHex.toUint8Array().slice(0, PrivateKey.LENGTH));
+    const keyPair = nacl.sign.keyPair.fromSeed(privateKeyHex.toUint8Array().slice(0, Ed25519PrivateKey.LENGTH));
     this.signingKeyPair = keyPair;
   }
 
@@ -108,7 +108,7 @@ export class PrivateKey extends asymmetric_crypto.PrivateKey {
    * @returns Uint8Array representation of the private key
    */
   toUint8Array(): Uint8Array {
-    return this.signingKeyPair.secretKey.slice(0, PrivateKey.LENGTH);
+    return this.signingKeyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH);
   }
 
   /**
@@ -126,10 +126,10 @@ export class PrivateKey extends asymmetric_crypto.PrivateKey {
    * @param args.message in HexInput format
    * @returns Signature
    */
-  sign(args: { message: HexInput }): Signature {
+  sign(args: { message: HexInput }): Ed25519Signature {
     const hex = Hex.fromHexInput({ hexInput: args.message });
     const signature = nacl.sign.detached(hex.toUint8Array(), this.signingKeyPair.secretKey);
-    return new Signature({ data: signature });
+    return new Ed25519Signature({ data: signature });
   }
 
   serialize(serializer: Serializer): void {
@@ -137,13 +137,13 @@ export class PrivateKey extends asymmetric_crypto.PrivateKey {
   }
 
   // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): asymmetric_crypto.PrivateKey {
+  deserialize(deserializer: Deserializer): Ed25519PrivateKey {
     throw new Error("Method not implemented.");
   }
 
-  static deserialize(deserializer: Deserializer): PrivateKey {
+  static deserialize(deserializer: Deserializer): Ed25519PrivateKey {
     const value = deserializer.deserializeBytes();
-    return new PrivateKey({ value });
+    return new Ed25519PrivateKey({ value });
   }
 
   /**
@@ -151,16 +151,16 @@ export class PrivateKey extends asymmetric_crypto.PrivateKey {
    *
    * @returns
    */
-  static generate(): PrivateKey {
+  static generate(): Ed25519PrivateKey {
     const keyPair = nacl.sign.keyPair();
-    return new PrivateKey({ value: keyPair.secretKey.slice(0, PrivateKey.LENGTH) });
+    return new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH) });
   }
 }
 
 /**
  * The product of signing a message with a private key.
  */
-export class Signature extends asymmetric_crypto.Signature {
+export class Ed25519Signature extends Signature {
   // Correct length of the signature in bytes (Uint8Array)
   static readonly LENGTH = 64;
 
@@ -171,8 +171,8 @@ export class Signature extends asymmetric_crypto.Signature {
     super();
 
     const hex = Hex.fromHexInput({ hexInput: args.data });
-    if (hex.toUint8Array().length !== Signature.LENGTH) {
-      throw new Error(`Signature length should be ${Signature.LENGTH}`);
+    if (hex.toUint8Array().length !== Ed25519Signature.LENGTH) {
+      throw new Error(`Signature length should be ${Ed25519Signature.LENGTH}`);
     }
 
     this.data = hex;
@@ -201,12 +201,12 @@ export class Signature extends asymmetric_crypto.Signature {
   }
 
   // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Signature {
+  deserialize(deserializer: Deserializer): Ed25519Signature {
     throw new Error("Method not implemented.");
   }
 
-  static deserialize(deserializer: Deserializer): Signature {
+  static deserialize(deserializer: Deserializer): Ed25519Signature {
     const data = deserializer.deserializeBytes();
-    return new Signature({ data });
+    return new Ed25519Signature({ data });
   }
 }
