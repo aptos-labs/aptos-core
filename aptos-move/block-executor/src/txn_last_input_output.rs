@@ -126,11 +126,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ) {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
+                self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
+                self.outputs[txn_idx as usize]
+                    .store(Some(Arc::new(TxnOutput::from_output_status(output))));
+
+                return Err(anyhow!(
+                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
+                ));
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
+
+        Ok(())
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {

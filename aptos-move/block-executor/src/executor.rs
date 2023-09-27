@@ -164,7 +164,7 @@ where
             }
         }
 
-        last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
+        let _ = last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -221,7 +221,7 @@ where
         maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
         scheduler_task: &mut SchedulerTask,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<(
             FeeStatement,
             Vec<FeeStatement>,
