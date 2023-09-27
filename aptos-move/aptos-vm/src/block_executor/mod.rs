@@ -8,7 +8,9 @@ use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
-use aptos_aggregator::{delta_change_set::DeltaOp, types::AggregatorID};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange, delta_change_set::DeltaOp, types::AggregatorID,
+};
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
@@ -121,6 +123,18 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output to be set to get deltas")
             .change_set()
             .aggregator_v1_delta_set()
+            .clone()
+    }
+
+    /// Should never be called after incorporate_delta_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
+    fn aggregator_v2_change_set(&self) -> HashMap<AggregatorID, AggregatorChange<AggregatorID>> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get deltas")
+            .change_set()
+            .aggregator_v2_change_set()
             .clone()
     }
 

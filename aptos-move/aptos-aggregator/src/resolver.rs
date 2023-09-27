@@ -78,9 +78,7 @@ pub trait TAggregatorView {
         &self,
         _id: &Self::IdentifierV2,
         _mode: AggregatorReadMode,
-    ) -> anyhow::Result<AggregatorValue> {
-        unimplemented!("Aggregator V2 is not yet supported")
-    }
+    ) -> anyhow::Result<AggregatorValue>;
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
