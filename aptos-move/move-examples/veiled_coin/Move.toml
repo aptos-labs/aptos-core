@@ -1,5 +1,5 @@
 [package]
-name = "Veiled coin"
+name = "VeiledCoin"
 version = "0.0.1"
 
 [dependencies]
