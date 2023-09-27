@@ -473,7 +473,8 @@ fn native_string_concat(
         });
     }
 
-    let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
+    // popping arguments from the end
+    let suffix = string_to_bytes(safely_pop_arg!(args, Struct))?;
     let snapshot_value = match snapshot_input_type.pop_snapshot_field_by_type(&mut args)? {
         SnapshotValue::Integer(v) => v,
         SnapshotValue::String(_) => {
@@ -483,7 +484,7 @@ fn native_string_concat(
         },
     };
 
-    let suffix = string_to_bytes(safely_pop_arg!(args, Struct))?;
+    let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
 
     let result_value = if context.aggregator_execution_enabled() {
         let (_, mut aggregator_data) = get_context_data(context);
@@ -496,7 +497,7 @@ fn native_string_concat(
         )
     } else {
         SnapshotValue::String(
-            SnapshotToStringFormula::Concat { prefix, suffix }.apply(snapshot_value),
+            SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value),
         )
     };
 
