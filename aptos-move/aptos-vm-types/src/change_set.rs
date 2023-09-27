@@ -373,4 +373,10 @@ impl VMChangeSet {
 
         checker.check_change_set(self)
     }
+
+    pub fn has_creation(&self) -> bool {
+        use WriteOp::*;
+        self.write_set_iter()
+            .any(|(_key, op)| matches!(op, Creation(..) | CreationWithMetadata { .. }))
+    }
 }

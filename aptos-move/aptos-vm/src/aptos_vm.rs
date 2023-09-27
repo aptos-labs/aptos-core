@@ -34,7 +34,7 @@ use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     block_metadata::BlockMetadata,
     fee_statement::FeeStatement,
-    on_chain_config::{new_epoch_event_key, ConfigStorage, FeatureFlag, TimedFeatureOverride},
+    on_chain_config::{new_epoch_event_key, FeatureFlag, TimedFeatureOverride},
     transaction::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -118,8 +118,8 @@ macro_rules! unwrap_or_discard {
 }
 
 impl AptosVM {
-    pub fn new(config_storage: &impl ConfigStorage) -> Self {
-        Self(AptosVMImpl::new(config_storage))
+    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+        Self(AptosVMImpl::new(resolver))
     }
 
     pub fn new_from_executor_view(executor_view: &impl ExecutorView) -> Self {
@@ -1440,7 +1440,7 @@ impl AptosVM {
             arguments,
             func_name.as_ident_str(),
             &func_inst,
-            metadata.as_ref(),
+            metadata.as_ref().map(Arc::as_ref),
             vm.0.get_features()
                 .is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;

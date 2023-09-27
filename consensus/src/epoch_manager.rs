@@ -59,6 +59,7 @@ use aptos_config::config::{ConsensusConfig, NodeConfig, SecureBackend};
 use aptos_consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
+    proposal_msg::ProposalMsg,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_global_constants::CONSENSUS_KEY;
@@ -100,10 +101,10 @@ use std::{
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
-const PROPSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
+const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
 /// Number of rounds we expect storage to be ahead of the proposer round,
 /// used for fetching data from DB.
-const PROPSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
+const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -133,6 +134,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     round_manager_tx: Option<
         aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
     >,
+    proposal_precheck_tx: Option<aptos_channel::Sender<Author, Box<ProposalMsg>>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     epoch_state: Option<Arc<EpochState>>,
     block_retrieval_tx:
@@ -183,6 +185,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
             round_manager_close_tx: None,
+            proposal_precheck_tx: None,
             epoch_state: None,
             block_retrieval_tx: None,
             quorum_store_msg_tx: None,
@@ -222,19 +225,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &self,
         epoch_state: &EpochState,
         onchain_config: &OnChainConsensusConfig,
-    ) -> Box<dyn ProposerElection + Send + Sync> {
+    ) -> Arc<dyn ProposerElection + Send + Sync> {
         let proposers = epoch_state
             .verifier
             .get_ordered_account_addresses_iter()
             .collect::<Vec<_>>();
         match &onchain_config.proposer_election_type() {
             ProposerElectionType::RotatingProposer(contiguous_rounds) => {
-                Box::new(RotatingProposer::new(proposers, *contiguous_rounds))
+                Arc::new(RotatingProposer::new(proposers, *contiguous_rounds))
             },
             // We don't really have a fixed proposer!
             ProposerElectionType::FixedProposer(contiguous_rounds) => {
                 let proposer = choose_leader(proposers);
-                Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
+                Arc::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             },
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
                 let (
@@ -271,7 +274,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
                 let seek_len = onchain_config.leader_reputation_exclude_round() as usize
                     + onchain_config.max_failed_authors_to_store()
-                    + PROPSER_ROUND_BEHIND_STORAGE_BUFFER;
+                    + PROPOSER_ROUND_BEHIND_STORAGE_BUFFER;
 
                 let backend = Box::new(AptosDBBackend::new(
                     window_size,
@@ -335,17 +338,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     self.config.window_for_chain_health,
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
-                Box::new(CachedProposerElection::new(
+                Arc::new(CachedProposerElection::new(
                     epoch_state.epoch,
                     proposer_election,
                     onchain_config.max_failed_authors_to_store()
-                        + PROPSER_ELECTION_CACHING_WINDOW_ADDITION,
+                        + PROPOSER_ELECTION_CACHING_WINDOW_ADDITION,
                 ))
             },
             ProposerElectionType::RoundProposer(round_proposers) => {
                 // Hardcoded to the first proposer
                 let default_proposer = proposers.first().unwrap();
-                Box::new(RoundProposer::new(
+                Arc::new(RoundProposer::new(
                     round_proposers.clone(),
                     *default_proposer,
                 ))
@@ -809,7 +812,42 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
         );
 
+        let (proposal_precheck_tx, mut proposal_precheck_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            1,
+            Some(&counters::ROUND_MANAGER_CHANNEL_MSGS),
+        );
         self.round_manager_tx = Some(round_manager_tx.clone());
+        self.proposal_precheck_tx = Some(proposal_precheck_tx);
+
+        let (checked_proposal_tx, checked_proposal_rx) = aptos_channel::new(
+            QueueStyle::KLAST,
+            onchain_consensus_config.leader_reputation_exclude_round() as usize,
+            None,
+        );
+        let proposer_election_clone = proposer_election.clone();
+        let checked_proposal_tx_clone = checked_proposal_tx.clone();
+
+        // Spawn task to buffer valid proposals
+        tokio::spawn(async move {
+            while let Some(proposal_msg) = proposal_precheck_rx.next().await {
+                if proposer_election_clone
+                    .is_valid_proposer(proposal_msg.proposer(), proposal_msg.proposal().round())
+                {
+                    if let Err(e) =
+                        checked_proposal_tx_clone.push((), VerifiedEvent::ProposalMsg(proposal_msg))
+                    {
+                        warn!("Failed to send to proposal channel {:?}", e);
+                    }
+                } else {
+                    warn!(
+                        "Invalid proposal {} from {}",
+                        proposal_msg.proposal(),
+                        proposal_msg.proposer(),
+                    );
+                }
+            }
+        });
 
         self.set_epoch_start_metrics(&epoch_state);
 
@@ -823,7 +861,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             self.storage.clone(),
             onchain_consensus_config,
-            round_manager_tx,
+            checked_proposal_tx,
             self.config.clone(),
         );
 
@@ -831,7 +869,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(round_manager_rx, close_rx));
+        tokio::spawn(round_manager.start(round_manager_rx, checked_proposal_rx, close_rx));
 
         self.spawn_block_retrieval_task(epoch, block_store);
     }
@@ -932,6 +970,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let epoch_state = self.epoch_state.clone().unwrap();
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
+            let proposal_precheck_tx = self.proposal_precheck_tx.clone();
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
@@ -951,6 +990,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             Self::forward_event(
                                 quorum_store_msg_tx,
                                 round_manager_tx,
+                                proposal_precheck_tx,
                                 peer_id,
                                 verified_event,
                             );
@@ -1071,6 +1111,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         round_manager_tx: Option<
             aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
         >,
+        proposal_precheck_tx: Option<aptos_channel::Sender<Author, Box<ProposalMsg>>>,
         peer_id: AccountAddress,
         event: VerifiedEvent,
     ) {
@@ -1086,6 +1127,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             | VerifiedEvent::BatchMsg(_)) => {
                 Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
                     .context("quorum store sender")
+            },
+            VerifiedEvent::ProposalMsg(proposal_msg) => {
+                Self::forward_event_to(proposal_precheck_tx, peer_id, proposal_msg)
+                    .context("proposal precheck sender")
             },
             round_manager_event => Self::forward_event_to(
                 round_manager_tx,
@@ -1207,6 +1252,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 }
 
+#[allow(dead_code)]
 fn new_signer_from_storage(author: Author, backend: &SecureBackend) -> Arc<ValidatorSigner> {
     let storage: Storage = backend.try_into().expect("Unable to initialize storage");
     if let Err(error) = storage.available() {

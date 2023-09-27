@@ -2,17 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod analyze;
+pub mod local_testnet;
 
+use self::local_testnet::RunLocalTestnet;
 use crate::{
     common::{
         types::{
-            CliCommand, CliError, CliResult, CliTypedResult, ConfigSearchMode,
-            OptionalPoolAddressArgs, PoolAddressArgs, ProfileOptions, PromptOptions, RestOptions,
-            TransactionOptions, TransactionSummary,
+            CliCommand, CliError, CliResult, CliTypedResult, OptionalPoolAddressArgs,
+            PoolAddressArgs, ProfileOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
-        utils::{prompt_yes_with_override, read_from_file},
+        utils::read_from_file,
     },
-    config::GlobalConfig,
     genesis::git::from_yaml,
     node::analyze::{
         analyze_validators::{AnalyzeValidators, ValidatorStats},
@@ -25,9 +25,7 @@ use aptos_backup_cli::{
     utils::GlobalRestoreOpt,
 };
 use aptos_cached_packages::aptos_stdlib;
-use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, bls12381::PublicKey, x25519, ValidCryptoMaterialStringExt};
-use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
 use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_logger::Level;
 use aptos_network_checker::args::{
@@ -50,19 +48,13 @@ use async_trait::async_trait;
 use bcs::Result;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::Parser;
-use futures::FutureExt;
-use rand::{rngs::StdRng, SeedableRng};
-use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     path::PathBuf,
-    pin::Pin,
-    thread,
     time::Duration,
 };
-use tokio::time::Instant;
 
 const SECS_TO_MICROSECS: u64 = 1_000_000;
 
@@ -1044,213 +1036,6 @@ impl From<&ValidatorConfigSummary> for ValidatorConfig {
             fullnode_network_addresses: bcs::to_bytes(&summary.fullnode_network_addresses).unwrap(),
             validator_index: summary.validator_index,
         }
-    }
-}
-
-const MAX_WAIT_S: u64 = 30;
-const WAIT_INTERVAL_MS: u64 = 100;
-const TESTNET_FOLDER: &str = "testnet";
-
-/// Run local testnet
-///
-/// This local testnet will run it's own Genesis and run as a single node
-/// network locally.  Optionally, a faucet can be added for minting APT coins.
-#[derive(Parser)]
-pub struct RunLocalTestnet {
-    /// An overridable config template for the test node
-    ///
-    /// If provided, the config will be used, and any needed configuration for the local testnet
-    /// will override the config's values
-    #[clap(long, value_parser)]
-    config_path: Option<PathBuf>,
-
-    /// The directory to save all files for the node
-    ///
-    /// Defaults to .aptos/testnet
-    #[clap(long, value_parser)]
-    test_dir: Option<PathBuf>,
-
-    /// Path to node configuration file override for local test mode.
-    ///
-    /// If provided, the default node config will be overridden by the config in the given file.
-    /// Cannot be used with --config-path
-    #[clap(long, value_parser, conflicts_with("config_path"))]
-    test_config_override: Option<PathBuf>,
-
-    /// Random seed for key generation in test mode
-    ///
-    /// This allows you to have deterministic keys for testing
-    #[clap(long, value_parser = aptos_node::load_seed)]
-    seed: Option<[u8; 32]>,
-
-    /// Clean the state and start with a new chain at genesis
-    ///
-    /// This will wipe the aptosdb in `test-dir` to remove any incompatible changes, and start
-    /// the chain fresh.  Note, that you will need to publish the module again and distribute funds
-    /// from the faucet accordingly
-    #[clap(long)]
-    force_restart: bool,
-
-    /// Run a faucet alongside the node
-    ///
-    /// Allows you to run a faucet alongside the node to create and fund accounts for testing
-    #[clap(long)]
-    with_faucet: bool,
-
-    /// Port to run the faucet on
-    ///
-    /// When running, you'll be able to use the faucet at `http://localhost:<port>/mint` e.g.
-    /// `http//localhost:8080/mint`
-    #[clap(long, default_value = "8081")]
-    faucet_port: u16,
-
-    /// Disable the delegation of faucet minting to a dedicated account
-    #[clap(long)]
-    do_not_delegate: bool,
-
-    #[clap(flatten)]
-    prompt_options: PromptOptions,
-}
-
-#[async_trait]
-impl CliCommand<()> for RunLocalTestnet {
-    fn command_name(&self) -> &'static str {
-        "RunLocalTestnet"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<()> {
-        let rng = self
-            .seed
-            .map(StdRng::from_seed)
-            .unwrap_or_else(StdRng::from_entropy);
-
-        let global_config = GlobalConfig::load()?;
-        let test_dir = match self.test_dir {
-            Some(test_dir) => test_dir,
-            None => global_config
-                .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
-                .join(TESTNET_FOLDER),
-        };
-
-        // Remove the current test directory and start with a new node
-        if self.force_restart && test_dir.exists() {
-            prompt_yes_with_override(
-                "Are you sure you want to delete the existing chain?",
-                self.prompt_options,
-            )?;
-            std::fs::remove_dir_all(test_dir.as_path()).map_err(|err| {
-                CliError::IO(format!("Failed to delete {}", test_dir.display()), err)
-            })?;
-        }
-
-        // Spawn the node in a separate thread
-        let config_path = self.config_path.clone();
-        let test_dir_copy = test_dir.clone();
-        let node_thread_handle = thread::spawn(move || {
-            let result = aptos_node::setup_test_environment_and_start_node(
-                config_path,
-                self.test_config_override,
-                Some(test_dir_copy),
-                false,
-                false,
-                aptos_cached_packages::head_release_bundle(),
-                rng,
-            );
-            eprintln!("Node stopped unexpectedly {:#?}", result);
-        });
-
-        // Run faucet if selected
-        let maybe_faucet_future = if self.with_faucet {
-            let max_wait = Duration::from_secs(MAX_WAIT_S);
-            let wait_interval = Duration::from_millis(WAIT_INTERVAL_MS);
-
-            // Load the config to get the rest port
-            let config_path = test_dir.join("0").join("node.yaml");
-
-            // We have to wait for the node to be configured above in the other thread
-            let mut config = None;
-            let start = Instant::now();
-            while start.elapsed() < max_wait {
-                if let Ok(loaded_config) = NodeConfig::load_from_path(&config_path) {
-                    config = Some(loaded_config);
-                    break;
-                }
-                tokio::time::sleep(wait_interval).await;
-            }
-
-            // Retrieve the port from the local node
-            let port = if let Some(config) = config {
-                config.api.address.port()
-            } else {
-                return Err(CliError::UnexpectedError(
-                    "Failed to find node configuration to start faucet".to_string(),
-                ));
-            };
-
-            // Check that the REST API is ready
-            let rest_url = Url::parse(&format!("http://localhost:{}", port)).map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to parse localhost URL {}", err))
-            })?;
-            let rest_client = aptos_rest_client::Client::new(rest_url.clone());
-            let start = Instant::now();
-            let mut started_successfully = false;
-
-            while start.elapsed() < max_wait {
-                if rest_client.get_index().await.is_ok() {
-                    started_successfully = true;
-                    break;
-                }
-                tokio::time::sleep(wait_interval).await
-            }
-
-            if !started_successfully {
-                return Err(CliError::UnexpectedError(format!(
-                    "Local node at {} did not start up before faucet",
-                    rest_url
-                )));
-            }
-
-            // Build the config for the faucet service.
-            let faucet_config = RunConfig::build_for_cli(
-                rest_url,
-                self.faucet_port,
-                FunderKeyEnum::KeyFile(test_dir.join("mint.key")),
-                self.do_not_delegate,
-                None,
-            );
-
-            // Start the faucet
-            Some(faucet_config.run().map(|result| {
-                eprintln!("Faucet stopped unexpectedly {:#?}", result);
-            }))
-        } else {
-            None
-        };
-
-        // Collect futures that should never end.
-        let mut futures: Vec<Pin<Box<dyn futures::Future<Output = ()> + Send>>> = Vec::new();
-
-        // This future just waits for the node thread.
-        let node_future = async move {
-            loop {
-                if node_thread_handle.is_finished() {
-                    return;
-                }
-                tokio::time::sleep(Duration::from_millis(500)).await;
-            }
-        };
-
-        // Wait for all the futures. We should never get past this point unless
-        // something goes wrong or the user signals for the process to end.
-        futures.push(Box::pin(node_future));
-        if let Some(faucet_future) = maybe_faucet_future {
-            futures.push(Box::pin(faucet_future));
-        }
-        futures::future::select_all(futures).await;
-
-        Err(CliError::UnexpectedError(
-            "One of the components stopped unexpectedly".to_string(),
-        ))
     }
 }
 

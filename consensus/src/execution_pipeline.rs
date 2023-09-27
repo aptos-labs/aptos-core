@@ -141,8 +141,6 @@ impl ExecutionPipeline {
     }
 }
 
-const PIPELINE_DEPTH: usize = 8;
-
 struct ExecuteBlockCommand {
     block: ExecutableBlock,
     parent_block_id: HashValue,

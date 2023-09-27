@@ -48,7 +48,7 @@ dependencies. In particular, an incarnation of transaction tx_j stops and waits
 on a condition variable whenever it reads a value marked as an ESTIMATE that was
 written by a lower transaction tx_k. When the execution of tx_k finishes, it
 signals the condition variable and the execution of tx_j continues. This way,
-tx_k does not read a value that is likely to cause an abort in the future due to a
+tx_j does not read a value that is likely to cause an abort in the future due to a
 validation failure, which would happen if the next incarnation of tx_k would
 indeed write to the same location (the ESTIMATE markers that are not overwritten
 are removed by the next incarnation).
@@ -139,6 +139,7 @@ subsequent incarnation to finish.
 #[macro_use(defer)]
 extern crate scopeguard;
 
+mod captured_reads;
 pub mod counters;
 pub mod errors;
 pub mod executor;

@@ -94,7 +94,7 @@ pub async fn to_common_result<T: Serialize>(
         }
     }
 
-    let result: ResultWrapper<T> = result.into();
+    let result = ResultWrapper::<T>::from(result);
     let string = serde_json::to_string_pretty(&result).unwrap();
     if is_err {
         Err(string)
@@ -152,7 +152,7 @@ impl<T> From<CliTypedResult<T>> for ResultWrapper<T> {
     fn from(result: CliTypedResult<T>) -> Self {
         match result {
             Ok(inner) => ResultWrapper::Result(inner),
-            Err(inner) => ResultWrapper::Error(inner.to_string()),
+            Err(inner) => ResultWrapper::Error(format!("{:#}", inner)),
         }
     }
 }

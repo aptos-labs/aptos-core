@@ -94,8 +94,9 @@ docker/compose/indexer-grpc/data-service-grpc-server.key
 .*\#
 \#*\#
 
-# Aptos CLI files
+# Aptos CLI / local testnet files
 .aptos
+**/*.rdb
 
 # VSCode settings
 .vscode/

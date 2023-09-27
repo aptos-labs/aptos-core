@@ -4,6 +4,7 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
+    counters::TIMER,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
     system_module_names::{
@@ -20,6 +21,7 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
+use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateViewId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -84,15 +86,15 @@ pub fn gas_config(
 }
 
 impl AptosVMImpl {
-    #[allow(clippy::new_without_default)]
-    pub fn new(config_storage: &impl ConfigStorage) -> Self {
+    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+        let _timer = TIMER.timer_with(&["impl_new"]);
         // Get the gas parameters
-        let (mut gas_params, gas_feature_version) = gas_config(config_storage);
+        let (mut gas_params, gas_feature_version) = gas_config(resolver);
 
         let storage_gas_params = match &mut gas_params {
             Ok(gas_params) => {
                 let storage_gas_params =
-                    StorageGasParameters::new(gas_feature_version, gas_params, config_storage);
+                    StorageGasParameters::new(gas_feature_version, gas_params, resolver);
 
                 // Overwrite table io gas parameters with global io pricing.
                 let g = &mut gas_params.natives.table;
@@ -135,12 +137,12 @@ impl AptosVMImpl {
             Err(_) => (NativeGasParameters::zeros(), MiscGasParameters::zeros()),
         };
 
-        let features = Features::fetch_config(config_storage).unwrap_or_default();
+        let features = Features::fetch_config(resolver).unwrap_or_default();
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
-        let chain_id = ChainId::fetch_config(config_storage).unwrap_or_else(ChainId::test);
+        let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
 
-        let timestamp = ConfigurationResource::fetch_config(config_storage)
+        let timestamp = ConfigurationResource::fetch_config(resolver)
             .map(|config| config.last_reconfiguration_time())
             .unwrap_or(0);
 
@@ -156,10 +158,11 @@ impl AptosVMImpl {
             chain_id.id(),
             features.clone(),
             timed_features.clone(),
+            resolver,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
-        let version = Version::fetch_config(config_storage);
+        let version = Version::fetch_config(resolver);
 
         Self {
             move_vm,
@@ -637,7 +640,7 @@ impl AptosVMImpl {
     pub(crate) fn extract_module_metadata(
         &self,
         module: &ModuleId,
-    ) -> Option<RuntimeModuleMetadataV1> {
+    ) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module)
         } else {

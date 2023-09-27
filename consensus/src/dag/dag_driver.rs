@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    adapter::TLedgerInfoProvider,
     dag_fetcher::FetchRequester,
     order_rule::OrderRule,
     storage::DAGStorage,
@@ -11,6 +12,7 @@ use super::{
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
+        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         types::{CertificateAckState, CertifiedNode, Node, NodeCertificate, SignatureBuilder},
     },
@@ -51,6 +53,7 @@ pub(crate) struct DagDriver {
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
     fetch_requester: Arc<FetchRequester>,
+    ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
 }
 
 impl DagDriver {
@@ -64,6 +67,7 @@ impl DagDriver {
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
         fetch_requester: Arc<FetchRequester>,
+        ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -91,6 +95,7 @@ impl DagDriver {
             storage,
             order_rule,
             fetch_requester,
+            ledger_info_provider,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -139,14 +144,33 @@ impl DagDriver {
 
     pub async fn enter_new_round(&mut self, new_round: Round, strong_links: Vec<NodeCertificate>) {
         debug!("entering new round {}", new_round);
-        // TODO: support pulling payload
+        let payload_filter = {
+            let dag_reader = self.dag.read();
+            let highest_commit_round = self
+                .ledger_info_provider
+                .get_highest_committed_anchor_round();
+            if strong_links.is_empty() {
+                PayloadFilter::Empty
+            } else {
+                PayloadFilter::from(
+                    &dag_reader
+                        .reachable(
+                            strong_links.iter().map(|node| node.metadata()),
+                            Some(highest_commit_round.saturating_sub(DAG_WINDOW as u64)),
+                            |_| true,
+                        )
+                        .map(|node_status| node_status.as_node().payload())
+                        .collect(),
+                )
+            }
+        };
         let payload = match self
             .payload_client
             .pull_payload(
                 Duration::from_secs(1),
                 100,
                 1000,
-                PayloadFilter::Empty,
+                payload_filter,
                 Box::pin(async {}),
                 false,
                 0,
@@ -184,10 +208,7 @@ impl DagDriver {
         let signature_builder =
             SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
-        let latest_ledger_info = self
-            .storage
-            .get_latest_ledger_info()
-            .expect("latest ledger info must exist");
+        let latest_ledger_info = self.ledger_info_provider.get_latest_ledger_info();
         let task = self
             .reliable_broadcast
             .broadcast(node.clone(), signature_builder)

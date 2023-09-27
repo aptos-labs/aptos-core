@@ -450,11 +450,7 @@ impl Deref for CertifiedNodeMessage {
 
 impl TDAGMessage for CertifiedNodeMessage {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.inner.verify(verifier)?;
-
-        self.ledger_info
-            .verify_signatures(verifier)
-            .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))
+        self.inner.verify(verifier)
     }
 }
 
@@ -580,8 +576,8 @@ impl RemoteFetchRequest {
         self.epoch
     }
 
-    pub fn targets(&self) -> &[NodeMetadata] {
-        &self.targets
+    pub fn targets(&self) -> impl Iterator<Item = &NodeMetadata> + Clone {
+        self.targets.iter()
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {

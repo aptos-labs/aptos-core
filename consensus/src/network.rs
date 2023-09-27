@@ -5,9 +5,9 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::{DAGMessage, DAGNetworkMessage, RpcWithFallback, TDAGNetworkSender},
+    dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
     experimental::commit_reliable_broadcast::CommitMessage,
-    logging::LogEvent,
+    logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
@@ -492,6 +492,17 @@ impl RBNetworkSender<DAGMessage> for NetworkSender {
     }
 }
 
+#[async_trait]
+impl ProofNotifier for NetworkSender {
+    async fn send_epoch_change(&self, proof: EpochChangeProof) {
+        self.send_epoch_change(proof).await
+    }
+
+    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
+        self.send_commit_proof(ledger_info).await
+    }
+}
+
 pub struct NetworkTask {
     consensus_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
@@ -629,6 +640,12 @@ impl NetworkTask {
                                 observe_block(
                                     proposal.proposal().timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED,
+                                );
+                                info!(
+                                    LogSchema::new(LogEvent::NetworkReceiveProposal)
+                                        .remote_peer(peer_id),
+                                    block_round = proposal.proposal().round(),
+                                    block_hash = proposal.proposal().id(),
                                 );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);

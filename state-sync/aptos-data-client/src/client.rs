@@ -21,7 +21,7 @@ use aptos_config::{
     network_id::PeerNetworkId,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
 use aptos_network::{application::interface::NetworkClient, protocols::network::RpcError};
 use aptos_storage_interface::DbReader;
@@ -46,9 +46,10 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use rand::prelude::SliceRandom;
-use std::{fmt, sync::Arc, time::Duration};
+use std::{fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 // Useful constants
@@ -76,15 +77,15 @@ const PEER_LOG_FREQ_SECS: u64 = 10;
 #[derive(Clone, Debug)]
 pub struct AptosDataClient {
     /// Config for AptosNet data client.
-    data_client_config: AptosDataClientConfig,
+    data_client_config: Arc<AptosDataClientConfig>,
     /// The underlying AptosNet storage service client.
     storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
     /// The state of the active subscription stream.
     active_subscription_state: Arc<Mutex<Option<SubscriptionState>>>,
     /// All of the data-client specific data we have on each network peer.
-    peer_states: Arc<RwLock<PeerStates>>,
+    peer_states: Arc<PeerStates>,
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
-    global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
+    global_summary_cache: Arc<ArcSwap<GlobalDataSummary>>,
     /// Used for generating the next request/response id.
     response_id_generator: Arc<U64IdGenerator>,
     /// Time service used for calculating peer lag
@@ -100,17 +101,21 @@ impl AptosDataClient {
         storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
         runtime: Option<Handle>,
     ) -> (Self, DataSummaryPoller) {
+        // Wrap the configs in an Arc (to be shared across components)
+        let base_config = Arc::new(base_config);
+        let data_client_config = Arc::new(data_client_config);
+
         // Create the data client
         let data_client = Self {
-            data_client_config,
+            data_client_config: data_client_config.clone(),
             storage_service_client: storage_service_client.clone(),
             active_subscription_state: Arc::new(Mutex::new(None)),
-            peer_states: Arc::new(RwLock::new(PeerStates::new(
+            peer_states: Arc::new(PeerStates::new(
                 base_config,
-                data_client_config,
+                data_client_config.clone(),
                 storage_service_client.get_peers_and_metadata(),
-            ))),
-            global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
+            )),
+            global_summary_cache: Arc::new(ArcSwap::from(Arc::new(GlobalDataSummary::empty()))),
             response_id_generator: Arc::new(U64IdGenerator::new()),
             time_service: time_service.clone(),
         };
@@ -150,7 +155,7 @@ impl AptosDataClient {
 
     /// Update a peer's data summary.
     pub fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
-        self.peer_states.write().update_summary(peer, summary)
+        self.peer_states.update_summary(peer, summary)
     }
 
     /// Recompute and update the global data summary cache
@@ -159,9 +164,12 @@ impl AptosDataClient {
         // the peer states (to handle disconnected peers).
         self.garbage_collect_peer_states()?;
 
-        // Calculate the aggregate data summary
-        let aggregate = self.peer_states.read().calculate_aggregate_summary();
-        *self.global_summary_cache.write() = aggregate;
+        // Calculate the global data summary
+        let global_data_summary = self.peer_states.calculate_global_data_summary();
+
+        // Update the cached data summary
+        self.global_summary_cache
+            .store(Arc::new(global_data_summary));
 
         Ok(())
     }
@@ -173,7 +181,6 @@ impl AptosDataClient {
 
         // Garbage collect the disconnected peers
         self.peer_states
-            .write()
             .garbage_collect_peer_states(all_connected_peers);
 
         Ok(())
@@ -281,11 +288,8 @@ impl AptosDataClient {
         prospective_peers
             .into_iter()
             .filter(|peer| {
-                self.peer_states.read().can_service_request(
-                    peer,
-                    self.time_service.clone(),
-                    request,
-                )
+                self.peer_states
+                    .can_service_request(peer, self.time_service.clone(), request)
             })
             .collect::<Vec<_>>()
     }
@@ -295,7 +299,7 @@ impl AptosDataClient {
         &self,
     ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Fetch the number of in-flight polls and update the metrics
-        let num_in_flight_polls = self.peer_states.read().num_in_flight_priority_polls();
+        let num_in_flight_polls = self.peer_states.num_in_flight_priority_polls();
         update_in_flight_metrics(PRIORITIZED_PEER, num_in_flight_polls);
 
         // Ensure we don't go over the maximum number of in-flight polls
@@ -311,7 +315,7 @@ impl AptosDataClient {
     /// Fetches the next regular peer to poll
     pub fn fetch_regular_peer_to_poll(&self) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Fetch the number of in-flight polls and update the metrics
-        let num_in_flight_polls = self.peer_states.read().num_in_flight_regular_polls();
+        let num_in_flight_polls = self.peer_states.num_in_flight_regular_polls();
         update_in_flight_metrics(REGULAR_PEER, num_in_flight_polls);
 
         // Ensure we don't go over the maximum number of in-flight polls
@@ -330,7 +334,7 @@ impl AptosDataClient {
         mut peers: Vec<PeerNetworkId>,
     ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
         // Identify the peers who do not already have in-flight requests.
-        peers.retain(|peer| !self.peer_states.read().existing_in_flight_request(peer));
+        peers.retain(|peer| !self.peer_states.existing_in_flight_request(peer));
 
         // Select a peer at random for polling
         let peer_to_poll = peers.choose(&mut rand::thread_rng());
@@ -339,14 +343,12 @@ impl AptosDataClient {
 
     /// Marks the given peers as having an in-flight poll request
     pub fn in_flight_request_started(&self, peer: &PeerNetworkId) {
-        self.peer_states.write().new_in_flight_request(peer);
+        self.peer_states.new_in_flight_request(peer);
     }
 
     /// Marks the given peers as polled
     pub fn in_flight_request_complete(&self, peer: &PeerNetworkId) {
-        self.peer_states
-            .write()
-            .mark_in_flight_request_complete(peer);
+        self.peer_states.mark_in_flight_request_complete(peer);
     }
 
     /// Returns all peers connected to us
@@ -372,7 +374,7 @@ impl AptosDataClient {
         let mut priority_peers = vec![];
         let mut regular_peers = vec![];
         for peer in all_connected_peers {
-            if self.peer_states.read().is_priority_peer(&peer) {
+            if self.peer_states.is_priority_peer(&peer) {
                 priority_peers.push(peer);
             } else {
                 regular_peers.push(peer);
@@ -500,7 +502,7 @@ impl AptosDataClient {
                 // On the one hand, scoring dynamics are simpler when each request
                 // is successful or failed but not both; on the other hand, this
                 // feels simpler for the consumer.
-                self.peer_states.write().update_score_success(peer);
+                self.peer_states.update_score_success(peer);
 
                 // Package up all of the context needed to fully report an error
                 // with this RPC.
@@ -565,9 +567,7 @@ impl AptosDataClient {
         _request: &StorageServiceRequest,
         error_type: ErrorType,
     ) {
-        self.peer_states
-            .write()
-            .update_score_error(peer, error_type);
+        self.peer_states.update_score_error(peer, error_type);
     }
 
     /// Creates a storage service request using the given data request
@@ -588,15 +588,15 @@ impl AptosDataClient {
 
     /// Returns a copy of the peer states for testing
     #[cfg(test)]
-    pub(crate) fn get_peer_states(&self) -> PeerStates {
-        self.peer_states.read().clone()
+    pub(crate) fn get_peer_states(&self) -> Arc<PeerStates> {
+        self.peer_states.clone()
     }
 }
 
 #[async_trait]
 impl AptosDataClientInterface for AptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
-        self.global_summary_cache.read().clone()
+        self.global_summary_cache.load().clone().deref().clone()
     }
 
     async fn get_epoch_ending_ledger_infos(

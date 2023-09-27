@@ -16,7 +16,7 @@ LOG = logging.getLogger(__name__)
 # stop running it later using the container name. For an explanation of these
 # arguments, see the argument parser in main.py.
 def run_node(network: Network, image_repo_with_project: str, external_test_dir: str):
-    image_name = build_image_name(image_repo_with_project, str(network))
+    image_name = build_image_name(image_repo_with_project, network)
     container_name = f"local-testnet-{network}"
     internal_mount_path = "/mymount"
     LOG.info(f"Trying to run local testnet from image: {image_name}")
@@ -62,6 +62,8 @@ def run_node(network: Network, image_repo_with_project: str, external_test_dir: 
             "run-local-testnet",
             "--test-dir",
             internal_mount_path,
+            "--no-faucet",
+            "--no-txn-stream",
         ],
     )
     LOG.info(f"Running local testnet from image: {image_name}")

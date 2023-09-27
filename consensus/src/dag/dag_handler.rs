@@ -3,11 +3,8 @@
 use super::{
     dag_driver::DagDriver,
     dag_fetcher::{FetchRequestHandler, FetchWaiter},
-    dag_state_sync::{
-        StateSyncStatus::{self, NeedsSync, Synced},
-        StateSyncTrigger,
-    },
-    types::{CertifiedNodeMessage, TDAGMessage},
+    dag_state_sync::{StateSyncStatus, StateSyncTrigger},
+    types::TDAGMessage,
     CertifiedNode, Node,
 };
 use crate::{
@@ -59,15 +56,15 @@ impl NetworkHandler {
     pub async fn run(
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
-    ) -> CertifiedNodeMessage {
+    ) -> StateSyncStatus {
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {
                 Some(msg) = dag_rpc_rx.next() => {
                     match self.process_rpc(msg).await {
                         Ok(sync_status) => {
-                            if let StateSyncStatus::NeedsSync(certified_node_msg) = sync_status {
-                                return certified_node_msg;
+                            if matches!(sync_status, StateSyncStatus::NeedsSync(_) | StateSyncStatus::EpochEnds) {
+                                return sync_status;
                             }
                         },
                         Err(e) =>  {
@@ -133,13 +130,14 @@ impl NetworkHandler {
                         self.node_receiver.process(node).await.map(|r| r.into())
                     },
                     DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
-                        match self.state_sync_trigger.check(certified_node_msg).await {
-                            ret @ (NeedsSync(_), None) => return Ok(ret.0),
-                            (Synced, Some(certified_node_msg)) => self
+                        match self.state_sync_trigger.check(certified_node_msg).await? {
+                            StateSyncStatus::Synced(Some(certified_node_msg)) => self
                                 .dag_driver
                                 .process(certified_node_msg.certified_node())
                                 .await
                                 .map(|r| r.into()),
+                            status @ (StateSyncStatus::NeedsSync(_)
+                            | StateSyncStatus::EpochEnds) => return Ok(status),
                             _ => unreachable!(),
                         }
                     },
@@ -151,6 +149,8 @@ impl NetworkHandler {
                 Err(err) => Err(err),
             }
         };
+
+        debug!("responding to rpc: {:?}", response);
 
         let response = response
             .and_then(|response_msg| {
@@ -165,6 +165,6 @@ impl NetworkHandler {
             .response_sender
             .send(response)
             .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
-            .map(|_| StateSyncStatus::Synced)
+            .map(|_| StateSyncStatus::Synced(None))
     }
 }

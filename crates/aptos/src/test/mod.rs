@@ -889,6 +889,7 @@ impl CliTestFramework {
             account: self.account_id(index),
             package,
             output_dir: Some(output_dir),
+            print_metadata: false,
         }
         .execute()
         .await

@@ -1,3 +1,10 @@
+/**
+ * This file contains the underlying implementations for exposed API surface in
+ * the {@link api/account}. By moving the methods out into a separate file,
+ * other namespaces and processes can access these methods without depending on the entire
+ * account namespace and without having a dependency cycle error.
+ */
+
 import { AptosConfig } from "../api/aptos_config";
 import {
   AccountData,
@@ -13,13 +20,6 @@ import { get } from "../client";
 import { paginateWithCursor } from "../utils/paginate_with_cursor";
 import { AccountAddress } from "../core";
 import { AptosApiType } from "../utils/const";
-
-/**
- * This file contains the underlying implementations for exposed API surface in
- * the {@link api/account}. By moving the methods out into a separate file,
- * other namespaces and processes can access these methods without depending on the entire
- * account namespace and without having a dependency cycle error.
- */
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;

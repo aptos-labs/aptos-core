@@ -40,7 +40,7 @@ mod aptosdb_test;
 
 #[cfg(feature = "db-debugger")]
 pub mod db_debugger;
-pub mod fast_sync_aptos_db;
+pub mod fast_sync_storage_wrapper;
 
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
@@ -197,6 +197,24 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
         Ok(())
     }
 }
+fn set_property(cf_name: &str, db: &DB) -> Result<()> {
+    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+        ROCKSDB_PROPERTIES
+            .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    }
+    Ok(())
+}
+
+fn set_property_sharded(cf_name: &str, db: &DB, db_shard_id: usize) -> Result<()> {
+    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+        let cf_label = format!("{}_{}", cf_name, db_shard_id);
+        ROCKSDB_PROPERTIES
+            .with_label_values(&[&cf_label, aptos_rocksdb_property_name])
+            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    }
+    Ok(())
+}
 
 fn update_rocksdb_properties(
     ledger_db: &LedgerDb,
@@ -207,70 +225,52 @@ fn update_rocksdb_properties(
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
 
-    let set_property_fn = |cf_name: &str, db: &DB| -> Result<()> {
-        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-            ROCKSDB_PROPERTIES
-                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
-        }
-        Ok(())
-    };
-
-    let gen_shard_cf_name =
-        |cf_name: &str, shard_id: u8| -> String { format!("shard_{}_{}", shard_id, cf_name) };
-
     let split_ledger = state_kv_db.enabled_sharding();
 
     if split_ledger {
         for cf in ledger_metadata_db_column_families() {
-            set_property_fn(cf, ledger_db.metadata_db())?;
+            set_property(cf, ledger_db.metadata_db())?;
         }
 
         for cf in write_set_db_column_families() {
-            set_property_fn(cf, ledger_db.write_set_db())?;
+            set_property(cf, ledger_db.write_set_db())?;
         }
 
         for cf in transaction_info_db_column_families() {
-            set_property_fn(cf, ledger_db.transaction_info_db())?;
+            set_property(cf, ledger_db.transaction_info_db())?;
         }
 
         for cf in transaction_db_column_families() {
-            set_property_fn(cf, ledger_db.transaction_db())?;
+            set_property(cf, ledger_db.transaction_db())?;
         }
 
         for cf in event_db_column_families() {
-            set_property_fn(cf, ledger_db.event_db())?;
+            set_property(cf, ledger_db.event_db())?;
         }
 
         for cf in transaction_accumulator_db_column_families() {
-            set_property_fn(cf, ledger_db.transaction_accumulator_db())?;
+            set_property(cf, ledger_db.transaction_accumulator_db())?;
         }
 
         for cf in state_kv_db_column_families() {
-            set_property_fn(cf, state_kv_db.metadata_db())?;
+            set_property(cf, state_kv_db.metadata_db())?;
             if state_kv_db.enabled_sharding() {
                 for shard in 0..NUM_STATE_SHARDS {
-                    set_property_fn(
-                        gen_shard_cf_name(cf, shard as u8).as_str(),
-                        state_kv_db.db_shard(shard as u8),
-                    )?;
+                    set_property_sharded(cf, state_kv_db.db_shard(shard as u8), shard)?;
                 }
             }
         }
     } else {
         for cf in ledger_db_column_families() {
-            set_property_fn(cf, ledger_db.metadata_db())?;
+            set_property(cf, ledger_db.metadata_db())?;
         }
     }
 
     for cf_name in state_merkle_db_column_families() {
-        set_property_fn(cf_name, state_merkle_db.metadata_db())?;
+        set_property(cf_name, state_merkle_db.metadata_db())?;
         if state_merkle_db.sharding_enabled() {
             for shard in 0..NUM_STATE_SHARDS {
-                set_property_fn(
-                    gen_shard_cf_name(cf_name, shard as u8).as_str(),
-                    state_merkle_db.db_shard(shard as u8),
-                )?;
+                set_property_sharded(cf_name, state_merkle_db.db_shard(shard as u8), shard)?;
             }
         }
     }

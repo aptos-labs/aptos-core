@@ -2,7 +2,7 @@
 
 use crate::{
     dag::{
-        adapter::Notifier,
+        adapter::OrderedNotifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::{DagStateSynchronizer, DAG_WINDOW},
         dag_store::Dag,
@@ -21,7 +21,6 @@ use aptos_time_service::TimeService;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
-    epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::random_validator_verifier,
@@ -99,7 +98,7 @@ impl TDagFetcher for MockDagFetcher {
 struct MockNotifier {}
 
 #[async_trait]
-impl Notifier for MockNotifier {
+impl OrderedNotifier for MockNotifier {
     fn send_ordered_nodes(
         &self,
         _ordered_nodes: Vec<Arc<CertifiedNode>>,
@@ -107,24 +106,13 @@ impl Notifier for MockNotifier {
     ) -> anyhow::Result<()> {
         Ok(())
     }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {}
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {}
 }
 
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
     let state_computer = Arc::new(EmptyStateComputer {});
-    let downstream_notifier = Arc::new(MockNotifier {});
 
-    DagStateSynchronizer::new(
-        epoch_state,
-        downstream_notifier,
-        time_service,
-        state_computer,
-        storage,
-    )
+    DagStateSynchronizer::new(epoch_state, time_service, state_computer, storage)
 }
 
 #[tokio::test]
@@ -194,12 +182,11 @@ async fn test_dag_state_sync() {
     };
 
     let sync_result = state_sync
-        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone())
+        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone(), 0)
         .await;
     let new_dag = sync_result.unwrap().unwrap();
 
     assert_eq!(new_dag.lowest_round(), (LI_ROUNDS - DAG_WINDOW) as Round);
     assert_eq!(new_dag.highest_round(), (NUM_ROUNDS - 1) as Round);
     assert_none!(new_dag.highest_ordered_anchor_round(),);
-    assert_eq!(new_dag.highest_committed_anchor_round(), LI_ROUNDS as Round);
 }
