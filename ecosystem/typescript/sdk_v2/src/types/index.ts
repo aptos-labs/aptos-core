@@ -85,7 +85,6 @@ export type AptosRequest = {
   params?: Record<string, string | AnyNumber | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;
-  isIndexer?: boolean;
 };
 
 /**

@@ -55,12 +55,14 @@ import {
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
-  const { data } = await get<{}, AccountData>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
-    originMethod: "getInfo",
-    overrides: { ...aptosConfig.clientConfig },
-  });
+  const { data } = await get<{}, AccountData>(
+    {
+      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
+      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
+      originMethod: "getInfo",
+    },
+    aptosConfig,
+  );
   return data;
 }
 
@@ -70,13 +72,15 @@ export async function getModules(args: {
   options?: PaginationArgs & LedgerVersion;
 }): Promise<MoveModuleBytecode[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, MoveModuleBytecode[]>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
-    params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
-    originMethod: "getModules",
-    overrides: { ...aptosConfig.clientConfig },
-  });
+  const data = await paginateWithCursor<{}, MoveModuleBytecode[]>(
+    {
+      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
+      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
+      params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
+      originMethod: "getModules",
+    },
+    aptosConfig,
+  );
   return data;
 }
 
@@ -95,13 +99,15 @@ export async function getModule(args: {
   options?: LedgerVersion;
 }): Promise<MoveModuleBytecode> {
   const { aptosConfig, accountAddress, moduleName, options } = args;
-  const { data } = await get<{}, MoveModuleBytecode>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
-    originMethod: "getModule",
-    params: { ledger_version: options?.ledgerVersion },
-    overrides: { ...aptosConfig.clientConfig },
-  });
+  const { data } = await get<{}, MoveModuleBytecode>(
+    {
+      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
+      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
+      originMethod: "getModule",
+      params: { ledger_version: options?.ledgerVersion },
+    },
+    aptosConfig,
+  );
   return data;
 }
 
@@ -111,13 +117,15 @@ export async function getTransactions(args: {
   options?: PaginationArgs;
 }): Promise<TransactionResponse[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, TransactionResponse[]>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
-    originMethod: "getTransactions",
-    params: { start: options?.start, limit: options?.limit },
-    overrides: { ...aptosConfig.clientConfig },
-  });
+  const data = await paginateWithCursor<{}, TransactionResponse[]>(
+    {
+      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
+      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
+      originMethod: "getTransactions",
+      params: { start: options?.start, limit: options?.limit },
+    },
+    aptosConfig,
+  );
   return data;
 }
 
@@ -127,13 +135,15 @@ export async function getResources(args: {
   options?: PaginationArgs & LedgerVersion;
 }): Promise<MoveResource[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, MoveResource[]>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
-    params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
-    originMethod: "getResources",
-    overrides: { ...aptosConfig.clientConfig },
-  });
+  const data = await paginateWithCursor<{}, MoveResource[]>(
+    {
+      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
+      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
+      params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
+      originMethod: "getResources",
+    },
+    aptosConfig,
+  );
   return data;
 }
 
@@ -144,13 +154,17 @@ export async function getResource(args: {
   options?: LedgerVersion;
 }): Promise<MoveResource> {
   const { aptosConfig, accountAddress, resourceType, options } = args;
-  const { data } = await get<{}, MoveResource>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resource/${resourceType}`,
-    originMethod: "getResource",
-    params: { ledger_version: options?.ledgerVersion },
-    overrides: { ...aptosConfig.clientConfig },
-  });
+  const { data } = await get<{}, MoveResource>(
+    {
+      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
+      endpoint: `accounts/${AccountAddress.fromHexInput({
+        input: accountAddress,
+      }).toString()}/resource/${resourceType}`,
+      originMethod: "getResource",
+      params: { ledger_version: options?.ledgerVersion },
+    },
+    aptosConfig,
+  );
   return data;
 }
 
@@ -282,7 +296,7 @@ export async function getAccountCollectionsWithOwnedTokens(args: {
   };
 
   if (options?.tokenStandard) {
-    whereCondition.token_standard = { _eq: options?.tokenStandard };
+    whereCondition.current_collection = { token_standard: { _eq: options?.tokenStandard } };
   }
 
   const graphqlQuery = {

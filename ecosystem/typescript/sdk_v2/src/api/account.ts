@@ -174,7 +174,7 @@ export class Account {
    * Queries the count of tokens owned by an account
    *
    * @param accountAddress The account address
-   * @returns an object { count : number }
+   * @returns An object { count : number }
    */
   async getAccountTokensCount(args: { accountAddress: HexInput }): Promise<GetAccountTokensCountQueryResponse> {
     const count = await getAccountTokensCount({ aptosConfig: this.config, ...args });
@@ -182,12 +182,12 @@ export class Account {
   }
 
   /**
-   * Queries account's current owned tokens.
+   * Queries the account's current owned tokens.
    *
    * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
    * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
    *
-   * @param accountAddress The account address address we want to get the tokens for
+   * @param accountAddress The account address we want to get the tokens for
    * @returns Tokens array with the token data
    */
   async getAccountOwnedTokens(args: {
@@ -209,7 +209,7 @@ export class Account {
    * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
    *
    * @param ownerAddress The account address we want to get the tokens for
-   * @param collectionAddress the collection address
+   * @param collectionAddress The address of the collection being queried
    * @returns Tokens array with the token data
    */
   async getAccountOwnedTokensFromCollectionAddress(args: {
@@ -250,7 +250,7 @@ export class Account {
    * Queries the count of transactions submitted by an account
    *
    * @param accountAddress The account address we want to get the total count for
-   * @returns an object { count : number }
+   * @returns An object { count : number }
    */
   async getAccountTransactionsCount(args: { accountAddress: HexInput }): Promise<GetAccountTransactionsCountResponse> {
     const count = getAccountTransactionsCount({ aptosConfig: this.config, ...args });
@@ -258,7 +258,7 @@ export class Account {
   }
 
   /**
-   * Queries an account coin data
+   * Queries an account's coins data
    *
    * @param accountAddress The account address we want to get the coins data for
    * @returns Array with the coins data
@@ -275,10 +275,10 @@ export class Account {
   }
 
   /**
-   * Queries the count of an account coins
+   * Queries the count of an account's coins
    *
    * @param accountAddress The account address we want to get the total count for
-   * @returns an object { count : number }
+   * @returns An object { count : number }
    */
   async getAccountCoinsCount(args: { accountAddress: HexInput }): Promise<GetAccountCoinsCountResponse> {
     const count = getAccountCoinsCount({ aptosConfig: this.config, ...args });
@@ -286,7 +286,7 @@ export class Account {
   }
 
   /**
-   * Queries an account owned objects
+   * Queries an account's owned objects
    *
    * @param ownerAddress The account address we want to get the objects for
    * @returns Objects array with the object data
