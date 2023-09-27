@@ -6,8 +6,9 @@ import { Deserializer } from "../bcs/deserializer";
 import { Serializer } from "../bcs/serializer";
 import { Hex } from "../core/hex";
 import { HexInput } from "../types";
+import * as asymmetric_crypto from "./asymmetric_crypto";
 
-export class PublicKey {
+export class PublicKey extends asymmetric_crypto.PublicKey {
   // Correct length of the public key in bytes (Uint8Array)
   static readonly LENGTH: number = 32;
 
@@ -20,6 +21,8 @@ export class PublicKey {
    * @param args.hexInput A HexInput (string or Uint8Array)
    */
   constructor(args: { hexInput: HexInput }) {
+    super();
+
     const { hexInput } = args;
     const hex = Hex.fromHexInput({ hexInput });
     if (hex.toUint8Array().length !== PublicKey.LENGTH) {
@@ -51,15 +54,20 @@ export class PublicKey {
    * @param args.data a signed message
    * @param args.signature the signature of the message
    */
-  verifySignature(args: { data: HexInput; signature: HexInput }): boolean {
+  verifySignature(args: { data: HexInput; signature: Signature }): boolean {
     const { data, signature } = args;
     const rawMessage = Hex.fromHexInput({ hexInput: data }).toUint8Array();
-    const rawSignature = Hex.fromHexInput({ hexInput: signature }).toUint8Array();
+    const rawSignature = Hex.fromHexInput({ hexInput: signature.toUint8Array() }).toUint8Array();
     return nacl.sign.detached.verify(rawMessage, rawSignature, this.key.toUint8Array());
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.key.toUint8Array());
+  }
+
+  // TODO: Update this in interface to be static, then remove this method
+  deserialize(deserializer: Deserializer): asymmetric_crypto.PublicKey {
+    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): PublicKey {
@@ -68,7 +76,7 @@ export class PublicKey {
   }
 }
 
-export class PrivateKey {
+export class PrivateKey extends asymmetric_crypto.PrivateKey {
   // Correct length of the private key in bytes (Uint8Array)
   static readonly LENGTH: number = 32;
 
@@ -81,6 +89,8 @@ export class PrivateKey {
    * @param value HexInput (string or Uint8Array)
    */
   constructor(args: { value: HexInput }) {
+    super();
+
     const { value } = args;
     const privateKeyHex = Hex.fromHexInput({ hexInput: value });
     if (privateKeyHex.toUint8Array().length !== PrivateKey.LENGTH) {
@@ -88,7 +98,7 @@ export class PrivateKey {
     }
 
     // Create keyPair from Private key in Uint8Array format
-    const keyPair = nacl.sign.keyPair.fromSeed(privateKeyHex.toUint8Array().slice(0, 32));
+    const keyPair = nacl.sign.keyPair.fromSeed(privateKeyHex.toUint8Array().slice(0, PrivateKey.LENGTH));
     this.signingKeyPair = keyPair;
   }
 
@@ -98,7 +108,7 @@ export class PrivateKey {
    * @returns Uint8Array representation of the private key
    */
   toUint8Array(): Uint8Array {
-    return this.signingKeyPair.secretKey.slice(0, 32);
+    return this.signingKeyPair.secretKey.slice(0, PrivateKey.LENGTH);
   }
 
   /**
@@ -107,7 +117,7 @@ export class PrivateKey {
    * @returns string representation of the private key
    */
   toString(): string {
-    return Hex.fromHexInput({ hexInput: this.signingKeyPair.secretKey.slice(0, 32) }).toString();
+    return Hex.fromHexInput({ hexInput: this.toUint8Array() }).toString();
   }
 
   /**
@@ -126,6 +136,11 @@ export class PrivateKey {
     serializer.serializeBytes(this.toUint8Array());
   }
 
+  // TODO: Update this in interface to be static, then remove this method
+  deserialize(deserializer: Deserializer): asymmetric_crypto.PrivateKey {
+    throw new Error("Method not implemented.");
+  }
+
   static deserialize(deserializer: Deserializer): PrivateKey {
     const value = deserializer.deserializeBytes();
     return new PrivateKey({ value });
@@ -138,14 +153,14 @@ export class PrivateKey {
    */
   static generate(): PrivateKey {
     const keyPair = nacl.sign.keyPair();
-    return new PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
+    return new PrivateKey({ value: keyPair.secretKey.slice(0, PrivateKey.LENGTH) });
   }
 }
 
 /**
  * The product of signing a message with a private key.
  */
-export class Signature {
+export class Signature extends asymmetric_crypto.Signature {
   // Correct length of the signature in bytes (Uint8Array)
   static readonly LENGTH = 64;
 
@@ -153,6 +168,8 @@ export class Signature {
   private readonly data: Hex;
 
   constructor(args: { data: HexInput }) {
+    super();
+
     const hex = Hex.fromHexInput({ hexInput: args.data });
     if (hex.toUint8Array().length !== Signature.LENGTH) {
       throw new Error(`Signature length should be ${Signature.LENGTH}`);
@@ -181,6 +198,11 @@ export class Signature {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.data.toUint8Array());
+  }
+
+  // TODO: Update this in interface to be static, then remove this method
+  deserialize(deserializer: Deserializer): Signature {
+    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): Signature {
