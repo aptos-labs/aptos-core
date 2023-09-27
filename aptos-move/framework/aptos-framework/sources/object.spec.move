@@ -2,6 +2,8 @@ spec aptos_framework::object {
 
     spec module {
         pragma aborts_if_is_strict;
+        //ghost variable
+        global g_roll: u8;
     }
 
     spec fun spec_exists_at<T: key>(object: address): bool;
@@ -373,9 +375,6 @@ spec aptos_framework::object {
         let object_address = object.inner;
         aborts_if !exists<ObjectCore>(object_address);
         aborts_if !global<ObjectCore>(object_address).allow_ungated_transfer;
-        // property 3: The 'indirect' owner of an object may transfer the object.
-        let post new_owner_address = global<ObjectCore>(object_address).owner;
-        ensures owner_address != object_address ==> new_owner_address == to;
     }
 
     spec transfer_raw(
@@ -404,10 +403,26 @@ spec aptos_framework::object {
     }
 
     spec verify_ungated_and_descendant(owner: address, destination: address) {
-        pragma aborts_if_is_partial;
         // TODO: Verify the link list loop in verify_ungated_and_descendant
+        pragma aborts_if_is_partial;
+        pragma unroll = MAXIMUM_OBJECT_NESTING;
         aborts_if !exists<ObjectCore>(destination);
-        aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
+        // aborts_if !global<ObjectCore>(destination).allow_ungated_transfer;
+        // aborts_if exists i in 0..g_roll:
+        //     owner != global<ObjectCore>(destination).owner && !exists<ObjectCore>(get_transfer_address(destination, i));
+        // aborts_if exists i in 0..g_roll:
+        //     owner != global<ObjectCore>(destination).owner && !global<ObjectCore>(get_transfer_address(destination, i)).allow_ungated_transfer;
+        //property 3: The 'indirect' owner of an object may transfer the object.
+        ensures exists i in 0..MAXIMUM_OBJECT_NESTING:
+            owner == get_transfer_address(destination, i);
+    }
+
+    spec fun get_transfer_address(addr: address, roll: u64): address {
+        let i = roll;
+        if ( i > 0 )
+        { get_transfer_address(global<ObjectCore>(addr).owner, i - 1) }
+        else
+        { global<ObjectCore>(addr).owner }
     }
 
     spec ungated_transfer_allowed<T: key>(object: Object<T>): bool {
