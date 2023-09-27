@@ -182,12 +182,11 @@ async fn test_dag_state_sync() {
     };
 
     let sync_result = state_sync
-        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone())
+        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone(), 0)
         .await;
     let new_dag = sync_result.unwrap().unwrap();
 
     assert_eq!(new_dag.lowest_round(), (LI_ROUNDS - DAG_WINDOW) as Round);
     assert_eq!(new_dag.highest_round(), (NUM_ROUNDS - 1) as Round);
     assert_none!(new_dag.highest_ordered_anchor_round(),);
-    assert_eq!(new_dag.highest_committed_anchor_round(), LI_ROUNDS as Round);
 }

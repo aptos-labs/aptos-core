@@ -17,6 +17,8 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 
 #[derive(Debug, Clone, Parser)]
 pub struct ReadyServerConfig {
+    /// The port to run the ready server. This exposes an endpoint at `/` that you can
+    /// use to check if the entire local testnet is ready.
     #[clap(long, default_value_t = 8090)]
     pub ready_server_listen_port: u16,
 }
