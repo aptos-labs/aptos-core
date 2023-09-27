@@ -146,7 +146,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get deltas")
+            .expect("Output to be set to aggregator change set")
             .change_set()
             .aggregator_v2_change_set()
             .clone()

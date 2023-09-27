@@ -10,7 +10,7 @@ use crate::{
 use aptos_aggregator::{
     delta_change_set::serialize,
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorValue, TryFromMoveValue, TryIntoMoveValue},
+    types::{AggregatorValue, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -107,13 +107,38 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    fn read_aggregator_v2_committed_value(
+    fn read_aggregator_v2_last_committed_value(
         &self,
         id: T::Identifier,
+        txn_idx: TxnIndex,
+        read_position: ReadPosition,
     ) -> Result<AggregatorValue, MVAggregatorsError> {
         self.versioned_map
             .aggregators()
-            .read_latest_committed_value(id)
+            .read_latest_committed_value(id, txn_idx, read_position)
+    }
+
+    fn read_aggregator_v2_aggregated_value(
+        &self,
+        id: T::Identifier,
+        txn_idx: TxnIndex,
+    ) -> Result<AggregatorValue, MVAggregatorsError> {
+        match self.versioned_map.aggregators().read(id, txn_idx) {
+            Ok(value) => {
+                if self
+                    .captured_reads
+                    .borrow_mut()
+                    .capture_delayed_field_read(id, value.clone())
+                    .is_err()
+                {
+                    // Inconsistency in recorded reads.
+                    Err(MVAggregatorsError::DeltaApplicationFailure)
+                } else {
+                    Ok(value)
+                }
+            },
+            Err(e) => Err(e),
+        }
     }
 
     // TODO: Actually fill in the logic to record fetched executables, etc.
@@ -550,12 +575,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
             ViewState::Sync(state) => {
                 let result = match mode {
                     AggregatorReadMode::Aggregated => {
-                        state.versioned_map.aggregators().read(*id, self.txn_idx)
+                        state.read_aggregator_v2_aggregated_value(*id, self.txn_idx)
                     },
                     AggregatorReadMode::LastCommitted => state
-                        .versioned_map
-                        .aggregators()
-                        .read_latest_committed_value(*id),
+                        .read_aggregator_v2_last_committed_value(
+                            *id,
+                            self.txn_idx,
+                            ReadPosition::BeforeCurrentTxn,
+                        ),
                 };
                 result.map_err(|e| {
                     anyhow::Error::new(VMStatus::error(
@@ -567,7 +594,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
             ViewState::Unsync(state) => state.unsync_map.fetch_aggregator(id).ok_or_else(|| {
                 anyhow::Error::new(VMStatus::error(
                     StatusCode::STORAGE_ERROR,
-                    Some("Aggregator doesn't exist".to_string()),
+                    Some(format!("Aggregator for id {:?} doesn't exist", id)),
                 ))
             }),
         }
@@ -621,8 +648,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(e.to_string()))?;
         match &self.latest_view {
+            // TODO are we at this point always supposed to read a value this transaction committed (i.e. AfterCurrentTxn)?
             ViewState::Sync(state) => Ok(state
-                .read_aggregator_v2_committed_value(id)
+                .read_aggregator_v2_last_committed_value(
+                    id,
+                    self.txn_idx,
+                    ReadPosition::AfterCurrentTxn,
+                )
                 .expect("Committed value for ID must always exist")
                 .try_into_move_value(layout)?),
             ViewState::Unsync(_state) => {

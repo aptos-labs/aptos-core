@@ -15,11 +15,16 @@ use crate::{
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
-use aptos_aggregator::{aggregator_change_set::AggregatorChange, delta_change_set::serialize};
+use aptos_aggregator::{
+    aggregator_change_set::{AggregatorChange, ApplyBase},
+    bounded_math::expect_ok,
+    delta_change_set::serialize,
+};
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
     unsync_map::UnsyncMap,
+    versioned_aggregators::CommitError,
     MVHashMap,
 };
 use aptos_state_view::TStateView;
@@ -33,7 +38,7 @@ use num_cpus;
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     marker::PhantomData,
     sync::{
         atomic::AtomicU32,
@@ -137,61 +142,54 @@ where
             .modified_keys(idx_to_execute)
             .map_or(HashMap::new(), |keys| keys.collect());
 
-        let mut prev_modified_aggregators = last_input_output
-            .aggregator_v2_keys(idx_to_execute)
-            .map_or(HashSet::new(), |keys| keys.collect());
+        // let mut prev_modified_aggregators = last_input_output
+        //     .aggregator_v2_keys(idx_to_execute)
+        //     .map_or(HashSet::new(), |keys| keys.collect());
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
-        let mut apply_updates =
-            |output: &E::Output| {
-                // First, apply writes.
-                for (k, v) in output.resource_write_set().into_iter().chain(
-                    output
-                        .aggregator_v1_write_set()
-                        .into_iter()
-                        .map(|(state_key, write_op)| (state_key, (write_op, None))),
-                ) {
-                    if prev_modified_keys.remove(&k).is_none() {
-                        updates_outside = true;
-                    }
-                    versioned_cache
-                        .data()
-                        .write(k, idx_to_execute, incarnation, v);
+        let mut apply_updates = |output: &E::Output| {
+            // First, apply writes.
+            for (k, v) in output.resource_write_set().into_iter().chain(
+                output
+                    .aggregator_v1_write_set()
+                    .into_iter()
+                    .map(|(state_key, write_op)| (state_key, (write_op, None))),
+            ) {
+                if prev_modified_keys.remove(&k).is_none() {
+                    updates_outside = true;
                 }
+                versioned_cache
+                    .data()
+                    .write(k, idx_to_execute, incarnation, v);
+            }
 
-                for (k, v) in output.module_write_set().into_iter() {
-                    if prev_modified_keys.remove(&k).is_none() {
-                        updates_outside = true;
-                    }
-                    versioned_cache.modules().write(k, idx_to_execute, v);
+            for (k, v) in output.module_write_set().into_iter() {
+                if prev_modified_keys.remove(&k).is_none() {
+                    updates_outside = true;
                 }
+                versioned_cache.modules().write(k, idx_to_execute, v);
+            }
 
-                // Then, apply deltas.
-                for (k, d) in output.aggregator_v1_delta_set().into_iter() {
-                    if prev_modified_keys.remove(&k).is_none() {
-                        updates_outside = true;
-                    }
-                    versioned_cache.data().add_delta(k, idx_to_execute, d);
+            // Then, apply deltas.
+            for (k, d) in output.aggregator_v1_delta_set().into_iter() {
+                if prev_modified_keys.remove(&k).is_none() {
+                    updates_outside = true;
                 }
+                versioned_cache.data().add_delta(k, idx_to_execute, d);
+            }
 
-                for (id, change) in output.aggregator_v2_change_set().into_iter() {
-                    if !prev_modified_aggregators.remove(&id) {
-                        updates_outside = true;
-                    }
+            for (id, change) in output.aggregator_v2_change_set().into_iter() {
+                // if !prev_modified_aggregators.remove(&id) {
+                //     updates_outside = true;
+                // }
 
-                    // TODO: figure out if change should update updates_outside
-                    // versioned_cache.aggregators().
-                    match change {
-                        AggregatorChange::Create(value) => versioned_cache
-                            .aggregators()
-                            .create_aggregator(id, idx_to_execute, value),
-                        AggregatorChange::Apply(apply) => versioned_cache
-                            .aggregators()
-                            .record_apply(id, idx_to_execute, apply),
-                    }
-                }
-            };
+                // TODO: figure out if change should update updates_outside
+                versioned_cache
+                    .aggregators()
+                    .record_change(id, idx_to_execute, change);
+            }
+        };
 
         let result = match execute_result {
             // These statuses are the results of speculative execution, so even for
@@ -248,6 +246,8 @@ where
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
+        // Note: we validate delayed field reads only at try_commit.
+
         // TODO: validate modules when there is no r/w fallback.
         let valid = read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
             && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate);
@@ -282,6 +282,7 @@ where
         &self,
         maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
         scheduler_task: &mut SchedulerTask,
@@ -290,6 +291,34 @@ where
         txn_fee_statements: &mut Vec<FeeStatement>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
+            let read_set = last_input_output
+                .read_set(txn_idx)
+                .expect("Read set must be recorded");
+            let mut execution_still_valid =
+                read_set.validate_delayed_field_reads(versioned_cache.aggregators(), txn_idx);
+            if execution_still_valid {
+                if let Some(aggregator_ids) = last_input_output.aggregator_v2_keys(txn_idx) {
+                    if let Err(e) = versioned_cache
+                        .aggregators()
+                        .try_commit(txn_idx, aggregator_ids.collect())
+                    {
+                        match e {
+                            CommitError::ReExecutionNeeded(_) => {
+                                execution_still_valid = false;
+                            },
+                            CommitError::CodeInvariantError(_) => {
+                                // TODO: fallback to sequential execution
+                                panic!();
+                            },
+                        }
+                    }
+                }
+            }
+            if !execution_still_valid {
+                // TODO call to re-execute transaction
+                panic!();
+            }
+
             // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
             let _commit_guard: CommitGuard =
                 CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
@@ -463,6 +492,7 @@ where
                     self.coordinator_commit_hook(
                         self.maybe_block_gas_limit,
                         scheduler,
+                        versioned_cache,
                         post_commit_txs,
                         &mut worker_idx,
                         &mut scheduler_task,
@@ -682,13 +712,62 @@ where
                     {
                         data_map.write(key, write_op);
                     }
+
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
                     counters::update_sequential_txn_gas_counters(&fee_statement);
 
+                    // TODO for materialization, we need to understand what we read,
+                    // or do exchange on every transaction, so this logic might change
+                    let mut second_phase = Vec::new();
+                    let mut updates = HashMap::new();
+                    for (id, change) in output.aggregator_v2_change_set().into_iter() {
+                        match change {
+                            AggregatorChange::Create(value) => {
+                                assert!(
+                                    data_map.fetch_aggregator(&id).is_none(),
+                                    "Sequential execution must not create duplicate aggregators"
+                                );
+                                updates.insert(id, value);
+                            },
+                            AggregatorChange::Apply(apply) => {
+                                match apply.get_apply_base_id(&id) {
+                                    ApplyBase::Previous(base_id) => {
+                                        updates.insert(
+                                            id,
+                                            expect_ok(apply.apply_to_base(
+                                                data_map.fetch_aggregator(&base_id).unwrap(),
+                                            ))
+                                            .unwrap(),
+                                        );
+                                    },
+                                    ApplyBase::Current(base_id) => {
+                                        second_phase.push((id, base_id, apply));
+                                    },
+                                };
+                            },
+                        }
+                    }
+                    for (id, base_id, apply) in second_phase.into_iter() {
+                        updates.insert(
+                            id,
+                            expect_ok(apply.apply_to_base(
+                                updates.get(&base_id).cloned().unwrap_or_else(|| {
+                                    data_map.fetch_aggregator(&base_id).unwrap()
+                                }),
+                            ))
+                            .unwrap(),
+                        );
+                    }
+                    println!("Updates : {:?}", updates);
+                    for (id, value) in updates.into_iter() {
+                        data_map.write_aggregator(id, value);
+                    }
+
                     // No delta writes are needed for sequential execution.
                     output.incorporate_delta_writes(vec![]);
+
                     //
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_transaction_committed(idx as TxnIndex, &output);
