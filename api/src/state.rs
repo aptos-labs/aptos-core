@@ -309,9 +309,11 @@ impl StateApi {
 
                 BasicResponse::try_from_json((resource, &ledger_info, BasicResponseStatus::Ok))
             },
-            AcceptType::Bcs => {
-                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            },
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                bytes.to_vec(),
+                &ledger_info,
+                BasicResponseStatus::Ok,
+            )),
         }
     }
 
@@ -348,7 +350,7 @@ impl StateApi {
 
         match accept_type {
             AcceptType::Json => {
-                let module = MoveModuleBytecode::new(bytes)
+                let module = MoveModuleBytecode::new(bytes.to_vec())
                     .try_parse_abi()
                     .context("Failed to parse move module ABI from bytes retrieved from storage")
                     .map_err(|err| {
@@ -361,9 +363,11 @@ impl StateApi {
 
                 BasicResponse::try_from_json((module, &ledger_info, BasicResponseStatus::Ok))
             },
-            AcceptType::Bcs => {
-                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            },
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                bytes.to_vec(),
+                &ledger_info,
+                BasicResponseStatus::Ok,
+            )),
         }
     }
 
@@ -452,9 +456,11 @@ impl StateApi {
 
                 BasicResponse::try_from_json((move_value, &ledger_info, BasicResponseStatus::Ok))
             },
-            AcceptType::Bcs => {
-                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            },
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                bytes.to_vec(),
+                &ledger_info,
+                BasicResponseStatus::Ok,
+            )),
         }
     }
 
@@ -505,9 +511,11 @@ impl StateApi {
                 "Get raw table item",
                 "Please use get table item instead.",
             )),
-            AcceptType::Bcs => {
-                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
-            },
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                bytes.to_vec(),
+                &ledger_info,
+                BasicResponseStatus::Ok,
+            )),
         }
     }
 

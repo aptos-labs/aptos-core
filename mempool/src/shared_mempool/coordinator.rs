@@ -30,7 +30,7 @@ use aptos_network::{
     },
     protocols::network::Event,
 };
-use aptos_types::on_chain_config::OnChainConfigPayload;
+use aptos_types::on_chain_config::{OnChainConfigPayload, OnChainConfigProvider};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
@@ -45,19 +45,20 @@ use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::IntervalStream;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
-pub(crate) async fn coordinator<NetworkClient, TransactionValidator>(
+pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvider>(
     mut smp: SharedMempool<NetworkClient, TransactionValidator>,
     executor: Handle,
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     mut client_events: MempoolEventsReceiver,
     mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mut mempool_listener: MempoolNotificationListener,
-    mut mempool_reconfig_events: ReconfigNotificationListener,
+    mut mempool_reconfig_events: ReconfigNotificationListener<ConfigProvider>,
     peer_update_interval_ms: u64,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
+    ConfigProvider: OnChainConfigProvider,
 {
     info!(LogSchema::event_log(
         LogEntry::CoordinatorRuntime,
@@ -227,13 +228,14 @@ fn handle_commit_notification<NetworkClient, TransactionValidator>(
 }
 
 /// Spawn a task to restart the transaction validator with the new reconfig data.
-async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator>(
+async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, ConfigProvider>(
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
     bounded_executor: &BoundedExecutor,
-    config_update: OnChainConfigPayload,
+    config_update: OnChainConfigPayload<ConfigProvider>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
+    ConfigProvider: OnChainConfigProvider,
 {
     info!(LogSchema::event_log(
         LogEntry::ReconfigUpdate,

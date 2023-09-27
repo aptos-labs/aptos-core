@@ -7,7 +7,10 @@ use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use evm::backend::MemoryVicinity;
 use evm_exec_utils::{compile, exec::Executor, tracing};
 use move_command_line_common::testing::EXP_EXT;
-use move_compiler::shared::{NumericalAddress, PackagePaths};
+use move_compiler::{
+    attr_derivation,
+    shared::{NumericalAddress, PackagePaths},
+};
 use move_model::{
     model::{FunId, GlobalEnv, QualifiedId},
     options::ModelBuilderOptions,
@@ -46,6 +49,10 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         "Async".to_string(),
         NumericalAddress::parse_str("0x1").unwrap(),
     );
+    let flags = move_compiler::Flags::empty()
+        .set_sources_shadow_deps(true)
+        .set_flavor("async");
+    let known_attributes = attr_derivation::get_known_attributes_for_flavor(&flags);
     let env = run_model_builder_with_options_and_compilation_flags(
         vec![PackagePaths {
             name: None,
@@ -58,9 +65,8 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             named_address_map,
         }],
         ModelBuilderOptions::default(),
-        move_compiler::Flags::empty()
-            .set_sources_shadow_deps(true)
-            .set_flavor("async"),
+        flags,
+        &known_attributes,
     )?;
     for exp in std::iter::once(String::new()).chain(experiments.into_iter()) {
         let mut options = Options {

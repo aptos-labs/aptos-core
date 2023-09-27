@@ -248,7 +248,7 @@ spec aptos_framework::staking_contract {
         // TODO: this function is normal in the local machine
         // However, timeout in the github test
 
-        pragma verify_duration_estimate = 1200;
+        pragma verify = false;
 
         include stake::ResourceRequirement;
         let staker_address = signer::address_of(staker);

@@ -2,7 +2,25 @@
 
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [2.0.3] - 2023/08/02
+## Unreleased
+
+## [2.1.1] - 2023/09/27
+### Added
+- Added an option `--print-metadata` to the command `aptos move download` to print out the metadata of the package to be downloaded.
+  - Example: `aptos move download  --account 0x1 --package AptosFramework --url https://mainnet.aptoslabs.com/v1 --print-metadata`
+### Updated
+- The `--with-faucet` flag has been removed from `aptos node run-local-testnet`, we now run a faucet by default. To disable the faucet use the `--no-faucet` flag.
+- **Breaking change**: When using `aptos node run-local-testnet` we now expose a transaction stream. Learn more about the transaction stream service here: https://aptos.dev/indexer/txn-stream/. Opt out of this with `--no-txn-stream`. This is marked as a breaking change since the CLI now uses a port (50051 by default) that it didn't used to. If you need this port, you can tell the CLI to use a different port with `--txn-stream-port`.
+
+## [2.1.0] - 2023/08/24
+### Updated
+- Updated CLI source compilation to use rust toolchain version 1.71.1 (from 1.71.0).
+### Added
+- Added basic ledger support for CLI
+  - Example: `aptos init --ledger` to create a new profile from ledger. After this, you can use it the same way as other profiles.
+  - Note: `Ledger Nano s Plus` or `Ledger Nano X` is highly recommended.
+
+## [2.0.3] - 2023/08/04
 ### Fixed
 - Fixed the following input arguments issue when running `aptos move view`
   - #8513: Fixed issue where CLI does not work with big numbers

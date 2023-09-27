@@ -8,6 +8,33 @@ use std::{
     ops::{Add, Mul},
 };
 
+/// Enum representing the dynamic form of an expression. Originally, it is in static
+/// form, which is hard to work with. The reason why the dynamic form isn't used as
+/// the default is because of performance issues especially since the Abstract Gas
+/// Algebra is used in the validator code as well. Dynamic Expressions let us work
+/// with expressions when it is not performance critical.
+#[derive(Debug, Clone)]
+pub enum DynamicExpression {
+    //// Represent GasAdd
+    Add {
+        left: Box<DynamicExpression>,
+        right: Box<DynamicExpression>,
+    },
+    //// Represent GasMul
+    Mul {
+        left: Box<DynamicExpression>,
+        right: Box<DynamicExpression>,
+    },
+    //// Represent GasParam
+    GasParam {
+        name: String,
+    },
+    //// Represent GasValue
+    GasValue {
+        value: u64,
+    },
+}
+
 /***************************************************************************************************
  * Gas Expression & Visitor
  *
@@ -37,6 +64,55 @@ pub trait GasExpression<Env> {
             inner: self,
             phantom: PhantomData,
         }
+    }
+
+    fn to_dynamic(&self) -> DynamicExpression {
+        pub struct DynamicExpressionBuilder {
+            //// Holds the AST
+            pub node: Vec<DynamicExpression>,
+        }
+
+        impl GasExpressionVisitor for DynamicExpressionBuilder {
+            fn add(&mut self) {
+                let expr = DynamicExpression::Add {
+                    left: (Box::new(self.node.pop().unwrap())),
+                    right: (Box::new(self.node.pop().unwrap())),
+                };
+                self.node.push(expr);
+            }
+
+            fn mul(&mut self) {
+                let expr = DynamicExpression::Mul {
+                    left: (Box::new(self.node.pop().unwrap())),
+                    right: (Box::new(self.node.pop().unwrap())),
+                };
+                self.node.push(expr);
+            }
+
+            fn gas_param<P>(&mut self) {
+                let tn = std::any::type_name::<P>().split("::");
+                let expr = DynamicExpression::GasParam {
+                    name: (tn.last().unwrap().to_string()),
+                };
+                self.node.push(expr);
+            }
+
+            fn quantity<U>(&mut self, quantity: GasQuantity<U>) {
+                let expr = DynamicExpression::GasValue {
+                    value: (quantity.into()),
+                };
+                self.node.push(expr);
+            }
+
+            fn per<U>(&mut self) {}
+        }
+
+        let mut visitor = DynamicExpressionBuilder { node: Vec::new() };
+        self.visit(&mut visitor);
+        visitor
+            .node
+            .pop()
+            .expect("Failed: there should be a root node in AST")
     }
 }
 

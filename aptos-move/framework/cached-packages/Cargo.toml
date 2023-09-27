@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-framework = { workspace = true }
-aptos-types = { workspace = true, features = ["fuzzing"] }
+aptos-types = { workspace = true }
 bcs = { workspace = true }
 include_dir = { workspace = true }
 move-core-types = { workspace = true }

@@ -47,6 +47,7 @@
   ],
   "liveNow": false,
   "panels": [
+    { "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 26, "title": "System Metrics", "type": "row" },
     {
       "datasource": { "type": "prometheus", "uid": "${Datasource}" },
       "fieldConfig": {
@@ -62,6 +63,7 @@
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -84,7 +86,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 0 },
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 1 },
       "id": 6,
       "options": {
         "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
@@ -114,7 +116,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 8, "y": 0 },
+      "gridPos": { "h": 11, "w": 8, "x": 8, "y": 1 },
       "hiddenSeries": false,
       "id": 2,
       "legend": {
@@ -135,7 +137,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -176,7 +178,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 0 },
+      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 1 },
       "hiddenSeries": false,
       "id": 25,
       "legend": {
@@ -197,7 +199,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -241,7 +243,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 11 },
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 12 },
       "hiddenSeries": false,
       "id": 13,
       "legend": {
@@ -262,7 +264,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -306,7 +308,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 8, "y": 11 },
+      "gridPos": { "h": 11, "w": 8, "x": 8, "y": 12 },
       "hiddenSeries": false,
       "id": 23,
       "legend": {
@@ -327,7 +329,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -370,7 +372,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 11 },
+      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 12 },
       "hiddenSeries": false,
       "id": 24,
       "legend": {
@@ -391,7 +393,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -432,7 +434,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 22 },
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 23 },
       "hiddenSeries": false,
       "id": 22,
       "legend": {
@@ -453,7 +455,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -494,7 +496,7 @@
       "fieldConfig": { "defaults": { "unit": "" }, "overrides": [] },
       "fill": 0,
       "fillGradient": 0,
-      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 22 },
+      "gridPos": { "h": 11, "w": 8, "x": 16, "y": 23 },
       "hiddenSeries": false,
       "id": 16,
       "legend": {
@@ -515,7 +517,7 @@
       "nullPointMode": "null",
       "options": { "alertThreshold": true },
       "percentage": false,
-      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "pluginVersion": "10.1.0-cloud.3.2a3062e8",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -547,9 +549,77 @@
         { "format": "short", "logBase": 1, "show": false }
       ],
       "yaxis": { "align": false }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "id": 27,
+      "panels": [],
+      "title": "Non-K8 mode system metrics",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 80 }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 11, "w": 8, "x": 0, "y": 35 },
+      "id": 28,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
+          "editorMode": "code",
+          "expr": "sum by (kubernetes_pod_name) (node_system_cpu_usage{chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\"})",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "System CPU Usage",
+      "type": "timeseries"
     }
   ],
-  "refresh": "",
+  "refresh": false,
   "schemaVersion": 38,
   "style": "dark",
   "tags": ["aptos-core"],
@@ -754,6 +824,6 @@
   "timezone": "",
   "title": "system",
   "uid": "system",
-  "version": 3,
+  "version": 5,
   "weekStart": ""
 }

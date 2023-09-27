@@ -9,10 +9,7 @@ runs:
     - run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
       shell: bash
 
-    - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # pin@v1
-      with:
-        override: true
-        components: rustfmt, clippy
+    - uses: dsherret/rust-toolchain-file@v1
 
     # rust-cache action will cache ~/.cargo and ./target
     # https://github.com/Swatinem/rust-cache#cache-details
@@ -21,7 +18,7 @@ runs:
 
     - name: install protoc and related tools
       shell: bash
-      run: scripts/dev_setup.sh -b -r
+      run: scripts/dev_setup.sh -b -r -y -P -J -t
 
     - run: echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
       shell: bash
@@ -32,3 +29,8 @@ runs:
       run: |
         git config --global credential.helper store
         echo "${{ inputs.GIT_CREDENTIALS }}" > ~/.git-credentials
+
+    # Display the rust toolchain version being installed
+    - name: Setup rust toolchain
+      shell: bash
+      run: rustup show

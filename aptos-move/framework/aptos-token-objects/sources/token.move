@@ -157,12 +157,12 @@ module aptos_token_objects::token {
         constructor_ref
     }
 
-    /// Generates the collections address based upon the creators address and the collection's name
+    /// Generates the token's address based upon the creator's address, the collection's name and the token's name.
     public fun create_token_address(creator: &address, collection: &String, name: &String): address {
         object::create_object_address(creator, create_token_seed(collection, name))
     }
 
-    /// Named objects are derived from a seed, the collection's seed is its name.
+    /// Named objects are derived from a seed, the token's seed is its name appended to the collection's name.
     public fun create_token_seed(collection: &String, name: &String): vector<u8> {
         assert!(string::length(name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
         let seed = *string::bytes(collection);

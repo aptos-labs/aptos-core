@@ -188,7 +188,7 @@ Basic instruction gas parameters are defined at [`instr.rs`] and include the fol
 | `vec_unpack_base`              | Base cost to unpack a vector             |
 | `vec_unpack_per_expected_elem` | Base cost to unpack a vector per element |
 
-Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas/src/`].
+Additional storage gas parameters are defined in [`table.rs`], [`move_stdlib.rs`], and other assorted source files in [`aptos-gas-schedule/src/`].
 
 ## Storage gas
 
@@ -252,8 +252,8 @@ As of the time of this writing, `min_price_per_gas_unit` in [`transaction.rs`](h
 | Constant                  | Value  |
 |---------------------------|--------|
 | `min_price_per_gas_unit`  | 100    |
-| `max_price_per_gas_unit`  | 10,000 |
-| `gas_unit_scaling_factor` | 10,000 |
+| `max_price_per_gas_unit`  | 10,000,000,000 |
+| `gas_unit_scaling_factor` | 1,000,000 |
 
 See [Payload gas](#payload-gas) for the meaning of these constants.
 
@@ -264,7 +264,7 @@ As of the time of this writing, [`initialize()`] sets the following minimum stor
 | Data style | Operation | Symbol | Minimum internal gas |
 |------------|-----------|--------|----------------------|
 | Per item   | Read      | $r_i$  | 300,000              |
-| Per item   | Create    | $c_i$  | 5,000,000            |
+| Per item   | Create    | $c_i$  | 300,000              |
 | Per item   | Write     | $w_i$  | 300,000              |
 | Per byte   | Read      | $r_b$  | 300                  |
 | Per byte   | Create    | $c_b$  | 5,000                |
@@ -276,7 +276,7 @@ Hence, in terms of octas, initial mainnet gas costs can be estimated as follows 
 | Operation       | Operation | Minimum octas |
 |-----------------|-----------|---------------|
 | Per-item read   | $r_i$     | 3000          |
-| Per-item create | $c_i$     | 50,000        |
+| Per-item create | $c_i$     | 50,000          |
 | Per-item write  | $w_i$     | 3000          |
 | Per-byte read   | $r_b$     | 3             |
 | Per-byte create | $c_b$     | 50            |
@@ -332,7 +332,7 @@ Hence in practice, payload gas is unlikely to be a concern.
 <!--- Alphabetized reference links -->
 
 [#4540]:                           https://github.com/aptos-labs/aptos-core/pull/4540/files
-[`aptos-gas/src/`]:                https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas/src/
+[`aptos-gas-schedule/src/`]:       https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/aptos-gas-schedule/src
 [`aptos_global_constants`]:        https://github.com/aptos-labs/aptos-core/blob/main/config/global-constants/src/lib.rs
 [`base_8192_exponential_curve()`]: https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/storage_gas.md#0x1_storage_gas_base_8192_exponential_curve
 [BCS sequence specification]:      https://github.com/diem/bcs#fixed-and-variable-length-sequences

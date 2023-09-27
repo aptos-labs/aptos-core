@@ -283,7 +283,8 @@ impl<'t> AptosPublicInfo<'t> {
             .unwrap()
             .into_inner()
             .sequence_number();
-        *self.root_account().sequence_number_mut() = root_sequence_number;
+        self.root_account()
+            .set_sequence_number(root_sequence_number);
     }
 }
 

@@ -20,7 +20,9 @@ use aptos_config::{
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519::PublicKey;
-use aptos_event_notifications::{EventSubscriptionService, ReconfigNotificationListener};
+use aptos_event_notifications::{
+    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
+};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::{
@@ -63,7 +65,7 @@ pub struct NetworkBuilder {
     executor: Option<Handle>,
     time_service: TimeService,
     network_context: NetworkContext,
-    discovery_listeners: Option<Vec<DiscoveryChangeListener>>,
+    discovery_listeners: Option<Vec<DiscoveryChangeListener<DbBackedOnChainConfig>>>,
     connectivity_manager_builder: Option<ConnectivityManagerBuilder>,
     health_checker_builder: Option<HealthCheckerBuilder>,
     peer_manager_builder: PeerManagerBuilder,
@@ -370,7 +372,7 @@ impl NetworkBuilder {
         &mut self,
         discovery_method: &DiscoveryMethod,
         pubkey: PublicKey,
-        reconfig_events: Option<ReconfigNotificationListener>,
+        reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     ) {
         let conn_mgr_reqs_tx = self
             .conn_mgr_reqs_tx()

@@ -445,6 +445,8 @@ pub enum Builtin {
     ToU128,
     /// Cast an integer into u256.
     ToU256,
+    /// `nop noplabel`
+    Nop,
 }
 
 /// Enum for different function calls
@@ -1519,6 +1521,7 @@ impl fmt::Display for Builtin {
             Builtin::ToU64 => write!(f, "to_u64"),
             Builtin::ToU128 => write!(f, "to_u128"),
             Builtin::ToU256 => write!(f, "to_u256"),
+            Builtin::Nop => write!(f, "nop;"),
         }
     }
 }

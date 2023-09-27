@@ -2,6 +2,7 @@
 
 use super::types::DAGMessage;
 use aptos_consensus_types::common::Author;
+use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use futures::{
@@ -16,15 +17,16 @@ use std::{
     time::Duration,
 };
 
+#[async_trait]
 pub trait RpcHandler {
     type Request;
     type Response;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
 }
 
 #[async_trait]
-pub trait DAGNetworkSender: Send + Sync {
+pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
     async fn send_rpc(
         &self,
         receiver: Author,
@@ -35,7 +37,7 @@ pub trait DAGNetworkSender: Send + Sync {
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         responders: Vec<Author>,
         message: DAGMessage,
         retry_interval: Duration,
@@ -79,7 +81,7 @@ pub struct RpcWithFallback {
     futures: Pin<
         Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGMessage>> + Send>>>>,
     >,
-    sender: Arc<dyn DAGNetworkSender>,
+    sender: Arc<dyn TDAGNetworkSender>,
     interval: Pin<Box<Interval>>,
 }
 
@@ -89,7 +91,7 @@ impl RpcWithFallback {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
-        sender: Arc<dyn DAGNetworkSender>,
+        sender: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
     ) -> Self {
         Self {
@@ -106,7 +108,7 @@ impl RpcWithFallback {
 }
 
 async fn send_rpc(
-    sender: Arc<dyn DAGNetworkSender>,
+    sender: Arc<dyn TDAGNetworkSender>,
     peer: Author,
     message: DAGMessage,
     timeout: Duration,

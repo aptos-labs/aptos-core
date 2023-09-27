@@ -9,10 +9,8 @@ import {
   TokenClient,
   MaybeHexString,
   OptionalTransactionArgs,
-  TransactionBuilder,
-  TransactionBuilderRemoteABI,
-  TxnBuilderTypes,
   getPropertyValueRaw,
+  Types,
 } from "aptos";
 import { NODE_URL, FAUCET_URL } from "./common";
 import { assert } from "console";
@@ -75,12 +73,10 @@ async function createTokenWithFeePayer(
   property_types?: Array<string>,
   extraArgs?: OptionalTransactionArgs,
 ): Promise<string> {
-  // Build the raw transaction.
-  const builder = new TransactionBuilderRemoteABI(client, { sender: account.address().hex(), ...extraArgs });
-  const rawTxn = await builder.build(
-    "0x3::token::create_token_script",
-    [],
-    [
+  const payload: Types.EntryFunctionPayload = {
+    function: "0x3::token::create_token_script",
+    type_arguments: [],
+    arguments: [
       collectionName,
       name,
       description,
@@ -95,42 +91,19 @@ async function createTokenWithFeePayer(
       getPropertyValueRaw(property_values, property_types),
       property_types,
     ],
-  );
-  // Build the fee payer transaction.
-  const feePayerTxn = new TxnBuilderTypes.FeePayerRawTransaction(
-    rawTxn,
-    [],
-    TxnBuilderTypes.AccountAddress.fromHex(feePayer.address().hex()),
-  );
-  // `account` signs the fee payer raw transaction.
-  const accountSignature = new TxnBuilderTypes.Ed25519Signature(
-    account.signBuffer(TransactionBuilder.getSigningMessage(feePayerTxn)).toUint8Array(),
-  );
-  // Construct the account authenticator.
-  const accountAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-    new TxnBuilderTypes.Ed25519PublicKey(account.signingKey.publicKey),
-    accountSignature,
-  );
-  // `feePayer` signs the fee payer raw transaction.
-  const feePayerSignature = new TxnBuilderTypes.Ed25519Signature(
-    feePayer.signBuffer(TransactionBuilder.getSigningMessage(feePayerTxn)).toUint8Array(),
-  );
-  // Construct the fee payer authenticator.
-  const feePayerAuthenticator = new TxnBuilderTypes.AccountAuthenticatorEd25519(
-    new TxnBuilderTypes.Ed25519PublicKey(feePayer.signingKey.publicKey),
-    feePayerSignature,
-  );
-  // Construct the transaction authenticator.
-  const txAuthenticatorFeePayer = new TxnBuilderTypes.TransactionAuthenticatorFeePayer(accountAuthenticator, [], [], {
-    address: TxnBuilderTypes.AccountAddress.fromHex(feePayer.address().hex()),
-    authenticator: feePayerAuthenticator,
-  });
-  // BCS encodes the raw transaction.
-  const bcsTxn = BCS.bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTxn, txAuthenticatorFeePayer));
-  // Submit the transaction.
-  const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
-  // Return the transaction hash.
-  return transactionRes.hash;
+  };
+
+  // Create a fee payer transaction with the sender, transaction payload, and fee payer account
+  const feePayerTxn = await client.generateFeePayerTransaction(account.address().hex(), payload, feePayer.address());
+
+  // sender and fee payer need to sign the transaction
+  const senderAuthenticator = await client.signMultiTransaction(account, feePayerTxn);
+  const feePayerAuthenticator = await client.signMultiTransaction(feePayer, feePayerTxn);
+
+  // submit gas fee payer transaction
+  const txn = await client.submitFeePayerTransaction(feePayerTxn, senderAuthenticator, feePayerAuthenticator);
+
+  return txn.hash;
 }
 
 /** run our demo! */
@@ -165,36 +138,42 @@ async function main(): Promise<void> {
   await waitForEnter();
 
   // Create a collection on Alice's account
-  console.log("\n=== Alice created a collection ===");
+  console.log("\n=== Alice sent a transaction to create a collection ===");
   const collectionName = "AliceCollection";
-  await ensureTxnSuccess(
-    tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+  let txnHash = await tokenClient.createCollection(
+    alice,
+    collectionName,
+    "Alice's simple collection",
+    "https://aptos.dev",
   );
-  console.log(`Alice's balance: ${await getBalance(alice)} octas`);
-  console.log(`Bob's balance: ${await getBalance(bob)} octas`);
+  let response = await client.waitForTransactionWithResult(txnHash, { checkSuccess: true });
+  let { gas_used, gas_unit_price } = response as any;
+  console.log(`Alice paid the gas fee of ${gas_used * gas_unit_price} octas.`);
+  console.log(`Alice's current balance: ${await getBalance(alice)} octas`);
+  console.log(`Bob's current balance: ${await getBalance(bob)} octas`);
   await waitForEnter();
 
   // Create a token on Alice's account while Bob pays the fee.
-  console.log("\n=== Alice created a token ===");
+  console.log("\n=== Alice sent a transaction to create a token while Bob paid the gas fee ===");
   const tokenName = "Alice Token";
-  await ensureTxnSuccess(
-    createTokenWithFeePayer(
-      bob,
-      alice,
-      collectionName,
-      tokenName,
-      "Alice's simple token",
-      1,
-      "https://aptos.dev/img/nyan.jpeg",
-      1000,
-      alice.address(),
-      0,
-      0,
-      ["key"],
-      ["2"],
-      ["u64"],
-    ),
+  txnHash = await createTokenWithFeePayer(
+    bob,
+    alice,
+    collectionName,
+    tokenName,
+    "Alice's simple token",
+    1,
+    "https://aptos.dev/img/nyan.jpeg",
+    1000,
+    alice.address(),
+    0,
+    0,
+    ["key"],
+    ["2"],
+    ["u64"],
   );
+  response = await client.waitForTransactionWithResult(txnHash, { checkSuccess: true });
+  ({ gas_used, gas_unit_price } = response as any);
   const propertyVersion = 0;
   const tokenId = {
     token_data_id: {
@@ -207,13 +186,14 @@ async function main(): Promise<void> {
   await tokenClient.getCollectionData(alice.address().hex(), collectionName);
   let aliceToken = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
   console.log(`Alice's token amount: ${aliceToken.amount}`);
-  console.log(`Alice's balance: ${await getBalance(alice)} octas`);
-  console.log(`Bob's balance: ${await getBalance(bob)} octas`);
+  console.log(`Bob paid the gas fee of ${gas_used * gas_unit_price} octas.`);
+  console.log(`Alice's current balance: ${await getBalance(alice)} octas`);
+  console.log(`Bob's current balance: ${await getBalance(bob)} octas`);
   await waitForEnter();
 
   // Transfer Token from Alice's Account to Bob's Account with bob paying the fee
-  console.log("\n=== Alice sent the token to Bob while Bob paid the fee ===");
-  const txnHash = await tokenClient.directTransferTokenWithFeePayer(
+  console.log("\n=== Alice sent a transaction to send the token to Bob while Bob paid the gas fee ===");
+  txnHash = await tokenClient.directTransferTokenWithFeePayer(
     alice,
     bob,
     alice.address(),
@@ -224,14 +204,16 @@ async function main(): Promise<void> {
     propertyVersion,
     undefined,
   );
-  await client.waitForTransaction(txnHash, { checkSuccess: true });
+  response = await client.waitForTransactionWithResult(txnHash, { checkSuccess: true });
+  ({ gas_used, gas_unit_price } = response as any);
   aliceToken = await tokenClient.getTokenForAccount(alice.address().hex(), tokenId);
   const bobToken = await tokenClient.getTokenForAccount(bob.address().hex(), tokenId);
   console.log(`Alice's token amount: ${aliceToken.amount}`);
   console.log(`Bob's token amount: ${bobToken.amount}`);
   // Check that Alice did not pay the fee, but Bob did.
-  console.log(`Alice's balance: ${await getBalance(alice)} octas`);
-  console.log(`Bob's balance: ${await getBalance(bob)} octas`);
+  console.log(`Bob paid the gas fee of ${gas_used * gas_unit_price} octas.`);
+  console.log(`Alice's current balance: ${await getBalance(alice)} octas`);
+  console.log(`Bob's current balance: ${await getBalance(bob)} octas`);
   await waitForEnter();
 }
 

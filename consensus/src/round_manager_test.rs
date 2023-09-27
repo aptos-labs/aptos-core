@@ -15,7 +15,7 @@ use crate::{
     },
     metrics_safety_rules::MetricsSafetyRules,
     network::{IncomingBlockRetrievalRequest, NetworkSender},
-    network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
+    network_interface::{CommitMessage, ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
     persistent_liveness_storage::RecoveryData,
@@ -114,8 +114,8 @@ impl NodeSetup {
         RoundState::new(time_interval, time_service, round_timeout_sender)
     }
 
-    fn create_proposer_election(proposers: Vec<Author>) -> Box<dyn ProposerElection + Send + Sync> {
-        Box::new(RotatingProposer::new(proposers, 1))
+    fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {
+        Arc::new(RotatingProposer::new(proposers, 1))
     }
 
     fn create_nodes(
@@ -335,11 +335,14 @@ impl NodeSetup {
     pub async fn next_network_message(&mut self) -> ConsensusMsg {
         match self.next_network_event().await {
             Event::Message(_, msg) => msg,
-            Event::RpcRequest(_, msg, _, _) => panic!(
-                "Unexpected event, got RpcRequest, expected Message: {:?} on node {}",
-                msg,
-                self.identity_desc()
-            ),
+            Event::RpcRequest(_, msg, _, _) if matches!(msg, ConsensusMsg::CommitMessage(_)) => msg,
+            Event::RpcRequest(_, msg, _, _) => {
+                panic!(
+                    "Unexpected event, got RpcRequest, expected Message: {:?} on node {}",
+                    msg,
+                    self.identity_desc()
+                )
+            },
             _ => panic!("Unexpected Network Event"),
         }
     }
@@ -381,6 +384,12 @@ impl NodeSetup {
     pub async fn next_commit_decision(&mut self) -> CommitDecision {
         match self.next_network_message().await {
             ConsensusMsg::CommitDecisionMsg(v) => *v,
+            ConsensusMsg::CommitMessage(d) if matches!(*d, CommitMessage::Decision(_)) => {
+                match *d {
+                    CommitMessage::Decision(d) => d,
+                    _ => unreachable!(),
+                }
+            },
             msg => panic!(
                 "Unexpected Consensus Message: {:?} on node {}",
                 msg,
@@ -1674,11 +1683,11 @@ pub fn forking_retrieval_test() {
 
         println!("Process all local timeouts");
         for node in nodes.iter_mut() {
-            info!("Timeouts on {}", node.id);
+            println!("Timeouts on {}", node.id);
             for i in 0..timeout_votes {
-                info!("Timeout {} on {}", i, node.id);
+                println!("Timeout {} on {}", i, node.id);
                 if node.id == forking_node && (2..4).contains(&i) {
-                    info!("Got {}", node.next_commit_decision().await);
+                    println!("Got {}", node.next_commit_decision().await);
                 }
 
                 let vote_msg_on_timeout = node.next_vote().await;
@@ -1705,7 +1714,7 @@ pub fn forking_retrieval_test() {
             assert!(vote_msg_on_timeout.vote().is_timeout());
         }
 
-        info!("Got {}", nodes[forking_node].next_commit_decision().await);
+        println!("Got {}", nodes[forking_node].next_commit_decision().await);
     });
 
     info!("Create forked block");

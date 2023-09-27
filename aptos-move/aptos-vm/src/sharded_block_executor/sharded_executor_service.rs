@@ -3,8 +3,9 @@
 use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
+        aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
-        counters::{SHARDED_BLOCK_EXECUTION_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
+        counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
@@ -14,12 +15,15 @@ use crate::{
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{ShardId, SubBlock, SubBlocksForShard},
+    block_executor::partitioner::{
+        ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
+    },
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
+use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -41,6 +45,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             rayon::ThreadPoolBuilder::new()
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
+                .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
                 .num_threads(num_threads + 2)
                 .build()
                 .unwrap(),
@@ -54,23 +59,6 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         }
     }
 
-    fn create_cross_shard_state_view<'a>(
-        &self,
-        base_view: &'a S,
-        sub_block: &SubBlock<AnalyzedTransaction>,
-        round_id: usize,
-    ) -> CrossShardStateView<'a, S> {
-        let mut cross_shard_state_key = HashSet::new();
-        for txn in &sub_block.transactions {
-            for (_, storage_locations) in txn.cross_shard_dependencies.required_edges_iter() {
-                for storage_location in storage_locations {
-                    cross_shard_state_key.insert(storage_location.clone().into_state_key());
-                }
-            }
-        }
-        CrossShardStateView::new(self.shard_id, round_id, cross_shard_state_key, base_view)
-    }
-
     fn execute_sub_block(
         &self,
         sub_block: SubBlock<AnalyzedTransaction>,
@@ -79,6 +67,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         concurrency_level: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        disable_speculative_logging();
         trace!(
             "executing sub block for shard {} and round {}",
             self.shard_id,
@@ -86,15 +75,46 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         );
         let cross_shard_commit_sender =
             CrossShardCommitSender::new(self.shard_id, self.cross_shard_client.clone(), &sub_block);
+        Self::execute_transactions_with_dependencies(
+            Some(self.shard_id),
+            self.executor_thread_pool.clone(),
+            sub_block.into_transactions_with_deps(),
+            self.cross_shard_client.clone(),
+            Some(cross_shard_commit_sender),
+            round,
+            state_view,
+            concurrency_level,
+            maybe_block_gas_limit,
+        )
+    }
 
+    pub fn execute_transactions_with_dependencies(
+        shard_id: Option<ShardId>, // None means execution on global shard
+        executor_thread_pool: Arc<rayon::ThreadPool>,
+        transactions: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+        cross_shard_client: Arc<dyn CrossShardClient>,
+        cross_shard_commit_sender: Option<CrossShardCommitSender>,
+        round: usize,
+        state_view: &S,
+        concurrency_level: usize,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let (callback, callback_receiver) = oneshot::channel();
 
-        let cross_shard_state_view =
-            Arc::new(self.create_cross_shard_state_view(state_view, &sub_block, round));
+        let cross_shard_state_view = Arc::new(CrossShardStateView::create_cross_shard_state_view(
+            state_view,
+            &transactions,
+        ));
+
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
-        let cross_shard_client = self.cross_shard_client.clone();
         let cross_shard_client_clone = cross_shard_client.clone();
-        self.executor_thread_pool.scope(|s| {
+
+        let aggr_overridden_state_view = Arc::new(AggregatorOverriddenStateView::new(
+            cross_shard_state_view.as_ref(),
+            TOTAL_SUPPLY_AGGR_BASE_VAL,
+        ));
+
+        executor_thread_pool.clone().scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
                     cross_shard_state_view_clone,
@@ -104,28 +124,33 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             });
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
-                    self.executor_thread_pool.clone(),
-                    sub_block
-                        .into_txns()
+                    executor_thread_pool,
+                    transactions
                         .into_iter()
-                        .map(|txn| txn.into_txn())
+                        .map(|txn| txn.into_txn().into_txn())
                         .collect(),
-                    cross_shard_state_view.as_ref(),
+                    aggr_overridden_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
-                    Some(cross_shard_commit_sender),
+                    cross_shard_commit_sender,
                 );
-                trace!(
-                    "executed sub block for shard {} and round {}",
-                    self.shard_id,
-                    round
-                );
-                // Send a self message to stop the cross-shard commit receiver.
-                cross_shard_client_clone.send_cross_shard_msg(
-                    self.shard_id,
-                    round,
-                    CrossShardMsg::StopMsg,
-                );
+                if let Some(shard_id) = shard_id {
+                    trace!(
+                        "executed sub block for shard {} and round {}",
+                        shard_id,
+                        round
+                    );
+                    // Send a self message to stop the cross-shard commit receiver.
+                    cross_shard_client_clone.send_cross_shard_msg(
+                        shard_id,
+                        round,
+                        CrossShardMsg::StopMsg,
+                    );
+                } else {
+                    trace!("executed block for global shard and round {}", round);
+                    // Send a self message to stop the cross-shard commit receiver.
+                    cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
+                }
                 callback.send(ret).unwrap();
             });
         });
@@ -141,7 +166,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     ) -> Result<Vec<Vec<TransactionOutput>>, VMStatus> {
         let mut result = vec![];
         for (round, sub_block) in transactions.into_sub_blocks().into_iter().enumerate() {
-            let _timer = SHARDED_BLOCK_EXECUTION_SECONDS
+            let _timer = SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS
                 .with_label_values(&[&self.shard_id.to_string(), &round.to_string()])
                 .start_timer();
             SHARDED_BLOCK_EXECUTOR_TXN_COUNT

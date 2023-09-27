@@ -10,10 +10,7 @@ use aptos_forge::{
 };
 use aptos_logger::info;
 use rand::SeedableRng;
-use std::{
-    fmt::{self, Debug, Display},
-    time::Duration,
-};
+use std::{fmt::Debug, time::Duration};
 use tokio::runtime::Runtime;
 
 pub struct SingleRunStats {
@@ -24,6 +21,7 @@ pub struct SingleRunStats {
     actual_duration: Duration,
 }
 
+#[derive(Debug)]
 pub enum Workloads {
     TPS(&'static [usize]),
     TRANSACTIONS(&'static [TransactionWorkload]),
@@ -37,10 +35,29 @@ impl Workloads {
         }
     }
 
-    fn name(&self, index: usize) -> String {
+    fn type_name(&self) -> String {
         match self {
-            Self::TPS(tpss) => tpss[index].to_string(),
-            Self::TRANSACTIONS(workloads) => workloads[index].to_string(),
+            Self::TPS(_) => "Load (TPS)".to_string(),
+            Self::TRANSACTIONS(_) => "Workload".to_string(),
+        }
+    }
+
+    fn phase_name(&self, index: usize, phase: usize) -> String {
+        match self {
+            Self::TPS(tpss) => {
+                assert_eq!(phase, 0);
+                format!("{}", tpss[index])
+            },
+            Self::TRANSACTIONS(workloads) => format!(
+                "{}{}: {}",
+                index,
+                if workloads[index].is_phased() {
+                    format!(": ph{}", phase)
+                } else {
+                    "".to_string()
+                },
+                workloads[index].phase_name(phase)
+            ),
         }
     }
 
@@ -57,16 +74,23 @@ pub struct TransactionWorkload {
     pub transaction_type: TransactionTypeArg,
     pub num_modules: usize,
     pub unique_senders: bool,
+    pub mempool_backlog: usize,
 }
 
 impl TransactionWorkload {
+    fn is_phased(&self) -> bool {
+        self.unique_senders
+    }
+
     fn configure(&self, request: EmitJobRequest) -> EmitJobRequest {
         let account_creation_type =
             TransactionTypeArg::AccountGenerationLargePool.materialize(1, false);
 
-        if self.unique_senders {
-            request.transaction_type(self.transaction_type.materialize(self.num_modules, false))
-        } else {
+        let request = request.mode(EmitJobMode::MaxLoad {
+            mempool_backlog: self.mempool_backlog,
+        });
+
+        if self.is_phased() {
             let write_type = self.transaction_type.materialize(self.num_modules, true);
             request.transaction_mix_per_phase(vec![
                 // warmup
@@ -76,13 +100,27 @@ impl TransactionWorkload {
                 // cooldown
                 vec![(write_type, 1)],
             ])
+        } else {
+            request.transaction_type(self.transaction_type.materialize(self.num_modules, false))
         }
     }
-}
 
-impl Display for TransactionWorkload {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Debug::fmt(self, f)
+    fn phase_name(&self, phase: usize) -> String {
+        format!(
+            "{}{}[{:.1}k]",
+            match (self.is_phased(), phase) {
+                (true, 0) => "CreateBurnerAccounts".to_string(),
+                (true, 1) => format!("{:?}", self.transaction_type),
+                (false, 0) => format!("{:?}", self.transaction_type),
+                _ => unreachable!(),
+            },
+            if self.num_modules > 1 {
+                format!("({} modules)", self.num_modules)
+            } else {
+                "".to_string()
+            },
+            self.mempool_backlog as f32 / 1000.0,
+        )
     }
 }
 
@@ -120,14 +158,9 @@ impl LoadVsPerfBenchmark {
         )?;
 
         let mut result = vec![];
-        let phased = stats_by_phase.len() > 1;
         for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
             result.push(SingleRunStats {
-                name: if phased {
-                    format!("{}_phase_{}", workloads.name(index), phase)
-                } else {
-                    workloads.name(index)
-                },
+                name: workloads.phase_name(index, phase),
                 stats: phase_stats.emitter_stats,
                 latency_breakdown: phase_stats.latency_breakdown,
                 ledger_transactions: phase_stats.ledger_transactions,
@@ -163,37 +196,34 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 std::thread::sleep(buffer);
             }
 
-            info!("Starting for {}", self.workloads.name(index));
-            results.append(&mut self.evaluate_single(
-                ctx,
-                &self.workloads,
-                index,
-                individual_duration,
-            )?);
+            info!("Starting for {:?}", self.workloads);
+            results.push(self.evaluate_single(ctx, &self.workloads, index, individual_duration)?);
 
             // Note: uncomment below to perform reconfig during a test
             // let mut aptos_info = ctx.swarm().aptos_public_info();
             // runtime.block_on(aptos_info.reconfig());
 
-            let table = to_table(&results);
+            let table = to_table(self.workloads.type_name(), &results);
             for line in table {
                 info!("{}", line);
             }
         }
 
-        let table = to_table(&results);
+        let table = to_table(self.workloads.type_name(), &results);
         for line in table {
             ctx.report.report_text(line);
         }
         for (index, result) in results.iter().enumerate() {
-            let rate = result.stats.rate();
+            // always take last phase for success criteria
+            let target_result = &result[result.len() - 1];
+            let rate = target_result.stats.rate();
             if let Some(criteria) = self.criteria.get(index) {
                 SuccessCriteriaChecker::check_core_for_success(
                     criteria,
                     ctx.report,
                     &rate,
-                    Some(&result.latency_breakdown),
-                    Some(result.name.clone()),
+                    Some(&target_result.latency_breakdown),
+                    Some(target_result.name.clone()),
                 )?;
             }
         }
@@ -201,11 +231,11 @@ impl NetworkTest for LoadVsPerfBenchmark {
     }
 }
 
-fn to_table(results: &[SingleRunStats]) -> Vec<String> {
+fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
     let mut table = Vec::new();
     table.push(format!(
-        "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
-        "workload",
+        "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        type_name,
         "submitted/s",
         "committed/s",
         "expired/s",
@@ -218,30 +248,32 @@ fn to_table(results: &[SingleRunStats]) -> Vec<String> {
         "batch->pos",
         "pos->prop",
         "prop->order",
-        "prop->commit",
+        "order->commit",
         "actual dur"
     ));
 
-    for result in results {
-        let rate = result.stats.rate();
-        table.push(format!(
-            "{: <30} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
-            result.name,
-            rate.submitted,
-            rate.committed,
-            rate.expired,
-            rate.failed_submission,
-            result.ledger_transactions / result.actual_duration.as_secs(),
-            rate.latency,
-            rate.p50_latency,
-            rate.p90_latency,
-            rate.p99_latency,
-            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).max_sample(),
-            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).max_sample(),
-            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).max_sample(),
-            result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).max_sample(),
-            result.actual_duration.as_secs()
-        ));
+    for run_results in results {
+        for result in run_results {
+            let rate = result.stats.rate();
+            table.push(format!(
+                "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12.3} | {: <12}",
+                result.name,
+                rate.submitted,
+                rate.committed,
+                rate.expired,
+                rate.failed_submission,
+                result.ledger_transactions / result.actual_duration.as_secs(),
+                rate.latency,
+                rate.p50_latency,
+                rate.p90_latency,
+                rate.p99_latency,
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsBatchToPos).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::QsPosToProposal).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusProposalToOrdered).max_sample(),
+                result.latency_breakdown.get_samples(&LatencyBreakdownSlice::ConsensusOrderedToCommit).max_sample(),
+                result.actual_duration.as_secs()
+            ));
+        }
     }
 
     table

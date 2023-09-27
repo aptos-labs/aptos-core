@@ -23,7 +23,7 @@ use aptos_consensus_types::{
     sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
-use aptos_executor_types::{Error, StateComputeResult};
+use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
@@ -370,7 +370,7 @@ impl BlockStore {
 
         let executed_block = match self.execute_block(block.clone()).await {
             Ok(res) => Ok(res),
-            Err(Error::BlockNotFound(parent_block_id)) => {
+            Err(ExecutorError::BlockNotFound(parent_block_id)) => {
                 // recover the block tree in executor
                 let blocks_to_reexecute = self
                     .path_from_ordered_root(parent_block_id)
@@ -406,7 +406,7 @@ impl BlockStore {
         self.inner.write().insert_block(executed_block)
     }
 
-    async fn execute_block(&self, block: Block) -> anyhow::Result<ExecutedBlock, Error> {
+    async fn execute_block(&self, block: Block) -> ExecutorResult<ExecutedBlock> {
         // Although NIL blocks don't have a payload, we still send a T::default() to compute
         // because we may inject a block prologue transaction.
         let state_compute_result = self

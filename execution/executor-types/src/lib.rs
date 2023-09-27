@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #![forbid(unsafe_code)]
 
+use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
 use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
@@ -22,9 +23,9 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-pub use error::Error;
-pub use executed_block::ExecutedBlock;
+pub use error::{ExecutorError, ExecutorResult};
 pub use executed_chunk::ExecutedChunk;
+pub use ledger_update_output::LedgerUpdateOutput;
 pub use parsed_transaction_output::ParsedTransactionOutput;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -38,10 +39,12 @@ use std::{
 };
 
 mod error;
-mod executed_block;
 mod executed_chunk;
+pub mod execution_output;
 pub mod in_memory_state_calculator;
+mod ledger_update_output;
 mod parsed_transaction_output;
+pub mod state_checkpoint_output;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
@@ -87,13 +90,34 @@ pub trait BlockExecutorTrait: Send + Sync {
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
     fn reset(&self) -> Result<()>;
 
-    /// Executes a block.
+    /// Executes a block - TBD, this API will be removed in favor of `execute_and_state_checkpoint`, followed
+    /// by `ledger_update` once we have ledger update as a separate pipeline phase.
     fn execute_block(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<StateComputeResult, Error>;
+    ) -> ExecutorResult<StateComputeResult> {
+        let block_id = block.block_id;
+        let state_checkpoint_output =
+            self.execute_and_state_checkpoint(block, parent_block_id, maybe_block_gas_limit)?;
+        self.ledger_update(block_id, parent_block_id, state_checkpoint_output)
+    }
+
+    /// Executes a block and returns the state checkpoint output.
+    fn execute_and_state_checkpoint(
+        &self,
+        block: ExecutableBlock,
+        parent_block_id: HashValue,
+        maybe_block_gas_limit: Option<u64>,
+    ) -> ExecutorResult<StateCheckpointOutput>;
+
+    fn ledger_update(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+        state_checkpoint_output: StateCheckpointOutput,
+    ) -> ExecutorResult<StateComputeResult>;
 
     /// Saves eligible blocks to persistent storage.
     /// If we have multiple blocks and not all of them have signatures, we may send them to storage
@@ -109,13 +133,13 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<(), Error>;
+    ) -> ExecutorResult<()>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,

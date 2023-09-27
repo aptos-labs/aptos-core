@@ -12,8 +12,8 @@ use crate::{
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
-        transaction_not_found_by_version, BadRequestError, BasicError, BasicErrorWith404,
-        BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
+        transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
+        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
         InsufficientStorageError, InternalError,
     },
     ApiTags,
@@ -38,7 +38,7 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsExecutorView, AptosVM};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -700,15 +700,18 @@ impl TransactionsApi {
                     AptosErrorCode::InternalError,
                     &ledger_info,
                 )
-            })?
-            .context(format!(
-                "Failed to find transaction at version: {}",
-                version
-            ))
-            .map_err(|_| transaction_not_found_by_version(version.0, &ledger_info))?;
+            })?;
 
-        self.get_transaction_inner(accept_type, txn_data, &ledger_info)
-            .await
+        match txn_data {
+            GetByVersionResponse::Found(txn_data) => {
+                self.get_transaction_inner(accept_type, txn_data, &ledger_info)
+                    .await
+            },
+            GetByVersionResponse::VersionTooNew => {
+                Err(transaction_not_found_by_version(version.0, &ledger_info))
+            },
+            GetByVersionResponse::VersionTooOld => Err(version_pruned(version.0, &ledger_info)),
+        }
     }
 
     /// Converts a transaction into the outgoing type
@@ -766,11 +769,14 @@ impl TransactionsApi {
         &self,
         version: u64,
         ledger_info: &LedgerInfo,
-    ) -> anyhow::Result<Option<TransactionData>> {
+    ) -> anyhow::Result<GetByVersionResponse> {
         if version > ledger_info.version() {
-            return Ok(None);
+            return Ok(GetByVersionResponse::VersionTooNew);
         }
-        Ok(Some(
+        if version < ledger_info.oldest_version() {
+            return Ok(GetByVersionResponse::VersionTooOld);
+        }
+        Ok(GetByVersionResponse::Found(
             self.context
                 .get_transaction_by_version(version, ledger_info.version())?
                 .into(),
@@ -1181,8 +1187,8 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let move_resolver = state_view.as_move_resolver();
-        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (_, output) =
+            AptosVM::simulate_signed_transaction(&txn, &state_view.as_executor_view());
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)
@@ -1324,4 +1330,10 @@ fn override_gas_parameters(
 
     // TODO: Check that signature is null, this would just be helpful for downstream use
     SignedTransaction::new_with_authenticator(raw_txn, signed_txn.authenticator())
+}
+
+enum GetByVersionResponse {
+    VersionTooNew,
+    VersionTooOld,
+    Found(TransactionData),
 }

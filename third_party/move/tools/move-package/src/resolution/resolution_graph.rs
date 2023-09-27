@@ -23,8 +23,7 @@ use move_command_line_common::files::{
 use move_compiler::command_line::DEFAULT_OUTPUT_DIR;
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::Symbol;
-use petgraph::{algo, graphmap::DiGraphMap, Outgoing};
-use ptree::{print_tree, TreeBuilder};
+use petgraph::{algo, graphmap::DiGraphMap};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
@@ -179,7 +178,7 @@ impl ResolvingGraph {
             bail!(
                 "Unresolved addresses found: [\n{}\n]\n\
                 To fix this, add an entry for each unresolved address to the [addresses] section of {}/Move.toml: \
-                e.g.,\n[addresses]\nStd = \"0x1\"\n\
+                e.g.,\n[addresses]\nstd = \"0x1\"\n\
                 Alternatively, you can also define [dev-addresses] and call with the --dev flag",
                 unresolved_addresses.join("\n"),
                 root_package_path.to_string_lossy()
@@ -828,30 +827,6 @@ impl ResolvingNamedAddress {
 impl ResolvedGraph {
     pub fn get_package(&self, package_ident: &PackageName) -> &ResolvedPackage {
         self.package_table.get(package_ident).unwrap()
-    }
-
-    fn print_info_dfs(&self, current_node: &PackageName, tree: &mut TreeBuilder) -> Result<()> {
-        let pkg = self.package_table.get(current_node).unwrap();
-
-        for (name, addr) in &pkg.resolution_table {
-            tree.add_empty_child(format!("{}:0x{}", name, addr.short_str_lossless()));
-        }
-
-        for node in self.graph.neighbors_directed(*current_node, Outgoing) {
-            tree.begin_child(node.to_string());
-            self.print_info_dfs(&node, tree)?;
-            tree.end_child();
-        }
-        Ok(())
-    }
-
-    pub fn print_info(&self) -> Result<()> {
-        let root = self.root_package.package.name;
-        let mut tree = TreeBuilder::new(root.to_string());
-        self.print_info_dfs(&root, &mut tree)?;
-        let tree = tree.build();
-        print_tree(&tree)?;
-        Ok(())
     }
 
     pub fn extract_named_address_mapping(

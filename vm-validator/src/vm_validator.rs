@@ -12,7 +12,6 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_view::AccountView,
-    on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::AptosVM;
@@ -30,7 +29,7 @@ pub trait TransactionValidation: Send + Sync + Clone {
     fn validate_transaction(&self, _txn: SignedTransaction) -> Result<VMValidatorResult>;
 
     /// Restart the transaction validation instance
-    fn restart(&mut self, config: OnChainConfigPayload) -> Result<()>;
+    fn restart(&mut self) -> Result<()>;
 
     /// Notify about new commit
     fn notify_commit(&mut self);
@@ -77,7 +76,7 @@ impl TransactionValidation for VMValidator {
         Ok(self.vm.validate_transaction(txn, &self.state_view))
     }
 
-    fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
+    fn restart(&mut self) -> Result<()> {
         self.notify_commit();
 
         self.vm = AptosVM::new_for_validation(&self.state_view);

@@ -19,12 +19,13 @@ move-ir-types = { path = "../move-ir/types" }
 move-model = { path = "../move-model" }
 # move dependencies
 move-prover-boogie-backend = { path = "boogie-backend" }
-move-stackless-bytecode = { path = "bytecode" }
+move-prover-bytecode-pipeline = { path = "bytecode-pipeline" }
+move-stackless-bytecode = { path = "../move-model/bytecode" }
 
 # external dependencies
 async-trait = "0.1.42"
 atty = "0.2.14"
-clap = { version = "4.3.5", features = ["derive"] }
+clap = { version = "4.3.9", features = ["derive"] }
 codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 futures = "0.3.12"

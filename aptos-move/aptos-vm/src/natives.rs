@@ -3,15 +3,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]
-use aptos_framework::natives::cryptography::algebra::AlgebraContext;
+use anyhow::Error;
+#[cfg(feature = "testing")]
+use aptos_aggregator::{
+    aggregator_extension::AggregatorID,
+    resolver::{AggregatorReadMode, TAggregatorView},
+};
+#[cfg(feature = "testing")]
+use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
-use aptos_types::chain_id::ChainId;
+use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures},
 };
+#[cfg(feature = "testing")]
+use aptos_types::{
+    chain_id::ChainId,
+    state_store::{state_key::StateKey, state_value::StateValue},
+};
+#[cfg(feature = "testing")]
+use bytes::Bytes;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -21,12 +35,39 @@ use {
         transaction_context::NativeTransactionContext,
     },
     move_vm_runtime::native_extensions::NativeContextExtensions,
-    move_vm_test_utils::BlankStorage,
     once_cell::sync::Lazy,
 };
 
 #[cfg(feature = "testing")]
-static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
+struct AptosBlankStorage;
+
+#[cfg(feature = "testing")]
+impl TAggregatorView for AptosBlankStorage {
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = AggregatorID;
+
+    fn get_aggregator_v1_state_value(
+        &self,
+        _id: &Self::IdentifierV1,
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<Option<StateValue>> {
+        Ok(None)
+    }
+}
+
+#[cfg(feature = "testing")]
+impl TableResolver for AptosBlankStorage {
+    fn resolve_table_entry(
+        &self,
+        _handle: &TableHandle,
+        _key: &[u8],
+    ) -> Result<Option<Bytes>, Error> {
+        Ok(None)
+    }
+}
+
+#[cfg(feature = "testing")]
+static DUMMY_RESOLVER: Lazy<AptosBlankStorage> = Lazy::new(|| AptosBlankStorage);
 
 pub fn aptos_natives(
     gas_feature_version: u64,
@@ -43,17 +84,21 @@ pub fn aptos_natives(
         features,
     );
 
+    aptos_natives_with_builder(&mut builder)
+}
+
+pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunctionTable {
     #[allow(unreachable_code)]
-    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, &mut builder)
+    aptos_move_stdlib::natives::all_natives(CORE_CODE_ADDRESS, builder)
         .into_iter()
         .filter(|(_, name, _, _)| name.as_str() != "vector")
         .chain(aptos_framework::natives::all_natives(
             CORE_CODE_ADDRESS,
-            &builder,
+            builder,
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
-            &mut builder,
+            builder,
         ))
         .collect()
 }
@@ -109,4 +154,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
+    exts.add(NativeEventContext::default());
 }

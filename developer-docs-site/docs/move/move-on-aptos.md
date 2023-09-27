@@ -33,9 +33,10 @@ Each deployment of the MoveVM has the ability to extend the core MoveVM with add
 
 The Aptos Move adapter features include:
 * [Move Objects](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-10.md) that offer an extensible programming model for globally access to heterogeneous set of resources stored at a single address on-chain.
+* [Cryptography primitives](./move-on-aptos/cryptography) for building scalable, privacy-preserving dapps.
 * [Resource accounts](./move-on-aptos/resource-accounts) that offer programmable accounts on-chain, which can be useful for DAOs (decentralized autonomous organizations), shared accounts, or building complex applications on-chain.
-* [Tables](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for storing key, value data within an account at scale
-* Parallelism via [Block-STM](https://medium.com/aptoslabs/block-stm-how-we-execute-over-160k-transactions-per-second-on-the-aptos-blockchain-3b003657e4ba) that enables concurrent execution of transactions without any input from the user
+* [Tables](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for storing key, value data within an account at scale.
+* Parallelism via [Block-STM](https://medium.com/aptoslabs/block-stm-how-we-execute-over-160k-transactions-per-second-on-the-aptos-blockchain-3b003657e4ba) that enables concurrent execution of transactions without any input from the user.
 
 The Aptos framework ships with many useful libraries:
 * A [Token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
@@ -66,7 +67,7 @@ Use these external resources to learn about the Move programming language:
 
 * [Teach yourself Move on Aptos](https://github.com/econia-labs/teach-yourself-move).
 * [Formal Verification, the Move Language, and the Move Prover](https://www.certik.com/resources/blog/2wSOZ3mC55AB6CYol6Q2rP-formal-verification-the-move-language-and-the-move-prover)
-* [IMCODING Move Tutorials](https://imcoding.online/courses/move-language)
+* [IMCODING Move Tutorials](https://www.imcoding.online/tutorials?tag=Aptos)
 * [Pontem Move Playground](https://playground.pontem.network/)
 * [Collection of nestable Move resources](https://github.com/taoheorg/taohe)
 * [Move-Lang tag on Stack Overflow](https://stackoverflow.com/questions/tagged/move-lang)

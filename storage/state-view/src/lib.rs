@@ -19,8 +19,8 @@ use aptos_types::{
     },
     transaction::Version,
 };
+use bytes::Bytes;
 use std::ops::Deref;
-
 pub mod account_with_state_cache;
 pub mod account_with_state_view;
 pub mod in_memory_state_view;
@@ -37,17 +37,13 @@ pub trait TStateView {
     }
 
     /// Gets the state value bytes for a given state key.
-    fn get_state_value_bytes(&self, state_key: &Self::Key) -> Result<Option<Vec<u8>>> {
+    fn get_state_value_bytes(&self, state_key: &Self::Key) -> Result<Option<Bytes>> {
         let val_opt = self.get_state_value(state_key)?;
-        Ok(val_opt.map(|val| val.into_bytes()))
+        Ok(val_opt.map(|val| val.bytes().clone()))
     }
 
     /// Gets the state value for a given state key.
     fn get_state_value(&self, state_key: &Self::Key) -> Result<Option<StateValue>>;
-
-    /// VM needs this method to know whether the current state view is for genesis state creation.
-    /// Currently TransactionPayload::WriteSet is only valid for genesis state creation.
-    fn is_genesis(&self) -> bool;
 
     /// Get state storage usage info at epoch ending.
     fn get_usage(&self) -> Result<StateStorageUsage>;
@@ -86,10 +82,6 @@ where
 
     fn get_state_value(&self, state_key: &K) -> Result<Option<StateValue>> {
         self.deref().get_state_value(state_key)
-    }
-
-    fn is_genesis(&self) -> bool {
-        self.deref().is_genesis()
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {

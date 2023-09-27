@@ -22,6 +22,7 @@ aptos-gas-algebra = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
 
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }

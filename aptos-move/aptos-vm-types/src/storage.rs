@@ -16,7 +16,7 @@ use move_core_types::{
     gas_algebra::{
         InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs, NumBytes,
     },
-    vm_status::{StatusCode, VMStatus},
+    vm_status::{err_msg, StatusCode, VMStatus},
 };
 use std::fmt::Debug;
 
@@ -96,10 +96,6 @@ pub struct StoragePricingV2 {
 }
 
 impl StoragePricingV2 {
-    pub fn zeros() -> Self {
-        Self::new_without_storage_curves(LATEST_GAS_FEATURE_VERSION, &AptosGasParameters::zeros())
-    }
-
     pub fn new_with_storage_curves(
         feature_version: u64,
         storage_gas_schedule: &StorageGasSchedule,
@@ -114,22 +110,6 @@ impl StoragePricingV2 {
             per_byte_read: storage_gas_schedule.per_byte_read.into(),
             per_byte_create: storage_gas_schedule.per_byte_create.into(),
             per_byte_write: storage_gas_schedule.per_byte_write.into(),
-        }
-    }
-
-    pub fn new_without_storage_curves(
-        feature_version: u64,
-        gas_params: &AptosGasParameters,
-    ) -> Self {
-        Self {
-            feature_version,
-            free_write_bytes_quota: Self::get_free_write_bytes_quota(feature_version, gas_params),
-            per_item_read: gas_params.vm.txn.storage_io_per_state_slot_read,
-            per_item_create: gas_params.vm.txn.storage_io_per_state_slot_write,
-            per_item_write: gas_params.vm.txn.storage_io_per_state_slot_write,
-            per_byte_read: gas_params.vm.txn.storage_io_per_state_byte_read,
-            per_byte_create: gas_params.vm.txn.storage_io_per_state_byte_write,
-            per_byte_write: gas_params.vm.txn.storage_io_per_state_byte_write,
         }
     }
 
@@ -253,10 +233,10 @@ impl StoragePricing {
                     gas_params,
                 )),
             },
-            10.. => V2(StoragePricingV2::new_without_storage_curves(
+            10.. => V3(StoragePricingV3 {
                 feature_version,
-                gas_params,
-            )),
+                free_write_bytes_quota: gas_params.vm.txn.free_write_bytes_quota,
+            }),
         }
     }
 
@@ -302,11 +282,19 @@ pub struct ChangeSetConfigs {
     max_bytes_all_write_ops_per_transaction: u64,
     max_bytes_per_event: u64,
     max_bytes_all_events_per_transaction: u64,
+    max_write_ops_per_transaction: u64,
 }
 
 impl ChangeSetConfigs {
     pub fn unlimited_at_gas_feature_version(gas_feature_version: u64) -> Self {
-        Self::new_impl(gas_feature_version, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+        Self::new_impl(
+            gas_feature_version,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        )
     }
 
     pub fn new(feature_version: u64, gas_params: &AptosGasParameters) -> Self {
@@ -325,6 +313,7 @@ impl ChangeSetConfigs {
         max_bytes_all_write_ops_per_transaction: u64,
         max_bytes_per_event: u64,
         max_bytes_all_events_per_transaction: u64,
+        max_write_ops_per_transaction: u64,
     ) -> Self {
         Self {
             gas_feature_version,
@@ -332,6 +321,7 @@ impl ChangeSetConfigs {
             max_bytes_all_write_ops_per_transaction,
             max_bytes_per_event,
             max_bytes_all_events_per_transaction,
+            max_write_ops_per_transaction,
         }
     }
 
@@ -347,24 +337,18 @@ impl ChangeSetConfigs {
     fn for_feature_version_3() -> Self {
         const MB: u64 = 1 << 20;
 
-        Self::new_impl(3, MB, u64::MAX, MB, 10 * MB)
+        Self::new_impl(3, MB, u64::MAX, MB, 10 * MB, u64::MAX)
     }
 
     fn from_gas_params(gas_feature_version: u64, gas_params: &AptosGasParameters) -> Self {
+        let params = &gas_params.vm.txn;
         Self::new_impl(
             gas_feature_version,
-            gas_params.vm.txn.max_bytes_per_write_op.into(),
-            gas_params
-                .vm
-                .txn
-                .max_bytes_all_write_ops_per_transaction
-                .into(),
-            gas_params.vm.txn.max_bytes_per_event.into(),
-            gas_params
-                .vm
-                .txn
-                .max_bytes_all_events_per_transaction
-                .into(),
+            params.max_bytes_per_write_op.into(),
+            params.max_bytes_all_write_ops_per_transaction.into(),
+            params.max_bytes_per_event.into(),
+            params.max_bytes_all_events_per_transaction.into(),
+            params.max_write_ops_per_transaction.into(),
         )
     }
 }
@@ -372,6 +356,12 @@ impl ChangeSetConfigs {
 impl CheckChangeSet for ChangeSetConfigs {
     fn check_change_set(&self, change_set: &VMChangeSet) -> Result<(), VMStatus> {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
+
+        if self.max_write_ops_per_transaction != 0
+            && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
+        {
+            return Err(VMStatus::error(ERR, err_msg("Too many write ops.")));
+        }
 
         let mut write_set_size = 0;
         for (key, op) in change_set.write_set_iter() {
@@ -424,9 +414,12 @@ impl StorageGasParameters {
         }
     }
 
-    pub fn free_and_unlimited() -> Self {
+    pub fn unlimited(free_write_bytes_quota: NumBytes) -> Self {
         Self {
-            pricing: StoragePricing::V2(StoragePricingV2::zeros()),
+            pricing: StoragePricing::V3(StoragePricingV3 {
+                feature_version: LATEST_GAS_FEATURE_VERSION,
+                free_write_bytes_quota,
+            }),
             change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ),

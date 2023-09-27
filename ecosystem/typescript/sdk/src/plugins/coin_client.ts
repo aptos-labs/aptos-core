@@ -8,6 +8,8 @@ import { FungibleAssetClient } from "./fungible_asset_client";
 import { Provider } from "../providers";
 import { AccountAddress } from "../aptos_types";
 
+export const TRANSFER_COINS = "0x1::aptos_account::transfer_coins";
+export const COIN_TRANSFER = "0x1::coin::transfer";
 /**
  * Class for working with the coin module, such as transferring coins and
  * checking balances.
@@ -65,7 +67,14 @@ export class CoinClient {
       createReceiverIfMissing?: boolean;
     },
   ): Promise<string> {
-    if (extraArgs?.coinType && AccountAddress.isValid(extraArgs.coinType)) {
+    // Since we can receive either a fully qualified type tag like "0x1::coin_type::CoinType"
+    // or a fungible object address "0x1234...6789" we first check to see if the raw string value includes "::"
+    // This is to make sure it's not supposed to be a fungible asset object address.
+    const isTypeTag = (extraArgs?.coinType ?? "").toString().includes("::");
+
+    // If the coin type exists, definitely isn't a type tag, and is a valid account address,
+    // then we enter this if block under the assumption that it's a fungible asset object address.
+    if (extraArgs?.coinType && !isTypeTag && AccountAddress.isValid(extraArgs.coinType)) {
       /* eslint-disable no-console */
       console.warn("to transfer a fungible asset, use `FungibleAssetClient()` class for better support");
       const provider = new Provider({
@@ -86,8 +95,13 @@ export class CoinClient {
     const coinTypeToTransfer = extraArgs?.coinType ?? APTOS_COIN;
 
     // If we should create the receiver account if it doesn't exist on-chain,
-    // use the `0x1::aptos_account::transfer` function.
-    const func = extraArgs?.createReceiverIfMissing ? "0x1::aptos_account::transfer_coins" : "0x1::coin::transfer";
+    // use the `0x1::aptos_account::transfer_coins` function.
+    let func: string;
+    if (extraArgs?.createReceiverIfMissing === undefined) {
+      func = TRANSFER_COINS;
+    } else {
+      func = extraArgs?.createReceiverIfMissing ? TRANSFER_COINS : COIN_TRANSFER;
+    }
 
     // Get the receiver address from the AptosAccount or MaybeHexString.
     const toAddress = getAddressFromAccountOrAddress(to);
@@ -122,10 +136,17 @@ export class CoinClient {
       // The coin type to use, defaults to 0x1::aptos_coin::AptosCoin.
       // If you want to check the balance of a fungible asset, set this param to be the
       // fungible asset address
-      coinType?: string;
+      coinType?: string | MaybeHexString;
     },
   ): Promise<bigint> {
-    if (extraArgs?.coinType && AccountAddress.isValid(extraArgs.coinType)) {
+    // Since we can receive either a fully qualified type tag like "0x1::coin_type::CoinType"
+    // or a fungible object address "0x1234...6789" we first check to see if the raw string value includes "::"
+    // This is to make sure it's not supposed to be a fungible asset object address.
+    const isTypeTag = (extraArgs?.coinType ?? "").toString().includes("::");
+
+    // If the coin type exists, definitely isn't a type tag, and is a valid account address,
+    // then we enter this if block under the assumption that it's a fungible asset object address.
+    if (extraArgs?.coinType && !isTypeTag && AccountAddress.isValid(extraArgs.coinType)) {
       /* eslint-disable no-console */
       console.warn("to check balance of a fungible asset, use `FungibleAssetClient()` class for better support");
       const provider = new Provider({

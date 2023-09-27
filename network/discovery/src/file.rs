@@ -62,6 +62,7 @@ mod tests {
         config::{Peer, PeerRole},
         network_id::NetworkContext,
     };
+    use aptos_event_notifications::DbBackedOnChainConfig;
     use aptos_network::connectivity_manager::{ConnectivityRequest, DiscoverySource};
     use aptos_temppath::TempPath;
     use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -78,7 +79,7 @@ mod tests {
             &aptos_network::counters::PENDING_CONNECTIVITY_MANAGER_REQUESTS,
         );
         let listener_task = async move {
-            let listener = DiscoveryChangeListener::file(
+            let listener = DiscoveryChangeListener::<DbBackedOnChainConfig>::file(
                 NetworkContext::mock(),
                 conn_mgr_reqs_tx,
                 path.as_ref().as_ref(),

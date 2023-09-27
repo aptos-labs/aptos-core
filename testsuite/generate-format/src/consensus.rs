@@ -76,6 +76,7 @@ pub fn get_registry() -> Result<Registry> {
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<aptos_consensus::network_interface::ConsensusMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus::network_interface::CommitMessage>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;

@@ -1,0 +1,133 @@
+module 0xcafe.VecSwap {
+        public calibrate_vec_swap_2_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_2<u64>(42, 43);        
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);        
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_vec_swap_2_x100() {
+    label b0:
+        Self.calibrate_vec_swap_2_impl(10);
+        return;       
+    }
+
+    public entry calibrate_vec_swap_2_x500() {
+    label b0:
+        Self.calibrate_vec_swap_2_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_vec_swap_2_x1000() {
+    label b0:
+        Self.calibrate_vec_swap_2_impl(100);
+        return;       
+    }
+
+    public calibrate_vec_swap_10_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_10<u64>(40, 41, 42, 43, 44, 45, 46, 47, 48, 49);        
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 3, 4);
+        vec_swap<u64>(&mut v, 3, 4);
+        vec_swap<u64>(&mut v, 3, 4);
+        vec_swap<u64>(&mut v, 8, 9);
+        vec_swap<u64>(&mut v, 8, 9);
+        vec_swap<u64>(&mut v, 8, 9);
+        vec_swap<u64>(&mut v, 8, 9);
+        
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_vec_swap_10_x100() {
+    label b0:
+        Self.calibrate_vec_swap_10_impl(10);
+        return;       
+    }
+
+    public entry calibrate_vec_swap_10_x500() {
+    label b0:
+        Self.calibrate_vec_swap_10_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_vec_swap_10_x1000() {
+    label b0:
+        Self.calibrate_vec_swap_10_impl(100);
+        return;       
+    }  
+
+    public calibrate_vec_swap_32_impl(n: u64) {
+        let i: u64;
+        let v: vector<u64>;
+    label entry:
+        i = 0;
+        v = vec_pack_32<u64>(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 0, 1);
+        vec_swap<u64>(&mut v, 10, 11);
+        vec_swap<u64>(&mut v, 10, 11);
+        vec_swap<u64>(&mut v, 20, 21);
+        vec_swap<u64>(&mut v, 20, 21);
+        vec_swap<u64>(&mut v, 28, 29);
+        vec_swap<u64>(&mut v, 28, 29);
+        vec_swap<u64>(&mut v, 28, 29);
+        vec_swap<u64>(&mut v, 28, 29);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }      
+
+    public entry calibrate_vec_swap_32_x100() {
+    label b0:
+        Self.calibrate_vec_swap_32_impl(10);
+        return;       
+    }
+
+    public entry calibrate_vec_swap_32_x500() {
+    label b0:
+        Self.calibrate_vec_swap_32_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_vec_swap_32_x1000() {
+    label b0:
+        Self.calibrate_vec_swap_32_impl(100);
+        return;       
+    }       
+}

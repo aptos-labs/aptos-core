@@ -62,7 +62,7 @@ async fn test_refresh_cached_storage_summary() {
         cached_storage_server_summary.clone(),
         storage_reader.clone(),
         storage_service_config,
-        cached_summary_update_notifier.clone(),
+        vec![cached_summary_update_notifier.clone()],
     );
 
     // Verify that the cached summary update listener is notified
@@ -102,7 +102,7 @@ async fn test_refresh_cached_storage_summary() {
         cached_storage_server_summary.clone(),
         storage_reader.clone(),
         storage_service_config,
-        cached_summary_update_notifier.clone(),
+        vec![cached_summary_update_notifier.clone()],
     );
 
     // Verify that the cached summary update listener is notified
@@ -129,7 +129,7 @@ async fn test_refresh_cached_storage_summary() {
         cached_storage_server_summary.clone(),
         storage_reader.clone(),
         storage_service_config,
-        cached_summary_update_notifier.clone(),
+        vec![cached_summary_update_notifier.clone()],
     );
 
     // Verify that the cached summary update listener is notified

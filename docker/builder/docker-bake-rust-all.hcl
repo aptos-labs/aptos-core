@@ -58,6 +58,7 @@ group "all" {
     "telemetry-service",
     "indexer-grpc",
     "validator-testing",
+    "nft-metadata-crawler",
   ])
 }
 
@@ -68,7 +69,7 @@ group "forge-images" {
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    debian = "docker-image://debian:bullseye@sha256:2c407480ad7c98bdc551dbb38b92acb674dc130c8298f2e0fa2ad34da9078637"
+    debian = "docker-image://debian:bullseye@sha256:9d23db14fbdc095689c423af56b9525538de139a1bbe950b4f0467698fb874d2"
   }
 }
 
@@ -77,7 +78,7 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    rust = "docker-image://rust:1.71.0-bullseye@sha256:7ec9143807d4ab7e6f9953fa405e611669a1bfd5faeb866dbacecdcc297f16ed"
+    rust = "docker-image://rust:1.71.1-bullseye@sha256:79ddef683780336ce47c56c86184cf49e4f36c598d8f0bfe9453f52437b1b9a9"
   }
   args = {
     PROFILE            = "${PROFILE}"
@@ -211,6 +212,15 @@ target "indexer-grpc" {
   target     = "indexer-grpc"
   cache-to   = generate_cache_to("indexer-grpc")
   tags       = generate_tags("indexer-grpc")
+}
+
+target "nft-metadata-crawler" {
+  inherits   = ["_common"]
+  target     = "nft-metadata-crawler"
+  dockerfile = "docker/builder/nft-metadata-crawler.Dockerfile"
+  tags       = generate_tags("nft-metadata-crawler")
+  cache-from = generate_cache_from("nft-metadata-crawler")
+  cache-to   = generate_cache_to("nft-metadata-crawler")
 }
 
 function "generate_cache_from" {

@@ -10,7 +10,7 @@ use crate::{
         get_child_and_sibling_half_start, Child, Children, InternalNode, LeafNode, Node, NodeKey,
         NodeType,
     },
-    NibbleExt, TreeReader, TreeWriter, IO_POOL, ROOT_NIBBLE_HEIGHT,
+    NibbleExt, TreeReader, TreeWriter, ROOT_NIBBLE_HEIGHT,
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::{
@@ -27,6 +27,7 @@ use aptos_types::{
     transaction::Version,
 };
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use std::{
     cmp::Eq,
     collections::HashMap,
@@ -35,6 +36,14 @@ use std::{
         Arc,
     },
 };
+
+static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("jmt_batch_{}", index))
+        .build()
+        .unwrap()
+});
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum ChildInfo<K> {

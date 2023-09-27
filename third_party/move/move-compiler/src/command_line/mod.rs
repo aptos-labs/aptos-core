@@ -17,6 +17,8 @@ pub const DEFAULT_OUTPUT_DIR: &str = "build";
 pub const SHADOW: &str = "shadow";
 pub const SHADOW_SHORT: char = 'S';
 
+pub const SKIP_ATTRIBUTE_CHECKS: &str = "skip-attribute-checks";
+
 pub const SOURCE_MAP: &str = "source-map";
 pub const SOURCE_MAP_SHORT: char = 'm';
 
@@ -35,3 +37,7 @@ pub const COLOR_MODE_ENV_VAR: &str = "COLOR_MODE";
 pub const MOVE_COMPILED_INTERFACES_DIR: &str = "mv_interfaces";
 
 pub const COMPILED_NAMED_ADDRESS_MAPPING: &str = "compiled-module-address-name";
+
+pub const MOVE_COMPILER_DEBUG_ENV_VAR: &str = "MOVE_COMPILER_DEBUG";
+
+pub const DEBUG_FLAG: &str = "debug";

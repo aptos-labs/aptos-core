@@ -233,11 +233,19 @@ pub fn arb_blocks_to_commit(
 pub fn arb_blocks_to_commit_with_block_nums(
     min_blocks: usize,
     max_blocks: usize,
-) -> impl Strategy<Value = Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>> {
-    arb_blocks_to_commit_impl(
-        5, /* num_accounts */
-        2, /* max_user_txn_per_block */
-        min_blocks, max_blocks,
+) -> impl Strategy<
+    Value = (
+        Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)>,
+        bool,
+    ),
+> {
+    (
+        arb_blocks_to_commit_impl(
+            5, /* num_accounts */
+            2, /* max_user_txn_per_block */
+            min_blocks, max_blocks,
+        ),
+        proptest::bool::ANY,
     )
 }
 
@@ -516,14 +524,25 @@ fn get_events_by_event_key(
         };
 
         let events: Vec<_> = itertools::zip_eq(events, expected_seq_nums)
-            .map(|(e, _)| (e.transaction_version, e.event))
-            .collect();
+            .map(|(e, _)| Ok((e.transaction_version, e.event)))
+            .collect::<Result<_>>()
+            .unwrap();
 
         let num_results = events.len() as u64;
         if num_results == 0 {
             break;
         }
-        assert_eq!(events.first().unwrap().1.sequence_number(), cursor);
+        assert_eq!(
+            events
+                .first()
+                .unwrap()
+                .1
+                .clone()
+                .v1()
+                .unwrap()
+                .sequence_number(),
+            cursor
+        );
 
         if order == Order::Ascending {
             if cursor + num_results > last_seq_num {
@@ -573,11 +592,17 @@ fn verify_events_by_event_key(
                 .first()
                 .expect("Shouldn't be empty")
                 .1
+                .clone()
+                .v1()
+                .unwrap()
                 .sequence_number();
             let last_seq = events
                 .last()
                 .expect("Shouldn't be empty")
                 .1
+                .clone()
+                .v1()
+                .unwrap()
                 .sequence_number();
 
             let traversed = get_events_by_event_key(
@@ -616,10 +641,12 @@ fn group_events_by_event_key(
     let mut event_key_to_events: HashMap<EventKey, Vec<(Version, ContractEvent)>> = HashMap::new();
     for (batch_idx, txn) in txns_to_commit.iter().enumerate() {
         for event in txn.events() {
-            event_key_to_events
-                .entry(*event.key())
-                .or_default()
-                .push((first_version + batch_idx as u64, event.clone()));
+            if let ContractEvent::V1(v1) = event {
+                event_key_to_events
+                    .entry(*v1.key())
+                    .or_default()
+                    .push((first_version + batch_idx as u64, event.clone()));
+            }
         }
     }
     event_key_to_events.into_iter().collect()
@@ -878,7 +905,7 @@ pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &Transacti
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
     let leaf_node = Node::new_leaf(key.hash(), value.hash(), (key.clone(), version));
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();

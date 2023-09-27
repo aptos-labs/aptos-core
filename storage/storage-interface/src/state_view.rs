@@ -35,10 +35,6 @@ impl TStateView for DbStateView {
         self.get(state_key)
     }
 
-    fn is_genesis(&self) -> bool {
-        self.version.is_none()
-    }
-
     fn get_usage(&self) -> Result<StateStorageUsage> {
         self.db.get_state_storage_usage(self.version)
     }

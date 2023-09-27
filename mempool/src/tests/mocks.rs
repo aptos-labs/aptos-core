@@ -29,7 +29,8 @@ use aptos_network::{
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
-    mempool_status::MempoolStatusCode, on_chain_config::OnChainConfigPayload,
+    mempool_status::MempoolStatusCode,
+    on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
     transaction::SignedTransaction,
 };
 use aptos_vm_validator::{
@@ -125,7 +126,10 @@ impl MockSharedMempool {
         reconfig_sender
             .push((), ReconfigNotification {
                 version: 1,
-                on_chain_configs: OnChainConfigPayload::new(1, Arc::new(HashMap::new())),
+                on_chain_configs: OnChainConfigPayload::new(
+                    1,
+                    InMemoryOnChainConfig::new(HashMap::new()),
+                ),
             })
             .unwrap();
         let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);

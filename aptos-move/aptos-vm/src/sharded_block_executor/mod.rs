@@ -3,29 +3,33 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::{
-    counters::NUM_EXECUTOR_SHARDS, executor_client::ExecutorClient,
+    counters::{
+        NUM_EXECUTOR_SHARDS, SHARDED_BLOCK_EXECUTION_SECONDS,
+        SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS,
+    },
+    executor_client::ExecutorClient,
 };
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::SubBlocksForShard,
+    block_executor::partitioner::{PartitionedTransactions, SubBlocksForShard},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
 
+pub mod aggr_overridden_state_view;
 pub mod coordinator_client;
 mod counters;
 pub mod cross_shard_client;
 mod cross_shard_state_view;
 pub mod executor_client;
+pub mod global_executor;
 pub mod local_executor_shard;
 pub mod messages;
+pub mod remote_state_value;
+pub mod sharded_aggregator_service;
 pub mod sharded_executor_service;
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
-mod tests;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> {
@@ -64,40 +68,48 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
     pub fn execute_block(
         &self,
         state_view: Arc<S>,
-        block: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        transactions: PartitionedTransactions,
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = SHARDED_BLOCK_EXECUTION_SECONDS.start_timer();
         let num_executor_shards = self.executor_client.num_shards();
         NUM_EXECUTOR_SHARDS.set(num_executor_shards as i64);
         assert_eq!(
             num_executor_shards,
-            block.len(),
+            transactions.num_shards(),
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
-        self.executor_client.execute_block(
-            state_view,
-            block,
-            concurrency_level_per_shard,
-            maybe_block_gas_limit,
-        );
+        let (sharded_output, global_output) = self
+            .executor_client
+            .execute_block(
+                state_view,
+                transactions,
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            )?
+            .into_inner();
         // wait for all remote executors to send the result back and append them in order by shard id
-        let results = self.executor_client.get_execution_result()?;
         trace!("ShardedBlockExecutor Received all results");
-        let num_rounds = results[0].len();
-        let mut aggreate_results = vec![];
+        let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();
+        let num_rounds = sharded_output[0].len();
+        let mut aggregated_results = vec![];
         let mut ordered_results = vec![vec![]; num_executor_shards * num_rounds];
-        for (shard_id, results_from_shard) in results.into_iter().enumerate() {
+        // Append the output from individual shards in the round order
+        for (shard_id, results_from_shard) in sharded_output.into_iter().enumerate() {
             for (round, result) in results_from_shard.into_iter().enumerate() {
                 ordered_results[round * num_executor_shards + shard_id] = result;
             }
         }
 
         for result in ordered_results.into_iter() {
-            aggreate_results.extend(result);
+            aggregated_results.extend(result);
         }
 
-        Ok(aggreate_results)
+        // Lastly append the global output
+        aggregated_results.extend(global_output);
+
+        Ok(aggregated_results)
     }
 }

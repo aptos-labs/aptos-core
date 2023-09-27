@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::{schema::nft_metadata_crawler_uris, utils::constants::MAX_RETRY_TIME_SECONDS};
+use crate::{
+    schema::nft_metadata_crawler::parsed_asset_uris, utils::constants::MAX_RETRY_TIME_SECONDS,
+};
 use backoff::{retry, ExponentialBackoff};
 use diesel::{
     prelude::*,
@@ -8,13 +10,12 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::warn;
 
 #[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
-#[diesel(primary_key(token_uri))]
-#[diesel(table_name = nft_metadata_crawler_uris)]
+#[diesel(primary_key(asset_uri))]
+#[diesel(table_name = parsed_asset_uris)]
 pub struct NFTMetadataCrawlerURIsQuery {
-    pub token_uri: String,
+    pub asset_uri: String,
     pub raw_image_uri: Option<String>,
     pub raw_animation_uri: Option<String>,
     pub cdn_json_uri: Option<String>,
@@ -27,13 +28,13 @@ pub struct NFTMetadataCrawlerURIsQuery {
 }
 
 impl NFTMetadataCrawlerURIsQuery {
-    pub fn get_by_token_uri(
-        token_uri: String,
+    pub fn get_by_asset_uri(
+        asset_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Option<Self> {
         let mut op = || {
-            nft_metadata_crawler_uris::table
-                .find(token_uri.clone())
+            parsed_asset_uris::table
+                .find(asset_uri.clone())
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -44,22 +45,18 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        match retry(backoff, &mut op) {
-            Ok(result) => {
-                warn!(token_uri = token_uri, "token_uri has been found");
-                Ok(result)
-            },
-            Err(_) => Ok(op()?),
-        }
+        retry(backoff, &mut op).expect("Querying asset_uri should not fail")
     }
 
     pub fn get_by_raw_image_uri(
+        asset_uri: String,
         raw_image_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Option<Self> {
         let mut op = || {
-            nft_metadata_crawler_uris::table
-                .filter(nft_metadata_crawler_uris::raw_image_uri.eq(raw_image_uri.clone()))
+            parsed_asset_uris::table
+                .filter(parsed_asset_uris::raw_image_uri.eq(raw_image_uri.clone()))
+                .filter(parsed_asset_uris::asset_uri.ne(asset_uri.clone()))
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -70,25 +67,18 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        match retry(backoff, &mut op) {
-            Ok(result) => {
-                warn!(
-                    raw_image_uri = raw_image_uri,
-                    "raw_image_uri has been found"
-                );
-                Ok(result)
-            },
-            Err(_) => Ok(op()?),
-        }
+        retry(backoff, &mut op).expect("Querying raw_image_uri should not fail")
     }
 
     pub fn get_by_raw_animation_uri(
+        asset_uri: String,
         raw_animation_uri: String,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
-    ) -> anyhow::Result<Option<Self>> {
+    ) -> Option<Self> {
         let mut op = || {
-            nft_metadata_crawler_uris::table
-                .filter(nft_metadata_crawler_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
+            parsed_asset_uris::table
+                .filter(parsed_asset_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
+                .filter(parsed_asset_uris::asset_uri.ne(asset_uri.clone()))
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -99,15 +89,6 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        match retry(backoff, &mut op) {
-            Ok(result) => {
-                warn!(
-                    raw_animation_uri = raw_animation_uri,
-                    "raw_animation_uri has been found"
-                );
-                Ok(result)
-            },
-            Err(_) => Ok(op()?),
-        }
+        retry(backoff, &mut op).expect("Querying raw_animation_uri should not fail")
     }
 }

@@ -9,7 +9,7 @@ use move_command_line_common::{
 use move_compiler::{
     compiled_unit::AnnotatedCompiledUnit,
     diagnostics::*,
-    shared::{Flags, NumericalAddress},
+    shared::{known_attributes::KnownAttribute, Flags, NumericalAddress},
     unit_test, CommentMap, Compiler, SteppedCompiler, PASS_CFGIR, PASS_PARSER,
 };
 use std::{collections::BTreeMap, fs, path::Path};
@@ -23,8 +23,12 @@ const VERIFICATION_EXT: &str = "verification";
 /// Root of tests which require to set flavor flags.
 const FLAVOR_PATH: &str = "flavors/";
 
+/// Root of tests which require to set skip_attribute_checks flag.
+const SKIP_ATTRIBUTE_CHECKS_PATH: &str = "skip_attribute_checks/";
+
 fn default_testing_addresses() -> BTreeMap<String, NumericalAddress> {
     let mapping = [
+        ("aptos_std", "0x1"),
         ("std", "0x1"),
         ("M", "0x1"),
         ("A", "0x42"),
@@ -85,8 +89,8 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
     let out_path = path.with_extension(OUT_EXT);
 
     let mut flags = Flags::empty();
-    match path.to_str() {
-        Some(p) if p.contains(FLAVOR_PATH) => {
+    if let Some(p) = path.to_str() {
+        if p.contains(FLAVOR_PATH) {
             // Extract the flavor from the path. Its the directory name of the file.
             let flavor = path
                 .parent()
@@ -96,8 +100,10 @@ fn move_check_testsuite(path: &Path) -> datatest_stable::Result<()> {
                 .to_string_lossy()
                 .to_string();
             flags = flags.set_flavor(flavor)
-        },
-        _ => {},
+        }
+        if p.contains(SKIP_ATTRIBUTE_CHECKS_PATH) {
+            flags = flags.set_skip_attribute_checks(true);
+        }
     };
     run_test(path, &exp_path, &out_path, flags)?;
     Ok(())
@@ -111,8 +117,9 @@ fn run_test(path: &Path, exp_path: &Path, out_path: &Path, flags: Flags) -> anyh
         targets,
         move_stdlib::move_stdlib_files(),
         default_testing_addresses(),
+        flags,
+        KnownAttribute::get_all_attribute_names(),
     )
-    .set_flags(flags)
     .run::<PASS_PARSER>()?;
     let diags = move_check_for_errors(comments_and_compiler_res);
 

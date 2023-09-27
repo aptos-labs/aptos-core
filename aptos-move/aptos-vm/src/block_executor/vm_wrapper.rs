@@ -12,11 +12,8 @@ use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use move_core_types::{
-    ident_str,
-    language_storage::{ModuleId, CORE_CODE_ADDRESS},
-    vm_status::VMStatus,
-};
+use aptos_vm_types::resolver::ExecutorView;
+use move_core_types::vm_status::VMStatus;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -30,20 +27,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Txn = PreprocessedTransaction;
 
     fn init(argument: &'a S) -> Self {
-        let vm = AptosVM::new(argument);
-
-        // Loading `0x1::account` and its transitive dependency into the code cache.
-        //
-        // This should give us a warm VM to avoid the overhead of VM cold start.
-        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
-        //
-        // Loading up `0x1::account` should be sufficient as this is the most common module
-        // used for prologue, epilogue and transfer functionality.
-
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver(argument),
-        );
+        // AptosVM has to be initialized using configs from storage.
+        let vm = AptosVM::new_from_state_view(&argument);
 
         Self {
             vm,
@@ -56,22 +41,22 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl StateView,
+        executor_view: &impl ExecutorView,
         txn: &PreprocessedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-
+        let resolver = self.vm.as_move_resolver(executor_view);
         match self
             .vm
-            .execute_single_transaction(txn, &self.vm.as_move_resolver(view), &log_context)
+            .execute_single_transaction(txn, &resolver, &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
-                    // TODO: Integrate delta application failure.
+                    // TODO: Integrate aggregator v2.
                     vm_output = vm_output
-                        .try_materialize(view)
+                        .try_materialize(&resolver)
                         .expect("Delta materialization failed");
                 }
 

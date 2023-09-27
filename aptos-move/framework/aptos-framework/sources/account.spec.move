@@ -419,6 +419,8 @@ spec aptos_framework::account {
         aborts_if len(ZERO_AUTH_KEY) != 32;
         include exists_at(resource_addr) ==> CreateResourceAccountAbortsIf;
         include !exists_at(resource_addr) ==> CreateAccountAbortsIf {addr: resource_addr};
+
+        ensures signer::address_of(result_1) == resource_addr;
     }
 
     /// Check if the bytes of the new address is 32.

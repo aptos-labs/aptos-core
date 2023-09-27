@@ -1,0 +1,54 @@
+module 0xcafe.CastU256 {
+
+    public calibrate_castu256_impl(n: u64) {
+        let i: u64;
+    label entry:
+        i = 0;
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+
+        _ = to_u256(0u8);
+        _ = to_u256(0u64);
+        _ = to_u256(0u128);
+        _ = to_u256(0u16);
+        _ = to_u256(0u32);
+        _ = to_u256(0u256);
+
+        _ = to_u256(21u8);
+        _ = to_u256(21u64);
+        _ = to_u256(21u128);
+        _ = to_u256(21u16);
+        _ = to_u256(21u32);
+        _ = to_u256(21u256);
+
+        _ = to_u256(255u8);
+        _ = to_u256(18446744073709551615u64);
+        _ = to_u256(340282366920938463463374607431768211455u128);
+        _ = to_u256(65535u16);
+        _ = to_u256(4294967295u32);
+        _ = to_u256(115792089237316195423570985008687907853269984665640564039457584007913129639935u256);
+
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_castu256_x100() {
+    label b0:
+        Self.calibrate_castu256_impl(10);
+        return;       
+    }
+
+    public entry calibrate_castu256_x500() {
+    label b0:
+        Self.calibrate_castu256_impl(50);
+        return;       
+    } 
+
+    public entry calibrate_castu256_x1000() {
+    label b0:
+        Self.calibrate_castu256_impl(100);
+        return;       
+    }                
+}    

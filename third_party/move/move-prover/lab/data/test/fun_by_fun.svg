@@ -1,0 +1,28 @@
+<svg width="1000" height="105" viewBox="0 0 1000 105" xmlns="http://www.w3.org/2000/svg">
+<rect x="0" y="0" width="1000" height="105" opacity="1" fill="#FFFFFF" stroke="none"/>
+<rect x="0" y="0" width="44" height="7" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="54" y="1" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+= prover
+</text>
+<text x="0" y="17" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+test::f1
+</text>
+<rect x="0" y="27" width="909" height="6" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="917" y="28" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.571
+</text>
+<text x="0" y="43" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+test::f2
+</text>
+<rect x="0" y="53" width="880" height="6" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="888" y="54" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.553
+</text>
+<text x="0" y="70" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="12.096774193548388" opacity="1" fill="#000000">
+test::f3
+</text>
+<rect x="0" y="79" width="902" height="6" opacity="1" fill="#B4B4B4" stroke="none"/>
+<text x="910" y="80" dy="0.76em" text-anchor="start" font-family="sans-serif" font-size="10.483870967741936" opacity="1" fill="#000000">
+0.567
+</text>
+</svg>

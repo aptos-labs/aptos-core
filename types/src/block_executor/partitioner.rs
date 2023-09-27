@@ -6,17 +6,34 @@ use crate::transaction::{
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
 pub type RoundId = usize;
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub static MAX_ALLOWED_PARTITIONING_ROUNDS: usize = 8;
+pub static GLOBAL_ROUND_ID: usize = MAX_ALLOWED_PARTITIONING_ROUNDS + 1;
+pub static GLOBAL_SHARD_ID: usize = usize::MAX;
+
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct ShardedTxnIndex {
     pub txn_index: TxnIndex,
     pub shard_id: ShardId,
     pub round_id: RoundId,
+}
+
+impl PartialOrd for ShardedTxnIndex {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        (self.round_id, self.shard_id, self.txn_index).partial_cmp(&(
+            other.round_id,
+            other.shard_id,
+            other.txn_index,
+        ))
+    }
 }
 
 impl ShardedTxnIndex {
@@ -33,8 +50,40 @@ impl ShardedTxnIndex {
 /// Denotes a set of cross shard edges, which contains the set (required or dependent) transaction
 /// indices and the relevant storage locations that are conflicting.
 pub struct CrossShardEdges {
-    edges: HashMap<ShardedTxnIndex, Vec<StorageLocation>>,
+    pub edges: HashMap<ShardedTxnIndex, Vec<StorageLocation>>,
 }
+
+impl PartialEq for CrossShardEdges {
+    fn eq(&self, other: &Self) -> bool {
+        let my_key_set = self.edges.keys().copied().collect::<HashSet<_>>();
+        let other_key_set = other.edges.keys().copied().collect::<HashSet<_>>();
+        if my_key_set != other_key_set {
+            return false;
+        }
+        for key in my_key_set {
+            let my_value = self
+                .edges
+                .get(&key)
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect::<HashSet<_>>();
+            let other_value = other
+                .edges
+                .get(&key)
+                .unwrap()
+                .clone()
+                .into_iter()
+                .collect::<HashSet<_>>();
+            if my_value != other_value {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Eq for CrossShardEdges {}
 
 impl CrossShardEdges {
     pub fn new(txn_idx: ShardedTxnIndex, storage_locations: Vec<StorageLocation>) -> Self {
@@ -76,7 +125,7 @@ impl IntoIterator for CrossShardEdges {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 /// Represents the dependencies of a transaction on other transactions across shards. Two types
 /// of dependencies are supported:
 /// 1. `required_edges`: The transaction depends on the execution of the transactions in the set. In this
@@ -86,8 +135,8 @@ impl IntoIterator for CrossShardEdges {
 /// Dependent edge is a reverse of required edge, for example if txn 20 in shard 2 requires txn 10 in shard 1,
 /// then txn 10 in shard 1 will have a dependent edge to txn 20 in shard 2.
 pub struct CrossShardDependencies {
-    required_edges: CrossShardEdges,
-    dependent_edges: CrossShardEdges,
+    pub required_edges: CrossShardEdges,
+    pub dependent_edges: CrossShardEdges,
 }
 
 impl CrossShardDependencies {
@@ -163,7 +212,7 @@ impl CrossShardDependencies {
 ///  | Transaction 3  | Transaction 6    | Transaction 9    |
 ///  +----------------+------------------+------------------+
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SubBlock<T> {
     // This is the index of first transaction relative to the block.
     pub start_index: TxnIndex,
@@ -249,7 +298,7 @@ impl<T: Clone> IntoIterator for SubBlock<T> {
 }
 
 // A set of sub blocks assigned to a shard.
-#[derive(Default, Clone, Debug, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct SubBlocksForShard<T> {
     pub shard_id: ShardId,
     pub sub_blocks: Vec<SubBlock<T>>,
@@ -318,6 +367,10 @@ impl<T: Clone> SubBlocksForShard<T> {
         self.sub_blocks.get_mut(round)
     }
 
+    pub fn remove_last_sub_block(&mut self) -> Option<SubBlock<T>> {
+        self.sub_blocks.pop()
+    }
+
     // Flattens a vector of `SubBlocksForShard` into a vector of transactions in the order they
     // appear in the block.
     pub fn flatten(block: Vec<SubBlocksForShard<T>>) -> Vec<T> {
@@ -339,7 +392,7 @@ impl<T: Clone> SubBlocksForShard<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TransactionWithDependencies<T> {
     pub txn: T,
     pub cross_shard_dependencies: CrossShardDependencies,
@@ -395,20 +448,100 @@ impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartitionedTransactions {
+    pub sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+    pub global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+}
+
+impl PartitionedTransactions {
+    pub fn new(
+        sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+    ) -> Self {
+        Self {
+            sharded_txns,
+            global_txns,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            sharded_txns: Vec::new(),
+            global_txns: Vec::new(),
+        }
+    }
+
+    pub fn into(
+        self,
+    ) -> (
+        Vec<SubBlocksForShard<AnalyzedTransaction>>,
+        Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+    ) {
+        (self.sharded_txns, self.global_txns)
+    }
+
+    pub fn num_shards(&self) -> usize {
+        self.sharded_txns.len()
+    }
+
+    pub fn sharded_txns(&self) -> &[SubBlocksForShard<AnalyzedTransaction>] {
+        &self.sharded_txns
+    }
+
+    pub fn num_sharded_txns(&self) -> usize {
+        self.sharded_txns
+            .iter()
+            .map(|sub_blocks| sub_blocks.num_txns())
+            .sum::<usize>()
+    }
+
+    pub fn num_txns(&self) -> usize {
+        self.num_sharded_txns() + self.global_txns.len()
+    }
+
+    pub fn add_checkpoint_txn(&mut self, last_txn: Transaction) {
+        assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
+        let txn_with_deps =
+            TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
+        if !self.global_txns.is_empty() {
+            self.global_txns.push(txn_with_deps);
+        } else {
+            self.sharded_txns
+                .last_mut()
+                .unwrap()
+                .sub_blocks
+                .last_mut()
+                .unwrap()
+                .transactions
+                .push(txn_with_deps)
+        }
+    }
+
+    pub fn flatten(transactions: PartitionedTransactions) -> Vec<AnalyzedTransaction> {
+        SubBlocksForShard::flatten(transactions.sharded_txns)
+            .into_iter()
+            .chain(
+                transactions
+                    .global_txns
+                    .into_iter()
+                    .map(|txn| txn.into_txn()),
+            )
+            .collect()
+    }
+}
+
 // Represents the transactions in a block that are ready to be executed.
 pub enum ExecutableTransactions {
     Unsharded(Vec<Transaction>),
-    Sharded(Vec<SubBlocksForShard<AnalyzedTransaction>>),
+    Sharded(PartitionedTransactions),
 }
 
 impl ExecutableTransactions {
     pub fn num_transactions(&self) -> usize {
         match self {
             ExecutableTransactions::Unsharded(transactions) => transactions.len(),
-            ExecutableTransactions::Sharded(sub_blocks) => sub_blocks
-                .iter()
-                .map(|sub_block| sub_block.num_txns())
-                .sum(),
+            ExecutableTransactions::Sharded(partitioned_txns) => partitioned_txns.num_txns(),
         }
     }
 }

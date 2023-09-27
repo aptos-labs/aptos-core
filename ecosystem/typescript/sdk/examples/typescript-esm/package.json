@@ -7,7 +7,9 @@
   "scripts": {
     "build": "rm -rf dist/* && tsc -p .",
     "test": "pnpm build && node ./dist/index.js",
-    "rotate_key": "ts-node --esm rotate_key.ts"
+    "offer_capabilities": "ts-node --esm offer_capabilities.ts",
+    "rotate_key": "ts-node --esm rotate_key.ts",
+    "multi_ed25519_to_multisig": "ts-node --esm multi_ed25519_to_multisig.ts"
   },
   "keywords": [],
   "author": "",

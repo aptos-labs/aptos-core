@@ -2,35 +2,45 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod sharded_block_partitioner;
+pub mod v2;
+
 pub mod test_utils;
 
-use aptos_types::transaction::Transaction;
+use aptos_types::{
+    block_executor::partitioner::{PartitionedTransactions, ShardId},
+    transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+};
+use move_core_types::account_address::AccountAddress;
+use std::{
+    collections::hash_map::DefaultHasher,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 
-pub trait BlockPartitioner: Send + Sync {
-    fn partition(&self, transactions: Vec<Transaction>, num_shards: usize)
-        -> Vec<Vec<Transaction>>;
+pub mod pre_partition;
+
+pub trait PartitionerConfig: Debug {
+    fn build(&self) -> Box<dyn BlockPartitioner>;
 }
 
-/// An implementation of partitioner that splits the transactions into equal-sized chunks.
-pub struct UniformPartitioner {}
+#[cfg(test)]
+mod tests;
 
-impl BlockPartitioner for UniformPartitioner {
+pub trait BlockPartitioner: Send {
     fn partition(
         &self,
-        transactions: Vec<Transaction>,
-        num_shards: usize,
-    ) -> Vec<Vec<Transaction>> {
-        let total_txns = transactions.len();
-        if total_txns == 0 {
-            return vec![];
-        }
-        let txns_per_shard = (total_txns as f64 / num_shards as f64).ceil() as usize;
-
-        let mut result = Vec::new();
-        for chunk in transactions.chunks(txns_per_shard) {
-            result.push(chunk.to_vec());
-        }
-        result
-    }
+        transactions: Vec<AnalyzedTransaction>,
+        num_shards: usize, //TODO: rethink about whether this is needed as part of `BlockPartitioner` API.
+    ) -> PartitionedTransactions;
 }
+
+/// When multiple transactions access the same storage location,
+/// use this function to pick a shard as the anchor/leader and resolve conflicts.
+/// Used by `ShardedBlockPartitioner` and `V2Partitioner`.
+fn get_anchor_shard_id(storage_location: &StorageLocation, num_shards: usize) -> ShardId {
+    let mut hasher = DefaultHasher::new();
+    storage_location.hash(&mut hasher);
+    (hasher.finish() % num_shards as u64) as usize
+}
+
+type Sender = Option<AccountAddress>;

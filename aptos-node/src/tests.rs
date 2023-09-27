@@ -7,9 +7,8 @@ use aptos_event_notifications::EventSubscriptionService;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{DbReader, DbReaderWriter, DbWriter};
 use aptos_temppath::TempPath;
-use aptos_types::{
-    chain_id::ChainId, on_chain_config::ON_CHAIN_CONFIG_REGISTRY, waypoint::Waypoint,
-};
+use aptos_types::{chain_id::ChainId, waypoint::Waypoint};
+use rand::SeedableRng;
 use std::{fs, sync::Arc};
 
 /// A mock database implementing DbReader and DbWriter
@@ -31,10 +30,8 @@ fn test_mutual_authentication_validators() {
     validator_network.mutual_authentication = false;
 
     // Create an event subscription service
-    let mut event_subscription_service = EventSubscriptionService::new(
-        ON_CHAIN_CONFIG_REGISTRY,
-        Arc::new(RwLock::new(DbReaderWriter::new(MockDatabase {}))),
-    );
+    let mut event_subscription_service =
+        EventSubscriptionService::new(Arc::new(RwLock::new(DbReaderWriter::new(MockDatabase {}))));
 
     // Set up the networks and gather the application network handles. This should panic.
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
@@ -52,10 +49,11 @@ fn test_aptos_vm_does_not_have_test_natives() {
     aptos_vm::natives::assert_no_test_natives(crate::utils::ERROR_MSG_BAD_FEATURE_FLAGS)
 }
 
+// This test confirms that the overriding behavior works as intended.
 #[test]
 fn test_create_single_node_test_config() {
-    // create a test config override and merge it with the default config
-    // this will get cleaned up by the tempdir when it goes out of scope
+    // Create a test config override and merge it with the default config.
+    // This will get cleaned up by the tempdir when it goes out of scope.
     let test_dir = aptos_temppath::TempPath::new().as_ref().to_path_buf();
     fs::DirBuilder::new()
         .recursive(true)
@@ -86,8 +84,16 @@ fn test_create_single_node_test_config() {
 
     // merge it
     let default_node_config = NodeConfig::get_default_validator_config();
-    let merged_config =
-        create_single_node_test_config(None, Some(config_override_path), false).unwrap();
+    let merged_config = create_single_node_test_config(
+        &None,
+        &Some(config_override_path),
+        &test_dir,
+        false,
+        false,
+        aptos_cached_packages::head_release_bundle(),
+        rand::rngs::StdRng::from_entropy(),
+    )
+    .unwrap();
 
     // overriden configs
     assert!(merged_config.storage.enable_indexer);

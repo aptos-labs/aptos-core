@@ -10,11 +10,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
-clap = { version = "4.3.5", features = ["derive"] }
+clap = { version = "4.3.9", features = ["derive"] }
 codespan-reporting = "0.11.1"
 crossbeam = "0.8"
 derivative = "2.2.0"
-dunce = "1.0.2"
+dunce = "1.0.4"
 im = "15.1.0"
 lsp-server = "0.5.1"
 lsp-types = "0.90.1"

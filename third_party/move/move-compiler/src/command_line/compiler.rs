@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    attr_derivation::add_attributes_for_flavor,
     cfgir,
     command_line::{DEFAULT_OUTPUT_DIR, MOVE_COMPILED_INTERFACES_DIR},
     compiled_unit,
@@ -11,7 +12,7 @@ use crate::{
     expansion, hlir, inlining, interface_generator, naming, parser,
     parser::{comments::*, *},
     shared::{
-        CompilationEnv, Flags, IndexedPackagePath, NamedAddressMap, NamedAddressMaps,
+        ast_debug, CompilationEnv, Flags, IndexedPackagePath, NamedAddressMap, NamedAddressMaps,
         NumericalAddress, PackagePaths,
     },
     to_bytecode, typing, unit_test, verification,
@@ -22,7 +23,7 @@ use move_command_line_common::files::{
 use move_core_types::language_storage::ModuleId as CompiledModuleId;
 use move_symbol_pool::Symbol;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     fs::File,
     io::{Read, Write},
@@ -42,6 +43,7 @@ pub struct Compiler<'a> {
     pre_compiled_lib: Option<&'a FullyCompiledProgram>,
     compiled_module_named_address_mapping: BTreeMap<CompiledModuleId, String>,
     flags: Flags,
+    known_attributes: BTreeSet<String>,
 }
 
 pub struct SteppedCompiler<'a, const P: Pass> {
@@ -95,6 +97,8 @@ impl<'a> Compiler<'a> {
     pub fn from_package_paths<Paths: Into<Symbol>, NamedAddress: Into<Symbol>>(
         targets: Vec<PackagePaths<Paths, NamedAddress>>,
         deps: Vec<PackagePaths<Paths, NamedAddress>>,
+        flags: Flags,
+        known_attributes: &BTreeSet<String>,
     ) -> Self {
         fn indexed_scopes(
             maps: &mut NamedAddressMaps,
@@ -132,7 +136,8 @@ impl<'a> Compiler<'a> {
             interface_files_dir_opt: None,
             pre_compiled_lib: None,
             compiled_module_named_address_mapping: BTreeMap::new(),
-            flags: Flags::empty(),
+            flags,
+            known_attributes: known_attributes.clone(),
         }
     }
 
@@ -140,6 +145,8 @@ impl<'a> Compiler<'a> {
         targets: Vec<Paths>,
         deps: Vec<Paths>,
         named_address_map: BTreeMap<NamedAddress, NumericalAddress>,
+        flags: Flags,
+        known_attributes: &BTreeSet<String>,
     ) -> Self {
         let targets = vec![PackagePaths {
             name: None,
@@ -151,13 +158,7 @@ impl<'a> Compiler<'a> {
             paths: deps,
             named_address_map,
         }];
-        Self::from_package_paths(targets, deps)
-    }
-
-    pub fn set_flags(mut self, flags: Flags) -> Self {
-        assert!(self.flags.is_empty());
-        self.flags = flags;
-        self
+        Self::from_package_paths(targets, deps, flags, known_attributes)
     }
 
     pub fn set_interface_files_dir(mut self, dir: String) -> Self {
@@ -210,13 +211,15 @@ impl<'a> Compiler<'a> {
             pre_compiled_lib,
             compiled_module_named_address_mapping,
             flags,
+            mut known_attributes,
         } = self;
         generate_interface_files_for_deps(
             &mut deps,
             interface_files_dir_opt,
             &compiled_module_named_address_mapping,
         )?;
-        let mut compilation_env = CompilationEnv::new(flags);
+        add_attributes_for_flavor(&flags, &mut known_attributes);
+        let mut compilation_env = CompilationEnv::new(flags, known_attributes);
         let (source_text, pprog_and_comments_res) =
             parse_program(&mut compilation_env, maps, targets, deps)?;
         let res: Result<_, Diagnostics> = pprog_and_comments_res.and_then(|(pprog, comments)| {
@@ -428,12 +431,16 @@ pub fn construct_pre_compiled_lib<Paths: Into<Symbol>, NamedAddress: Into<Symbol
     targets: Vec<PackagePaths<Paths, NamedAddress>>,
     interface_files_dir_opt: Option<String>,
     flags: Flags,
+    known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<Result<FullyCompiledProgram, (FilesSourceText, Diagnostics)>> {
-    let (files, pprog_and_comments_res) =
-        Compiler::from_package_paths(targets, Vec::<PackagePaths<Paths, NamedAddress>>::new())
-            .set_interface_files_dir_opt(interface_files_dir_opt)
-            .set_flags(flags)
-            .run::<PASS_PARSER>()?;
+    let (files, pprog_and_comments_res) = Compiler::from_package_paths(
+        targets,
+        Vec::<PackagePaths<Paths, NamedAddress>>::new(),
+        flags,
+        known_attributes,
+    )
+    .set_interface_files_dir_opt(interface_files_dir_opt)
+    .run::<PASS_PARSER>()?;
 
     let (_comments, stepped) = match pprog_and_comments_res {
         Err(errors) => return Ok(Err((files, errors))),
@@ -690,7 +697,7 @@ pub fn generate_interface_files(
     {
         let (id, interface_contents) =
             interface_generator::write_file_to_string(module_to_named_address, &path)?;
-        let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address()));
+        let addr_dir = dir_path!(all_addr_dir.clone(), format!("{}", id.address().to_hex()));
         let file_path = file_path!(addr_dir.clone(), format!("{}", id.name()), MOVE_EXTENSION);
         result.push(IndexedPackagePath {
             path: Symbol::from(file_path.clone().into_os_string().into_string().unwrap()),
@@ -773,8 +780,20 @@ fn run(
             let prog = parser::merge_spec_modules::program(compilation_env, prog);
             let prog = unit_test::filter_test_members::program(compilation_env, prog);
             let prog = verification::ast_filter::program(compilation_env, prog);
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "Before expansion: program = {}",
+                    ast_debug::display_verbose(&prog)
+                )
+            };
             let eprog = expansion::translate::program(compilation_env, pre_compiled_lib, prog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After expansion: program = {}",
+                    ast_debug::display_verbose(&eprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -786,6 +805,12 @@ fn run(
         PassResult::Expansion(eprog) => {
             let nprog = naming::translate::program(compilation_env, pre_compiled_lib, eprog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After naming: program = {}",
+                    ast_debug::display_verbose(&nprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -797,6 +822,12 @@ fn run(
         PassResult::Naming(nprog) => {
             let tprog = typing::translate::program(compilation_env, pre_compiled_lib, nprog);
             compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After typing: program = {}",
+                    ast_debug::display_verbose(&tprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -808,6 +839,12 @@ fn run(
         PassResult::Typing(mut tprog) => {
             inlining::translate::run_inlining(compilation_env, &mut tprog);
             compilation_env.check_diags_at_or_above_severity(Severity::BlockingError)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After inlining: program = {}",
+                    ast_debug::display_verbose(&tprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -819,6 +856,12 @@ fn run(
         PassResult::Inlining(tprog) => {
             let hprog = hlir::translate::program(compilation_env, pre_compiled_lib, tprog);
             compilation_env.check_diags_at_or_above_severity(Severity::Bug)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After hlir: program = {}",
+                    ast_debug::display_verbose(&hprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,
@@ -830,6 +873,12 @@ fn run(
         PassResult::HLIR(hprog) => {
             let cprog = cfgir::translate::program(compilation_env, pre_compiled_lib, hprog);
             compilation_env.check_diags_at_or_above_severity(Severity::NonblockingError)?;
+            if compilation_env.flags().debug() {
+                eprintln!(
+                    "After cfgir: program = {}",
+                    ast_debug::display_verbose(&cprog)
+                )
+            };
             run(
                 compilation_env,
                 pre_compiled_lib,

@@ -383,6 +383,7 @@ class AptosTokenClient:
 
         return TransactionPayload(payload)
 
+    # :!:>create_collection
     async def create_collection(
         self,
         creator: Account,
@@ -401,7 +402,7 @@ class AptosTokenClient:
         tokens_freezable_by_creator: bool,
         royalty_numerator: int,
         royalty_denominator: int,
-    ) -> str:
+    ) -> str:  # <:!:create_collection
         payload = AptosTokenClient.create_collection_payload(
             description,
             max_supply,
@@ -458,6 +459,7 @@ class AptosTokenClient:
 
         return TransactionPayload(payload)
 
+    # :!:>mint_token
     async def mint_token(
         self,
         creator: Account,
@@ -466,7 +468,7 @@ class AptosTokenClient:
         name: str,
         uri: str,
         properties: PropertyMap,
-    ) -> str:
+    ) -> str:  # <:!:mint_token
         payload = AptosTokenClient.mint_token_payload(
             collection, description, name, uri, properties
         )
@@ -514,6 +516,12 @@ class AptosTokenClient:
             creator, TransactionPayload(payload)
         )
         return await self.client.submit_bcs_transaction(signed_transaction)
+
+    # :!:>transfer_token
+    async def transfer_token(
+        self, owner: Account, token: AccountAddress, to: AccountAddress
+    ) -> str:
+        return await self.client.transfer_object(owner, token, to)  # <:!:transfer_token
 
     async def burn_token(self, creator: Account, token: AccountAddress) -> str:
         payload = EntryFunction.natural(

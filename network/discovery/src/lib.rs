@@ -16,6 +16,7 @@ use aptos_network::{
     logging::NetworkSchema,
 };
 use aptos_time_service::TimeService;
+use aptos_types::on_chain_config::OnChainConfigProvider;
 use futures::{Stream, StreamExt};
 use std::{
     path::Path,
@@ -38,20 +39,20 @@ pub enum DiscoveryError {
 }
 
 /// A union type for all implementations of `DiscoveryChangeListenerTrait`
-pub struct DiscoveryChangeListener {
+pub struct DiscoveryChangeListener<P: OnChainConfigProvider> {
     discovery_source: DiscoverySource,
     network_context: NetworkContext,
     update_channel: aptos_channels::Sender<ConnectivityRequest>,
-    source_stream: DiscoveryChangeStream,
+    source_stream: DiscoveryChangeStream<P>,
 }
 
-enum DiscoveryChangeStream {
-    ValidatorSet(ValidatorSetStream),
+enum DiscoveryChangeStream<P: OnChainConfigProvider> {
+    ValidatorSet(ValidatorSetStream<P>),
     File(FileStream),
     Rest(RestStream),
 }
 
-impl Stream for DiscoveryChangeStream {
+impl<P: OnChainConfigProvider> Stream for DiscoveryChangeStream<P> {
     type Item = Result<PeerSet, DiscoveryError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -63,12 +64,12 @@ impl Stream for DiscoveryChangeStream {
     }
 }
 
-impl DiscoveryChangeListener {
+impl<P: OnChainConfigProvider> DiscoveryChangeListener<P> {
     pub fn validator_set(
         network_context: NetworkContext,
         update_channel: aptos_channels::Sender<ConnectivityRequest>,
         expected_pubkey: x25519::PublicKey,
-        reconfig_events: ReconfigNotificationListener,
+        reconfig_events: ReconfigNotificationListener<P>,
     ) -> Self {
         let source_stream = DiscoveryChangeStream::ValidatorSet(ValidatorSetStream::new(
             network_context,

@@ -1,10 +1,10 @@
 ---
-title: "Aptos Coin"
+title: "Aptos Coin (Legacy)"
 ---
 import ThemedImage from '@theme/ThemedImage';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-# Aptos Coin
+# Aptos Coin (Legacy)
 
 [Coin](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) provides a standard, typesafe framework for simple, fungible tokens or coins. 
 

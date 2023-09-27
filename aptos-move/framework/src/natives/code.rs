@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::any::Any;
+use crate::{natives::any::Any, unzip_metadata_str};
 use anyhow::bail;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use aptos_types::{transaction::ModuleBundle, vm_status::StatusCode};
+use aptos_types::{
+    on_chain_config::OnChainConfig, transaction::ModuleBundle, vm_status::StatusCode,
+};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
@@ -63,6 +65,11 @@ pub struct PackageRegistry {
     pub packages: Vec<PackageMetadata>,
 }
 
+impl OnChainConfig for PackageRegistry {
+    const MODULE_IDENTIFIER: &'static str = "code";
+    const TYPE_IDENTIFIER: &'static str = "PackageRegistry";
+}
+
 /// The PackageMetadata type. This must be kept in sync with `code.move`. Documentation is
 /// also found there.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -76,6 +83,28 @@ pub struct PackageMetadata {
     pub modules: Vec<ModuleMetadata>,
     pub deps: Vec<PackageDep>,
     pub extension: MoveOption<Any>,
+}
+
+impl fmt::Display for PackageMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Package name:{}", self.name)?;
+        writeln!(f, "Upgrade policy:{}", self.upgrade_policy)?;
+        writeln!(f, "Upgrade number:{}", self.upgrade_number)?;
+        writeln!(f, "Source digest:{}", self.source_digest)?;
+        let manifest_str = unzip_metadata_str(&self.manifest).unwrap();
+        writeln!(f, "Manifest:")?;
+        writeln!(f, "{}", manifest_str)?;
+        writeln!(f, "Package Dependency:")?;
+        for dep in &self.deps {
+            writeln!(f, "{:?}", dep)?;
+        }
+        writeln!(f, "extension:{:?}", self.extension)?;
+        writeln!(f, "Modules:")?;
+        for module in &self.modules {
+            writeln!(f, "{}", module)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd)]
@@ -92,6 +121,24 @@ pub struct ModuleMetadata {
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
     pub extension: MoveOption<Any>,
+}
+
+impl fmt::Display for ModuleMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Module name:{}", self.name)?;
+        if !self.source.is_empty() {
+            writeln!(f, "Source code:")?;
+            let source = unzip_metadata_str(&self.source).unwrap();
+            writeln!(f, "{}", source)?;
+        }
+        if !self.source_map.is_empty() {
+            writeln!(f, "Source map:")?;
+            let source_map = unzip_metadata_str(&self.source_map).unwrap();
+            writeln!(f, "{}", source_map)?;
+        }
+        writeln!(f, "Module extension:{:?}", self.extension)?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]

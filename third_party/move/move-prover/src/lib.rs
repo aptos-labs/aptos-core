@@ -10,7 +10,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use move_abigen::Abigen;
-use move_compiler::shared::PackagePaths;
+use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
@@ -20,10 +20,10 @@ use move_model::{
 use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
 };
-use move_stackless_bytecode::{
-    function_target_pipeline::FunctionTargetsHolder, number_operation::GlobalNumberOperationState,
-    pipeline_factory,
+use move_prover_bytecode_pipeline::{
+    number_operation::GlobalNumberOperationState, pipeline_factory,
 };
+use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -59,6 +59,8 @@ pub fn run_move_prover<W: WriteColor>(
             named_address_map: addrs,
         }],
         options.model_builder.clone(),
+        options.skip_attribute_checks,
+        KnownAttribute::get_all_attribute_names(),
     )?;
     run_move_prover_with_model(&env, error_writer, options, Some(now))
 }
@@ -76,7 +78,6 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             }
         }
     }
-    //global_state.create_initial_exp_oper_state(env);
     env.set_extension(global_state);
 }
 

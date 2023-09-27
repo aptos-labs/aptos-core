@@ -192,8 +192,7 @@ pub struct ProposerAndVoterConfig {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::on_chain_config::OnChainConfigPayload;
-    use std::sync::Arc;
+    use crate::on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload};
 
     #[test]
     fn test_config_yaml_serialization() {
@@ -246,7 +245,7 @@ mod test {
             bcs::to_bytes(&bcs::to_bytes(&consensus_config).unwrap()).unwrap(),
         );
 
-        let payload = OnChainConfigPayload::new(1, Arc::new(configs));
+        let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         let result: OnChainConsensusConfig = payload.get().unwrap();
         assert!(matches!(

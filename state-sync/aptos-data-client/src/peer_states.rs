@@ -16,12 +16,10 @@ use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
+use aptos_time_service::TimeService;
+use dashmap::{DashMap, DashSet};
 use itertools::Itertools;
-use std::{
-    cmp::min,
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{cmp::min, sync::Arc};
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
@@ -81,7 +79,7 @@ impl PeerState {
     }
 
     /// Returns the storage summary iff the peer is not below the ignore threshold
-    fn storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
+    fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
         if self.score <= IGNORE_PEER_THRESHOLD {
             None
         } else {
@@ -108,26 +106,26 @@ impl PeerState {
 /// advertisements and data-client internal metadata for scoring.
 #[derive(Clone, Debug)]
 pub(crate) struct PeerStates {
-    base_config: BaseConfig,
-    data_client_config: AptosDataClientConfig,
-    peer_to_state: HashMap<PeerNetworkId, PeerState>,
-    in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
-    in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
+    base_config: Arc<BaseConfig>,
+    data_client_config: Arc<AptosDataClientConfig>,
+    peer_to_state: DashMap<PeerNetworkId, PeerState>,
+    in_flight_priority_polls: DashSet<PeerNetworkId>, // The priority peers with in-flight polls
+    in_flight_regular_polls: DashSet<PeerNetworkId>,  // The regular peers with in-flight polls
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl PeerStates {
     pub fn new(
-        base_config: BaseConfig,
-        data_client_config: AptosDataClientConfig,
+        base_config: Arc<BaseConfig>,
+        data_client_config: Arc<AptosDataClientConfig>,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         Self {
             base_config,
             data_client_config,
-            peer_to_state: HashMap::new(),
-            in_flight_priority_polls: HashSet::new(),
-            in_flight_regular_polls: HashSet::new(),
+            peer_to_state: DashMap::new(),
+            in_flight_priority_polls: DashSet::new(),
+            in_flight_regular_polls: DashSet::new(),
             peers_and_metadata,
         }
     }
@@ -137,6 +135,7 @@ impl PeerStates {
     pub fn can_service_request(
         &self,
         peer: &PeerNetworkId,
+        time_service: TimeService,
         request: &StorageServiceRequest,
     ) -> bool {
         // Storage services can always respond to data advertisement requests.
@@ -149,46 +148,60 @@ impl PeerStates {
         }
 
         // Check if the peer can service the request
-        self.peer_to_state
-            .get(peer)
-            .and_then(PeerState::storage_summary_if_not_ignored)
-            .map(|summary| summary.can_service(&self.data_client_config, request))
-            .unwrap_or(false)
+        if let Some(peer_state) = self.peer_to_state.get(peer) {
+            return match peer_state.get_storage_summary_if_not_ignored() {
+                Some(storage_summary) => {
+                    storage_summary.can_service(&self.data_client_config, time_service, request)
+                },
+                None => false, // The peer is temporarily ignored
+            };
+        }
+
+        // Otherwise, the request cannot be serviced
+        false
     }
 
     /// Updates the score of the peer according to a successful operation
-    pub fn update_score_success(&mut self, peer: PeerNetworkId) {
-        let old_score = self.peer_to_state.entry(peer).or_default().score;
-        self.peer_to_state
-            .entry(peer)
-            .or_default()
-            .update_score_success();
-        let new_score = self.peer_to_state.entry(peer).or_default().score;
-        if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PeerNoLongerIgnored)
-                    .message("Peer will no longer be ignored")
-                    .peer(&peer))
-            );
+    pub fn update_score_success(&self, peer: PeerNetworkId) {
+        if let Some(mut entry) = self.peer_to_state.get_mut(&peer) {
+            // Get the peer's old score
+            let old_score = entry.score;
+
+            // Update the peer's score with a successful operation
+            entry.update_score_success();
+
+            // Log if the peer is no longer ignored
+            let new_score = entry.score;
+            if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
+                info!(
+                    (LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::PeerNoLongerIgnored)
+                        .message("Peer will no longer be ignored")
+                        .peer(&peer))
+                );
+            }
         }
     }
 
     /// Updates the score of the peer according to an error
-    pub fn update_score_error(&mut self, peer: PeerNetworkId, error: ErrorType) {
-        let old_score = self.peer_to_state.entry(peer).or_default().score;
-        self.peer_to_state
-            .entry(peer)
-            .or_default()
-            .update_score_error(error);
-        let new_score = self.peer_to_state.entry(peer).or_default().score;
-        if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PeerIgnored)
-                    .message("Peer will be ignored")
-                    .peer(&peer))
-            );
+    pub fn update_score_error(&self, peer: PeerNetworkId, error: ErrorType) {
+        if let Some(mut entry) = self.peer_to_state.get_mut(&peer) {
+            // Get the peer's old score
+            let old_score = entry.score;
+
+            // Update the peer's score with an error
+            entry.update_score_error(error);
+
+            // Log if the peer is now ignored
+            let new_score = entry.score;
+            if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
+                info!(
+                    (LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::PeerIgnored)
+                        .message("Peer will be ignored")
+                        .peer(&peer))
+                );
+            }
         }
     }
 
@@ -208,13 +221,13 @@ impl PeerStates {
     }
 
     /// Marks an in-flight request as started for the specified peer
-    pub fn new_in_flight_request(&mut self, peer: &PeerNetworkId) {
+    pub fn new_in_flight_request(&self, peer: &PeerNetworkId) {
         // Get the current in-flight polls
         let is_priority_peer = self.is_priority_peer(peer);
         let in_flight_polls = if is_priority_peer {
-            &mut self.in_flight_priority_polls
+            &self.in_flight_priority_polls
         } else {
-            &mut self.in_flight_regular_polls
+            &self.in_flight_regular_polls
         };
 
         // Insert the new peer
@@ -232,11 +245,12 @@ impl PeerStates {
     }
 
     /// Marks the pending in-flight request as complete for the specified peer
-    pub fn mark_in_flight_request_complete(&mut self, peer: &PeerNetworkId) {
+    pub fn mark_in_flight_request_complete(&self, peer: &PeerNetworkId) {
         // The priority of the peer might have changed since we
         // last polled it, so we attempt to remove it from both
         // the regular and priority in-flight requests.
-        if !self.in_flight_priority_polls.remove(peer) && !self.in_flight_regular_polls.remove(peer)
+        if self.in_flight_priority_polls.remove(peer).is_none()
+            && self.in_flight_regular_polls.remove(peer).is_none()
         {
             error!(
                 (LogSchema::new(LogEntry::PeerStates)
@@ -290,7 +304,7 @@ impl PeerStates {
     }
 
     /// Updates the storage summary for the given peer
-    pub fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
+    pub fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
         self.peer_to_state
             .entry(peer)
             .or_default()
@@ -298,23 +312,27 @@ impl PeerStates {
     }
 
     /// Garbage collects the peer states to remove data for disconnected peers
-    pub fn garbage_collect_peer_states(&mut self, connected_peers: Vec<PeerNetworkId>) {
+    pub fn garbage_collect_peer_states(&self, connected_peers: Vec<PeerNetworkId>) {
         self.peer_to_state
             .retain(|peer_network_id, _| connected_peers.contains(peer_network_id));
     }
 
     /// Calculates a global data summary using all known storage summaries
-    pub fn calculate_aggregate_summary(&self) -> GlobalDataSummary {
-        // Only include likely-not-malicious peers in the data summary aggregation
-        let summaries: Vec<StorageServerSummary> = self
+    pub fn calculate_global_data_summary(&self) -> GlobalDataSummary {
+        // Gather all storage summaries, but exclude peers that are ignored
+        let storage_summaries: Vec<StorageServerSummary> = self
             .peer_to_state
-            .values()
-            .filter_map(PeerState::storage_summary_if_not_ignored)
-            .cloned()
+            .iter()
+            .filter_map(|peer_state| {
+                peer_state
+                    .value()
+                    .get_storage_summary_if_not_ignored()
+                    .cloned()
+            })
             .collect();
 
         // If we have no peers, return an empty global summary
-        if summaries.is_empty() {
+        if storage_summaries.is_empty() {
             return GlobalDataSummary::empty();
         }
 
@@ -324,7 +342,7 @@ impl PeerStates {
         let mut max_state_chunk_sizes = vec![];
         let mut max_transaction_chunk_sizes = vec![];
         let mut max_transaction_output_chunk_sizes = vec![];
-        for summary in summaries {
+        for summary in storage_summaries {
             // Collect aggregate data advertisements
             if let Some(epoch_ending_ledger_infos) = summary.data_summary.epoch_ending_ledger_infos
             {
@@ -373,7 +391,7 @@ impl PeerStates {
 
     #[cfg(test)]
     /// Returns a copy of the peer to states map for test purposes
-    pub fn get_peer_to_states(&self) -> HashMap<PeerNetworkId, PeerState> {
+    pub fn get_peer_to_states(&self) -> DashMap<PeerNetworkId, PeerState> {
         self.peer_to_state.clone()
     }
 }

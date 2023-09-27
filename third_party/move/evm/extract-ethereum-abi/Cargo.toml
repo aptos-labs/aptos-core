@@ -16,7 +16,7 @@ move-to-yul = { path = "../move-to-yul" }
 # external dependencies
 anyhow = "1.0.38"
 atty = "0.2.14"
-clap = { version = "4.3.5", features = ["derive", "env"] }
+clap = { version = "4.3.9", features = ["derive", "env"] }
 codespan = "0.11.1"
 codespan-reporting = "0.11.1"
 ethabi = "17.0.0"

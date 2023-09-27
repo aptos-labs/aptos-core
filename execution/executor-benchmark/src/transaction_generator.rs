@@ -4,24 +4,30 @@
 
 use crate::account_generator::{AccountCache, AccountGenerator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
+use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::TransactionGeneratorCreator;
 use aptos_types::{
-    account_address::AccountAddress,
-    account_config::aptos_test_root_address,
-    account_view::AccountView,
-    chain_id::ChainId,
-    transaction::{Transaction, Version},
+    account_address::AccountAddress, account_config::aptos_test_root_address,
+    account_view::AccountView, chain_id::ChainId, transaction::Transaction,
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
-use rand::thread_rng;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+#[cfg(test)]
+use rand::SeedableRng;
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
+use rayon::{
+    iter::{IntoParallelRefIterator, ParallelIterator},
+    ThreadPool, ThreadPoolBuilder,
+};
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
+use std::collections::HashSet;
 use std::{
+    collections::{BTreeMap, HashMap},
     fs::File,
     io::{Read, Write},
     iter::once,
@@ -32,7 +38,7 @@ use std::{
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
 
-fn get_progress_bar(num_accounts: usize) -> ProgressBar {
+pub(crate) fn get_progress_bar(num_accounts: usize) -> ProgressBar {
     let bar = ProgressBar::new(num_accounts as u64);
     bar.set_style(ProgressStyle::default_bar().template(
         "[{elapsed_precise} {per_sec}] {bar:100.cyan/blue} {percent}% ETA {eta_precise}",
@@ -82,9 +88,6 @@ pub struct TransactionGenerator {
     /// creation.
     num_existing_accounts: usize,
 
-    /// Record the number of txns generated.
-    version: Version,
-
     /// Each generated block of transactions are sent to this channel. Using `SyncSender` to make
     /// sure if execution is slow to consume the transactions, we do not run out of memory.
     block_sender: Option<mpsc::SyncSender<Vec<Transaction>>>,
@@ -94,6 +97,12 @@ pub struct TransactionGenerator {
 
     /// root account is used across creating and minting.
     root_account: LocalAccount,
+
+    /// # of workers used to generate transactions.
+    num_workers: usize,
+    // TODO(grao): Use a different pool, and pin threads to dedicate cores to avoid affecting the
+    // rest parts of benchmark.
+    worker_pool: ThreadPool,
 }
 
 impl TransactionGenerator {
@@ -108,14 +117,7 @@ impl TransactionGenerator {
             num_accounts,
             name,
         );
-        let mut accounts = AccountCache::new(generator);
-        let bar = get_progress_bar(num_accounts);
-        for _ in 0..num_accounts {
-            accounts.grow(1);
-            bar.inc(1);
-        }
-        bar.finish();
-        accounts
+        AccountCache::new(generator, num_accounts)
     }
 
     pub fn resync_sequence_numbers(
@@ -128,7 +130,7 @@ impl TransactionGenerator {
             let seq_num = get_sequence_number(account.address(), reader.clone());
             if seq_num > 0 {
                 updated += 1;
-                *account.sequence_number_mut() = seq_num;
+                account.set_sequence_number(seq_num);
             }
         }
         if updated > 0 {
@@ -175,8 +177,8 @@ impl TransactionGenerator {
         genesis_key: Ed25519PrivateKey,
         block_sender: mpsc::SyncSender<Vec<Transaction>>,
         db_dir: P,
-        version: Version,
         num_main_signer_accounts: Option<usize>,
+        num_workers: usize,
     ) -> Self {
         let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
 
@@ -193,9 +195,13 @@ impl TransactionGenerator {
                 Self::gen_user_account_cache(db.reader.clone(), num_cached_accounts, 0)
             }),
             num_existing_accounts,
-            version,
             block_sender: Some(block_sender),
             transaction_factory: Self::create_transaction_factory(),
+            num_workers,
+            worker_pool: ThreadPoolBuilder::new()
+                .num_threads(num_workers)
+                .build()
+                .unwrap(),
         }
     }
 
@@ -235,10 +241,6 @@ impl TransactionGenerator {
         self.num_existing_accounts
     }
 
-    pub fn version(&self) -> Version {
-        self.version
-    }
-
     pub fn run_mint(
         &mut self,
         reader: Arc<dyn DbReader>,
@@ -269,9 +271,19 @@ impl TransactionGenerator {
         block_size: usize,
         num_transfer_blocks: usize,
         transactions_per_sender: usize,
+        connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
+        hotspot_probability: Option<f32>,
     ) {
         assert!(self.block_sender.is_some());
-        self.gen_transfer_transactions(block_size, num_transfer_blocks, transactions_per_sender);
+        self.gen_transfer_transactions(
+            block_size,
+            num_transfer_blocks,
+            transactions_per_sender,
+            connected_tx_grps,
+            shuffle_connected_txns,
+            hotspot_probability,
+        );
     }
 
     pub fn run_workload(
@@ -295,13 +307,12 @@ impl TransactionGenerator {
             )
             .into_iter()
             .flat_map(|idx| {
-                let sender = &mut self.main_signer_accounts.as_mut().unwrap().accounts[idx];
+                let sender = &self.main_signer_accounts.as_mut().unwrap().accounts[idx];
                 transaction_generator.generate_transactions(sender, transactions_per_sender)
             })
             .map(Transaction::UserTransaction)
             .chain(once(Transaction::StateCheckpoint(HashValue::random())))
             .collect();
-            self.version += transactions.len() as Version;
 
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
@@ -349,7 +360,6 @@ impl TransactionGenerator {
                 })
                 .chain(once(Transaction::StateCheckpoint(HashValue::random())))
                 .collect();
-            self.version += transactions.len() as Version;
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
                 sender.send(transactions).unwrap();
@@ -379,10 +389,22 @@ impl TransactionGenerator {
         let bar = get_progress_bar(num_new_accounts);
 
         for chunk in &(0..num_new_accounts).chunks(block_size) {
-            let transactions: Vec<_> = chunk
+            let input: Vec<_> = chunk
                 .map(|_| {
-                    let sender = self.seed_accounts_cache.as_mut().unwrap().get_random();
-                    let new_account = generator.generate();
+                    (
+                        self.seed_accounts_cache
+                            .as_mut()
+                            .unwrap()
+                            .get_random_index(),
+                        generator.generate(),
+                    )
+                })
+                .collect();
+            self.generate_and_send_block(
+                self.seed_accounts_cache.as_ref().unwrap(),
+                input,
+                |(sender_idx, new_account), account_cache| {
+                    let sender = &account_cache.accounts[sender_idx];
                     let txn = sender.sign_with_transaction_builder(
                         self.transaction_factory
                             .implicitly_create_user_account_and_transfer(
@@ -391,13 +413,9 @@ impl TransactionGenerator {
                             ),
                     );
                     Transaction::UserTransaction(txn)
-                })
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
-                .collect();
-            self.version += transactions.len() as Version;
-            if let Some(sender) = &self.block_sender {
-                sender.send(transactions).unwrap();
-            }
+                },
+                |(sender_idx, _)| *sender_idx,
+            );
             bar.inc(block_size as u64);
         }
         bar.finish();
@@ -405,39 +423,277 @@ impl TransactionGenerator {
     }
 
     /// Generates transactions for random pairs of accounts.
-    pub fn gen_transfer_transactions(
+    pub fn gen_random_transfer_transactions(
         &mut self,
         block_size: usize,
         num_blocks: usize,
         transactions_per_sender: usize,
     ) {
         for _ in 0..num_blocks {
-            // TODO: handle when block_size isn't divisible by transactions_per_sender
-            let transactions: Vec<_> = (0..(block_size / transactions_per_sender))
-                .flat_map(|_| {
-                    let (sender, receivers) = self
-                        .main_signer_accounts
-                        .as_mut()
-                        .unwrap()
-                        .get_random_transfer_batch(transactions_per_sender);
-                    receivers
-                        .into_iter()
-                        .map(|receiver| {
-                            let amount = 1;
-                            let txn = sender.sign_with_transaction_builder(
-                                self.transaction_factory.transfer(receiver, amount),
-                            );
-                            Transaction::UserTransaction(txn)
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .chain(once(Transaction::StateCheckpoint(HashValue::random())))
-                .collect();
-            self.version += transactions.len() as Version;
+            let transfer_indices =
+                self.get_random_transfer_indices(block_size, transactions_per_sender);
+            self.generate_and_send_transfer_block(
+                self.main_signer_accounts.as_ref().unwrap(),
+                transfer_indices,
+            );
+        }
+    }
 
-            if let Some(sender) = &self.block_sender {
-                sender.send(transactions).unwrap();
+    fn get_random_transfer_indices(
+        &mut self,
+        block_size: usize,
+        transactions_per_sender: usize,
+    ) -> Vec<(usize, usize)> {
+        // TODO: handle when block_size isn't divisible by transactions_per_sender
+        (0..(block_size / transactions_per_sender))
+            .flat_map(|_| {
+                let (sender, receivers) = self
+                    .main_signer_accounts
+                    .as_mut()
+                    .unwrap()
+                    .get_random_transfer_batch(transactions_per_sender);
+                receivers
+                    .into_iter()
+                    .map(|receiver| (sender, receiver))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
+    }
+
+    /// Generates random P2P transfer transactions, with `1-hotspot_probability` of the accounts used `hotspot_probability` of the time.
+    ///
+    /// Example 1. If `hotspot_probability` is 0.5, all accounts have the same probability of being sampled.
+    ///
+    /// Example 2. Say there are 10 accounts A0, ..., A9 and `hotspot_probability` is 0.8.
+    /// Whenever we need to sample an account, with probability 0.8 we sample from {A0, A1} uniformly at random;
+    /// with probability 0.2 we sample from {A2, ..., A9} uniformly at random.
+    pub fn gen_random_transfers_with_hotspot(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        hotspot_probability: f32,
+    ) {
+        assert!((0.5..1.0).contains(&hotspot_probability));
+        for _ in 0..num_blocks {
+            let transfer_indices =
+                self.get_random_with_hotspot_transfer_indices(block_size, hotspot_probability);
+            self.generate_and_send_transfer_block(
+                self.main_signer_accounts.as_ref().unwrap(),
+                transfer_indices,
+            );
+        }
+    }
+
+    fn get_random_with_hotspot_transfer_indices(
+        &mut self,
+        block_size: usize,
+        hotspot_probability: f32,
+    ) -> Vec<(usize, usize)> {
+        let num_accounts = self.main_signer_accounts.as_ref().unwrap().len();
+        let num_hotspot_accounts =
+            ((1.0 - hotspot_probability) * num_accounts as f32).ceil() as usize;
+        let mut rng = thread_rng();
+        (0..block_size)
+            .map(|_| {
+                (
+                    rand_with_hotspot(&mut rng, num_accounts, num_hotspot_accounts),
+                    rand_with_hotspot(&mut rng, num_accounts, num_hotspot_accounts),
+                )
+            })
+            .collect()
+    }
+
+    /// 'Conflicting groups of txns' are a type of 'connected groups of txns'.
+    /// Here we generate conflicts completely on one particular address (which can be sender or
+    /// receiver).
+    /// To generate 'n' conflicting groups, we divide the signer accounts into 'n' pools, and
+    /// create 'block_size / n' transactions in each group. In each group, we randomly pick
+    /// an address from the pool belonging to that group, and create all txns with that address as
+    /// a sender or receiver (thereby generating conflicts around that address). In other words,
+    /// all txns in a group would have to be executed in serial order.
+    /// Finally, after generating such groups of conflicting txns, we shuffle them to generate a
+    /// more realistic workload (that is conflicting txns need not always be consecutive).
+    fn get_conflicting_grps_transfer_indices(
+        rng: &mut StdRng,
+        num_signer_accounts: usize,
+        block_size: usize,
+        conflicting_tx_grps: usize,
+        shuffle_indices: bool,
+    ) -> Vec<(usize, usize)> {
+        let num_accounts_per_grp = num_signer_accounts / conflicting_tx_grps;
+        // TODO: handle when block_size isn't divisible by connected_tx_grps; an easy
+        //       way to do this is to just generate a few more transactions in the last group
+        let num_txns_per_grp = block_size / conflicting_tx_grps;
+
+        if 2 * conflicting_tx_grps >= num_signer_accounts {
+            panic!(
+                "For the desired workload we want num_signer_accounts ({}) > 2 * num_txns_per_grp ({})",
+                num_signer_accounts, num_txns_per_grp);
+        } else if conflicting_tx_grps > block_size {
+            panic!(
+                "connected_tx_grps ({}) > block_size ({}) cannot guarantee at least 1 txn per grp",
+                conflicting_tx_grps, block_size
+            );
+        }
+
+        let mut signer_account_indices: Vec<_> = (0..num_signer_accounts).collect();
+        signer_account_indices.shuffle(rng);
+
+        let mut transfer_indices: Vec<_> = (0..conflicting_tx_grps)
+            .flat_map(|grp_idx| {
+                let accounts_start_idx = grp_idx * num_accounts_per_grp;
+                let accounts_end_idx = accounts_start_idx + num_accounts_per_grp - 1;
+                let mut accounts_pool: Vec<_> =
+                    signer_account_indices[accounts_start_idx..=accounts_end_idx].to_vec();
+                let index1 = accounts_pool.pop().unwrap();
+
+                let conflicting_indices: Vec<_> = (0..num_txns_per_grp)
+                    .map(|_| {
+                        let index2 = accounts_pool[rng.gen_range(0, accounts_pool.len())];
+                        if rng.gen::<bool>() {
+                            (index1, index2)
+                        } else {
+                            (index2, index1)
+                        }
+                    })
+                    .collect();
+                conflicting_indices
+            })
+            .collect();
+        if shuffle_indices {
+            transfer_indices.shuffle(rng);
+        }
+        transfer_indices
+    }
+
+    /// A 'connected transaction group' is a group of transactions where all the transactions are
+    /// connected to each other. For now we generate connected groups of txns as conflicting, but
+    /// real world workloads can be more complex (and we can generate them as needed in the future).
+    pub fn gen_connected_grps_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
+    ) {
+        for _ in 0..num_blocks {
+            let num_signer_accounts = self.main_signer_accounts.as_ref().unwrap().accounts.len();
+            let rng = &mut self.main_signer_accounts.as_mut().unwrap().rng;
+            let transfer_indices: Vec<_> =
+                TransactionGenerator::get_conflicting_grps_transfer_indices(
+                    rng,
+                    num_signer_accounts,
+                    block_size,
+                    connected_tx_grps,
+                    shuffle_connected_txns,
+                );
+            self.generate_and_send_transfer_block(
+                self.main_signer_accounts.as_ref().unwrap(),
+                transfer_indices,
+            );
+        }
+    }
+
+    fn generate_and_send_transfer_block(
+        &self,
+        account_cache: &AccountCache,
+        transfer_indices: Vec<(usize, usize)>,
+    ) {
+        self.generate_and_send_block(
+            account_cache,
+            transfer_indices,
+            |(sender_idx, receiver_idx), account_cache| {
+                let txn = account_cache.accounts[sender_idx].sign_with_transaction_builder(
+                    self.transaction_factory
+                        .transfer(account_cache.accounts[receiver_idx].address(), 1),
+                );
+                Transaction::UserTransaction(txn)
+            },
+            |(sender_idx, _)| *sender_idx,
+        );
+    }
+
+    fn generate_and_send_block<T, F, S>(
+        &self,
+        account_cache: &AccountCache,
+        inputs: Vec<T>,
+        func: F,
+        sender_func: S,
+    ) where
+        T: Send,
+        F: Fn(T, &AccountCache) -> Transaction + Send + Sync,
+        S: Fn(&T) -> usize,
+    {
+        let block_size = inputs.len();
+        let mut jobs = Vec::new();
+        jobs.resize_with(self.num_workers, BTreeMap::new);
+        inputs.into_iter().enumerate().for_each(|(i, input)| {
+            let sender_idx = sender_func(&input);
+            jobs[sender_idx % self.num_workers].insert(i, || func(input, account_cache));
+        });
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.worker_pool.scope(move |scope| {
+            for (_, per_worker_jobs) in jobs.into_iter().enumerate() {
+                let tx = tx.clone();
+                scope.spawn(move |_| {
+                    for (index, job) in per_worker_jobs {
+                        tx.send((index, job())).unwrap();
+                    }
+                });
             }
+        });
+
+        let mut transactions_by_index = HashMap::new();
+        while let Ok((index, txn)) = rx.recv() {
+            transactions_by_index.insert(index, txn);
+        }
+
+        let mut transactions = Vec::new();
+        for i in 0..block_size {
+            transactions.push(transactions_by_index.get(&i).unwrap().clone());
+        }
+
+        transactions.push(Transaction::StateCheckpoint(HashValue::random()));
+
+        if let Some(sender) = &self.block_sender {
+            sender.send(transactions).unwrap();
+        }
+    }
+
+    pub fn gen_transfer_transactions(
+        &mut self,
+        block_size: usize,
+        num_blocks: usize,
+        transactions_per_sender: usize,
+        connected_tx_grps: usize,
+        shuffle_connected_txns: bool,
+        hotspot_probability: Option<f32>,
+    ) {
+        info!("Starting block generation.");
+        info!("block_size={block_size}");
+        info!("num_blocks={num_blocks}");
+        if connected_tx_grps > 0 {
+            info!("block_generation_mode=connected_tx_grps");
+            info!("connected_tx_grps={connected_tx_grps}");
+            info!("shuffle_connected_txns={shuffle_connected_txns}");
+            self.gen_connected_grps_transfer_transactions(
+                block_size,
+                num_blocks,
+                connected_tx_grps,
+                shuffle_connected_txns,
+            );
+        } else if hotspot_probability.is_some() {
+            info!("block_generation_mode=sample_from_pool_with_hotspot");
+            info!("hotspot_ratio={hotspot_probability:?}");
+            self.gen_random_transfers_with_hotspot(
+                block_size,
+                num_blocks,
+                hotspot_probability.unwrap(),
+            );
+        } else {
+            info!("block_generation_mode=default_sample");
+            info!("transactions_per_sender={transactions_per_sender}");
+            self.gen_random_transfer_transactions(block_size, num_blocks, transactions_per_sender);
         }
     }
 
@@ -481,5 +737,78 @@ impl TransactionGenerator {
     /// Drops the sender to notify the receiving end of the channel.
     pub fn drop_sender(&mut self) {
         self.block_sender.take().unwrap();
+    }
+}
+
+/// With probability `1-h/n`, pick an integer in [0, h) uniformly at random;
+/// with probability `h/n`, pick an integer in [h, n) uniformly at random.
+fn rand_with_hotspot<R: Rng>(rng: &mut R, n: usize, h: usize) -> usize {
+    let from_hotspot = rng.gen_range(0, n) > h;
+    if from_hotspot {
+        rng.gen_range(0, h)
+    } else {
+        rng.gen_range(h, n)
+    }
+}
+
+#[test]
+fn test_get_conflicting_grps_transfer_indices() {
+    let mut rng = StdRng::from_entropy();
+
+    fn dfs(node: usize, adj_list: &HashMap<usize, HashSet<usize>>, visited: &mut HashSet<usize>) {
+        visited.insert(node);
+        for &n in adj_list.get(&node).unwrap() {
+            if !visited.contains(&n) {
+                dfs(n, adj_list, visited);
+            }
+        }
+    }
+
+    fn get_num_connected_components(adj_list: &HashMap<usize, HashSet<usize>>) -> usize {
+        let mut visited = HashSet::new();
+        let mut num_connected_components = 0;
+        for node in adj_list.keys() {
+            if !visited.contains(node) {
+                dfs(*node, adj_list, &mut visited);
+                num_connected_components += 1;
+            }
+        }
+        num_connected_components
+    }
+
+    {
+        let block_size = 100;
+        let num_signer_accounts = 1000;
+        // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
+        // (iii) when all txns in the block are independent (iv) all txns are dependent
+        for connected_txn_grps in [3, block_size / 10, block_size, 1] {
+            let transfer_indices = TransactionGenerator::get_conflicting_grps_transfer_indices(
+                &mut rng,
+                num_signer_accounts,
+                block_size,
+                connected_txn_grps,
+                true,
+            );
+
+            let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();
+            assert_eq!(
+                transfer_indices.len(),
+                (block_size / connected_txn_grps) * connected_txn_grps
+            );
+            for (sender_idx, receiver_idx) in transfer_indices {
+                assert!(sender_idx < num_signer_accounts);
+                assert!(receiver_idx < num_signer_accounts);
+                adj_list
+                    .entry(sender_idx)
+                    .or_insert(HashSet::new())
+                    .insert(receiver_idx);
+                adj_list
+                    .entry(receiver_idx)
+                    .or_insert(HashSet::new())
+                    .insert(sender_idx);
+            }
+
+            assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);
+        }
     }
 }

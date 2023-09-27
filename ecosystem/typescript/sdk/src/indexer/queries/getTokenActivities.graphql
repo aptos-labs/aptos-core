@@ -1,3 +1,4 @@
+#import "./TokenActivitiesFieldsFragment";
 query getTokenActivities(
   $where_condition: token_activities_v2_bool_exp!
   $offset: Int
@@ -5,20 +6,6 @@ query getTokenActivities(
   $order_by: [token_activities_v2_order_by!]
 ) {
   token_activities_v2(where: $where_condition, order_by: $order_by, offset: $offset, limit: $limit) {
-    after_value
-    before_value
-    entry_function_id_str
-    event_account_address
-    event_index
-    from_address
-    is_fungible_v2
-    property_version_v1
-    to_address
-    token_amount
-    token_data_id
-    token_standard
-    transaction_timestamp
-    transaction_version
-    type
+    ...TokenActivitiesFields
   }
 }

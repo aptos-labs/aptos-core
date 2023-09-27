@@ -26,6 +26,12 @@ class Kubernetes(ABC):
         pass
 
     @abstractmethod
+    def delete_resource(
+        self, kubernetes_object: KubernetesResource, namespace: str = "default"
+    ) -> bool:
+        pass
+
+    @abstractmethod
     def get_resources(
         self, type: type, namespace: str = "default"
     ) -> List[KubernetesResource]:
@@ -111,8 +117,103 @@ class LiveKubernetes(Kubernetes):
             return core_v1_api.create_namespaced_persistent_volume_claim(
                 namespace=namespace, body=kubernetes_object
             )
+        elif isinstance(kubernetes_object, client.V1Pod):  # type: ignore
+            return core_v1_api.create_namespaced_pod(
+                namespace=namespace, body=kubernetes_object
+            )
         else:
             raise NotImplemented("This resource type is not implemented!")
+
+    def delete_resource(
+        self, kubernetes_object: KubernetesResource, namespace: str = "default"
+    ) -> bool:
+        config.load_kube_config()  # type:ignore
+        core_v1_api = client.CoreV1Api()
+        apps_v1_api = client.AppsV1Api()
+        if not kubernetes_object.metadata or not kubernetes_object.metadata.name:
+            raise ApiException(
+                status=400,
+                reason="Cannot delete a k8s resource without metadata or name!",
+            )
+        self._verify_k8s_obj_name(namespace)
+        resource_name: str = kubernetes_object.metadata.name
+        self._verify_k8s_obj_name(resource_name)
+        if isinstance(kubernetes_object, client.V1Namespace):
+            try:
+                core_v1_api.delete_namespace(
+                    name=namespace, body=client.V1DeleteOptions()
+                )
+            except Exception as exception:
+                log.error(f'Failed deleting the namespace "{namespace}""!')
+                return False
+        elif isinstance(kubernetes_object, client.V1Service):
+            try:
+                core_v1_api.delete_namespaced_service(
+                    name=resource_name,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(),
+                )
+            except Exception as exception:
+                log.error(f'Failed deleting the service "{resource_name}""!')
+                return False
+        elif isinstance(kubernetes_object, client.V1StatefulSet):
+            try:
+                apps_v1_api.delete_namespaced_stateful_set(
+                    name=resource_name,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(),
+                )
+            except Exception as exception:
+                log.error(f'Failed deleting the statefulset "{resource_name}""!')
+                return False
+        elif isinstance(kubernetes_object, client.V1ConfigMap):
+            try:
+                core_v1_api.delete_namespaced_config_map(
+                    name=resource_name,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(),
+                )
+            except Exception as exception:
+                log.error(f'Failed deleting the configmap "{resource_name}""!')
+                return False
+        elif isinstance(kubernetes_object, client.V1Secret):  # type: ignore
+            try:
+                core_v1_api.delete_namespaced_secret(
+                    name=resource_name,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(),
+                )
+            except Exception as exception:
+                log.error(f'Failed deleting the secret "{resource_name}""!')
+                return False
+        elif isinstance(kubernetes_object, client.V1PersistentVolumeClaim):  # type: ignore
+            try:
+                core_v1_api.delete_namespaced_persistent_volume_claim(
+                    name=resource_name,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(),
+                )
+            except Exception as exception:
+                log.error(
+                    f'Failed deleting the persistent volume claim "{resource_name}""!'
+                )
+                return False
+        elif isinstance(kubernetes_object, client.V1Pod):  # type: ignore
+            try:
+                core_v1_api.delete_namespaced_pod(
+                    name=resource_name,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(),
+                )
+            except Exception as exception:
+                log.error(f'Failed deleting the pod "{resource_name}""!')
+                return False
+        else:
+            raise NotImplemented(
+                "Delete operation on this resource type is not implemented!"
+            )
+
+        return True
 
     def get_resources(
         self, type: type, namespace: str = "default"
@@ -171,6 +272,7 @@ class LiveKubernetes(Kubernetes):
             raise ApiException(status=400, reason="NO STATEFULSET SPEC FOUND.")
 
     def delete_namespace(self, namespace: str, wait_deletion: bool) -> bool:
+        # TODO Deprecate this method, merge with delete_resource
         config.load_kube_config()  # type:ignore
         core_v1_api = client.CoreV1Api()
         try:
@@ -322,6 +424,31 @@ class SpyKubernetes(Kubernetes):
                 namespace, resource_name, kubernetes_object
             )
 
+    def delete_resource(
+        self, kubernetes_object: KubernetesResource, namespace: str = "default"
+    ) -> bool:
+        if not kubernetes_object.metadata or not kubernetes_object.metadata.name:
+            raise ApiException(
+                status=400,
+                reason="Cannot delete a k8s resource without metadata or name!",
+            )
+        self._verify_k8s_obj_name(namespace)
+        resource_name: str = kubernetes_object.metadata.name
+        self._verify_k8s_obj_name(resource_name)
+        if isinstance(kubernetes_object, client.V1Namespace):
+            if not resource_name in self.namespaces:
+                raise ApiException(
+                    status=400,
+                    reason=f'The namespace with the name "{resource_name}" does not exist!',
+                )
+            self.namespaces.pop(resource_name)
+            self.namespaced_resource_dictionary.pop(resource_name)
+            return True
+        else:
+            return self._delete_resource_helper(
+                namespace, resource_name, kubernetes_object
+            )
+
     def get_resources(
         self, type: type, namespace: str = "default"
     ) -> List[KubernetesResource]:
@@ -463,3 +590,28 @@ class SpyKubernetes(Kubernetes):
             )
         resources[resource_name] = resource
         return resource
+
+    def _delete_resource_helper(
+        self,
+        namespace: str,
+        resource_name: str,
+        resource: KubernetesResource,
+    ) -> bool:
+        resource_type: int = hash(type(resource))
+        self._check_namespace_exists(namespace)
+        resource_types: dict[
+            int, dict[str, KubernetesResource]
+        ] = self.namespaced_resource_dictionary[namespace]
+        if not resource_type in resource_types:
+            resource_types[resource_type] = dict()
+        resources: dict[str, KubernetesResource] = resource_types[resource_type]
+        if not resource_name in resources:
+            log.error(
+                f'This {resource_type} named "{resource_name}" does not exist in this namespace "{namespace}"!'
+            )
+            raise ApiException(
+                status=409,
+                reason=f'The namespace with the name "{resource_name}" does not exist!',
+            )
+        resources.pop(resource_name)
+        return True

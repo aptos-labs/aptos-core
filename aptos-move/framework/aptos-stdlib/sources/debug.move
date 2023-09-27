@@ -66,7 +66,6 @@ module aptos_std::debug {
     public fun test()  {
         let x = 42;
         assert_equal(&x, b"42");
-        print(&x);
 
         let v = vector::empty();
         vector::push_back(&mut v, 100);
@@ -102,8 +101,11 @@ module aptos_std::debug {
         assert_equal(&str, b"\"Can you say \\\"Hel\\\\lo\\\"?\"");
     }
 
-    #[test]
-    fun test_print_primitive_types() {
+
+    #[test_only]
+    use std::features;
+    #[test(s = @0x123)]
+    fun test_print_primitive_types(s: signer) {
         let u8 = 255u8;
         assert_equal(&u8, b"255");
 
@@ -131,10 +133,10 @@ module aptos_std::debug {
         let a = @0x1234c0ffee;
         assert_equal(&a, b"@0x1234c0ffee");
 
-        // print a signer
-        /*let senders = create_signers_for_testing(1);
-        let sender = vector::pop_back(&mut senders);
-        print(&sender);*/
+        if (features::signer_native_format_fix_enabled()) {
+            let signer = s;
+            assert_equal(&signer, b"signer(@0x123)");
+        }
     }
 
     const MSG_1 : vector<u8> = b"abcdef";
@@ -159,8 +161,8 @@ module aptos_std::debug {
         assert_equal(&obj, b"0x1::debug::TestInner {\n  val: 10,\n  vec: [],\n  msgs: []\n}");
     }
 
-    #[test]
-    fun test_print_vectors() {
+    #[test(s1 = @0x123, s2 = @0x456)]
+    fun test_print_vectors(s1: signer, s2: signer) {
         let v_u8 = x"ffabcdef";
         assert_equal(&v_u8, b"0xffabcdef");
 
@@ -185,8 +187,10 @@ module aptos_std::debug {
         let v_addr = vector[@0x1234, @0x5678, @0xabcdef];
         assert_equal(&v_addr, b"[ @0x1234, @0x5678, @0xabcdef ]");
 
-        /*let v_signer = create_signers_for_testing(4);
-        print(&v_signer);*/
+        if (features::signer_native_format_fix_enabled()) {
+            let v_signer = vector[s1, s2];
+            assert_equal(&v_signer, b"[ signer(@0x123), signer(@0x456) ]");
+        };
 
         let v = vector[
             TestInner {
@@ -203,8 +207,8 @@ module aptos_std::debug {
         assert_equal(&v, b"[\n  0x1::debug::TestInner {\n    val: 4,\n    vec: [ 127, 128 ],\n    msgs: [\n      0x00ff,\n      0xabcd\n    ]\n  },\n  0x1::debug::TestInner {\n    val: 8,\n    vec: [ 128, 129 ],\n    msgs: [\n      0x0000\n    ]\n  }\n]");
     }
 
-    #[test]
-    fun test_print_vector_of_vectors() {
+    #[test(s1 = @0x123, s2 = @0x456)]
+    fun test_print_vector_of_vectors(s1: signer, s2: signer) {
         let v_u8 = vector[x"ffab", x"cdef"];
         assert_equal(&v_u8, b"[\n  0xffab,\n  0xcdef\n]");
 
@@ -229,8 +233,10 @@ module aptos_std::debug {
         let v_addr = vector[vector[@0x1234, @0x5678], vector[@0xabcdef, @0x9999]];
         assert_equal(&v_addr, b"[\n  [ @0x1234, @0x5678 ],\n  [ @0xabcdef, @0x9999 ]\n]");
 
-        /*let v_signer = vector[create_signers_for_testing(2), create_signers_for_testing(2)];
-        print(&v_signer);*/
+        if (features::signer_native_format_fix_enabled()) {
+            let v_signer = vector[vector[s1], vector[s2]];
+            assert_equal(&v_signer, b"[\n  [ signer(@0x123) ],\n  [ signer(@0x456) ]\n]");
+        };
 
         let v = vector[
             vector[

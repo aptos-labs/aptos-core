@@ -4,8 +4,8 @@ use super::helpers::new_node;
 use crate::dag::{
     tests::helpers::new_certified_node,
     types::{
-        CertifiedNode, DagSnapshotBitmask, Node, NodeCertificate, NodeMetadata, RemoteFetchRequest,
-        TDAGMessage,
+        CertifiedNode, DAGNetworkMessage, DagSnapshotBitmask, Extensions, Node, NodeCertificate,
+        NodeMetadata, RemoteFetchRequest, TDAGMessage,
     },
 };
 use aptos_consensus_types::common::Payload;
@@ -24,6 +24,7 @@ fn test_node_verify() {
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
         Payload::empty(false),
         vec![],
+        Extensions::empty(),
     );
     assert_eq!(
         invalid_node
@@ -33,20 +34,20 @@ fn test_node_verify() {
         "invalid digest"
     );
 
-    // Well-formed round 0 node
-    let zeroth_round_node = new_node(0, 10, signers[0].author(), vec![]);
-    assert_ok!(zeroth_round_node.verify(&validator_verifier));
+    // Well-formed round 1 node
+    let first_round_node = new_node(1, 10, signers[0].author(), vec![]);
+    assert_ok!(first_round_node.verify(&validator_verifier));
 
-    // Round 1 node without parents
+    // Round 2 node without parents
     let node = new_node(2, 20, signers[0].author(), vec![]);
     assert_eq!(
         node.verify(&validator_verifier).unwrap_err().to_string(),
         "not enough parents to satisfy voting power",
     );
 
-    // Round 1
+    // Round 1 cert
     let parent_cert = NodeCertificate::new(
-        zeroth_round_node.metadata().clone(),
+        first_round_node.metadata().clone(),
         AggregateSignature::empty(),
     );
     let node = new_node(3, 20, signers[0].author(), vec![parent_cert]);
@@ -64,6 +65,7 @@ fn test_certified_node_verify() {
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
         Payload::empty(false),
         vec![],
+        Extensions::empty(),
     );
     let invalid_certified_node = CertifiedNode::new(invalid_node, AggregateSignature::empty());
     assert_eq!(
@@ -139,4 +141,30 @@ fn test_dag_snapshot_bitmask() {
     assert!(bitmask.has(2, 1));
     assert!(!bitmask.has(10, 10));
     assert_eq!(bitmask.first_round(), 1);
+}
+
+#[test]
+fn test_dag_network_message() {
+    let short_data = vec![10; 10];
+    let long_data = vec![20; 30];
+
+    let short_message = DAGNetworkMessage {
+        epoch: 1,
+        data: short_data,
+    };
+
+    assert_eq!(
+        format!("{:?}", short_message),
+        "DAGNetworkMessage { epoch: 1, data: \"0a0a0a0a0a0a0a0a0a0a\" }"
+    );
+
+    let long_message = DAGNetworkMessage {
+        epoch: 2,
+        data: long_data,
+    };
+
+    assert_eq!(
+        format!("{:?}", long_message),
+        "DAGNetworkMessage { epoch: 2, data: \"1414141414141414141414141414141414141414\" }"
+    );
 }

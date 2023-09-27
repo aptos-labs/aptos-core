@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 
 use crate::dag::{
-    dag_network::{DAGNetworkSender, RpcWithFallback},
+    dag_network::{RpcWithFallback, TDAGNetworkSender},
     types::{DAGMessage, TestAck, TestMessage},
 };
 use anyhow::{anyhow, bail};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
+use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
@@ -28,7 +29,19 @@ struct MockDAGNetworkSender {
 }
 
 #[async_trait]
-impl DAGNetworkSender for MockDAGNetworkSender {
+impl RBNetworkSender<DAGMessage> for MockDAGNetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        _receiver: Author,
+        _message: DAGMessage,
+        _timeout: Duration,
+    ) -> anyhow::Result<DAGMessage> {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
+impl TDAGNetworkSender for MockDAGNetworkSender {
     async fn send_rpc(
         &self,
         receiver: Author,
@@ -57,7 +70,7 @@ impl DAGNetworkSender for MockDAGNetworkSender {
     }
 
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         responders: Vec<Author>,
         message: DAGMessage,
         retry_interval: Duration,
@@ -68,7 +81,7 @@ impl DAGNetworkSender for MockDAGNetworkSender {
             message,
             retry_interval,
             rpc_timeout,
-            Arc::new(self.clone()),
+            self.clone(),
             self.time_service.clone(),
         )
     }
@@ -98,7 +111,7 @@ async fn test_send_rpc_with_fallback() {
     };
 
     let message = TestMessage(vec![42; validators.len() - 1]);
-    let mut rpc = sender
+    let mut rpc = Arc::new(sender)
         .send_rpc_with_fallbacks(
             validators,
             message.into(),

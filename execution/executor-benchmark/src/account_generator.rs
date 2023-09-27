@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_sdk::{move_types::account_address::AccountAddress, types::LocalAccount};
+use crate::transaction_generator::get_progress_bar;
+use aptos_sdk::types::LocalAccount;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{collections::VecDeque, sync::mpsc};
 
@@ -60,7 +61,6 @@ impl AccountGenerator {
 }
 
 pub struct AccountCache {
-    generator: AccountGenerator,
     pub accounts: VecDeque<LocalAccount>,
     pub rng: StdRng,
 }
@@ -68,10 +68,18 @@ pub struct AccountCache {
 impl AccountCache {
     const SEED: Seed = [1; 32];
 
-    pub fn new(generator: AccountGenerator) -> Self {
+    pub fn new(mut generator: AccountGenerator, num_accounts: usize) -> Self {
+        let bar = get_progress_bar(num_accounts);
+        let accounts = (0..num_accounts)
+            .map(|_| {
+                let account = generator.generate();
+                bar.inc(1);
+                account
+            })
+            .collect();
+        bar.finish();
         Self {
-            generator,
-            accounts: VecDeque::new(),
+            accounts,
             rng: StdRng::from_seed(Self::SEED),
         }
     }
@@ -89,30 +97,19 @@ impl AccountCache {
         &self.accounts
     }
 
-    pub fn grow(&mut self, n: usize) {
-        let accounts: Vec<_> = (0..n).map(|_| self.generator.generate()).collect();
-        self.accounts.extend(accounts);
-    }
-
     pub fn get_random(&mut self) -> &mut LocalAccount {
-        let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), 1);
-        let index = indices.index(0);
-
+        let index = self.get_random_index();
         &mut self.accounts[index]
     }
 
-    pub fn get_random_transfer_batch(
-        &mut self,
-        batch_size: usize,
-    ) -> (&mut LocalAccount, Vec<AccountAddress>) {
+    pub fn get_random_index(&mut self) -> usize {
+        rand::seq::index::sample(&mut self.rng, self.accounts.len(), 1).index(0)
+    }
+
+    pub fn get_random_transfer_batch(&mut self, batch_size: usize) -> (usize, Vec<usize>) {
         let indices = rand::seq::index::sample(&mut self.rng, self.accounts.len(), batch_size + 1);
         let sender_idx = indices.index(0);
-        let receivers = indices
-            .iter()
-            .skip(1)
-            .map(|i| self.accounts[i].address())
-            .collect();
-        let sender = &mut self.accounts[sender_idx];
-        (sender, receivers)
+        let receivers = indices.iter().skip(1).collect();
+        (sender_idx, receivers)
     }
 }

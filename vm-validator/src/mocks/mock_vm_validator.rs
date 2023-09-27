@@ -7,7 +7,6 @@ use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
-    on_chain_config::OnChainConfigPayload,
     transaction::{SignedTransaction, VMValidatorResult},
     vm_status::StatusCode,
 };
@@ -76,7 +75,7 @@ impl TransactionValidation for MockVMValidator {
         Ok(VMValidatorResult::new(ret, 0))
     }
 
-    fn restart(&mut self, _config: OnChainConfigPayload) -> Result<()> {
+    fn restart(&mut self) -> Result<()> {
         Ok(())
     }
 

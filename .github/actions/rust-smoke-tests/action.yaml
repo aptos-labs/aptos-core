@@ -1,0 +1,49 @@
+name: Rust Smoke Tests
+description: Runs all Rust smoke tests
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Checkout the repository and setup the rust toolchain
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Install nextest
+    - uses: taiki-e/install-action@v1.5.6
+      with:
+        tool: nextest
+
+    # Run a postgres database
+    - name: Run postgres database
+      run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      shell: bash
+
+    # Run the rust smoke tests
+    - name: Run rust smoke tests
+      # Prebuild the aptos-node binary so that tests don't start before the node is built.
+      # Also, prebuild the aptos-node binary as a separate step to avoid feature unification issues.
+      # Note: --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
+      run: cargo build --locked --package=aptos-node --features=failpoints,indexer --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
+      shell: bash
+      env:
+        INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+
+    # We always try to create the artifact, but it only creates on flaky or failed smoke tests -- when the directories are empty.
+    - name: Upload smoke test logs for failed and flaky tests
+      if: ${{ failure() || success() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: failed-smoke-test-logs
+        # Retain all smoke test data except for the db (which may be large).
+        path: |
+          /tmp/.tmp*
+          !/tmp/.tmp*/**/db/
+        retention-days: 14

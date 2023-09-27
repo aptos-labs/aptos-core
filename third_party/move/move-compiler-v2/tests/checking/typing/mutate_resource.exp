@@ -7,12 +7,15 @@ module 0x8675309::M {
         r = pack M::R(false);
         Tuple()
     }
-    private fun t1<T>(r: &mut T,x: T) {
+    private fun t1<T>(r: &mut #0,x: #0) {
         r = x;
         Tuple()
     }
-    private fun t2<T>(r: &mut T,x: T) {
+    private fun t2<T>(r: &mut #0,x: #0) {
         r = x;
         Tuple()
     }
+    spec fun $t0(r: &mut M::R);
+    spec fun $t1<T>(r: &mut #0,x: #0);
+    spec fun $t2<T>(r: &mut #0,x: #0);
 } // end 0x8675309::M

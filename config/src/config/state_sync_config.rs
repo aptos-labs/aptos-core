@@ -20,8 +20,8 @@ const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
 const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
 
 // The maximum number of concurrent requests to send
-const MAX_CONCURRENT_REQUESTS: u64 = 12;
-const MAX_CONCURRENT_STATE_REQUESTS: u64 = 12;
+const MAX_CONCURRENT_REQUESTS: u64 = 6;
+const MAX_CONCURRENT_STATE_REQUESTS: u64 = 6;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -58,6 +58,11 @@ impl BootstrappingMode {
             },
             BootstrappingMode::ExecuteOrApplyFromGenesis => "execute_or_apply_from_genesis",
         }
+    }
+
+    /// Returns true iff the bootstrapping mode is fast sync
+    pub fn is_fast_sync(&self) -> bool {
+        *self == BootstrappingMode::DownloadLatestStates
     }
 }
 
@@ -154,10 +159,14 @@ pub struct StorageServiceConfig {
     pub max_network_channel_size: u64,
     /// Maximum number of bytes to send per network message
     pub max_network_chunk_bytes: u64,
+    /// Maximum number of active subscriptions (per peer)
+    pub max_num_active_subscriptions: u64,
     /// Maximum period (ms) of pending optimistic fetch requests
     pub max_optimistic_fetch_period_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum period (ms) of pending subscription requests
+    pub max_subscription_period_ms: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -179,8 +188,10 @@ impl Default for StorageServiceConfig {
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
+            max_num_active_subscriptions: 30,
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_subscription_period_ms: 30_000, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
@@ -193,6 +204,9 @@ impl Default for StorageServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
+    /// Whether or not to enable data subscription streaming.
+    pub enable_subscription_streaming: bool,
+
     /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
@@ -215,6 +229,10 @@ pub struct DataStreamingServiceConfig {
     /// memory. Once the number grows beyond this value, garbage collection occurs.
     pub max_notification_id_mappings: u64,
 
+    /// Maxinum number of consecutive subscriptions that can be made before
+    /// the subscription stream is terminated and a new stream must be created.
+    pub max_num_consecutive_subscriptions: u64,
+
     /// The interval (milliseconds) at which to check the progress of each stream.
     pub progress_check_interval_ms: u64,
 }
@@ -222,12 +240,14 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
+            enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
             max_data_stream_channel_sizes: 300,
             max_request_retry: 5,
             max_notification_id_mappings: 300,
+            max_num_consecutive_subscriptions: 50,
             progress_check_interval_ms: 50,
         }
     }
@@ -246,12 +266,14 @@ pub struct AptosDataClientConfig {
     pub max_num_in_flight_regular_polls: u64,
     /// Maximum number of output reductions before transactions are returned
     pub max_num_output_reductions: u64,
-    /// Maximum version lag we'll tolerate when sending optimistic fetch requests
-    pub max_optimistic_fetch_version_lag: u64,
+    /// Maximum lag (in seconds) we'll tolerate when sending optimistic fetch requests
+    pub max_optimistic_fetch_lag_secs: u64,
     /// Maximum timeout (in ms) when waiting for a response (after exponential increases)
     pub max_response_timeout_ms: u64,
     /// Maximum number of state keys and values per chunk
     pub max_state_chunk_size: u64,
+    /// Maximum lag (in seconds) we'll tolerate when sending subscription requests
+    pub max_subscription_lag_secs: u64,
     /// Maximum number of transactions per chunk
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
@@ -260,6 +282,8 @@ pub struct AptosDataClientConfig {
     pub optimistic_fetch_timeout_ms: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
+    /// Timeout (in ms) when waiting for a subscription response
+    pub subscription_response_timeout_ms: u64,
     /// Interval (in ms) between data summary poll loop executions
     pub summary_poll_loop_interval_ms: u64,
     /// Whether or not to request compression for incoming data
@@ -269,19 +293,21 @@ pub struct AptosDataClientConfig {
 impl Default for AptosDataClientConfig {
     fn default() -> Self {
         Self {
-            latency_monitor_loop_interval_ms: 50, // 50 milliseconds
+            latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_in_flight_priority_polls: 10,
             max_num_in_flight_regular_polls: 10,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_version_lag: 50_000, // Assumes 5K TPS for 10 seconds, which should be plenty
-            max_response_timeout_ms: 60_000,          // 60 seconds
+            max_optimistic_fetch_lag_secs: 30, // 30 seconds
+            max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
+            max_subscription_lag_secs: 30, // 30 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000, // 5 seconds
             response_timeout_ms: 10_000,       // 10 seconds
             summary_poll_loop_interval_ms: 200,
+            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
     }
@@ -289,10 +315,35 @@ impl Default for AptosDataClientConfig {
 
 impl ConfigSanitizer for StateSyncConfig {
     fn sanitize(
-        _node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
+        node_type: NodeType,
+        chain_id: ChainId,
+    ) -> Result<(), Error> {
+        // Sanitize the state sync driver config
+        StateSyncDriverConfig::sanitize(node_config, node_type, chain_id)
+    }
+}
+
+impl ConfigSanitizer for StateSyncDriverConfig {
+    fn sanitize(
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {
+        let sanitizer_name = Self::get_sanitizer_name();
+        let state_sync_driver_config = &node_config.state_sync.state_sync_driver;
+
+        // Verify that auto-bootstrapping is not enabled for
+        // nodes that are fast syncing.
+        let fast_sync_enabled = state_sync_driver_config.bootstrapping_mode.is_fast_sync();
+        if state_sync_driver_config.enable_auto_bootstrapping && fast_sync_enabled {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Auto-bootstrapping should not be enabled for nodes that are fast syncing!"
+                    .to_string(),
+            ));
+        }
+
         Ok(())
     }
 }
@@ -304,8 +355,17 @@ impl ConfigOptimizer for StateSyncConfig {
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<bool, Error> {
-        // Optimize the state sync driver
-        StateSyncDriverConfig::optimize(node_config, local_config_yaml, node_type, chain_id)
+        // Optimize the driver and data streaming service configs
+        let modified_driver_config =
+            StateSyncDriverConfig::optimize(node_config, local_config_yaml, node_type, chain_id)?;
+        let modified_data_streaming_config = DataStreamingServiceConfig::optimize(
+            node_config,
+            local_config_yaml,
+            node_type,
+            chain_id,
+        )?;
+
+        Ok(modified_driver_config || modified_data_streaming_config)
     }
 }
 
@@ -334,6 +394,37 @@ impl ConfigOptimizer for StateSyncDriverConfig {
     }
 }
 
+impl ConfigOptimizer for DataStreamingServiceConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        node_type: NodeType,
+        _chain_id: ChainId,
+    ) -> Result<bool, Error> {
+        let data_streaming_service_config = &mut node_config.state_sync.data_streaming_service;
+        let local_stream_config_yaml = &local_config_yaml["state_sync"]["data_streaming_service"];
+
+        // Double the aggression of the pre-fetcher for validators and VFNs
+        let mut modified_config = false;
+        if node_type.is_validator() || node_type.is_validator_fullnode() {
+            // Double transaction prefetching
+            if local_stream_config_yaml["max_concurrent_requests"].is_null() {
+                data_streaming_service_config.max_concurrent_requests = MAX_CONCURRENT_REQUESTS * 2;
+                modified_config = true;
+            }
+
+            // Double state-value prefetching
+            if local_stream_config_yaml["max_concurrent_state_requests"].is_null() {
+                data_streaming_service_config.max_concurrent_state_requests =
+                    MAX_CONCURRENT_STATE_REQUESTS * 2;
+                modified_config = true;
+            }
+        }
+
+        Ok(modified_config)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,7 +434,7 @@ mod tests {
         // Create a node config with execution mode enabled
         let mut node_config = create_execution_mode_config();
 
-        // Optimize the config and verify no modifications are made
+        // Optimize the config and verify modifications are made
         let modified_config = StateSyncConfig::optimize(
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
@@ -351,7 +442,7 @@ mod tests {
             ChainId::new(40), // Not mainnet or testnet
         )
         .unwrap();
-        assert!(!modified_config);
+        assert!(modified_config);
 
         // Verify that the bootstrapping mode is not changed
         assert_eq!(
@@ -376,10 +467,8 @@ mod tests {
         assert!(modified_config);
 
         // Verify that the bootstrapping mode is now set to fast sync
-        assert_eq!(
-            node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
-        );
+        let state_sync_driver_config = node_config.state_sync.state_sync_driver;
+        assert!(state_sync_driver_config.bootstrapping_mode.is_fast_sync());
     }
 
     #[test]
@@ -398,10 +487,8 @@ mod tests {
         assert!(modified_config);
 
         // Verify that the bootstrapping mode is now set to fast sync
-        assert_eq!(
-            node_config.state_sync.state_sync_driver.bootstrapping_mode,
-            BootstrappingMode::DownloadLatestStates
-        );
+        let state_sync_driver_config = node_config.state_sync.state_sync_driver;
+        assert!(state_sync_driver_config.bootstrapping_mode.is_fast_sync());
     }
 
     #[test]
@@ -419,7 +506,7 @@ mod tests {
         )
         .unwrap();
 
-        // Optimize the config and verify no modifications are made
+        // Optimize the config and verify modifications are made
         let modified_config = StateSyncConfig::optimize(
             &mut node_config,
             &local_config_yaml,
@@ -427,13 +514,136 @@ mod tests {
             ChainId::testnet(),
         )
         .unwrap();
-        assert!(!modified_config);
+        assert!(modified_config);
 
         // Verify that the bootstrapping mode is still set to execution mode
         assert_eq!(
             node_config.state_sync.state_sync_driver.bootstrapping_mode,
             BootstrappingMode::ExecuteTransactionsFromGenesis
         );
+    }
+
+    #[test]
+    fn test_optimize_prefetcher_mainnet_validator() {
+        // Create a default node config
+        let mut node_config = NodeConfig::default();
+
+        // Optimize the config and verify modifications are made
+        let modified_config = StateSyncConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::Validator,
+            ChainId::mainnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that the prefetcher aggression has doubled
+        let data_streaming_service_config = &node_config.state_sync.data_streaming_service;
+        assert_eq!(
+            data_streaming_service_config.max_concurrent_requests,
+            MAX_CONCURRENT_REQUESTS * 2
+        );
+        assert_eq!(
+            data_streaming_service_config.max_concurrent_state_requests,
+            MAX_CONCURRENT_STATE_REQUESTS * 2
+        );
+    }
+
+    #[test]
+    fn test_optimize_prefetcher_testnet_pfn() {
+        // Create a default node config
+        let mut node_config = NodeConfig::default();
+
+        // Optimize the config and verify modifications are made
+        let modified_config = StateSyncConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that the prefetcher aggression has not changed
+        let data_streaming_service_config = &node_config.state_sync.data_streaming_service;
+        assert_eq!(
+            data_streaming_service_config.max_concurrent_requests,
+            MAX_CONCURRENT_REQUESTS
+        );
+        assert_eq!(
+            data_streaming_service_config.max_concurrent_state_requests,
+            MAX_CONCURRENT_STATE_REQUESTS
+        );
+    }
+
+    #[test]
+    fn test_optimize_prefetcher_vfn_no_override() {
+        // Create a node config where the state prefetcher is set to 100
+        let mut node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                data_streaming_service: DataStreamingServiceConfig {
+                    max_concurrent_state_requests: 100,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Create a local config YAML where the state prefetcher is set to 100
+        let local_config_yaml = serde_yaml::from_str(
+            r#"
+            state_sync:
+                data_streaming_service:
+                    max_concurrent_state_requests: 100
+            "#,
+        )
+        .unwrap();
+
+        // Optimize the config and verify modifications are made
+        let modified_config = StateSyncConfig::optimize(
+            &mut node_config,
+            &local_config_yaml,
+            NodeType::ValidatorFullnode,
+            ChainId::testnet(),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify that the prefetcher aggression has changed but not the state prefetcher
+        let data_streaming_service_config = &node_config.state_sync.data_streaming_service;
+        assert_eq!(
+            data_streaming_service_config.max_concurrent_requests,
+            MAX_CONCURRENT_REQUESTS * 2
+        );
+        assert_eq!(
+            data_streaming_service_config.max_concurrent_state_requests,
+            100
+        );
+    }
+
+    #[test]
+    fn test_sanitize_auto_bootstrapping_fast_sync() {
+        // Create a node config with fast sync and
+        // auto bootstrapping enabled.
+        let node_config = NodeConfig {
+            state_sync: StateSyncConfig {
+                state_sync_driver: StateSyncDriverConfig {
+                    bootstrapping_mode: BootstrappingMode::DownloadLatestStates,
+                    enable_auto_bootstrapping: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Verify that sanitization fails
+        let error =
+            StateSyncConfig::sanitize(&node_config, NodeType::Validator, ChainId::testnet())
+                .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 
     /// Creates and returns a node config with the syncing modes set to execution
