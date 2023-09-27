@@ -163,7 +163,7 @@ export class Ed25519PrivateKey extends PrivateKey {
    */
   static generate(): PrivateKey {
     const keyPair = nacl.sign.keyPair();
-    return new PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
+    return new PrivateKey({ value: keyPair.secretKey.slice(0, PrivateKey.LENGTH) });
   }
 }
 
