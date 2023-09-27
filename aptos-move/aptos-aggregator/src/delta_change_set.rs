@@ -132,6 +132,7 @@ mod test {
     use crate::{
         bounded_math::{EBOUND_OVERFLOW, EBOUND_UNDERFLOW},
         resolver::{AggregatorReadMode, TAggregatorView},
+        types::AggregatorValue,
         FakeAggregatorView,
     };
     use aptos_types::{
@@ -414,6 +415,17 @@ mod test {
             _id: &Self::IdentifierV1,
             _mode: AggregatorReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
+            Err(anyhow::Error::new(VMStatus::error(
+                StatusCode::STORAGE_ERROR,
+                Some("Error message from BadStorage.".to_string()),
+            )))
+        }
+
+        fn get_aggregator_v2_value(
+            &self,
+            _id: &Self::IdentifierV2,
+            _mode: AggregatorReadMode,
+        ) -> anyhow::Result<AggregatorValue> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 Some("Error message from BadStorage.".to_string()),
