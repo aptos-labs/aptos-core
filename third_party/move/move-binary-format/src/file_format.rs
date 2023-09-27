@@ -28,7 +28,7 @@
 //! those structs translate to tables and table specifications.
 
 use crate::{
-    access::ModuleAccess,
+    access::{ModuleAccess, ScriptAccess},
     errors::{PartialVMError, PartialVMResult},
     file_format_common,
     internals::ModuleIndex,
@@ -1840,6 +1840,14 @@ pub struct CompiledScript {
 impl CompiledScript {
     /// Returns the index of `main` in case a script is converted to a module.
     pub const MAIN_INDEX: FunctionDefinitionIndex = FunctionDefinitionIndex(0);
+
+    /// Returns the code key of `module_handle`
+    pub fn module_id_for_handle(&self, module_handle: &ModuleHandle) -> ModuleId {
+        ModuleId::new(
+            *self.address_identifier_at(module_handle.address),
+            self.identifier_at(module_handle.name).to_owned(),
+        )
+    }
 }
 
 /// A `CompiledModule` defines the structure of a module which is the unit of published code.

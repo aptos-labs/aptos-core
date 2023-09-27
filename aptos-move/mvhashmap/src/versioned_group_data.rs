@@ -165,9 +165,9 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
     fn get_latest_tagged_value(
         &self,
-        txn_idx: TxnIndex,
         tag: &T,
-    ) -> Result<(Arc<V>, Version), MVGroupError> {
+        txn_idx: TxnIndex,
+    ) -> Result<(Version, Arc<V>), MVGroupError> {
         let common_error = || -> MVGroupError {
             if self.idx_to_update.contains_key(&ShiftedTxnIndex::zero()) {
                 MVGroupError::TagNotFound
@@ -192,8 +192,8 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                             ))
                         } else {
                             Ok((
-                                entry.value.clone(),
                                 idx.idx().map(|idx| (idx, entry.incarnation)),
+                                entry.value.clone(),
                             ))
                         }
                     },
@@ -291,11 +291,11 @@ impl<
     pub fn read_from_group(
         &self,
         key: &K,
-        txn_idx: TxnIndex,
         tag: &T,
-    ) -> anyhow::Result<(Arc<V>, Version), MVGroupError> {
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<(Version, Arc<V>), MVGroupError> {
         match self.group_values.get(key) {
-            Some(g) => g.get_latest_tagged_value(txn_idx, tag),
+            Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),
         }
     }
@@ -392,18 +392,18 @@ mod test {
         );
         // for reading a tag at ap_1, w.o. returning size, idx = 3 is Uninitialized.
         assert_matches!(
-            map.read_from_group(&ap_1, 3, &1),
+            map.read_from_group(&ap_1, &1, 3),
             Err(MVGroupError::Uninitialized)
         );
         // ... but idx = 4 should find the previously stored value.
         assert_eq!(
-            map.read_from_group(&ap_1, 4, &1).unwrap(),
+            map.read_from_group(&ap_1, &1, 4).unwrap(),
             // Arc compares by value, no return size, incarnation.
-            (Arc::new(TestValue::with_len(1)), Ok((3, 1)))
+            (Ok((3, 1)), Arc::new(TestValue::with_len(1)))
         );
         // ap_0 should still be uninitialized.
         assert_matches!(
-            map.read_from_group(&ap_0, 3, &1),
+            map.read_from_group(&ap_0, &1, 3),
             Err(MVGroupError::Uninitialized)
         );
 
@@ -415,7 +415,7 @@ mod test {
             (1..3).map(|i| (i, TestValue::with_len(4))),
         );
         assert_matches!(
-            map.read_from_group(&ap_2, 4, &2),
+            map.read_from_group(&ap_2, &2, 4),
             Err(MVGroupError::Uninitialized)
         );
         map.provide_base_values(
@@ -426,21 +426,21 @@ mod test {
 
         // Tag not found vs not initialized,
         assert_matches!(
-            map.read_from_group(&ap_2, 4, &2),
+            map.read_from_group(&ap_2, &2, 4),
             Err(MVGroupError::TagNotFound)
         );
         assert_matches!(
-            map.read_from_group(&ap_2, 5, &4),
+            map.read_from_group(&ap_2, &4, 5),
             Err(MVGroupError::TagNotFound)
         );
         // vs finding a versioned entry from txn 4, vs from storage.
         assert_eq!(
-            map.read_from_group(&ap_2, 5, &2).unwrap(),
-            (Arc::new(TestValue::with_len(4)), Ok((4, 0)))
+            map.read_from_group(&ap_2, &2, 5).unwrap(),
+            (Ok((4, 0)), Arc::new(TestValue::with_len(4)))
         );
         assert_eq!(
-            map.read_from_group(&ap_2, 5, &0).unwrap(),
-            (Arc::new(TestValue::with_len(2)), Err(StorageVersion))
+            map.read_from_group(&ap_2, &0, 5).unwrap(),
+            (Err(StorageVersion), Arc::new(TestValue::with_len(2)))
         );
     }
 
@@ -458,8 +458,8 @@ mod test {
             (0..2).map(|i| (i, TestValue::new(vec![5, 3]))),
         );
         assert_eq!(
-            map.read_from_group(&ap, 12, &1).unwrap(),
-            (Arc::new(TestValue::new(vec![5, 3])), Ok((5, 3)))
+            map.read_from_group(&ap, &1, 12).unwrap(),
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
         );
         map.write(
             ap.clone(),
@@ -469,27 +469,27 @@ mod test {
             (1..3).map(|i| (i, TestValue::new(vec![10, 1]))),
         );
         assert_eq!(
-            map.read_from_group(&ap, 12, &1).unwrap(),
-            (Arc::new(TestValue::new(vec![10, 1])), Ok((10, 1)))
+            map.read_from_group(&ap, &1, 12).unwrap(),
+            (Ok((10, 1)), Arc::new(TestValue::new(vec![10, 1])))
         );
 
         map.mark_estimate(&ap, 10);
-        assert_matches!(map.read_from_group(&ap, 12, &1), Err(Dependency(10)));
-        assert_matches!(map.read_from_group(&ap, 12, &2), Err(Dependency(10)));
-        assert_matches!(map.read_from_group(&ap, 12, &3), Err(Uninitialized));
+        assert_matches!(map.read_from_group(&ap, &1, 12), Err(Dependency(10)));
+        assert_matches!(map.read_from_group(&ap, &2, 12), Err(Dependency(10)));
+        assert_matches!(map.read_from_group(&ap, &3, 12), Err(Uninitialized));
         assert_eq!(
-            map.read_from_group(&ap, 12, &0).unwrap(),
-            (Arc::new(TestValue::new(vec![5, 3])), Ok((5, 3)))
+            map.read_from_group(&ap, &0, 12).unwrap(),
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
         );
 
         map.delete(&ap, 10);
         assert_eq!(
-            map.read_from_group(&ap, 12, &0).unwrap(),
-            (Arc::new(TestValue::new(vec![5, 3])), Ok((5, 3)))
+            map.read_from_group(&ap, &0, 12).unwrap(),
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
         );
         assert_eq!(
-            map.read_from_group(&ap, 12, &1).unwrap(),
-            (Arc::new(TestValue::new(vec![5, 3])), Ok((5, 3)))
+            map.read_from_group(&ap, &1, 12).unwrap(),
+            (Ok((5, 3)), Arc::new(TestValue::new(vec![5, 3])))
         );
     }
 

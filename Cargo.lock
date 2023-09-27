@@ -590,6 +590,7 @@ dependencies = [
  "criterion",
  "crossbeam",
  "dashmap",
+ "derivative",
  "itertools",
  "move-binary-format",
  "move-core-types",
@@ -601,6 +602,7 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "serde",
+ "test-case",
 ]
 
 [[package]]
@@ -2245,9 +2247,11 @@ dependencies = [
  "move-command-line-common",
  "move-core-types",
  "move-ir-compiler",
+ "move-model",
  "move-vm-types",
  "num_cpus",
  "once_cell",
+ "petgraph 0.5.1",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -9846,6 +9850,7 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
+ "derivative",
  "move-binary-format",
  "move-core-types",
  "once_cell",
