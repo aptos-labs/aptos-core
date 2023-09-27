@@ -54,8 +54,12 @@ impl OnChainExecutionConfig {
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V3(ExecutionConfigV3 {
-            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
-            block_gas_limit: Some(35000),
+            // FIXME(aldenhu):
+            // transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(256),
+            // FIXME(aldenhu):
+            // block_gas_limit: Some(35000),
+            block_gas_limit: None,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
         })
     }
