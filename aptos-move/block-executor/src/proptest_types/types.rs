@@ -2,8 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
+use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -659,6 +662,16 @@ where
 
     fn aggregator_v1_delta_set(&self) -> BTreeMap<K, DeltaOp> {
         self.deltas.iter().cloned().collect()
+    }
+
+    fn aggregator_v2_change_set(
+        &self,
+    ) -> HashMap<
+        <Self::Txn as Transaction>::Identifier,
+        AggregatorChange<<Self::Txn as Transaction>::Identifier>,
+    > {
+        // TODO: add aggregators V2 to the proptest?
+        HashMap::new()
     }
 
     // TODO: Currently, appending None to all events, which means none of the
