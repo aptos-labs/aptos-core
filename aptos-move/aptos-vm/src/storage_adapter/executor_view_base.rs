@@ -3,7 +3,7 @@
 
 use aptos_aggregator::{
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::AggregatorID,
+    types::{AggregatorID, AggregatorValue},
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::{
@@ -42,6 +42,14 @@ impl<'s, S: StateView> TAggregatorView for ExecutorViewBase<'s, S> {
         _mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.0.get_state_value(state_key)
+    }
+
+    fn get_aggregator_v2_value(
+        &self,
+        _id: &Self::IdentifierV2,
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<AggregatorValue> {
+        unimplemented!()
     }
 }
 
