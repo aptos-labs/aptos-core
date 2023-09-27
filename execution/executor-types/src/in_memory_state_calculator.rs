@@ -218,7 +218,7 @@ impl InMemoryStateCalculator {
 
         zip_eq(
             self.updates_between_checkpoint_and_latest.iter_mut(),
-            self.updates_after_latest.into_iter(),
+            self.updates_after_latest,
         )
         .for_each(|(base, delta)| {
             base.extend(delta);

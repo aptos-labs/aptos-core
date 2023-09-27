@@ -423,8 +423,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             allow_deletes,
         )
         .into_iter()
-        .zip(reads.into_iter())
-        .zip(gas.into_iter())
+        .zip(reads)
+        .zip(gas)
         .map(|(((writes, deltas), reads), gas)| MockIncarnation {
             reads,
             writes,

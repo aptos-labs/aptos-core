@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
@@ -182,7 +184,7 @@ impl AccountInfoUniverse {
     ) -> Self {
         let mut accounts: Vec<_> = account_private_keys
             .into_iter()
-            .zip(consensus_private_keys.into_iter())
+            .zip(consensus_private_keys)
             .map(|(private_key, consensus_private_key)| {
                 AccountInfo::new(private_key, consensus_private_key)
             })
