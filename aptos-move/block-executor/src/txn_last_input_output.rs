@@ -6,7 +6,6 @@ use crate::{
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
 };
-use anyhow::anyhow;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{fee_statement::FeeStatement, write_set::WriteOp};
 use arc_swap::ArcSwapOption;
@@ -105,7 +104,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         input: CapturedReads<T>,
         output: ExecutionStatus<O, Error<E>>,
-    ) -> anyhow::Result<()> {
+    ) -> Option<Error<E>> {
         let written_modules = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
@@ -126,16 +125,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ) {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
-                return Err(anyhow!(
-                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
-                ));
+                return Some(Error::ModulePathReadWrite);
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
 
-        Ok(())
+        None
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {

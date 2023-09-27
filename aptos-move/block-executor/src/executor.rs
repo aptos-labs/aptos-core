@@ -165,12 +165,10 @@ where
             }
         }
 
-        if last_input_output
-            .record(idx_to_execute, sync_view.take_reads(), result)
-            .is_err()
+        if let Some(err) = &last_input_output.record(idx_to_execute, sync_view.take_reads(), result)
         {
             let mut maybe_error = maybe_error.lock();
-            *maybe_error = Some(Error::ModulePathReadWrite);
+            *maybe_error = Some(err.clone());
             scheduler.halt();
             return SchedulerTask::NoTask;
         }
