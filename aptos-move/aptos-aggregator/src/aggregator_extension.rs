@@ -564,7 +564,7 @@ impl AggregatorData {
             } => {
                 let base = self.read_snapshot(base_snapshot, resolver)?;
                 match base {
-                    SnapshotValue::Integer(v) => Ok(SnapshotValue::String(formula.apply(v))),
+                    SnapshotValue::Integer(v) => Ok(SnapshotValue::String(formula.apply_to(v))),
                     SnapshotValue::String(_) => Err(code_invariant_error(
                         "Tried calling concat on String SnapshotValue",
                     )),
