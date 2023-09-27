@@ -34,8 +34,7 @@ use num_cpus;
 use rayon::ThreadPool;
 use std::{
     collections::HashMap,
-    marker::PhantomData,
-    marker::Sync,
+    marker::{PhantomData, Sync},
     sync::{atomic::AtomicU32, Arc},
 };
 
