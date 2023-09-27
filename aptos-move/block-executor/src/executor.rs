@@ -164,7 +164,7 @@ where
             }
         }
 
-        let _ = last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
+        last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
