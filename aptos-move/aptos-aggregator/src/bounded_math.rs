@@ -39,7 +39,7 @@ pub(crate) fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
         .with_sub_status(code)
 }
 
-pub(crate) fn code_invariant_error<T: std::fmt::Debug>(message: T) -> PartialVMError {
+pub fn code_invariant_error<T: std::fmt::Debug>(message: T) -> PartialVMError {
     error!(
         "Aggregator code invariant broken (there is a bug in the code), {:?}",
         message

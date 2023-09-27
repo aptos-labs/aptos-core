@@ -8,13 +8,20 @@ use crate::{
         mock_delete_with_layout, mock_modify, mock_modify_with_layout, MockChangeSetChecker,
     },
 };
+use aptos_aggregator::{
+    aggregator_change_set::{AggregatorApplyChange, AggregatorChange},
+    bounded_math::SignedU128,
+    delta_change_set::DeltaOp,
+    delta_math::DeltaHistory,
+    types::{AggregatorID, SnapshotToStringFormula},
+};
 use aptos_types::{
     access_path::AccessPath,
     state_store::state_key::StateKey,
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
-use claims::{assert_matches, assert_ok};
+use claims::{assert_matches, assert_ok, assert_some_eq};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -395,6 +402,100 @@ fn test_failed_conversion_to_change_set() {
             status_code: StatusCode::DATA_FORMAT_ERROR,
             sub_status: None,
             message: Some(_),
+        })
+    );
+}
+
+#[test]
+fn test_aggregator_v2_snapshots_and_derived() {
+    use AggregatorApplyChange::*;
+    use AggregatorChange::*;
+
+    let agg_changes_1 = vec![(
+        AggregatorID::new(1),
+        Apply(AggregatorDelta {
+            delta: DeltaOp::new(SignedU128::Positive(3), 100, DeltaHistory {
+                max_achieved_positive_delta: 3,
+                min_achieved_negative_delta: 0,
+                min_overflow_positive_delta: Some(10),
+                max_underflow_negative_delta: None,
+            }),
+        }),
+    )];
+    let mut change_set_1 = build_change_set(vec![], vec![], vec![], vec![], agg_changes_1);
+
+    let agg_changes_2 = vec![
+        (
+            AggregatorID::new(1),
+            Apply(AggregatorDelta {
+                delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
+                    max_achieved_positive_delta: 5,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: Some(6),
+                    max_underflow_negative_delta: None,
+                }),
+            }),
+        ),
+        (
+            AggregatorID::new(2),
+            Apply(SnapshotDelta {
+                base_aggregator: AggregatorID::new(1),
+                delta: DeltaOp::new(SignedU128::Positive(2), 100, DeltaHistory {
+                    max_achieved_positive_delta: 6,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: Some(8),
+                    max_underflow_negative_delta: None,
+                }),
+            }),
+        ),
+        (
+            AggregatorID::new(3),
+            Apply(SnapshotDerived {
+                base_snapshot: AggregatorID::new(2),
+                formula: SnapshotToStringFormula::Concat {
+                    prefix: "p".as_bytes().to_vec(),
+                    suffix: "s".as_bytes().to_vec(),
+                },
+            }),
+        ),
+    ];
+    let change_set_2 = build_change_set(vec![], vec![], vec![], vec![], agg_changes_2);
+
+    assert_ok!(change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker));
+
+    let output_map = change_set_1.aggregator_v2_change_set();
+    assert_eq!(output_map.len(), 3);
+    assert_some_eq!(
+        output_map.get(&AggregatorID::new(1)),
+        &Apply(AggregatorDelta {
+            delta: DeltaOp::new(SignedU128::Positive(8), 100, DeltaHistory {
+                max_achieved_positive_delta: 8,
+                min_achieved_negative_delta: 0,
+                min_overflow_positive_delta: Some(9),
+                max_underflow_negative_delta: None,
+            })
+        })
+    );
+    assert_some_eq!(
+        output_map.get(&AggregatorID::new(2)),
+        &Apply(SnapshotDelta {
+            base_aggregator: AggregatorID::new(1),
+            delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
+                max_achieved_positive_delta: 9,
+                min_achieved_negative_delta: 0,
+                min_overflow_positive_delta: Some(10),
+                max_underflow_negative_delta: None,
+            })
+        })
+    );
+    assert_some_eq!(
+        output_map.get(&AggregatorID::new(3)),
+        &Apply(SnapshotDerived {
+            base_snapshot: AggregatorID::new(2),
+            formula: SnapshotToStringFormula::Concat {
+                prefix: "p".as_bytes().to_vec(),
+                suffix: "s".as_bytes().to_vec()
+            },
         })
     );
 }
