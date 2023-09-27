@@ -886,7 +886,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.6",
  "sha2 0.9.9",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "static_assertions",
  "thiserror",
  "tiny-keccak",
@@ -1639,7 +1639,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "sha2 0.10.6",
  "sha2 0.9.9",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "siphasher",
  "smallvec",
  "tempfile",
@@ -3502,7 +3502,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "smallvec",
 ]
 
@@ -8950,7 +8950,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "smallvec",
  "walkdir",
 ]
@@ -9122,7 +9122,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.5.1",
  "regex",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "tempfile",
  "walkdir",
 ]
@@ -9655,7 +9655,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-types",
  "once_cell",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "smallvec",
  "tempfile",
 ]
@@ -9819,7 +9819,7 @@ dependencies = [
  "parking_lot 0.11.2",
  "proptest",
  "serde",
- "sha3 0.9.1",
+ "sha3 0.10.6",
  "tracing",
 ]
 
