@@ -4,12 +4,14 @@
 #![forbid(unsafe_code)]
 
 use crate::ParsedTransactionOutput;
+use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     state_store::ShardedStateUpdates,
     transaction::{Transaction, TransactionStatus},
 };
+use itertools::zip_eq;
 
 #[derive(Default)]
 pub struct TransactionsByStatus {
@@ -57,25 +59,25 @@ impl TransactionsByStatus {
 #[derive(Default)]
 pub struct StateCheckpointOutput {
     txns: TransactionsByStatus,
-    state_updates_vec: Vec<ShardedStateUpdates>,
+    per_version_state_updates: Vec<ShardedStateUpdates>,
     state_checkpoint_hashes: Vec<Option<HashValue>>,
-    block_state_updates: ShardedStateUpdates,
+    state_updates_before_last_checkpoint: ShardedStateUpdates,
     sharded_state_cache: ShardedStateCache,
 }
 
 impl StateCheckpointOutput {
     pub fn new(
         txns: TransactionsByStatus,
-        state_updates_vec: Vec<ShardedStateUpdates>,
+        per_version_state_updates: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
-        block_state_updates: ShardedStateUpdates,
+        state_updates_before_last_checkpoint: ShardedStateUpdates,
         sharded_state_cache: ShardedStateCache,
     ) -> Self {
         Self {
             txns,
-            state_updates_vec,
+            per_version_state_updates,
             state_checkpoint_hashes,
-            block_state_updates,
+            state_updates_before_last_checkpoint,
             sharded_state_cache,
         }
     }
@@ -95,10 +97,36 @@ impl StateCheckpointOutput {
     ) {
         (
             self.txns,
-            self.state_updates_vec,
+            self.per_version_state_updates,
             self.state_checkpoint_hashes,
-            self.block_state_updates,
+            self.state_updates_before_last_checkpoint,
             self.sharded_state_cache,
         )
+    }
+
+    pub fn check_and_update_state_checkpoint_hashes(
+        &mut self,
+        trusted_hashes: Vec<Option<HashValue>>,
+    ) -> Result<()> {
+        let len = self.state_checkpoint_hashes.len();
+        ensure!(
+            len == trusted_hashes.len(),
+            "Number of txns doesn't match. self: {len}, trusted: {}",
+            trusted_hashes.len()
+        );
+
+        zip_eq(
+            self.state_checkpoint_hashes.iter_mut(),
+            trusted_hashes.iter(),
+        )
+        .try_for_each(|(self_hash, trusted_hash)| {
+            if self_hash.is_none() && trusted_hash.is_some() {
+                *self_hash = *trusted_hash;
+            } else {
+                ensure!(self_hash == trusted_hash,
+                        "State checkpoint hash doesn't match, self: {self_hash:?}, trusted: {trusted_hash:?}");
+            }
+            Ok(())
+        })
     }
 }

@@ -486,11 +486,13 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
+    let (executed, _, _) = chunk_output
+        .apply_to_ledger(&ledger_view, None, None)
+        .unwrap();
 
     db.writer
         .save_transactions(
-            &executed.transactions_to_commit().unwrap(),
+            executed.transactions_to_commit(),
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             None,
@@ -685,10 +687,10 @@ fn run_transactions_naive(
             maybe_block_gas_limit,
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
+        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None, None).unwrap();
         db.writer
             .save_transactions(
-                &executed.transactions_to_commit().unwrap(),
+                executed.transactions_to_commit(),
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 None,
