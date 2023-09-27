@@ -2033,7 +2033,7 @@ fn pfn_const_tps(
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
@@ -2081,7 +2081,7 @@ fn pfn_performance(
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Avoid epoch changes which can introduce noise
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
