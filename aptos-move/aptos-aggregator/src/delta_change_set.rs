@@ -6,7 +6,7 @@
 //! postcondition.
 
 use crate::{
-    bounded_math::SignedU128,
+    bounded_math::{code_invariant_error, SignedU128},
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
 };
 use move_binary_format::errors::PartialVMResult;
@@ -43,36 +43,39 @@ impl DeltaOp {
         merge_data_and_delta(base, &self.update, &self.history, self.max_value)
     }
 
+    pub fn create_merged_delta(
+        prev_delta: &DeltaOp,
+        next_delta: &DeltaOp,
+    ) -> PartialVMResult<DeltaOp> {
+        if prev_delta.max_value != next_delta.max_value {
+            return Err(code_invariant_error(
+                "Cannot merge deltas with different limits",
+            ));
+        }
+
+        let (new_update, new_history) = merge_two_deltas(
+            &prev_delta.update,
+            &prev_delta.history,
+            &next_delta.update,
+            &next_delta.history,
+            next_delta.max_value,
+        )?;
+
+        Ok(DeltaOp::new(new_update, next_delta.max_value, new_history))
+    }
+
     /// Applies self on top of previous delta, merging them together. Note
     /// that the strict ordering here is crucial for catching overflows
     /// correctly.
     pub fn merge_with_previous_delta(&mut self, previous_delta: DeltaOp) -> PartialVMResult<()> {
-        assert_eq!(
-            self.max_value, previous_delta.max_value,
-            "Cannot merge deltas with different limits",
-        );
-        let (new_update, new_history) = merge_two_deltas(
-            &previous_delta.update,
-            &previous_delta.history,
-            &self.update,
-            &self.history,
-            self.max_value,
-        )?;
-
-        self.update = new_update;
-        self.history = new_history;
+        *self = Self::create_merged_delta(&previous_delta, self)?;
         Ok(())
     }
 
     /// Applies next delta on top of self, merging two deltas together. This is a reverse
     /// of `merge_with_previous_delta`.
     pub fn merge_with_next_delta(&mut self, next_delta: DeltaOp) -> PartialVMResult<()> {
-        // Now self follows the other delta.
-        let mut previous_delta = next_delta;
-        std::mem::swap(self, &mut previous_delta);
-
-        // Perform the merge.
-        self.merge_with_previous_delta(previous_delta)?;
+        *self = Self::create_merged_delta(self, &next_delta)?;
         Ok(())
     }
 }
