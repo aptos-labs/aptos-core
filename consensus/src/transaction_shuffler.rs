@@ -38,7 +38,9 @@ pub fn create_transaction_shuffler(
             info!("Using no-op sender aware shuffling v1");
             Arc::new(NoOpShuffler {})
         },
-        SenderAwareV2(conflict_window_size) => {
+        SenderAwareV2(_conflict_window_size) => {
+            // FIXME(aldenhu):
+            let conflict_window_size = 256;
             info!(
                 "Using sender aware transaction shuffling with conflict window size {}",
                 conflict_window_size
