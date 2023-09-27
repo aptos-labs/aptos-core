@@ -647,7 +647,7 @@ uuid = { version = "1.0.0", features = ["v4", "serde"] }
 walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
-which = "4.2.5"
+which = "4.4.2"
 x25519-dalek = "1.2.0"
 
 # MOVE DEPENDENCIES
