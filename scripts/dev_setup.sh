@@ -296,6 +296,26 @@ function install_awscli {
   fi
 }
 
+function install_s5cmd {
+  PACKAGE_MANAGER=$1
+  if ! command -v s5cmd &> /dev/null; then
+    if [[ $(uname -s) == "Darwin" ]]; then
+      install_pkg peak/tap/s5cmd brew
+    elif [[ "$PACKAGE_MANAGER" == "apk" ]]; then
+      echo "not supported"
+      exit 1;
+    else
+      TMPFILE=$(mktemp)
+      rm "$TMPFILE"
+      mkdir -p "$TMPFILE"/work/
+      curl -sL -o "$TMPFILE"/s5cmd.tar.gz https://github.com/peak/s5cmd/releases/download/v2.2.2/s5cmd_2.2.2_Linux-64bit.tar.gz
+      tar -C "$TMPFILE"/work -xzvf "$TMPFILE"/s5cmd.tar.gz
+      mv "$TMPFILE"/work/s5cmd "${INSTALL_DIR}"/
+      "${INSTALL_DIR}"s5cmd version
+    fi
+  fi
+}
+
 function install_pkg {
   package=$1
   PACKAGE_MANAGER=$2

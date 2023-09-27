@@ -6,7 +6,7 @@ commands:
     echo "$FILE_HANDLE"
     exec 1>&-
     gzip -c | aws s3 cp - "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE"
-  open_for_read: 'aws s3 cp "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE" - --no-sign-request | gzip -cd'
+  open_for_read: 's5cmd --no-sign-request cat "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE" | gzip -cd'
   save_metadata_line: |
     FILE_HANDLE="metadata/$FILE_NAME"
     echo "$FILE_HANDLE"
