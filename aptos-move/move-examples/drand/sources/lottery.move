@@ -150,7 +150,7 @@ module drand::lottery {
             // It's time to draw, but nobody signed up => nobody won.
             // Close the lottery (even if the randomness might be incorrect).
             option::extract(&mut lottery.draw_at);
-            return 
+            return
         };
 
         // Determine the next drand round after `draw_at`
