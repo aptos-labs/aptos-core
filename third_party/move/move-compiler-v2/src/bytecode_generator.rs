@@ -744,7 +744,7 @@ impl<'env> Generator<'env> {
         }
         let args = args
             .iter()
-            .zip(param_types.into_iter())
+            .zip(param_types)
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
         let args = self.gen_arg_list(&args);

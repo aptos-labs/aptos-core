@@ -213,7 +213,7 @@ pub(crate) fn construct_args(
     if types.len() != args.len() {
         return Err(invalid_signature());
     }
-    for (ty, arg) in types.iter().zip(args.into_iter()) {
+    for (ty, arg) in types.iter().zip(args) {
         let arg = construct_arg(
             session,
             &ty.subst(ty_args).unwrap(),

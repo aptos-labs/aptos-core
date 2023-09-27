@@ -553,7 +553,7 @@ fn get_events_by_event_key(
                 );
                 break;
             } else {
-                ret.extend(events.into_iter());
+                ret.extend(events);
                 cursor += num_results;
             }
         } else {
@@ -566,7 +566,7 @@ fn get_events_by_event_key(
                 );
                 break;
             } else {
-                ret.extend(events.into_iter());
+                ret.extend(events);
                 cursor -= num_results;
             }
         }

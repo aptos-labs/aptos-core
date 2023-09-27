@@ -402,6 +402,6 @@ fn buffer_manager_sync_test() {
         // we should only see batches[dropped_batches..num_batches]
         assert_results(batches.drain(dropped_batches..).collect(), &mut result_rx).await;
 
-        assert!(matches!(result_rx.next().now_or_never(), None));
+        assert!(result_rx.next().now_or_never().is_none());
     });
 }

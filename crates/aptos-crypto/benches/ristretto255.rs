@@ -71,7 +71,7 @@ fn multi_scalar_mul<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
             |(points, scalars)| {
                 RistrettoPoint::vartime_multiscalar_mul(
                     scalars.iter(),
-                    points.iter().collect::<Vec<&RistrettoPoint>>().into_iter(),
+                    points.iter().collect::<Vec<&RistrettoPoint>>(),
                 )
             },
         )

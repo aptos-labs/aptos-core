@@ -170,8 +170,8 @@ impl ExecutedChunk {
     }
 
     pub fn combine(&mut self, rhs: Self) {
-        self.to_commit.extend(rhs.to_commit.into_iter());
-        self.status.extend(rhs.status.into_iter());
+        self.to_commit.extend(rhs.to_commit);
+        self.status.extend(rhs.status);
         self.result_view = rhs.result_view;
         self.next_epoch_state = rhs.next_epoch_state;
         self.ledger_info = rhs.ledger_info;

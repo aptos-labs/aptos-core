@@ -311,7 +311,7 @@ fn native_request_publish(
         allowed
             .entry(destination)
             .or_default()
-            .extend(expected_modules.clone().into_iter());
+            .extend(expected_modules.clone());
         allowed
     });
 

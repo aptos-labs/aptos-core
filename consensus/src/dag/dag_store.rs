@@ -225,7 +225,7 @@ impl Dag {
     }
 
     fn reachable_filter(start: Vec<HashValue>) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
-        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start.into_iter());
+        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start);
         move |node| {
             if reachable.contains(&node.digest()) {
                 for parent in node.parents() {
