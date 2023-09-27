@@ -1,34 +1,29 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    network_controller::{error::Error, Message, MessageType, NetworkMessage},
-    NetworkServer,
+    grpc_network_service::RemoteExecutionServerWrapper,
+    network_controller::{Message, MessageType},
 };
-use aptos_logger::{error, warn};
+use aptos_logger::warn;
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,
     net::SocketAddr,
     sync::{Arc, Mutex},
-    thread,
 };
+use tokio::{runtime::Runtime, sync::oneshot};
 
 pub struct InboundHandler {
     service: String,
-    server: Arc<Mutex<NetworkServer>>,
-    // Used to route incoming messages to correct channel.
+    listen_addr: SocketAddr,
     inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
 }
 
 impl InboundHandler {
-    pub fn new(service: String, listen_addr: SocketAddr, timeout_ms: u64) -> Self {
+    pub fn new(service: String, listen_addr: SocketAddr, _: u64) -> Self {
         Self {
             service: service.clone(),
-            server: Arc::new(Mutex::new(NetworkServer::new(
-                service,
-                listen_addr,
-                timeout_ms,
-            ))),
+            listen_addr,
             inbound_handlers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -43,24 +38,20 @@ impl InboundHandler {
         inbound_handlers.insert(MessageType::new(message_type), sender);
     }
 
-    pub fn start(&mut self) {
-        let inbound_handlers = self.inbound_handlers.clone(); // Clone the hashmap for the thread
-        let server_clone = self.server.clone(); // Clone the server to move into the thread
-                                                // Spawn a thread to handle incoming messages
-        let thread_name = format!("{}_network_inbound_handler", self.service);
-        let builder = thread::Builder::new().name(thread_name);
-        builder
-            .spawn(move || {
-                loop {
-                    // Receive incoming messages from the server
-                    if let Err(e) =
-                        Self::process_one_incoming_message(&server_clone, &inbound_handlers)
-                    {
-                        error!("Error processing incoming messages: {:?}", e);
-                    }
-                }
-            })
-            .expect("Failed to spawn network_inbound_handler thread");
+    pub fn start(&self, rt: &Runtime) -> Option<oneshot::Sender<()>> {
+        if self.inbound_handlers.lock().unwrap().is_empty() {
+            return None;
+        }
+
+        let (server_shutdown_tx, server_shutdown_rx) = oneshot::channel();
+        // The server is started in a separate task
+        RemoteExecutionServerWrapper::new(self.inbound_handlers.clone()).start(
+            rt,
+            self.service.clone(),
+            self.listen_addr,
+            server_shutdown_rx,
+        );
+        Some(server_shutdown_tx)
     }
 
     // Helper function to short-circuit the network message not to be sent over the network for self messages
@@ -72,29 +63,5 @@ impl InboundHandler {
         } else {
             warn!("No handler registered for message type: {:?}", message_type);
         }
-    }
-
-    fn process_one_incoming_message(
-        network_server: &Arc<Mutex<NetworkServer>>,
-        inbound_handlers: &Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
-    ) -> Result<(), Error> {
-        let message = network_server.lock().unwrap().read()?;
-        let network_msg: NetworkMessage = bcs::from_bytes(&message)?;
-        // Get the sender's SocketAddr from the received message
-        let sender = network_msg.sender;
-        let msg = network_msg.message;
-        let message_type = network_msg.message_type;
-
-        // Check if there is a registered handler for the sender
-        if let Some(handler) = inbound_handlers.lock().unwrap().get(&message_type) {
-            // Send the message to the registered handler
-            handler.send(msg)?;
-        } else {
-            warn!(
-                "No handler registered for sender: {:?} and msg type {:?}",
-                sender, message_type
-            );
-        }
-        Ok(())
     }
 }

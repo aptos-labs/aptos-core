@@ -3,12 +3,14 @@
 use crate::network_controller::{
     inbound_handler::InboundHandler, outbound_handler::OutboundHandler,
 };
+use aptos_logger::{info, warn};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use tokio::{runtime::Runtime, sync::oneshot};
 
 mod error;
 mod inbound_handler;
@@ -64,10 +66,26 @@ impl Message {
     }
 }
 
+/// NetworkController is the main entry point for sending and receiving messages over the network.
+/// 1. If a node acts as both client and server, albeit in different contexts, GRPC needs separate
+///    runtimes for client context and server context. Otherwise we a hang in GRPC. This seems to be
+///    an internal bug in GRPC.
+/// 2. We want to use tokio runtimes because it is best for async IO and tonic GRPC
+///    implementation is async. However, we want the rest of the system (remote executor service)
+///    to use rayon thread pools because it is best for CPU bound tasks.
+/// 3. NetworkController, InboundHandler and OutboundHandler work as a bridge between the sync and
+///    async worlds.
+/// 4. We need to shutdown all the async tasks spawned by the NetworkController runtimes, otherwise
+///    the program will hang, or have resource leaks.
 #[allow(dead_code)]
 pub struct NetworkController {
     inbound_handler: Arc<Mutex<InboundHandler>>,
     outbound_handler: OutboundHandler,
+    inbound_rpc_runtime: Runtime,
+    outbound_rpc_runtime: Runtime,
+    inbound_server_shutdown_tx: Option<oneshot::Sender<()>>,
+    outbound_task_shutdown_tx: Option<Sender<Message>>,
+    listen_addr: SocketAddr,
 }
 
 impl NetworkController {
@@ -78,9 +96,16 @@ impl NetworkController {
             timeout_ms,
         )));
         let outbound_handler = OutboundHandler::new(service, listen_addr, inbound_handler.clone());
+        info!("Network controller created for node {}", listen_addr);
         Self {
             inbound_handler,
             outbound_handler,
+            inbound_rpc_runtime: Runtime::new().unwrap(),
+            outbound_rpc_runtime: Runtime::new().unwrap(),
+            // we initialize the shutdown handles when we start the network controller
+            inbound_server_shutdown_tx: None,
+            outbound_task_shutdown_tx: None,
+            listen_addr,
         }
     }
 
@@ -109,8 +134,29 @@ impl NetworkController {
     }
 
     pub fn start(&mut self) {
-        self.inbound_handler.lock().unwrap().start();
-        self.outbound_handler.start();
+        info!(
+            "Starting network controller started for at {}",
+            self.listen_addr
+        );
+        self.inbound_server_shutdown_tx = self
+            .inbound_handler
+            .lock()
+            .unwrap()
+            .start(&self.inbound_rpc_runtime);
+        self.outbound_task_shutdown_tx = self.outbound_handler.start(&self.outbound_rpc_runtime);
+    }
+
+    pub fn shutdown(&mut self) {
+        info!("Shutting down network controller at {}", self.listen_addr);
+        if let Some(shutdown_signal) = self.inbound_server_shutdown_tx.take() {
+            shutdown_signal.send(()).unwrap();
+        }
+
+        if let Some(shutdown_signal) = self.outbound_task_shutdown_tx.take() {
+            shutdown_signal.send(Message::new(vec![])).unwrap_or_else(|_| {
+                warn!("Failed to send shutdown signal to outbound task; probably already shutdown");
+            })
+        }
     }
 }
 
@@ -118,7 +164,10 @@ impl NetworkController {
 mod tests {
     use crate::network_controller::{Message, NetworkController};
     use aptos_config::utils;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        thread,
+    };
 
     #[test]
     fn test_basic_send_receive() {
@@ -144,6 +193,10 @@ mod tests {
         network_controller1.start();
         network_controller2.start();
 
+        // wait for the server to be ready to serve
+        // TODO: We need to pass this test without this sleep
+        thread::sleep(std::time::Duration::from_millis(10));
+
         let test1_message = "test1".as_bytes().to_vec();
         test1_sender
             .send(Message::new(test1_message.clone()))
@@ -159,5 +212,8 @@ mod tests {
 
         let received_test2_message = test2_receiver.recv().unwrap();
         assert_eq!(received_test2_message.data, test2_message);
+
+        network_controller1.shutdown();
+        network_controller2.shutdown();
     }
 }
