@@ -155,16 +155,6 @@ export class Ed25519PrivateKey extends PrivateKey {
     const keyPair = nacl.sign.keyPair();
     return new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH) });
   }
-
-  /**
-   * Generate a new random private key.
-   *
-   * @returns
-   */
-  static generate(): PrivateKey {
-    const keyPair = nacl.sign.keyPair();
-    return new PrivateKey({ value: keyPair.secretKey.slice(0, PrivateKey.LENGTH) });
-  }
 }
 
 /**
