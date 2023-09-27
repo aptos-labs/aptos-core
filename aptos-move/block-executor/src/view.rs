@@ -69,7 +69,7 @@ impl ReadResult {
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
+    versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     scheduler: &'a Scheduler,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
@@ -77,7 +77,7 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
 
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
+        shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         shared_scheduler: &'a Scheduler,
         shared_counter: &'a AtomicU32,
     ) -> Self {
@@ -224,7 +224,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 }
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
+    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X, T::Identifier>,
     pub(crate) _counter: &'a u32,
 }
 
@@ -488,5 +488,37 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     ) -> anyhow::Result<Option<StateValue>> {
         // TODO: Integrate aggregators.
         self.get_resource_state_value(state_key, None)
+    }
+
+    fn get_aggregator_v2_value(
+        &self,
+        id: &Self::IdentifierV2,
+        mode: AggregatorReadMode,
+    ) -> anyhow::Result<aptos_aggregator::types::AggregatorValue> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                let result = match mode {
+                    AggregatorReadMode::Aggregated => {
+                        state.versioned_map.aggregators().read(*id, self.txn_idx)
+                    },
+                    AggregatorReadMode::LastCommitted => state
+                        .versioned_map
+                        .aggregators()
+                        .read_latest_committed_value(*id),
+                };
+                result.map_err(|e| {
+                    anyhow::Error::new(VMStatus::error(
+                        StatusCode::STORAGE_ERROR,
+                        Some(format!("Error during read: {:?}", e)),
+                    ))
+                })
+            },
+            ViewState::Unsync(state) => state.unsync_map.fetch_aggregator(id).ok_or_else(|| {
+                anyhow::Error::new(VMStatus::error(
+                    StatusCode::STORAGE_ERROR,
+                    Some("Aggregator doesn't exist".to_string()),
+                ))
+            }),
+        }
     }
 }
