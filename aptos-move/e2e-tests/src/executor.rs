@@ -855,9 +855,9 @@ impl FakeExecutor {
             .to_vec()
     }
 
-    pub fn exec(
+    pub fn exec_module(
         &mut self,
-        module_name: &str,
+        module_id: &ModuleId,
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
@@ -883,7 +883,7 @@ impl FakeExecutor {
             let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
-                    &Self::module(module_name),
+                    module_id,
                     &Self::name(function_name),
                     type_params,
                     args,
@@ -892,7 +892,7 @@ impl FakeExecutor {
                 .unwrap_or_else(|e| {
                     panic!(
                         "Error calling {}.{}: {}",
-                        module_name,
+                        module_id,
                         function_name,
                         e.into_vm_status()
                     )
@@ -910,6 +910,16 @@ impl FakeExecutor {
         };
         self.data_store.add_write_set(&write_set);
         self.event_store.extend(events);
+    }
+
+    pub fn exec(
+        &mut self,
+        module_name: &str,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) {
+        self.exec_module(&Self::module(module_name), function_name, type_params, args)
     }
 
     pub fn try_exec(

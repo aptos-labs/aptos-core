@@ -24,7 +24,7 @@ use aptos_config::config::{NodeConfig, DEFAULT_GRPC_STREAM_PORT};
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig as FaucetConfig};
 use aptos_indexer_grpc_server_framework::setup_logging;
 use aptos_logger::debug;
-use aptos_node::create_single_node_test_config;
+use aptos_node::{load_node_config, start_test_environment_node};
 use async_trait::async_trait;
 use clap::Parser;
 use futures::{Future, FutureExt};
@@ -150,7 +150,10 @@ impl RunLocalTestnet {
             .map(StdRng::from_seed)
             .unwrap_or_else(StdRng::from_entropy);
 
-        let mut node_config = create_single_node_test_config(
+        // If there is a config on disk, this function will use that. If not, it will
+        // create a new one, taking the config_path and test_config_override arguments
+        // into account.
+        let mut node_config = load_node_config(
             &self.config_path,
             &self.test_config_override,
             &test_dir,
@@ -159,7 +162,7 @@ impl RunLocalTestnet {
             aptos_cached_packages::head_release_bundle(),
             rng,
         )
-        .context("Failed to create config for node")?;
+        .context("Failed to load / create config for node")?;
 
         eprintln!();
 
@@ -210,22 +213,8 @@ impl RunLocalTestnet {
         test_dir: PathBuf,
         config: NodeConfig,
     ) -> CliTypedResult<impl Future<Output = ()>> {
-        let rng = self
-            .seed
-            .map(StdRng::from_seed)
-            .unwrap_or_else(StdRng::from_entropy);
-
         let node_thread_handle = thread::spawn(move || {
-            let result = aptos_node::setup_test_environment_and_start_node(
-                None,
-                None,
-                Some(config),
-                Some(test_dir),
-                false,
-                false,
-                aptos_cached_packages::head_release_bundle(),
-                rng,
-            );
+            let result = start_test_environment_node(config, test_dir, false);
             eprintln!("Node stopped unexpectedly {:#?}", result);
         });
 

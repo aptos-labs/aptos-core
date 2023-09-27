@@ -18,7 +18,7 @@ use crate::{
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDataError, MVDataOutput, TxnIndex},
+    types::{Incarnation, TxnIndex},
     unsync_map::UnsyncMap,
     MVHashMap,
 };
@@ -118,7 +118,7 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         signature_verified_block: &[T],
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
         executor: &E,
@@ -215,39 +215,18 @@ where
         idx_to_validate: TxnIndex,
         incarnation: Incarnation,
         validation_wave: Wave,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
-        use MVDataError::*;
-        use MVDataOutput::*;
-
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
-        let valid = read_set.iter().all(|r| {
-            if r.is_speculative_failure() {
-                return false;
-            }
-
-            match versioned_cache.data().fetch_data(r.path(), idx_to_validate) {
-                Ok(Versioned(version, _)) => r.validate_versioned(version),
-                Ok(Resolved(value)) => r.validate_resolved(value),
-                Err(Uninitialized) => {
-                    // Can match the current behavior for modules: the path would be considered
-                    // 'Uninitialized' for data() hashmap, as the output is stored in the modules
-                    // MVHashMap. We validate all module reads successfully, as reading any
-                    // module that is also published triggeres ModulePathReadWrite fallback.
-                    r.validate_module()
-                },
-                // Dependency implies a validation failure, and if the original read were to
-                // observe an unresolved delta, it would set the aggregator base value in the
-                // multi-versioned data-structure, resolve, and record the resolved value.
-                Err(Dependency(_)) | Err(Unresolved(_)) | Err(DeltaApplicationFailure) => false,
-            }
-        });
+        // TODO: validate modules when there is no r/w fallback.
+        let valid = read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
+            && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate);
 
         let aborted = !valid && scheduler.try_abort(idx_to_validate, incarnation);
 
@@ -282,7 +261,7 @@ where
         post_commit_txs: &Vec<Sender<u32>>,
         worker_idx: &mut usize,
         scheduler_task: &mut SchedulerTask,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         accumulated_fee_statement: &mut FeeStatement,
         txn_fee_statements: &mut Vec<FeeStatement>,
     ) {
@@ -371,7 +350,7 @@ where
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
@@ -432,7 +411,7 @@ where
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
-        last_input_output: &TxnLastInputOutput<T::Key, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
