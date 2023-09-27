@@ -580,12 +580,12 @@ fn single_test_suite(
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, false, false),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true),
-        "pfn_performance" => pfn_performance(duration, false, false),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
-        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_performance" => pfn_performance(duration, false, false, true),
+        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
+        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
         "gather_metrics" => gather_metrics(),
         "net_bench" => net_bench(),
         "net_bench_two_region_env" => net_bench_two_region_env(),
@@ -2020,15 +2020,22 @@ fn pfn_const_tps(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
+    epoch_changes: bool,
 ) -> ForgeConfig {
+    let epoch_duration_secs = if epoch_changes {
+        300 // 5 minutes
+    } else {
+        60 * 60 * 2 // 2 hours
+    };
+
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Require frequent epoch changes
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            // Avoid epoch changes which can introduce noise
+            helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(95)
@@ -2060,9 +2067,15 @@ fn pfn_performance(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
+    epoch_changes: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
     let min_expected_tps = 4500;
+    let epoch_duration_secs = if epoch_changes {
+        300 // 5 minutes
+    } else {
+        60 * 60 * 2 // 2 hours
+    };
 
     // Create the forge config
     ForgeConfig::default()
@@ -2070,8 +2083,8 @@ fn pfn_performance(
         .with_initial_fullnode_count(7)
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Require frequent epoch changes
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            // Avoid epoch changes which can introduce noise
+            helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(min_expected_tps)
