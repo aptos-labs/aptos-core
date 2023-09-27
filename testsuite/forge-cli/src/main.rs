@@ -2025,7 +2025,7 @@ fn pfn_const_tps(
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
     } else {
-        60 * 60 * 2 // 2 hours
+        60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
     ForgeConfig::default()
@@ -2034,7 +2034,6 @@ fn pfn_const_tps(
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Avoid epoch changes which can introduce noise
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
@@ -2074,7 +2073,7 @@ fn pfn_performance(
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
     } else {
-        60 * 60 * 2 // 2 hours
+        60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
     };
 
     // Create the forge config
