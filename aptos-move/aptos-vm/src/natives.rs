@@ -4,6 +4,7 @@
 
 #[cfg(feature = "testing")]
 use anyhow::Error;
+use aptos_aggregator::types::AggregatorValue;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
     resolver::{AggregatorReadMode, TAggregatorView},
@@ -52,6 +53,14 @@ impl TAggregatorView for AptosBlankStorage {
         _mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
+    }
+
+    fn get_aggregator_v2_value(
+        &self,
+        _id: &Self::IdentifierV2,
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<AggregatorValue> {
+        unimplemented!()
     }
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types::MVModulesOutput, utils::module_hash};
+use aptos_aggregator::types::AggregatorValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
@@ -13,33 +14,46 @@ use std::{cell::RefCell, collections::HashMap, hash::Hash, sync::Arc};
 /// In this case only the latest recorded version is relevant, simplifying the implementation.
 /// The functionality also includes Executable caching based on the hash of ExecutableDescriptor
 /// (i.e. module hash for modules published during the latest block - not at storage version).
-pub struct UnsyncMap<K: ModulePath, V: TransactionWrite, X: Executable> {
+pub struct UnsyncMap<K: ModulePath, V: TransactionWrite, X: Executable, I: Copy> {
     // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
     // simplifies the trait-based integration for executable caching. TODO: better representation.
     // Optional hash can store the hash of the module to avoid re-computations.
     map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
+    aggregator_map: RefCell<HashMap<I, AggregatorValue>>,
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> Default
-    for UnsyncMap<K, V, X>
+impl<
+        K: ModulePath + Hash + Clone + Eq,
+        V: TransactionWrite,
+        X: Executable,
+        I: Hash + Clone + Copy + Eq,
+    > Default for UnsyncMap<K, V, X, I>
 {
     fn default() -> Self {
         Self {
             map: RefCell::new(HashMap::new()),
             executable_cache: RefCell::new(HashMap::new()),
             executable_bytes: RefCell::new(0),
+            aggregator_map: RefCell::new(HashMap::new()),
         }
     }
 }
 
-impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> UnsyncMap<K, V, X> {
+impl<
+        K: ModulePath + Hash + Clone + Eq,
+        V: TransactionWrite,
+        X: Executable,
+        I: Hash + Clone + Copy + Eq,
+    > UnsyncMap<K, V, X, I>
+{
     pub fn new() -> Self {
         Self {
             map: RefCell::new(HashMap::new()),
             executable_cache: RefCell::new(HashMap::new()),
             executable_bytes: RefCell::new(0),
+            aggregator_map: RefCell::new(HashMap::new()),
         }
     }
 
@@ -59,6 +73,10 @@ impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> Unsy
                 |x| Executable((x.clone(), ExecutableDescriptor::Published(*hash))),
             )
         })
+    }
+
+    pub fn fetch_aggregator(&self, id: &I) -> Option<AggregatorValue> {
+        self.aggregator_map.borrow().get(id).cloned()
     }
 
     pub fn write(&self, key: K, value: V) {
@@ -86,5 +104,9 @@ impl<K: ModulePath + Hash + Clone + Eq, V: TransactionWrite, X: Executable> Unsy
 
     pub fn executable_size(&self) -> usize {
         *self.executable_bytes.borrow()
+    }
+
+    pub fn write_aggregator(&self, id: I, value: AggregatorValue) {
+        self.aggregator_map.borrow_mut().insert(id, value);
     }
 }
