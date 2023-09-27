@@ -32,7 +32,7 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, TestValue, ExecutableTestType> = UnsyncMap::new();
+    let map: UnsyncMap<KeyType<Vec<u8>>, TestValue, ExecutableTestType, ()> = UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 
@@ -55,7 +55,8 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType> = MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
+        MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 5);

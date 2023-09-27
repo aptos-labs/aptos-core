@@ -38,7 +38,7 @@ pub struct VMChangeSet {
     module_write_set: HashMap<StateKey, WriteOp>,
     aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
-    aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange>,
+    aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
@@ -75,7 +75,7 @@ impl VMChangeSet {
         module_write_set: HashMap<StateKey, WriteOp>,
         aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
-        aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange>,
+        aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -221,7 +221,9 @@ impl VMChangeSet {
         &self.aggregator_v1_delta_set
     }
 
-    pub fn aggregator_v2_change_set(&self) -> &HashMap<AggregatorID, AggregatorChange> {
+    pub fn aggregator_v2_change_set(
+        &self,
+    ) -> &HashMap<AggregatorID, AggregatorChange<AggregatorID>> {
         &self.aggregator_v2_change_set
     }
 
@@ -356,8 +358,8 @@ impl VMChangeSet {
     }
 
     fn squash_additional_aggregator_v2_changes(
-        change_set: &mut HashMap<AggregatorID, AggregatorChange>,
-        additional_change_set: HashMap<AggregatorID, AggregatorChange>,
+        change_set: &mut HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
+        additional_change_set: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
     ) -> anyhow::Result<(), VMStatus> {
         let merged_changes = additional_change_set
             .into_iter()
