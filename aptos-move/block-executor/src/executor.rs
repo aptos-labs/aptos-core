@@ -17,6 +17,7 @@ use crate::{
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::delta_change_set::serialize;
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
@@ -88,6 +89,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
+        maybe_error: &Mutex<Option<Error<E::Error>>>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
@@ -163,7 +165,15 @@ where
             }
         }
 
-        last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
+        if last_input_output
+            .record(idx_to_execute, sync_view.take_reads(), result)
+            .is_err()
+        {
+            let mut maybe_error = maybe_error.lock();
+            *maybe_error = Some(Error::ModulePathReadWrite);
+            scheduler.halt();
+            return SchedulerTask::NoTask;
+        }
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
@@ -224,7 +234,7 @@ where
         shared_commit_state: &ExplicitSyncWrapper<(
             FeeStatement,
             Vec<FeeStatement>,
-            Option<Error<E::Error>>,
+            Mutex<Option<Error<E::Error>>>,
         )>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
@@ -264,6 +274,7 @@ where
             }
 
             if last_input_output.execution_error(txn_idx).is_some() {
+                let mut maybe_error = maybe_error.lock();
                 *maybe_error = last_input_output.execution_error(txn_idx);
                 info!(
                     "Block execution was aborted due to {:?}",
@@ -393,7 +404,7 @@ where
         shared_commit_state: &ExplicitSyncWrapper<(
             FeeStatement,
             Vec<FeeStatement>,
-            Option<Error<E::Error>>,
+            Mutex<Option<Error<E::Error>>>,
         )>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
@@ -443,17 +454,21 @@ where
                     txn_idx,
                     incarnation,
                     ExecutionTaskType::Execution,
-                ) => Self::execute(
-                    txn_idx,
-                    incarnation,
-                    block,
-                    last_input_output,
-                    versioned_cache,
-                    scheduler,
-                    &executor,
-                    base_view,
-                    ParallelState::new(versioned_cache, scheduler, shared_counter),
-                ),
+                ) => {
+                    let (_, _, maybe_error) = shared_commit_state.get();
+                    Self::execute(
+                        txn_idx,
+                        incarnation,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                        ParallelState::new(versioned_cache, scheduler, shared_counter),
+                        maybe_error,
+                    )
+                },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
@@ -505,7 +520,7 @@ where
         let shared_commit_state = ExplicitSyncWrapper::new((
             FeeStatement::zero(),
             Vec::<FeeStatement>::with_capacity(num_txns),
-            None,
+            Mutex::new(None),
         ));
 
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
@@ -550,7 +565,7 @@ where
         });
 
         let (_, _, maybe_error) = shared_commit_state.into_inner();
-        match maybe_error {
+        match maybe_error.into_inner() {
             Some(err) => Err(err),
             None => Ok(final_results.into_inner()),
         }
