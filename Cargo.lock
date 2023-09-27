@@ -885,7 +885,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sha2 0.10.6",
- "sha2 0.9.9",
  "sha3 0.9.1",
  "static_assertions",
  "thiserror",
@@ -1638,7 +1637,6 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "sha2 0.10.6",
- "sha2 0.9.9",
  "sha3 0.9.1",
  "siphasher",
  "smallvec",
@@ -1874,7 +1872,7 @@ dependencies = [
  "reqwest-retry",
  "serde",
  "serde_json",
- "sha2 0.9.9",
+ "sha2 0.10.6",
  "tokio",
  "url",
 ]
@@ -9093,7 +9091,7 @@ dependencies = [
  "num-bigint 0.4.3",
  "once_cell",
  "serde",
- "sha2 0.9.9",
+ "sha2 0.10.6",
  "walkdir",
 ]
 
@@ -9422,7 +9420,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_yaml 0.8.26",
- "sha2 0.9.9",
+ "sha2 0.10.6",
  "tempfile",
  "termcolor",
  "toml 0.5.9",
