@@ -145,7 +145,7 @@ pub enum SnapshotToStringFormula {
 }
 
 impl SnapshotToStringFormula {
-    pub fn apply(&self, base: u128) -> Vec<u8> {
+    pub fn apply_to(&self, base: u128) -> Vec<u8> {
         match self {
             SnapshotToStringFormula::Concat { prefix, suffix } => {
                 let middle_string = base.to_string();
