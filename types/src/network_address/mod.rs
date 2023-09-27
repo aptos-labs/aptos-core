@@ -125,6 +125,7 @@ pub enum Protocol {
     // probably need to move network wire into its own crate to avoid circular
     // dependency b/w network and types.
     Handshake(u8),
+    Udp(u16),
 }
 
 /// A minimally parsed DNS name. We don't really do any checking other than
@@ -239,7 +240,7 @@ fn is_network_layer(p: Option<&Protocol>) -> bool {
 fn is_transport_layer(p: Option<&Protocol>) -> bool {
     use Protocol::*;
 
-    matches!(p, Some(Tcp(_)))
+    matches!(p, Some(Tcp(_)) | Some(Udp(_)))
 }
 
 fn is_session_layer(p: Option<&Protocol>, allow_empty: bool) -> bool {
@@ -391,6 +392,7 @@ impl NetworkAddress {
     pub fn find_port(&self) -> Option<u16> {
         self.0.iter().find_map(|proto| match proto {
             Protocol::Tcp(port) => Some(*port),
+            Protocol::Udp(port) => Some(*port),
             _ => None,
         })
     }
@@ -508,7 +510,8 @@ impl From<SocketAddr> for NetworkAddress {
     fn from(sockaddr: SocketAddr) -> NetworkAddress {
         let ip_proto = Protocol::from(sockaddr.ip());
         let tcp_proto = Protocol::Tcp(sockaddr.port());
-        NetworkAddress::from_protocols(vec![ip_proto, tcp_proto]).unwrap()
+        let udp_proto = Protocol::Udp(sockaddr.port());
+        NetworkAddress::from_protocols(vec![ip_proto, tcp_proto, udp_proto]).unwrap()
     }
 }
 
@@ -606,6 +609,7 @@ impl fmt::Display for Protocol {
             Dns4(domain) => write!(f, "/dns4/{}", domain),
             Dns6(domain) => write!(f, "/dns6/{}", domain),
             Tcp(port) => write!(f, "/tcp/{}", port),
+            Udp(port) => write!(f, "/udp/{}", port),
             Memory(port) => write!(f, "/memory/{}", port),
             NoiseIK(pubkey) => write!(
                 f,
@@ -640,6 +644,7 @@ impl Protocol {
             "dns4" => Protocol::Dns4(parse_one(args)?),
             "dns6" => Protocol::Dns6(parse_one(args)?),
             "tcp" => Protocol::Tcp(parse_one(args)?),
+            "udp" => Protocol::Udp(parse_one(args)?),
             "memory" => Protocol::Memory(parse_one(args)?),
             "noise-ik" => Protocol::NoiseIK(x25519::PublicKey::from_encoded_string(
                 args.next().ok_or(ParseError::UnexpectedEnd)?,
@@ -785,6 +790,23 @@ pub fn parse_ip_tcp(protos: &[Protocol]) -> Option<((IpAddr, u16), &[Protocol])>
     }
 }
 
+/// Parse the `&[Protocol]` into the `"/ip4/<addr>/udp/<port>"` or
+/// `"/ip6/<addr>/udp/<port>"` prefix and unparsed `&[Protocol]` suffix.
+pub fn parse_ip_udp(protos: &[Protocol]) -> Option<((IpAddr, u16), &[Protocol])> {
+    use Protocol::*;
+
+    if protos.len() < 2 {
+        return None;
+    }
+
+    let (prefix, suffix) = protos.split_at(2);
+    match prefix {
+        [Ip4(ip), Udp(port)] => Some(((IpAddr::V4(*ip), *port), suffix)),
+        [Ip6(ip), Udp(port)] => Some(((IpAddr::V6(*ip), *port), suffix)),
+        _ => None,
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum IpFilter {
     Any,
@@ -821,6 +843,25 @@ pub fn parse_dns_tcp(protos: &[Protocol]) -> Option<((IpFilter, &DnsName, u16), 
     }
 }
 
+/// Parse the `&[Protocol]` into the `"/dns/<domain>/udp/<port>"`,
+/// `"/dns4/<domain>/udp/<port>"`, or `"/dns6/<domain>/udp/<port>"` prefix and
+/// unparsed `&[Protocol]` suffix.
+pub fn parse_dns_udp(protos: &[Protocol]) -> Option<((IpFilter, &DnsName, u16), &[Protocol])> {
+    use Protocol::*;
+
+    if protos.len() < 2 {
+        return None;
+    }
+
+    let (prefix, suffix) = protos.split_at(2);
+    match prefix {
+        [Dns(name), Udp(port)] => Some(((IpFilter::Any, name, *port), suffix)),
+        [Dns4(name), Udp(port)] => Some(((IpFilter::OnlyIp4, name, *port), suffix)),
+        [Dns6(name), Udp(port)] => Some(((IpFilter::OnlyIp6, name, *port), suffix)),
+        _ => None,
+    }
+}
+
 pub fn parse_tcp(protos: &[Protocol]) -> Option<((String, u16), &[Protocol])> {
     use Protocol::*;
 
@@ -835,6 +876,24 @@ pub fn parse_tcp(protos: &[Protocol]) -> Option<((String, u16), &[Protocol])> {
         [Dns(name), Tcp(port)] => Some(((name.to_string(), *port), suffix)),
         [Dns4(name), Tcp(port)] => Some(((name.to_string(), *port), suffix)),
         [Dns6(name), Tcp(port)] => Some(((name.to_string(), *port), suffix)),
+        _ => None,
+    }
+}
+
+pub fn parse_udp(protos: &[Protocol]) -> Option<((String, u16), &[Protocol])> {
+    use Protocol::*;
+
+    if protos.len() < 2 {
+        return None;
+    }
+
+    let (prefix, suffix) = protos.split_at(2);
+    match prefix {
+        [Ip4(ip), Udp(port)] => Some(((ip.to_string(), *port), suffix)),
+        [Ip6(ip), Udp(port)] => Some(((ip.to_string(), *port), suffix)),
+        [Dns(name), Udp(port)] => Some(((name.to_string(), *port), suffix)),
+        [Dns4(name), Udp(port)] => Some(((name.to_string(), *port), suffix)),
+        [Dns6(name), Udp(port)] => Some(((name.to_string(), *port), suffix)),
         _ => None,
     }
 }

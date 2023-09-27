@@ -567,11 +567,13 @@ proptest-derive = "0.3.0"
 prost = "0.12.1"
 prost-types = "0.12.1"
 quanta = "0.10.1"
+quinn = "0.10.2"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 random_word = "0.3.0"
 rayon = "1.5.2"
+rcgen = "0.11.1"
 redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.9.3"
@@ -587,6 +589,7 @@ ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstest = "0.15.0"
+rustls = { version = "0.21.0", default-features = false, features = ["quic"] }
 rusty-fork = "0.3.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"
