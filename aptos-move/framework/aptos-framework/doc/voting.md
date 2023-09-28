@@ -42,8 +42,11 @@ the resolution process.
 -  [Function `resolve`](#0x1_voting_resolve)
 -  [Function `resolve_proposal_v2`](#0x1_voting_resolve_proposal_v2)
 -  [Function `next_proposal_id`](#0x1_voting_next_proposal_id)
+-  [Function `get_proposer`](#0x1_voting_get_proposer)
 -  [Function `is_voting_closed`](#0x1_voting_is_voting_closed)
 -  [Function `can_be_resolved_early`](#0x1_voting_can_be_resolved_early)
+-  [Function `get_proposal_metadata`](#0x1_voting_get_proposal_metadata)
+-  [Function `get_proposal_metadata_value`](#0x1_voting_get_proposal_metadata_value)
 -  [Function `get_proposal_state`](#0x1_voting_get_proposal_state)
 -  [Function `get_proposal_creation_secs`](#0x1_voting_get_proposal_creation_secs)
 -  [Function `get_proposal_expiration_secs`](#0x1_voting_get_proposal_expiration_secs)
@@ -52,6 +55,7 @@ the resolution process.
 -  [Function `get_early_resolution_vote_threshold`](#0x1_voting_get_early_resolution_vote_threshold)
 -  [Function `get_votes`](#0x1_voting_get_votes)
 -  [Function `is_resolved`](#0x1_voting_is_resolved)
+-  [Function `get_resolution_time`](#0x1_voting_get_resolution_time)
 -  [Function `is_multi_step_proposal_in_execution`](#0x1_voting_is_multi_step_proposal_in_execution)
 -  [Function `is_voting_period_over`](#0x1_voting_is_voting_period_over)
 -  [Specification](#@Specification_1)
@@ -1126,6 +1130,33 @@ Return the next unassigned proposal id
 
 </details>
 
+<a name="0x1_voting_get_proposer"></a>
+
+## Function `get_proposer`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposer">get_proposer</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposer">get_proposer</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <b>address</b> <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+    <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
+    proposal.proposer
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_voting_is_voting_closed"></a>
 
 ## Function `is_voting_closed`
@@ -1177,6 +1208,67 @@ Return true if the proposal has reached early resolution threshold (if specified
         };
     };
     <b>false</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_voting_get_proposal_metadata"></a>
+
+## Function `get_proposal_metadata`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_metadata">get_proposal_metadata</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_metadata">get_proposal_metadata</a>&lt;ProposalType: store&gt;(
+    voting_forum_address: <b>address</b>,
+    proposal_id: u64,
+): SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+    <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
+    proposal.metadata
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_voting_get_proposal_metadata_value"></a>
+
+## Function `get_proposal_metadata_value`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_metadata_value">get_proposal_metadata_value</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64, metadata_key: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_proposal_metadata_value">get_proposal_metadata_value</a>&lt;ProposalType: store&gt;(
+    voting_forum_address: <b>address</b>,
+    proposal_id: u64,
+    metadata_key: String,
+): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+    <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
+    *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(&proposal.metadata, &metadata_key)
 }
 </code></pre>
 
@@ -1440,6 +1532,36 @@ Return true if the governance proposal has already been resolved.
     <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
     <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
     proposal.is_resolved
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_voting_get_resolution_time"></a>
+
+## Function `get_resolution_time`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_resolution_time">get_resolution_time</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="voting.md#0x1_voting_get_resolution_time">get_resolution_time</a>&lt;ProposalType: store&gt;(
+    voting_forum_address: <b>address</b>,
+    proposal_id: u64,
+): u64 <b>acquires</b> <a href="voting.md#0x1_voting_VotingForum">VotingForum</a> {
+    <b>let</b> voting_forum = <b>borrow_global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&voting_forum.proposals, proposal_id);
+    proposal.resolution_time_secs
 }
 </code></pre>
 
