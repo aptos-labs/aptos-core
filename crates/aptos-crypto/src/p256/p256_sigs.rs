@@ -129,7 +129,8 @@ impl Signature for P256Signature {
     /// Outside of this crate, this particular function should only be used for native signature
     /// verification in Move.
     ///
-    /// This function will check both the signature and `public_key` for small subgroup attacks.
+    /// Checks for and rejects non-canonical signatures (r,s) where s > (n/2), where n is the group
+    /// order
     fn verify_arbitrary_msg(&self, message: &[u8], public_key: &P256PublicKey) -> Result<()> {
         P256Signature::check_s_malleability(&self.to_bytes())?;
 
