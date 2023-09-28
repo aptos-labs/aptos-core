@@ -608,14 +608,14 @@ impl Scheduler {
     /// It will set the done_marker to be true, resolve all pending dependencies.
     ///
     /// Currently there are 4 scenarios to early halt the BlockSTM execution.
-    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
+    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.t
     /// 2. There is a txn with VM execution status Abort.
     /// 3. There is a txn with VM execution status SkipRest.
     /// 4. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.
     ///
     /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
     /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.
-    pub fn halt(&self) {
+    pub fn halt(&self) -> bool {
         // The first thread that sets done_marker to be true will be reponsible for
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function resolve_condvar().
@@ -623,7 +623,9 @@ impl Scheduler {
             for txn_idx in 0..self.num_txns {
                 self.resolve_condvar(txn_idx);
             }
+            return true;
         }
+        false
     }
 
     /// When early halt the BlockSTM, some of the threads

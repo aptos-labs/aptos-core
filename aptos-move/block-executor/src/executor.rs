@@ -165,11 +165,11 @@ where
             }
         }
 
-        if let Some(err) = &last_input_output.record(idx_to_execute, sync_view.take_reads(), result)
-        {
-            let mut maybe_error = maybe_error.lock();
-            *maybe_error = Some(err.clone());
-            scheduler.halt();
+        if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
+            if scheduler.halt() {
+                let mut maybe_error = maybe_error.lock();
+                *maybe_error = Some(Error::ModulePathReadWrite);
+            }
             return SchedulerTask::NoTask;
         }
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
@@ -272,13 +272,14 @@ where
             }
 
             if last_input_output.execution_error(txn_idx).is_some() {
-                let mut maybe_error = maybe_error.lock();
-                *maybe_error = last_input_output.execution_error(txn_idx);
-                info!(
-                    "Block execution was aborted due to {:?}",
-                    maybe_error.as_ref().unwrap()
-                );
-                scheduler.halt();
+                if scheduler.halt() {
+                    let mut maybe_error = maybe_error.lock();
+                    *maybe_error = last_input_output.execution_error(txn_idx);
+                    info!(
+                        "Block execution was aborted due to {:?}",
+                        maybe_error.as_ref().unwrap()
+                    );
+                } // else it's already halted
                 break;
             }
 

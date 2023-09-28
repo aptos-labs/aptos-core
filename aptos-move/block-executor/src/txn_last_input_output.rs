@@ -87,7 +87,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         false
     }
 
-    /// Returns an error if a module path that was read was previously written to, and vice versa.
+    /// Returns false on an error - if a module path that was read was previously written to, and vice versa.
     /// Since parallel executor is instantiated per block, any module that is in the Move-VM loader
     /// cache must previously be read and would be recorded in the 'module_reads' set. Any module
     /// that is written (published or re-published) goes through transaction output write-set and
@@ -104,7 +104,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         input: CapturedReads<T>,
         output: ExecutionStatus<O, Error<E>>,
-    ) -> Option<Error<E>> {
+    ) -> bool {
         let written_modules = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
@@ -125,14 +125,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ) {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
-                return Some(Error::ModulePathReadWrite);
+                return false;
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
 
-        None
+        true
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
