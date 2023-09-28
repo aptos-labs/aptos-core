@@ -9,6 +9,8 @@ export interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
 }
 
+export type DeserializableType<T> = T & Deserializable<T>;
+
 export class Deserializer {
   private buffer: ArrayBuffer;
 

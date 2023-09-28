@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import nacl from "tweetnacl";
-import { Deserializer } from "../bcs/deserializer";
+import { Deserializable, Deserializer } from "../bcs/deserializer";
 import { Serializer } from "../bcs/serializer";
 import { Hex } from "../core/hex";
 import { HexInput } from "../types";
 import { PublicKey, PrivateKey, Signature } from "./asymmetric_crypto";
 
-export class Ed25519PublicKey extends PublicKey {
+export class Ed25519PublicKey implements PublicKey, Deserializable<Ed25519PrivateKey> {
   // Correct length of the public key in bytes (Uint8Array)
   static readonly LENGTH: number = 32;
 
@@ -21,8 +21,6 @@ export class Ed25519PublicKey extends PublicKey {
    * @param args.hexInput A HexInput (string or Uint8Array)
    */
   constructor(args: { hexInput: HexInput }) {
-    super();
-
     const { hexInput } = args;
     const hex = Hex.fromHexInput({ hexInput });
     if (hex.toUint8Array().length !== Ed25519PublicKey.LENGTH) {
@@ -65,13 +63,13 @@ export class Ed25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): PublicKey {
+  static deserialize(deserializer: Deserializer): Ed25519PublicKey {
     const value = deserializer.deserializeBytes();
     return new Ed25519PublicKey({ hexInput: value });
   }
 }
 
-export class Ed25519PrivateKey extends PrivateKey {
+export class Ed25519PrivateKey implements PrivateKey, Deserializable<Ed25519PrivateKey> {
   // Correct length of the private key in bytes (Uint8Array)
   static readonly LENGTH: number = 32;
 
@@ -84,8 +82,6 @@ export class Ed25519PrivateKey extends PrivateKey {
    * @param value HexInput (string or Uint8Array)
    */
   constructor(args: { value: HexInput }) {
-    super();
-
     const { value } = args;
     const privateKeyHex = Hex.fromHexInput({ hexInput: value });
     if (privateKeyHex.toUint8Array().length !== Ed25519PrivateKey.LENGTH) {
@@ -121,7 +117,7 @@ export class Ed25519PrivateKey extends PrivateKey {
    * @param args.message in HexInput format
    * @returns Signature
    */
-  sign(args: { message: HexInput }): Ed25519Signature {
+  sign(args: { message: HexInput }): Signature {
     const hex = Hex.fromHexInput({ hexInput: args.message });
     const signature = nacl.sign.detached(hex.toUint8Array(), this.signingKeyPair.secretKey);
     return new Ed25519Signature({ data: signature });
@@ -129,11 +125,6 @@ export class Ed25519PrivateKey extends PrivateKey {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Ed25519PrivateKey {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): Ed25519PrivateKey {
@@ -155,7 +146,7 @@ export class Ed25519PrivateKey extends PrivateKey {
 /**
  * The product of signing a message with a private key.
  */
-export class Ed25519Signature extends Signature {
+export class Ed25519Signature implements Signature, Deserializable<Ed25519Signature> {
   // Correct length of the signature in bytes (Uint8Array)
   static readonly LENGTH = 64;
 
@@ -163,8 +154,6 @@ export class Ed25519Signature extends Signature {
   private readonly data: Hex;
 
   constructor(args: { data: HexInput }) {
-    super();
-
     const hex = Hex.fromHexInput({ hexInput: args.data });
     if (hex.toUint8Array().length !== Ed25519Signature.LENGTH) {
       throw new Error(`Signature length should be ${Ed25519Signature.LENGTH}`);
@@ -195,12 +184,7 @@ export class Ed25519Signature extends Signature {
     serializer.serializeBytes(this.data.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Ed25519Signature {
-    throw new Error("Method not implemented.");
-  }
-
-  static deserialize(deserializer: Deserializer): Ed25519Signature {
+  static deserialize(deserializer: Deserializer): Signature {
     const data = deserializer.deserializeBytes();
     return new Ed25519Signature({ data });
   }

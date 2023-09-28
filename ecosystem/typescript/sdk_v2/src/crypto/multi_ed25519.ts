@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Deserializer } from "../bcs/deserializer";
+import { Deserializable, Deserializer } from "../bcs/deserializer";
 import { Serializer } from "../bcs/serializer";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 import { PublicKey, Signature } from "./asymmetric_crypto";
@@ -76,17 +76,13 @@ export class MultiEd25519PublicKey extends PublicKey {
     return Hex.fromHexInput({ hexInput: this.toUint8Array() }).toString();
   }
 
+  // eslint-disable-next-line class-methods-use-this,@typescript-eslint/no-unused-vars
   verifySignature(args: { data: HexInput; signature: MultiEd25519Signature }): boolean {
     throw new Error("TODO - Method not implemented.");
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
@@ -103,7 +99,7 @@ export class MultiEd25519PublicKey extends PublicKey {
   }
 }
 
-export class MultiEd25519Signature extends Signature {
+export class MultiEd25519Signature extends Signature implements Deserializable<MultiEd25519Signature> {
   // Maximum number of signatures supported
   static MAX_SIGNATURES_SUPPORTED = 32;
 
@@ -218,11 +214,6 @@ export class MultiEd25519Signature extends Signature {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Signature {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519Signature {

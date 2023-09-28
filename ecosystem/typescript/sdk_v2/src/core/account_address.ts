@@ -4,6 +4,7 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { HexInput } from "../types";
 import { ParsingError, ParsingResult } from "./common";
+import { Deserializable, Deserializer, Serializable, Serializer } from "../bcs";
 
 /**
  * This enum is used to explain why an address was invalid.
@@ -34,7 +35,7 @@ export enum AddressInvalidReason {
  * The comments in this class make frequent reference to the LONG and SHORT formats,
  * as well as "special" addresses. To learn what these refer to see AIP-40.
  */
-export class AccountAddress {
+export class AccountAddress implements Serializable, Deserializable<AccountAddress> {
   /*
    * This is the internal representation of an account address.
    */
@@ -71,6 +72,15 @@ export class AccountAddress {
       );
     }
     this.data = args.data;
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeFixedBytes(this.toUint8Array());
+  }
+
+  static deserialize(deserializer: Deserializer): AccountAddress {
+    const data = deserializer.deserializeFixedBytes(AccountAddress.LENGTH);
+    return new AccountAddress({ data });
   }
 
   /**
