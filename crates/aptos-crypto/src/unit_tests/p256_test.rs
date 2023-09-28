@@ -144,42 +144,42 @@ proptest! {
 
         // NIST-P256 signing ensures a canonical S value.
         let s = NonZeroScalar::try_from(&s_bytes[..]).unwrap();
-        let order_half = NonZeroScalar::try_from(&ORDER_HALF[..]).unwrap();
 
-        // adding ORDER_HALF (half the order of the base point) so that S + ORDER_HALF > ORDER_HALF
-        let malleable_s = NonZeroScalar::new(*s + *order_half).unwrap();
+        // computing s' = n - s to obtain the non-canonical valid signature over `message`
+        let malleable_s = NonZeroScalar::new(-*s).unwrap();
         let malleable_s_bytes = malleable_s.to_bytes();
         // Update the signature (the S part).
         serialized[32..].copy_from_slice(&malleable_s_bytes);
 
         prop_assert_ne!(serialized_old, serialized);
 
-        // Check that malleable signatures will pass verification and deserialization in the RustCrypto
+        // Check that valid non-canonical signatures will pass verification and deserialization in the RustCrypto
         // p256 crate.
         // Construct the corresponding RustCrypto p256 public key.
         let rustcrypto_public_key = p256::ecdsa::VerifyingKey::from_sec1_bytes(
             &keypair.public_key.to_bytes()
         ).unwrap();
 
-        // Construct the corresponding RustCrypto p256 Signature. This signature is malleable.
+        // Construct the corresponding RustCrypto p256 Signature. This signature is valid but
+        // non-canonical.
         let rustcrypto_sig = p256::ecdsa::Signature::try_from(&serialized[..]);
 
-        // RustCrypto p256 will deserialize the malleable
+        // RustCrypto p256 will deserialize the non-canonical
         // signature. It does not detect it.
         prop_assert!(rustcrypto_sig.is_ok());
 
-        let msg_bytes = bcs::to_bytes(&message);
+        let msg_bytes = signing_message(&message);
         prop_assert!(msg_bytes.is_ok());
 
         let rustcrypto_sig = rustcrypto_sig.unwrap();
-        // RustCrypto p256 verify will NOT accept the mauled signature
-        prop_assert!(rustcrypto_public_key.verify(msg_bytes.as_ref().unwrap(), &rustcrypto_sig).is_err());
-        // ...therefore, neither will our own P256Signature::verify
+        // RustCrypto p256 verify WILL accept the mauled signature
+        prop_assert!(rustcrypto_public_key.verify(msg_bytes.as_ref().unwrap(), &rustcrypto_sig).is_ok());
+        // ...however, our own P256Signature::verify will not
         let sig = P256Signature::from_bytes_unchecked(&serialized).unwrap();
         prop_assert!(sig.verify(&message, &keypair.public_key).is_err());
 
         let serialized_malleable: &[u8] = &serialized;
-        // try_from will fail on malleable signatures. We detect malleable signatures
+        // try_from will fail on non-canonical signatures. We detect non-canonical signatures
         // early during deserialization.
         prop_assert_eq!(
             P256Signature::try_from(serialized_malleable),
@@ -187,7 +187,7 @@ proptest! {
         );
 
         // We expect from_bytes_unchecked deserialization to succeed, as RustCrypto p256
-        // does not check for signature malleability. This method is pub(crate)
+        // does not check for non-canonical signatures. This method is pub(crate)
         // and only used for test purposes.
         let sig_unchecked = P256Signature::from_bytes_unchecked(&serialized);
         prop_assert!(sig_unchecked.is_ok());
