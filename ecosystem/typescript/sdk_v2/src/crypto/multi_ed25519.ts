@@ -6,6 +6,7 @@ import { Serializer } from "../bcs/serializer";
 import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
 import { PublicKey, Signature } from "./asymmetric_crypto";
 import { HexInput } from "../types";
+import { Hex } from "../core/hex";
 
 export class MultiEd25519PublicKey extends PublicKey {
   // Maximum number of public keys supported
@@ -69,6 +70,10 @@ export class MultiEd25519PublicKey extends PublicKey {
     bytes[this.publicKeys.length * Ed25519PublicKey.LENGTH] = this.threshold;
 
     return bytes;
+  }
+
+  toString(): string {
+    return Hex.fromHexInput({ hexInput: this.toUint8Array() }).toString();
   }
 
   verifySignature(args: { data: HexInput; signature: MultiEd25519Signature }): boolean {
@@ -135,6 +140,10 @@ export class MultiEd25519Signature extends Signature {
       );
     }
 
+    if (signatures.length > MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
+      throw new Error(`The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`);
+    }
+
     this.signatures = signatures;
     this.bitmap = bitmap;
   }
@@ -151,6 +160,10 @@ export class MultiEd25519Signature extends Signature {
     bytes.set(this.bitmap, this.signatures.length * Ed25519Signature.LENGTH);
 
     return bytes;
+  }
+
+  toString(): string {
+    return Hex.fromHexInput({ hexInput: this.toUint8Array() }).toString();
   }
 
   /**

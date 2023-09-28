@@ -4,6 +4,9 @@
 export const ed25519 = {
   privateKey: "0xc5338cd251c22daa8c9c9cc94f498cc8a5c7e1d2e75287a5dda91096fe64efa5",
   publicKey: "0xde19e5d1880cac87d57484ce9ed2e84cf0f9599f12e7cc3a52e4e7657a763f2c",
+  authKey: "0x978c213990c4833df71548df7ce49d54c759d6b6d932de22b24d56060b7af2aa",
+  address: "0x978c213990c4833df71548df7ce49d54c759d6b6d932de22b24d56060b7af2aa",
+  mnemonic: "shoot island position soft burden budget tooth cruel issue economy destroy above",
   message: "0x7777",
   // eslint-disable-next-line max-len
   signedMessage:

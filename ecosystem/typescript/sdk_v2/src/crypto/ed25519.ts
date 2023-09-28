@@ -149,7 +149,7 @@ export class Ed25519PrivateKey extends PrivateKey {
   /**
    * Generate a new random private key.
    *
-   * @returns
+   * @returns Ed25519PrivateKey
    */
   static generate(): Ed25519PrivateKey {
     const keyPair = nacl.sign.keyPair();
