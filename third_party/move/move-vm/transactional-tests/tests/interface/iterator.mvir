@@ -1,0 +1,81 @@
+//# publish
+module 0x42.Iterator {
+    public for_all<Container, Elem, Index: copy + drop>[
+        |&Container, Index| (bool),
+        |&Container, Index| (Index),
+        |&Container, Index| (&Elem),
+        |&Elem| (bool),
+    ](
+        container: &Container,
+        index: Index,
+    ): bool {
+        let cur_elem: &Elem;
+    label entry:
+        jump_if_false (call_virtual(0)(copy(container), copy(index))) non_empty;
+        return true;
+    label non_empty:
+        cur_elem = call_virtual(2)(copy(container), copy(index));
+        jump_if (call_virtual(3)(move(cur_elem))) next_element;
+        return false;
+    label next_element:
+        index = call_virtual(1)(copy(container), copy(index));
+        jump entry;
+    }
+}
+
+//# publish
+module 0x42.VectorIterator {
+    import 0x1.vector;
+
+    public is_end<T>(v: &vector<T>, index: u64): bool {
+    label b0:
+        return move(index) >= vector.length<T>(move(v));
+    }
+
+    public next<T>(v: &vector<T>, index: u64): u64 {
+    label b0:
+        return move(index) + 1;
+    }
+
+    public elem<T>(v: &vector<T>, index: u64): &T {
+    label b0:
+        return vector.borrow<T>(move(v), move(index));
+    }
+}
+
+//# publish
+module 0x42.Helper {
+    public is_even(u: &u64): bool {
+    label b0:
+        return (*move(u)) % 2 == 0;
+    }
+}
+
+//# run
+import 0x42.Iterator;
+import 0x42.VectorIterator;
+import 0x42.Helper;
+
+main() {
+    let v: vector<u64>;
+    let result: bool;
+label b0:
+    v = vec_pack_8<u64>(40, 41, 42, 43, 44, 45, 46, 47);
+    result = Iterator.for_all<vector<u64>, u64, u64>[
+        VectorIterator.is_end<u64>,
+        VectorIterator.next<u64>,
+        VectorIterator.elem<u64>,
+        Helper.is_even,
+    ](&v, 0);
+    assert(!move(result), 52);
+
+    v = vec_pack_8<u64>(40, 0, 42, 44, 44, 48, 46, 48);
+    result = Iterator.for_all<vector<u64>, u64, u64>[
+        VectorIterator.is_end<u64>,
+        VectorIterator.next<u64>,
+        VectorIterator.elem<u64>,
+        Helper.is_even,
+    ](&v, 0);
+    assert(move(result), 52);
+    return;
+}
