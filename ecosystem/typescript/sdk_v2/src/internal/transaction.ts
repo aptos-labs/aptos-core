@@ -22,7 +22,7 @@ export async function getTransactions(args: {
     originMethod: "getTransactions",
     params: { start: options?.start, limit: options?.limit },
     overrides: { ...aptosConfig.clientConfig },
-  });
+  }, aptosConfig);
   return data;
 }
 
@@ -33,6 +33,6 @@ export async function getGasPriceEstimation(args: { aptosConfig: AptosConfig }) 
     endpoint: "estimate_gas_price",
     originMethod: "getGasPriceEstimation",
     overrides: { ...aptosConfig.clientConfig },
-  });
+  }, aptosConfig);
   return data;
 }
