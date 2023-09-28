@@ -41,7 +41,7 @@ impl QuicTransport {}
 impl Transport for QuicTransport {
     type Error = ::std::io::Error;
     type Inbound = future::Ready<io::Result<Self::Output>>;
-    type Listener = QuicConnectionStream;
+    type Listener = QuicConnectionStream<'static>;
     type Outbound = QuicOutboundConnection;
     type Output = QuicConnection;
 
@@ -216,27 +216,44 @@ fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
 
 #[must_use = "streams do nothing unless polled"]
 #[allow(dead_code)]
-pub struct QuicConnectionStream {
+pub struct QuicConnectionStream<'a> {
     server_endpoint: Pin<Box<quinn::Endpoint>>,
+    server_accept: Option<Pin<Box<quinn::Accept<'a>>>>,
     pending_connections: Pin<Box<FuturesUnordered<Connecting>>>,
     pending_quic_connections: Pin<Box<FuturesUnordered<PendingQuicConnection>>>,
 }
 
-impl QuicConnectionStream {
+impl<'a> QuicConnectionStream<'a> {
     pub fn new(server_endpoint: quinn::Endpoint) -> Self {
         Self {
             server_endpoint: Box::pin(server_endpoint),
+            server_accept: None,
             pending_connections: Box::pin(FuturesUnordered::new()),
             pending_quic_connections: Box::pin(FuturesUnordered::new()),
         }
     }
 }
 
-impl Stream for QuicConnectionStream {
+impl<'a> Stream for QuicConnectionStream<'a> {
     type Item = io::Result<(future::Ready<io::Result<QuicConnection>>, NetworkAddress)>;
 
-    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
-        // Check if there are any new QUIC connections that are ready
+    fn poll_next(self: Pin<&mut Self>, _context: &mut Context) -> Poll<Option<Self::Item>> {
+        unimplemented!("POLL NEXT?!")
+        /*
+        // Setup the endpoint acceptor
+        if self.server_accept.is_none() {
+            self.server_accept = Some(Box::pin(self.server_endpoint.as_mut().accept()));
+        }
+
+        // Check if there are any new pending connections to accept
+        if let Some(server_accept) = &mut self.server_accept {
+            if let Poll::Ready(Some(server_accept)) = server_accept.as_mut().poll(context) {
+                // Add the new connection to list of pending connections
+                self.pending_connections.as_mut().push(server_accept);
+            }
+        }
+
+        // Check if there are any pending QUIC connections that are ready
         if let Poll::Ready(Some(Ok(quic_connection))) =
             self.pending_quic_connections.as_mut().poll_next(context)
         {
@@ -250,55 +267,19 @@ impl Stream for QuicConnectionStream {
             ))));
         }
 
-        // Check if there are any new pending connections to accept
-        /*
-        let this = self.as_mut();
-        let server_accept = this.server_endpoint.accept();
-        futures::pin_mut!(server_accept);
-        let connecting = if let Poll::Ready(Some(connecting)) = server_accept.poll(context) {
-            Some(connecting)
-        } else {
-            None
-        };
-        if let Some(pending_connection) = connecting {
-            // Add the new connection to list of pending connections
-            this.pending_connections.as_mut().push(pending_connection);
+        // Check if there are any pending connections that are ready
+        if let Poll::Ready(Some(Ok(connection))) =
+            self.pending_connections.as_mut().poll_next(context)
+        {
+            // Create the pending QUIC socket
+            let pending_quic_socket = PendingQuicConnection::new(connection);
+
+            // Add the new pending QUIC socket to the list of pending QUIC sockets
+            self.pending_quic_connections.push(pending_quic_socket);
         }
+
+        Poll::Pending
          */
-
-        // Check if there are any new pending connections to accept
-        if let Poll::Ready(Some(pending_connection)) = self.server_accept.as_mut().poll(context) {
-            // Add the new connection to list of pending connections
-            self.pending_connections.as_mut().push(pending_connection);
-        }
-
-        // Poll the pending connections to see if any of them are ready
-        match self.pending_connections.as_mut().poll_next(context) {
-            Poll::Ready(Some(Ok(connection))) => {
-                // Create the pending QUIC socket
-                let pending_quic_socket = PendingQuicConnection::new(connection);
-
-                // Add the new pending QUIC socket to the list of pending QUIC sockets
-                self.pending_quic_connections.push(pending_quic_socket);
-
-                // We're still waiting
-                Poll::Pending
-            },
-            Poll::Ready(Some(Err(error))) => {
-                // Something went wrong!
-                let error = io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Could not accept connection: {:?}", error),
-                );
-                Poll::Ready(Some(Err(error)))
-            },
-            Poll::Ready(None) => {
-                // Something went wrong!
-                let error = io::Error::new(io::ErrorKind::Other, "No pending connections!");
-                Poll::Ready(Some(Err(error)))
-            },
-            Poll::Pending => Poll::Pending,
-        }
     }
 }
 
@@ -367,7 +348,7 @@ impl Future for PendingQuicConnection {
 
 async fn create_quic_connection(connection: quinn::Connection) -> io::Result<QuicConnection> {
     // Create the QUIC connection
-    Ok(QuicConnection::new(connection).await?)
+    QuicConnection::new(connection).await
 }
 
 /// A wrapper around a quinn Connection that implements the AsyncRead/AsyncWrite traits
