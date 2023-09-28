@@ -360,7 +360,11 @@ impl<T: Transaction> CapturedReads<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::proptest_types::types::{KeyType, MockEvent, ValueType};
+    use crate::{
+        proptest_types::types::{KeyType, MockEvent, ValueType},
+        task::Transaction,
+    };
+    use aptos_aggregator::types::AggregatorID;
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
@@ -532,7 +536,7 @@ mod test {
 
     impl BlockExecutableTransaction for TestTransactionType {
         type Event = MockEvent;
-        type Identifier = ();
+        type Identifier = AggregatorID;
         type Key = KeyType<u32>;
         type Tag = u32;
         type Value = ValueType;

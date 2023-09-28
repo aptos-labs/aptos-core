@@ -87,12 +87,22 @@ pub enum MoveStructLayout {
     },
 }
 
+/// Used to distinguish between aggregators ans snapshots.
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+pub enum IdentifierMappingKind {
+    Aggregator,
+    Snapshot,
+}
+
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum LayoutTag {
     /// The current type corresponds to an aggregator or a snapshot values
-    /// and requires special handling in serialization and deserialization.
-    AggregatorLifting,
+    /// and requires special handling in serialization and deserialization:
+    /// the concrete values have to be replaced with unique identifiers and
+    /// back.
+    IdentifierMapping(IdentifierMappingKind),
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
@@ -341,7 +351,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::Tagged(tag, layout) => match tag {
                 // Serialization ignores the tag for types which correspond to aggregator or
                 // snapshot values.
-                LayoutTag::AggregatorLifting => layout.deserialize(deserializer),
+                LayoutTag::IdentifierMapping(_) => layout.deserialize(deserializer),
             },
         }
     }
@@ -545,7 +555,7 @@ impl fmt::Display for MoveTypeLayout {
             Struct(s) => write!(f, "{}", s),
             Signer => write!(f, "signer"),
             Tagged(tag, typ) => match tag {
-                LayoutTag::AggregatorLifting => write!(f, "{}", typ),
+                LayoutTag::IdentifierMapping(_) => write!(f, "{}", typ),
             },
         }
     }
@@ -594,7 +604,7 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
             MoveTypeLayout::Tagged(tag, v) => match tag {
-                LayoutTag::AggregatorLifting => v.as_ref().try_into()?,
+                LayoutTag::IdentifierMapping(_) => v.as_ref().try_into()?,
             },
         })
     }

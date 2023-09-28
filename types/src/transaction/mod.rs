@@ -1834,7 +1834,18 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + DeserializeOwned
         + Serialize;
     /// AggregatorV2 identifier type.
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Copy;
+    type Identifier: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + Copy
+        + From<u64>
+        + TryIntoMoveValue
+        + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

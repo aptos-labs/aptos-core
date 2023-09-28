@@ -336,11 +336,11 @@ mod test {
 
         // failed because of wrong max_value
         assert!(aggregator_data
-            .snapshot(AggregatorID::new(900), 800)
+            .snapshot(AggregatorID::new(900), 800, context.resolver)
             .is_err());
 
         assert_ok_eq!(
-            aggregator_data.snapshot(AggregatorID::new(900), 900),
+            aggregator_data.snapshot(AggregatorID::new(900), 900, context.resolver),
             AggregatorID::new(1)
         );
 
@@ -353,7 +353,7 @@ mod test {
         );
 
         assert_ok_eq!(
-            aggregator_data.snapshot(AggregatorID::new(900), 900),
+            aggregator_data.snapshot(AggregatorID::new(900), 900, context.resolver),
             AggregatorID::new(2)
         );
 
@@ -383,13 +383,14 @@ mod test {
         );
 
         assert_ok_eq!(
-            aggregator_data.snapshot(AggregatorID::new(2000), 2000),
+            aggregator_data.snapshot(AggregatorID::new(2000), 2000, context.resolver),
             AggregatorID::new(3)
         );
 
         assert_eq!(
             aggregator_data.string_concat(
                 AggregatorID::new(2200),
+                context.resolver,
                 "prefix".as_bytes().to_vec(),
                 "suffix".as_bytes().to_vec()
             ),

@@ -1,10 +1,41 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::bounded_math::code_invariant_error;
+use crate::{
+    bounded_math::code_invariant_error,
+    utils::{
+        bytes_to_string, from_utf8_bytes, is_string_layout, string_to_bytes, to_utf8_bytes,
+        u128_to_u64,
+    },
+};
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress,
+    value::{IdentifierMappingKind, MoveTypeLayout},
+    vm_status::StatusCode,
+};
+use move_vm_types::values::{Struct, Value};
+
+/// Types which implement this trait can be converted to a Move value.
+pub trait TryIntoMoveValue: Sized {
+    type Error: std::fmt::Display;
+
+    fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error>;
+}
+
+/// Types which implement this trait can be constructed from a Move value.
+pub trait TryFromMoveValue: Sized {
+    // Allows to pass extra information from the caller.
+    type Hint;
+    type Error: std::fmt::Display;
+
+    fn try_from_move_value(
+        layout: &MoveTypeLayout,
+        value: Value,
+        hint: &Self::Hint,
+    ) -> Result<Self, Self::Error>;
+}
 
 pub type AggregatorResult<T> = Result<T, AggregatorError>;
 
@@ -23,8 +54,64 @@ impl AggregatorID {
         Self(value)
     }
 
-    pub fn id(&self) -> u64 {
+    pub fn as_u64(&self) -> u64 {
         self.0
+    }
+}
+
+// Used for ID generation from u32/u64 counters.
+impl From<u64> for AggregatorID {
+    fn from(value: u64) -> Self {
+        Self::new(value)
+    }
+}
+
+impl TryIntoMoveValue for AggregatorID {
+    type Error = PartialVMError;
+
+    fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
+        Ok(match layout {
+            MoveTypeLayout::U64 => Value::u64(self.0),
+            MoveTypeLayout::U128 => Value::u128(self.0 as u128),
+            layout if is_string_layout(layout) => bytes_to_string(to_utf8_bytes(self.0)),
+            _ => {
+                return Err(
+                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                        "Failed to convert {:?} into a Move value with {} layout",
+                        self, layout
+                    )),
+                )
+            },
+        })
+    }
+}
+
+impl TryFromMoveValue for AggregatorID {
+    type Error = PartialVMError;
+    type Hint = ();
+
+    fn try_from_move_value(
+        layout: &MoveTypeLayout,
+        value: Value,
+        _hint: &Self::Hint,
+    ) -> Result<Self, Self::Error> {
+        Ok(Self::new(match layout {
+            MoveTypeLayout::U64 => value.value_as::<u64>()?,
+            MoveTypeLayout::U128 => u128_to_u64(value.value_as::<u128>()?)?,
+            layout if is_string_layout(layout) => {
+                let bytes = string_to_bytes(value.value_as::<Struct>()?)?;
+                from_utf8_bytes(bytes)?
+            },
+            // We use value to ID conversion in serialization.
+            _ => {
+                return Err(
+                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                        "Failed to convert a Move value with {} layout into an identifier",
+                        layout
+                    )),
+                )
+            },
+        }))
     }
 }
 
@@ -104,6 +191,65 @@ impl AggregatorValue {
                 "Tried calling into_derived_value on Snapshot value",
             )),
         }
+    }
+}
+
+impl TryIntoMoveValue for AggregatorValue {
+    type Error = PartialVMError;
+
+    fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
+        use AggregatorValue::*;
+        use MoveTypeLayout::*;
+
+        Ok(match (self, layout) {
+            (Aggregator(v) | Snapshot(v), U64) => Value::u64(v as u64),
+            (Aggregator(v) | Snapshot(v), U128) => Value::u128(v),
+            (Derived(bytes), layout) if is_string_layout(layout) => bytes_to_string(bytes),
+            (value, layout) => {
+                return Err(
+                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                        "Failed to convert {:?} into Move value with {} layout",
+                        value, layout
+                    )),
+                )
+            },
+        })
+    }
+}
+
+impl TryFromMoveValue for AggregatorValue {
+    type Error = PartialVMError;
+    // Need to distinguish between aggregators and snapshots of integer types.
+    // TODO: We only need that because of the current enum-based implementations.
+    type Hint = IdentifierMappingKind;
+
+    fn try_from_move_value(
+        layout: &MoveTypeLayout,
+        value: Value,
+        hint: &Self::Hint,
+    ) -> Result<Self, Self::Error> {
+        use AggregatorValue::*;
+        use IdentifierMappingKind as K;
+        use MoveTypeLayout as L;
+
+        Ok(match (hint, layout) {
+            (K::Aggregator, L::U64) => Aggregator(value.value_as::<u64>()? as u128),
+            (K::Aggregator, L::U128) => Aggregator(value.value_as::<u128>()?),
+            (K::Snapshot, L::U64) => Snapshot(value.value_as::<u64>()? as u128),
+            (K::Snapshot, L::U128) => Snapshot(value.value_as::<u128>()?),
+            (K::Snapshot, layout) if is_string_layout(layout) => {
+                let bytes = string_to_bytes(value.value_as::<Struct>()?)?;
+                Derived(bytes)
+            },
+            _ => {
+                return Err(
+                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                        "Failed to convert Move value {:?} with {} layout into AggregatorValue",
+                        value, layout
+                    )),
+                )
+            },
+        })
     }
 }
 
