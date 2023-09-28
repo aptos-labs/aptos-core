@@ -4,8 +4,8 @@
 import { Deserializer } from "../../src/bcs/deserializer";
 import { Serializer } from "../../src/bcs/serializer";
 import { Hex } from "../../src/core/hex";
-import { PublicKey, Signature } from "../../src/crypto/ed25519";
-import { MultiPublicKey, MultiSignature } from "../../src/crypto/multi_ed25519";
+import { Ed25519PublicKey, Ed25519Signature } from "../../src/crypto/ed25519";
+import { MultiEd25519PublicKey, MultiEd25519Signature } from "../../src/crypto/multi_ed25519";
 import { multiEd25519PkTestObject, multiEd25519SigTestObject } from "./helper";
 
 describe("MultiPublicKey", () => {
@@ -14,11 +14,11 @@ describe("MultiPublicKey", () => {
     const publicKey2 = "aef3f4a4b8eca1dfc343361bf8e436bd42de9259c04b8314eb8e2054dd6e82ab";
     const publicKey3 = "8a5762e21ac1cdb3870442c77b4c3af58c7cedb8779d0270e6d4f1e2f7367d74";
 
-    const multiPubKey = new MultiPublicKey({
+    const multiPubKey = new MultiEd25519PublicKey({
       publicKeys: [
-        new PublicKey({ hexInput: publicKey1 }),
-        new PublicKey({ hexInput: publicKey2 }),
-        new PublicKey({ hexInput: publicKey3 }),
+        new Ed25519PublicKey({ hexInput: publicKey1 }),
+        new Ed25519PublicKey({ hexInput: publicKey2 }),
+        new Ed25519PublicKey({ hexInput: publicKey3 }),
       ],
       threshold: 2,
     });
@@ -35,10 +35,10 @@ describe("MultiPublicKey", () => {
   it("should serializes to bytes correctly", async () => {
     let edPksArray = [];
     for (let i = 0; i < multiEd25519PkTestObject.public_keys.length; i++) {
-      edPksArray.push(new PublicKey({ hexInput: multiEd25519PkTestObject.public_keys[i] }));
+      edPksArray.push(new Ed25519PublicKey({ hexInput: multiEd25519PkTestObject.public_keys[i] }));
     }
 
-    const pubKeyMultiSig = new MultiPublicKey({
+    const pubKeyMultiSig = new MultiEd25519PublicKey({
       publicKeys: edPksArray,
       threshold: multiEd25519PkTestObject.threshold,
     });
@@ -51,17 +51,17 @@ describe("MultiPublicKey", () => {
   it("should deserializes from bytes correctly", async () => {
     let edPksArray = [];
     for (let i = 0; i < multiEd25519PkTestObject.public_keys.length; i++) {
-      edPksArray.push(new PublicKey({ hexInput: multiEd25519PkTestObject.public_keys[i] }));
+      edPksArray.push(new Ed25519PublicKey({ hexInput: multiEd25519PkTestObject.public_keys[i] }));
     }
 
-    const pubKeyMultiSig = new MultiPublicKey({
+    const pubKeyMultiSig = new MultiEd25519PublicKey({
       publicKeys: edPksArray,
       threshold: multiEd25519PkTestObject.threshold,
     });
 
     const serializer = new Serializer();
     serializer.serialize(pubKeyMultiSig);
-    const deserialzed = MultiPublicKey.deserialize(new Deserializer(serializer.toUint8Array()));
+    const deserialzed = MultiEd25519PublicKey.deserialize(new Deserializer(serializer.toUint8Array()));
     expect(new Hex({ data: deserialzed.toUint8Array() })).toEqual(new Hex({ data: pubKeyMultiSig.toUint8Array() }));
   });
 });
@@ -71,11 +71,11 @@ describe("MultiSignature", () => {
     let edSigsArray = [];
     for (let i = 0; i < multiEd25519SigTestObject.signatures.length; i++) {
       edSigsArray.push(
-        new Signature({ data: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array() }),
+        new Ed25519Signature({ data: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array() }),
       );
     }
 
-    const multisig = new MultiSignature({
+    const multisig = new MultiEd25519Signature({
       signatures: edSigsArray,
       bitmap: Hex.fromString({ str: multiEd25519SigTestObject.bitmap }).toUint8Array(),
     });
@@ -89,38 +89,38 @@ describe("MultiSignature", () => {
     let edSigsArray = [];
     for (let i = 0; i < multiEd25519SigTestObject.signatures.length; i++) {
       edSigsArray.push(
-        new Signature({ data: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array() }),
+        new Ed25519Signature({ data: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array() }),
       );
     }
 
-    const multisig = new MultiSignature({
+    const multisig = new MultiEd25519Signature({
       signatures: edSigsArray,
       bitmap: Hex.fromString({ str: multiEd25519SigTestObject.bitmap }).toUint8Array(),
     });
 
     const serializer = new Serializer();
     serializer.serialize(multisig);
-    const deserialzed = MultiSignature.deserialize(new Deserializer(serializer.toUint8Array()));
+    const deserialzed = MultiEd25519Signature.deserialize(new Deserializer(serializer.toUint8Array()));
     expect(Hex.fromHexInput({ hexInput: deserialzed.toUint8Array() })).toEqual(
       Hex.fromHexInput({ hexInput: multisig.toUint8Array() }),
     );
   });
 
   it("should creates a valid bitmap", () => {
-    expect(MultiSignature.createBitmap({ bits: [0, 2, 31] })).toEqual(
+    expect(MultiEd25519Signature.createBitmap({ bits: [0, 2, 31] })).toEqual(
       new Uint8Array([0b10100000, 0b00000000, 0b00000000, 0b00000001]),
     );
   });
 
   it("should throws exception when creating a bitmap with wrong bits", async () => {
     expect(() => {
-      MultiSignature.createBitmap({ bits: [32] });
+      MultiEd25519Signature.createBitmap({ bits: [32] });
     }).toThrow("Invalid bit value 32.");
   });
 
   it("should throws exception when creating a bitmap with duplicate bits", async () => {
     expect(() => {
-      MultiSignature.createBitmap({ bits: [2, 2] });
+      MultiEd25519Signature.createBitmap({ bits: [2, 2] });
     }).toThrow("Duplicated bits detected.");
   });
 });

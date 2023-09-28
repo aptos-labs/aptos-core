@@ -3,9 +3,11 @@
 
 import { Deserializer } from "../bcs/deserializer";
 import { Serializer } from "../bcs/serializer";
-import { PublicKey, Signature } from "./ed25519";
+import { Ed25519PublicKey, Ed25519Signature } from "./ed25519";
+import { PublicKey, Signature } from "./asymmetric_crypto";
+import { HexInput } from "../types";
 
-export class MultiPublicKey {
+export class MultiEd25519PublicKey extends PublicKey {
   // Maximum number of public keys supported
   static readonly MAX_KEYS = 32;
 
@@ -16,7 +18,7 @@ export class MultiPublicKey {
   static readonly MIN_THRESHOLD = 1;
 
   // List of Ed25519 public keys for this MultiEd25519PublicKey
-  public readonly publicKeys: PublicKey[];
+  public readonly publicKeys: Ed25519PublicKey[];
 
   // The minimum number of valid signatures required, for the number of public keys specified
   public readonly threshold: number;
@@ -32,19 +34,23 @@ export class MultiPublicKey {
    * @param publicKeys A list of public keys
    * @param threshold At least "threshold" signatures must be valid
    */
-  constructor(args: { publicKeys: PublicKey[]; threshold: number }) {
+  constructor(args: { publicKeys: Ed25519PublicKey[]; threshold: number }) {
+    super();
+
     const { publicKeys, threshold } = args;
 
     // Validate number of public keys
-    if (publicKeys.length > MultiPublicKey.MAX_KEYS || publicKeys.length < MultiPublicKey.MIN_KEYS) {
+    if (publicKeys.length > MultiEd25519PublicKey.MAX_KEYS || publicKeys.length < MultiEd25519PublicKey.MIN_KEYS) {
       throw new Error(
-        `Must have between ${MultiPublicKey.MIN_KEYS} and ${MultiPublicKey.MAX_KEYS} public keys, inclusive`,
+        `Must have between ${MultiEd25519PublicKey.MIN_KEYS} and ${MultiEd25519PublicKey.MAX_KEYS} public keys, inclusive`,
       );
     }
 
     // Validate threshold: must be between 1 and the number of public keys, inclusive
-    if (threshold < MultiPublicKey.MIN_THRESHOLD || threshold > publicKeys.length) {
-      throw new Error(`Threshold must be between ${MultiPublicKey.MIN_THRESHOLD} and ${publicKeys.length}, inclusive`);
+    if (threshold < MultiEd25519PublicKey.MIN_THRESHOLD || threshold > publicKeys.length) {
+      throw new Error(
+        `Threshold must be between ${MultiEd25519PublicKey.MIN_THRESHOLD} and ${publicKeys.length}, inclusive`,
+      );
     }
 
     this.publicKeys = publicKeys;
@@ -55,42 +61,51 @@ export class MultiPublicKey {
    * Converts a PublicKeys into Uint8Array (bytes) with: bytes = p1_bytes | ... | pn_bytes | threshold
    */
   toUint8Array(): Uint8Array {
-    const bytes = new Uint8Array(this.publicKeys.length * PublicKey.LENGTH + 1);
-    this.publicKeys.forEach((k: PublicKey, i: number) => {
-      bytes.set(k.toUint8Array(), i * PublicKey.LENGTH);
+    const bytes = new Uint8Array(this.publicKeys.length * Ed25519PublicKey.LENGTH + 1);
+    this.publicKeys.forEach((k: Ed25519PublicKey, i: number) => {
+      bytes.set(k.toUint8Array(), i * Ed25519PublicKey.LENGTH);
     });
 
-    bytes[this.publicKeys.length * PublicKey.LENGTH] = this.threshold;
+    bytes[this.publicKeys.length * Ed25519PublicKey.LENGTH] = this.threshold;
 
     return bytes;
+  }
+
+  verifySignature(args: { data: HexInput; signature: MultiEd25519Signature }): boolean {
+    throw new Error("TODO - Method not implemented.");
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): MultiPublicKey {
+  // TODO: Update this in interface to be static, then remove this method
+  deserialize(deserializer: Deserializer): PublicKey {
+    throw new Error("Method not implemented.");
+  }
+
+  static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
     const bytes = deserializer.deserializeBytes();
     const threshold = bytes[bytes.length - 1];
 
-    const keys: PublicKey[] = [];
+    const keys: Ed25519PublicKey[] = [];
 
-    for (let i = 0; i < bytes.length - 1; i += PublicKey.LENGTH) {
+    for (let i = 0; i < bytes.length - 1; i += Ed25519PublicKey.LENGTH) {
       const begin = i;
-      keys.push(new PublicKey({ hexInput: bytes.subarray(begin, begin + PublicKey.LENGTH) }));
+      keys.push(new Ed25519PublicKey({ hexInput: bytes.subarray(begin, begin + Ed25519PublicKey.LENGTH) }));
     }
-    return new MultiPublicKey({ publicKeys: keys, threshold });
+    return new MultiEd25519PublicKey({ publicKeys: keys, threshold });
   }
 }
 
-export class MultiSignature {
+export class MultiEd25519Signature extends Signature {
   // Maximum number of signatures supported
   static MAX_SIGNATURES_SUPPORTED = 32;
 
   // Bitmap length
   static BITMAP_LEN: number = 4;
 
-  public readonly signatures: Signature[];
+  public readonly signatures: Ed25519Signature[];
 
   public readonly bitmap: Uint8Array;
 
@@ -104,14 +119,18 @@ export class MultiSignature {
    * @param args.bitmap 4 bytes, at most 32 signatures are supported. If Nth bit value is `1`, the Nth
    * signature should be provided in `signatures`. Bits are read from left to right
    */
-  constructor(args: { signatures: Signature[]; bitmap: Uint8Array }) {
+  constructor(args: { signatures: Ed25519Signature[]; bitmap: Uint8Array }) {
+    super();
+
     const { signatures, bitmap } = args;
-    if (bitmap.length !== MultiSignature.BITMAP_LEN) {
-      throw new Error(`"bitmap" length should be ${MultiSignature.BITMAP_LEN}`);
+    if (bitmap.length !== MultiEd25519Signature.BITMAP_LEN) {
+      throw new Error(`"bitmap" length should be ${MultiEd25519Signature.BITMAP_LEN}`);
     }
 
-    if (signatures.length > MultiSignature.MAX_SIGNATURES_SUPPORTED) {
-      throw new Error(`The number of signatures cannot be greater than ${MultiSignature.MAX_SIGNATURES_SUPPORTED}`);
+    if (signatures.length > MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
+      throw new Error(
+        `The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`,
+      );
     }
 
     this.signatures = signatures;
@@ -122,12 +141,12 @@ export class MultiSignature {
    * Converts a MultiSignature into Uint8Array (bytes) with `bytes = s1_bytes | ... | sn_bytes | bitmap`
    */
   toUint8Array(): Uint8Array {
-    const bytes = new Uint8Array(this.signatures.length * Signature.LENGTH + MultiSignature.BITMAP_LEN);
-    this.signatures.forEach((k: Signature, i: number) => {
-      bytes.set(k.toUint8Array(), i * Signature.LENGTH);
+    const bytes = new Uint8Array(this.signatures.length * Ed25519Signature.LENGTH + MultiEd25519Signature.BITMAP_LEN);
+    this.signatures.forEach((k: Ed25519Signature, i: number) => {
+      bytes.set(k.toUint8Array(), i * Ed25519Signature.LENGTH);
     });
 
-    bytes.set(this.bitmap, this.signatures.length * Signature.LENGTH);
+    bytes.set(this.bitmap, this.signatures.length * Ed25519Signature.LENGTH);
 
     return bytes;
   }
@@ -157,12 +176,12 @@ export class MultiSignature {
     const dupCheckSet = new Set();
 
     bits.forEach((bit: number) => {
-      if (bit >= MultiSignature.MAX_SIGNATURES_SUPPORTED) {
-        throw new Error(`Invalid bit value ${bit}.`);
+      if (bit >= MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
+        throw new Error(`Cannot have a signature larger than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED - 1}`);
       }
 
       if (dupCheckSet.has(bit)) {
-        throw new Error("Duplicated bits detected.");
+        throw new Error("Duplicate bits detected");
       }
 
       dupCheckSet.add(bit);
@@ -183,16 +202,21 @@ export class MultiSignature {
     serializer.serializeBytes(this.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): MultiSignature {
+  // TODO: Update this in interface to be static, then remove this method
+  deserialize(deserializer: Deserializer): Signature {
+    throw new Error("Method not implemented.");
+  }
+
+  static deserialize(deserializer: Deserializer): MultiEd25519Signature {
     const bytes = deserializer.deserializeBytes();
     const bitmap = bytes.subarray(bytes.length - 4);
 
-    const signatures: Signature[] = [];
+    const signatures: Ed25519Signature[] = [];
 
-    for (let i = 0; i < bytes.length - bitmap.length; i += Signature.LENGTH) {
+    for (let i = 0; i < bytes.length - bitmap.length; i += Ed25519Signature.LENGTH) {
       const begin = i;
-      signatures.push(new Signature({ data: bytes.subarray(begin, begin + Signature.LENGTH) }));
+      signatures.push(new Ed25519Signature({ data: bytes.subarray(begin, begin + Ed25519Signature.LENGTH) }));
     }
-    return new MultiSignature({ signatures, bitmap });
+    return new MultiEd25519Signature({ signatures, bitmap });
   }
 }
