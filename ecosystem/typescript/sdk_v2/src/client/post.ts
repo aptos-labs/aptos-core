@@ -33,6 +33,7 @@ export async function post<Req, Res>(options: PostRequestOptions): Promise<Aptos
       method: "POST",
       name: options.name,
       path: options.path,
+      body: options.body,
       contentType: options.contentType,
       params: options.params,
       overrides: {

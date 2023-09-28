@@ -69,6 +69,11 @@ export class Ed25519PublicKey extends PublicKey {
     const value = deserializer.deserializeBytes();
     return new Ed25519PublicKey({ hexInput: value });
   }
+
+  // eslint-disable-next-line class-methods-use-this,@typescript-eslint/no-unused-vars
+  deserialize(deserializer: Deserializer): PublicKey {
+    throw new Error("Not implemented");
+  }
 }
 
 export class Ed25519PrivateKey extends PrivateKey {

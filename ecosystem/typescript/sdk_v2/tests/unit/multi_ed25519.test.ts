@@ -115,12 +115,12 @@ describe("MultiSignature", () => {
   it("should throws exception when creating a bitmap with wrong bits", async () => {
     expect(() => {
       MultiEd25519Signature.createBitmap({ bits: [32] });
-    }).toThrow("Invalid bit value 32.");
+    }).toThrow("Cannot have a signature larger than 31.");
   });
 
   it("should throws exception when creating a bitmap with duplicate bits", async () => {
     expect(() => {
       MultiEd25519Signature.createBitmap({ bits: [2, 2] });
-    }).toThrow("Duplicated bits detected.");
+    }).toThrow("Duplicate bits detected.");
   });
 });

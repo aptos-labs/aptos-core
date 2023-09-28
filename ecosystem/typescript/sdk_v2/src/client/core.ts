@@ -60,16 +60,15 @@ export async function aptosRequest<Req, Res>(
   aptosConfig: AptosConfig,
 ): Promise<AptosResponse<Req, Res>> {
   const { url, path, method, body, contentType, params, overrides } = options;
-  const fullEndpoint = `${url}/${path ?? ""}`;
-  const response = await request<Req, Res>(fullEndpoint, method, body, contentType, params, overrides);
-
+  const fullUrl = `${url}/${path ?? ""}`;
+  const response = await request<Req, Res>(fullUrl, method, body, contentType, params, overrides);
   const result: AptosResponse<Req, Res> = {
     status: response.status,
     statusText: response.statusText!,
     data: response.data,
     headers: response.headers,
     config: response.config,
-    url: fullEndpoint,
+    url: fullUrl,
   };
 
   // to support both fullnode and indexer responses,
