@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{aggregator_change_set::AggregatorChange, delta_change_set::DeltaOp};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    delta_change_set::DeltaOp,
+    types::{TryFromMoveValue, TryIntoMoveValue},
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,

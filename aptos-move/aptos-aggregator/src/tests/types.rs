@@ -7,7 +7,7 @@ use crate::{
     types::{AggregatorID, AggregatorValue, AggregatorVersionedID},
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap};
 
 pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorVersionedID {
     AggregatorVersionedID::V1(aggregator_v1_state_key_for_test(key))
@@ -17,11 +17,21 @@ pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
     StateKey::raw(key.to_le_bytes().to_vec())
 }
 
-#[derive(Default)]
 pub struct FakeAggregatorView {
     // TODO: consider adding deltas to test different read modes.
     v1_store: HashMap<StateKey, StateValue>,
     v2_store: HashMap<AggregatorID, AggregatorValue>,
+    counter: RefCell<u32>,
+}
+
+impl Default for FakeAggregatorView {
+    fn default() -> Self {
+        Self {
+            v1_store: HashMap::new(),
+            v2_store: HashMap::new(),
+            counter: RefCell::new(0),
+        }
+    }
 }
 
 impl FakeAggregatorView {
@@ -56,5 +66,12 @@ impl TAggregatorView for FakeAggregatorView {
             .get(id)
             .cloned()
             .ok_or_else(|| anyhow::Error::msg(format!("Value does not exist for id {:?}", id)))
+    }
+
+    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+        let mut counter = self.counter.borrow_mut();
+        let id = Self::IdentifierV2::new(*counter as u64);
+        *counter += 1;
+        id
     }
 }

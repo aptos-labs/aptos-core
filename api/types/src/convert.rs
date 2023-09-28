@@ -804,7 +804,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
             MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
-                LayoutTag::AggregatorLifting => {
+                LayoutTag::IdentifierMapping(_) => {
                     self.try_into_vm_value_from_layout(inner_layout, val)?
                 },
             },
