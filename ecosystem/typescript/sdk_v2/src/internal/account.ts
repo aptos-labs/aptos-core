@@ -184,7 +184,7 @@ export async function getAccountTokensCount(args: {
   const data = await queryIndexer<GetAccountTokensCountQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountTokensCount",
+    name: "getAccountTokensCount",
   });
 
   return data.current_token_ownerships_v2_aggregate.aggregate;
@@ -224,7 +224,7 @@ export async function getAccountOwnedTokens(args: {
   const data = await queryIndexer<GetAccountOwnedTokensQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountOwnedTokens",
+    name: "getAccountOwnedTokens",
   });
 
   return data.current_token_ownerships_v2;
@@ -267,7 +267,7 @@ export async function getAccountOwnedTokensFromCollectionAddress(args: {
   const data = await queryIndexer<GetAccountOwnedTokensFromCollectionQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountOwnedTokensFromCollectionAddress",
+    name: "getAccountOwnedTokensFromCollectionAddress",
   });
 
   return data.current_token_ownerships_v2;
@@ -307,7 +307,7 @@ export async function getAccountCollectionsWithOwnedTokens(args: {
   const data = await queryIndexer<GetAccountCollectionsWithOwnedTokensQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountCollectionsWithOwnedTokens",
+    name: "getAccountCollectionsWithOwnedTokens",
   });
 
   return data.current_collection_ownership_v2_view;
@@ -329,7 +329,7 @@ export async function getAccountTransactionsCount(args: {
   const data = await queryIndexer<GetAccountTransactionsCountQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountTransactionsCount",
+    name: "getAccountTransactionsCount",
   });
 
   return data.account_transactions_aggregate.aggregate;
@@ -363,7 +363,7 @@ export async function getAccountCoinsData(args: {
   const data = await queryIndexer<GetAccountCoinsDataQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountCoinsData",
+    name: "getAccountCoinsData",
   });
 
   return data.current_fungible_asset_balances;
@@ -384,7 +384,7 @@ export async function getAccountCoinsCount(args: {
   const data = await queryIndexer<GetAccountCoinsCountQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountCoinsCount",
+    name: "getAccountCoinsCount",
   });
 
   return data.current_fungible_asset_balances_aggregate.aggregate;
@@ -416,7 +416,7 @@ export async function getAccountOwnedObjects(args: {
   const data = await queryIndexer<GetAccountOwnedObjectsQuery>({
     aptosConfig,
     query: graphqlQuery,
-    originMethod: "getAccountOwnedObjects",
+    name: "getAccountOwnedObjects",
   });
 
   return data.current_objects;
