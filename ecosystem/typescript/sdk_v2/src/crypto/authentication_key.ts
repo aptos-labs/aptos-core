@@ -4,13 +4,15 @@
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { AccountAddress, Hex } from "../core";
 import { HexInput } from "../types";
-import { MultiPublicKey } from "./multi_ed25519";
-import { PublicKey } from "./ed25519";
+import { MultiEd25519PublicKey } from "./multi_ed25519";
+import { PublicKey } from "./asymmetric_crypto";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
  * their private key(s) associated with the account without changing the address that hosts their account.
  * @see {@link * https://aptos.dev/concepts/accounts | Account Basics}
+ * 
+ * Note: AuthenticationKey only supports Ed25519 and MultiEd25519 public keys for now.
  *
  * Account addresses can be derived from AuthenticationKey
  */
@@ -56,7 +58,7 @@ export class AuthenticationKey {
    * @param multiPublicKey A K-of-N MultiPublicKey
    * @returns AuthenticationKey
    */
-  static fromMultiPublicKey(args: { multiPublicKey: MultiPublicKey }): AuthenticationKey {
+  static fromMultiPublicKey(args: { multiPublicKey: MultiEd25519PublicKey }): AuthenticationKey {
     const { multiPublicKey } = args;
     const multiPubKeyBytes = multiPublicKey.toUint8Array();
 
@@ -71,7 +73,7 @@ export class AuthenticationKey {
   }
 
   /**
-   * Converts a PublicKey to AuthenticationKey
+   * Converts a PublicKey(s) to AuthenticationKey
    *
    * @param publicKey
    * @returns AuthenticationKey

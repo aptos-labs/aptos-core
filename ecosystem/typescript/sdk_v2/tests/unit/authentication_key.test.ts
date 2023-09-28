@@ -1,6 +1,6 @@
 import { AuthenticationKey } from "../../src/crypto/authentication_key";
-import { PublicKey } from "../../src/crypto/ed25519";
-import { MultiPublicKey } from "../../src/crypto/multi_ed25519";
+import { Ed25519PublicKey } from "../../src/crypto/ed25519";
+import { MultiEd25519PublicKey } from "../../src/crypto/multi_ed25519";
 import { ed25519, multiEd25519PkTestObject } from "./helper";
 
 describe("AuthenticationKey", () => {
@@ -17,8 +17,8 @@ describe("AuthenticationKey", () => {
     );
   });
 
-  it("should create AuthenticationKey from PublicKey", () => {
-    const publicKey = new PublicKey({ hexInput: ed25519.publicKey });
+  it("should create AuthenticationKey from Ed25519PublicKey", () => {
+    const publicKey = new Ed25519PublicKey({ hexInput: ed25519.publicKey });
     const authKey = AuthenticationKey.fromPublicKey({ publicKey });
     expect(authKey).toBeInstanceOf(AuthenticationKey);
     expect(authKey.data.toString()).toEqual(ed25519.authKey);
@@ -28,10 +28,10 @@ describe("AuthenticationKey", () => {
     // create the MultiPublicKey
     let edPksArray = [];
     for (let i = 0; i < multiEd25519PkTestObject.public_keys.length; i++) {
-      edPksArray.push(new PublicKey({ hexInput: multiEd25519PkTestObject.public_keys[i] }));
+      edPksArray.push(new Ed25519PublicKey({ hexInput: multiEd25519PkTestObject.public_keys[i] }));
     }
 
-    const pubKeyMultiSig = new MultiPublicKey({
+    const pubKeyMultiSig = new MultiEd25519PublicKey({
       publicKeys: edPksArray,
       threshold: multiEd25519PkTestObject.threshold,
     });

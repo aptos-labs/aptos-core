@@ -7,9 +7,10 @@ import { AccountAddress } from "./account_address";
 import { Hex } from "./hex";
 import { bytesToHex } from "@noble/hashes/utils";
 import { HexInput } from "../types";
-import { PrivateKey, PublicKey, Signature } from "../crypto/ed25519";
+import { PrivateKey, PublicKey, Signature } from "../crypto/asymmetric_crypto";
 import { derivePath } from "../utils/hd-key";
 import { AuthenticationKey } from "../crypto/authentication_key";
+import { Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature } from "../crypto/ed25519";
 
 /**
  * Class for creating and managing account on Aptos network
@@ -31,6 +32,9 @@ export class Account {
 
   /**
    * constructor for Account
+   * 
+   * TODO: This constructor uses the nacl library directly, which only works with ed25519 keys.
+   * Need to update this to use the new crypto library if new schemes are added.
    *
    * @param args.privateKey PrivateKey - private key of the account
    * @param args.address AccountAddress - address of the account
@@ -43,7 +47,7 @@ export class Account {
 
     // Derive the public key from the private key
     const keyPair = nacl.sign.keyPair.fromSeed(privateKey.toUint8Array().slice(0, 32));
-    this.publicKey = new PublicKey({ hexInput: keyPair.publicKey });
+    this.publicKey = new Ed25519PublicKey({ hexInput: keyPair.publicKey });
 
     this.privateKey = privateKey;
     this.accountAddress = address;
@@ -56,7 +60,7 @@ export class Account {
    */
   static generate(): Account {
     const keyPair = nacl.sign.keyPair();
-    const privateKey = new PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
+    const privateKey = new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
     const address = new AccountAddress({ data: Account.authKey({ publicKey: keyPair.publicKey }).toUint8Array() });
     return new Account({ privateKey, address });
   }
@@ -70,7 +74,7 @@ export class Account {
   static fromPrivateKey(args: { privateKey: HexInput }): Account {
     const privatekeyHex = Hex.fromHexInput({ hexInput: args.privateKey });
     const keyPair = nacl.sign.keyPair.fromSeed(privatekeyHex.toUint8Array().slice(0, 32));
-    const privateKey = new PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
+    const privateKey = new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
     const address = new AccountAddress({ data: Account.authKey({ publicKey: keyPair.publicKey }).toUint8Array() });
     return new Account({ privateKey, address });
   }
@@ -86,7 +90,7 @@ export class Account {
   static fromPrivateKeyAndAddress(args: { privateKey: HexInput; address: AccountAddress }): Account {
     const privatekeyHex = Hex.fromHexInput({ hexInput: args.privateKey });
     const signingKey = nacl.sign.keyPair.fromSeed(privatekeyHex.toUint8Array().slice(0, 32));
-    const privateKey = new PrivateKey({ value: signingKey.secretKey.slice(0, 32) });
+    const privateKey = new Ed25519PrivateKey({ value: signingKey.secretKey.slice(0, 32) });
     return new Account({ privateKey, address: args.address });
   }
 
@@ -112,7 +116,7 @@ export class Account {
     const { key } = derivePath(path, bytesToHex(bip39.mnemonicToSeedSync(normalizeMnemonics)));
 
     const signingKey = nacl.sign.keyPair.fromSeed(key.slice(0, 32));
-    const privateKey = new PrivateKey({ value: signingKey.secretKey.slice(0, 32) });
+    const privateKey = new Ed25519PrivateKey({ value: signingKey.secretKey.slice(0, 32) });
     const address = new AccountAddress({ data: Account.authKey({ publicKey: signingKey.publicKey }).toUint8Array() });
 
     return new Account({ privateKey, address });
@@ -132,7 +136,7 @@ export class Account {
    * @returns Authentication key for the associated account
    */
   static authKey(args: { publicKey: HexInput }): Hex {
-    const publicKey = new PublicKey({ hexInput: args.publicKey });
+    const publicKey = new Ed25519PublicKey({ hexInput: args.publicKey });
     const authKey = AuthenticationKey.fromPublicKey({ publicKey });
     return authKey.data;
   }
@@ -145,6 +149,6 @@ export class Account {
   verifySignature(message: HexInput, signature: HexInput): boolean {
     const rawMessage = Hex.fromHexInput({ hexInput: message }).toUint8Array();
     const rawSignature = Hex.fromHexInput({ hexInput: signature }).toUint8Array();
-    return this.publicKey.verifySignature({ data: rawMessage, signature: rawSignature });
+    return this.publicKey.verifySignature({ data: rawMessage, signature: new Ed25519Signature({ data: rawSignature }) });
   }
 }
