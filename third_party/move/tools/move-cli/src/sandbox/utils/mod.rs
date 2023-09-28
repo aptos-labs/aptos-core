@@ -21,7 +21,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{ChangeSet, Event, Op},
+    effects::{ChangeSet, Op},
     errmap::ErrorMapping,
     language_storage::{ModuleId, TypeTag},
     transaction_argument::TransactionArgument,
@@ -151,21 +151,10 @@ fn print_struct_diff_with_indent(
 
 pub(crate) fn explain_execution_effects(
     changeset: &ChangeSet,
-    events: &[Event],
     state: &OnDiskStateView,
 ) -> Result<()> {
     // execution effects should contain no modules
     assert!(changeset.modules().next().is_none());
-    if !events.is_empty() {
-        println!("Emitted {:?} events:", events.len());
-        // TODO: better event printing
-        for (event_key, event_sequence_number, _event_type, event_data) in events {
-            println!(
-                "Emitted {:?} as the {}th event to stream {:?}",
-                event_data, event_sequence_number, event_key
-            )
-        }
-    }
     if !changeset.accounts().is_empty() {
         println!(
             "Changed resource(s) under {:?} address(es):",
@@ -243,11 +232,10 @@ pub(crate) fn explain_execution_effects(
     Ok(())
 }
 
-/// Commit the resources and events modified by a transaction to disk
+/// Commit the resources modified by a transaction to disk
 pub(crate) fn maybe_commit_effects(
     commit: bool,
     changeset: ChangeSet,
-    events: Vec<Event>,
     state: &OnDiskStateView,
 ) -> Result<()> {
     // similar to explain effects, all module publishing happens via save_modules(), so effects
@@ -263,11 +251,7 @@ pub(crate) fn maybe_commit_effects(
                 }
             }
         }
-
-        for (event_key, event_sequence_number, event_type, event_data) in events {
-            state.save_event(&event_key, event_sequence_number, event_type, event_data)?
-        }
-    } else if !(changeset.resources().next().is_none() && events.is_empty()) {
+    } else if changeset.resources().next().is_some() {
         println!("Discarding changes; re-run without --dry-run if you would like to keep them.")
     }
 

@@ -499,6 +499,10 @@ where
         self.vm_gas_params().txn.storage_fee_for_slot(op)
     }
 
+    fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee {
+        self.vm_gas_params().txn.storage_fee_refund_for_slot(op)
+    }
+
     fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
         self.vm_gas_params().txn.storage_fee_for_bytes(key, op)
     }

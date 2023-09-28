@@ -16,13 +16,13 @@ use aptos_schemadb::{
 };
 pub use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema},
+    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
     quorum_certificate::QCSchema,
 };
 use schema::{
     single_entry::{SingleEntryKey, SingleEntrySchema},
-    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME,
-    ORDERED_ANCHOR_ID_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
+    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, QC_CF_NAME,
+    SINGLE_ENTRY_CF_NAME,
 };
 use std::{iter::Iterator, path::Path, time::Instant};
 
@@ -59,7 +59,7 @@ impl ConsensusDB {
             NODE_CF_NAME,
             CERTIFIED_NODE_CF_NAME,
             DAG_VOTE_CF_NAME,
-            ORDERED_ANCHOR_ID_CF_NAME,
+            "ordered_anchor_id", // deprecated CF
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);
@@ -90,12 +90,12 @@ impl ConsensusDB {
         let last_vote = self.get_last_vote()?;
         let highest_2chain_timeout_certificate = self.get_highest_2chain_timeout_certificate()?;
         let consensus_blocks = self
-            .get_all_data::<BlockSchema>()?
+            .get_all::<BlockSchema>()?
             .into_iter()
             .map(|(_, block)| block)
             .collect();
         let consensus_qcs = self
-            .get_all_data::<QCSchema>()?
+            .get_all::<QCSchema>()?
             .into_iter()
             .map(|(_, qc)| qc)
             .collect();
@@ -187,22 +187,26 @@ impl ConsensusDB {
         Ok(())
     }
 
-    pub fn save_data<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
+    pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<(), DbError> {
         let batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
         self.commit(batch)?;
         Ok(())
     }
 
-    pub fn delete_data<S: Schema>(&self, keys: Vec<S::Key>) -> Result<(), DbError> {
+    pub fn delete<S: Schema>(&self, keys: Vec<S::Key>) -> Result<(), DbError> {
         let batch = SchemaBatch::new();
         keys.iter().try_for_each(|key| batch.delete::<S>(key))?;
         self.commit(batch)
     }
 
-    pub fn get_all_data<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
+    pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>>>()?)
+    }
+
+    pub fn get<S: Schema>(&self, key: &S::Key) -> Result<Option<S::Value>, DbError> {
+        Ok(self.db.get::<S>(key)?)
     }
 }

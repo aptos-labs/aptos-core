@@ -29,7 +29,9 @@ fn success_generic(ty_args: Vec<TypeTag>, tests: Vec<(&str, Vec<(Vec<Vec<u8>>, &
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
+    );
 
     let mut module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
     let string_struct = StructTag {
@@ -90,7 +92,9 @@ fn fail_generic(
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::test_dir_path("string_args.data/pack")));
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("string_args.data/pack"))
+    );
 
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 

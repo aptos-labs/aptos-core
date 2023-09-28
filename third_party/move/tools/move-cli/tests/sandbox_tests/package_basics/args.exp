@@ -86,10 +86,11 @@ native public borrow_address(s: &signer): &address
 }
 Command `errmap`:
 Command `info`:
-PackageBasics
-├─ std:0x1
-└─ MoveStdlib
-   └─ std:0x1
+error: unrecognized subcommand 'info'
+
+Usage: move [OPTIONS] <COMMAND>
+
+For more information, try '--help'.
 Command `test double_two`:
 INCLUDING DEPENDENCY MoveStdlib
 BUILDING PackageBasics

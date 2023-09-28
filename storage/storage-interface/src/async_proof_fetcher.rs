@@ -25,7 +25,7 @@ use std::{
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
         .num_threads(AptosVM::get_num_proof_reading_threads())
-        .thread_name(|index| format!("proof_reader_{}", index))
+        .thread_name(|index| format!("proof_reader-{}", index))
         .build()
         .unwrap()
 });

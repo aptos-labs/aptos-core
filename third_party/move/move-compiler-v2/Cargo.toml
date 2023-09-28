@@ -12,10 +12,15 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.62"
 move-binary-format = { path = "../move-binary-format" }
+move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
+move-command-line-common = { path = "../move-command-line-common" }
+#move-package = { path = "../tools/move-package" }
 move-compiler = { path = "../move-compiler" }
 move-core-types = { path = "../move-core/types" }
+move-ir-types = { path = "../move-ir/types" }
 move-model = { path = "../move-model" }
 move-stackless-bytecode = { path = "../move-model/bytecode" }
+move-symbol-pool = { path = "../move-symbol-pool" }
 
 bcs = { workspace = true }
 clap = { version = "4.3.9", features = ["derive", "env"] }

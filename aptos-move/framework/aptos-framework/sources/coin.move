@@ -365,6 +365,19 @@ module aptos_framework::coin {
         merge(&mut coin_store.coin, coin);
     }
 
+    /// Deposit the coin balance into the recipient's account without checking if the account is frozen.
+    /// This is for internal use only and doesn't emit an DepositEvent.
+    public(friend) fun force_deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) acquires CoinStore {
+        assert!(
+            is_account_registered<CoinType>(account_addr),
+            error::not_found(ECOIN_STORE_NOT_PUBLISHED),
+        );
+
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+
+        merge(&mut coin_store.coin, coin);
+    }
+
     /// Destroys a zero-value coin. Calls will fail if the `value` in the passed-in `token` is non-zero
     /// so it is impossible to "burn" any non-zero amount of `Coin` without having
     /// a `BurnCapability` for the specific `CoinType`.

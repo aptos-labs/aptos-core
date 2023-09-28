@@ -205,9 +205,7 @@ spec aptos_framework::voting {
         proposal_id: u64,
         next_execution_hash: vector<u8>,
     ) {
-        // TODO: set because of a possible bug in boogie that needs further investigation
         use aptos_framework::chain_status;
-        pragma verify = false;
         // Ensures existence of Timestamp
         requires chain_status::is_operating();
 
@@ -215,12 +213,14 @@ spec aptos_framework::voting {
         let voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         let post post_voting_forum = global<VotingForum<ProposalType>>(voting_forum_address);
-        let post post_proposal = table::spec_get(voting_forum.proposals, proposal_id);
+        let post post_proposal = table::spec_get(post_voting_forum.proposals, proposal_id);
         let multi_step_in_execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
-        ensures simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) &&
-            ((len(next_execution_hash) != 0 && is_multi_step) || (len(next_execution_hash) == 0 && !is_multi_step)) ==>
+        ensures (simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) && len(next_execution_hash) != 0) ==>
+            simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(true);
+        ensures (simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key) &&
+            (len(next_execution_hash) == 0 && !is_multi_step)) ==>
             simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(true);
 
         let multi_step_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
@@ -233,8 +233,9 @@ spec aptos_framework::voting {
         aborts_if len(next_execution_hash) == 0 && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if len(next_execution_hash) == 0 && is_multi_step && !simple_map::spec_contains_key(proposal.metadata, multi_step_in_execution_key);
         // property 4: For single-step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal.
-        ensures len(next_execution_hash) == 0 ==> post_proposal.is_resolved == true && post_proposal.resolution_time_secs == timestamp::spec_now_seconds();
-        ensures len(next_execution_hash) == 0 && is_multi_step ==> simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(false);
+        ensures len(next_execution_hash) == 0 ==> post_proposal.resolution_time_secs == timestamp::spec_now_seconds();
+        ensures len(next_execution_hash) == 0 ==> post_proposal.is_resolved == true;
+        ensures (len(next_execution_hash) == 0 && is_multi_step) ==> simple_map::spec_get(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(false);
         // property 4: For multi-step proposals, it ensures that the next_execution_hash parameter contains the hash of the next step.
         ensures len(next_execution_hash) != 0 ==> post_proposal.execution_hash == next_execution_hash;
     }

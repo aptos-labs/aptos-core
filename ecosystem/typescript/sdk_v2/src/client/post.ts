@@ -1,5 +1,6 @@
+import { AptosRequest } from "../types";
 import { aptosRequest } from "./core";
-import { AptosRequest, AptosResponse } from "./types";
+import { AptosResponse } from "./types";
 
 export type PostRequestOptions = Omit<AptosRequest, "method">;
 

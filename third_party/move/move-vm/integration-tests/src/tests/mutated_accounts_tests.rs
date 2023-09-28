@@ -33,7 +33,7 @@ fn mutated_accounts() {
         }
     "#;
 
-    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR));
+    let code = code.replace("{{ADDR}}", &format!("0x{}", TEST_ADDR.to_hex()));
     let mut units = compile_units(&code).unwrap();
     let m = as_module(units.pop().unwrap());
     let mut blob = vec![];
@@ -87,7 +87,7 @@ fn mutated_accounts() {
     .unwrap();
     assert_eq!(sess.num_mutated_accounts(&TEST_ADDR), 2);
 
-    let (changes, _) = sess.finish().unwrap();
+    let changes = sess.finish().unwrap();
     storage.apply(changes).unwrap();
 
     let mut sess = vm.new_session(&storage);

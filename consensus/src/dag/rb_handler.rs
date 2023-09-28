@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{storage::DAGStorage, NodeId};
+use super::{dag_fetcher::TFetchRequester, storage::DAGStorage, NodeId};
 use crate::dag::{
     dag_network::RpcHandler,
     dag_store::Dag,
@@ -12,6 +12,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error as ThisError;
 
@@ -21,24 +22,26 @@ pub enum NodeBroadcastHandleError {
     InvalidParent,
     #[error("missing parents")]
     MissingParents,
-    #[error("parents do not meet quorum voting power")]
-    NotEnoughParents,
+    #[error("stale round number")]
+    StaleRound(Round),
 }
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
-    signer: ValidatorSigner,
+    signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
+    fetch_requester: Arc<dyn TFetchRequester>,
 }
 
 impl NodeBroadcastHandler {
     pub fn new(
         dag: Arc<RwLock<Dag>>,
-        signer: ValidatorSigner,
+        signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
+        fetch_requester: Arc<dyn TFetchRequester>,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -49,6 +52,7 @@ impl NodeBroadcastHandler {
             signer,
             epoch_state,
             storage,
+            fetch_requester,
         }
     }
 
@@ -67,21 +71,15 @@ impl NodeBroadcastHandler {
         self.storage.delete_votes(to_delete)
     }
 
-    fn validate(&self, node: &Node) -> anyhow::Result<()> {
+    fn validate(&self, node: Node) -> anyhow::Result<Node> {
         let current_round = node.metadata().round();
 
-        // round 0 is a special case and does not require any parents
-        if current_round == 0 {
-            return Ok(());
-        }
-
-        let prev_round = current_round - 1;
-
         let dag_reader = self.dag.read();
-        // check if the parent round is missing in the DAG
+        let lowest_round = dag_reader.lowest_round();
+
         ensure!(
-            prev_round >= dag_reader.lowest_round(),
-            NodeBroadcastHandleError::MissingParents
+            current_round >= lowest_round,
+            NodeBroadcastHandleError::StaleRound(current_round)
         );
 
         // check which parents are missing in the DAG
@@ -91,19 +89,30 @@ impl NodeBroadcastHandler {
             .filter(|parent| !dag_reader.exists(parent.metadata()))
             .cloned()
             .collect();
+        drop(dag_reader); // Drop the DAG store early as it is no longer required
+
         if !missing_parents.is_empty() {
-            // For each missing parent, verify their signatures and voting power
+            // For each missing parent, verify their signatures and voting power.
+            // Otherwise, a malicious node can send bad nodes with fake parents
+            // and cause this peer to issue unnecessary fetch requests.
             ensure!(
                 missing_parents
                     .iter()
                     .all(|parent| { parent.verify(&self.epoch_state.verifier).is_ok() }),
                 NodeBroadcastHandleError::InvalidParent
             );
-            // TODO: notify dag fetcher to fetch missing node and drop this node
-            bail!(NodeBroadcastHandleError::MissingParents);
+
+            // Don't issue fetch requests for parents of the lowest round in the DAG
+            // because they are already GC'ed
+            if current_round > lowest_round {
+                if let Err(err) = self.fetch_requester.request_for_node(node) {
+                    error!("request to fetch failed: {}", err);
+                }
+                bail!(NodeBroadcastHandleError::MissingParents);
+            }
         }
 
-        Ok(())
+        Ok(node)
     }
 }
 
@@ -120,7 +129,7 @@ fn read_votes_from_storage(
             votes_by_round_peer
                 .entry(node_id.round())
                 .or_insert_with(BTreeMap::new)
-                .insert(node_id.author(), vote);
+                .insert(*node_id.author(), vote);
         } else {
             to_delete.push(node_id);
         }
@@ -132,12 +141,13 @@ fn read_votes_from_storage(
     votes_by_round_peer
 }
 
+#[async_trait]
 impl RpcHandler for NodeBroadcastHandler {
     type Request = Node;
     type Response = Vote;
 
-    fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
-        self.validate(&node)?;
+    async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        let node = self.validate(node)?;
 
         let votes_by_peer = self
             .votes_by_round_peer

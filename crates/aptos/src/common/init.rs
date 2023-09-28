@@ -6,13 +6,14 @@ use crate::{
     common::{
         types::{
             account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
-            ConfigSearchMode, EncodingOptions, PrivateKeyInputOptions, ProfileConfig,
-            ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
+            ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
+            ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
         },
-        utils::{fund_account, prompt_yes_with_override, read_line, wait_for_transactions},
+        utils::{fund_account, prompt_yes_with_override, read_line},
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
+use aptos_ledger;
 use aptos_rest_client::{
     aptos_api_types::{AptosError, AptosErrorCode},
     error::{AptosErrorResponse, RestError},
@@ -45,9 +46,24 @@ pub struct InitTool {
     #[clap(long)]
     pub faucet_url: Option<Url>,
 
+    /// Auth token, if we're using the faucet. This is only used this time, we don't
+    /// store it.
+    #[clap(long, env)]
+    pub faucet_auth_token: Option<String>,
+
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
     pub skip_faucet: bool,
+
+    /// Whether you want to create a profile from your ledger account
+    ///
+    /// Make sure that you have your Ledger device connected and unlocked, with the Aptos app installed and opened.
+    /// You must also enable "Blind Signing" on your device to sign transactions from the CLI.
+    #[clap(long)]
+    pub ledger: bool,
+
+    #[clap(flatten)]
+    pub(crate) hardware_wallet_options: HardwareWalletOptions,
 
     #[clap(flatten)]
     pub rng_args: RngArgs,
@@ -86,7 +102,6 @@ impl CliCommand<()> for InitTool {
         } else {
             ProfileConfig::default()
         };
-
         eprintln!("Configuring for profile {}", profile_name);
 
         // Choose a network
@@ -131,50 +146,118 @@ impl CliCommand<()> for InitTool {
             Network::Custom => self.custom_network(&mut profile_config)?,
         }
 
-        // Private key
-        let private_key = if let Some(private_key) = self
-            .private_key_options
-            .extract_private_key_cli(self.encoding_options.encoding)?
+        // Check if any ledger flag is set
+        let derivation_path = if let Some(deri_path) =
+            self.hardware_wallet_options.extract_derivation_path()?
         {
-            eprintln!("Using command line argument for private key");
-            private_key
-        } else {
-            eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
-            let input = read_line("Private key")?;
-            let input = input.trim();
-            if input.is_empty() {
-                if let Some(private_key) = profile_config.private_key {
-                    eprintln!("No key given, keeping existing key...");
-                    private_key
-                } else {
-                    eprintln!("No key given, generating key...");
-                    self.rng_args
-                        .key_generator()?
-                        .generate_ed25519_private_key()
-                }
-            } else {
-                Ed25519PrivateKey::from_encoded_string(input)
-                    .map_err(|err| CliError::UnableToParse("Ed25519PrivateKey", err.to_string()))?
-            }
-        };
-        let public_key = private_key.public_key();
+            Some(deri_path)
+        } else if self.ledger {
+            // Fetch the top 5 (index 0-4) accounts from Ledger
+            let account_map = aptos_ledger::fetch_batch_accounts(Some(0..5))?;
+            eprintln!(
+                "Please choose an index from the following {} ledger accounts, or choose an arbitrary index that you want to use:",
+                account_map.len()
+            );
 
-        let client = aptos_rest_client::Client::new(
-            Url::parse(
-                profile_config
-                    .rest_url
-                    .as_ref()
-                    .expect("Must have rest client as created above"),
-            )
-            .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-        );
+            // Iterate through the accounts and print them out
+            for (index, (derivation_path, account)) in account_map.iter().enumerate() {
+                eprintln!(
+                    "[{}] Derivation path: {} (Address: {})",
+                    index, derivation_path, account
+                );
+            }
+            let input_index = read_line("derivation_index")?;
+            let input_index = input_index.trim();
+            let path = aptos_ledger::DERIVATION_PATH.replace("{index}", input_index);
+
+            // Validate the path
+            if !aptos_ledger::validate_derivation_path(&path) {
+                return Err(CliError::UnexpectedError(
+                    "Invalid index input. Please make sure the input is a valid number index"
+                        .to_owned(),
+                ));
+            }
+            Some(path)
+        } else {
+            None
+        };
+
+        // Set the derivation_path to the one user chose
+        profile_config.derivation_path = derivation_path.clone();
+
+        // Private key
+        let private_key = if self.is_hardware_wallet() {
+            // Private key stays in ledger
+            None
+        } else {
+            let ed25519_private_key = if let Some(key) = self
+                .private_key_options
+                .extract_private_key_cli(self.encoding_options.encoding)?
+            {
+                eprintln!("Using command line argument for private key");
+                key
+            } else {
+                eprintln!("Enter your private key as a hex literal (0x...) [Current: {} | No input: Generate new key (or keep one if present)]", profile_config.private_key.as_ref().map(|_| "Redacted").unwrap_or("None"));
+                let input = read_line("Private key")?;
+                let input = input.trim();
+                if input.is_empty() {
+                    if let Some(key) = profile_config.private_key {
+                        eprintln!("No key given, keeping existing key...");
+                        key
+                    } else {
+                        eprintln!("No key given, generating key...");
+                        self.rng_args
+                            .key_generator()?
+                            .generate_ed25519_private_key()
+                    }
+                } else {
+                    Ed25519PrivateKey::from_encoded_string(input).map_err(|err| {
+                        CliError::UnableToParse("Ed25519PrivateKey", err.to_string())
+                    })?
+                }
+            };
+
+            Some(ed25519_private_key)
+        };
+
+        // Public key
+        let public_key = if self.is_hardware_wallet() {
+            let pub_key = match aptos_ledger::get_public_key(
+                derivation_path
+                    .ok_or(CliError::UnexpectedError(
+                        "Invalid derivation path".to_string(),
+                    ))?
+                    .as_str(),
+                false,
+            ) {
+                Ok(pub_key_str) => pub_key_str,
+                Err(err) => {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Unexpected Ledger Error: {:?}",
+                        err.to_string()
+                    )))
+                },
+            };
+            pub_key
+        } else {
+            private_key.clone().unwrap().public_key()
+        };
+
+        let rest_url = Url::parse(
+            profile_config
+                .rest_url
+                .as_ref()
+                .expect("Must have rest client as created above"),
+        )
+        .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?;
+        let client = aptos_rest_client::Client::new(rest_url);
 
         // lookup the address from onchain instead of deriving it
         // if this is the rotated key, deriving it will outputs an incorrect address
         let derived_address = account_address_from_public_key(&public_key);
         let address = lookup_address(&client, derived_address, false).await?;
 
-        profile_config.private_key = Some(private_key);
+        profile_config.private_key = private_key;
         profile_config.public_key = Some(public_key);
         profile_config.account = Some(address);
 
@@ -225,14 +308,15 @@ impl CliCommand<()> for InitTool {
                     "Account {} doesn't exist, creating it and funding it with {} Octas",
                     address, NUM_DEFAULT_OCTAS
                 );
-                let hashes = fund_account(
+                fund_account(
+                    client,
                     Url::parse(faucet_url)
                         .map_err(|err| CliError::UnableToParse("rest_url", err.to_string()))?,
-                    NUM_DEFAULT_OCTAS,
+                    self.faucet_auth_token.as_deref(),
                     address,
+                    NUM_DEFAULT_OCTAS,
                 )
                 .await?;
-                wait_for_transactions(&client, hashes).await?;
                 eprintln!("Account {} funded successfully", address);
             }
         } else if account_exists {
@@ -328,6 +412,10 @@ impl InitTool {
         };
         profile_config.faucet_url = faucet_url;
         Ok(())
+    }
+
+    fn is_hardware_wallet(&self) -> bool {
+        self.hardware_wallet_options.is_hardware_wallet() || self.ledger
     }
 }
 

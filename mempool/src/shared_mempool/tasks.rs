@@ -69,8 +69,17 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
                 )
                 .peer(&peer)
                 .error(&error)),
+                BroadcastError::NoTransactions(_) | BroadcastError::PeerNotPrioritized(_, _) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(60)),
+                        trace!("{:?}", err)
+                    );
+                },
                 _ => {
-                    debug!("{:?}", err)
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(60)),
+                        debug!("{:?}", err)
+                    );
                 },
             }
         }

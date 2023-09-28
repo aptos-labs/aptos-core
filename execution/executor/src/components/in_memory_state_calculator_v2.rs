@@ -5,6 +5,7 @@ use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{ParsedTransactionOutput, ProofReader};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
@@ -23,6 +24,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use arr_macro::arr;
+use bytes::Bytes;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -38,16 +40,16 @@ impl<'a> CoreAccountStateView<'a> {
 }
 
 impl<'a> AccountView for CoreAccountStateView<'a> {
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Bytes>> {
         if let Some(v_opt) = self.updates[state_key.get_shard_id() as usize].get(state_key) {
-            return Ok(v_opt.as_ref().map(|x| x.bytes().to_vec()));
+            return Ok(v_opt.as_ref().map(StateValue::bytes).cloned());
         }
         if let Some(entry) = self.base[state_key.get_shard_id() as usize]
             .get(state_key)
             .as_ref()
         {
             let state_value = entry.value().1.as_ref();
-            return Ok(state_value.map(|x| x.bytes().to_vec()));
+            return Ok(state_value.map(StateValue::bytes).cloned());
         }
         Ok(None)
     }
@@ -102,7 +104,7 @@ impl InMemoryStateCalculatorV2 {
         let StateCache {
             // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
             // calculation
-            frozen_base: _,
+            frozen_base,
             sharded_state_cache,
             proofs,
         } = state_cache;
@@ -134,6 +136,10 @@ impl InMemoryStateCalculatorV2 {
             )?;
             (new_checkpoint, new_checkpoint_version)
         };
+
+        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
+            drop(frozen_base);
+        });
 
         let state_checkpoint_hashes = std::iter::repeat(None)
             .take(num_txns - 1)

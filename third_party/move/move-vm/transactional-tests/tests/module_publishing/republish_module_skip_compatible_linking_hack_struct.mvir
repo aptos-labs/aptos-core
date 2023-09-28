@@ -22,7 +22,7 @@ module 0x42.A {
   }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.A {
   struct A has store,drop {
         f: u64,

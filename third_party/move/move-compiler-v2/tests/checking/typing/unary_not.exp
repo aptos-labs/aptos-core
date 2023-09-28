@@ -15,4 +15,5 @@ module 0x8675309::M {
           Tuple()
         }
     }
+    spec fun $t0(x: bool,r: M::R);
 } // end 0x8675309::M

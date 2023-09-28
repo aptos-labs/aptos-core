@@ -32,6 +32,7 @@ pub struct ReliableBroadcast<M: RBMessage, TBackoff> {
     network_sender: Arc<dyn RBNetworkSender<M>>,
     backoff_policy: TBackoff,
     time_service: TimeService,
+    rpc_timeout_duration: Duration,
 }
 
 impl<M, TBackoff> ReliableBroadcast<M, TBackoff>
@@ -44,12 +45,14 @@ where
         network_sender: Arc<dyn RBNetworkSender<M>>,
         backoff_policy: TBackoff,
         time_service: TimeService,
+        rpc_timeout_duration: Duration,
     ) -> Self {
         Self {
             validators,
             network_sender,
             backoff_policy,
             time_service,
+            rpc_timeout_duration,
         }
     }
 
@@ -61,6 +64,7 @@ where
         let receivers: Vec<_> = self.validators.clone();
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
+        let rpc_timeout_duration = self.rpc_timeout_duration;
         let mut backoff_policies: HashMap<Author, TBackoff> = self
             .validators
             .iter()
@@ -79,7 +83,7 @@ where
                     (
                         receiver,
                         network_sender
-                            .send_rb_rpc(receiver, message, Duration::from_millis(500))
+                            .send_rb_rpc(receiver, message, rpc_timeout_duration)
                             .await,
                     )
                 }

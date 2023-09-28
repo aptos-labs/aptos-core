@@ -17,11 +17,12 @@ use std::{
     time::Duration,
 };
 
+#[async_trait]
 pub trait RpcHandler {
     type Request;
     type Response;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
 }
 
 #[async_trait]
@@ -36,7 +37,7 @@ pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         responders: Vec<Author>,
         message: DAGMessage,
         retry_interval: Duration,

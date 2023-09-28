@@ -150,8 +150,7 @@ pub fn publish(
         }
 
         if !has_error {
-            let (changeset, events) = session.finish().map_err(|e| e.into_vm_status())?;
-            assert!(events.is_empty());
+            let changeset = session.finish().map_err(|e| e.into_vm_status())?;
             if verbose {
                 explain_publish_changeset(&changeset);
             }
@@ -171,7 +170,7 @@ pub fn publish(
         for unit in modules_to_publish {
             let id = module(&unit.unit)?.self_id();
             let module_bytes = unit.unit.serialize(bytecode_version);
-            serialized_modules.push((id, module_bytes));
+            serialized_modules.push((id, module_bytes.into()));
         }
         state.save_modules(&serialized_modules)?;
     }

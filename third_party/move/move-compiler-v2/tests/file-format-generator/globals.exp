@@ -120,7 +120,7 @@ fun globals::write($t0: address, $t1: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v6
+// Move bytecode v4294967295
 module 42.globals {
 struct R has store {
 	f: u64

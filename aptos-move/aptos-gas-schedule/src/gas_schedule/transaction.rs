@@ -140,6 +140,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             10 << 20, // all events from a single transaction are 10MB max
         ],
         [
+            max_write_ops_per_transaction: NumSlots,
+            { 11.. => "max_write_ops_per_transaction" },
+            8192,
+        ],
+        [
             storage_fee_per_state_slot_create: FeePerSlot,
             { 7.. => "storage_fee_per_state_slot_create" },
             50000,
@@ -200,6 +205,19 @@ impl TransactionGasParameters {
             | ModificationWithMetadata { .. }
             | Deletion
             | DeletionWithMetadata { .. } => 0.into(),
+        }
+    }
+
+    pub fn storage_fee_refund_for_slot(&self, op: &WriteOp) -> Fee {
+        use WriteOp::*;
+
+        match op {
+            DeletionWithMetadata { metadata, .. } => Fee::new(metadata.deposit()),
+            Creation(..)
+            | CreationWithMetadata { .. }
+            | Modification(..)
+            | ModificationWithMetadata { .. }
+            | Deletion => 0.into(),
         }
     }
 

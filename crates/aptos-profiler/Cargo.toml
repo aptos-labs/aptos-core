@@ -13,15 +13,11 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+regex = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
-pprof = { version = "0.11", features = ["flamegraph"] }
-backtrace = { version = "0.3" }
-jemallocator = { version = "0.3.2", features = [
-    "profiling",
-    "unprefixed_malloc_on_supported_platforms",
-] }
-jemalloc-sys = { version = "0.3" }
-
-
+pprof = { workspace = true }
+backtrace = { workspace = true }
+jemallocator = { workspace = true }
+jemalloc-sys = { workspace = true }
 

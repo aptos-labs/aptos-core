@@ -12,6 +12,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, Error, Result};
+use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
@@ -23,7 +24,6 @@ use std::{
     convert::TryFrom,
     fmt,
 };
-
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 pub struct AccountState {
     address: AccountAddress,
@@ -120,7 +120,7 @@ impl fmt::Debug for AccountState {
 }
 
 impl AccountView for AccountState {
-    fn get_state_value(&self, _: &StateKey) -> Result<Option<Vec<u8>>> {
+    fn get_state_value(&self, _: &StateKey) -> Result<Option<Bytes>> {
         unimplemented!()
     }
 
@@ -141,7 +141,7 @@ impl TryFrom<&StateValue> for AccountState {
     type Error = Error;
 
     fn try_from(state_value: &StateValue) -> Result<Self> {
-        AccountState::try_from(state_value.bytes()).map_err(Into::into)
+        AccountState::try_from(state_value.bytes().as_ref()).map_err(Into::into)
     }
 }
 

@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_config::{
-    config::{DiscoveryMethod, NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
+    config::{DiscoveryMethod, NodeConfig, OverrideNodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
     network_id::NetworkId,
 };
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
@@ -28,7 +28,10 @@ async fn test_full_node_basic_flow() {
     let vfn_peer_id = swarm.full_nodes().next().unwrap().peer_id();
     let version = swarm.versions().max().unwrap();
     let pfn_peer_id = swarm
-        .add_full_node(&version, NodeConfig::get_default_pfn_config())
+        .add_full_node(
+            &version,
+            OverrideNodeConfig::new_with_default_base(NodeConfig::get_default_pfn_config()),
+        )
         .await
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
@@ -214,7 +217,13 @@ async fn test_private_full_node() {
         NetworkId::Public,
         PeerRole::PreferredUpstream,
     );
-    let private = swarm.add_full_node(&version, private_config).await.unwrap();
+    let private = swarm
+        .add_full_node(
+            &version,
+            OverrideNodeConfig::new_with_default_base(private_config),
+        )
+        .await
+        .unwrap();
 
     // And connect the user to the private swarm
     add_node_to_seeds(
@@ -223,7 +232,13 @@ async fn test_private_full_node() {
         NetworkId::Public,
         PeerRole::PreferredUpstream,
     );
-    let user = swarm.add_full_node(&version, user_config).await.unwrap();
+    let user = swarm
+        .add_full_node(
+            &version,
+            OverrideNodeConfig::new_with_default_base(user_config),
+        )
+        .await
+        .unwrap();
 
     swarm
         .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_CONNECTIVITY_WAIT_SECS))

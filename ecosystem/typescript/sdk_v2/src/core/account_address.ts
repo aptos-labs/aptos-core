@@ -205,20 +205,18 @@ export class AccountAddress {
 
     // Check if the address is in LONG form. If it is not, this is only allowed for
     // special addresses, in which case we check it is in proper SHORT form.
-    if (args.input.length != AccountAddress.LONG_STRING_LENGTH + 2) {
+    if (args.input.length !== AccountAddress.LONG_STRING_LENGTH + 2) {
       if (!address.isSpecial()) {
         throw new ParsingError(
-          "The given hex string is not a special address, it must be represented as 0x + 64 chars.",
+          `The given hex string ${address} is not a special address, it must be represented as 0x + 64 chars.`,
           AddressInvalidReason.LONG_FORM_REQUIRED_UNLESS_SPECIAL,
         );
-      } else {
+      } else if (args.input.length !== 3) {
         // 0x + one hex char is the only valid SHORT form for special addresses.
-        if (args.input.length != 3) {
-          throw new ParsingError(
-            "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes.",
-            AddressInvalidReason.INVALID_PADDING_ZEROES,
-          );
-        }
+        throw new ParsingError(
+          "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes.",
+          AddressInvalidReason.INVALID_PADDING_ZEROES,
+        );
       }
     }
 

@@ -450,11 +450,15 @@ class Installer:
             )
             return None
 
-        if MACOS:
-            return "MacOSX-x86_64"
-
         if WINDOWS:
             return "Windows-x86_64"
+        
+        if MACOS:
+            sys.stdout.write(
+                colorize("error", "You are trying to install from macOS. Please use brew to install Aptos CLI instead - [brew install aptos]")
+            )
+            self._write("")
+            sys.exit(1)
 
         # On Linux, we check what version of OpenSSL we're working with to figure out
         # which binary to download.

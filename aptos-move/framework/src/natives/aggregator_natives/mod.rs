@@ -3,7 +3,9 @@
 
 pub mod aggregator;
 pub mod aggregator_factory;
+pub mod aggregator_v2;
 pub mod context;
-mod helpers;
+pub(crate) mod helpers;
+mod helpers_v2;
 
 pub use context::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext};

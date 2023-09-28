@@ -13,7 +13,7 @@ use aptos_types::{
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
-    data_cache::StorageAdapter,
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
 use aptos_vm_types::storage::ChangeSetConfigs;
@@ -118,13 +118,12 @@ where
         TimedFeatures::enable_all(),
     )
     .unwrap();
-    let state_view_storage = StorageAdapter::new(state_view);
+    let resolver = state_view.as_move_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
-        let mut session = GenesisSession(
-            move_vm.new_session(&state_view_storage, SessionId::genesis(genesis_id)),
-        );
+        let mut session =
+            GenesisSession(move_vm.new_session(&resolver, SessionId::genesis(genesis_id)));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();
@@ -139,7 +138,7 @@ where
     };
 
     // Genesis never produces the delta change set.
-    assert!(change_set.aggregator_delta_set().is_empty());
+    assert!(change_set.aggregator_v1_delta_set().is_empty());
     change_set
         .try_into_storage_change_set()
         .expect("Conversion from VMChangeSet into ChangeSet should always succeed")
