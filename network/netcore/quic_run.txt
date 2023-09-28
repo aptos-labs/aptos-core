@@ -1,0 +1,69 @@
+    Finished test [unoptimized + debuginfo] target(s) in 0.45s
+     Running unittests src/lib.rs (/Users/joshlind/Matonee/Code/aptos/clone/aptos-core/target/debug/deps/aptos_netcore-d13b068321f622df)
+
+running 3 tests
+test transport::quic::test::unsupported_multiaddrs ... ok
+test transport::quic::test::test_resolve_with_filter ... ok
+test transport::quic::test::simple_listen_and_dial ... FAILED
+
+failures:
+
+---- transport::quic::test::simple_listen_and_dial stdout ----
+(QuicConnectionStream) Polling Next PendingQuicConnection
+Creating QUIC connection from QUINN connection: 127.0.0.1:49254
+(Remote: 127.0.0.1:49254) Opened a new send stream: Ok(0)
+Got QUIC connection for: 127.0.0.1:49254
+(simple_listen_and_dial: outbound) Got a new connection! Addr: /ip4/127.0.0.1/udp/49254
+(simple_listen_and_dial: outbound, /ip4/127.0.0.1/udp/49254) Writing hello packet!
+(Remote: 127.0.0.1:49254) Polling Write. Result: Ready(Ok(5))
+(simple_listen_and_dial: outbound, /ip4/127.0.0.1/udp/49254) Reading first data packet!
+(Remote: 127.0.0.1:49254) Polling Read. Recv Stream: false
+(QuicConnectionStream) Polling Next PendingQuicConnection
+(QuicConnectionStream) Got a new pending connection!
+(Remote: 127.0.0.1:49254) Polling Read. Recv Stream: false
+(QuicConnectionStream) Polling Next PendingQuicConnection
+(Remote: 127.0.0.1:49254) Polling Read. Recv Stream: false
+(QuicConnectionStream) Polling Next PendingQuicConnection
+(QuicConnectionStream) Got a new pending QUIC connection!
+(PendingQuicConnection) Polling PendingQuicConnection
+Creating QUIC connection from QUINN connection: 127.0.0.1:56703
+(Remote: 127.0.0.1:56703) Opened a new send stream: Ok(0)
+Got QUIC connection for: 127.0.0.1:56703
+(PendingQuicConnection) Got a new and ready QUIC connection!
+(QuicConnectionStream) Got a new and ready QUIC connection!
+In listener future! Maybe result: true
+(simple_listen_and_dial: inbound) Got a new connection! Addr: /ip4/127.0.0.1/udp/56703
+(simple_listen_and_dial: inbound, /ip4/127.0.0.1/udp/56703) Reading hello packet!
+(Remote: 127.0.0.1:56703) Polling Read. Recv Stream: false
+(Remote: 127.0.0.1:56703) Got a new recv stream!
+(Remote: 127.0.0.1:56703) Polling Read. Result: Ready(Ok(5))
+(simple_listen_and_dial: inbound, /ip4/127.0.0.1/udp/56703) Verifying hello packet: [72, 101, 108, 108, 111]
+(simple_listen_and_dial: inbound, /ip4/127.0.0.1/udp/56703) Writing first data packet!
+(Remote: 127.0.0.1:56703) Polling Write. Result: Ready(Ok(5))
+(simple_listen_and_dial: inbound, /ip4/127.0.0.1/udp/56703) Writing second data packet!
+(Remote: 127.0.0.1:56703) Polling Write. Result: Ready(Ok(4))
+(simple_listen_and_dial: inbound, /ip4/127.0.0.1/udp/56703) Reading third data packet!
+(Remote: 127.0.0.1:56703) Polling Read. Recv Stream: true
+(Remote: 127.0.0.1:56703) Polling Read. Result: Pending
+(Remote: 127.0.0.1:49254) Polling Read. Recv Stream: false
+(Remote: 127.0.0.1:49254) Got a new recv stream!
+(Remote: 127.0.0.1:49254) Polling Read. Result: Ready(Ok(5))
+(simple_listen_and_dial: outbound, /ip4/127.0.0.1/udp/49254) Verifying first data packet: [69, 97, 114, 116, 104]
+(simple_listen_and_dial: outbound, /ip4/127.0.0.1/udp/49254) Reading second data packet!
+(Remote: 127.0.0.1:49254) Polling Read. Recv Stream: true
+(Remote: 127.0.0.1:49254) Polling Read. Result: Ready(Ok(4))
+(simple_listen_and_dial: outbound, /ip4/127.0.0.1/udp/49254) Verifying second data packet: [70, 105, 114, 101]
+(simple_listen_and_dial: outbound, /ip4/127.0.0.1/udp/49254) Writing third data packet!
+(Remote: 127.0.0.1:49254) Polling Write. Result: Ready(Err(Custom { kind: NotConnected, error: ConnectionLost(TimedOut) }))
+(Remote: 127.0.0.1:56703) Polling Read. Recv Stream: true
+(Remote: 127.0.0.1:56703) Polling Read. Result: Ready(Err(Custom { kind: NotConnected, error: ConnectionLost(TimedOut) }))
+thread 'transport::quic::test::simple_listen_and_dial' panicked at 'called `Result::unwrap()` on an `Err` value: Custom { kind: NotConnected, error: ConnectionLost(TimedOut) }', /rustc/eb26296b556cef10fb713a38f3d16b9886080f26/library/core/src/ops/function.rs:250:5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    transport::quic::test::simple_listen_and_dial
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 20.01s
+
+error: test failed, to rerun pass `--lib`
