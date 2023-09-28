@@ -32,7 +32,7 @@ export class Account {
 
   /**
    * constructor for Account
-   * 
+   *
    * TODO: This constructor uses the nacl library directly, which only works with ed25519 keys.
    * Need to update this to use the new crypto library if new schemes are added.
    *
@@ -54,7 +54,7 @@ export class Account {
   }
 
   /**
-   * Generate a new account with random private key and address
+   * Derives an account with random private key and address
    *
    * @returns Account
    */
@@ -66,7 +66,7 @@ export class Account {
   }
 
   /**
-   * Creates new account with provided private key
+   * Derives an account with provided private key
    *
    * @param args.privateKey Hex - private key of the account
    * @returns Account
@@ -80,7 +80,7 @@ export class Account {
   }
 
   /**
-   * Creates new account with provided private key and address
+   * Derives an account with provided private key and address
    * This is intended to be used for account that has it's key rotated
    *
    * @param args.privateKey Hex - private key of the account
@@ -95,7 +95,8 @@ export class Account {
   }
 
   /**
-   * Creates new account with bip44 path and mnemonics,
+   * Derives an account with bip44 path and mnemonics,
+   *
    * @param path. (e.g. m/44'/637'/0'/0'/0')
    * Detailed description: {@link https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki}
    * @param mnemonics.
@@ -141,14 +142,27 @@ export class Account {
     return authKey.data;
   }
 
-  sign(data: HexInput): Signature {
-    const signature = this.privateKey.sign({ message: data });
+  /**
+   * Sign the given message with the private key.
+   *
+   * @param args.data in HexInput format
+   * @returns Signature
+   */
+  sign(args: { data: HexInput }): Signature {
+    const signature = this.privateKey.sign({ message: args.data });
     return signature;
   }
 
-  verifySignature(message: HexInput, signature: HexInput): boolean {
+  /**
+   * Verify the given message and signature with the public key.
+   *
+   * @param args.message raw message data in HexInput format
+   * @param args.signature signed message Signature
+   * @returns
+   */
+  verifySignature(args: { message: HexInput; signature: Signature }): boolean {
+    const { message, signature } = args;
     const rawMessage = Hex.fromHexInput({ hexInput: message }).toUint8Array();
-    const rawSignature = Hex.fromHexInput({ hexInput: signature }).toUint8Array();
-    return this.publicKey.verifySignature({ data: rawMessage, signature: new Ed25519Signature({ data: rawSignature }) });
+    return this.publicKey.verifySignature({ data: rawMessage, signature });
   }
 }

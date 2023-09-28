@@ -4,6 +4,7 @@
 import { Account } from "../../src/core/account";
 import { AccountAddress } from "../../src/core/account_address";
 import { Hex } from "../../src/core/hex";
+import { Ed25519Signature } from "../../src/crypto/ed25519";
 import { ed25519 } from "./helper";
 
 describe("Account", () => {
@@ -61,7 +62,10 @@ describe("Account", () => {
       privateKey,
       address: AccountAddress.fromString({ input: address }),
     });
-    expect(account.sign(message).toString()).toEqual(signedMessage);
-    expect(account.verifySignature(message, signedMessage)).toBe(true);
+    expect(account.sign({ data: message }).toString()).toEqual(signedMessage);
+
+    // Verify the signature
+    const signature = new Ed25519Signature({ data: signedMessage });
+    expect(account.verifySignature({ message, signature })).toBe(true);
   });
 });
