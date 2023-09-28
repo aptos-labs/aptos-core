@@ -6,8 +6,9 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { get } from "../client";
+import { get, getFullNode } from "../client";
 import { GasEstimation, PaginationArgs, TransactionResponse } from "../types";
+import { GasEstimation } from "../types";
 import { AptosApiType } from "../utils/const";
 import { paginateWithCursor } from "../utils/paginate_with_cursor";
 
@@ -28,11 +29,10 @@ export async function getTransactions(args: {
 
 export async function getGasPriceEstimation(args: { aptosConfig: AptosConfig }) {
   const { aptosConfig } = args;
-  const { data } = await get<{}, GasEstimation>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    path: "estimate_gas_price",
+  const { data } = await getFullNode<{}, GasEstimation>({
+    aptosConfig,
     name: "getGasPriceEstimation",
-    overrides: { ...aptosConfig.clientConfig },
-  }, aptosConfig);
+    path: "estimate_gas_price",
+  });
   return data;
 }
