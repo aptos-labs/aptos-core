@@ -580,9 +580,10 @@ fn single_test_suite(
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_const_tps" => pfn_const_tps(duration, 100, false, false, true),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, 100, false, true, false),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, 100, true, true, false),
+        "pfn_const_tps_with_realistic_env_3K" => pfn_const_tps(duration, 3000, true, true, false),
         "pfn_performance" => pfn_performance(duration, false, false, true),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
@@ -2041,6 +2042,7 @@ fn multiregion_benchmark_test() -> ForgeConfig {
 /// Likewise, if `add_network_emulation` is true, network chaos is enabled.
 fn pfn_const_tps(
     duration: Duration,
+    tps: usize,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
@@ -2054,7 +2056,7 @@ fn pfn_const_tps(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
