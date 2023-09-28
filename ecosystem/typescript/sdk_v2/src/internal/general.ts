@@ -6,19 +6,18 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { get, post } from "../client";
+import {get, getFullNode, post} from "../client";
 import { Block, GraphqlQuery, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
 import { AptosApiType } from "../utils/const";
 
 export async function getLedgerInfo(args: { aptosConfig: AptosConfig }): Promise<LedgerInfo> {
   const { aptosConfig } = args;
-  const { data } = await get<{}, LedgerInfo>(
+  const { data } = await getFullNode<{}, LedgerInfo>(
     {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      path: "",
+      aptosConfig,
       name: "getLedgerInfo",
+      path: "",
     },
-    aptosConfig,
   );
   return data;
 }
@@ -29,14 +28,13 @@ export async function getBlockByVersion(args: {
   options?: { withTransactions?: boolean };
 }): Promise<Block> {
   const { aptosConfig, blockVersion, options } = args;
-  const { data } = await get<{}, Block>(
+  const { data } = await getFullNode<{}, Block>(
     {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      path: `blocks/by_version/${blockVersion}`,
+      aptosConfig,
       name: "getBlockByVersion",
+      path: `blocks/by_version/${blockVersion}`,
       params: { with_transactions: options?.withTransactions },
     },
-    aptosConfig,
   );
   return data;
 }
@@ -47,14 +45,13 @@ export async function getBlockByHeight(args: {
   options?: { withTransactions?: boolean };
 }): Promise<Block> {
   const { aptosConfig, blockHeight, options } = args;
-  const { data } = await get<{}, Block>(
+  const { data } = await getFullNode<{}, Block>(
     {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      path: `blocks/by_height/${blockHeight}`,
+      aptosConfig,
       name: "getBlockByHeight",
+      path: `blocks/by_height/${blockHeight}`,
       params: { with_transactions: options?.withTransactions },
     },
-    aptosConfig,
   );
   return data;
 }

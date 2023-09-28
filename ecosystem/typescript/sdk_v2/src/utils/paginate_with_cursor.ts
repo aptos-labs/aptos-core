@@ -1,11 +1,10 @@
 import { AptosConfig } from "../api/aptos_config";
-import { get } from "../client";
+import {get, getFullNode, GetFullNodeRequestOptions} from "../client";
 import { AptosRequest } from "../types";
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(
-  options: Omit<AptosRequest, "body" | "method">,
-  aptosConfig: AptosConfig,
+  options: GetFullNodeRequestOptions,
 ): Promise<Res> {
   const out = [];
   let cursor: string | undefined;
@@ -14,15 +13,14 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
   while (true) {
     requestParams.start = cursor;
     // eslint-disable-next-line no-await-in-loop
-    const response = await get<Req, Res>(
+    const response = await getFullNode<Req, Res>(
       {
-        url: options.url,
+        aptosConfig: options.aptosConfig,
+        name: options.name,
         path: options.path,
         params: requestParams,
-        name: options.name,
         overrides: options.overrides,
       },
-      aptosConfig,
     );
     // eslint-disable-next-line no-underscore-dangle
     /**
