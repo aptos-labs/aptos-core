@@ -16,7 +16,7 @@ export async function getLedgerInfo(args: { aptosConfig: AptosConfig }): Promise
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: "",
-      originMethod: "getLedgerInfo",
+      name: "getLedgerInfo",
     },
     aptosConfig,
   );
@@ -33,7 +33,7 @@ export async function getBlockByVersion(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `blocks/by_version/${blockVersion}`,
-      originMethod: "getBlockByVersion",
+      name: "getBlockByVersion",
       params: { with_transactions: options?.withTransactions },
     },
     aptosConfig,
@@ -51,7 +51,7 @@ export async function getBlockByHeight(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `blocks/by_height/${blockHeight}`,
-      originMethod: "getBlockByHeight",
+      name: "getBlockByHeight",
       params: { with_transactions: options?.withTransactions },
     },
     aptosConfig,
@@ -71,7 +71,7 @@ export async function getTableItem(args: {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       body: data,
       path: `tables/${handle}/item`,
-      originMethod: "getTableItem",
+      name: "getTableItem",
       params: { ledger_version: options?.ledgerVersion },
     },
     aptosConfig,
@@ -90,7 +90,7 @@ export async function view(args: {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       body: payload,
       path: "view",
-      originMethod: "view",
+      name: "view",
       params: { ledger_version: options?.ledgerVersion },
     },
     aptosConfig,
@@ -108,7 +108,7 @@ export async function queryIndexer<T>(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.INDEXER),
       body: query,
-      originMethod: originMethod ?? "queryIndexer",
+      name: originMethod ?? "queryIndexer",
       overrides: { WITH_CREDENTIALS: false },
     },
     aptosConfig,

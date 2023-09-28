@@ -59,7 +59,7 @@ export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: 
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
-      originMethod: "getInfo",
+      name: "getInfo",
     },
     aptosConfig,
   );
@@ -77,7 +77,7 @@ export async function getModules(args: {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
       params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
-      originMethod: "getModules",
+      name: "getModules",
     },
     aptosConfig,
   );
@@ -103,7 +103,7 @@ export async function getModule(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
-      originMethod: "getModule",
+      name: "getModule",
       params: { ledger_version: options?.ledgerVersion },
     },
     aptosConfig,
@@ -121,7 +121,7 @@ export async function getTransactions(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
-      originMethod: "getTransactions",
+      name: "getTransactions",
       params: { start: options?.start, limit: options?.limit },
     },
     aptosConfig,
@@ -140,7 +140,7 @@ export async function getResources(args: {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
       params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
-      originMethod: "getResources",
+      name: "getResources",
     },
     aptosConfig,
   );
@@ -160,7 +160,7 @@ export async function getResource(args: {
       path: `accounts/${AccountAddress.fromHexInput({
         input: accountAddress,
       }).toString()}/resource/${resourceType}`,
-      originMethod: "getResource",
+      name: "getResource",
       params: { ledger_version: options?.ledgerVersion },
     },
     aptosConfig,
