@@ -6,6 +6,7 @@ import { AccountAddress, Hex } from "../core";
 import { HexInput } from "../types";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { PublicKey } from "./asymmetric_crypto";
+import { Ed25519PublicKey } from "./ed25519";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
@@ -51,28 +52,6 @@ export class AuthenticationKey {
   }
 
   /**
-   * Converts a K-of-N MultiEd25519PublicKey to AuthenticationKey with:
-   * `auth_key = sha3-256(p_1 | … | p_n | K | 0x01)`. `K` represents the K-of-N required for
-   * authenticating the transaction. `0x01` is the 1-byte scheme for multisig.
-   *
-   * @param multiPublicKey A K-of-N MultiPublicKey
-   * @returns AuthenticationKey
-   */
-  static fromMultiPublicKey(args: { multiPublicKey: MultiEd25519PublicKey }): AuthenticationKey {
-    const { multiPublicKey } = args;
-    const multiPubKeyBytes = multiPublicKey.toUint8Array();
-
-    const bytes = new Uint8Array(multiPubKeyBytes.length + 1);
-    bytes.set(multiPubKeyBytes);
-    bytes.set([AuthenticationKey.MULTI_ED25519_SCHEME], multiPubKeyBytes.length);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return new AuthenticationKey({ data: hash.digest() });
-  }
-
-  /**
    * Converts a PublicKey(s) to AuthenticationKey
    *
    * @param publicKey
@@ -80,11 +59,21 @@ export class AuthenticationKey {
    */
   static fromPublicKey(args: { publicKey: PublicKey }): AuthenticationKey {
     const { publicKey } = args;
+
+    let scheme: number;
+    if (publicKey instanceof Ed25519PublicKey) {
+      scheme = AuthenticationKey.ED25519_SCHEME;
+    } else if (publicKey instanceof MultiEd25519PublicKey) {
+      scheme = AuthenticationKey.MULTI_ED25519_SCHEME;
+    } else {
+      throw new Error("Unsupported authentication key scheme");
+    }
+
     const pubKeyBytes = publicKey.toUint8Array();
 
     const bytes = new Uint8Array(pubKeyBytes.length + 1);
     bytes.set(pubKeyBytes);
-    bytes.set([AuthenticationKey.ED25519_SCHEME], pubKeyBytes.length);
+    bytes.set([scheme], pubKeyBytes.length);
 
     const hash = sha3Hash.create();
     hash.update(bytes);

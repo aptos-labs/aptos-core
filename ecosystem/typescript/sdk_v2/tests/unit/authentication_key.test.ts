@@ -36,7 +36,7 @@ describe("AuthenticationKey", () => {
       threshold: multiEd25519PkTestObject.threshold,
     });
 
-    const authKey = AuthenticationKey.fromMultiPublicKey({ multiPublicKey: pubKeyMultiSig });
+    const authKey = AuthenticationKey.fromPublicKey({ publicKey: pubKeyMultiSig });
     expect(authKey).toBeInstanceOf(AuthenticationKey);
     expect(authKey.data.toString()).toEqual("0xa81cfac3df59920593ff417b45fc347ead3d88f8e25112c0488d34d7c9eb20af");
   });
