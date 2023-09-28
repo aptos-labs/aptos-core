@@ -194,11 +194,11 @@ export class MultiEd25519Signature extends Signature {
 
     bits.forEach((bit: number) => {
       if (bit >= MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
-        throw new Error(`Cannot have a signature larger than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED - 1}`);
+        throw new Error(`Cannot have a signature larger than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED - 1}.`);
       }
 
       if (dupCheckSet.has(bit)) {
-        throw new Error("Duplicate bits detected");
+        throw new Error("Duplicate bits detected.");
       }
 
       dupCheckSet.add(bit);

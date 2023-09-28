@@ -88,7 +88,6 @@ describe("PrivateKey", () => {
     const privateKey = new Ed25519PrivateKey({ value: ed25519.privateKey });
     expect(privateKey).toBeInstanceOf(Ed25519PrivateKey);
     expect(privateKey.toString()).toEqual(ed25519.privateKey);
-    console.log(privateKey.toUint8Array());
 
     // Create from Uint8Array
     const hexUint8Array = new Uint8Array([
