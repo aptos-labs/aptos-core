@@ -8,8 +8,34 @@ import {
   PaginationArgs,
   TransactionResponse,
   HexInput,
+  IndexerPaginationArgs,
+  GetAccountTokensCountQueryResponse,
+  TokenStandard,
+  OrderBy,
+  GetAccountOwnedTokensQueryResponse,
+  GetAccountCollectionsWithOwnedTokenResponse,
+  GetAccountTransactionsCountResponse,
+  GetAccountCoinsDataResponse,
+  GetAccountCoinsCountResponse,
+  GetAccountOwnedObjectsResponse,
+  GetAccountOwnedTokensFromCollectionResponse,
 } from "../types";
-import { getInfo, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
+import {
+  getAccountCoinsCount,
+  getAccountCoinsData,
+  getAccountCollectionsWithOwnedTokens,
+  getAccountOwnedObjects,
+  getAccountOwnedTokens,
+  getAccountOwnedTokensFromCollectionAddress,
+  getAccountTokensCount,
+  getAccountTransactionsCount,
+  getInfo,
+  getModule,
+  getModules,
+  getResource,
+  getResources,
+  getTransactions,
+} from "../internal/account";
 
 /**
  * A class to query all `Account` related queries on Aptos.
@@ -142,5 +168,137 @@ export class Account {
   }): Promise<MoveResource> {
     const resource = await getResource({ aptosConfig: this.config, ...args });
     return resource;
+  }
+
+  /**
+   * Queries the count of tokens owned by an account
+   *
+   * @param accountAddress The account address
+   * @returns An object { count : number }
+   */
+  async getAccountTokensCount(args: { accountAddress: HexInput }): Promise<GetAccountTokensCountQueryResponse> {
+    const count = await getAccountTokensCount({ aptosConfig: this.config, ...args });
+    return count;
+  }
+
+  /**
+   * Queries the account's current owned tokens.
+   *
+   * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
+   * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
+   *
+   * @param accountAddress The account address we want to get the tokens for
+   * @returns Tokens array with the token data
+   */
+  async getAccountOwnedTokens(args: {
+    accountAddress: HexInput;
+    options?: {
+      tokenStandard?: TokenStandard;
+      pagination?: IndexerPaginationArgs;
+      orderBy?: OrderBy<GetAccountOwnedTokensQueryResponse[0]>;
+    };
+  }): Promise<GetAccountOwnedTokensQueryResponse> {
+    const tokens = await getAccountOwnedTokens({ aptosConfig: this.config, ...args });
+    return tokens;
+  }
+
+  /**
+   * Queries all tokens of a specific collection that an account owns by the collection address
+   *
+   * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
+   * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
+   *
+   * @param ownerAddress The account address we want to get the tokens for
+   * @param collectionAddress The address of the collection being queried
+   * @returns Tokens array with the token data
+   */
+  async getAccountOwnedTokensFromCollectionAddress(args: {
+    ownerAddress: HexInput;
+    collectionAddress: HexInput;
+    options?: {
+      tokenStandard?: TokenStandard;
+      pagination?: IndexerPaginationArgs;
+      orderBy?: OrderBy<GetAccountOwnedTokensFromCollectionResponse[0]>;
+    };
+  }): Promise<GetAccountOwnedTokensFromCollectionResponse> {
+    const tokens = await getAccountOwnedTokensFromCollectionAddress({ aptosConfig: this.config, ...args });
+    return tokens;
+  }
+
+  /**
+   * Queries for all collections that an account has tokens for.
+   *
+   * This query returns all tokens (v1 and v2 standards) an account owns, including NFTs, fungible, soulbound, etc.
+   * If you want to get only the token from a specific standrd, you can pass an optional tokenStandard param
+   *
+   * @param accountAddress The account address we want to get the collections for
+   * @returns Collections array with the collections data
+   */
+  async getAccountCollectionsWithOwnedTokens(args: {
+    accountAddress: HexInput;
+    options?: {
+      tokenStandard?: TokenStandard;
+      pagination?: IndexerPaginationArgs;
+      orderBy?: OrderBy<GetAccountCollectionsWithOwnedTokenResponse[0]>;
+    };
+  }): Promise<GetAccountCollectionsWithOwnedTokenResponse> {
+    const collections = await getAccountCollectionsWithOwnedTokens({ aptosConfig: this.config, ...args });
+    return collections;
+  }
+
+  /**
+   * Queries the count of transactions submitted by an account
+   *
+   * @param accountAddress The account address we want to get the total count for
+   * @returns An object { count : number }
+   */
+  async getAccountTransactionsCount(args: { accountAddress: HexInput }): Promise<GetAccountTransactionsCountResponse> {
+    const count = getAccountTransactionsCount({ aptosConfig: this.config, ...args });
+    return count;
+  }
+
+  /**
+   * Queries an account's coins data
+   *
+   * @param accountAddress The account address we want to get the coins data for
+   * @returns Array with the coins data
+   */
+  async getAccountCoinsData(args: {
+    accountAddress: HexInput;
+    options?: {
+      pagination?: IndexerPaginationArgs;
+      orderBy?: OrderBy<GetAccountCoinsDataResponse[0]>;
+    };
+  }): Promise<GetAccountCoinsDataResponse> {
+    const data = await getAccountCoinsData({ aptosConfig: this.config, ...args });
+    return data;
+  }
+
+  /**
+   * Queries the count of an account's coins
+   *
+   * @param accountAddress The account address we want to get the total count for
+   * @returns An object { count : number }
+   */
+  async getAccountCoinsCount(args: { accountAddress: HexInput }): Promise<GetAccountCoinsCountResponse> {
+    const count = getAccountCoinsCount({ aptosConfig: this.config, ...args });
+    return count;
+  }
+
+  /**
+   * Queries an account's owned objects
+   *
+   * @param ownerAddress The account address we want to get the objects for
+   * @returns Objects array with the object data
+   */
+  async getAccountOwnedObjects(args: {
+    ownerAddress: HexInput;
+    options?: {
+      pagination?: IndexerPaginationArgs;
+      orderBy?: OrderBy<GetAccountOwnedObjectsResponse[0]>;
+    };
+  }): Promise<GetAccountOwnedObjectsResponse> {
+    const objects = getAccountOwnedObjects({ aptosConfig: this.config, ...args });
+    return objects;
   }
 }

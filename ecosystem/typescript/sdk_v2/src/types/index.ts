@@ -1,5 +1,7 @@
 import { Network } from "../utils/api-endpoints";
 
+export * from "./indexer";
+
 /**
  * Hex data as input to a function
  */
@@ -748,7 +750,7 @@ export type Block = {
   transactions?: Array<TransactionResponse>;
 };
 
-/////// REQUEST TYPES ///////
+// REQUEST TYPES
 
 /**
  * View request for the Move view function API
