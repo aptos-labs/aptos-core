@@ -1095,7 +1095,8 @@ fn parse_statement_(tokens: &mut Lexer) -> Result<Statement_, ParseError<Loc, an
         | Tok::ToU32
         | Tok::ToU64
         | Tok::ToU128
-        | Tok::ToU256 => Ok(Statement_::Exp(Box::new(parse_call(tokens)?))),
+        | Tok::ToU256
+        | Tok::CallVirtual => Ok(Statement_::Exp(Box::new(parse_call(tokens)?))),
         Tok::LParen => {
             tokens.advance()?;
             let start = tokens.start_loc();

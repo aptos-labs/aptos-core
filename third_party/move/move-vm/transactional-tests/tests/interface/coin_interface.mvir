@@ -21,7 +21,7 @@ module 0x42.BasicCoin1 {
         let value: u64;
     label b0:
         Coin<CoinType> { value } = move(other);
-        *&mut move(c).Coin<CoinType>::value = (*&copy(c).Coin<CoinType>::value) + 1;
+        *&mut move(c).Coin<CoinType>::value = (*&copy(c).Coin<CoinType>::value) + move(value);
         return;
     }
 
@@ -60,7 +60,7 @@ module 0x42.BasicCoin2 {
         let value: u64;
     label b0:
         Coin { value } = move(other);
-        *&mut move(c).Coin::value = (*&copy(c).Coin::value) + 1;
+        *&mut move(c).Coin::value = (*&copy(c).Coin::value) + move(value);
         return;
     }
 
@@ -83,7 +83,7 @@ module 0x42.CoinType {
 
 //# publish
 module 0x42.GenericAdder {
-    public add_coins<T>[|&T| (u64)](coin1: &T, coin2: &T): u64 {
+    public add_coin_values<T>[|&T| (u64)](coin1: &T, coin2: &T): u64 {
         let v1: u64;
         let v2: u64;
     label b0:
@@ -91,9 +91,13 @@ module 0x42.GenericAdder {
         v2 = call_virtual(0)(move(coin2));
         return move(v1) + move(v2);
     }
+
+    public add_coins<T>[|&mut T, T| ()](coin1: &mut T, coin2: T) {
+    label b0:
+        call_virtual(0)(move(coin1), move(coin2));
+        return;
+    }
 }
-
-
 
 //# run
 import 0x42.BasicCoin1;
@@ -104,11 +108,37 @@ main() {
     let coin1: BasicCoin1.Coin<CoinType.Foo>;
     let coin2: BasicCoin1.Coin<CoinType.Foo>;
     let v: u64;
+    let v2: u64;
 label b0:
     coin1 = BasicCoin1.mint<CoinType.Foo>(10);
     coin2 = BasicCoin1.mint<CoinType.Foo>(20);
 
-    v = GenericAdder.add_coins<BasicCoin1.Coin<CoinType.Foo>>[BasicCoin1.value<CoinType.Foo>](&coin1, &coin2);
+    v = GenericAdder.add_coin_values<BasicCoin1.Coin<CoinType.Foo>>[BasicCoin1.value<CoinType.Foo>](&coin1, &coin2);
     assert(move(v) == 30, 0);
+    GenericAdder.add_coins<BasicCoin1.Coin<CoinType.Foo>>[BasicCoin1.merge<CoinType.Foo>](&mut coin1, move(coin2));
+    v2 = BasicCoin1.value<CoinType.Foo>(&coin1);
+    assert(move(v2) == 30, 0);
+    return;
+}
+
+//# run
+import 0x42.BasicCoin2;
+import 0x42.GenericAdder;
+import 0x42.CoinType;
+
+main() {
+    let coin1: BasicCoin2.Coin;
+    let coin2: BasicCoin2.Coin;
+    let v: u64;
+    let v2: u64;
+label b0:
+    coin1 = BasicCoin2.mint(10);
+    coin2 = BasicCoin2.mint(20);
+
+    v = GenericAdder.add_coin_values<BasicCoin2.Coin>[BasicCoin2.value](&coin1, &coin2);
+    assert(move(v) == 30, 0);
+    GenericAdder.add_coins<BasicCoin2.Coin>[BasicCoin2.merge](&mut coin1, move(coin2));
+    v2 = BasicCoin2.value(&coin1);
+    assert(move(v2) == 30, 0);
     return;
 }
