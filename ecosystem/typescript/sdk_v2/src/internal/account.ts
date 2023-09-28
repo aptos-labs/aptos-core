@@ -5,12 +5,11 @@
  * account namespace and without having a dependency cycle error.
  */
 
-import {AptosConfig} from "../api/aptos_config";
-import {get, getFullNode} from "../client";
-import {paginateWithCursor} from "../utils/paginate_with_cursor";
-import {AccountAddress, Hex} from "../core";
-import {AptosApiType} from "../utils/const";
-import {queryIndexer} from "./general";
+import { AptosConfig } from "../api/aptos_config";
+import { getFullNode } from "../client";
+import { paginateWithCursor } from "../utils/paginate_with_cursor";
+import { AccountAddress, Hex } from "../core";
+import { queryIndexer } from "./general";
 import {
   AccountData,
   GetAccountCoinsCountResponse,
@@ -55,13 +54,11 @@ import {
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
-  const { data } = await getFullNode<{}, AccountData>(
-    {
-      aptosConfig,
-      name: "getInfo",
-      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
-    },
-  );
+  const { data } = await getFullNode<{}, AccountData>({
+    aptosConfig,
+    name: "getInfo",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
+  });
   return data;
 }
 
@@ -71,14 +68,12 @@ export async function getModules(args: {
   options?: PaginationArgs & LedgerVersion;
 }): Promise<MoveModuleBytecode[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, MoveModuleBytecode[]>(
-    {
-      aptosConfig,
-      name: "getModules",
-      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
-      params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
-    },
-  );
+  const data = await paginateWithCursor<{}, MoveModuleBytecode[]>({
+    aptosConfig,
+    name: "getModules",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
+    params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
+  });
   return data;
 }
 
@@ -97,14 +92,12 @@ export async function getModule(args: {
   options?: LedgerVersion;
 }): Promise<MoveModuleBytecode> {
   const { aptosConfig, accountAddress, moduleName, options } = args;
-  const { data } = await getFullNode<{}, MoveModuleBytecode>(
-    {
-      aptosConfig,
-      name: "getModule",
-      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
-      params: { ledger_version: options?.ledgerVersion },
-    },
-  );
+  const { data } = await getFullNode<{}, MoveModuleBytecode>({
+    aptosConfig,
+    name: "getModule",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
+    params: { ledger_version: options?.ledgerVersion },
+  });
   return data;
 }
 
@@ -114,14 +107,12 @@ export async function getTransactions(args: {
   options?: PaginationArgs;
 }): Promise<TransactionResponse[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, TransactionResponse[]>(
-    {
-      aptosConfig,
-      name: "getTransactions",
-      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
-      params: { start: options?.start, limit: options?.limit },
-    },
-  );
+  const data = await paginateWithCursor<{}, TransactionResponse[]>({
+    aptosConfig,
+    name: "getTransactions",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
+    params: { start: options?.start, limit: options?.limit },
+  });
   return data;
 }
 
@@ -131,15 +122,12 @@ export async function getResources(args: {
   options?: PaginationArgs & LedgerVersion;
 }): Promise<MoveResource[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, MoveResource[]>(
-    {
-      aptosConfig,
-      name: "getResources",
-      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
-      params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
-    },
+  const data = await paginateWithCursor<{}, MoveResource[]>({
     aptosConfig,
-  );
+    name: "getResources",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
+    params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
+  });
   return data;
 }
 
@@ -150,16 +138,14 @@ export async function getResource(args: {
   options?: LedgerVersion;
 }): Promise<MoveResource> {
   const { aptosConfig, accountAddress, resourceType, options } = args;
-  const { data } = await getFullNode<{}, MoveResource>(
-    {
-      aptosConfig,
-      name: "getResource",
-      path: `accounts/${AccountAddress.fromHexInput({
-        input: accountAddress,
-      }).toString()}/resource/${resourceType}`,
-      params: { ledger_version: options?.ledgerVersion },
-    },
-  );
+  const { data } = await getFullNode<{}, MoveResource>({
+    aptosConfig,
+    name: "getResource",
+    path: `accounts/${AccountAddress.fromHexInput({
+      input: accountAddress,
+    }).toString()}/resource/${resourceType}`,
+    params: { ledger_version: options?.ledgerVersion },
+  });
   return data;
 }
 

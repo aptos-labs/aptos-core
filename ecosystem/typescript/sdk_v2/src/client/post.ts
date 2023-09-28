@@ -1,12 +1,12 @@
 import { AptosConfig } from "../api/aptos_config";
-import {AnyNumber, ClientConfig} from "../types";
+import { AnyNumber, ClientConfig } from "../types";
 import { aptosRequest } from "./core";
 import { AptosResponse } from "./types";
-import {AptosApiType} from "../utils/const";
+import { AptosApiType } from "../utils/const";
 
 export type PostRequestOptions = {
   aptosConfig: AptosConfig;
-  type: AptosApiType,
+  type: AptosApiType;
   name: string;
   path: string;
   contentType?: string;
@@ -15,7 +15,7 @@ export type PostRequestOptions = {
   overrides?: ClientConfig;
 };
 
-export type PostFullNodeRequestOptions =  Omit<PostRequestOptions, "type">;
+export type PostFullNodeRequestOptions = Omit<PostRequestOptions, "type">;
 
 /**
  * Main function to do a Post request
@@ -24,30 +24,27 @@ export type PostFullNodeRequestOptions =  Omit<PostRequestOptions, "type">;
  * @param aptosConfig The config information for the SDK client instance
  * @returns
  */
-export async function post<Req, Res>(
-  options: PostRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
+export async function post<Req, Res>(options: PostRequestOptions): Promise<AptosResponse<Req, Res>> {
   const url = options.aptosConfig.getRequestUrl(options.type);
 
   const response: AptosResponse<Req, Res> = await aptosRequest<Req, Res>(
-      {
-        url,
-        method: "POST",
-        name: options.name,
-        path: options.path,
-        contentType: options.contentType,
-        params: options.params,
-        overrides: {
-          ...options.aptosConfig, ...options.overrides
-        }
+    {
+      url,
+      method: "POST",
+      name: options.name,
+      path: options.path,
+      contentType: options.contentType,
+      params: options.params,
+      overrides: {
+        ...options.aptosConfig,
+        ...options.overrides,
       },
-      options.aptosConfig
+    },
+    options.aptosConfig,
   );
   return response;
 }
 
-export async function postFullnode<Req, Res>(
-    options: PostFullNodeRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
-  return post<Req, Res>({...options, type: AptosApiType.FULLNODE});
+export async function postFullnode<Req, Res>(options: PostFullNodeRequestOptions): Promise<AptosResponse<Req, Res>> {
+  return post<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
 }

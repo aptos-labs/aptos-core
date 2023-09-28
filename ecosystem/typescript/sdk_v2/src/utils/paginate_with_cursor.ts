@@ -1,6 +1,4 @@
-import { AptosConfig } from "../api/aptos_config";
-import {get, getFullNode, GetFullNodeRequestOptions} from "../client";
-import { AptosRequest } from "../types";
+import { getFullNode, GetFullNodeRequestOptions } from "../client";
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(
@@ -13,15 +11,13 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
   while (true) {
     requestParams.start = cursor;
     // eslint-disable-next-line no-await-in-loop
-    const response = await getFullNode<Req, Res>(
-      {
-        aptosConfig: options.aptosConfig,
-        name: options.name,
-        path: options.path,
-        params: requestParams,
-        overrides: options.overrides,
-      },
-    );
+    const response = await getFullNode<Req, Res>({
+      aptosConfig: options.aptosConfig,
+      name: options.name,
+      path: options.path,
+      params: requestParams,
+      overrides: options.overrides,
+    });
     // eslint-disable-next-line no-underscore-dangle
     /**
      * the cursor is a "state key" from the API prespective. Client

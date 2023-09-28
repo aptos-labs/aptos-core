@@ -6,10 +6,8 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { get, getFullNode } from "../client";
+import { getFullNode } from "../client";
 import { GasEstimation, PaginationArgs, TransactionResponse } from "../types";
-import { GasEstimation } from "../types";
-import { AptosApiType } from "../utils/const";
 import { paginateWithCursor } from "../utils/paginate_with_cursor";
 
 export async function getTransactions(args: {
@@ -18,12 +16,11 @@ export async function getTransactions(args: {
 }): Promise<TransactionResponse[]> {
   const { aptosConfig, options } = args;
   const data = await paginateWithCursor<{}, TransactionResponse[]>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: "transactions",
-    originMethod: "getTransactions",
+    aptosConfig,
+    name: "getTransactions",
+    path: "transactions",
     params: { start: options?.start, limit: options?.limit },
-    overrides: { ...aptosConfig.clientConfig },
-  }, aptosConfig);
+  });
   return data;
 }
 
