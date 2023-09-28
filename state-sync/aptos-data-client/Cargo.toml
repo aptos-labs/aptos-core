@@ -32,6 +32,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
+ordered-float = { workspace = true }
 # Note: we cannot rely on the workspace version of rand because it's out-of-date
 # and does not provide the necessary interfaces for weighted sampling. Similarly,
 # it's not trivial to update rand on the workspace because of several dependency
