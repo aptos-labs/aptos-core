@@ -4,11 +4,10 @@
 
 #[cfg(feature = "testing")]
 use anyhow::Error;
-use aptos_aggregator::types::AggregatorValue;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::AggregatorID,
+    types::{AggregatorID, AggregatorValue},
 };
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
@@ -37,10 +36,22 @@ use {
     },
     move_vm_runtime::native_extensions::NativeContextExtensions,
     once_cell::sync::Lazy,
+    std::sync::atomic::{AtomicU32, Ordering},
 };
 
 #[cfg(feature = "testing")]
-struct AptosBlankStorage;
+struct AptosBlankStorage {
+    counter: AtomicU32,
+}
+
+#[cfg(feature = "testing")]
+impl AptosBlankStorage {
+    pub fn new() -> Self {
+        Self {
+            counter: AtomicU32::new(0),
+        }
+    }
+}
 
 #[cfg(feature = "testing")]
 impl TAggregatorView for AptosBlankStorage {
@@ -62,6 +73,10 @@ impl TAggregatorView for AptosBlankStorage {
     ) -> anyhow::Result<AggregatorValue> {
         unimplemented!()
     }
+
+    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+        (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
+    }
 }
 
 #[cfg(feature = "testing")]
@@ -76,7 +91,8 @@ impl TableResolver for AptosBlankStorage {
 }
 
 #[cfg(feature = "testing")]
-static DUMMY_RESOLVER: Lazy<AptosBlankStorage> = Lazy::new(|| AptosBlankStorage);
+#[allow(clippy::redundant_closure)]
+static DUMMY_RESOLVER: Lazy<AptosBlankStorage> = Lazy::new(|| AptosBlankStorage::new());
 
 pub fn aptos_natives(
     gas_feature_version: u64,

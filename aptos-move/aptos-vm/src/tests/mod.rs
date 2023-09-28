@@ -4,6 +4,6 @@
 #[cfg(test)]
 mod mock_view;
 #[cfg(test)]
-mod test_resolver_with_aggregator_liftings;
+mod test_resolver_with_identifier_mapping;
 #[cfg(test)]
-mod test_value_exchange;
+mod test_value_to_identifier_mapping;

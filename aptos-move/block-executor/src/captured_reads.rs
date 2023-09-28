@@ -362,6 +362,7 @@ mod test {
         proptest_types::types::{KeyType, MockEvent, ValueType},
         task::Transaction,
     };
+    use aptos_aggregator::types::AggregatorID;
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
@@ -532,7 +533,7 @@ mod test {
 
     impl Transaction for TestTransactionType {
         type Event = MockEvent;
-        type Identifier = ();
+        type Identifier = AggregatorID;
         type Key = KeyType<u32>;
         type Tag = u32;
         type Value = ValueType;

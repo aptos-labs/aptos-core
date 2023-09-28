@@ -6,6 +6,7 @@ use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput}
 use aptos_aggregator::{
     aggregator_change_set::AggregatorChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    types::AggregatorID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -40,6 +41,7 @@ use std::{
         Arc,
     },
 };
+
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -305,7 +307,7 @@ impl<
     > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
-    type Identifier = ();
+    type Identifier = AggregatorID;
     type Key = K;
     type Tag = u32;
     type Value = V;
@@ -560,7 +562,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<K, MoveTypeLayout, ()>,
+        view: &impl TExecutorView<K, MoveTypeLayout, AggregatorID>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,

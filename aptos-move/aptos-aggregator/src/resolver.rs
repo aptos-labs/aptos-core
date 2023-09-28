@@ -80,9 +80,7 @@ pub trait TAggregatorView {
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
-        unimplemented!("ID generation for Aggregator V2 is not yet supported")
-    }
+    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2;
 
     /// Consumes a single delta of aggregator V1, and tries to materialize it
     /// with a given identifier (state key). If materialization succeeds, a
