@@ -124,7 +124,6 @@ use rayon::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::default::Default;
 use std::{
-    borrow::Borrow,
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
@@ -879,7 +878,7 @@ impl AptosDB {
 
     fn save_transactions_validation(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -945,7 +944,7 @@ impl AptosDB {
 
     fn calculate_and_commit_ledger_and_state_kv(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
@@ -998,7 +997,7 @@ impl AptosDB {
 
     fn commit_state_kv_and_ledger_metadata(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
@@ -1009,7 +1008,7 @@ impl AptosDB {
             .start_timer();
         let state_updates_vec = txns_to_commit
             .iter()
-            .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
+            .map(|txn_to_commit| txn_to_commit.state_updates())
             .collect::<Vec<_>>();
 
         let ledger_metadata_batch = SchemaBatch::new();
@@ -1063,7 +1062,7 @@ impl AptosDB {
 
     fn commit_events(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         skip_index: bool,
     ) -> Result<()> {
@@ -1078,7 +1077,7 @@ impl AptosDB {
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.event_store.put_events(
                     first_version + i as u64,
-                    txn_to_commit.borrow().events(),
+                    txn_to_commit.events(),
                     skip_index,
                     &batch,
                 )?;
@@ -1093,7 +1092,7 @@ impl AptosDB {
 
     fn commit_transactions(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         skip_index: bool,
     ) -> Result<()> {
@@ -1111,7 +1110,7 @@ impl AptosDB {
                     |(i, txn_to_commit)| -> Result<()> {
                         self.transaction_store.put_transaction(
                             chunk_first_version + i as u64,
-                            txn_to_commit.borrow().transaction(),
+                            txn_to_commit.transaction(),
                             skip_index,
                             &batch,
                         )?;
@@ -1128,7 +1127,7 @@ impl AptosDB {
 
     fn commit_transaction_accumulator(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: u64,
     ) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -1152,7 +1151,7 @@ impl AptosDB {
 
     fn commit_transaction_infos(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: u64,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -1167,7 +1166,7 @@ impl AptosDB {
                 let version = first_version + i as u64;
                 self.ledger_store.put_transaction_info(
                     version,
-                    txn_to_commit.borrow().transaction_info(),
+                    txn_to_commit.transaction_info(),
                     &batch,
                 )?;
 
@@ -1182,7 +1181,7 @@ impl AptosDB {
 
     fn commit_write_sets(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -1196,7 +1195,7 @@ impl AptosDB {
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.transaction_store.put_write_set(
                     first_version + i as u64,
-                    txn_to_commit.borrow().write_set(),
+                    txn_to_commit.write_set(),
                     &batch,
                 )?;
 
@@ -1303,7 +1302,7 @@ impl AptosDB {
 
     fn post_commit(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -1330,10 +1329,7 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["indexer_index"])
                 .start_timer();
-            let write_sets: Vec<_> = txns_to_commit
-                .iter()
-                .map(|txn| txn.borrow().write_set())
-                .collect();
+            let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
             indexer.index(self.state_store.clone(), first_version, &write_sets)?;
         }
 
@@ -2148,7 +2144,7 @@ impl DbWriter for AptosDB {
     /// Same as save_transactions, but only for a whole block.
     fn save_transaction_block(
         &self,
-        txns_to_commit: &[Arc<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
