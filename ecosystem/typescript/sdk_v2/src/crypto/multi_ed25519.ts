@@ -105,8 +105,10 @@ export class MultiEd25519Signature extends Signature {
   // Bitmap length
   static BITMAP_LEN: number = 4;
 
+  // List of Ed25519Signatures for this MultiEd25519Signature
   public readonly signatures: Ed25519Signature[];
 
+  // The bitmap masks that public key that has signed the message
   public readonly bitmap: Uint8Array;
 
   /**
