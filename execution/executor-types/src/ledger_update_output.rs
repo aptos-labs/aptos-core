@@ -5,12 +5,12 @@
 
 use crate::StateComputeResult;
 use anyhow::{ensure, Result};
-use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
+use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    proof::accumulator::InMemoryAccumulator,
+    proof::accumulator::InMemoryTransactionAccumulator,
     state_store::ShardedStateUpdates,
     transaction::{Transaction, TransactionStatus, TransactionToCommit},
 };
@@ -26,13 +26,11 @@ pub struct LedgerUpdateOutput {
     pub sharded_state_cache: ShardedStateCache,
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
-    pub transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+    pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
 }
 
 impl LedgerUpdateOutput {
-    pub fn new_empty(
-        transaction_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
-    ) -> Self {
+    pub fn new_empty(transaction_accumulator: Arc<InMemoryTransactionAccumulator>) -> Self {
         Self {
             transaction_accumulator,
             ..Default::default()
@@ -46,7 +44,7 @@ impl LedgerUpdateOutput {
         }
     }
 
-    pub fn txn_accumulator(&self) -> &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>> {
+    pub fn txn_accumulator(&self) -> &Arc<InMemoryTransactionAccumulator> {
         &self.transaction_accumulator
     }
 
@@ -71,7 +69,7 @@ impl LedgerUpdateOutput {
 
     pub fn as_state_compute_result(
         &self,
-        parent_accumulator: &Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+        parent_accumulator: &Arc<InMemoryTransactionAccumulator>,
         next_epoch_state: Option<EpochState>,
     ) -> StateComputeResult {
         let txn_accu = self.txn_accumulator();

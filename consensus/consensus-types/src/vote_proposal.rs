@@ -7,7 +7,7 @@ use aptos_crypto::hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_H
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     epoch_state::EpochState,
-    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof},
+    proof::{accumulator::InMemoryTransactionAccumulator, AccumulatorExtensionProof},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -73,7 +73,7 @@ impl VoteProposal {
     /// Attention: this function itself does not verify the proof.
     fn vote_data_with_extension_proof(
         &self,
-        new_tree: &InMemoryAccumulator<TransactionAccumulatorHasher>,
+        new_tree: &InMemoryTransactionAccumulator,
     ) -> VoteData {
         VoteData::new(
             self.block().gen_block_info(

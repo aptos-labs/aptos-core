@@ -10,9 +10,7 @@ use crate::{
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
-    proof::{
-        accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
-    },
+    proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
     transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
@@ -21,7 +19,7 @@ use crate::{
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
     ed25519::*,
-    hash::{CryptoHash, EventAccumulatorHasher},
+    hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
     secp256k1_ecdsa,
     traits::{signing_message, SigningKey},
@@ -49,7 +47,7 @@ mod transaction_argument;
 
 use crate::{
     contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
-    write_set::TransactionWrite,
+    proof::accumulator::InMemoryEventAccumulator, write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
@@ -877,8 +875,7 @@ impl TransactionWithProof {
         if let Some(events) = &self.events {
             let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
             let event_root_hash =
-                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes[..])
-                    .root_hash();
+                InMemoryEventAccumulator::from_leaves(&event_hashes[..]).root_hash();
             ensure!(
                 event_root_hash == self.proof.transaction_info().event_root_hash(),
                 "Event root hash ({}) not expected ({}).",
@@ -1193,8 +1190,7 @@ impl TransactionOutput {
             .iter()
             .map(CryptoHash::hash)
             .collect::<Vec<_>>();
-        let event_root_hash =
-            InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
+        let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash;
         ensure!(
             event_root_hash == txn_info.event_root_hash(),
             "{}: version:{}, event_root_hash:{:?}, expected:{:?}, events: {:?}, expected(if known): {:?}",
@@ -1678,8 +1674,7 @@ fn verify_events_against_root_hash(
     transaction_info: &TransactionInfo,
 ) -> Result<()> {
     let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
-    let event_root_hash =
-        InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash();
+    let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
     ensure!(
         event_root_hash == transaction_info.event_root_hash(),
         "The event root hash calculated doesn't match that carried on the \

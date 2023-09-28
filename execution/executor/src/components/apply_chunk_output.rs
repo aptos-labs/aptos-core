@@ -12,10 +12,7 @@ use crate::{
     metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
 };
 use anyhow::{ensure, Result};
-use aptos_crypto::{
-    hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher},
-    HashValue,
-};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
@@ -27,7 +24,7 @@ use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    proof::accumulator::InMemoryAccumulator,
+    proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     state_store::ShardedStateUpdates,
     transaction::{
         ExecutionStatus, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
@@ -106,7 +103,7 @@ impl ApplyChunkOutput {
 
     pub fn calculate_ledger_update(
         state_checkpoint_output: StateCheckpointOutput,
-        base_txn_accumulator: Arc<InMemoryAccumulator<TransactionAccumulatorHasher>>,
+        base_txn_accumulator: Arc<InMemoryTransactionAccumulator>,
     ) -> Result<(LedgerUpdateOutput, Vec<Transaction>, Vec<Transaction>)> {
         let (
             txns,
@@ -319,8 +316,7 @@ impl ApplyChunkOutput {
             .into_par_iter()
             .map(|(event_hashes, write_set_hash)| {
                 (
-                    InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes)
-                        .root_hash(),
+                    InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash(),
                     write_set_hash,
                 )
             })
