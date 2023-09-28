@@ -19,7 +19,7 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
         url: options.url,
         path: options.path,
         params: requestParams,
-        originMethod: options.originMethod,
+        name: options.name,
         overrides: options.overrides,
       },
       aptosConfig,
