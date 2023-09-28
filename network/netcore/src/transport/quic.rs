@@ -41,9 +41,9 @@ impl QuicTransport {}
 impl Transport for QuicTransport {
     type Error = ::std::io::Error;
     type Inbound = future::Ready<io::Result<Self::Output>>;
-    type Listener = QuicListenerStream;
-    type Outbound = QuicOutbound;
-    type Output = QuicSocket;
+    type Listener = QuicConnectionStream;
+    type Outbound = QuicOutboundConnection;
+    type Output = QuicConnection;
 
     fn listen_on(
         &self,
@@ -64,10 +64,10 @@ impl Transport for QuicTransport {
         // Get the listen address
         let listen_addr = NetworkAddress::from(server_endpoint.local_addr()?);
 
-        // Create the QUIC listener stream
-        let quic_listener_stream = QuicListenerStream::new(server_endpoint);
+        // Create the QUIC connection stream
+        let quic_connection_stream = QuicConnectionStream::new(server_endpoint);
 
-        Ok((quic_listener_stream, listen_addr))
+        Ok((quic_connection_stream, listen_addr))
     }
 
     fn dial(&self, _peer_id: PeerId, addr: NetworkAddress) -> Result<Self::Outbound, Self::Error> {
@@ -106,13 +106,13 @@ impl Transport for QuicTransport {
                 })
         };
 
-        let f: Pin<Box<dyn Future<Output = io::Result<QuicSocket>> + Send + 'static>> =
+        let f: Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>> =
             Box::pin(match proxy_addr {
                 Some(proxy_addr) => Either::Left(connect_via_proxy(proxy_addr, addr)),
                 None => Either::Right(resolve_and_connect(addr)),
             });
 
-        Ok(QuicOutbound { inner: f })
+        Ok(QuicOutboundConnection { inner: f })
     }
 }
 
@@ -157,12 +157,12 @@ pub async fn connect_to_remote(
 
 /// Note: we need to take ownership of this `NetworkAddress` (instead of just
 /// borrowing the `&[Protocol]` slice) so this future can be `Send + 'static`.
-pub async fn resolve_and_connect(addr: NetworkAddress) -> io::Result<QuicSocket> {
+pub async fn resolve_and_connect(addr: NetworkAddress) -> io::Result<QuicConnection> {
     // Open a connection to the remote server
     let connection = open_connection_to_remote(addr).await?;
 
     // Create the QUIC socket
-    QuicSocket::new(connection).await
+    QuicConnection::new(connection).await
 }
 
 /// Attempts to connect to the remote address
@@ -200,7 +200,10 @@ async fn open_connection_to_remote(addr: NetworkAddress) -> io::Result<quinn::Co
     }
 }
 
-async fn connect_via_proxy(_proxy_addr: String, _addr: NetworkAddress) -> io::Result<QuicSocket> {
+async fn connect_via_proxy(
+    _proxy_addr: String,
+    _addr: NetworkAddress,
+) -> io::Result<QuicConnection> {
     unimplemented!("CONNECT VIA PROXY!!")
 }
 
@@ -213,51 +216,70 @@ fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
 
 #[must_use = "streams do nothing unless polled"]
 #[allow(dead_code)]
-pub struct QuicListenerStream {
-    server_endpoint: quinn::Endpoint,
+pub struct QuicConnectionStream {
+    server_endpoint: Pin<Box<quinn::Endpoint>>,
     pending_connections: Pin<Box<FuturesUnordered<Connecting>>>,
-    pending_quic_sockets: Pin<Box<FuturesUnordered<PendingQuicSocket>>>,
+    pending_quic_connections: Pin<Box<FuturesUnordered<PendingQuicConnection>>>,
 }
 
-impl QuicListenerStream {
+impl QuicConnectionStream {
     pub fn new(server_endpoint: quinn::Endpoint) -> Self {
         Self {
-            server_endpoint,
+            server_endpoint: Box::pin(server_endpoint),
             pending_connections: Box::pin(FuturesUnordered::new()),
-            pending_quic_sockets: Box::pin(FuturesUnordered::new()),
+            pending_quic_connections: Box::pin(FuturesUnordered::new()),
         }
     }
 }
 
-impl Stream for QuicListenerStream {
-    type Item = io::Result<(future::Ready<io::Result<QuicSocket>>, NetworkAddress)>;
+impl Stream for QuicConnectionStream {
+    type Item = io::Result<(future::Ready<io::Result<QuicConnection>>, NetworkAddress)>;
 
-    fn poll_next(self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
-        // Check if there are any new QUIC sockets that are ready
-        if let Poll::Ready(Some(Ok(quic_socket))) =
-            self.pending_quic_sockets.as_mut().poll_next(context)
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
+        // Check if there are any new QUIC connections that are ready
+        if let Poll::Ready(Some(Ok(quic_connection))) =
+            self.pending_quic_connections.as_mut().poll_next(context)
         {
             // Get the remote address
-            let remote_address = NetworkAddress::from(quic_socket.connection.remote_address());
+            let remote_address = NetworkAddress::from(quic_connection.connection.remote_address());
 
-            // Return the QUIC socket and remote address
-            return Poll::Ready(Some(Ok((future::ready(Ok(quic_socket)), remote_address))));
+            // Return the QUIC connection and remote address
+            return Poll::Ready(Some(Ok((
+                future::ready(Ok(quic_connection)),
+                remote_address,
+            ))));
         }
 
         // Check if there are any new pending connections to accept
-        if let Poll::Ready(Some(connecting)) = self.server_endpoint.accept().poll() {
+        /*
+        let this = self.as_mut();
+        let server_accept = this.server_endpoint.accept();
+        futures::pin_mut!(server_accept);
+        let connecting = if let Poll::Ready(Some(connecting)) = server_accept.poll(context) {
+            Some(connecting)
+        } else {
+            None
+        };
+        if let Some(pending_connection) = connecting {
             // Add the new connection to list of pending connections
-            self.pending_connections.push(connecting);
+            this.pending_connections.as_mut().push(pending_connection);
+        }
+         */
+
+        // Check if there are any new pending connections to accept
+        if let Poll::Ready(Some(pending_connection)) = self.server_accept.as_mut().poll(context) {
+            // Add the new connection to list of pending connections
+            self.pending_connections.as_mut().push(pending_connection);
         }
 
         // Poll the pending connections to see if any of them are ready
         match self.pending_connections.as_mut().poll_next(context) {
             Poll::Ready(Some(Ok(connection))) => {
                 // Create the pending QUIC socket
-                let pending_quic_socket = PendingQuicSocket::new(connection);
+                let pending_quic_socket = PendingQuicConnection::new(connection);
 
                 // Add the new pending QUIC socket to the list of pending QUIC sockets
-                self.pending_quic_sockets.push(pending_quic_socket);
+                self.pending_quic_connections.push(pending_quic_socket);
 
                 // We're still waiting
                 Poll::Pending
@@ -281,43 +303,51 @@ impl Stream for QuicListenerStream {
 }
 
 #[must_use = "futures do nothing unless polled"]
-pub struct QuicOutbound {
-    inner: Pin<Box<dyn Future<Output = io::Result<QuicSocket>> + Send + 'static>>,
+pub struct QuicOutboundConnection {
+    inner: Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>>,
 }
 
-impl Future for QuicOutbound {
-    type Output = io::Result<QuicSocket>;
+impl Future for QuicOutboundConnection {
+    type Output = io::Result<QuicConnection>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        let quic_socket = ready!(Pin::new(&mut self.inner).poll(context))?;
-        Poll::Ready(Ok(quic_socket))
+        let quic_connection = ready!(Pin::new(&mut self.inner).poll(context))?;
+        Poll::Ready(Ok(quic_connection))
     }
 }
 
-/// A wrapper around a quinn Connection that represents a pending QuicSocket
+/// A set of pending QUIC connections
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct PendingQuicSocket {
-    pending_quic_sockets: Pin<Box<FuturesUnordered<io::Result<QuicSocket>>>>,
+pub struct PendingQuicConnection {
+    pending_quic_connections: Pin<
+        Box<
+            FuturesUnordered<
+                Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>>,
+            >,
+        >,
+    >,
 }
 
-impl PendingQuicSocket {
-    pub fn new(quic_connection: quinn::Connection) -> Self {
-        let pending_quic_sockets = Box::pin(FuturesUnordered::new());
-        pending_quic_sockets.push(QuicSocket::new(quic_connection));
+impl PendingQuicConnection {
+    pub fn new(connection: quinn::Connection) -> Self {
+        let pending_quic_connections = Box::pin(FuturesUnordered::new());
+        let future: Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>> =
+            Box::pin(create_quic_connection(connection));
+        pending_quic_connections.push(future);
         Self {
-            pending_quic_sockets,
+            pending_quic_connections,
         }
     }
 }
 
-impl Future for PendingQuicSocket {
-    type Output = io::Result<QuicSocket>;
+impl Future for PendingQuicConnection {
+    type Output = io::Result<QuicConnection>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        // Poll the pending QUIC sockets to see if any of them are ready
-        match self.pending_quic_sockets.as_mut().poll_next(context) {
-            Poll::Ready(Some(Ok(quic_socket))) => Poll::Ready(Ok(quic_socket)),
+        // Poll the pending QUIC connections to see if any of them are ready
+        match self.pending_quic_connections.as_mut().poll_next(context) {
+            Poll::Ready(Some(Ok(quic_connection))) => Poll::Ready(Ok(quic_connection)),
             Poll::Ready(Some(Err(error))) => {
                 // Something went wrong!
                 let error = io::Error::new(
@@ -335,16 +365,21 @@ impl Future for PendingQuicSocket {
     }
 }
 
+async fn create_quic_connection(connection: quinn::Connection) -> io::Result<QuicConnection> {
+    // Create the QUIC connection
+    Ok(QuicConnection::new(connection).await?)
+}
+
 /// A wrapper around a quinn Connection that implements the AsyncRead/AsyncWrite traits
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct QuicSocket {
+pub struct QuicConnection {
     connection: quinn::Connection,
     send_streams: Vec<Compat<quinn::SendStream>>,
     recv_streams: Vec<Compat<quinn::RecvStream>>,
 }
 
-impl QuicSocket {
+impl QuicConnection {
     pub async fn new(connection: quinn::Connection) -> io::Result<Self> {
         // Open several connection streams
         let mut send_streams = vec![];
@@ -355,7 +390,7 @@ impl QuicSocket {
             recv_streams.push(recv_stream.compat());
         }
 
-        // Create the QUIC socket
+        // Create the QUIC connection
         Ok(Self {
             connection,
             send_streams,
@@ -364,7 +399,7 @@ impl QuicSocket {
     }
 }
 
-impl AsyncRead for QuicSocket {
+impl AsyncRead for QuicConnection {
     fn poll_read(
         mut self: Pin<&mut Self>,
         context: &mut Context,
@@ -376,7 +411,7 @@ impl AsyncRead for QuicSocket {
     }
 }
 
-impl AsyncWrite for QuicSocket {
+impl AsyncWrite for QuicConnection {
     fn poll_write(
         mut self: Pin<&mut Self>,
         context: &mut Context,
