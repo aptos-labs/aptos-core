@@ -16,7 +16,7 @@ use futures::{
     stream::FuturesUnordered,
     Stream,
 };
-use quinn::{ClientConfig, Connecting, ServerConfig};
+use quinn::{ClientConfig, Connecting, IdleTimeout, ServerConfig, TransportConfig, VarInt};
 use std::{
     fmt::Debug,
     io,
@@ -70,7 +70,7 @@ impl Transport for QuicTransport {
         let server_endpoint = quinn::Endpoint::server(server_config, socket_addr)?;
 
         // Get the listen address
-        let listen_addr = NetworkAddress::from(server_endpoint.local_addr()?);
+        let listen_addr = NetworkAddress::from_udp(server_endpoint.local_addr()?);
 
         // Save the server endpoint
         self.server_endpoint = Some(server_endpoint.clone());
@@ -172,8 +172,8 @@ pub async fn resolve_and_connect(addr: NetworkAddress) -> io::Result<QuicConnect
     // Open a connection to the remote server
     let connection = open_connection_to_remote(addr).await?;
 
-    // Create the QUIC socket
-    QuicConnection::new(connection).await
+    // Create the QUIC connection
+    create_quic_connection(connection).await
 }
 
 /// Attempts to connect to the remote address
@@ -247,10 +247,14 @@ impl Stream for QuicConnectionStream {
     type Item = io::Result<(future::Ready<io::Result<QuicConnection>>, NetworkAddress)>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
+        println!("(QuicConnectionStream) Polling Next PendingQuicConnection");
+
         // Check if there are any new pending connections to accept
         let server_endpoint = self.server_endpoint.clone();
         let mut server_accept = Box::pin(server_endpoint.accept());
         if let Poll::Ready(Some(pending_connection)) = server_accept.as_mut().poll(context) {
+            println!("(QuicConnectionStream) Got a new pending connection!");
+
             // Add the new pending connection to the list of pending connections
             self.pending_connections.as_mut().push(pending_connection);
         }
@@ -259,19 +263,24 @@ impl Stream for QuicConnectionStream {
         if let Poll::Ready(Some(Ok(connection))) =
             self.pending_connections.as_mut().poll_next(context)
         {
-            // Create the pending QUIC socket
-            let pending_quic_socket = PendingQuicConnection::new(connection);
+            println!("(QuicConnectionStream) Got a new pending QUIC connection!");
 
-            // Add the new pending QUIC socket to the list of pending QUIC sockets
-            self.pending_quic_connections.push(pending_quic_socket);
+            // Create the pending QUIC connection
+            let pending_quic_connection = PendingQuicConnection::new(connection);
+
+            // Add the new pending QUIC connection to the list of pending QUIC connections
+            self.pending_quic_connections.push(pending_quic_connection);
         }
 
         // Check if there are any pending QUIC connections that are now ready
         if let Poll::Ready(Some(Ok(quic_connection))) =
             self.pending_quic_connections.as_mut().poll_next(context)
         {
+            println!("(QuicConnectionStream) Got a new and ready QUIC connection!");
+
             // Get the remote address
-            let remote_address = NetworkAddress::from(quic_connection.connection.remote_address());
+            let remote_address =
+                NetworkAddress::from_udp(quic_connection.connection.remote_address());
 
             // Return the QUIC connection and remote address
             return Poll::Ready(Some(Ok((
@@ -327,10 +336,17 @@ impl Future for PendingQuicConnection {
     type Output = io::Result<QuicConnection>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
+        println!("(PendingQuicConnection) Polling PendingQuicConnection");
+
         // Poll the pending QUIC connections to see if any of them are ready
         match self.pending_quic_connections.as_mut().poll_next(context) {
-            Poll::Ready(Some(Ok(quic_connection))) => Poll::Ready(Ok(quic_connection)),
+            Poll::Ready(Some(Ok(quic_connection))) => {
+                println!("(PendingQuicConnection) Got a new and ready QUIC connection!");
+                Poll::Ready(Ok(quic_connection))
+            },
             Poll::Ready(Some(Err(error))) => {
+                println!("(PendingQuicConnection) Got an error: {:?}", error);
+
                 // Something went wrong!
                 let error = io::Error::new(
                     io::ErrorKind::Other,
@@ -338,10 +354,14 @@ impl Future for PendingQuicConnection {
                 );
                 Poll::Ready(Err(error))
             },
-            Poll::Ready(None) => Poll::Ready(Err(io::Error::new(
-                io::ErrorKind::Other,
-                "No pending QUIC sockets!",
-            ))),
+            Poll::Ready(None) => {
+                println!("(PendingQuicConnection) Got None!");
+
+                Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "No pending QUIC connections!",
+                )))
+            },
             Poll::Pending => Poll::Pending,
         }
     }
@@ -349,7 +369,18 @@ impl Future for PendingQuicConnection {
 
 async fn create_quic_connection(connection: quinn::Connection) -> io::Result<QuicConnection> {
     // Create the QUIC connection
-    QuicConnection::new(connection).await
+    let remote_address = connection.remote_address();
+
+    println!(
+        "Creating QUIC connection from QUINN connection: {:?}",
+        remote_address
+    );
+
+    let connection = QuicConnection::new(connection).await;
+
+    println!("Got QUIC connection for: {:?}", remote_address);
+
+    connection
 }
 
 /// A wrapper around a quinn Connection that implements the AsyncRead/AsyncWrite traits
@@ -366,7 +397,7 @@ impl QuicConnection {
         // Open several connection streams
         let mut send_streams = vec![];
         let mut recv_streams = vec![];
-        for _ in 0..3 {
+        for _ in 0..1 {
             let (send_stream, recv_stream) = connection.open_bi().await?;
             send_streams.push(send_stream.compat_write());
             recv_streams.push(recv_stream.compat());
@@ -389,7 +420,14 @@ impl AsyncRead for QuicConnection {
     ) -> Poll<io::Result<usize>> {
         // TODO: read from multiple streams?
         let recv_stream = self.recv_streams.first_mut().unwrap();
-        Pin::new(recv_stream).poll_read(context, buf)
+
+        let result = Pin::new(recv_stream).poll_read(context, buf);
+        println!(
+            "(Remote: {:?}) Polling Read. Result: {:?}",
+            self.connection.remote_address(),
+            result
+        );
+        result
     }
 }
 
@@ -401,19 +439,40 @@ impl AsyncWrite for QuicConnection {
     ) -> Poll<io::Result<usize>> {
         // TODO: write to multiple streams?
         let send_stream = self.send_streams.first_mut().unwrap();
-        Pin::new(send_stream).poll_write(context, buf)
+
+        let result = Pin::new(send_stream).poll_write(context, buf);
+        println!(
+            "(Remote: {:?}) Polling Write. Result: {:?}",
+            self.connection.remote_address(),
+            result
+        );
+        result
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
         // TODO: flush all streams?
         let send_stream = self.send_streams.first_mut().unwrap();
-        Pin::new(send_stream).poll_flush(context)
+
+        let result = Pin::new(send_stream).poll_flush(context);
+        println!(
+            "(Remote: {:?}) Polling Flush. Result: {:?}",
+            self.connection.remote_address(),
+            result
+        );
+        result
     }
 
     fn poll_close(mut self: Pin<&mut Self>, _context: &mut Context) -> Poll<io::Result<()>> {
         // TODO: close all streams?
         let send_stream = self.send_streams.first_mut().unwrap();
-        Pin::new(send_stream).poll_close(_context)
+
+        let result = Pin::new(send_stream).poll_close(_context);
+        println!(
+            "(Remote: {:?}) Polling Close. Result: {:?}",
+            self.connection.remote_address(),
+            result
+        );
+        result
     }
 }
 
@@ -448,8 +507,23 @@ fn configure_client() -> ClientConfig {
         .with_custom_certificate_verifier(SkipServerVerification::new())
         .with_no_client_auth();
 
+    // Create the client transport config
+    let transport_config = create_transport_config();
+
     // Create the QUIC client configuration
-    ClientConfig::new(Arc::new(crypto_config))
+    let mut client = ClientConfig::new(Arc::new(crypto_config));
+    client.transport_config(transport_config);
+    client
+}
+
+/// Returns a new transport config
+fn create_transport_config() -> Arc<TransportConfig> {
+    let mut transport_config = quinn::TransportConfig::default();
+
+    transport_config.max_idle_timeout(Some(IdleTimeout::from(VarInt::from_u32(20_000)))); // 20 secs
+    transport_config.keep_alive_interval(Some(std::time::Duration::from_secs(20))); // 20 secs
+
+    Arc::new(transport_config)
 }
 
 /// Returns the default server configuration along with its dummy certificate
@@ -461,13 +535,18 @@ fn configure_server() -> io::Result<(ServerConfig, Vec<u8>)> {
     let priv_key = rustls::PrivateKey(priv_key);
     let cert_chain = vec![rustls::Certificate(cert_der.clone())];
 
+    // Create the server transport config
+    let transport_config = create_transport_config();
+
     // Create the QUIC server configuration
-    let server_config = ServerConfig::with_single_cert(cert_chain, priv_key).map_err(|error| {
-        io::Error::new(
-            io::ErrorKind::Other,
-            format!("Invalid server certificate: {:?}", error),
-        )
-    })?;
+    let mut server_config =
+        ServerConfig::with_single_cert(cert_chain, priv_key).map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Invalid server certificate: {:?}", error),
+            )
+        })?;
+    server_config.transport_config(transport_config);
 
     Ok((server_config, cert_der))
 }
@@ -486,18 +565,51 @@ mod test {
 
     #[tokio::test]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
-        let mut t = QuicTransport::default().and_then(|mut out, _addr, origin| async move {
+        let mut t = QuicTransport::new().and_then(|mut out, addr, origin| async move {
+            println!(
+                "(simple_listen_and_dial: {:?}) Got a new connection! Addr: {:?}",
+                origin, addr
+            );
             match origin {
                 ConnectionOrigin::Inbound => {
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing data!",
+                        origin, addr
+                    );
                     out.write_all(b"Earth").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading data!",
+                        origin, addr
+                    );
                     let mut buf = [0; 3];
                     out.read_exact(&mut buf).await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Verifying data: {:?}",
+                        origin, addr, buf
+                    );
                     assert_eq!(&buf, b"Air");
                 },
                 ConnectionOrigin::Outbound => {
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading data!",
+                        origin, addr
+                    );
+
                     let mut buf = [0; 5];
                     out.read_exact(&mut buf).await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Verifying data: {:?}",
+                        origin, addr, buf
+                    );
                     assert_eq!(&buf, b"Earth");
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing data!",
+                        origin, addr
+                    );
                     out.write_all(b"Air").await?;
                 },
             }
@@ -508,6 +620,10 @@ mod test {
         let peer_id = PeerId::random();
         let dial = t.dial(peer_id, addr)?;
         let listener = listener.into_future().then(|(maybe_result, _stream)| {
+            println!(
+                "In listener future! Maybe result: {:?}",
+                maybe_result.is_some()
+            );
             let (incoming, _addr) = maybe_result.unwrap().unwrap();
             incoming.map(Result::unwrap)
         });
