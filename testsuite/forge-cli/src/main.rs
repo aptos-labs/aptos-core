@@ -589,6 +589,7 @@ fn single_test_suite(
         "gather_metrics" => gather_metrics(),
         "net_bench" => net_bench(),
         "net_bench_two_region_env" => net_bench_two_region_env(),
+        "net_bench_two_region_env_small_messages" => net_bench_two_region_env_small_messages(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1367,12 +1368,21 @@ fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.direct_send_per_second = 1000;
 }
 
-fn netbench_config_4_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_5_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
     netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 40;
+    netbench_config.direct_send_per_second = 50;
+}
+
+/// Currently sending 16 MB/s outbound gets 12 MB/s inbound.
+fn netbench_config_16_megabytes_per_sec_large_messages(netbench_config: &mut NetbenchConfig) {
+    netbench_config.enabled = true;
+    netbench_config.max_network_channel_size = 1000;
+    netbench_config.enable_direct_send_testing = true;
+    netbench_config.direct_send_data_size = 1000000;
+    netbench_config.direct_send_per_second = 16;
 }
 
 fn net_bench() -> ForgeConfig {
@@ -1386,16 +1396,29 @@ fn net_bench() -> ForgeConfig {
         }))
 }
 
-fn net_bench_two_region_env() -> ForgeConfig {
+fn net_bench_two_region_inner(
+    netbench_config_fn: Arc<dyn Fn(&mut NetbenchConfig) + Send + Sync>,
+) -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(wrap_with_two_region_env(Delay::new(180)))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            // Not using 100 MBps here, as it will lead to throughput collapse
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            // Use a target that is not too much higher than the achievable throughput, to avoid
+            // throughput collapse
             let mut netbench_config = NetbenchConfig::default();
-            netbench_config_4_megabytes_per_sec(&mut netbench_config);
+            netbench_config_fn(&mut netbench_config);
             config.netbench = Some(netbench_config);
         }))
+}
+
+fn net_bench_two_region_env() -> ForgeConfig {
+    net_bench_two_region_inner(Arc::new(
+        netbench_config_16_megabytes_per_sec_large_messages,
+    ))
+}
+
+fn net_bench_two_region_env_small_messages() -> ForgeConfig {
+    net_bench_two_region_inner(Arc::new(netbench_config_5_megabytes_per_sec_small_messages))
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
