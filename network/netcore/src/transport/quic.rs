@@ -16,11 +16,13 @@ use futures::{
     stream::FuturesUnordered,
     Stream,
 };
-use quinn::{ClientConfig, Connecting, IdleTimeout, ServerConfig, TransportConfig, VarInt};
+use quinn::{
+    ClientConfig, Connecting, Endpoint, IdleTimeout, ServerConfig, TransportConfig, VarInt,
+};
 use std::{
     fmt::Debug,
     io,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -65,9 +67,7 @@ impl Transport for QuicTransport {
         }
 
         // Create the QUIC server endpoint. This will call bind on the socket addr.
-        let (server_config, _server_certificate) = configure_server()?;
-        let socket_addr = SocketAddr::new(ipaddr, port);
-        let server_endpoint = quinn::Endpoint::server(server_config, socket_addr)?;
+        let server_endpoint = create_server_endpoint(ipaddr, port)?;
 
         // Get the listen address
         let listen_addr = NetworkAddress::from_udp(server_endpoint.local_addr()?);
@@ -142,19 +142,13 @@ pub async fn connect_to_remote(
     port: u16,
     remote_ipaddr: std::net::IpAddr,
 ) -> io::Result<quinn::Connection> {
-    // Create the QUIC client endpoint. This will call bind on 127.0.0.1.
-    let mut client_endpoint =
-        quinn::Endpoint::client("127.0.0.1:0".parse().unwrap()).map_err(|error| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("could not create client endpoint: {:?}", error),
-            )
-        })?;
-    client_endpoint.set_default_client_config(configure_client());
+    // Create the QUIC server endpoint. This will call bind on localhost.
+    let ipaddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+    let server_endpoint = create_server_endpoint(ipaddr, 0)?;
 
     // Connect to the remote server
     let socket_addr = SocketAddr::new(remote_ipaddr, port);
-    let connecting = client_endpoint
+    let connecting = server_endpoint
         .connect(socket_addr, SERVER_STRING)
         .map_err(|error| {
             io::Error::new(
@@ -388,26 +382,21 @@ async fn create_quic_connection(connection: quinn::Connection) -> io::Result<Qui
 #[allow(dead_code)]
 pub struct QuicConnection {
     connection: quinn::Connection,
-    send_streams: Vec<Compat<quinn::SendStream>>,
-    recv_streams: Vec<Compat<quinn::RecvStream>>,
+    send_stream: Compat<quinn::SendStream>,
+    recv_stream: Option<Compat<quinn::RecvStream>>,
 }
 
 impl QuicConnection {
     pub async fn new(connection: quinn::Connection) -> io::Result<Self> {
-        // Open several connection streams
-        let mut send_streams = vec![];
-        let mut recv_streams = vec![];
-        for _ in 0..1 {
-            let (send_stream, recv_stream) = connection.open_bi().await?;
-            send_streams.push(send_stream.compat_write());
-            recv_streams.push(recv_stream.compat());
-        }
+        // Open a uni-directional stream
+        let send_stream = connection.open_uni().await?;
+        println!("(Remote: {:?}) Opened a new send stream: {:?}", connection.remote_address(), send_stream.priority());
 
         // Create the QUIC connection
         Ok(Self {
             connection,
-            send_streams,
-            recv_streams,
+            send_stream: send_stream.compat_write(),
+            recv_stream: None,
         })
     }
 }
@@ -418,16 +407,37 @@ impl AsyncRead for QuicConnection {
         context: &mut Context,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        // TODO: read from multiple streams?
-        let recv_stream = self.recv_streams.first_mut().unwrap();
-
-        let result = Pin::new(recv_stream).poll_read(context, buf);
         println!(
-            "(Remote: {:?}) Polling Read. Result: {:?}",
+            "(Remote: {:?}) Polling Read. Recv Stream: {:?}",
             self.connection.remote_address(),
-            result
+            self.recv_stream.is_some(),
         );
-        result
+
+        // If there is no recv stream, then accept a new stream from the remote
+        if self.recv_stream.is_none() {
+            let connection = self.connection.clone();
+            let mut uni_accept = Box::pin(connection.accept_uni());
+            if let Poll::Ready(Ok(recv_stream)) = uni_accept.as_mut().poll(context) {
+                println!(
+                    "(Remote: {:?}) Got a new recv stream!",
+                    self.connection.remote_address(),
+                );
+                self.recv_stream = Some(recv_stream.compat());
+            }
+        }
+
+        // Otherwise, read from the existing stream
+        if let Some(recv_stream) = &mut self.recv_stream {
+            let result = Pin::new(recv_stream).poll_read(context, buf);
+            println!(
+                "(Remote: {:?}) Polling Read. Result: {:?}",
+                self.connection.remote_address(),
+                result
+            );
+            return result;
+        }
+
+        Poll::Pending
     }
 }
 
@@ -438,7 +448,7 @@ impl AsyncWrite for QuicConnection {
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         // TODO: write to multiple streams?
-        let send_stream = self.send_streams.first_mut().unwrap();
+        let send_stream = &mut self.send_stream;
 
         let result = Pin::new(send_stream).poll_write(context, buf);
         println!(
@@ -451,7 +461,7 @@ impl AsyncWrite for QuicConnection {
 
     fn poll_flush(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<io::Result<()>> {
         // TODO: flush all streams?
-        let send_stream = self.send_streams.first_mut().unwrap();
+        let send_stream = &mut self.send_stream;
 
         let result = Pin::new(send_stream).poll_flush(context);
         println!(
@@ -464,7 +474,7 @@ impl AsyncWrite for QuicConnection {
 
     fn poll_close(mut self: Pin<&mut Self>, _context: &mut Context) -> Poll<io::Result<()>> {
         // TODO: close all streams?
-        let send_stream = self.send_streams.first_mut().unwrap();
+        let send_stream = &mut self.send_stream;
 
         let result = Pin::new(send_stream).poll_close(_context);
         println!(
@@ -551,6 +561,22 @@ fn configure_server() -> io::Result<(ServerConfig, Vec<u8>)> {
     Ok((server_config, cert_der))
 }
 
+/// Creates a QUIC server endpoint
+fn create_server_endpoint(
+    ipaddr: IpAddr,
+    port: u16,
+) -> Result<Endpoint, <QuicTransport as Transport>::Error> {
+    // Create the QUIC server configuration
+    let (server_config, _server_certificate) = configure_server()?;
+
+    // Create the QUIC server endpoint
+    let socket_addr = SocketAddr::new(ipaddr, port);
+    let mut server_endpoint = quinn::Endpoint::server(server_config, socket_addr)?;
+    server_endpoint.set_default_client_config(configure_client()); // Required to skip certificate verification
+
+    Ok(server_endpoint)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -561,9 +587,10 @@ mod test {
         io::{AsyncReadExt, AsyncWriteExt},
         StreamExt,
     };
-    use tokio::runtime::Runtime;
+    use std::time::Duration;
+    use tokio::{runtime::Runtime, time::timeout};
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
         let mut t = QuicTransport::new().and_then(|mut out, addr, origin| async move {
             println!(
@@ -573,44 +600,99 @@ mod test {
             match origin {
                 ConnectionOrigin::Inbound => {
                     println!(
-                        "(simple_listen_and_dial: {:?}, {:?}) Writing data!",
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading hello packet!",
                         origin, addr
                     );
-                    out.write_all(b"Earth").await?;
-
-                    println!(
-                        "(simple_listen_and_dial: {:?}, {:?}) Reading data!",
-                        origin, addr
-                    );
-                    let mut buf = [0; 3];
+                    let mut buf = [0; 1];
                     out.read_exact(&mut buf).await?;
+                    assert_eq!(&buf, b"H");
 
                     println!(
-                        "(simple_listen_and_dial: {:?}, {:?}) Verifying data: {:?}",
-                        origin, addr, buf
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading hello2 packet!",
+                        origin, addr
                     );
-                    assert_eq!(&buf, b"Air");
+                    let mut buf = [0; 2];
+                    out.read_exact(&mut buf).await?;
+                    assert_eq!(&buf, b"HH");
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing first data packet!",
+                        origin, addr
+                    );
+                    out.write_all(b"EEE").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing second data packet!",
+                        origin, addr
+                    );
+                    out.write_all(b"FFFF").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading third data packet!",
+                        origin, addr
+                    );
+                    let mut buf = [0; 5];
+                    out.read_exact(&mut buf).await?;
+                    assert_eq!(&buf, b"AAAAA");
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing fourth data packet!",
+                        origin, addr
+                    );
+                    out.write_all(b"WWWWWW").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Everything looks good!",
+                        origin, addr
+                    );
                 },
                 ConnectionOrigin::Outbound => {
                     println!(
-                        "(simple_listen_and_dial: {:?}, {:?}) Reading data!",
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing hello packet!",
+                        origin, addr
+                    );
+                    out.write_all(b"H").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing hello2 packet!",
+                        origin, addr
+                    );
+                    out.write_all(b"HH").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading first data packet!",
                         origin, addr
                     );
 
-                    let mut buf = [0; 5];
+                    let mut buf = [0; 3];
                     out.read_exact(&mut buf).await?;
+                    assert_eq!(&buf, b"EEE");
 
                     println!(
-                        "(simple_listen_and_dial: {:?}, {:?}) Verifying data: {:?}",
-                        origin, addr, buf
-                    );
-                    assert_eq!(&buf, b"Earth");
-
-                    println!(
-                        "(simple_listen_and_dial: {:?}, {:?}) Writing data!",
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading second data packet!",
                         origin, addr
                     );
-                    out.write_all(b"Air").await?;
+
+                    let mut buf = [0; 4];
+                    out.read_exact(&mut buf).await?;
+                    assert_eq!(&buf, b"FFFF");
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Writing third data packet!",
+                        origin, addr
+                    );
+                    out.write_all(b"AAAAA").await?;
+
+                    println!(
+                        "(simple_listen_and_dial: {:?}, {:?}) Reading fourth data packet!",
+                        origin, addr
+                    );
+
+                    let mut buf = [0; 6];
+                    out.read_exact(&mut buf).await?;
+                    assert_eq!(&buf, b"WWWWWW");
+
+                    panic!("Got here, boss!")
                 },
             }
             Ok(())
@@ -628,7 +710,9 @@ mod test {
             incoming.map(Result::unwrap)
         });
 
-        let (outgoing, _incoming) = join(dial, listener).await;
+        let (outgoing, _incoming) = timeout(Duration::from_secs(10), join(dial, listener))
+            .await
+            .unwrap();
         assert!(outgoing.is_ok());
         Ok(())
     }
