@@ -3,14 +3,14 @@
 
 import nacl from "tweetnacl";
 import * as bip39 from "@scure/bip39";
+import { bytesToHex } from "@noble/hashes/utils";
 import { AccountAddress } from "./account_address";
 import { Hex } from "./hex";
-import { bytesToHex } from "@noble/hashes/utils";
 import { HexInput } from "../types";
 import { PrivateKey, PublicKey, Signature } from "../crypto/asymmetric_crypto";
 import { derivePath } from "../utils/hd-key";
 import { AuthenticationKey } from "../crypto/authentication_key";
-import { Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature } from "../crypto/ed25519";
+import { Ed25519PrivateKey, Ed25519PublicKey } from "../crypto/ed25519";
 
 /**
  * Class for creating and managing account on Aptos network
@@ -20,9 +20,13 @@ import { Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature } from "../crypto
  */
 export class Account {
   /**
-   * A private key and public key, associated with the given account
+   * Public key associated with the account
    */
   readonly publicKey: PublicKey;
+
+  /**
+   * Private key associated with the account
+   */
   readonly privateKey: PrivateKey;
 
   /**

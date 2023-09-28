@@ -11,7 +11,7 @@ import { PublicKey } from "./asymmetric_crypto";
  * Each account stores an authentication key. Authentication key enables account owners to rotate
  * their private key(s) associated with the account without changing the address that hosts their account.
  * @see {@link https://aptos.dev/concepts/accounts | Account Basics}
- * 
+ *
  * Note: AuthenticationKey only supports Ed25519 and MultiEd25519 public keys for now.
  *
  * Account addresses can be derived from AuthenticationKey

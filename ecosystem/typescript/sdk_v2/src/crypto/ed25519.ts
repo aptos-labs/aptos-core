@@ -65,11 +65,6 @@ export class Ed25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Method not implemented.");
-  }
-
   static deserialize(deserializer: Deserializer): PublicKey {
     const value = deserializer.deserializeBytes();
     return new Ed25519PublicKey({ hexInput: value });

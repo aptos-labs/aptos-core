@@ -141,7 +141,9 @@ export class MultiEd25519Signature extends Signature {
     }
 
     if (signatures.length > MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
-      throw new Error(`The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`);
+      throw new Error(
+        `The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`,
+      );
     }
 
     this.signatures = signatures;
@@ -205,6 +207,7 @@ export class MultiEd25519Signature extends Signature {
 
       let byte = bitmap[byteOffset];
 
+      // eslint-disable-next-line no-bitwise
       byte |= firstBitInByte >> bit % 8;
 
       bitmap[byteOffset] = byte;
