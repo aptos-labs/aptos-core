@@ -494,6 +494,13 @@ module aptos_framework::voting {
     }
 
     #[view]
+    public fun get_proposer<ProposalType: store>(voting_forum_address: address, proposal_id: u64): address acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        proposal.proposer
+    }
+
+    #[view]
     public fun is_voting_closed<ProposalType: store>(voting_forum_address: address, proposal_id: u64): bool acquires VotingForum {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow(&voting_forum.proposals, proposal_id);
@@ -509,6 +516,27 @@ module aptos_framework::voting {
             };
         };
         false
+    }
+
+    #[view]
+    public fun get_proposal_metadata<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): SimpleMap<String, vector<u8>> acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        proposal.metadata
+    }
+
+    #[view]
+    public fun get_proposal_metadata_value<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+        metadata_key: String,
+    ): vector<u8> acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        *simple_map::borrow(&proposal.metadata, &metadata_key)
     }
 
     #[view]
@@ -612,6 +640,16 @@ module aptos_framework::voting {
         let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow(&voting_forum.proposals, proposal_id);
         proposal.is_resolved
+    }
+
+    #[view]
+    public fun get_resolution_time<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): u64 acquires VotingForum {
+        let voting_forum = borrow_global<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow(&voting_forum.proposals, proposal_id);
+        proposal.resolution_time_secs
     }
 
     #[view]
