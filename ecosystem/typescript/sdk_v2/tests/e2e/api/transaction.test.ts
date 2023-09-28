@@ -10,4 +10,8 @@ describe("transaction api", () => {
     expect(data).toHaveProperty("deprioritized_gas_estimate");
     expect(data).toHaveProperty("prioritized_gas_estimate");
   });
+
+  test("it queries for transactions on the chain", async () => {
+    // TODO - add tests once transaction submission is in
+  });
 });

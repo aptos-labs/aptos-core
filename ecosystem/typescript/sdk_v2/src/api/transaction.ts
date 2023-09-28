@@ -1,5 +1,5 @@
-import { getGasPriceEstimation } from "../internal/transaction";
-import { GasEstimation } from "../types";
+import { getGasPriceEstimation, getTransactions } from "../internal/transaction";
+import { GasEstimation, PaginationArgs, TransactionResponse } from "../types";
 import { AptosConfig } from "./aptos_config";
 
 export class Transaction {
@@ -7,6 +7,21 @@ export class Transaction {
 
   constructor(config: AptosConfig) {
     this.config = config;
+  }
+
+  /**
+   * Queries on-chain transactions. This function will not return pending
+   * transactions. For that, use `getTransactionsByHash`.
+   *
+   * @param options Optional pagination object
+   *
+   * @returns Array of on-chain transactions
+   */
+  async getTransactions(args: {
+    options?: PaginationArgs;
+  }): Promise<TransactionResponse[]> {
+    const transactions = await getTransactions({ aptosConfig: this.config, ...args });
+    return transactions;
   }
 
   /**
