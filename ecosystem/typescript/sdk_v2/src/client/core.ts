@@ -76,7 +76,11 @@ export async function aptosRequest<Req, Res>(
   if (aptosConfig.isIndexerRequest(url)) {
     // errors from indexer
     if ((result.data as any).errors) {
-      throw new AptosApiError(options, result, response.data.errors[0].message ?? "Generic Error");
+      throw new AptosApiError(
+        options,
+        result,
+        response.data.errors[0].message ?? `Unhandled Error ${response.status} : ${response.statusText}`,
+      );
     }
     result.data = (result.data as any).data as Res;
   }
@@ -85,5 +89,9 @@ export async function aptosRequest<Req, Res>(
     return result;
   }
   const errorMessage = errors[result.status];
-  throw new AptosApiError(options, result, errorMessage ?? "Generic Error");
+  throw new AptosApiError(
+    options,
+    result,
+    errorMessage ?? `Unhandled Error ${response.status} : ${response.statusText}`,
+  );
 }
