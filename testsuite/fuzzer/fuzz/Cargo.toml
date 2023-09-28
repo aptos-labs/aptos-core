@@ -19,6 +19,11 @@ move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
+aptos-language-e2e-tests = { workspace = true }
+aptos-vm = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-vm-genesis = { workspace = true }
+once_cell = { workspace = true }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
 
 [[bin]]
@@ -54,6 +59,12 @@ doc = false
 [[bin]]
 name = "move_execute_entry_function"
 path = "fuzz_targets/move/execute_entry_function.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "move_aptosvm_publish_and_run"
+path = "fuzz_targets/move/aptosvm_publish_and_run.rs"
 test = false
 doc = false
 
