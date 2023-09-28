@@ -83,6 +83,7 @@ pub enum FeatureFlag {
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
+    Secp256k1ECDSAAuthenticator,
     LimitMaxIdentifierLength,
 }
 
@@ -217,6 +218,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
+            FeatureFlag::Secp256k1ECDSAAuthenticator => {
+                AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
+            },
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         }
     }
@@ -274,6 +278,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
+            AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
+                FeatureFlag::Secp256k1ECDSAAuthenticator
+            },
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
         }
     }
