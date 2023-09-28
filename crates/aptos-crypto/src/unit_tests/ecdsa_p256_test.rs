@@ -37,14 +37,14 @@ proptest! {
     fn test_keys_encode(keypair in uniform_keypair_strategy::<P256PrivateKey, P256PublicKey>()) {
         {
             let encoded = keypair.private_key.to_encoded_string().unwrap();
-            // Hex encoding of a 64-bytes key is 128 (2 x 64) characters.
+            // Hex encoding of a 64-bytes key is 128 (2 x 64) characters + 2 for the prepended '0x'
             prop_assert_eq!(2 + 2 * P256_PRIVATE_KEY_LENGTH, encoded.len());
             let decoded = P256PrivateKey::from_encoded_string(&encoded);
             prop_assert_eq!(Some(keypair.private_key), decoded.ok());
         }
         {
             let encoded = keypair.public_key.to_encoded_string().unwrap();
-            // Hex encoding of a 65-bytes key is 130 (2 x 65) characters.
+            // Hex encoding of a 65-bytes key is 130 (2 x 65) characters + 2 for the prepended '0x'
             prop_assert_eq!(2 + 2 * P256_PUBLIC_KEY_LENGTH, encoded.len());
             let decoded = P256PublicKey::from_encoded_string(&encoded);
             prop_assert_eq!(Some(keypair.public_key), decoded.ok());
