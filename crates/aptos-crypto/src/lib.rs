@@ -19,7 +19,7 @@ pub mod test_utils;
 pub mod traits;
 pub mod validatable;
 pub mod x25519;
-pub mod p256;
+pub mod ecdsa_p256;
 
 #[cfg(test)]
 mod unit_tests;

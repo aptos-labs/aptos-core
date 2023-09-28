@@ -4,7 +4,7 @@
 //! This file implements traits for ECDSA signatures over NIST-P256.
 
 use crate::{
-    p256::{P256PrivateKey, P256PublicKey, ORDER_HALF, ORDER_MINUS_ONE},
+    ecdsa_p256::{P256PrivateKey, P256PublicKey, ORDER_HALF, ORDER_MINUS_ONE},
     hash::CryptoHash,
     traits::*,
 };
