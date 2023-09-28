@@ -39,8 +39,8 @@ fn ty_to_sig(ty: &MoveTypeLayout) -> Option<SignatureToken> {
         MoveTypeLayout::Struct(_) => None,
         MoveTypeLayout::Bool => Some(SignatureToken::Bool),
         MoveTypeLayout::Tagged(tag, layout) => match tag {
-            // Ignore aggregator liftings.
-            LayoutTag::AggregatorLifting => ty_to_sig(layout.as_ref()),
+            // Ignore aggregator / snapshot mappings.
+            LayoutTag::IdentifierMapping(_) => ty_to_sig(layout.as_ref()),
         },
     }
 }

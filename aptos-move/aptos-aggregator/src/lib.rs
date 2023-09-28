@@ -8,6 +8,7 @@ pub mod delta_change_set;
 pub mod delta_math;
 pub mod resolver;
 pub mod types;
+pub mod utils;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod tests;
