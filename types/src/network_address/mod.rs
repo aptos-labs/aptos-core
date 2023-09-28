@@ -240,7 +240,7 @@ fn is_network_layer(p: Option<&Protocol>) -> bool {
 fn is_transport_layer(p: Option<&Protocol>) -> bool {
     use Protocol::*;
 
-    matches!(p, Some(Tcp(_)) | Some(Udp(_)))
+    matches!(p, Some(Tcp(_))) || matches!(p, Some(Udp(_)))
 }
 
 fn is_session_layer(p: Option<&Protocol>, allow_empty: bool) -> bool {
@@ -262,6 +262,12 @@ fn is_handshake_layer(p: Option<&Protocol>, allow_empty: bool) -> bool {
 }
 
 impl NetworkAddress {
+    pub fn from_udp(sockaddr: SocketAddr) -> NetworkAddress {
+        let ip_proto = Protocol::from(sockaddr.ip());
+        let udp_proto = Protocol::Udp(sockaddr.port());
+        NetworkAddress::from_protocols(vec![ip_proto, udp_proto]).unwrap()
+    }
+
     pub fn from_protocols(protocols: Vec<Protocol>) -> Result<Self, ParseError> {
         use Protocol::*;
 
@@ -278,12 +284,18 @@ impl NetworkAddress {
         }
 
         if !matches!(p, Some(Memory(_))) {
-            p = iter.next();
-            if p.is_none() {
-                return Ok(Self(protocols));
-            }
-            if !is_transport_layer(p) {
-                return Err(ParseError::TransportLayerMissing);
+            loop {
+                p = iter.next();
+                if !(is_transport_layer(p)) {
+                    break;
+                }
+
+                if p.is_none() {
+                    return Ok(Self(protocols));
+                }
+                if !is_transport_layer(p) {
+                    return Err(ParseError::TransportLayerMissing);
+                }
             }
         }
 
@@ -477,6 +489,14 @@ impl ToSocketAddrs for NetworkAddress {
         if let Some(((ipaddr, port), _)) = parse_ip_tcp(self.as_slice()) {
             Ok(vec![SocketAddr::new(ipaddr, port)].into_iter())
         } else if let Some(((ip_filter, dns_name, port), _)) = parse_dns_tcp(self.as_slice()) {
+            format!("{}:{}", dns_name, port).to_socket_addrs().map(|v| {
+                v.filter(|addr| ip_filter.matches(addr.ip()))
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            })
+        } else if let Some(((ipaddr, port), _)) = parse_ip_udp(self.as_slice()) {
+            Ok(vec![SocketAddr::new(ipaddr, port)].into_iter())
+        } else if let Some(((ip_filter, dns_name, port), _)) = parse_dns_udp(self.as_slice()) {
             format!("{}:{}", dns_name, port).to_socket_addrs().map(|v| {
                 v.filter(|addr| ip_filter.matches(addr.ip()))
                     .collect::<Vec<_>>()
@@ -929,6 +949,8 @@ fn parse_aptosnet_protos(protos: &[Protocol]) -> Option<&[Protocol]> {
     let transport_suffix = parse_ip_tcp(protos)
         .map(|x| x.1)
         .or_else(|| parse_dns_tcp(protos).map(|x| x.1))
+        .or_else(|| parse_ip_udp(protos).map(|x| x.1))
+        .or_else(|| parse_dns_udp(protos).map(|x| x.1))
         .or_else(|| {
             if cfg!(test) {
                 parse_memory(protos).map(|x| x.1)
@@ -963,7 +985,7 @@ mod test {
     use claims::assert_matches;
 
     #[test]
-    fn test_network_address_display() {
+    fn test_network_address_display_tcp() {
         use super::Protocol::*;
         let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
         let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
@@ -984,7 +1006,28 @@ mod test {
     }
 
     #[test]
-    fn test_network_address_parse_success() {
+    fn test_network_address_display_udp() {
+        use super::Protocol::*;
+        let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
+        let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
+        let protocols = vec![
+            Dns(DnsName("example.com".to_owned())),
+            Udp(1234),
+            NoiseIK(pubkey),
+            Handshake(0),
+        ];
+
+        let addr = NetworkAddress::from_protocols(protocols).unwrap();
+
+        let noise_addr_str = format!(
+            "/dns/example.com/udp/1234/noise-ik/0x{}/handshake/0",
+            pubkey_str
+        );
+        assert_eq!(noise_addr_str, addr.to_string());
+    }
+
+    #[test]
+    fn test_network_address_parse_success_tcp() {
         use super::Protocol::*;
 
         let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
@@ -1039,6 +1082,61 @@ mod test {
     }
 
     #[test]
+    fn test_network_address_parse_success_udp() {
+        use super::Protocol::*;
+
+        let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
+        let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
+        let noise_addr_str = format!(
+            "/dns/example.com/udp/1234/noise-ik/{}/handshake/5",
+            pubkey_str
+        );
+
+        let test_cases = [
+            ("/memory/1234", vec![Memory(1234)]),
+            (
+                &(format!(
+                    "/ip4/12.34.56.78/udp/1234/noise-ik/{}/handshake/123",
+                    pubkey_str
+                )),
+                vec![
+                    Ip4(Ipv4Addr::new(12, 34, 56, 78)),
+                    Udp(1234),
+                    NoiseIK(pubkey),
+                    Handshake(123),
+                ],
+            ),
+            ("/ip6/::1/udp/0", vec![
+                Ip6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                Udp(0),
+            ]),
+            ("/ip6/dead:beef::c0de/udp/8080", vec![
+                Ip6(Ipv6Addr::new(0xDEAD, 0xBEEF, 0, 0, 0, 0, 0, 0xC0DE)),
+                Udp(8080),
+            ]),
+            ("/dns/example.com/udp/80", vec![
+                Dns(DnsName("example.com".to_owned())),
+                Udp(80),
+            ]),
+            (&noise_addr_str, vec![
+                Dns(DnsName("example.com".to_owned())),
+                Udp(1234),
+                NoiseIK(pubkey),
+                Handshake(5),
+            ]),
+        ];
+
+        for (addr_str, expected_address) in &test_cases {
+            let actual_address = NetworkAddress::from_str(addr_str)
+                .map_err(|err| format_err!("failed to parse: input: '{}', err: {}", addr_str, err))
+                .unwrap();
+            let expected_address =
+                NetworkAddress::from_protocols(expected_address.clone()).unwrap();
+            assert_eq!(actual_address, expected_address);
+        }
+    }
+
+    #[test]
     fn test_network_address_parse_fail() {
         let test_cases = [
             "",
@@ -1049,6 +1147,11 @@ mod test {
             "/tcp/1234/",
             "/tcp/1234/foobar/5",
             "/tcp/99999",
+            "/udp",
+            "udp/1234",
+            "/udp/1234/",
+            "/udp/1234/foobar/5",
+            "/udp/99999",
             "/ip4/1.1.1",
             "/ip4/1.1.1.1.",
             "/ip4/1.1.1.1.1",
@@ -1093,6 +1196,23 @@ mod test {
     }
 
     #[test]
+    fn test_parse_ip_udp() {
+        let addr = NetworkAddress::from_str("/ip4/1.2.3.4/udp/123").unwrap();
+        let expected_suffix: &[Protocol] = &[];
+        assert_eq!(
+            parse_ip_udp(addr.as_slice()).unwrap(),
+            ((IpAddr::from_str("1.2.3.4").unwrap(), 123), expected_suffix)
+        );
+
+        let addr = NetworkAddress::from_str("/ip6/::1/udp/123").unwrap();
+        let expected_suffix: &[Protocol] = &[];
+        assert_eq!(
+            parse_ip_udp(addr.as_slice()).unwrap(),
+            ((IpAddr::from_str("::1").unwrap(), 123), expected_suffix)
+        );
+    }
+
+    #[test]
     fn test_parse_dns_tcp() {
         let dns_name = DnsName::from_str("example.com").unwrap();
         let addr = NetworkAddress::from_str("/dns/example.com/tcp/123").unwrap();
@@ -1125,7 +1245,39 @@ mod test {
     }
 
     #[test]
-    fn test_find_noise_proto() {
+    fn test_parse_dns_udp() {
+        let dns_name = DnsName::from_str("example.com").unwrap();
+        let addr = NetworkAddress::from_str("/dns/example.com/udp/123").unwrap();
+        let expected_suffix: &[Protocol] = &[];
+        assert_eq!(
+            parse_dns_udp(addr.as_slice()).unwrap(),
+            ((IpFilter::Any, &dns_name, 123), expected_suffix)
+        );
+
+        let addr = NetworkAddress::from_str("/dns4/example.com/udp/123").unwrap();
+        let expected_suffix: &[Protocol] = &[];
+        assert_eq!(
+            parse_dns_udp(addr.as_slice()).unwrap(),
+            ((IpFilter::OnlyIp4, &dns_name, 123), expected_suffix)
+        );
+
+        let addr = NetworkAddress::from_str("/dns6/example.com/udp/123").unwrap();
+        let expected_suffix: &[Protocol] = &[];
+        assert_eq!(
+            parse_dns_udp(addr.as_slice()).unwrap(),
+            ((IpFilter::OnlyIp6, &dns_name, 123), expected_suffix)
+        );
+
+        // The first `e` in `example.com` is a unicode character and not a regular `e`!
+        let bad_address = "/dns6/еxample.com/udp/123";
+        assert_matches!(
+            NetworkAddress::from_str(bad_address),
+            Err(ParseError::DnsNameNonASCII(_))
+        );
+    }
+
+    #[test]
+    fn test_find_noise_proto_tcp() {
         let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
         let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
         let addr = NetworkAddress::from_str(&format!(
@@ -1145,7 +1297,27 @@ mod test {
     }
 
     #[test]
-    fn test_parse_handshake() {
+    fn test_find_noise_proto_udp() {
+        let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
+        let pubkey = x25519::PublicKey::from_encoded_string(pubkey_str).unwrap();
+        let addr = NetworkAddress::from_str(&format!(
+            "/dns4/example.com/udp/1024/noise-ik/{}/handshake/0",
+            pubkey_str
+        ))
+        .unwrap();
+
+        assert_eq!(addr.find_noise_proto().unwrap(), pubkey);
+
+        let addr = NetworkAddress::from_str(&format!(
+            "/dns4/example.com/udp/999/noise-ik/{}/handshake/0",
+            pubkey_str
+        ))
+        .unwrap();
+        assert_eq!(addr.find_noise_proto().unwrap(), pubkey);
+    }
+
+    #[test]
+    fn test_parse_handshake_tcp() {
         let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
         let addr = NetworkAddress::from_str(&format!(
             "/dns4/example.com/tcp/999/noise-ik/{}/handshake/0",
@@ -1157,6 +1329,25 @@ mod test {
 
         let addr = NetworkAddress::from_str(&format!(
             "/ip4/127.0.0.1/tcp/999/noise-ik/{}/handshake/0/",
+            pubkey_str
+        ))
+        .unwrap();
+        assert_eq!(parse_handshake(addr.as_slice()).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_parse_handshake_udp() {
+        let pubkey_str = "080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120";
+        let addr = NetworkAddress::from_str(&format!(
+            "/dns4/example.com/udp/999/noise-ik/{}/handshake/0",
+            pubkey_str
+        ))
+        .unwrap();
+
+        assert_eq!(parse_handshake(addr.as_slice()).unwrap(), 0);
+
+        let addr = NetworkAddress::from_str(&format!(
+            "/ip4/127.0.0.1/udp/999/noise-ik/{}/handshake/0/",
             pubkey_str
         ))
         .unwrap();
