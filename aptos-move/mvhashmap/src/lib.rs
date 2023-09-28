@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    versioned_data::VersionedData, versioned_group_data::VersionedGroupData,
-    versioned_modules::VersionedModules,
+    versioned_aggregators::VersionedAggregators, versioned_data::VersionedData,
+    versioned_group_data::VersionedGroupData, versioned_modules::VersionedModules,
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
@@ -12,7 +12,6 @@ use aptos_types::{
 };
 use serde::Serialize;
 use std::{fmt::Debug, hash::Hash};
-use versioned_aggregators::VersionedAggregators;
 
 pub mod types;
 pub mod unsync_map;
@@ -37,8 +36,8 @@ mod unit_tests;
 pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
-    modules: VersionedModules<K, V, X>,
     aggregators: VersionedAggregators<I>,
+    modules: VersionedModules<K, V, X>,
 }
 
 impl<
@@ -56,8 +55,8 @@ impl<
         MVHashMap {
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
-            modules: VersionedModules::new(),
             aggregators: VersionedAggregators::new(),
+            modules: VersionedModules::new(),
         }
     }
 
@@ -72,12 +71,12 @@ impl<
         &self.group_data
     }
 
-    pub fn modules(&self) -> &VersionedModules<K, V, X> {
-        &self.modules
-    }
-
     pub fn aggregators(&self) -> &VersionedAggregators<I> {
         &self.aggregators
+    }
+
+    pub fn modules(&self) -> &VersionedModules<K, V, X> {
+        &self.modules
     }
 }
 

@@ -6,7 +6,7 @@ use crate::natives::{
         helpers_v2::{
             aggregator_snapshot_field_value, aggregator_snapshot_value_field_as_id,
             aggregator_value_field_as_id, get_aggregator_fields_u128, get_aggregator_fields_u64,
-            set_aggregator_value_field, string_to_bytes, u128_to_u64,
+            set_aggregator_value_field,
         },
         NativeAggregatorContext,
     },
@@ -17,6 +17,7 @@ use aptos_aggregator::{
     bounded_math::BoundedMath,
     resolver::AggregatorResolver,
     types::{AggregatorVersionedID, SnapshotToStringFormula, SnapshotValue},
+    utils::{string_to_bytes, to_utf8_bytes, u128_to_u64},
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -104,7 +105,7 @@ pub fn create_value_by_type(ty_arg: &Type, value: u128) -> SafeNativeResult<Valu
     }
 }
 
-// To aviod checking is_string_type multiple times, check type_arg only once, and convert into this enum
+// To avoid checking is_string_type multiple times, check type_arg only once, and convert into this enum
 enum SnapshotType {
     U128,
     U64,
@@ -166,7 +167,7 @@ impl SnapshotType {
                 Ok(Value::struct_(Struct::pack(vec![Value::vector_u8(
                     match value {
                         SnapshotValue::String(v) => v,
-                        SnapshotValue::Integer(v) => v.to_string().into_bytes(),
+                        SnapshotValue::Integer(v) => to_utf8_bytes(v),
                     },
                 )])))
             },
@@ -209,11 +210,10 @@ fn native_create_aggregator(
     let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
 
     let value_field_value = if context.aggregator_execution_enabled() {
-        let (_, mut aggregator_data) = get_context_data(context);
-        let id = aggregator_data.generate_id();
-        let aggregator_id = AggregatorVersionedID::V2(id);
-        aggregator_data.create_new_aggregator(aggregator_id, max_value);
-        id.id() as u128
+        let (resolver, mut aggregator_data) = get_context_data(context);
+        let id = resolver.generate_aggregator_v2_id();
+        aggregator_data.create_new_aggregator(AggregatorVersionedID::V2(id), max_value);
+        id.as_u64() as u128
     } else {
         0
     };
@@ -339,9 +339,11 @@ fn native_snapshot(
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
     let result_value = if context.aggregator_execution_enabled() {
-        let (_, mut aggregator_data) = get_context_data(context);
+        let (resolver, mut aggregator_data) = get_context_data(context);
         let aggregator_id = aggregator_value_field_as_id(agg_value)?;
-        aggregator_data.snapshot(aggregator_id, agg_max_value)?.id() as u128
+        aggregator_data
+            .snapshot(aggregator_id, agg_max_value, resolver)?
+            .as_u64() as u128
     } else {
         agg_value
     };
@@ -374,9 +376,9 @@ fn native_create_snapshot(
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
 
     let result_value = if context.aggregator_execution_enabled() {
-        let (_, mut aggregator_data) = get_context_data(context);
-        let snapshot_id = aggregator_data.create_new_snapshot(input);
-        SnapshotValue::Integer(snapshot_id.id() as u128)
+        let (resolver, mut aggregator_data) = get_context_data(context);
+        let snapshot_id = aggregator_data.create_new_snapshot(input, resolver);
+        SnapshotValue::Integer(snapshot_id.as_u64() as u128)
     } else {
         input
     };
@@ -487,13 +489,13 @@ fn native_string_concat(
     let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
 
     let result_value = if context.aggregator_execution_enabled() {
-        let (_, mut aggregator_data) = get_context_data(context);
+        let (resolver, mut aggregator_data) = get_context_data(context);
 
         let aggregator_id = aggregator_value_field_as_id(snapshot_value)?;
         SnapshotValue::Integer(
             aggregator_data
-                .string_concat(aggregator_id, prefix, suffix)
-                .id() as u128,
+                .string_concat(aggregator_id, resolver, prefix, suffix)
+                .as_u64() as u128,
         )
     } else {
         SnapshotValue::String(
