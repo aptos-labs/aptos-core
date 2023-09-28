@@ -59,7 +59,7 @@ where
     pub fn new(
         network_context: NetworkContext,
         time_service: TimeService,
-        transport: TTransport,
+        mut transport: TTransport,
         listen_addr: NetworkAddress,
         transport_reqs_rx: aptos_channels::Receiver<TransportRequest>,
         transport_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,

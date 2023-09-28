@@ -42,7 +42,7 @@ where
     type Output = O;
 
     fn listen_on(
-        &self,
+        &mut self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
         let (listener, addr) = self.transport.listen_on(addr)?;
