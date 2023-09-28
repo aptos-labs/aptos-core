@@ -147,7 +147,9 @@ impl ValidatorVerifier {
         let quorum_voting_power = if validator_infos.is_empty() {
             0
         } else {
-            total_voting_power * 2 / 3 + 1
+            // FIXME(alden):
+            // total_voting_power * 2 / 3 + 1
+            total_voting_power
         };
         Self::build_index(validator_infos, quorum_voting_power, total_voting_power)
     }
