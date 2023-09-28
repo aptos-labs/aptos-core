@@ -431,6 +431,10 @@ mod test {
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
+
+        fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+            unimplemented!("Irrelevant for the test")
+        }
     }
 
     #[test]
