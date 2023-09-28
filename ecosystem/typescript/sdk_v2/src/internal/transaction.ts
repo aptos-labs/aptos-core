@@ -30,7 +30,7 @@ export async function getGasPriceEstimation(args: { aptosConfig: AptosConfig }) 
   const { aptosConfig } = args;
   const { data } = await get<{}, GasEstimation>({
     url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: "estimate_gas_price",
+    path: "estimate_gas_price",
     originMethod: "getGasPriceEstimation",
     overrides: { ...aptosConfig.clientConfig },
   }, aptosConfig);

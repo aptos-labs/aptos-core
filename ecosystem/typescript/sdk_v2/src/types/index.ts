@@ -79,7 +79,7 @@ export type ClientConfig = {
 export type AptosRequest = {
   url: string;
   method: "GET" | "POST";
-  endpoint?: string;
+  path?: string;
   body?: any;
   contentType?: string;
   params?: Record<string, string | AnyNumber | boolean | undefined>;
