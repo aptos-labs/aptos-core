@@ -4,7 +4,7 @@
 //! This file implements traits for ECDSA signatures over NIST-P256.
 
 use crate::{
-    ecdsa_p256::{P256PrivateKey, P256PublicKey, ORDER_HALF, ORDER_MINUS_ONE},
+    ecdsa_p256::{P256PrivateKey, P256PublicKey, ORDER_HALF},
     hash::CryptoHash,
     traits::*,
 };
@@ -15,8 +15,6 @@ use serde::Serialize;
 use std::{cmp::Ordering, fmt};
 use signature::Verifier;
 use p256::NonZeroScalar;
-use p256::NistP256;
-use p256::elliptic_curve::Curve;
 
 use super::P256_SIGNATURE_LENGTH;
 
@@ -95,10 +93,10 @@ impl P256Signature {
         let r = self.0.r();
         // NonZeroScalar::try_from throws an error on being passed the curve order, so we use the
         // order minus one, then add one later to compute (n-1) - s + 1 = n-s
-        let order_minus_one = NonZeroScalar::try_from(&ORDER_MINUS_ONE[..]).unwrap();
-        let one = NonZeroScalar::from_uint(<NistP256 as Curve>::Uint::ONE).unwrap();
+        //let order_minus_one = NonZeroScalar::try_from(&ORDER_MINUS_ONE[..]).unwrap();
+        //let one = NonZeroScalar::from_uint(<NistP256 as Curve>::Uint::ONE).unwrap();
         // Dereferencing a NonZeroScalar makes it a Scalar, which implements subtraction
-        let new_s = *order_minus_one - *s + *one;
+        let new_s = -*s; //*order_minus_one - *s + *one;
         let new_s_nonzero = NonZeroScalar::new(new_s).unwrap();
         let new_sig = p256::ecdsa::Signature::from_scalars(&r, &new_s_nonzero).unwrap();
         P256Signature(new_sig)

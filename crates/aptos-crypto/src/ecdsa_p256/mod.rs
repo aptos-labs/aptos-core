@@ -10,7 +10,7 @@
 //! ```
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
 //! use aptos_crypto::{
-//!     p256::*,
+//!     ecdsa_p256::*,
 //!     traits::{Signature, SigningKey, Uniform},
 //!     test_utils::KeyPair
 //! };
@@ -35,11 +35,6 @@ pub const P256_PRIVATE_KEY_LENGTH: usize = 32;
 pub const P256_PUBLIC_KEY_LENGTH: usize = 65;
 /// The length in bytes of the P256Signature
 pub const P256_SIGNATURE_LENGTH: usize = 64;
-
-/// The order of P256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final), minus one.
-const ORDER_MINUS_ONE: [u8; 32] = [
-    0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0x50,
-];
 
 /// The value (q-1)/2, where q is the order of P256 as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
 /// Computed with the following SageMath code:
