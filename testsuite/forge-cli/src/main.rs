@@ -580,10 +580,18 @@ fn single_test_suite(
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, 100, false, false, true),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, 100, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, 100, true, true, false),
-        "pfn_const_tps_with_realistic_env_3K" => pfn_const_tps(duration, 3000, true, true, false),
+        // Latency percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
+        "pfn_const_tps" => pfn_const_tps(duration, 100, false, false, true, 2.5, 4., 5.),
+        "pfn_const_tps_with_network_chaos" => {
+            pfn_const_tps(duration, 100, false, true, false, 2.5, 4., 5.)
+        },
+        "pfn_const_tps_with_realistic_env" => {
+            pfn_const_tps(duration, 100, true, true, false, 2.5, 4., 5.)
+        },
+        // Latency percentile thresholds conservatively set to +2 of 100 TPS. Should be revisited.
+        "pfn_const_tps_with_realistic_env_3K" => {
+            pfn_const_tps(duration, 3000, true, true, false, 4.5, 6., 7.)
+        },
         "pfn_performance" => pfn_performance(duration, false, false, true),
         "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
@@ -2046,6 +2054,9 @@ fn pfn_const_tps(
     add_cpu_chaos: bool,
     add_network_emulation: bool,
     epoch_changes: bool,
+    p50_latency_s: f32,
+    p90_latency_s: f32,
+    p99_latency_s: f32,
 ) -> ForgeConfig {
     let epoch_duration_secs = if epoch_changes {
         300 // 5 minutes
@@ -2062,14 +2073,13 @@ fn pfn_const_tps(
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
-            SuccessCriteria::new(95)
+            SuccessCriteria::new(tps * 95 / 100)
                 .add_no_restarts()
                 .add_max_expired_tps(0)
                 .add_max_failed_submission_tps(0)
-                // Percentile thresholds are set to +1 second of non-PFN tests. Should be revisited.
-                .add_latency_threshold(2.5, LatencyType::P50)
-                .add_latency_threshold(4., LatencyType::P90)
-                .add_latency_threshold(5., LatencyType::P99)
+                .add_latency_threshold(p50_latency_s, LatencyType::P50)
+                .add_latency_threshold(p90_latency_s, LatencyType::P90)
+                .add_latency_threshold(p99_latency_s, LatencyType::P99)
                 .add_wait_for_catchup_s(
                     // Give at least 60s for catchup and at most 10% of the run
                     (duration.as_secs() / 10).max(60),
