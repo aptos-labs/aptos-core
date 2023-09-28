@@ -331,7 +331,9 @@ dependencies = [
  "claims",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "once_cell",
+ "test-case",
 ]
 
 [[package]]
@@ -591,6 +593,7 @@ dependencies = [
  "itertools",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "num_cpus",
  "once_cell",
  "parking_lot 0.12.1",

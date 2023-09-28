@@ -344,6 +344,10 @@ impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
     ) -> anyhow::Result<AggregatorValue> {
         self.executor_view.get_aggregator_v2_value(id, mode)
     }
+
+    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+        self.executor_view.generate_aggregator_v2_id()
+    }
 }
 
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {

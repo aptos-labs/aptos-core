@@ -48,7 +48,7 @@ fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
             true
         },
 
-        L::Vector(layout) | L::Tagged(LayoutTag::AggregatorLifting, layout) => {
+        L::Vector(layout) | L::Tagged(LayoutTag::IdentifierMapping(_), layout) => {
             is_valid_layout(layout)
         },
 

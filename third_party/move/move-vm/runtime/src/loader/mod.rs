@@ -24,7 +24,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{IdentifierMappingKind, LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructIdentifier, StructType, Type};
@@ -1496,7 +1496,7 @@ impl<'a> Resolver<'a> {
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        self.loader.type_to_type_layout_with_aggregator_lifting(ty)
+        self.loader.type_to_type_layout_with_identifier_mappings(ty)
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
@@ -1892,7 +1892,7 @@ impl Loader {
         name: &StructIdentifier,
         ty_args: &[Type],
         count: &mut u64,
-        has_aggregator_lifting: &mut bool,
+        has_identifier_mappings: &mut bool,
         depth: u64,
     ) -> PartialVMResult<MoveStructLayout> {
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
@@ -1911,9 +1911,8 @@ impl Loader {
 
         // Some types can have fields which are lifted at serialization or deserialization
         // times. Right now these are Aggregator and AggregatorSnapshot.
-        let contains_lifting =
-            self.is_aggregator_struct(name) || self.is_aggregator_snapshot_struct(name);
-        *has_aggregator_lifting |= contains_lifting;
+        let maybe_mapping = self.get_identifier_mapping_kind(name);
+        *has_identifier_mappings |= maybe_mapping.is_some();
 
         let field_tys = struct_type
             .fields
@@ -1922,13 +1921,14 @@ impl Loader {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let mut field_layouts = field_tys
             .iter()
-            .map(|ty| self.type_to_type_layout_impl(ty, count, has_aggregator_lifting, depth + 1))
+            .map(|ty| self.type_to_type_layout_impl(ty, count, has_identifier_mappings, depth + 1))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         // For aggregators / snapshots, the first field should be lifted.
-        if contains_lifting {
+        if let Some(kind) = maybe_mapping {
             if let Some(l) = field_layouts.first_mut() {
-                *l = MoveTypeLayout::Tagged(LayoutTag::AggregatorLifting, Box::new(l.clone()));
+                *l =
+                    MoveTypeLayout::Tagged(LayoutTag::IdentifierMapping(kind), Box::new(l.clone()));
             }
         }
 
@@ -1954,28 +1954,31 @@ impl Loader {
     // types.
     // Let's think how we can do this nicer.
 
-    /// Returns true if a given struct is an Aggregator.
-    fn is_aggregator_struct(&self, struct_name: &StructIdentifier) -> bool {
-        struct_name.module.address().eq(&AccountAddress::ONE)
-            && struct_name.module.name().eq(ident_str!("aggregator_v2"))
-            && struct_name.name.as_ident_str().eq(ident_str!("Aggregator"))
-    }
+    fn get_identifier_mapping_kind(
+        &self,
+        struct_name: &StructIdentifier,
+    ) -> Option<IdentifierMappingKind> {
+        let ident_str_to_kind = |ident_str: &IdentStr| -> Option<IdentifierMappingKind> {
+            if ident_str.eq(ident_str!("Aggregator")) {
+                Some(IdentifierMappingKind::Aggregator)
+            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
+                Some(IdentifierMappingKind::Snapshot)
+            } else {
+                None
+            }
+        };
 
-    /// Returns true if a given struct is an AggregatorSnapshot.
-    fn is_aggregator_snapshot_struct(&self, struct_name: &StructIdentifier) -> bool {
-        struct_name.module.address().eq(&AccountAddress::ONE)
-            && struct_name.module.name().eq(ident_str!("aggregator_v2"))
-            && struct_name
-                .name
-                .as_ident_str()
-                .eq(ident_str!("AggregatorSnapshot"))
+        (struct_name.module.address().eq(&AccountAddress::ONE)
+            && struct_name.module.name().eq(ident_str!("aggregator_v2")))
+        .then_some(ident_str_to_kind(struct_name.name.as_ident_str()))
+        .flatten()
     }
 
     fn type_to_type_layout_impl(
         &self,
         ty: &Type,
         count: &mut u64,
-        has_aggregator_lifting: &mut bool,
+        has_identifier_mappings: &mut bool,
         depth: u64,
     ) -> PartialVMResult<MoveTypeLayout> {
         if *count > MAX_TYPE_TO_LAYOUT_NODES {
@@ -2026,7 +2029,7 @@ impl Loader {
                 MoveTypeLayout::Vector(Box::new(self.type_to_type_layout_impl(
                     ty,
                     count,
-                    has_aggregator_lifting,
+                    has_identifier_mappings,
                     depth + 1,
                 )?))
             },
@@ -2036,7 +2039,7 @@ impl Loader {
                     name,
                     &[],
                     count,
-                    has_aggregator_lifting,
+                    has_identifier_mappings,
                     depth,
                 )?)
             },
@@ -2046,7 +2049,7 @@ impl Loader {
                     name,
                     ty_args,
                     count,
-                    has_aggregator_lifting,
+                    has_identifier_mappings,
                     depth,
                 )?)
             },
@@ -2241,15 +2244,15 @@ impl Loader {
         self.type_to_type_tag_impl(ty, &mut gas_context)
     }
 
-    pub(crate) fn type_to_type_layout_with_aggregator_lifting(
+    pub(crate) fn type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let mut count = 0;
-        let mut has_aggregator_lifting = false;
+        let mut has_identifier_mappings = false;
         let layout =
-            self.type_to_type_layout_impl(ty, &mut count, &mut has_aggregator_lifting, 1)?;
-        Ok((layout, has_aggregator_lifting))
+            self.type_to_type_layout_impl(ty, &mut count, &mut has_identifier_mappings, 1)?;
+        Ok((layout, has_identifier_mappings))
     }
 
     pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {

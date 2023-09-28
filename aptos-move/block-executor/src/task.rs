@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{aggregator_change_set::AggregatorChange, delta_change_set::DeltaOp};
+use aptos_aggregator::{
+    aggregator_change_set::AggregatorChange,
+    delta_change_set::DeltaOp,
+    types::{TryFromMoveValue, TryIntoMoveValue},
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
@@ -47,7 +51,18 @@ pub trait Transaction: Sync + Send + Clone + 'static {
         + DeserializeOwned
         + Serialize;
     /// AggregatorV2 identifier type.
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug + Copy;
+    type Identifier: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + Copy
+        + From<u64>
+        + TryIntoMoveValue
+        + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

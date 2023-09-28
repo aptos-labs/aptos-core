@@ -11,13 +11,24 @@ use aptos_types::state_store::{
 };
 use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
 use move_core_types::value::MoveTypeLayout;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 /// Adapter to convert a `StateView` into an `ExecutorView`.
-pub struct ExecutorViewBase<'s, S>(&'s S);
+pub struct ExecutorViewBase<'s, S> {
+    base: &'s S,
+    // Because aggregators V2 replace identifiers, this counter serves as
+    // ID generator. We use atomic so that the adapter can be used in
+    // concurrent setting, plus the adapter is not supposed to be used
+    // for block execution.
+    counter: AtomicU32,
+}
 
 impl<'s, S: StateView> ExecutorViewBase<'s, S> {
-    pub(crate) fn new(state_view: &'s S) -> Self {
-        Self(state_view)
+    pub(crate) fn new(base: &'s S) -> Self {
+        Self {
+            base,
+            counter: AtomicU32::new(0),
+        }
     }
 }
 
@@ -41,7 +52,11 @@ impl<'s, S: StateView> TAggregatorView for ExecutorViewBase<'s, S> {
         // Reading from StateView can be in precise mode only.
         _mode: AggregatorReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
-        self.0.get_state_value(state_key)
+        self.base.get_state_value(state_key)
+    }
+
+    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+        (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
     }
 
     fn get_aggregator_v2_value(
@@ -62,7 +77,7 @@ impl<'s, S: StateView> TResourceView for ExecutorViewBase<'s, S> {
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
-        self.0.get_state_value(state_key)
+        self.base.get_state_value(state_key)
     }
 }
 
@@ -70,16 +85,16 @@ impl<'s, S: StateView> TModuleView for ExecutorViewBase<'s, S> {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        self.0.get_state_value(state_key)
+        self.base.get_state_value(state_key)
     }
 }
 
 impl<'s, S: StateView> StateStorageView for ExecutorViewBase<'s, S> {
     fn id(&self) -> StateViewId {
-        self.0.id()
+        self.base.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        self.0.get_usage()
+        self.base.get_usage()
     }
 }
