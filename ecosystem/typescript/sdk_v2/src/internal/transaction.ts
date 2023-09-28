@@ -18,7 +18,7 @@ export async function getTransactions(args: {
   const { aptosConfig, options } = args;
   const data = await paginateWithCursor<{}, TransactionResponse[]>({
     url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: `transactions`,
+    endpoint: "transactions",
     originMethod: "getTransactions",
     params: { start: options?.start, limit: options?.limit },
     overrides: { ...aptosConfig.clientConfig },
