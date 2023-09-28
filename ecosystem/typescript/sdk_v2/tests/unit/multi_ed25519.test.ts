@@ -71,7 +71,9 @@ describe("MultiSignature", () => {
     let edSigsArray = [];
     for (let i = 0; i < multiEd25519SigTestObject.signatures.length; i++) {
       edSigsArray.push(
-        new Ed25519Signature({ data: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array() }),
+        new Ed25519Signature({
+          hexInput: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array(),
+        }),
       );
     }
 
@@ -89,7 +91,9 @@ describe("MultiSignature", () => {
     let edSigsArray = [];
     for (let i = 0; i < multiEd25519SigTestObject.signatures.length; i++) {
       edSigsArray.push(
-        new Ed25519Signature({ data: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array() }),
+        new Ed25519Signature({
+          hexInput: Hex.fromString({ str: multiEd25519SigTestObject.signatures[i] }).toUint8Array(),
+        }),
       );
     }
 

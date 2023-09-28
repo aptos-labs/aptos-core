@@ -6,7 +6,7 @@ import { HexInput } from "../types";
 
 export abstract class PublicKey implements Serializable, Deserializable<PublicKey> {
   // Verify the given message with the public key and signature.
-  abstract verifySignature(args: { data: HexInput; signature: Signature }): boolean;
+  abstract verifySignature(args: { message: HexInput; signature: Signature }): boolean;
 
   // Convert the public key to bytes or Uint8Array.
   abstract toUint8Array(): Uint8Array;
@@ -32,6 +32,11 @@ export abstract class PrivateKey implements Serializable, Deserializable<Private
   // TODO: This should be a static method.
   abstract deserialize(deserializer: Deserializer): PrivateKey;
   abstract serialize(serializer: Serializer): void;
+
+  /**
+   * Derives the public key from the private key
+   */
+  abstract publicKey(): PublicKey;
 }
 
 export abstract class Signature implements Serializable, Deserializable<Signature> {

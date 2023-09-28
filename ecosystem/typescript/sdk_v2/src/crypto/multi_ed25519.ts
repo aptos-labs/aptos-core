@@ -76,7 +76,7 @@ export class MultiEd25519PublicKey extends PublicKey {
     return Hex.fromHexInput({ hexInput: this.toUint8Array() }).toString();
   }
 
-  verifySignature(args: { data: HexInput; signature: MultiEd25519Signature }): boolean {
+  verifySignature(args: { message: HexInput; signature: MultiEd25519Signature }): boolean {
     throw new Error("TODO - Method not implemented.");
   }
 
@@ -233,7 +233,7 @@ export class MultiEd25519Signature extends Signature {
 
     for (let i = 0; i < bytes.length - bitmap.length; i += Ed25519Signature.LENGTH) {
       const begin = i;
-      signatures.push(new Ed25519Signature({ data: bytes.subarray(begin, begin + Ed25519Signature.LENGTH) }));
+      signatures.push(new Ed25519Signature({ hexInput: bytes.subarray(begin, begin + Ed25519Signature.LENGTH) }));
     }
     return new MultiEd25519Signature({ signatures, bitmap });
   }
