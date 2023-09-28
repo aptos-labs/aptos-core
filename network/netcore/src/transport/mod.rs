@@ -104,7 +104,7 @@ pub trait Transport {
     /// The returned [`NetworkAddress`] is the actual listening address, this is done to take into
     /// account OS-assigned port numbers (e.g. listening on port 0).
     fn listen_on(
-        &self,
+        &mut self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error>
     where

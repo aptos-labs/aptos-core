@@ -238,7 +238,7 @@ fn test_transport_success<TTransport>(
     let (
         rt,
         _mock_time,
-        (listener_peer_id, listener_transport),
+        (listener_peer_id, mut listener_transport),
         (dialer_peer_id, dialer_transport),
         _,
         supported_protocols,
@@ -321,7 +321,7 @@ fn test_transport_rejects_unauthed_dialer<TTransport>(
     let (
         rt,
         _mock_time,
-        (listener_peer_id, listener_transport),
+        (listener_peer_id, mut listener_transport),
         (dialer_peer_id, dialer_transport),
         peers_and_metadata,
         _supported_protocols,
@@ -380,7 +380,7 @@ fn test_transport_maybe_mutual<TTransport>(
     let (
         rt,
         _mock_time,
-        (listener_peer_id, listener_transport),
+        (listener_peer_id, mut listener_transport),
         (dialer_peer_id, dialer_transport),
         peers_and_metadata,
         supported_protocols,

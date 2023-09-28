@@ -16,7 +16,7 @@ pub type Inbound<O, E> = Pin<Box<dyn Future<Output = Result<O, E>> + Send>>;
 pub type Outbound<O, E> = Pin<Box<dyn Future<Output = Result<O, E>> + Send>>;
 
 trait AbstractBoxedTransport<O, E> {
-    fn listen_on(&self, addr: NetworkAddress) -> Result<(Listener<O, E>, NetworkAddress), E>;
+    fn listen_on(&mut self, addr: NetworkAddress) -> Result<(Listener<O, E>, NetworkAddress), E>;
     fn dial(&self, peer_id: PeerId, addr: NetworkAddress) -> Result<Outbound<O, E>, E>;
 }
 
@@ -28,7 +28,7 @@ where
     T::Outbound: Send + 'static,
     E: ::std::error::Error + Send + Sync + 'static,
 {
-    fn listen_on(&self, addr: NetworkAddress) -> Result<(Listener<O, E>, NetworkAddress), E> {
+    fn listen_on(&mut self, addr: NetworkAddress) -> Result<(Listener<O, E>, NetworkAddress), E> {
         let (listener, addr) = self.listen_on(addr)?;
         let listener = listener
             .map(|result| result.map(|(incoming, addr)| (incoming.boxed() as Inbound<O, E>, addr)));
@@ -74,7 +74,7 @@ where
     type Output = O;
 
     fn listen_on(
-        &self,
+        &mut self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
         self.inner.listen_on(addr)

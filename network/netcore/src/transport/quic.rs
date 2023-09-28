@@ -34,19 +34,27 @@ const SERVER_STRING: &str = "aptos-node";
 
 /// Transport to build QUIC connections
 #[derive(Debug, Clone, Default)]
-pub struct QuicTransport {}
+pub struct QuicTransport {
+    server_endpoint: Option<quinn::Endpoint>,
+}
 
-impl QuicTransport {}
+impl QuicTransport {
+    pub fn new() -> Self {
+        Self {
+            server_endpoint: None,
+        }
+    }
+}
 
 impl Transport for QuicTransport {
     type Error = ::std::io::Error;
     type Inbound = future::Ready<io::Result<Self::Output>>;
-    type Listener = QuicConnectionStream<'static>;
+    type Listener = QuicConnectionStream;
     type Outbound = QuicOutboundConnection;
     type Output = QuicConnection;
 
     fn listen_on(
-        &self,
+        &mut self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
         // Parse the IP address, port and suffix
@@ -63,6 +71,9 @@ impl Transport for QuicTransport {
 
         // Get the listen address
         let listen_addr = NetworkAddress::from(server_endpoint.local_addr()?);
+
+        // Save the server endpoint
+        self.server_endpoint = Some(server_endpoint.clone());
 
         // Create the QUIC connection stream
         let quic_connection_stream = QuicConnectionStream::new(server_endpoint);
@@ -216,44 +227,46 @@ fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
 
 #[must_use = "streams do nothing unless polled"]
 #[allow(dead_code)]
-pub struct QuicConnectionStream<'a> {
+pub struct QuicConnectionStream {
     server_endpoint: Pin<Box<quinn::Endpoint>>,
-    server_accept: Option<Pin<Box<quinn::Accept<'a>>>>,
     pending_connections: Pin<Box<FuturesUnordered<Connecting>>>,
     pending_quic_connections: Pin<Box<FuturesUnordered<PendingQuicConnection>>>,
 }
 
-impl<'a> QuicConnectionStream<'a> {
+impl QuicConnectionStream {
     pub fn new(server_endpoint: quinn::Endpoint) -> Self {
         Self {
             server_endpoint: Box::pin(server_endpoint),
-            server_accept: None,
             pending_connections: Box::pin(FuturesUnordered::new()),
             pending_quic_connections: Box::pin(FuturesUnordered::new()),
         }
     }
 }
 
-impl<'a> Stream for QuicConnectionStream<'a> {
+impl Stream for QuicConnectionStream {
     type Item = io::Result<(future::Ready<io::Result<QuicConnection>>, NetworkAddress)>;
 
-    fn poll_next(self: Pin<&mut Self>, _context: &mut Context) -> Poll<Option<Self::Item>> {
-        unimplemented!("POLL NEXT?!")
-        /*
-        // Setup the endpoint acceptor
-        if self.server_accept.is_none() {
-            self.server_accept = Some(Box::pin(self.server_endpoint.as_mut().accept()));
-        }
-
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
         // Check if there are any new pending connections to accept
-        if let Some(server_accept) = &mut self.server_accept {
-            if let Poll::Ready(Some(server_accept)) = server_accept.as_mut().poll(context) {
-                // Add the new connection to list of pending connections
-                self.pending_connections.as_mut().push(server_accept);
-            }
+        let server_endpoint = self.server_endpoint.clone();
+        let mut server_accept = Box::pin(server_endpoint.accept());
+        if let Poll::Ready(Some(pending_connection)) = server_accept.as_mut().poll(context) {
+            // Add the new pending connection to the list of pending connections
+            self.pending_connections.as_mut().push(pending_connection);
         }
 
-        // Check if there are any pending QUIC connections that are ready
+        // Check if there are any pending connections that are now ready
+        if let Poll::Ready(Some(Ok(connection))) =
+            self.pending_connections.as_mut().poll_next(context)
+        {
+            // Create the pending QUIC socket
+            let pending_quic_socket = PendingQuicConnection::new(connection);
+
+            // Add the new pending QUIC socket to the list of pending QUIC sockets
+            self.pending_quic_connections.push(pending_quic_socket);
+        }
+
+        // Check if there are any pending QUIC connections that are now ready
         if let Poll::Ready(Some(Ok(quic_connection))) =
             self.pending_quic_connections.as_mut().poll_next(context)
         {
@@ -267,19 +280,7 @@ impl<'a> Stream for QuicConnectionStream<'a> {
             ))));
         }
 
-        // Check if there are any pending connections that are ready
-        if let Poll::Ready(Some(Ok(connection))) =
-            self.pending_connections.as_mut().poll_next(context)
-        {
-            // Create the pending QUIC socket
-            let pending_quic_socket = PendingQuicConnection::new(connection);
-
-            // Add the new pending QUIC socket to the list of pending QUIC sockets
-            self.pending_quic_connections.push(pending_quic_socket);
-        }
-
         Poll::Pending
-         */
     }
 }
 
@@ -485,7 +486,7 @@ mod test {
 
     #[tokio::test]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
-        let t = QuicTransport::default().and_then(|mut out, _addr, origin| async move {
+        let mut t = QuicTransport::default().and_then(|mut out, _addr, origin| async move {
             match origin {
                 ConnectionOrigin::Inbound => {
                     out.write_all(b"Earth").await?;
@@ -518,7 +519,7 @@ mod test {
 
     #[test]
     fn unsupported_multiaddrs() {
-        let t = QuicTransport::default();
+        let mut t = QuicTransport::default();
 
         let result = t.listen_on("/memory/0".parse().unwrap());
         assert!(result.is_err());

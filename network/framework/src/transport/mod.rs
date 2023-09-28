@@ -581,7 +581,7 @@ where
     /// `/ip4/<ipaddr>/tcp/<port>` or
     /// `/ip6/<ipaddr>/tcp/<port>`
     pub fn listen_on(
-        &self,
+        &mut self,
         addr: NetworkAddress,
     ) -> io::Result<(
         impl Stream<
@@ -653,7 +653,7 @@ where
             .map(|upgrade_fut| upgrade_fut.boxed())
     }
 
-    fn listen_on(&self, addr: NetworkAddress) -> io::Result<(Self::Listener, NetworkAddress)> {
+    fn listen_on(&mut self, addr: NetworkAddress) -> io::Result<(Self::Listener, NetworkAddress)> {
         let (listener, listen_addr) = self.listen_on(addr)?;
         let listener = listener
             .map_ok(|(upgrade_fut, addr)| (upgrade_fut.boxed(), addr))

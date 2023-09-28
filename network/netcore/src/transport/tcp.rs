@@ -99,7 +99,7 @@ impl Transport for TcpTransport {
     type Output = TcpSocket;
 
     fn listen_on(
-        &self,
+        &mut self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
         let ((ipaddr, port), addr_suffix) =
@@ -421,7 +421,7 @@ mod test {
 
     #[tokio::test]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
-        let t = TcpTransport::default().and_then(|mut out, _addr, origin| async move {
+        let mut t = TcpTransport::default().and_then(|mut out, _addr, origin| async move {
             match origin {
                 ConnectionOrigin::Inbound => {
                     out.write_all(b"Earth").await?;
@@ -454,7 +454,7 @@ mod test {
 
     #[test]
     fn unsupported_multiaddrs() {
-        let t = TcpTransport::default();
+        let mut t = TcpTransport::default();
 
         let result = t.listen_on("/memory/0".parse().unwrap());
         assert!(result.is_err());
