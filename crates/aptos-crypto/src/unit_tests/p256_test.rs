@@ -56,16 +56,16 @@ proptest! {
         message in random_serializable_struct(),
         keypairs in proptest::array::uniform10(uniform_keypair_strategy::<P256PrivateKey, P256PublicKey>())
     ) {
-        let mut signatures: Vec<(P256PublicKey, P256Signature)> = keypairs.iter().map(|keypair| {
+        let mut pks_and_sigs: Vec<(P256PublicKey, P256Signature)> = keypairs.iter().map(|keypair| {
             (keypair.public_key.clone(), keypair.private_key.sign(&message).unwrap())
         }).collect();
-        prop_assert!(P256Signature::batch_verify(&message, signatures.clone()).is_ok());
+        prop_assert!(P256Signature::batch_verify(&message, pks_and_sigs.clone()).is_ok());
         // We swap message and signature for the last element,
         // resulting in an incorrect signature
-        let (key, _sig) = signatures.pop().unwrap();
-        let other_sig = signatures.last().unwrap().clone().1;
-        signatures.push((key, other_sig));
-        prop_assert!(P256Signature::batch_verify(&message, signatures).is_err());
+        let (pk, _sig) = pks_and_sigs.pop().unwrap();
+        let other_sig = pks_and_sigs.last().unwrap().clone().1;
+        pks_and_sigs.push((pk, other_sig));
+        prop_assert!(P256Signature::batch_verify(&message, pks_and_sigs).is_err());
     }
 
     #[test]

@@ -64,7 +64,7 @@ impl P256PrivateKey {
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
-        let secret_key: &p256::ecdsa::SigningKey = &self.0;
+        let secret_key = &self.0;
         let sig = P256Signature(secret_key.sign(message.as_ref()));
         let canonical_sig = P256Signature::make_canonical(&sig);
 

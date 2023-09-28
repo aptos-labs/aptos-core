@@ -82,7 +82,7 @@ impl P256Signature {
                 _ => {},
             }
         }
-        // As this stage S == ORDER_HALF which implies a non canonical S.
+        // At this stage S == ORDER_HALF which implies a non canonical S.
         false
     }
 
