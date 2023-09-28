@@ -231,7 +231,7 @@ impl VMChangeSet {
                 .into_iter()
                 .map(into_write)
                 .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
-        aggregator_write_set.extend(materialized_aggregator_delta_set.into_iter());
+        aggregator_write_set.extend(materialized_aggregator_delta_set);
 
         Ok(Self {
             resource_write_set,

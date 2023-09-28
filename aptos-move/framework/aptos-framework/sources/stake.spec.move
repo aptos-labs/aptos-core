@@ -11,27 +11,18 @@ spec aptos_framework::stake {
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorSet>(@aptos_framework);
 
-        // property 1: the validator set resource stores consensus information for each validator.
-        // the consensus scheme remains consistent across all validators within the set.
-        // this property cause timeout (not proved)
-
-        // apply ConsensusInv to * except on_new_epoch;
-
         // property 2: The owner of a validator remains immutable.
         apply ValidatorOwnerNoChange to *;
-
-        // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
-        // this property cause timeout (proved)
-
-        // apply StakedValueNochange to * except add_stake, add_stake_with_cap, withdraw, withdraw_with_cap, on_new_epoch, update_stake_pool;
 
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
         global ghost_proposer_idx: Option<u64>;
     }
 
-    spec schema ConsensusInv{
-        invariant global<ValidatorSet>(@aptos_framework).consensus_scheme == 0;
+    // property 1: the validator set resource stores consensus information for each validator.
+    // the consensus scheme remains consistent across all validators within the set.
+    spec ValidatorSet {
+        invariant consensus_scheme == 0;
     }
 
     spec schema ValidatorOwnerNoChange {
@@ -39,13 +30,13 @@ spec aptos_framework::stake {
             old(global<OwnerCapability>(addr)).pool_address == global<OwnerCapability>(addr).pool_address;
     }
 
+    // property 3: The total staked value in the stake pool should be constant (excluding adding and withdrawing operations).
     spec schema StakedValueNochange {
-        ensures forall addr: address where old(exists<StakePool>(addr)): {
-            let stake_pool = old(global<StakePool>(addr));
-            let post_stake_pool = global<StakePool>(addr);
-            stake_pool.active.value + stake_pool.inactive.value + stake_pool.pending_active.value + stake_pool.pending_inactive.value ==
-            post_stake_pool.active.value + post_stake_pool.inactive.value + post_stake_pool.pending_active.value + post_stake_pool.pending_inactive.value
-        };
+        pool_address: address;
+        let stake_pool = global<StakePool>(pool_address);
+        let post post_stake_pool = global<StakePool>(pool_address);
+        ensures stake_pool.active.value + stake_pool.inactive.value + stake_pool.pending_active.value + stake_pool.pending_inactive.value ==
+            post_stake_pool.active.value + post_stake_pool.inactive.value + post_stake_pool.pending_active.value + post_stake_pool.pending_inactive.value;
     }
 
     // A desired invariant for the validator set.
@@ -100,6 +91,7 @@ spec aptos_framework::stake {
         let post stake_pool = global<StakePool>(pool_address);
         aborts_if amount != 0 && !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
+        include StakedValueNochange;
         let min_amount = aptos_std::math64::min(amount,pre_stake_pool.active.value);
 
         ensures stake_pool.active.value == pre_stake_pool.active.value - min_amount;
@@ -115,6 +107,7 @@ spec aptos_framework::stake {
         let now_seconds = timestamp::spec_now_seconds();
         let lockup = config.recurring_lockup_duration_secs;
         modifies global<StakePool>(pool_address);
+        include StakedValueNochange;
 
         aborts_if !exists<StakePool>(pool_address);
         aborts_if pre_stake_pool.locked_until_secs >= lockup + now_seconds;
@@ -134,6 +127,7 @@ spec aptos_framework::stake {
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         modifies global<ValidatorConfig>(pool_address);
+        include StakedValueNochange;
 
         // Only the true operator address can update the network and full node addresses of the validator.
         aborts_if !exists<StakePool>(pool_address);
@@ -146,13 +140,17 @@ spec aptos_framework::stake {
 
     spec set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) {
         let pool_address = owner_cap.pool_address;
-        let post stake_pool = global<StakePool>(pool_address);
+        let post post_stake_pool = global<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
-        ensures stake_pool.operator_address == new_operator;
+        include StakedValueNochange;
+
+        ensures post_stake_pool.operator_address == new_operator;
     }
 
     spec reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) {
         let pool_address = owner_cap.pool_address;
+        include StakedValueNochange;
+
         aborts_if !stake_pool_exists(pool_address);
 
         let pre_stake_pool = global<StakePool>(pool_address);
@@ -177,16 +175,18 @@ spec aptos_framework::stake {
         aborts_if signer::address_of(operator) != pre_stake_pool.operator_address;
         aborts_if !exists<ValidatorConfig>(pool_address);
         modifies global<ValidatorConfig>(pool_address);
+        include StakedValueNochange;
 
         ensures validator_info.consensus_pubkey == new_consensus_pubkey;
     }
 
     spec set_delegated_voter_with_cap(owner_cap: &OwnerCapability, new_voter: address) {
         let pool_address = owner_cap.pool_address;
-        let post stake_pool = global<StakePool>(pool_address);
+        let post post_stake_pool = global<StakePool>(pool_address);
+        include StakedValueNochange;
         aborts_if !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
-        ensures stake_pool.delegated_voter == new_voter;
+        ensures post_stake_pool.delegated_voter == new_voter;
     }
 
     spec on_new_epoch {
@@ -214,9 +214,7 @@ spec aptos_framework::stake {
     }
 
     spec update_stake_pool {
-        // Can't verify becasue of timeout (properties proved)
-        // Takes 90s to verify
-        pragma verify = false;
+        pragma verify_duration_estimate = 200;
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StakePool>(pool_address);
@@ -547,8 +545,8 @@ spec aptos_framework::stake {
         requires exists<ValidatorFees>(@aptos_framework);
     }
 
-    // Add helper function in staking_config lead to unexpected error
-    // So we write two helper functions here to describe function staking_config::get_reward_rate().
+    // Adding helper function in staking_config leads to an unexpected error
+    // So we write two helper functions here to model function staking_config::get_reward_rate().
     spec fun spec_get_reward_rate_1(config: StakingConfig): num {
         if (features::spec_periodical_reward_rate_decrease_enabled()) {
             let epoch_rewards_rate = global<staking_config::StakingRewardsConfig>(@aptos_framework).rewards_rate;

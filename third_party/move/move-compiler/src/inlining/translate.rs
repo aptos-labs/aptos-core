@@ -340,7 +340,7 @@ impl<'l, 'r> SubstitutionVisitor<'l, 'r> {
                             loc,
                             get_params_from_decls(&decls)
                                 .into_iter()
-                                .zip(get_args_from_exp(args).into_iter())
+                                .zip(get_args_from_exp(args))
                                 .map(|(s, e)| ((Var(Name::new(e.exp.loc, s)), e.ty.clone()), e)),
                         );
                         // Process body in sub-visitor
@@ -760,7 +760,7 @@ impl<'l> Inliner<'l> {
                         call_loc,
                         UnannotatedExp_::ExpList(
                             exps.into_iter()
-                                .zip(tys.into_iter())
+                                .zip(tys)
                                 .map(|(e, ty)| {
                                     ExpListItem::Single(
                                         make_annotated_exp_of(e, ty.clone(), call_loc),

@@ -580,15 +580,16 @@ fn single_test_suite(
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, false, false),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true),
-        "pfn_performance" => pfn_performance(duration, false, false),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true),
-        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true),
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_performance" => pfn_performance(duration, false, false, true),
+        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
+        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
         "gather_metrics" => gather_metrics(),
         "net_bench" => net_bench(),
         "net_bench_two_region_env" => net_bench_two_region_env(),
+        "net_bench_two_region_env_small_messages" => net_bench_two_region_env_small_messages(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -1367,12 +1368,21 @@ fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.direct_send_per_second = 1000;
 }
 
-fn netbench_config_4_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_5_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
     netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 40;
+    netbench_config.direct_send_per_second = 50;
+}
+
+/// Currently sending 16 MB/s outbound gets 12 MB/s inbound.
+fn netbench_config_16_megabytes_per_sec_large_messages(netbench_config: &mut NetbenchConfig) {
+    netbench_config.enabled = true;
+    netbench_config.max_network_channel_size = 1000;
+    netbench_config.enable_direct_send_testing = true;
+    netbench_config.direct_send_data_size = 1000000;
+    netbench_config.direct_send_per_second = 16;
 }
 
 fn net_bench() -> ForgeConfig {
@@ -1386,16 +1396,29 @@ fn net_bench() -> ForgeConfig {
         }))
 }
 
-fn net_bench_two_region_env() -> ForgeConfig {
+fn net_bench_two_region_inner(
+    netbench_config_fn: Arc<dyn Fn(&mut NetbenchConfig) + Send + Sync>,
+) -> ForgeConfig {
     ForgeConfig::default()
         .add_network_test(wrap_with_two_region_env(Delay::new(180)))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            // Not using 100 MBps here, as it will lead to throughput collapse
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
+            // Use a target that is not too much higher than the achievable throughput, to avoid
+            // throughput collapse
             let mut netbench_config = NetbenchConfig::default();
-            netbench_config_4_megabytes_per_sec(&mut netbench_config);
+            netbench_config_fn(&mut netbench_config);
             config.netbench = Some(netbench_config);
         }))
+}
+
+fn net_bench_two_region_env() -> ForgeConfig {
+    net_bench_two_region_inner(Arc::new(
+        netbench_config_16_megabytes_per_sec_large_messages,
+    ))
+}
+
+fn net_bench_two_region_env_small_messages() -> ForgeConfig {
+    net_bench_two_region_inner(Arc::new(netbench_config_5_megabytes_per_sec_small_messages))
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
@@ -2020,15 +2043,21 @@ fn pfn_const_tps(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
+    epoch_changes: bool,
 ) -> ForgeConfig {
+    let epoch_duration_secs = if epoch_changes {
+        300 // 5 minutes
+    } else {
+        60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
+    };
+
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 100 }))
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Require frequent epoch changes
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(95)
@@ -2060,18 +2089,23 @@ fn pfn_performance(
     duration: Duration,
     add_cpu_chaos: bool,
     add_network_emulation: bool,
+    epoch_changes: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
     let min_expected_tps = 4500;
+    let epoch_duration_secs = if epoch_changes {
+        300 // 5 minutes
+    } else {
+        60 * 60 * 2 // 2 hours; avoid epoch changes which can introduce noise
+    };
 
     // Create the forge config
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
         .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
-        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
-            // Require frequent epoch changes
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_success_criteria(
             SuccessCriteria::new(min_expected_tps)

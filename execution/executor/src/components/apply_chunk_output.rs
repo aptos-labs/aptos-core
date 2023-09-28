@@ -254,11 +254,10 @@ impl ApplyChunkOutput {
         };
 
         // Separate transactions with the Keep status out.
-        let (mut to_keep, to_discard) =
-            itertools::zip_eq(transactions.into_iter(), transaction_outputs.into_iter())
-                .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
-                    matches!(o.status(), TransactionStatus::Keep(_))
-                });
+        let (mut to_keep, to_discard) = itertools::zip_eq(transactions, transaction_outputs)
+            .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
+                matches!(o.status(), TransactionStatus::Keep(_))
+            });
 
         // Append the StateCheckpoint transaction to the end of to_keep
         if let Some(block_id) = state_checkpoint_to_add {
