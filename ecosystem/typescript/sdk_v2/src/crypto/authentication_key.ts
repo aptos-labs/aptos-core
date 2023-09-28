@@ -51,6 +51,19 @@ export class AuthenticationKey {
     return this.data.toUint8Array();
   }
 
+  static fromBytesAndScheme(args: { hexInput: HexInput; scheme: AuthenticationKeyScheme }) {
+    const { hexInput, scheme } = args;
+    const inputBytes = Hex.fromHexInput({ hexInput }).toUint8Array();
+    const bytes = new Uint8Array(inputBytes.length + 1);
+    bytes.set(inputBytes);
+    bytes.set([scheme], inputBytes.length);
+
+    const hash = sha3Hash.create();
+    hash.update(bytes);
+
+    return new AuthenticationKey({ data: hash.digest() });
+  }
+
   /**
    * Converts a PublicKey(s) to AuthenticationKey
    *
@@ -70,15 +83,7 @@ export class AuthenticationKey {
     }
 
     const pubKeyBytes = publicKey.toUint8Array();
-
-    const bytes = new Uint8Array(pubKeyBytes.length + 1);
-    bytes.set(pubKeyBytes);
-    bytes.set([scheme], pubKeyBytes.length);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return new AuthenticationKey({ data: hash.digest() });
+    return AuthenticationKey.fromBytesAndScheme({ hexInput: pubKeyBytes, scheme });
   }
 
   /**
