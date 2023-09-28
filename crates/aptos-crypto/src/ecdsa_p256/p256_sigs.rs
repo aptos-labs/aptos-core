@@ -24,8 +24,6 @@ use super::P256_SIGNATURE_LENGTH;
 #[derive(DeserializeKey, Clone, SerializeKey)]
 pub struct P256Signature(pub(crate) p256::ecdsa::Signature);
 
-impl private::Sealed for P256Signature {}
-
 impl P256Signature {
     /// The length of the P256Signature
     pub const LENGTH: usize = P256_SIGNATURE_LENGTH;

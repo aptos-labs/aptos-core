@@ -318,4 +318,8 @@ pub(crate) mod private {
     impl Sealed for crate::bls12381::PublicKey {}
     impl Sealed for crate::bls12381::Signature {}
     impl Sealed for crate::bls12381::ProofOfPossession {}
+
+    impl Sealed for crate::ecdsa_p256::P256PrivateKey {}
+    impl Sealed for crate::ecdsa_p256::P256PublicKey {}
+    impl Sealed for crate::ecdsa_p256::P256Signature {}
 }

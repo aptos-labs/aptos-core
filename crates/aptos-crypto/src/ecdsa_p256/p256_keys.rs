@@ -23,8 +23,6 @@ use std::fmt;
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
 pub struct P256PrivateKey(pub(crate) p256::ecdsa::SigningKey);
 
-impl private::Sealed for P256PrivateKey {}
-
 #[cfg(feature = "assert-private-keys-not-cloneable")]
 static_assertions::assert_not_impl_any!(P256PrivateKey: Clone);
 
@@ -39,8 +37,6 @@ impl Clone for P256PrivateKey {
 /// A P256 public key
 #[derive(DeserializeKey, Clone, SerializeKey)]
 pub struct P256PublicKey(pub(crate) p256::ecdsa::VerifyingKey);
-
-impl private::Sealed for P256PublicKey {}
 
 impl P256PrivateKey {
     /// The length of the P256PrivateKey
