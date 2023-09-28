@@ -8,6 +8,16 @@ import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { PublicKey } from "./asymmetric_crypto";
 import { Ed25519PublicKey } from "./ed25519";
 
+export enum AuthenticationKeyScheme {
+  Ed25519 = 0,
+  MultiEd25519 = 1,
+  DeriveAuid = 251,
+  DeriveObjectAddressFromObject = 252,
+  DeriveObjectAddressFromGuid = 253,
+  DeriveObjectAddressFromSeed = 254,
+  DeriveResourceAccountAddress = 255,
+}
+
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
  * their private key(s) associated with the account without changing the address that hosts their account.
@@ -20,16 +30,6 @@ import { Ed25519PublicKey } from "./ed25519";
 export class AuthenticationKey {
   // Length of AuthenticationKey in bytes(Uint8Array)
   static readonly LENGTH: number = 32;
-
-  // Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys
-  static readonly MULTI_ED25519_SCHEME: number = 1;
-
-  // Scheme identifier for Ed25519 signatures used to derive authentication key for MultiEd25519 public key
-  static readonly ED25519_SCHEME: number = 0;
-
-  // Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
-  // authentication key) of a resource account.
-  static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
 
   // Actual data of AuthenticationKey, in Hex format
   public readonly data: Hex;
@@ -62,9 +62,9 @@ export class AuthenticationKey {
 
     let scheme: number;
     if (publicKey instanceof Ed25519PublicKey) {
-      scheme = AuthenticationKey.ED25519_SCHEME;
+      scheme = AuthenticationKeyScheme.Ed25519.valueOf();
     } else if (publicKey instanceof MultiEd25519PublicKey) {
-      scheme = AuthenticationKey.MULTI_ED25519_SCHEME;
+      scheme = AuthenticationKeyScheme.MultiEd25519.valueOf();
     } else {
       throw new Error("Unsupported authentication key scheme");
     }
