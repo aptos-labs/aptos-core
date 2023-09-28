@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import nacl from "tweetnacl";
 import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "@noble/hashes/utils";
 import { AccountAddress } from "./account_address";
@@ -10,7 +9,7 @@ import { HexInput } from "../types";
 import { PrivateKey, PublicKey, Signature } from "../crypto/asymmetric_crypto";
 import { derivePath } from "../utils/hd-key";
 import { AuthenticationKey } from "../crypto/authentication_key";
-import { Ed25519PrivateKey, Ed25519PublicKey } from "../crypto/ed25519";
+import { Ed25519PrivateKey } from "../crypto/ed25519";
 
 /**
  * Class for creating and managing account on Aptos network
@@ -37,7 +36,6 @@ export class Account {
   /**
    * constructor for Account
    *
-   * TODO: This constructor uses the nacl library directly, which only works with ed25519 keys.
    * Need to update this to use the new crypto library if new schemes are added.
    *
    * @param args.privateKey PrivateKey - private key of the account
@@ -50,9 +48,7 @@ export class Account {
     const { privateKey, address } = args;
 
     // Derive the public key from the private key
-    const keyPair = nacl.sign.keyPair.fromSeed(privateKey.toUint8Array().slice(0, 32));
-    this.publicKey = new Ed25519PublicKey({ hexInput: keyPair.publicKey });
-
+    this.publicKey = privateKey.publicKey();
     this.privateKey = privateKey;
     this.accountAddress = address;
   }
@@ -63,9 +59,8 @@ export class Account {
    * @returns Account
    */
   static generate(): Account {
-    const keyPair = nacl.sign.keyPair();
-    const privateKey = new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
-    const address = new AccountAddress({ data: Account.authKey({ publicKey: keyPair.publicKey }).toUint8Array() });
+    const privateKey = Ed25519PrivateKey.generate();
+    const address = new AccountAddress({ data: Account.authKey({ publicKey: privateKey.publicKey() }).toUint8Array() });
     return new Account({ privateKey, address });
   }
 
@@ -75,12 +70,12 @@ export class Account {
    * @param args.privateKey Hex - private key of the account
    * @returns Account
    */
-  static fromPrivateKey(args: { privateKey: HexInput }): Account {
-    const privatekeyHex = Hex.fromHexInput({ hexInput: args.privateKey });
-    const keyPair = nacl.sign.keyPair.fromSeed(privatekeyHex.toUint8Array().slice(0, 32));
-    const privateKey = new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, 32) });
-    const address = new AccountAddress({ data: Account.authKey({ publicKey: keyPair.publicKey }).toUint8Array() });
-    return new Account({ privateKey, address });
+  static fromPrivateKey(args: { privateKey: PrivateKey }): Account {
+    const { privateKey } = args;
+    const publicKey = privateKey.publicKey();
+    const authKey = Account.authKey({ publicKey });
+    const address = new AccountAddress({ data: authKey.toUint8Array() });
+    return Account.fromPrivateKeyAndAddress({ privateKey, address });
   }
 
   /**
@@ -91,11 +86,8 @@ export class Account {
    * @param args.address AccountAddress - address of the account
    * @returns Account
    */
-  static fromPrivateKeyAndAddress(args: { privateKey: HexInput; address: AccountAddress }): Account {
-    const privatekeyHex = Hex.fromHexInput({ hexInput: args.privateKey });
-    const signingKey = nacl.sign.keyPair.fromSeed(privatekeyHex.toUint8Array().slice(0, 32));
-    const privateKey = new Ed25519PrivateKey({ value: signingKey.secretKey.slice(0, 32) });
-    return new Account({ privateKey, address: args.address });
+  static fromPrivateKeyAndAddress(args: { privateKey: PrivateKey; address: AccountAddress }): Account {
+    return new Account(args);
   }
 
   /**
@@ -119,12 +111,8 @@ export class Account {
       .join(" ");
 
     const { key } = derivePath(path, bytesToHex(bip39.mnemonicToSeedSync(normalizeMnemonics)));
-
-    const signingKey = nacl.sign.keyPair.fromSeed(key.slice(0, 32));
-    const privateKey = new Ed25519PrivateKey({ value: signingKey.secretKey.slice(0, 32) });
-    const address = new AccountAddress({ data: Account.authKey({ publicKey: signingKey.publicKey }).toUint8Array() });
-
-    return new Account({ privateKey, address });
+    const privateKey = new Ed25519PrivateKey({ hexInput: key });
+    return Account.fromPrivateKey({ privateKey });
   }
 
   /**
@@ -140,14 +128,16 @@ export class Account {
    * See here for more info: {@link https://aptos.dev/concepts/accounts#single-signer-authentication}
    * @returns Authentication key for the associated account
    */
-  static authKey(args: { publicKey: HexInput }): Hex {
-    const publicKey = new Ed25519PublicKey({ hexInput: args.publicKey });
+  static authKey(args: { publicKey: PublicKey }): Hex {
+    const { publicKey } = args;
     const authKey = AuthenticationKey.fromPublicKey({ publicKey });
     return authKey.data;
   }
 
   /**
    * Sign the given message with the private key.
+   *
+   * TODO: Add sign transaction or specific types
    *
    * @param args.data in HexInput format
    * @returns Signature
@@ -167,6 +157,6 @@ export class Account {
   verifySignature(args: { message: HexInput; signature: Signature }): boolean {
     const { message, signature } = args;
     const rawMessage = Hex.fromHexInput({ hexInput: message }).toUint8Array();
-    return this.publicKey.verifySignature({ data: rawMessage, signature });
+    return this.publicKey.verifySignature({ message: rawMessage, signature });
   }
 }
