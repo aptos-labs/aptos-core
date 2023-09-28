@@ -15,25 +15,23 @@ The current required minimum for staking is 1 million APT.
 Important There is no upgrade mechanism for the staking contract from staking pool to delegation pool. A new delegation pool would have to be created.
 :::
 
-## Connect to Aptos network
 
-[Connect to the Aptos network](./connect-to-aptos-network.md) and start your node with `validator-identity` and `validator-fullnode-identity` addresses using your staking pool address.
+## Initialize a staking pool
 
-## Initializing the stake pool
+1. Create a staking pool by running the below command:
 
-Make sure that this step is performed by the owner. See [Initialize staking pool](#initialize-staking-pool) section.
+```bash
+aptos stake create-staking-contract \
+--operator <operator-address> \
+--voter <voter-address> \
+--amount 100000000000000 \
+--commission-percentage 10 \
+--profile mainnet-owner
+```
 
-## Joining validator set
-
-Follow the below steps to set up the validator node using the operator account and join the validator set.
-
-:::tip Mainnet vs Testnet
-The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
-:::
+2. Once the staking pool has been created, you can proceed to [connect to the Aptos Network](./connect-to-aptos-network.md).
 
 ## Perform pool owner operations
-
-This document describes how to [use the Aptos CLI](../../../tools/aptos-cli/use-cli/use-aptos-cli.md) to perform owner operations during validation.
 
 ### Owner operations with CLI
 
@@ -52,15 +50,6 @@ aptos init --profile mainnet-owner \
 
 You can either enter the private key from an existing wallet, or create new wallet address.
 
-### Initialize staking pool
-
-```bash
-aptos stake create-staking-contract \
---operator <operator-address> \
---voter <voter-address> \
---amount 100000000000000 \
---commission-percentage 10
-```
 
 ### Transfer coin between accounts
 
@@ -125,92 +114,6 @@ aptos move run --function-id 0x1::staking_contract::update_commision \
 ```
 
 ## Perform operator operations
-
-### 1. Initialize Aptos CLI
-
-  ```bash
-  aptos init --profile mainnet-operator \
-  --network mainnet \
-  --private-key <operator_account_private_key> \
-  --skip-faucet
-  ```
-  
-:::tip
-The `account_private_key` for the operator can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
-:::
-
-### 2. Check your validator account balance 
-
-Make sure you have enough APT to pay for gas. You can check for this either on the Aptos Explorer or using the CLI:
-
-- On the Aptos Explorer `https://explorer.aptoslabs.com/account/<account-address>?network=Mainnet`, or 
-- Use the CLI:
-
-  ```bash
-  aptos account list --profile mainnet-operator
-  ```
-    
-This will show you the coin balance you have in the validator account. You will see an output like below:
-    
-```json
-"coin": {
-    "value": "5000"
-  }
-```
-
-:::tip Already in validator set? Skip to Step 6
-If you know you are already in the validator set, then skip steps 3, 4, and 5 and go directly to step 6 to confirm it.
-:::
-
-### 3. Update validator network addresses on-chain
-
-```bash
-aptos node update-validator-network-addresses  \
-  --pool-address <pool-address> \
-  --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-  --profile mainnet-operator
-```
-
-:::tip Important notes
-The network address updates and the consensus key rotation will be applied only at the end of the current epoch. Note that the validator need not leave the validator set to make these updates. You can run the commands for address and key changes. For the remaining duration of the current epoch your validator will still use the old key and addresses but when the epoch ends it will switch to the new key and addresses.
-:::
-
-### 4. Rotate the validator consensus key on-chain
-
-```bash
-aptos node update-consensus-key  \
-  --pool-address <pool-address> \
-  --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
-  --profile mainnet-operator
-```
-
-### 5. Join the validator set
-
-```bash
-aptos node join-validator-set \
-  --pool-address <pool-address> \
-  --profile mainnet-operator
-```
-
-The validator set is updated at every epoch change. You will see your validator node joining the validator set only in the next epoch. Both validator and validator fullnode will start syncing once your validator is in the validator set.
-
-:::tip When is next epoch?
-You can see it on the [Aptos Explorer](https://explorer.aptoslabs.com/validators/all?network=mainnet) or by running the command `aptos node get-stake-pool` as shown in [Checking your stake pool information](#checking-your-stake-pool-information).
-:::
-
-### 6. Check the validator set
-   
-When you join the validator set, your validator node will be in "Pending Active" state until the next epoch occurs. **During this time you might see errors like "No connected AptosNet peers". This is normal.** Run the below command to look for your validator in the "pending_active" list.
-
-```bash
-aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.pending_active' | grep <pool_address>
-```
-
-When the next epoch happens, the node will be moved into "active_validators" list.  Run the below command to see your validator in the "active_validators" list:
-
-```bash
-aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active_validators' | grep <pool_address>
-```
 
 ## Checking your stake pool information
 
