@@ -7,7 +7,7 @@ use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
 };
-use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_crypto::hash::CryptoHash;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_scratchpad::SparseMerkleTree;
@@ -15,7 +15,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    proof::accumulator::InMemoryAccumulator,
+    proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
 use proptest::{collection::vec, prelude::*, sample::Index};
@@ -168,10 +168,7 @@ prop_compose! {
         mut universe in any_with::<AccountInfoUniverse>(num_accounts).no_shrink(),
         block_gens in vec(any_with::<BlockGen>(max_user_txns_per_block), min_blocks..=max_blocks),
     ) -> Vec<(Vec<TransactionToCommit>, LedgerInfoWithSignatures)> {
-        type EventAccumulator = InMemoryAccumulator<EventAccumulatorHasher>;
-        type TxnAccumulator = InMemoryAccumulator<TransactionAccumulatorHasher>;
-
-        let mut txn_accumulator = TxnAccumulator::new_empty();
+        let mut txn_accumulator = InMemoryTransactionAccumulator::new_empty();
         let mut result = Vec::new();
 
         let mut in_memory_state = StateDelta::new_empty();
@@ -188,7 +185,7 @@ prop_compose! {
 
                 // calculate event root hash
                 let event_hashes: Vec<_> = txn.events().iter().map(CryptoHash::hash).collect();
-                let event_root_hash = EventAccumulator::from_leaves(&event_hashes).root_hash();
+                let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
 
                 // calculate state checkpoint hash and this must be the last txn
                 let state_checkpoint_hash = if txn.is_state_checkpoint() {
