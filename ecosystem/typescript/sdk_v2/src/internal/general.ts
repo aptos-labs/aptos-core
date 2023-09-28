@@ -15,7 +15,7 @@ export async function getLedgerInfo(args: { aptosConfig: AptosConfig }): Promise
   const { data } = await get<{}, LedgerInfo>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: "",
+      path: "",
       originMethod: "getLedgerInfo",
     },
     aptosConfig,
@@ -32,7 +32,7 @@ export async function getBlockByVersion(args: {
   const { data } = await get<{}, Block>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `blocks/by_version/${blockVersion}`,
+      path: `blocks/by_version/${blockVersion}`,
       originMethod: "getBlockByVersion",
       params: { with_transactions: options?.withTransactions },
     },
@@ -50,7 +50,7 @@ export async function getBlockByHeight(args: {
   const { data } = await get<{}, Block>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `blocks/by_height/${blockHeight}`,
+      path: `blocks/by_height/${blockHeight}`,
       originMethod: "getBlockByHeight",
       params: { with_transactions: options?.withTransactions },
     },
@@ -70,7 +70,7 @@ export async function getTableItem(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       body: data,
-      endpoint: `tables/${handle}/item`,
+      path: `tables/${handle}/item`,
       originMethod: "getTableItem",
       params: { ledger_version: options?.ledgerVersion },
     },
@@ -89,7 +89,7 @@ export async function view(args: {
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
       body: payload,
-      endpoint: "view",
+      path: "view",
       originMethod: "view",
       params: { ledger_version: options?.ledgerVersion },
     },

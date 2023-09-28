@@ -17,7 +17,7 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
     const response = await get<Req, Res>(
       {
         url: options.url,
-        endpoint: options.endpoint,
+        path: options.path,
         params: requestParams,
         originMethod: options.originMethod,
         overrides: options.overrides,

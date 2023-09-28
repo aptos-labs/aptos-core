@@ -58,7 +58,7 @@ export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: 
   const { data } = await get<{}, AccountData>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
+      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
       originMethod: "getInfo",
     },
     aptosConfig,
@@ -75,7 +75,7 @@ export async function getModules(args: {
   const data = await paginateWithCursor<{}, MoveModuleBytecode[]>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
+      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
       params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
       originMethod: "getModules",
     },
@@ -102,7 +102,7 @@ export async function getModule(args: {
   const { data } = await get<{}, MoveModuleBytecode>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
+      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
       originMethod: "getModule",
       params: { ledger_version: options?.ledgerVersion },
     },
@@ -120,7 +120,7 @@ export async function getTransactions(args: {
   const data = await paginateWithCursor<{}, TransactionResponse[]>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
+      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
       originMethod: "getTransactions",
       params: { start: options?.start, limit: options?.limit },
     },
@@ -138,7 +138,7 @@ export async function getResources(args: {
   const data = await paginateWithCursor<{}, MoveResource[]>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
+      path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
       params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
       originMethod: "getResources",
     },
@@ -157,7 +157,7 @@ export async function getResource(args: {
   const { data } = await get<{}, MoveResource>(
     {
       url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({
+      path: `accounts/${AccountAddress.fromHexInput({
         input: accountAddress,
       }).toString()}/resource/${resourceType}`,
       originMethod: "getResource",

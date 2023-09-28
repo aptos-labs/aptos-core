@@ -59,8 +59,8 @@ export async function aptosRequest<Req, Res>(
   options: AptosRequest,
   aptosConfig: AptosConfig,
 ): Promise<AptosResponse<Req, Res>> {
-  const { url, endpoint, method, body, contentType, params, overrides } = options;
-  const fullEndpoint = `${url}/${endpoint ?? ""}`;
+  const { url, path, method, body, contentType, params, overrides } = options;
+  const fullEndpoint = `${url}/${path ?? ""}`;
   const response = await request<Req, Res>(fullEndpoint, method, body, contentType, params, overrides);
 
   const result: AptosResponse<Req, Res> = {
