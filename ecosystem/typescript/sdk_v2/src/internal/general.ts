@@ -6,7 +6,7 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import {get, getFullNode, post} from "../client";
+import {get, getFullNode, post, postFullnode} from "../client";
 import { Block, GraphqlQuery, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
 import { AptosApiType } from "../utils/const";
 
@@ -63,15 +63,14 @@ export async function getTableItem(args: {
   options?: LedgerVersion;
 }): Promise<any> {
   const { aptosConfig, handle, data, options } = args;
-  const response = await post<TableItemRequest, any>(
+  const response = await postFullnode<TableItemRequest, any>(
     {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      body: data,
-      path: `tables/${handle}/item`,
+      aptosConfig,
       name: "getTableItem",
+      path: `tables/${handle}/item`,
       params: { ledger_version: options?.ledgerVersion },
+      body: data,
     },
-    aptosConfig,
   );
   return response.data;
 }
@@ -82,15 +81,14 @@ export async function view(args: {
   options?: LedgerVersion;
 }): Promise<MoveValue[]> {
   const { aptosConfig, payload, options } = args;
-  const { data } = await post<ViewRequest, MoveValue[]>(
+  const { data } = await postFullnode<ViewRequest, MoveValue[]>(
     {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      body: payload,
-      path: "view",
+      aptosConfig,
       name: "view",
+      path: "view",
       params: { ledger_version: options?.ledgerVersion },
+      body: payload,
     },
-    aptosConfig,
   );
   return data;
 }
@@ -98,17 +96,18 @@ export async function view(args: {
 export async function queryIndexer<T>(args: {
   aptosConfig: AptosConfig;
   query: GraphqlQuery;
-  originMethod?: string;
+  name?: string;
 }): Promise<T> {
-  const { aptosConfig, query, originMethod } = args;
+  const { aptosConfig, query, name } = args;
   const { data } = await post<GraphqlQuery, T>(
     {
-      url: aptosConfig.getRequestUrl(AptosApiType.INDEXER),
+      aptosConfig,
+      type: AptosApiType.INDEXER,
+      name: name ?? "queryIndexer",
+      path: "",
       body: query,
-      name: originMethod ?? "queryIndexer",
       overrides: { WITH_CREDENTIALS: false },
     },
-    aptosConfig,
   );
   return data;
 }
