@@ -31,6 +31,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `LinearTransferRef`](#0x1_object_LinearTransferRef)
 -  [Struct `DeriveRef`](#0x1_object_DeriveRef)
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
+-  [Resource `Ghost$g_roll`](#0x1_object_Ghost$g_roll)
 -  [Constants](#@Constants_0)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
 -  [Function `is_object`](#0x1_object_is_object)
@@ -448,6 +449,33 @@ Emitted whenever the object's owner field is changed.
 </dd>
 <dt>
 <code><b>to</b>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_object_Ghost$g_roll"></a>
+
+## Resource `Ghost$g_roll`
+
+
+
+<pre><code><b>struct</b> Ghost$<a href="object.md#0x1_object_g_roll">g_roll</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>v: u8</code>
 </dt>
 <dd>
 
@@ -1739,19 +1767,19 @@ objects may have cyclic dependencies.
     );
 
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
-
     <b>let</b> count = 0;
     <b>while</b> ({
         <b>spec</b> {
             <b>invariant</b> count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
             <b>invariant</b> <b>forall</b> i in 0..count:
                 <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address) && <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address).allow_ungated_transfer;
+            <b>invariant</b> <b>forall</b> i in 0..count:
+                current_address == <a href="object.md#0x1_object_get_transfer_address">get_transfer_address</a>(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination).owner, i);
         };
         owner != current_address
     }) {
         <b>let</b> count = count + 1;
         <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
-
         // At this point, the first <a href="object.md#0x1_object">object</a> <b>exists</b> and so the more likely case is that the
         // <a href="object.md#0x1_object">object</a>'s owner is not an <a href="object.md#0x1_object">object</a>. So we <b>return</b> a more sensible <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>.
         <b>assert</b>!(
@@ -1763,7 +1791,6 @@ objects may have cyclic dependencies.
             <a href="object.md#0x1_object">object</a>.allow_ungated_transfer,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENO_UNGATED_TRANSFERS">ENO_UNGATED_TRANSFERS</a>),
         );
-
         current_address = <a href="object.md#0x1_object">object</a>.owner;
     };
 }
@@ -1920,6 +1947,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
+<a name="0x1_object_g_roll"></a>
+<b>global</b> <a href="object.md#0x1_object_g_roll">g_roll</a>: u8;
 </code></pre>
 
 
@@ -2585,8 +2614,6 @@ Return true if the provided address has indirect or direct ownership of the prov
 <b>let</b> object_address = <a href="object.md#0x1_object">object</a>.inner;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address);
 <b>aborts_if</b> !<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address).allow_ungated_transfer;
-<b>let</b> <b>post</b> new_owner_address = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(object_address).owner;
-<b>ensures</b> owner_address != object_address ==&gt; new_owner_address == <b>to</b>;
 </code></pre>
 
 
@@ -2642,8 +2669,24 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>pragma</b> unroll = <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination);
 <b>aborts_if</b> !<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination).allow_ungated_transfer;
+</code></pre>
+
+
+
+
+<a name="0x1_object_get_transfer_address"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_get_transfer_address">get_transfer_address</a>(addr: <b>address</b>, roll: u64): <b>address</b> {
+   <b>let</b> i = roll;
+   <b>if</b> ( i &gt; 0 )
+   { <a href="object.md#0x1_object_get_transfer_address">get_transfer_address</a>(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr).owner, i - 1) }
+   <b>else</b>
+   { <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr).owner }
+}
 </code></pre>
 
 
