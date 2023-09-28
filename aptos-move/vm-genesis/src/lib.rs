@@ -430,6 +430,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::AGGREGATOR_SNAPSHOTS,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
         FeatureFlag::SAFER_METADATA,
+        FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR,
     ]
 }
 
