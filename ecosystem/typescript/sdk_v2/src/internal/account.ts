@@ -19,8 +19,7 @@ import {
 import { get } from "../client";
 import { paginateWithCursor } from "../utils/paginate_with_cursor";
 import { AccountAddress } from "../core";
-import { AptosApiType, APTOS_COIN } from "../utils/const";
-import { getGasPriceEstimation } from "./transaction";
+import { AptosApiType } from "../utils/const";
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
@@ -121,20 +120,4 @@ export async function getResource(args: {
     overrides: { ...aptosConfig.clientConfig },
   });
   return data;
-}
-
-export async function estimateAccountMaxGasAmount(args: { aptosConfig: AptosConfig; accountAddress: HexInput }) {
-  const { aptosConfig, accountAddress } = args;
-  // Only APT coin is accepted as gas
-  const typeTag = `0x1::coin::CoinStore<${APTOS_COIN}>`;
-  const [{ gas_estimate: gasUnitPrice }, resources] = await Promise.all([
-    getGasPriceEstimation({ aptosConfig }),
-    getResources({ aptosConfig, accountAddress }),
-  ]);
-  const accountResource = resources.find((r) => r.type === typeTag);
-  if (!accountResource) {
-    throw new Error(`account ${accountAddress} doesnt have a ${typeTag} resource`);
-  }
-  const balance = BigInt((accountResource.data as any).coin.value);
-  return balance / BigInt(gasUnitPrice);
 }

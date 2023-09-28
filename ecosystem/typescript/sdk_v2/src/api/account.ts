@@ -9,15 +9,7 @@ import {
   TransactionResponse,
   HexInput,
 } from "../types";
-import {
-  estimateAccountMaxGasAmount,
-  getInfo,
-  getModule,
-  getModules,
-  getResource,
-  getResources,
-  getTransactions,
-} from "../internal/account";
+import { getInfo, getModule, getModules, getResource, getResources, getTransactions } from "../internal/account";
 
 /**
  * A class to query all `Account` related queries on Aptos.
@@ -150,21 +142,5 @@ export class Account {
   }): Promise<MoveResource> {
     const resource = await getResource({ aptosConfig: this.config, ...args });
     return resource;
-  }
-
-  /**
-   * This function calculates the maximum gas amount to be paid
-   * by the transaction sender.
-   * It is calculated by the account APT value / network estimate gas price
-   *
-   * The maximum gas amount of a transaction is the maximum
-   * amount of gas the sender is ready to pay for the transaction.
-   *
-   * @param accountAddress Aptos account address
-   * @returns The estimated maximum gas amount to be paid by the transaction sender
-   */
-  async estimateAccountMaxGasAmount(args: { accountAddress: HexInput }) {
-    const amount = await estimateAccountMaxGasAmount({ aptosConfig: this.config, ...args });
-    return amount;
   }
 }

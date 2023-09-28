@@ -3,7 +3,6 @@ import { Network } from "../../../src/utils/api-endpoints";
 
 // TODO
 // add account getTransactions tests once sdk v2 supports faucet (which needs transaction operation support)
-// add estimateAccountMaxGasAmount test once sdk v2 supports Account class
 
 describe("account api", () => {
   describe("throws when account address in invalid", () => {
@@ -138,18 +137,6 @@ describe("account api", () => {
       });
       expect(data).toHaveProperty("type");
       expect(data.type).toBe("0x1::account::Account");
-    });
-  });
-  describe("calculate account max gas amount", () => {
-    test("it throws when account doesnt have APT coin", async () => {
-      const config = new AptosConfig({ network: Network.LOCAL });
-      const aptos = new Aptos(config);
-      expect(
-        async () =>
-          await aptos.estimateAccountMaxGasAmount({
-            accountAddress: "0x1",
-          }),
-      ).rejects.toThrow("account 0x1 doesnt have a 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin> resource");
     });
   });
 });
