@@ -146,6 +146,9 @@ impl NetworkController {
         self.outbound_task_shutdown_tx = self.outbound_handler.start(&self.outbound_rpc_runtime);
     }
 
+    // TODO: This is still not a very clean shutdown. We don't wait for the full shutdown after
+    //       sending the signal. May not matter much for now because we shutdown before exiting the
+    //       process. Ideally, we want to fix this.
     pub fn shutdown(&mut self) {
         info!("Shutting down network controller at {}", self.listen_addr);
         if let Some(shutdown_signal) = self.inbound_server_shutdown_tx.take() {

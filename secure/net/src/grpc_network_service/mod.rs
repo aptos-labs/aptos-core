@@ -57,9 +57,12 @@ impl GRPCNetworkMessageServiceServerWrapper {
             .unwrap();
 
         info!("Starting Server async at {:?}", server_addr);
-        // NOTE: serve_with_shutdown() starts the server, if successful the task does not return
-        // till the server is shutdown. Hence this should be called as a separate non-blocking task.
-        // Signal handler 'server_shutdown_rx' is needed to shutdown the server
+        // NOTE: (1) serve_with_shutdown() starts the server, if successful the task does not return
+        //           till the server is shutdown. Hence this should be called as a separate
+        //           non-blocking task. Signal handler 'server_shutdown_rx' is needed to shutdown
+        //           the server
+        //       (2) There is no easy way to know if/when the server has started successfully. Hence
+        //           we may need to implement a healthcheck service to check if the server is up
         Server::builder()
             .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
             .add_service(NetworkMessageServiceServer::new(self))

@@ -55,7 +55,6 @@ pub fn create_thread_remote_executor_shards(
 }
 
 #[test]
-#[ignore]
 fn test_sharded_block_executor_no_conflict() {
     use std::thread;
 
