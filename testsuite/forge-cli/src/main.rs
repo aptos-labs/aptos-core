@@ -1377,12 +1377,12 @@ fn netbench_config_5_megabytes_per_sec_small_messages(netbench_config: &mut Netb
 }
 
 /// With default GCP linux settings, sending 16 MB/s outbound gets 12 MB/s inbound.
-fn netbench_config_64_megabytes_per_sec_large_messages(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_48_megabytes_per_sec_large_messages(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
     netbench_config.direct_send_data_size = 1000000;
-    netbench_config.direct_send_per_second = 64;
+    netbench_config.direct_send_per_second = 48;
 }
 
 fn net_bench() -> ForgeConfig {
@@ -1413,7 +1413,7 @@ fn net_bench_two_region_inner(
 
 fn net_bench_two_region_env() -> ForgeConfig {
     net_bench_two_region_inner(Arc::new(
-        netbench_config_64_megabytes_per_sec_large_messages,
+        netbench_config_48_megabytes_per_sec_large_messages,
     ))
 }
 
