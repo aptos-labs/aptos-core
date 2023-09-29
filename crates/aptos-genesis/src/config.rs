@@ -275,7 +275,7 @@ impl HostAndPort {
         } else {
             Protocol::Dns(self.host.clone())
         };
-        let port_protocol = Protocol::Tcp(self.port);
+        let port_protocol = Protocol::Udp(self.port);
         let noise_protocol = Protocol::NoiseIK(key);
         let handshake_protocol = Protocol::Handshake(HANDSHAKE_VERSION);
 

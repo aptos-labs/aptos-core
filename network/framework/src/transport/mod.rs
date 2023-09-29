@@ -34,6 +34,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
+use aptos_types::network_address::{parse_dns_udp, parse_ip_udp};
 
 #[cfg(test)]
 mod test;
@@ -482,13 +483,15 @@ where
         let (base_transport_protos, base_transport_suffix) = parse_ip_tcp(protos)
             .map(|x| (&protos[..2], x.1))
             .or_else(|| parse_dns_tcp(protos).map(|x| (&protos[..2], x.1)))
+            .or_else(|| parse_ip_udp(protos).map(|x| (&protos[..2], x.1)))
+            .or_else(|| parse_dns_udp(protos).map(|x| (&protos[..2], x.1)))
             .or_else(|| parse_memory(protos).map(|x| (&protos[..1], x.1)))
             .ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!(
                         "Unexpected dialing network address: '{}', expected: \
-                         memory, ip+tcp, or dns+tcp",
+                         memory, ip+tcp, dns+tcp, ip+udp, or dns+udp",
                         addr
                     ),
                 )

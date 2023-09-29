@@ -26,6 +26,7 @@ use std::{
     task::{Context, Poll},
     time::{SystemTime, UNIX_EPOCH},
 };
+use std::net::Ipv4Addr;
 use tokio::net::lookup_host;
 use tokio_util::compat::{Compat, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use url::Url;
@@ -158,13 +159,13 @@ pub async fn connect_to_remote(
     remote_ipaddr: std::net::IpAddr,
 ) -> io::Result<quinn::Connection> {
     // Connect to the remote server
-    let socket_addr = SocketAddr::new(remote_ipaddr, port);
+    let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     let connecting = server_endpoint
         .connect(socket_addr, SERVER_STRING)
         .map_err(|error| {
             io::Error::new(
                 io::ErrorKind::Other,
-                format!("could not connect to remote server: {:?}", error),
+                format!("josh :could not connect to remote server: {:?}", error),
             )
         })?;
 
@@ -173,7 +174,10 @@ pub async fn connect_to_remote(
 
 /// Note: we need to take ownership of this `NetworkAddress` (instead of just
 /// borrowing the `&[Protocol]` slice) so this future can be `Send + 'static`.
-pub async fn resolve_and_connect(server_endpoint: quinn::Endpoint, addr: NetworkAddress) -> io::Result<QuicConnection> {
+pub async fn resolve_and_connect(
+    server_endpoint: quinn::Endpoint,
+    addr: NetworkAddress,
+) -> io::Result<QuicConnection> {
     // Open a connection to the remote server
     let connection = open_connection_to_remote(server_endpoint, addr).await?;
 
@@ -182,7 +186,10 @@ pub async fn resolve_and_connect(server_endpoint: quinn::Endpoint, addr: Network
 }
 
 /// Attempts to connect to the remote address
-async fn open_connection_to_remote(server_endpoint: quinn::Endpoint, addr: NetworkAddress) -> io::Result<quinn::Connection> {
+async fn open_connection_to_remote(
+    server_endpoint: quinn::Endpoint,
+    addr: NetworkAddress,
+) -> io::Result<quinn::Connection> {
     let protos = addr.as_slice();
     if let Some(((ipaddr, port), _addr_suffix)) = parse_ip_udp(protos) {
         // this is an /ip4 or /ip6 address, so we can just connect without any
@@ -195,7 +202,9 @@ async fn open_connection_to_remote(server_endpoint: quinn::Endpoint, addr: Netwo
 
         // try to connect until the first succeeds
         for socketaddr in socketaddr_iter {
-            match connect_to_remote(server_endpoint.clone(), socketaddr.port(), socketaddr.ip()).await {
+            match connect_to_remote(server_endpoint.clone(), socketaddr.port(), socketaddr.ip())
+                .await
+            {
                 Ok(connection) => return Ok(connection),
                 Err(err) => last_err = Some(err),
             }

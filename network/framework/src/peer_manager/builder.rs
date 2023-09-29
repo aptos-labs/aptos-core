@@ -24,6 +24,7 @@ use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
 use aptos_netcore::transport::{
+    quic::{QuicConnection, QuicTransport},
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
@@ -142,11 +143,13 @@ impl PeerManagerContext {
 type MemoryPeerManager =
     PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
 type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
+type QuicPeerManager = PeerManager<AptosNetTransport<QuicTransport>, NoiseStream<QuicConnection>>;
 
 enum TransportPeerManager {
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
     Memory(MemoryPeerManager),
     Tcp(TcpPeerManager),
+    Quic(QuicPeerManager),
 }
 
 pub struct PeerManagerBuilder {
@@ -267,12 +270,29 @@ impl PeerManagerBuilder {
             ),
         };
 
-        let mut aptos_tcp_transport = APTOS_TCP_TRANSPORT.clone();
-        let tcp_cfg = self.get_tcp_buffers_cfg();
-        aptos_tcp_transport.set_tcp_buffers(&tcp_cfg);
-
         self.peer_manager = match self.listen_address.as_slice() {
+            [Ip4(_), Udp(_)] | [Ip6(_), Udp(_)] => {
+                let aptos_quic_transport = QuicTransport::new();
+                Some(TransportPeerManager::Quic(self.build_with_transport(
+                    AptosNetTransport::new(
+                        aptos_quic_transport,
+                        self.network_context,
+                        self.time_service.clone(),
+                        key,
+                        auth_mode,
+                        HANDSHAKE_VERSION,
+                        chain_id,
+                        protos,
+                        enable_proxy_protocol,
+                    ),
+                    executor,
+                )))
+            },
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
+                let mut aptos_tcp_transport = APTOS_TCP_TRANSPORT.clone();
+                let tcp_cfg = self.get_tcp_buffers_cfg();
+                aptos_tcp_transport.set_tcp_buffers(&tcp_cfg);
+
                 Some(TransportPeerManager::Tcp(self.build_with_transport(
                     AptosNetTransport::new(
                         aptos_tcp_transport,
@@ -376,6 +396,7 @@ impl PeerManagerBuilder {
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
             TransportPeerManager::Memory(pm) => self.start_peer_manager(pm, executor),
             TransportPeerManager::Tcp(pm) => self.start_peer_manager(pm, executor),
+            TransportPeerManager::Quic(pm) => self.start_peer_manager(pm, executor),
         }
     }
 
