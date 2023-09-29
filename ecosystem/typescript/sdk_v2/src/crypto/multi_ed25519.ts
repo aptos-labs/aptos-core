@@ -8,20 +8,33 @@ import { PublicKey, Signature } from "./asymmetric_crypto";
 import { HexInput } from "../types";
 import { Hex } from "../core/hex";
 
+/**
+ * Represents the public key of a K-of-N Ed25519 multisig transaction.
+ */
 export class MultiEd25519PublicKey extends PublicKey {
-  // Maximum number of public keys supported
+  /**
+   * Maximum number of public keys supported
+   */
   static readonly MAX_KEYS = 32;
 
-  // Minimum number of public keys required
+  /**
+   * Minimum number of public keys needed
+   */
   static readonly MIN_KEYS = 2;
 
-  // Minimum number of threshold supported
+  /**
+   * Minimum threshold for the number of valid signatures required
+   */
   static readonly MIN_THRESHOLD = 1;
 
-  // List of Ed25519 public keys for this MultiEd25519PublicKey
+  /**
+   * List of Ed25519 public keys for this MultiEd25519PublicKey
+   */
   public readonly publicKeys: Ed25519PublicKey[];
 
-  // The minimum number of valid signatures required, for the number of public keys specified
+  /**
+   * The minimum number of valid signatures required, for the number of public keys specified
+   */
   public readonly threshold: number;
 
   /**
@@ -103,17 +116,30 @@ export class MultiEd25519PublicKey extends PublicKey {
   }
 }
 
+/**
+ * Represents the signature of a K-of-N Ed25519 multisig transaction.
+ */
 export class MultiEd25519Signature extends Signature {
-  // Maximum number of signatures supported
+  /**
+   * Maximum number of Ed25519 signatures supported
+   */
   static MAX_SIGNATURES_SUPPORTED = 32;
 
-  // Bitmap length
+  /**
+   * Number of bytes in the bitmap representing who signed the transaction (32-bits)
+   */
   static BITMAP_LEN: number = 4;
 
-  // List of Ed25519Signatures for this MultiEd25519Signature
+  /**
+   * The list of underlying Ed25519 signatures
+   */
   public readonly signatures: Ed25519Signature[];
 
-  // The bitmap masks that public key that has signed the message
+  /**
+   * 32-bit Bitmap representing who signed the transaction
+   *
+   * This is represented where each public key can be masked to determine whether the message was signed by that key.
+   */
   public readonly bitmap: Uint8Array;
 
   /**
@@ -132,12 +158,6 @@ export class MultiEd25519Signature extends Signature {
     const { signatures, bitmap } = args;
     if (bitmap.length !== MultiEd25519Signature.BITMAP_LEN) {
       throw new Error(`"bitmap" length should be ${MultiEd25519Signature.BITMAP_LEN}`);
-    }
-
-    if (signatures.length > MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
-      throw new Error(
-        `The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`,
-      );
     }
 
     if (signatures.length > MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
