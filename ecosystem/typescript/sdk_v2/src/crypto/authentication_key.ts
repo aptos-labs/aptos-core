@@ -3,47 +3,10 @@
 
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { AccountAddress, Hex } from "../core";
-import { HexInput } from "../types";
+import { AuthenticationKeyScheme, HexInput } from "../types";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { PublicKey } from "./asymmetric_crypto";
 import { Ed25519PublicKey } from "./ed25519";
-
-/**
- * A list of Authentication Key schemes that are supported by Aptos.
- *
- * Keys that start with `Derive` are solely used for deriving account addresses from
- * other data. They are not used for signing transactions.
- */
-export enum AuthenticationKeyScheme {
-  /**
-   * For Ed25519PublicKey
-   */
-  Ed25519 = 0,
-  /**
-   * For MultiEd25519PublicKey
-   */
-  MultiEd25519 = 1,
-  /**
-   * Derives an address using an AUID, used for objects
-   */
-  DeriveAuid = 251,
-  /**
-   * Derives an address from another object address
-   */
-  DeriveObjectAddressFromObject = 252,
-  /**
-   * Derives an address from a GUID, used for objects
-   */
-  DeriveObjectAddressFromGuid = 253,
-  /**
-   * Derives an address from seed bytes, used for named objects
-   */
-  DeriveObjectAddressFromSeed = 254,
-  /**
-   * Derives an address from seed bytes, used for resource accounts
-   */
-  DeriveResourceAccountAddress = 255,
-}
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
@@ -116,7 +79,7 @@ export class AuthenticationKey {
     } else if (publicKey instanceof MultiEd25519PublicKey) {
       scheme = AuthenticationKeyScheme.MultiEd25519.valueOf();
     } else {
-      throw new Error("Unsupported authentication key scheme");
+      throw new Error("No supported authentication scheme for public key");
     }
 
     const pubKeyBytes = publicKey.toUint8Array();

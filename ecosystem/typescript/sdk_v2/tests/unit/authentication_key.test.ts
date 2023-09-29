@@ -2,6 +2,9 @@ import { AuthenticationKey } from "../../src/crypto/authentication_key";
 import { Ed25519PublicKey } from "../../src/crypto/ed25519";
 import { MultiEd25519PublicKey } from "../../src/crypto/multi_ed25519";
 import { ed25519, multiEd25519PkTestObject } from "./helper";
+import { PublicKey, Signature } from "../../src/crypto/asymmetric_crypto";
+import { Serializer, Deserializer } from "../../src/bcs";
+import { HexInput } from "../../src/types";
 
 describe("AuthenticationKey", () => {
   it("should create an instance with save the hexinput correctly", () => {
@@ -45,5 +48,36 @@ describe("AuthenticationKey", () => {
     const authKey = new AuthenticationKey({ data: ed25519.authKey });
     const accountAddress = authKey.derivedAddress();
     expect(accountAddress.toString()).toEqual(ed25519.authKey);
+  });
+
+  it("should throw an error on an unsupported key", () => {
+    class NewPublicKey extends PublicKey {
+      constructor() {
+        super();
+      }
+      deserialize(deserializer: Deserializer): PublicKey {
+        throw new Error("Not implemented");
+      }
+
+      serialize(serializer: Serializer): void {
+        throw new Error("Not implemented");
+      }
+
+      toUint8Array(): Uint8Array {
+        throw new Error("Not implemented");
+      }
+
+      toString(): string {
+        throw new Error("Not implemented");
+      }
+
+      verifySignature(args: { message: HexInput; signature: Signature }): boolean {
+        throw new Error("Not implemented");
+      }
+    }
+
+    expect(() => AuthenticationKey.fromPublicKey({ publicKey: new NewPublicKey() })).toThrowError(
+      "No supported authentication scheme for public key",
+    );
   });
 });
