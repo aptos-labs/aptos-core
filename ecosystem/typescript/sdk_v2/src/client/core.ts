@@ -59,17 +59,16 @@ export async function aptosRequest<Req, Res>(
   options: AptosRequest,
   aptosConfig: AptosConfig,
 ): Promise<AptosResponse<Req, Res>> {
-  const { url, endpoint, method, body, contentType, params, overrides } = options;
-  const fullEndpoint = `${url}/${endpoint ?? ""}`;
-  const response = await request<Req, Res>(fullEndpoint, method, body, contentType, params, overrides);
-
+  const { url, path, method, body, contentType, params, overrides } = options;
+  const fullUrl = `${url}/${path ?? ""}`;
+  const response = await request<Req, Res>(fullUrl, method, body, contentType, params, overrides);
   const result: AptosResponse<Req, Res> = {
     status: response.status,
     statusText: response.statusText!,
     data: response.data,
     headers: response.headers,
     config: response.config,
-    url: fullEndpoint,
+    url: fullUrl,
   };
 
   // to support both fullnode and indexer responses,
@@ -77,7 +76,11 @@ export async function aptosRequest<Req, Res>(
   if (aptosConfig.isIndexerRequest(url)) {
     // errors from indexer
     if ((result.data as any).errors) {
-      throw new AptosApiError(options, result, response.data.errors[0].message ?? "Generic Error");
+      throw new AptosApiError(
+        options,
+        result,
+        response.data.errors[0].message ?? `Unhandled Error ${response.status} : ${response.statusText}`,
+      );
     }
     result.data = (result.data as any).data as Res;
   }
@@ -86,5 +89,9 @@ export async function aptosRequest<Req, Res>(
     return result;
   }
   const errorMessage = errors[result.status];
-  throw new AptosApiError(options, result, errorMessage ?? "Generic Error");
+  throw new AptosApiError(
+    options,
+    result,
+    errorMessage ?? `Unhandled Error ${response.status} : ${response.statusText}`,
+  );
 }

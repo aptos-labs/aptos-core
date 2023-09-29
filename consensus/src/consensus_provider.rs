@@ -69,10 +69,11 @@ pub fn start_consensus(
         timeout_sender,
         consensus_to_mempool_sender,
         state_computer,
-        storage,
+        storage.clone(),
         quorum_store_db,
         reconfig_events,
         bounded_executor,
+        aptos_time_service::TimeService::real(),
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

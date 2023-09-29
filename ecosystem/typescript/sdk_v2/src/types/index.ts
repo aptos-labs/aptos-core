@@ -79,7 +79,7 @@ export type ClientConfig = {
 export type AptosRequest = {
   url: string;
   method: "GET" | "POST";
-  endpoint?: string;
+  path?: string;
   body?: any;
   contentType?: string;
   params?: Record<string, string | AnyNumber | boolean | undefined>;
@@ -780,3 +780,40 @@ export type TableItemRequest = {
    */
   key: any;
 };
+
+/**
+ * A list of Authentication Key schemes that are supported by Aptos.
+ *
+ * Keys that start with `Derive` are solely used for deriving account addresses from
+ * other data. They are not used for signing transactions.
+ */
+export enum AuthenticationKeyScheme {
+  /**
+   * For Ed25519PublicKey
+   */
+  Ed25519 = 0,
+  /**
+   * For MultiEd25519PublicKey
+   */
+  MultiEd25519 = 1,
+  /**
+   * Derives an address using an AUID, used for objects
+   */
+  DeriveAuid = 251,
+  /**
+   * Derives an address from another object address
+   */
+  DeriveObjectAddressFromObject = 252,
+  /**
+   * Derives an address from a GUID, used for objects
+   */
+  DeriveObjectAddressFromGuid = 253,
+  /**
+   * Derives an address from seed bytes, used for named objects
+   */
+  DeriveObjectAddressFromSeed = 254,
+  /**
+   * Derives an address from seed bytes, used for resource accounts
+   */
+  DeriveResourceAccountAddress = 255,
+}

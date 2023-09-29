@@ -6,10 +6,8 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { get } from "../client";
+import { getAptosFullNode, paginateWithCursor } from "../client";
 import { GasEstimation, PaginationArgs, TransactionResponse } from "../types";
-import { AptosApiType } from "../utils/const";
-import { paginateWithCursor } from "../utils/paginate_with_cursor";
 
 export async function getTransactions(args: {
   aptosConfig: AptosConfig;
@@ -17,22 +15,20 @@ export async function getTransactions(args: {
 }): Promise<TransactionResponse[]> {
   const { aptosConfig, options } = args;
   const data = await paginateWithCursor<{}, TransactionResponse[]>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: "transactions",
+    aptosConfig,
     originMethod: "getTransactions",
+    path: "transactions",
     params: { start: options?.start, limit: options?.limit },
-    overrides: { ...aptosConfig.clientConfig },
-  }, aptosConfig);
+  });
   return data;
 }
 
 export async function getGasPriceEstimation(args: { aptosConfig: AptosConfig }) {
   const { aptosConfig } = args;
-  const { data } = await get<{}, GasEstimation>({
-    url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-    endpoint: "estimate_gas_price",
+  const { data } = await getAptosFullNode<{}, GasEstimation>({
+    aptosConfig,
     originMethod: "getGasPriceEstimation",
-    overrides: { ...aptosConfig.clientConfig },
-  }, aptosConfig);
+    path: "estimate_gas_price",
+  });
   return data;
 }

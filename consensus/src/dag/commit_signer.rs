@@ -3,13 +3,14 @@
 use crate::experimental::signing_phase::CommitSignerProvider;
 use aptos_crypto::bls12381;
 use aptos_types::validator_signer::ValidatorSigner;
+use std::sync::Arc;
 
 pub struct DagCommitSigner {
-    signer: ValidatorSigner,
+    signer: Arc<ValidatorSigner>,
 }
 
 impl DagCommitSigner {
-    pub fn new(signer: ValidatorSigner) -> Self {
+    pub fn new(signer: Arc<ValidatorSigner>) -> Self {
         Self { signer }
     }
 }
