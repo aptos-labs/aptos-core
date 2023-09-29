@@ -45,7 +45,7 @@ use std::{
     pin::Pin,
 };
 use tokio::task::JoinHandle;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::fmt::MakeWriter;
 
 const TESTNET_FOLDER: &str = "testnet";
@@ -340,6 +340,17 @@ impl CliCommand<()> for RunLocalTestnet {
         } else {
             eprintln!("\nOne of the futures exited unexpectedly, running shutdown steps...");
         }
+
+        // At this point replace the ctrl-c handler so the user can kill the CLI
+        // instantly if they send the signal twice.
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to register ctrl-c hook");
+            warn!("Received ctrl-c twice and exited immediately");
+            eprintln!();
+            std::process::exit(1);
+        });
 
         // Run shutdown steps, if any.
         for shutdown_step in shutdown_steps {
