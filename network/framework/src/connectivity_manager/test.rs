@@ -9,7 +9,10 @@ use crate::{
     transport::ConnectionMetadata,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
+use aptos_config::{
+    config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
+    network_id::NetworkId,
+};
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_logger::info;
 use aptos_time_service::{MockTimeService, TimeService};
@@ -748,10 +751,8 @@ fn public_connection_limit() {
 fn basic_update_discovered_peers() {
     let mut rng = StdRng::from_seed(TEST_SEED);
     let (mock, mut conn_mgr) = TestHarness::new(HashMap::new());
-    let trusted_peers = mock
-        .peers_and_metadata
-        .get_trusted_peers(&mock.network_context.network_id())
-        .unwrap();
+    let peers_and_metadata = mock.peers_and_metadata.clone();
+    let network_id = mock.network_context.network_id();
 
     // sample some example data
     let peer_id_a = AccountAddress::ZERO;
@@ -777,42 +778,42 @@ fn basic_update_discovered_peers() {
 
     // basic one peer one discovery source
     conn_mgr.handle_update_discovered_peers(DiscoverySource::OnChainValidatorSet, peers_1.clone());
-    assert_eq!(*trusted_peers.read(), peers_1);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1.clone());
 
     // same update does nothing
     conn_mgr.handle_update_discovered_peers(DiscoverySource::OnChainValidatorSet, peers_1.clone());
-    assert_eq!(*trusted_peers.read(), peers_1);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1.clone());
 
     // reset
     conn_mgr
         .handle_update_discovered_peers(DiscoverySource::OnChainValidatorSet, peers_empty.clone());
-    assert_eq!(*trusted_peers.read(), peers_empty);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_empty.clone());
 
     // basic union across multiple sources
     conn_mgr.handle_update_discovered_peers(DiscoverySource::OnChainValidatorSet, peers_1.clone());
-    assert_eq!(*trusted_peers.read(), peers_1);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1.clone());
     conn_mgr.handle_update_discovered_peers(DiscoverySource::Config, peers_2);
-    assert_eq!(*trusted_peers.read(), peers_1_2);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1_2.clone());
 
     // does nothing even if another source has same set
     conn_mgr
         .handle_update_discovered_peers(DiscoverySource::OnChainValidatorSet, peers_1_2.clone());
-    assert_eq!(*trusted_peers.read(), peers_1_2);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1_2.clone());
     conn_mgr.handle_update_discovered_peers(DiscoverySource::Config, peers_1_2.clone());
-    assert_eq!(*trusted_peers.read(), peers_1_2);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1_2.clone());
 
     // since on-chain and config now contain the same sets, clearing one should do nothing.
     conn_mgr.handle_update_discovered_peers(DiscoverySource::Config, peers_empty.clone());
-    assert_eq!(*trusted_peers.read(), peers_1_2);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_1_2.clone());
 
     // reset
     conn_mgr
         .handle_update_discovered_peers(DiscoverySource::OnChainValidatorSet, peers_empty.clone());
-    assert_eq!(*trusted_peers.read(), peers_empty);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_empty.clone());
 
     // empty update again does nothing
     conn_mgr.handle_update_discovered_peers(DiscoverySource::Config, peers_empty.clone());
-    assert_eq!(*trusted_peers.read(), peers_empty);
+    verify_trusted_peers(&peers_and_metadata, &network_id, peers_empty.clone());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -827,7 +828,7 @@ async fn test_stale_peers_unknown_inbound() {
         .peers_and_metadata
         .get_trusted_peers(&network_context.network_id())
         .unwrap();
-    assert!(trusted_peers.read().is_empty());
+    assert!(trusted_peers.is_empty());
 
     // Create and connect peer 1 (an unknown outbound connection)
     let peer_id_1 = PeerId::random();
@@ -873,7 +874,7 @@ async fn test_stale_peers_vfn_inbound() {
         .peers_and_metadata
         .get_trusted_peers(&network_context.network_id())
         .unwrap();
-    assert!(trusted_peers.read().is_empty());
+    assert!(trusted_peers.is_empty());
 
     // Create and connect peer 1 (a vfn inbound connection)
     let peer_id_1 = PeerId::random();
@@ -904,5 +905,17 @@ async fn test_stale_peers_vfn_inbound() {
     tokio::join!(
         connectivity_manager.close_stale_connections(),
         mock.expect_disconnect_fail(peer_id_2, connection_metadata_2.addr)
+    );
+}
+
+/// Verifies that the trusted peers match the expected set
+fn verify_trusted_peers(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    network_id: &NetworkId,
+    expected_peer_set: HashMap<AccountAddress, Peer>,
+) {
+    assert_eq!(
+        peers_and_metadata.get_trusted_peers(network_id).unwrap(),
+        expected_peer_set
     );
 }
