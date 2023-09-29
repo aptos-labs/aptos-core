@@ -1,0 +1,40 @@
+warning[W03017]: Use of deprecated constant
+   ┌─ tests/move_check/deprecated/deprecated_placement_module.move:3:8
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+ 3 │ module M {
+   │        ^ Use of constant 'C' from deprecated module '0x42::M'
+   ·
+10 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
+   │                                         - Constant 'C' from module '0x42::M' used here
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module.move:25:9
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+25 │     use 0x42::M;
+   │         ^^^^^^^ Use of deprecated module '0x42::M'
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module.move:29:15
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+29 │     let foo: S = M::foo();
+   │                  ^ Use of deprecated module '0x42::M'
+
+warning[W03016]: Use of deprecated function
+   ┌─ tests/move_check/deprecated/deprecated_placement_module.move:29:15
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+29 │     let foo: S = M::foo();
+   │                  ^  --- Function 'foo' from module '0x42::M' used here
+   │                  │   
+   │                  Use of function 'foo' from deprecated module '0x42::M'
+

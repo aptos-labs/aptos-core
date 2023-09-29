@@ -1,0 +1,165 @@
+warning[W03017]: Use of deprecated constant
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:3:8
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+ 3 │ module M {
+   │        ^ Use of constant 'C' from deprecated module '0x42::M'
+   ·
+13 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
+   │                                         - Constant 'C' from module '0x42::M' used here
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:4:9
+   │
+ 4 │     use 0x41::N;
+   │         ^^^^^^^ Use of deprecated module '0x41::N'
+   ·
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:13:23
+   │
+13 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
+   │                       ^ Use of deprecated module '0x41::N'
+   ·
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+
+warning[W03015]: Use of deprecated struct
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:13:23
+   │
+13 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
+   │                       ^  - Struct 'S' from module '0x41::N' used here
+   │                       │   
+   │                       Use of struct 'S' from deprecated module '0x41::N'
+   ·
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:13:48
+   │
+13 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
+   │                                                ^ Use of deprecated module '0x41::N'
+   ·
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+
+warning[W03016]: Use of deprecated function
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:13:48
+   │
+13 │     public fun foo(): N::S { let _foo = C + 3; N::bar() }
+   │                                                ^  --- Function 'bar' from module '0x41::N' used here
+   │                                                │   
+   │                                                Use of function 'bar' from deprecated module '0x41::N'
+   ·
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+
+warning[W03015]: Use of deprecated struct
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:20:14
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+20 │ module 0x41::N {
+   │              ^ Use of struct 'S' from deprecated module '0x41::N'
+   ·
+25 │     public fun bar(): S { S { } }
+   │                       - Struct 'S' from module '0x41::N' used here
+
+warning[W03015]: Use of deprecated struct
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:20:14
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+20 │ module 0x41::N {
+   │              ^ Use of struct 'S' from deprecated module '0x41::N'
+   ·
+25 │     public fun bar(): S { S { } }
+   │                           - Struct 'S' from module '0x41::N' used here
+
+warning[W03015]: Use of deprecated struct
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:20:14
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+20 │ module 0x41::N {
+   │              ^ Use of struct 'S' from deprecated module '0x41::N'
+   ·
+28 │     public fun consume(_x: S) { }
+   │                            - Struct 'S' from module '0x41::N' used here
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:32:9
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+32 │     use 0x42::M;
+   │         ^^^^^^^ Use of deprecated module '0x42::M'
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:33:9
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+   ·
+33 │     use 0x41::N::S;
+   │         ^^^^^^^ Use of deprecated module '0x41::N'
+
+warning[W03014]: Use of deprecated member
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:33:9
+   │
+21 │     #[deprecated]
+   │       ---------- member 'S' in module '0x41::N' deprecated here
+   ·
+33 │     use 0x41::N::S;
+   │         ^^^^^^^  - Use of member 'S' from module '0x41::N' used here
+   │         │         
+   │         Use of deprecated member 'S' from module '0x41::N'
+
+warning[W03015]: Use of deprecated struct
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:33:9
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+   ·
+33 │     use 0x41::N::S;
+   │         ^^^^^^^ Use of struct 'S' from deprecated module '0x41::N'
+   ·
+36 │     let foo: S = M::foo();
+   │              - Struct 'S' from module '0x41::N' used here
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:36:15
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+36 │     let foo: S = M::foo();
+   │                  ^ Use of deprecated module '0x42::M'
+
+warning[W03016]: Use of deprecated function
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:36:15
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+36 │     let foo: S = M::foo();
+   │                  ^  --- Function 'foo' from module '0x42::M' used here
+   │                  │   
+   │                  Use of function 'foo' from deprecated module '0x42::M'
+
+warning[W03016]: Use of deprecated function
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:37:2
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+   ·
+37 │     0x41::N::consume(foo);
+   │     ^^^^^^^  ------- Function 'consume' from module '0x41::N' used here
+   │     │         
+   │     Use of function 'consume' from deprecated module '0x41::N'
+
