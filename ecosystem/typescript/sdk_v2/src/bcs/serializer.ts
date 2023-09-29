@@ -21,8 +21,7 @@ export abstract class Serializable {
   /**
    * Serializes a `Serializable` value to its BCS representation.
    * This function is the Typescript SDK equivalent of `bcs::to_bytes` in Move.
-   * @param value The Serializable value to serialize
-   * @returns the byte buffer BCS representation of the value
+   * @returns the BCS representation of the Serializable instance as a byte buffer
    */
   bcsToBytes(): Uint8Array {
     const serializer = new Serializer();
