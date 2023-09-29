@@ -6,15 +6,15 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { getFullNode, post, postFullnode } from "../client";
+import { getAptosFullNode, post, postAptosFullNode } from "../client";
 import { Block, GraphqlQuery, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
 import { AptosApiType } from "../utils/const";
 
 export async function getLedgerInfo(args: { aptosConfig: AptosConfig }): Promise<LedgerInfo> {
   const { aptosConfig } = args;
-  const { data } = await getFullNode<{}, LedgerInfo>({
+  const { data } = await getAptosFullNode<{}, LedgerInfo>({
     aptosConfig,
-    name: "getLedgerInfo",
+    originMethod: "getLedgerInfo",
     path: "",
   });
   return data;
@@ -26,9 +26,9 @@ export async function getBlockByVersion(args: {
   options?: { withTransactions?: boolean };
 }): Promise<Block> {
   const { aptosConfig, blockVersion, options } = args;
-  const { data } = await getFullNode<{}, Block>({
+  const { data } = await getAptosFullNode<{}, Block>({
     aptosConfig,
-    name: "getBlockByVersion",
+    originMethod: "getBlockByVersion",
     path: `blocks/by_version/${blockVersion}`,
     params: { with_transactions: options?.withTransactions },
   });
@@ -41,9 +41,9 @@ export async function getBlockByHeight(args: {
   options?: { withTransactions?: boolean };
 }): Promise<Block> {
   const { aptosConfig, blockHeight, options } = args;
-  const { data } = await getFullNode<{}, Block>({
+  const { data } = await getAptosFullNode<{}, Block>({
     aptosConfig,
-    name: "getBlockByHeight",
+    originMethod: "getBlockByHeight",
     path: `blocks/by_height/${blockHeight}`,
     params: { with_transactions: options?.withTransactions },
   });
@@ -57,9 +57,9 @@ export async function getTableItem(args: {
   options?: LedgerVersion;
 }): Promise<any> {
   const { aptosConfig, handle, data, options } = args;
-  const response = await postFullnode<TableItemRequest, any>({
+  const response = await postAptosFullNode<TableItemRequest, any>({
     aptosConfig,
-    name: "getTableItem",
+    originMethod: "getTableItem",
     path: `tables/${handle}/item`,
     params: { ledger_version: options?.ledgerVersion },
     body: data,
@@ -73,9 +73,9 @@ export async function view(args: {
   options?: LedgerVersion;
 }): Promise<MoveValue[]> {
   const { aptosConfig, payload, options } = args;
-  const { data } = await postFullnode<ViewRequest, MoveValue[]>({
+  const { data } = await postAptosFullNode<ViewRequest, MoveValue[]>({
     aptosConfig,
-    name: "view",
+    originMethod: "view",
     path: "view",
     params: { ledger_version: options?.ledgerVersion },
     body: payload,
@@ -86,13 +86,13 @@ export async function view(args: {
 export async function queryIndexer<T>(args: {
   aptosConfig: AptosConfig;
   query: GraphqlQuery;
-  name?: string;
+  originMethod?: string;
 }): Promise<T> {
-  const { aptosConfig, query, name } = args;
+  const { aptosConfig, query, originMethod } = args;
   const { data } = await post<GraphqlQuery, T>({
     aptosConfig,
     type: AptosApiType.INDEXER,
-    name: name ?? "queryIndexer",
+    originMethod: originMethod ?? "queryIndexer",
     path: "",
     body: query,
     overrides: { WITH_CREDENTIALS: false },
