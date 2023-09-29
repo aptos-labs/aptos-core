@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! QUIC Transport
-use crate::transport::Transport;
-use aptos_proxy::Proxy;
+use crate::transport::{utils, Transport};
+use aptos_logger::prelude::*;
 use aptos_types::{
-    network_address::{parse_dns_udp, parse_ip_udp, IpFilter, NetworkAddress},
+    network_address::{parse_dns_udp, parse_ip_udp, DnsName, IpFilter, NetworkAddress},
     PeerId,
 };
 use futures::{
@@ -16,23 +15,23 @@ use futures::{
     stream::FuturesUnordered,
     Stream,
 };
-use quinn::{ClientConfig, Connecting, Endpoint, ServerConfig, TransportConfig};
+use quinn::Connection;
 use std::{
     fmt::Debug,
     io,
-    net::{IpAddr, SocketAddr},
+    io::Error,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
     time::{SystemTime, UNIX_EPOCH},
 };
-use std::net::Ipv4Addr;
-use tokio::net::lookup_host;
 use tokio_util::compat::{Compat, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
-use url::Url;
 
 // Useful constants
 const SERVER_STRING: &str = "aptos-node";
+const STREAM_START_MESSAGE: &str = "start-stream";
+const STREAM_START_MESSSAGE_LENGTH: usize = 12; // Update this if the stream start message changes!
 
 /// Transport to build QUIC connections
 #[derive(Debug, Clone, Default)]
@@ -51,7 +50,7 @@ impl QuicTransport {
 impl Transport for QuicTransport {
     type Error = ::std::io::Error;
     type Inbound = future::Ready<io::Result<Self::Output>>;
-    type Listener = QuicConnectionStream;
+    type Listener = QuicConnectionListener;
     type Outbound = QuicOutboundConnection;
     type Output = QuicConnection;
 
@@ -59,14 +58,16 @@ impl Transport for QuicTransport {
         &mut self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
+        info!("Listening on: {}", addr);
         // Parse the IP address, port and suffix
         let ((ipaddr, port), addr_suffix) =
-            parse_ip_udp(addr.as_slice()).ok_or_else(|| invalid_addr_error(&addr))?;
+            parse_ip_udp(addr.as_slice()).ok_or_else(|| utils::invalid_addr_error(&addr))?;
         if !addr_suffix.is_empty() {
-            return Err(invalid_addr_error(&addr));
+            return Err(utils::invalid_addr_error(&addr));
         }
 
         // If the server endpoint doesn't exist, create it
+        info!("Creating server endpoint!");
         if self.server_endpoint.is_none() {
             // Create the QUIC server endpoint. This will call bind on the socket addr.
             let server_endpoint = create_server_endpoint(ipaddr, port)?;
@@ -75,105 +76,87 @@ impl Transport for QuicTransport {
             self.server_endpoint = Some(server_endpoint);
         }
 
-        // Create the QUIC connection stream
+        // Create the QUIC connection listener
+        info!("Creating QUIC connection listener!");
         if let Some(server_endpoint) = self.server_endpoint.clone() {
             // Get the listen address
             let listen_addr = NetworkAddress::from_udp(server_endpoint.local_addr()?);
 
-            // Create the QUIC connection stream
-            let quic_connection_stream = QuicConnectionStream::new(server_endpoint);
+            // Create the QUIC connection listener
+            let quic_connection_listener = QuicConnectionListener::new(server_endpoint);
 
-            Ok((quic_connection_stream, listen_addr))
+            Ok((quic_connection_listener, listen_addr))
         } else {
             Err(io::Error::new(
                 io::ErrorKind::Other,
-                "Could not create QUIC server endpoint!",
+                "Could not create QUIC connection listener! Missing server endpoint!",
             ))
         }
     }
 
-    fn dial(&self, _peer_id: PeerId, addr: NetworkAddress) -> Result<Self::Outbound, Self::Error> {
-        let protos = addr.as_slice();
+    fn dial(&self, peer_id: PeerId, addr: NetworkAddress) -> Result<Self::Outbound, Self::Error> {
+        info!("Dialing peer {:?} at address: {:?}", peer_id, addr);
 
-        // ensure addr is well formed to save some work before potentially
-        // spawning a dial task that will fail anyway.
+        // Verify the address is well formed
+        let protos = addr.as_slice();
         parse_ip_udp(protos)
             .map(|_| ())
             .or_else(|| parse_dns_udp(protos).map(|_| ()))
-            .ok_or_else(|| invalid_addr_error(&addr))?;
+            .ok_or_else(|| utils::invalid_addr_error(&addr))?;
 
-        let proxy = Proxy::new();
+        // Get the server endpoint. Note: `listen_on()` should have been called already.
+        info!("Getting the server endpoint!");
+        let server_endpoint = self.server_endpoint.clone().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "The server endpoint was missing! Are we sure listen_on() has been called?",
+            )
+        })?;
 
-        let proxy_addr = {
-            use aptos_types::network_address::Protocol::*;
-
-            let addr = match protos.first() {
-                Some(Ip4(ip)) => proxy.https(&ip.to_string()),
-                Some(Ip6(ip)) => proxy.https(&ip.to_string()),
-                Some(Dns(name)) | Some(Dns4(name)) | Some(Dns6(name)) => proxy.https(name.as_ref()),
-                _ => None,
-            };
-
-            addr.and_then(|https_proxy| Url::parse(https_proxy).ok())
-                .and_then(|url| {
-                    if url.has_host() && url.scheme() == "http" {
-                        Some(format!(
-                            "{}:{}",
-                            url.host().unwrap(),
-                            url.port_or_known_default().unwrap()
-                        ))
-                    } else {
-                        None
-                    }
-                })
-        };
-
-        // Unwrap the server endpoint as listen_on() should already have been called
-        let server_endpoint = self.server_endpoint.clone().unwrap();
+        // Create a proxy address (if required)
+        let proxy_addr = utils::create_proxy_addr(protos);
 
         // Create the outbound connection future
-        let f: Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>> =
-            Box::pin(match proxy_addr {
-                Some(proxy_addr) => Either::Left(connect_via_proxy(proxy_addr, addr)),
-                None => Either::Right(resolve_and_connect(server_endpoint, addr)),
-            });
+        info!("Dialing peer future!");
+        let dial_future: Pin<
+            Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>,
+        > = Box::pin(match proxy_addr {
+            Some(proxy_addr) => Either::Left(connect_via_proxy(proxy_addr, addr)),
+            None => Either::Right(resolve_and_connect(server_endpoint, addr)),
+        });
 
-        Ok(QuicOutboundConnection { inner: f })
+        Ok(QuicOutboundConnection { dial_future })
     }
 }
 
-/// Try to lookup the dns name, then filter addrs according to the `IpFilter`.
-async fn resolve_with_filter(
-    ip_filter: IpFilter,
-    dns_name: &str,
-    port: u16,
-) -> io::Result<impl Iterator<Item = SocketAddr> + '_> {
-    Ok(lookup_host((dns_name, port))
-        .await?
-        .filter(move |socketaddr| ip_filter.matches(socketaddr.ip())))
-}
-
+/// Connects to the remote server address.
 pub async fn connect_to_remote(
     server_endpoint: quinn::Endpoint,
     port: u16,
-    remote_ipaddr: std::net::IpAddr,
+    remote_ipaddr: IpAddr,
 ) -> io::Result<quinn::Connection> {
+    // Create the socket addr for the remote addr
+    let socket_addr = if remote_ipaddr == Ipv4Addr::UNSPECIFIED {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port)
+    } else {
+        SocketAddr::new(remote_ipaddr, port)
+    };
+
     // Connect to the remote server
-    let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     let connecting = server_endpoint
         .connect(socket_addr, SERVER_STRING)
         .map_err(|error| {
             io::Error::new(
                 io::ErrorKind::Other,
-                format!("josh :could not connect to remote server: {:?}", error),
+                format!("Could not connect to remote server! Error: {:?}", error),
             )
         })?;
 
+    // Transform the connecting future into a connection
     Ok(connecting.await?)
 }
 
-/// Note: we need to take ownership of this `NetworkAddress` (instead of just
-/// borrowing the `&[Protocol]` slice) so this future can be `Send + 'static`.
+/// Resolves the remote address and connects to it
 pub async fn resolve_and_connect(
     server_endpoint: quinn::Endpoint,
     addr: NetworkAddress,
@@ -192,39 +175,50 @@ async fn open_connection_to_remote(
 ) -> io::Result<quinn::Connection> {
     let protos = addr.as_slice();
     if let Some(((ipaddr, port), _addr_suffix)) = parse_ip_udp(protos) {
-        // this is an /ip4 or /ip6 address, so we can just connect without any
-        // extra resolving or filtering.
+        // This is an /ip4 or /ip6 address, so we can connect without resolving of filtering
         connect_to_remote(server_endpoint, port, ipaddr).await
     } else if let Some(((ip_filter, dns_name, port), _addr_suffix)) = parse_dns_udp(protos) {
-        // resolve dns name and filter
-        let socketaddr_iter = resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
-        let mut last_err = None;
-
-        // try to connect until the first succeeds
-        for socketaddr in socketaddr_iter {
-            match connect_to_remote(server_endpoint.clone(), socketaddr.port(), socketaddr.ip())
-                .await
-            {
-                Ok(connection) => return Ok(connection),
-                Err(err) => last_err = Some(err),
-            }
-        }
-
-        Err(last_err.unwrap_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "could not resolve dns name to any address: name: {}, ip filter: {:?}",
-                    dns_name.as_ref(),
-                    ip_filter,
-                ),
-            )
-        }))
+        // This is a /dns4 or /dns6 address, so we need to resolve the DNS name and filter
+        resolve_dns_and_connect(server_endpoint, ip_filter, dns_name, port).await
     } else {
-        Err(invalid_addr_error(&addr))
+        // This is an invalid address
+        Err(utils::invalid_addr_error(&addr))
     }
 }
 
+/// Resolves the given DNS name and connects to the first socket address that works
+async fn resolve_dns_and_connect(
+    server_endpoint: quinn::Endpoint,
+    ip_filter: IpFilter,
+    dns_name: &DnsName,
+    port: u16,
+) -> Result<Connection, Error> {
+    // Resolve the DNS name and filter
+    let socketaddr_iter = utils::resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
+    let mut last_err = None;
+
+    // Connect to the first socket address that works
+    for socketaddr in socketaddr_iter {
+        match connect_to_remote(server_endpoint.clone(), socketaddr.port(), socketaddr.ip()).await {
+            Ok(connection) => return Ok(connection),
+            Err(err) => last_err = Some(err),
+        }
+    }
+
+    // We failed to connect to any of the socket addresses
+    Err(last_err.unwrap_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "Could not resolve the DNS name to any address! Name: {}, IP filter: {:?}",
+                dns_name.as_ref(),
+                ip_filter,
+            ),
+        )
+    }))
+}
+
+// TODO: complete me?
 async fn connect_via_proxy(
     _proxy_addr: String,
     _addr: NetworkAddress,
@@ -232,22 +226,15 @@ async fn connect_via_proxy(
     unimplemented!("CONNECT VIA PROXY!!")
 }
 
-fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!("Invalid NetworkAddress: '{}'", addr),
-    )
-}
-
 #[must_use = "streams do nothing unless polled"]
 #[allow(dead_code)]
-pub struct QuicConnectionStream {
+pub struct QuicConnectionListener {
     server_endpoint: Pin<Box<quinn::Endpoint>>,
-    pending_connections: Pin<Box<FuturesUnordered<Connecting>>>,
+    pending_connections: Pin<Box<FuturesUnordered<quinn::Connecting>>>,
     pending_quic_connections: Pin<Box<FuturesUnordered<PendingQuicConnection>>>,
 }
 
-impl QuicConnectionStream {
+impl QuicConnectionListener {
     pub fn new(server_endpoint: quinn::Endpoint) -> Self {
         Self {
             server_endpoint: Box::pin(server_endpoint),
@@ -257,17 +244,17 @@ impl QuicConnectionStream {
     }
 }
 
-impl Stream for QuicConnectionStream {
+impl Stream for QuicConnectionListener {
     type Item = io::Result<(future::Ready<io::Result<QuicConnection>>, NetworkAddress)>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
-        println!("QuicConnectionStream::poll_next()");
+        info!("QuicConnectionStream::poll_next()");
 
         // Check if there are any new pending connections to accept
         let server_endpoint = self.server_endpoint.clone();
         let mut server_accept = Box::pin(server_endpoint.accept());
         if let Poll::Ready(Some(pending_connection)) = server_accept.as_mut().poll(context) {
-            println!("(QuicConnectionStream) Got a new pending connection!");
+            info!("(QuicConnectionStream) Got a new pending connection!");
 
             // Add the new pending connection to the list of pending connections
             self.pending_connections.as_mut().push(pending_connection);
@@ -277,7 +264,7 @@ impl Stream for QuicConnectionStream {
         if let Poll::Ready(Some(Ok(connection))) =
             self.pending_connections.as_mut().poll_next(context)
         {
-            println!("(QuicConnectionStream) Got a new pending QUIC connection!");
+            info!("(QuicConnectionStream) Got a new pending QUIC connection!");
 
             // Create the pending QUIC connection
             let pending_quic_connection = PendingQuicConnection::new(connection);
@@ -290,7 +277,7 @@ impl Stream for QuicConnectionStream {
         if let Poll::Ready(Some(Ok(quic_connection))) =
             self.pending_quic_connections.as_mut().poll_next(context)
         {
-            println!("(QuicConnectionStream) Got a new and ready QUIC connection!");
+            info!("(QuicConnectionStream) Got a new and ready QUIC connection!");
 
             // Get the remote address
             let remote_address =
@@ -307,16 +294,17 @@ impl Stream for QuicConnectionStream {
     }
 }
 
+/// A future that resolves to a QUIC connection
 #[must_use = "futures do nothing unless polled"]
 pub struct QuicOutboundConnection {
-    inner: Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>>,
+    dial_future: Pin<Box<dyn Future<Output = io::Result<QuicConnection>> + Send + 'static>>,
 }
 
 impl Future for QuicOutboundConnection {
     type Output = io::Result<QuicConnection>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        let quic_connection = ready!(Pin::new(&mut self.inner).poll(context))?;
+        let quic_connection = ready!(Pin::new(&mut self.dial_future).poll(context))?;
         Poll::Ready(Ok(quic_connection))
     }
 }
@@ -350,16 +338,16 @@ impl Future for PendingQuicConnection {
     type Output = io::Result<QuicConnection>;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Self::Output> {
-        println!("(PendingQuicConnection) Polling PendingQuicConnection");
+        info!("(PendingQuicConnection) Polling PendingQuicConnection");
 
         // Poll the pending QUIC connections to see if any of them are ready
         match self.pending_quic_connections.as_mut().poll_next(context) {
             Poll::Ready(Some(Ok(quic_connection))) => {
-                println!("(PendingQuicConnection) Got a new and ready QUIC connection!");
+                info!("(PendingQuicConnection) Got a new and ready QUIC connection!");
                 Poll::Ready(Ok(quic_connection))
             },
             Poll::Ready(Some(Err(error))) => {
-                println!("(PendingQuicConnection) Got an error: {:?}", error);
+                info!("(PendingQuicConnection) Got an error: {:?}", error);
 
                 // Something went wrong!
                 let error = io::Error::new(
@@ -369,7 +357,7 @@ impl Future for PendingQuicConnection {
                 Poll::Ready(Err(error))
             },
             Poll::Ready(None) => {
-                println!("(PendingQuicConnection) Got None!");
+                info!("(PendingQuicConnection) Got None!");
 
                 Poll::Ready(Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -381,6 +369,7 @@ impl Future for PendingQuicConnection {
     }
 }
 
+/// Creates a QUIC connection from a QUINN connection
 async fn create_quic_connection(connection: quinn::Connection) -> io::Result<QuicConnection> {
     QuicConnection::new(connection).await
 }
@@ -396,22 +385,24 @@ pub struct QuicConnection {
 
 impl QuicConnection {
     pub async fn new(connection: quinn::Connection) -> io::Result<Self> {
-        // Open a uni-directional stream and send a no-op message
-        // so that the receiver can accept it.
+        // Open a uni-directional stream and send a stream start
+        // message so that the receiver can accept it.
         let send_connection = connection.clone();
         let send_stream = tokio::task::spawn(async move {
             // Open the stream
             let mut send_stream = send_connection.open_uni().await.unwrap();
-            println!(
+            info!(
                 "(Remote: {:?}) Opened a new send stream!",
                 send_connection.remote_address(),
             );
 
-            // Send a no-op message
-            let message = "no-op";
-            send_stream.write_all(message.as_bytes()).await.unwrap();
-            println!(
-                "(Remote: {:?}) Wrote no-op message",
+            // Send a stream start message
+            send_stream
+                .write_all(STREAM_START_MESSAGE.as_bytes())
+                .await
+                .unwrap();
+            info!(
+                "(Remote: {:?}) Wrote stream start message",
                 send_connection.remote_address(),
             );
 
@@ -423,20 +414,20 @@ impl QuicConnection {
         let recv_stream = tokio::task::spawn(async move {
             // Accept the stream
             let mut recv_stream = recv_connection.accept_uni().await.unwrap();
-            println!(
+            info!(
                 "(Remote: {:?}) Accepted a new recv stream!",
                 recv_connection.remote_address(),
             );
 
-            // Read the no-op message
-            let mut buf = [0; 5];
+            // Read the stream start message
+            let mut buf = [0; STREAM_START_MESSSAGE_LENGTH];
             recv_stream.read_exact(&mut buf).await.unwrap();
-            println!(
-                "(Remote: {:?}) Read no-op message",
+            info!(
+                "(Remote: {:?}) Read stream start message",
                 recv_connection.remote_address(),
             );
-            if buf != "no-op".as_bytes() {
-                panic!("Read the wrong no-op message!");
+            if buf != STREAM_START_MESSAGE.as_bytes() {
+                panic!("The stream start message is invalid!");
             }
 
             recv_stream
@@ -461,7 +452,7 @@ impl AsyncRead for QuicConnection {
         context: &mut Context,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
-        println!(
+        info!(
             "[{:?}] (Remote: {:?}) Polling Read.",
             SystemTime::now().duration_since(UNIX_EPOCH).unwrap(),
             self.connection.remote_address(),
@@ -469,7 +460,7 @@ impl AsyncRead for QuicConnection {
 
         // Otherwise, read from the existing stream
         let result = Pin::new(&mut self.recv_stream).poll_read(context, buf);
-        println!(
+        info!(
             "(Remote: {:?}) Polling Read. Result: {:?}",
             self.connection.remote_address(),
             result
@@ -488,7 +479,7 @@ impl AsyncWrite for QuicConnection {
         let send_stream = &mut self.send_stream;
 
         let result = Pin::new(send_stream).poll_write(context, buf);
-        println!(
+        info!(
             "(Remote: {:?}) Polling Write. Result: {:?}",
             self.connection.remote_address(),
             result
@@ -501,7 +492,7 @@ impl AsyncWrite for QuicConnection {
         let send_stream = &mut self.send_stream;
 
         let result = Pin::new(send_stream).poll_flush(context);
-        println!(
+        info!(
             "(Remote: {:?}) Polling Flush. Result: {:?}",
             self.connection.remote_address(),
             result
@@ -514,7 +505,7 @@ impl AsyncWrite for QuicConnection {
         let send_stream = &mut self.send_stream;
 
         let result = Pin::new(send_stream).poll_close(_context);
-        println!(
+        info!(
             "(Remote: {:?}) Polling Close. Result: {:?}",
             self.connection.remote_address(),
             result
@@ -547,7 +538,7 @@ impl rustls::client::ServerCertVerifier for SkipServerVerification {
 }
 
 /// Returns the default client configured that ignores the server certificate
-fn configure_client() -> ClientConfig {
+fn configure_client() -> quinn::ClientConfig {
     // Create the dummy crypto config
     let crypto_config = rustls::ClientConfig::builder()
         .with_safe_defaults()
@@ -558,13 +549,13 @@ fn configure_client() -> ClientConfig {
     let transport_config = create_transport_config();
 
     // Create the QUIC client configuration
-    let mut client = ClientConfig::new(Arc::new(crypto_config));
+    let mut client = quinn::ClientConfig::new(Arc::new(crypto_config));
     client.transport_config(transport_config);
     client
 }
 
 /// Returns a new transport config
-fn create_transport_config() -> Arc<TransportConfig> {
+fn create_transport_config() -> Arc<quinn::TransportConfig> {
     let mut transport_config = quinn::TransportConfig::default();
 
     transport_config.max_idle_timeout(None);
@@ -573,7 +564,7 @@ fn create_transport_config() -> Arc<TransportConfig> {
 }
 
 /// Returns the default server configuration along with its dummy certificate
-fn configure_server() -> io::Result<(ServerConfig, Vec<u8>)> {
+fn configure_server() -> io::Result<(quinn::ServerConfig, Vec<u8>)> {
     // Create the dummy server certificate
     let cert = rcgen::generate_simple_self_signed(vec![SERVER_STRING.into()]).unwrap();
     let cert_der = cert.serialize_der().unwrap();
@@ -586,7 +577,7 @@ fn configure_server() -> io::Result<(ServerConfig, Vec<u8>)> {
 
     // Create the QUIC server configuration
     let mut server_config =
-        ServerConfig::with_single_cert(cert_chain, priv_key).map_err(|error| {
+        quinn::ServerConfig::with_single_cert(cert_chain, priv_key).map_err(|error| {
             io::Error::new(
                 io::ErrorKind::Other,
                 format!("Invalid server certificate: {:?}", error),
@@ -601,7 +592,7 @@ fn configure_server() -> io::Result<(ServerConfig, Vec<u8>)> {
 fn create_server_endpoint(
     ipaddr: IpAddr,
     port: u16,
-) -> Result<Endpoint, <QuicTransport as Transport>::Error> {
+) -> Result<quinn::Endpoint, <QuicTransport as Transport>::Error> {
     // Create the QUIC server configuration
     let (server_config, _server_certificate) = configure_server()?;
 
@@ -615,9 +606,10 @@ fn create_server_endpoint(
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
     use super::*;
-    use crate::transport::{ConnectionOrigin, Transport, TransportExt};
-    use aptos_types::PeerId;
+    use crate::transport::{utils::resolve_with_filter, ConnectionOrigin, Transport, TransportExt};
+    use aptos_types::{network_address::IpFilter, PeerId};
     use futures::{
         future::{join, FutureExt},
         io::{AsyncReadExt, AsyncWriteExt},
@@ -629,13 +621,13 @@ mod test {
     #[tokio::test]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
         let mut transport = QuicTransport::new().and_then(|mut out, addr, origin| async move {
-            println!(
+            info!(
                 "(simple_listen_and_dial: {:?}) Got a new connection! Addr: {:?}",
                 origin, addr
             );
             match origin {
                 ConnectionOrigin::Inbound => {
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Reading hello packet!",
                         origin, addr
                     );
@@ -643,7 +635,7 @@ mod test {
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"H");
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Reading hello2 packet!",
                         origin, addr
                     );
@@ -651,19 +643,19 @@ mod test {
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"HH");
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Writing first data packet!",
                         origin, addr
                     );
                     out.write_all(b"EEE").await?;
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Writing second data packet!",
                         origin, addr
                     );
                     out.write_all(b"FFFF").await?;
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Reading third data packet!",
                         origin, addr
                     );
@@ -671,29 +663,29 @@ mod test {
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"AAAAA");
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Writing fourth data packet!",
                         origin, addr
                     );
                     out.write_all(b"WWWWWW").await?;
                     out.close().await?;
 
-                    println!("Everything looks good!");
+                    info!("Everything looks good!");
                 },
                 ConnectionOrigin::Outbound => {
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Writing hello packet!",
                         origin, addr
                     );
                     out.write_all(b"H").await?;
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Writing hello2 packet!",
                         origin, addr
                     );
                     out.write_all(b"HH").await?;
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Reading first data packet!",
                         origin, addr
                     );
@@ -702,7 +694,7 @@ mod test {
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"EEE");
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Reading second data packet!",
                         origin, addr
                     );
@@ -711,13 +703,13 @@ mod test {
                     out.read_exact(&mut buf).await?;
                     assert_eq!(&buf, b"FFFF");
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Writing third data packet!",
                         origin, addr
                     );
                     out.write_all(b"AAAAA").await?;
 
-                    println!(
+                    info!(
                         "(simple_listen_and_dial: {:?}, {:?}) Reading fourth data packet!",
                         origin, addr
                     );
@@ -727,7 +719,7 @@ mod test {
                     assert_eq!(&buf, b"WWWWWW");
                     out.close().await?;
 
-                    println!("Got here!")
+                    info!("Got here!")
                 },
             }
             Ok(())
@@ -753,25 +745,25 @@ mod test {
     async fn simple_listen_and_dial_large_data() -> Result<(), ::std::io::Error> {
         let mut transport = QuicTransport::new().and_then(|mut out, _addr, origin| async move {
             for i in 0..100 {
-                println!("Executing loop {:?}!", i);
+                info!("Executing loop {:?}!", i);
                 match origin {
                     ConnectionOrigin::Inbound => {
-                        println!("Sending a large chunk of data!!");
+                        info!("Sending a large chunk of data!!");
                         let large_data = [0; 1024 * 10];
                         out.write_all(&large_data).await?;
 
-                        println!("Receiving a large chunk of data!!");
+                        info!("Receiving a large chunk of data!!");
                         let mut buf = [0; 1024 * 10];
                         out.read_exact(&mut buf).await?;
                         assert_eq!(buf, [1; 1024 * 10]);
                     },
                     ConnectionOrigin::Outbound => {
-                        println!("Receiving a large chunk of data!!");
+                        info!("Receiving a large chunk of data!!");
                         let mut buf = [0; 1024 * 10];
                         out.read_exact(&mut buf).await?;
                         assert_eq!(buf, [0; 1024 * 10]);
 
-                        println!("Sending a large chunk of data!!");
+                        info!("Sending a large chunk of data!!");
                         let large_data = [1; 1024 * 10];
                         out.write_all(&large_data).await?;
                     },
@@ -808,6 +800,25 @@ mod test {
         let peer_id = PeerId::random();
         let result = t.dial(peer_id, "/memory/22".parse().unwrap());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn dns_address_check() {
+        // Test all protos
+        let address = NetworkAddress::from_str("/dns/aptos-node-1-validator/udp/6180/noise-ik/0x94db6c0c92f719cdd2bce341cfb996aa0f0bd77d35b4deac706158a9128fa01c/handshake/0").unwrap();
+        let protos = address.as_slice();
+        parse_ip_udp(protos)
+            .map(|_| ())
+            .or_else(|| parse_dns_udp(protos).map(|_| ()))
+            .ok_or_else(|| utils::invalid_addr_error(&address)).unwrap();
+
+        // Test only part of the protos
+        let address = NetworkAddress::from_str("/dns/aptos-node-1-validator/udp/6180/").unwrap();
+        let protos = address.as_slice();
+        parse_ip_udp(protos)
+            .map(|_| ())
+            .or_else(|| parse_dns_udp(protos).map(|_| ()))
+            .ok_or_else(|| utils::invalid_addr_error(&address)).unwrap();
     }
 
     #[test]

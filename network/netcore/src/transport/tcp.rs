@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! TCP Transport
-use crate::transport::Transport;
-use aptos_proxy::Proxy;
+use crate::transport::{utils, Transport};
 use aptos_types::{
-    network_address::{parse_dns_tcp, parse_ip_tcp, parse_tcp, IpFilter, NetworkAddress},
+    network_address::{parse_dns_tcp, parse_ip_tcp, parse_tcp, NetworkAddress},
     PeerId,
 };
 use futures::{
@@ -24,10 +23,9 @@ use std::{
 };
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{lookup_host, TcpListener, TcpStream},
+    net::{TcpListener, TcpStream},
 };
 use tokio_util::compat::Compat;
-use url::Url;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TCPBufferCfg {
@@ -103,9 +101,9 @@ impl Transport for TcpTransport {
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
         let ((ipaddr, port), addr_suffix) =
-            parse_ip_tcp(addr.as_slice()).ok_or_else(|| invalid_addr_error(&addr))?;
+            parse_ip_tcp(addr.as_slice()).ok_or_else(|| utils::invalid_addr_error(&addr))?;
         if !addr_suffix.is_empty() {
-            return Err(invalid_addr_error(&addr));
+            return Err(utils::invalid_addr_error(&addr));
         }
 
         let addr = SocketAddr::new(ipaddr, port);
@@ -145,33 +143,10 @@ impl Transport for TcpTransport {
         parse_ip_tcp(protos)
             .map(|_| ())
             .or_else(|| parse_dns_tcp(protos).map(|_| ()))
-            .ok_or_else(|| invalid_addr_error(&addr))?;
+            .ok_or_else(|| utils::invalid_addr_error(&addr))?;
 
-        let proxy = Proxy::new();
-
-        let proxy_addr = {
-            use aptos_types::network_address::Protocol::*;
-
-            let addr = match protos.first() {
-                Some(Ip4(ip)) => proxy.https(&ip.to_string()),
-                Some(Ip6(ip)) => proxy.https(&ip.to_string()),
-                Some(Dns(name)) | Some(Dns4(name)) | Some(Dns6(name)) => proxy.https(name.as_ref()),
-                _ => None,
-            };
-
-            addr.and_then(|https_proxy| Url::parse(https_proxy).ok())
-                .and_then(|url| {
-                    if url.has_host() && url.scheme() == "http" {
-                        Some(format!(
-                            "{}:{}",
-                            url.host().unwrap(),
-                            url.port_or_known_default().unwrap()
-                        ))
-                    } else {
-                        None
-                    }
-                })
-        };
+        // Create a proxy address (if required)
+        let proxy_addr = utils::create_proxy_addr(protos);
 
         let f: Pin<Box<dyn Future<Output = io::Result<TcpStream>> + Send + 'static>> =
             Box::pin(match proxy_addr {
@@ -184,17 +159,6 @@ impl Transport for TcpTransport {
             config: self.clone(),
         })
     }
-}
-
-/// Try to lookup the dns name, then filter addrs according to the `IpFilter`.
-async fn resolve_with_filter(
-    ip_filter: IpFilter,
-    dns_name: &str,
-    port: u16,
-) -> io::Result<impl Iterator<Item = SocketAddr> + '_> {
-    Ok(lookup_host((dns_name, port))
-        .await?
-        .filter(move |socketaddr| ip_filter.matches(socketaddr.ip())))
 }
 
 pub async fn connect_with_config(
@@ -233,7 +197,8 @@ pub async fn resolve_and_connect(
         connect_with_config(port, ipaddr, tcp_buff_cfg).await
     } else if let Some(((ip_filter, dns_name, port), _addr_suffix)) = parse_dns_tcp(protos) {
         // resolve dns name and filter
-        let socketaddr_iter = resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
+        let socketaddr_iter =
+            utils::resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
         let mut last_err = None;
 
         // try to connect until the first succeeds
@@ -255,7 +220,7 @@ pub async fn resolve_and_connect(
             )
         }))
     } else {
-        Err(invalid_addr_error(&addr))
+        Err(utils::invalid_addr_error(&addr))
     }
 }
 
@@ -303,15 +268,8 @@ async fn connect_via_proxy(proxy_addr: String, addr: NetworkAddress) -> io::Resu
             }
         }
     } else {
-        Err(invalid_addr_error(&addr))
+        Err(utils::invalid_addr_error(&addr))
     }
-}
-
-fn invalid_addr_error(addr: &NetworkAddress) -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidInput,
-        format!("Invalid NetworkAddress: '{}'", addr),
-    )
 }
 
 #[must_use = "streams do nothing unless polled"]
@@ -411,7 +369,7 @@ impl AsyncWrite for TcpSocket {
 mod test {
     use super::*;
     use crate::transport::{ConnectionOrigin, Transport, TransportExt};
-    use aptos_types::PeerId;
+    use aptos_types::{network_address::IpFilter, PeerId};
     use futures::{
         future::{join, FutureExt},
         io::{AsyncReadExt, AsyncWriteExt},
@@ -473,21 +431,21 @@ mod test {
 
         let f = async move {
             // this should always return something
-            let addrs = resolve_with_filter(IpFilter::Any, "localhost", 1234)
+            let addrs = utils::resolve_with_filter(IpFilter::Any, "localhost", 1234)
                 .await
                 .unwrap()
                 .collect::<Vec<_>>();
             assert!(!addrs.is_empty(), "addrs: {:?}", addrs);
 
             // we should only get Ip4 addrs
-            let addrs = resolve_with_filter(IpFilter::OnlyIp4, "localhost", 1234)
+            let addrs = utils::resolve_with_filter(IpFilter::OnlyIp4, "localhost", 1234)
                 .await
                 .unwrap()
                 .collect::<Vec<_>>();
             assert!(addrs.iter().all(SocketAddr::is_ipv4), "addrs: {:?}", addrs);
 
             // we should only get Ip6 addrs
-            let addrs = resolve_with_filter(IpFilter::OnlyIp6, "localhost", 1234)
+            let addrs = utils::resolve_with_filter(IpFilter::OnlyIp6, "localhost", 1234)
                 .await
                 .unwrap()
                 .collect::<Vec<_>>();

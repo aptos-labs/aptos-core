@@ -13,7 +13,7 @@ consensus:
     safety_rules:
         service:
             type: process
-            server_address: "/ip4/127.0.0.1/udp/5555"
+            server_address: "/ip4/127.0.0.1/tcp/5555"
 
 execution:
     genesis_file_location: "relative/path/to/genesis"

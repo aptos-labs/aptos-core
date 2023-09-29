@@ -24,6 +24,7 @@ pub mod memory;
 pub mod proxy_protocol;
 pub mod quic;
 pub mod tcp;
+mod utils;
 
 /// Origin of how a Connection was established.
 #[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]

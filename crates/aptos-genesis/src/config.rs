@@ -275,7 +275,10 @@ impl HostAndPort {
         } else {
             Protocol::Dns(self.host.clone())
         };
+
+        // Hack!!
         let port_protocol = Protocol::Udp(self.port);
+
         let noise_protocol = Protocol::NoiseIK(key);
         let handshake_protocol = Protocol::Handshake(HANDSHAKE_VERSION);
 

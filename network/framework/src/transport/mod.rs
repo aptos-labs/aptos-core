@@ -24,7 +24,9 @@ use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::{
     chain_id::ChainId,
-    network_address::{parse_dns_tcp, parse_ip_tcp, parse_memory, NetworkAddress},
+    network_address::{
+        parse_dns_tcp, parse_dns_udp, parse_ip_tcp, parse_ip_udp, parse_memory, NetworkAddress,
+    },
     PeerId,
 };
 use futures::{
@@ -34,7 +36,6 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
-use aptos_types::network_address::{parse_dns_udp, parse_ip_udp};
 
 #[cfg(test)]
 mod test;
