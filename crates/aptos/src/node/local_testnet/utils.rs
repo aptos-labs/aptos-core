@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::traits::ShutdownStep;
 use anyhow::{bail, Context, Result};
+use async_trait::async_trait;
 use reqwest::Url;
-use std::{
-    fs::create_dir_all,
-    net::SocketAddr,
-    path::Path,
-    process::{ExitStatus, Stdio},
-};
+use std::{fs::create_dir_all, net::SocketAddr, path::Path, process::Stdio};
 use tokio::process::Command;
 use tracing::info;
 
@@ -40,12 +37,14 @@ pub async fn confirm_docker_available() -> Result<()> {
     Ok(())
 }
 
-pub async fn delete_container(container_name: &str) -> Result<ExitStatus> {
+/// Delete a container. If the container doesn't exist, that's fine, just move on.
+pub async fn delete_container(container_name: &str) -> Result<()> {
     info!(
         "Removing any existing postgres container with name {}",
         container_name
     );
-    let status = Command::new("docker")
+
+    let _ = Command::new("docker")
         .arg("rm")
         .arg("-f")
         .arg(container_name)
@@ -58,19 +57,12 @@ pub async fn delete_container(container_name: &str) -> Result<ExitStatus> {
             container_name
         ))?;
 
-    if !status.success() {
-        bail!(
-            "Failed to delete any existing container with name {}: {:?}",
-            container_name,
-            status
-        );
-    }
     info!(
         "Removed any existing postgres container with name {}",
         container_name
     );
 
-    Ok(status)
+    Ok(())
 }
 
 pub async fn pull_docker_image(image_name: &str) -> Result<()> {
@@ -131,4 +123,25 @@ pub fn setup_docker_logging(
     let stderr = Stdio::from(file);
 
     Ok((stdout, stderr))
+}
+
+/// This shutdown step forcibly kills a container with the given name. If no container
+/// is found we continue without error.
+#[derive(Clone, Debug)]
+pub struct KillContainerShutdownStep {
+    container_name: &'static str,
+}
+
+impl KillContainerShutdownStep {
+    pub fn new(container_name: &'static str) -> Self {
+        Self { container_name }
+    }
+}
+
+#[async_trait]
+impl ShutdownStep for KillContainerShutdownStep {
+    async fn run(self: Box<Self>) -> Result<()> {
+        delete_container(self.container_name).await?;
+        Ok(())
+    }
 }

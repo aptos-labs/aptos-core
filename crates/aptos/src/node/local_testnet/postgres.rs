@@ -3,11 +3,11 @@
 
 use super::{
     health_checker::HealthChecker,
-    traits::ServiceManager,
+    traits::{ServiceManager, ShutdownStep},
     utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
 };
-use crate::node::local_testnet::utils::setup_docker_logging;
+use crate::node::local_testnet::utils::{setup_docker_logging, KillContainerShutdownStep};
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
@@ -226,5 +226,12 @@ impl ServiceManager for PostgresManager {
         }
 
         Ok(())
+    }
+
+    fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
+        // Shutdown the postgres container, if any.
+        vec![Box::new(KillContainerShutdownStep::new(
+            POSTGRES_CONTAINER_NAME,
+        ))]
     }
 }
