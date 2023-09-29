@@ -3433,6 +3433,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-experimental-runtimes",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-scratchpad",
@@ -3787,6 +3788,7 @@ dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-experimental-runtimes",
  "arr_macro",
  "bcs 0.1.4",
  "bytes",

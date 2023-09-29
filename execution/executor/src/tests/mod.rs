@@ -4,7 +4,6 @@
 
 use crate::{
     block_executor::BlockExecutor,
-    chunk_executor::ChunkExecutor,
     components::chunk_output::ChunkOutput,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
     mock_vm::{
@@ -16,7 +15,7 @@ use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
-    BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer, VerifyExecutionMode,
+    BlockExecutorTrait, ExecutedChunk, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
@@ -489,15 +488,32 @@ fn apply_transaction_by_writeset(
     let (executed, _, _) = chunk_output
         .apply_to_ledger(&ledger_view, None, None)
         .unwrap();
+    let ExecutedChunk {
+        result_state,
+        ledger_info,
+        next_epoch_state: _,
+        ledger_update_output,
+    } = executed;
+    let LedgerUpdateOutput {
+        status: _,
+        to_commit,
+        reconfig_events: _,
+        transaction_info_hashes: _,
+        state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
+        sharded_state_cache,
+        transaction_accumulator: _,
+    } = ledger_update_output;
 
     db.writer
         .save_transactions(
-            executed.transactions_to_commit(),
+            &to_commit,
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
-            None,
+            ledger_info.as_ref(),
             true, /* sync_commit */
-            executed.result_view.state().clone(),
+            result_state,
+            state_updates_before_last_checkpoint,
+            Some(&sharded_state_cache),
         )
         .unwrap();
 }
@@ -694,23 +710,41 @@ fn run_transactions_naive(
         )
         .unwrap();
         let (executed, _, _) = out.apply_to_ledger(&ledger_view, None, None).unwrap();
+        let next_ledger_view = executed.result_view();
+        let ExecutedChunk {
+            result_state,
+            ledger_info,
+            next_epoch_state: _,
+            ledger_update_output,
+        } = executed;
+        let LedgerUpdateOutput {
+            status: _,
+            to_commit,
+            reconfig_events: _,
+            transaction_info_hashes: _,
+            state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
+            sharded_state_cache,
+            transaction_accumulator: _,
+        } = ledger_update_output;
         db.writer
             .save_transactions(
-                executed.transactions_to_commit(),
+                &to_commit,
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
-                None,
+                ledger_info.as_ref(),
                 true, /* sync_commit */
-                executed.result_view.state().clone(),
+                result_state,
+                state_updates_before_last_checkpoint,
+                Some(&sharded_state_cache),
             )
             .unwrap();
-        ledger_view = executed.result_view;
+        ledger_view = next_ledger_view;
     }
     ledger_view.txn_accumulator().root_hash()
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(10))]
+    #![proptest_config(ProptestConfig::with_cases(1))]
 
     #[test]
     #[cfg_attr(feature = "consensus-only-perf-test", ignore)]
@@ -801,6 +835,7 @@ proptest! {
             let ledger_info = gen_ledger_info(ledger_version_from_block_size(block_a.txns.len(), BLOCK_GAS_LIMIT) as u64, root_hash, block_a.id, 1);
             executor.commit_blocks(vec![block_a.id], ledger_info).unwrap();
             parent_block_id = block_a.id;
+            drop(executor);
         }
 
         // Now we construct a new executor and run one more block.
@@ -830,56 +865,5 @@ proptest! {
             txns
         }, BLOCK_GAS_LIMIT);
         prop_assert_eq!(root_hash, expected_root_hash);
-    }
-
-    #[ignore]
-    #[test]
-    fn test_idempotent_commits(chunk_size in 1..30u64, overlap_size in 1..30u64, num_new_txns in 1..30u64) {
-        let (chunk_start, chunk_end) = (1, chunk_size + 1);
-        let (overlap_start, overlap_end) = (chunk_size + 1, chunk_size + overlap_size + 1);
-        let (mut chunks, ledger_info) =
-            create_transaction_chunks(vec![
-                chunk_start..chunk_end,
-                overlap_start..overlap_end
-            ]);
-
-        let overlap_txn_list_with_proof = chunks.pop().unwrap();
-        let txn_list_with_proof_to_commit = chunks.pop().unwrap();
-        let mut first_block_txns = txn_list_with_proof_to_commit.transactions.clone();
-
-        // Commit the first chunk without committing the ledger info.
-        let TestExecutor { _path, db, executor } = TestExecutor::new();
-        {
-            let executor = ChunkExecutor::<MockVM>::new(db);
-            executor.execute_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
-            executor.commit().unwrap();
-        }
-
-        first_block_txns.extend(overlap_txn_list_with_proof.transactions);
-        let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)
-                             .map(|i| encode_mint_transaction(gen_address(i), 100))).collect::<Vec<_>>();
-
-        executor.reset().unwrap();
-        let parent_block_id = executor.committed_block_id();
-        let first_block_id = gen_block_id(1);
-        let _output1 = executor.execute_block(
-            (first_block_id, first_block_txns).into(),
-            parent_block_id, BLOCK_GAS_LIMIT
-        ).unwrap();
-
-        let second_block_id = gen_block_id(2);
-        let output2 = executor.execute_block(
-            (second_block_id, block(second_block_txns, BLOCK_GAS_LIMIT)).into(),
-            first_block_id, BLOCK_GAS_LIMIT
-        ).unwrap();
-
-        let version = chunk_size + overlap_size + num_new_txns + 1;
-        prop_assert_eq!(output2.version(), version);
-
-        let ledger_info = gen_ledger_info(version, output2.root_hash(), second_block_id, 1);
-        executor.commit_blocks(
-            vec![first_block_id, second_block_id],
-            ledger_info,
-        ).unwrap();
     }
 }

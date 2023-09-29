@@ -45,6 +45,7 @@ impl ApplyChunkOutput {
         chunk_output: ChunkOutput,
         parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
+        known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         is_block: bool,
     ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
         let ChunkOutput {
@@ -73,7 +74,7 @@ impl ApplyChunkOutput {
             state_checkpoint_hashes,
             result_state,
             next_epoch_state,
-            block_state_updates,
+            state_updates_before_last_checkpoint,
             sharded_state_cache,
         ) = {
             let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
@@ -88,17 +89,24 @@ impl ApplyChunkOutput {
             )?
         };
 
-        Ok((
-            result_state,
-            next_epoch_state,
-            StateCheckpointOutput::new(
-                TransactionsByStatus::new(status, to_keep, to_discard, to_retry),
-                state_updates_vec,
-                state_checkpoint_hashes,
-                block_state_updates,
-                sharded_state_cache,
-            ),
-        ))
+        let mut state_checkpoint_output = StateCheckpointOutput::new(
+            TransactionsByStatus::new(status, to_keep, to_discard, to_retry),
+            state_updates_vec,
+            state_checkpoint_hashes,
+            state_updates_before_last_checkpoint,
+            sharded_state_cache,
+        );
+
+        // On state sync/replay, we generate state checkpoints only periodically, for the
+        // last state checkpoint of each chunk.
+        // A mismatch in the SMT will be detected at that occasion too. Here we just copy
+        // in the state root from the TxnInfo in the proof.
+        if let Some(state_checkpoint_hashes) = known_state_checkpoints {
+            state_checkpoint_output
+                .check_and_update_state_checkpoint_hashes(state_checkpoint_hashes)?;
+        }
+
+        Ok((result_state, next_epoch_state, state_checkpoint_output))
     }
 
     pub fn calculate_ledger_update(
@@ -142,7 +150,7 @@ impl ApplyChunkOutput {
                 to_commit,
                 reconfig_events,
                 transaction_info_hashes,
-                state_updates_before_last_checkpoint,
+                state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
                 sharded_state_cache,
                 transaction_accumulator,
             },
@@ -154,26 +162,17 @@ impl ApplyChunkOutput {
     pub fn apply_chunk(
         chunk_output: ChunkOutput,
         base_view: &ExecutedTrees,
-        state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
+        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
-        let (result_state, next_epoch_state, mut state_checkpoint_output) =
+        let (result_state, next_epoch_state, state_checkpoint_output) =
             Self::calculate_state_checkpoint(
                 chunk_output,
                 base_view.state(),
                 append_state_checkpoint_to_block,
+                known_state_checkpoint_hashes,
                 /*is_block=*/ false,
             )?;
-
-        // On state sync/replay, we generate state checkpoints only periodically, for the
-        // last state checkpoint of each chunk.
-        // A mismatch in the SMT will be detected at that occasion too. Here we just copy
-        // in the state root from the TxnInfo in the proof.
-        if let Some(state_checkpoint_hashes) = state_checkpoint_hashes {
-            state_checkpoint_output
-                .check_and_update_state_checkpoint_hashes(state_checkpoint_hashes)?;
-        }
-
         let (ledger_update_output, to_discard, to_retry) = Self::calculate_ledger_update(
             state_checkpoint_output,
             base_view.txn_accumulator().clone(),
@@ -181,14 +180,10 @@ impl ApplyChunkOutput {
 
         Ok((
             ExecutedChunk {
-                status: ledger_update_output.status,
-                to_commit: ledger_update_output.to_commit,
-                result_view: ExecutedTrees::new(
-                    result_state,
-                    ledger_update_output.transaction_accumulator,
-                ),
-                next_epoch_state,
+                result_state,
                 ledger_info: None,
+                next_epoch_state,
+                ledger_update_output,
             },
             to_discard,
             to_retry,
@@ -397,6 +392,9 @@ pub fn ensure_no_discard(to_discard: Vec<Transaction>) -> Result<()> {
 }
 
 pub fn ensure_no_retry(to_retry: Vec<Transaction>) -> Result<()> {
-    ensure!(to_retry.is_empty(), "Chunk crosses epoch boundary.",);
+    ensure!(
+        to_retry.is_empty(),
+        "Seeing retries when syncing, did it crosses epoch boundary?",
+    );
     Ok(())
 }

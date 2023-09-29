@@ -1376,12 +1376,12 @@ impl Display for TransactionInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct TransactionToCommit {
-    transaction: Transaction,
-    transaction_info: TransactionInfo,
-    state_updates: ShardedStateUpdates,
-    write_set: WriteSet,
-    events: Vec<ContractEvent>,
-    is_reconfig: bool,
+    pub transaction: Transaction,
+    pub transaction_info: TransactionInfo,
+    pub state_updates: ShardedStateUpdates,
+    pub write_set: WriteSet,
+    pub events: Vec<ContractEvent>,
+    pub is_reconfig: bool,
 }
 
 impl TransactionToCommit {

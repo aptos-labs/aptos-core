@@ -162,6 +162,8 @@ impl DbWriter for FastSyncStorageWrapper {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         self.get_aptos_db_write_ref().save_transactions(
             txns_to_commit,
@@ -170,28 +172,7 @@ impl DbWriter for FastSyncStorageWrapper {
             ledger_info_with_sigs,
             sync_commit,
             latest_in_memory_state,
-        )
-    }
-
-    fn save_transaction_block(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        block_state_updates: ShardedStateUpdates,
-        sharded_state_cache: &ShardedStateCache,
-    ) -> Result<()> {
-        self.get_aptos_db_write_ref().save_transaction_block(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-            block_state_updates,
+            state_updates_until_last_checkpoint,
             sharded_state_cache,
         )
     }
