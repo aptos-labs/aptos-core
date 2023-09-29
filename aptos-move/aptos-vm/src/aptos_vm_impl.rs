@@ -4,7 +4,6 @@
 
 use crate::{
     access_path_cache::AccessPathCache,
-    counters::TIMER,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
     system_module_names::{
@@ -21,7 +20,6 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateViewId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
@@ -87,7 +85,6 @@ pub fn gas_config(
 
 impl AptosVMImpl {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
-        let _timer = TIMER.timer_with(&["impl_new"]);
         // Get the gas parameters
         let (mut gas_params, gas_feature_version) = gas_config(resolver);
 
