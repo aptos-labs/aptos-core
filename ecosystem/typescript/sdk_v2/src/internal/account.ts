@@ -6,8 +6,7 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { getFullNode } from "../client";
-import { paginateWithCursor } from "../utils/paginate_with_cursor";
+import { getFullNode, paginateWithCursor } from "../client";
 import { AccountAddress, Hex } from "../core";
 import { queryIndexer } from "./general";
 import {
