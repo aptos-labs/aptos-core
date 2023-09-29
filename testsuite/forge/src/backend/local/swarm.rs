@@ -38,7 +38,10 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use std::net::SocketAddr;
 use tempfile::TempDir;
+use url::quirks::port;
+use aptos_sdk::types::network_address::NetworkAddress;
 
 #[derive(Debug)]
 pub enum SwarmDirectory {
@@ -214,12 +217,22 @@ impl LocalSwarm {
                 };
                 validator_config.set_data_dir(validator.base_dir());
                 *validator.config_mut() = validator_config.clone();
+
+                // HACK!!
+                if let Some(validator_network) = validator_config.validator_network.as_mut() {
+                    let addr = validator_network.listen_address.find_ip_addr().unwrap();
+                    let port = validator_network.listen_address.find_port().unwrap();
+                    validator_network.listen_address = NetworkAddress::from_udp(SocketAddr::new(addr, port));
+                }
+
                 // Since the validator's config has changed we need to save it
                 validator_override_config.save_config(validator.config_path())?;
 
                 Ok((validator.peer_id(), public_network))
             })
             .collect::<Result<HashMap<_, _>>>()?;
+
+        //panic!("Validator config: {:?}", validators);
 
         // We print out the root key to make it easy for users to deploy a local faucet
         let encoded_root_key = EncodingType::Hex.encode_key("root_key", &root_key)?;

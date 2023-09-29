@@ -299,7 +299,10 @@ impl NetworkAddress {
             }
         }
 
-        p = iter.next();
+        if is_transport_layer(p) {
+            p = iter.next();
+        }
+
         if p.is_none() {
             return Ok(Self(protocols));
         }

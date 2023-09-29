@@ -13,7 +13,7 @@ consensus:
     safety_rules:
         service:
             type: process
-            server_address: "/ip4/127.0.0.1/tcp/5555"
+            server_address: "/ip4/127.0.0.1/udp/5555"
 
 execution:
     genesis_file_location: "relative/path/to/genesis"
@@ -22,7 +22,7 @@ execution:
 # and full_node_networks to allow fullnode connects to validator.
 
 full_node_networks:
-    - listen_address: "/ip4/0.0.0.0/tcp/6181"
+    - listen_address: "/ip4/0.0.0.0/udp/6181"
       max_outbound_connections: 0
       identity:
           type: "from_storage"
@@ -39,7 +39,7 @@ full_node_networks:
 
 validator_network:
     discovery_method: "onchain"
-    listen_address: "/ip4/0.0.0.0/tcp/6180"
+    listen_address: "/ip4/0.0.0.0/udp/6180"
     identity:
         type: "from_storage"
         key_name: "validator_network"
