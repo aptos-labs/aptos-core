@@ -58,23 +58,32 @@ pub fn prompt_yes(prompt: &str) -> bool {
     result.unwrap()
 }
 
-/// Convert any successful response to Success
+/// Convert any successful response to Success. If there is an error, show as JSON
+/// unless `jsonify_error` is false.
 pub async fn to_common_success_result<T>(
     command: &str,
     start_time: Instant,
     result: CliTypedResult<T>,
+    jsonify_error: bool,
 ) -> CliResult {
-    to_common_result(command, start_time, result.map(|_| "Success")).await
+    to_common_result(
+        command,
+        start_time,
+        result.map(|_| "Success"),
+        jsonify_error,
+    )
+    .await
 }
 
-/// For pretty printing outputs in JSON
+/// For pretty printing outputs in JSON. You can opt out of printing the error as
+/// JSON by setting `jsonify_error` to false.
 pub async fn to_common_result<T: Serialize>(
     command: &str,
     start_time: Instant,
     result: CliTypedResult<T>,
+    jsonify_error: bool,
 ) -> CliResult {
     let latency = start_time.elapsed();
-    let is_err = result.is_err();
 
     if !telemetry_is_disabled() {
         let error = if let Err(ref error) = result {
@@ -86,7 +95,7 @@ pub async fn to_common_result<T: Serialize>(
 
         if let Err(err) = timeout(
             Duration::from_millis(2000),
-            send_telemetry_event(command, latency, !is_err, error),
+            send_telemetry_event(command, latency, error),
         )
         .await
         {
@@ -95,11 +104,15 @@ pub async fn to_common_result<T: Serialize>(
     }
 
     let result = ResultWrapper::<T>::from(result);
-    let string = serde_json::to_string_pretty(&result).unwrap();
-    if is_err {
-        Err(string)
-    } else {
-        Ok(string)
+    match result {
+        ResultWrapper::Result(result) => Ok(serde_json::to_string_pretty(&result).unwrap()),
+        ResultWrapper::Error(error) => {
+            if jsonify_error {
+                Err(serde_json::to_string_pretty(&error).unwrap())
+            } else {
+                Err(error)
+            }
+        },
     }
 }
 
@@ -108,12 +121,7 @@ pub fn cli_build_information() -> BTreeMap<String, String> {
 }
 
 /// Sends a telemetry event about the CLI build, command and result
-async fn send_telemetry_event(
-    command: &str,
-    latency: Duration,
-    success: bool,
-    error: Option<&str>,
-) {
+async fn send_telemetry_event(command: &str, latency: Duration, error: Option<&str>) {
     // Collect the build information
     let build_information = cli_build_information();
 
@@ -122,7 +130,7 @@ async fn send_telemetry_event(
         build_information,
         command.into(),
         latency,
-        success,
+        error.is_none(),
         error,
     )
     .await;

@@ -1246,6 +1246,11 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
     /// Returns a name for logging purposes
     fn command_name(&self) -> &'static str;
 
+    /// Returns whether the error should be JSONifyed.
+    fn jsonify_error_output(&self) -> bool {
+        true
+    }
+
     /// Executes the command, returning a command specific type
     async fn execute(self) -> CliTypedResult<T>;
 
@@ -1260,14 +1265,28 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
         let command_name = self.command_name();
         start_logger(level);
         let start_time = Instant::now();
-        to_common_result(command_name, start_time, self.execute().await).await
+        let jsonify_error_output = self.jsonify_error_output();
+        to_common_result(
+            command_name,
+            start_time,
+            self.execute().await,
+            jsonify_error_output,
+        )
+        .await
     }
 
     /// Same as execute serialized without setting up logging
     async fn execute_serialized_without_logger(self) -> CliResult {
         let command_name = self.command_name();
         let start_time = Instant::now();
-        to_common_result(command_name, start_time, self.execute().await).await
+        let jsonify_error_output = self.jsonify_error_output();
+        to_common_result(
+            command_name,
+            start_time,
+            self.execute().await,
+            jsonify_error_output,
+        )
+        .await
     }
 
     /// Executes the command, and throws away Ok(result) for the string Success
@@ -1275,7 +1294,14 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
         start_logger(Level::Warn);
         let command_name = self.command_name();
         let start_time = Instant::now();
-        to_common_success_result(command_name, start_time, self.execute().await).await
+        let jsonify_error_output = self.jsonify_error_output();
+        to_common_success_result(
+            command_name,
+            start_time,
+            self.execute().await,
+            jsonify_error_output,
+        )
+        .await
     }
 }
 
