@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // @generated
 pub mod aptos {
     pub mod indexer {

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    grpc_network_service::RemoteExecutionServerWrapper,
+    grpc_network_service::GRPCNetworkMessageServiceServerWrapper,
     network_controller::{Message, MessageType},
 };
 use aptos_logger::warn;
@@ -16,14 +16,16 @@ use tokio::{runtime::Runtime, sync::oneshot};
 pub struct InboundHandler {
     service: String,
     listen_addr: SocketAddr,
+    rpc_timeout_ms: u64,
     inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
 }
 
 impl InboundHandler {
-    pub fn new(service: String, listen_addr: SocketAddr, _: u64) -> Self {
+    pub fn new(service: String, listen_addr: SocketAddr, rpc_timeout_ms: u64) -> Self {
         Self {
             service: service.clone(),
             listen_addr,
+            rpc_timeout_ms,
             inbound_handlers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -45,10 +47,11 @@ impl InboundHandler {
 
         let (server_shutdown_tx, server_shutdown_rx) = oneshot::channel();
         // The server is started in a separate task
-        RemoteExecutionServerWrapper::new(self.inbound_handlers.clone()).start(
+        GRPCNetworkMessageServiceServerWrapper::new(self.inbound_handlers.clone()).start(
             rt,
             self.service.clone(),
             self.listen_addr,
+            self.rpc_timeout_ms,
             server_shutdown_rx,
         );
         Some(server_shutdown_tx)

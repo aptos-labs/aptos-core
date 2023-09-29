@@ -6,15 +6,14 @@ syntax = "proto3";
 package aptos.remote_executor.v1;
 
 message NetworkMessage {
-    string sender_addr = 1;
-    bytes message = 2;
-    string message_type = 3;
+    bytes message = 1;
+    string message_type = 2;
 }
 
 message Empty {
 
 }
 
-service RemoteExecution {
+service NetworkMessageService {
     rpc SimpleMsgExchange(NetworkMessage) returns (Empty);
 }

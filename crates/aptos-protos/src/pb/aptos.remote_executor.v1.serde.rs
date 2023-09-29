@@ -80,9 +80,6 @@ impl serde::Serialize for NetworkMessage {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if !self.sender_addr.is_empty() {
-            len += 1;
-        }
         if !self.message.is_empty() {
             len += 1;
         }
@@ -90,9 +87,6 @@ impl serde::Serialize for NetworkMessage {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.remote_executor.v1.NetworkMessage", len)?;
-        if !self.sender_addr.is_empty() {
-            struct_ser.serialize_field("senderAddr", &self.sender_addr)?;
-        }
         if !self.message.is_empty() {
             struct_ser.serialize_field("message", pbjson::private::base64::encode(&self.message).as_str())?;
         }
@@ -109,8 +103,6 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "sender_addr",
-            "senderAddr",
             "message",
             "message_type",
             "messageType",
@@ -118,7 +110,6 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            SenderAddr,
             Message,
             MessageType,
         }
@@ -142,7 +133,6 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                         E: serde::de::Error,
                     {
                         match value {
-                            "senderAddr" | "sender_addr" => Ok(GeneratedField::SenderAddr),
                             "message" => Ok(GeneratedField::Message),
                             "messageType" | "message_type" => Ok(GeneratedField::MessageType),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -164,22 +154,15 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                 where
                     V: serde::de::MapAccess<'de>,
             {
-                let mut sender_addr__ = None;
                 let mut message__ = None;
                 let mut message_type__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
-                        GeneratedField::SenderAddr => {
-                            if sender_addr__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("senderAddr"));
-                            }
-                            sender_addr__ = Some(map.next_value()?);
-                        }
                         GeneratedField::Message => {
                             if message__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("message"));
                             }
-                            message__ = 
+                            message__ =
                                 Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
                             ;
                         }
@@ -192,7 +175,6 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                     }
                 }
                 Ok(NetworkMessage {
-                    sender_addr: sender_addr__.unwrap_or_default(),
                     message: message__.unwrap_or_default(),
                     message_type: message_type__.unwrap_or_default(),
                 })

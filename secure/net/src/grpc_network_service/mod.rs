@@ -4,8 +4,8 @@
 use crate::network_controller::{Message, MessageType};
 use aptos_logger::{error, info};
 use aptos_protos::remote_executor::v1::{
-    remote_execution_client::RemoteExecutionClient,
-    remote_execution_server::{RemoteExecution, RemoteExecutionServer},
+    network_message_service_client::NetworkMessageServiceClient,
+    network_message_service_server::{NetworkMessageService, NetworkMessageServiceServer},
     Empty, NetworkMessage, FILE_DESCRIPTOR_SET,
 };
 use crossbeam_channel::Sender;
@@ -20,11 +20,11 @@ use tonic::{
     Request, Response, Status,
 };
 
-pub struct RemoteExecutionServerWrapper {
+pub struct GRPCNetworkMessageServiceServerWrapper {
     inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
 }
 
-impl RemoteExecutionServerWrapper {
+impl GRPCNetworkMessageServiceServerWrapper {
     pub fn new(inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>) -> Self {
         Self { inbound_handlers }
     }
@@ -36,14 +36,21 @@ impl RemoteExecutionServerWrapper {
         rt: &Runtime,
         _service: String,
         server_addr: SocketAddr,
+        rpc_timeout_ms: u64,
         server_shutdown_rx: oneshot::Receiver<()>,
     ) {
         rt.spawn(async move {
-            self.start_async(server_addr, server_shutdown_rx).await;
+            self.start_async(server_addr, rpc_timeout_ms, server_shutdown_rx)
+                .await;
         });
     }
 
-    async fn start_async(self, server_addr: SocketAddr, server_shutdown_rx: oneshot::Receiver<()>) {
+    async fn start_async(
+        self,
+        server_addr: SocketAddr,
+        rpc_timeout_ms: u64,
+        server_shutdown_rx: oneshot::Receiver<()>,
+    ) {
         let reflection_service = tonic_reflection::server::Builder::configure()
             .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
             .build()
@@ -54,7 +61,8 @@ impl RemoteExecutionServerWrapper {
         // till the server is shutdown. Hence this should be called as a separate non-blocking task.
         // Signal handler 'server_shutdown_rx' is needed to shutdown the server
         Server::builder()
-            .add_service(RemoteExecutionServer::new(self))
+            .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
+            .add_service(NetworkMessageServiceServer::new(self))
             .add_service(reflection_service)
             .serve_with_shutdown(server_addr, async {
                 server_shutdown_rx.await.ok();
@@ -66,13 +74,13 @@ impl RemoteExecutionServerWrapper {
 }
 
 #[tonic::async_trait]
-impl RemoteExecution for RemoteExecutionServerWrapper {
+impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
     async fn simple_msg_exchange(
         &self,
         request: Request<NetworkMessage>,
     ) -> Result<Response<Empty>, Status> {
+        let remote_addr = request.remote_addr();
         let network_message = request.into_inner();
-        let sender = network_message.sender_addr;
         let msg = Message::new(network_message.message);
         let message_type = MessageType::new(network_message.message_type);
 
@@ -82,19 +90,19 @@ impl RemoteExecution for RemoteExecutionServerWrapper {
         } else {
             error!(
                 "No handler registered for sender: {:?} and msg type {:?}",
-                sender, message_type
+                remote_addr, message_type
             );
         }
         Ok(Response::new(Empty {}))
     }
 }
 
-pub struct RemoteExecutionClientWrapper {
+pub struct GRPCNetworkMessageServiceClientWrapper {
     remote_addr: String,
-    remote_channel: RemoteExecutionClient<Channel>,
+    remote_channel: NetworkMessageServiceClient<Channel>,
 }
 
-impl RemoteExecutionClientWrapper {
+impl GRPCNetworkMessageServiceClientWrapper {
     pub fn new(rt: &Runtime, remote_addr: SocketAddr) -> Self {
         Self {
             remote_addr: remote_addr.to_string(),
@@ -103,12 +111,12 @@ impl RemoteExecutionClientWrapper {
         }
     }
 
-    async fn get_channel(remote_addr: String) -> RemoteExecutionClient<Channel> {
+    async fn get_channel(remote_addr: String) -> NetworkMessageServiceClient<Channel> {
         info!("Trying to connect to remote server at {:?}", remote_addr);
         let conn = tonic::transport::Endpoint::new(remote_addr)
             .unwrap()
             .connect_lazy();
-        RemoteExecutionClient::new(conn)
+        NetworkMessageServiceClient::new(conn)
     }
 
     pub async fn send_message(
@@ -118,15 +126,14 @@ impl RemoteExecutionClientWrapper {
         mt: &MessageType,
     ) {
         let request = tonic::Request::new(NetworkMessage {
-            sender_addr: sender_addr.to_string(),
             message: message.data,
             message_type: mt.get_type(),
         });
-        // TODO: Retry with exponential backoff on failure
+        // TODO: Retry with exponential backoff on failures
         match self.remote_channel.simple_msg_exchange(request).await {
             Ok(_) => {},
             Err(e) => {
-                error!(
+                panic!(
                     "Error '{}' sending message to {} on node {:?}",
                     e, self.remote_addr, sender_addr
                 );
@@ -153,7 +160,7 @@ fn basic_test() {
         .lock()
         .unwrap()
         .insert(MessageType::new(message_type.clone()), msg_tx);
-    let server = RemoteExecutionServerWrapper::new(server_handlers);
+    let server = GRPCNetworkMessageServiceServerWrapper::new(server_handlers);
 
     let rt = Runtime::new().unwrap();
     let (server_shutdown_tx, server_shutdown_rx) = oneshot::channel();
@@ -161,10 +168,11 @@ fn basic_test() {
         &rt,
         "unit tester".to_string(),
         server_addr,
+        1000,
         server_shutdown_rx,
     );
 
-    let mut grpc_client = RemoteExecutionClientWrapper::new(&rt, server_addr);
+    let mut grpc_client = GRPCNetworkMessageServiceClientWrapper::new(&rt, server_addr);
 
     let client_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), utils::get_available_port());
     let test_message_content = "test1".as_bytes().to_vec();

@@ -76,3 +76,25 @@ fn test_sharded_block_executor_no_conflict() {
         executor_service.shutdown();
     });
 }
+
+#[test]
+fn test_sharded_block_executor_with_conflict() {
+    use std::thread;
+
+    let num_shards = 8;
+    let (mut controller, executor_client, mut executor_services) =
+        create_thread_remote_executor_shards(num_shards, Some(2));
+    controller.start();
+    let sharded_block_executor = ShardedBlockExecutor::new(executor_client);
+
+    // wait for the servers to be ready before sending messages
+    // TODO: We need to pass this test without this sleep
+    thread::sleep(std::time::Duration::from_millis(10));
+
+    test_utils::sharded_block_executor_with_conflict(sharded_block_executor, 2);
+
+    controller.shutdown();
+    executor_services.iter_mut().for_each(|executor_service| {
+        executor_service.shutdown();
+    });
+}

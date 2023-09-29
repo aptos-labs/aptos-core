@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    grpc_network_service::RemoteExecutionClientWrapper,
+    grpc_network_service::GRPCNetworkMessageServiceClientWrapper,
     network_controller::{inbound_handler::InboundHandler, Message, MessageType},
 };
-use aptos_logger::{info, trace};
+use aptos_logger::{info, warn};
 use crossbeam_channel::{unbounded, Receiver, Select, Sender};
 use std::{
     collections::{HashMap, HashSet},
@@ -63,11 +63,12 @@ impl OutboundHandler {
         ));
 
         // Create a grpc client for each remote address
-        let mut grpc_clients: HashMap<SocketAddr, RemoteExecutionClientWrapper> = HashMap::new();
+        let mut grpc_clients: HashMap<SocketAddr, GRPCNetworkMessageServiceClientWrapper> =
+            HashMap::new();
         self.remote_addresses.iter().for_each(|remote_addr| {
             grpc_clients.insert(
                 *remote_addr,
-                RemoteExecutionClientWrapper::new(rt, *remote_addr),
+                GRPCNetworkMessageServiceClientWrapper::new(rt, *remote_addr),
             );
         });
 
@@ -100,7 +101,7 @@ impl OutboundHandler {
         outbound_handlers: Vec<(Receiver<Message>, SocketAddr, MessageType)>,
         socket_addr: &SocketAddr,
         inbound_handler: Arc<Mutex<InboundHandler>>,
-        grpc_clients: &mut HashMap<SocketAddr, RemoteExecutionClientWrapper>,
+        grpc_clients: &mut HashMap<SocketAddr, GRPCNetworkMessageServiceClientWrapper>,
     ) {
         loop {
             let mut select = Select::new();
@@ -118,13 +119,13 @@ impl OutboundHandler {
                         msg = m;
                     },
                     Err(e) => {
-                        // not necessarily an error, just means a sender closed a channel
-                        trace!(
-                            "{:?} on outbound handler for {:?}",
+                        warn!(
+                            "{:?} for outbound handler on {:?}. This can happen in shutdown,\
+                             but should not happen otherwise",
                             e.to_string(),
                             socket_addr
                         );
-                        continue;
+                        return;
                     },
                 }
             }

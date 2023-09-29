@@ -2,16 +2,16 @@
 
 // @generated
 /// Generated client implementations.
-pub mod remote_execution_client {
+pub mod network_message_service_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
     #[derive(Debug, Clone)]
-    pub struct RemoteExecutionClient<T> {
+    pub struct NetworkMessageServiceClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl RemoteExecutionClient<tonic::transport::Channel> {
+    impl NetworkMessageServiceClient<tonic::transport::Channel> {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -22,7 +22,7 @@ pub mod remote_execution_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> RemoteExecutionClient<T>
+    impl<T> NetworkMessageServiceClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
@@ -40,7 +40,7 @@ pub mod remote_execution_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> RemoteExecutionClient<InterceptedService<T, F>>
+        ) -> NetworkMessageServiceClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -54,7 +54,7 @@ pub mod remote_execution_client {
                 http::Request<tonic::body::BoxBody>,
             >>::Error: Into<StdError> + Send + Sync,
         {
-            RemoteExecutionClient::new(InterceptedService::new(inner, interceptor))
+            NetworkMessageServiceClient::new(InterceptedService::new(inner, interceptor))
         }
         /// Compress requests with the given encoding.
         ///
@@ -103,13 +103,13 @@ pub mod remote_execution_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.remote_executor.v1.RemoteExecution/SimpleMsgExchange",
+                "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
             );
             let mut req = request.into_request();
             req.extensions_mut()
                 .insert(
                     GrpcMethod::new(
-                        "aptos.remote_executor.v1.RemoteExecution",
+                        "aptos.remote_executor.v1.NetworkMessageService",
                         "SimpleMsgExchange",
                     ),
                 );
@@ -118,12 +118,12 @@ pub mod remote_execution_client {
     }
 }
 /// Generated server implementations.
-pub mod remote_execution_server {
+pub mod network_message_service_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with RemoteExecutionServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with NetworkMessageServiceServer.
     #[async_trait]
-    pub trait RemoteExecution: Send + Sync + 'static {
+    pub trait NetworkMessageService: Send + Sync + 'static {
         ///
         async fn simple_msg_exchange(
             &self,
@@ -132,7 +132,7 @@ pub mod remote_execution_server {
     }
     ///
     #[derive(Debug)]
-    pub struct RemoteExecutionServer<T: RemoteExecution> {
+    pub struct NetworkMessageServiceServer<T: NetworkMessageService> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
@@ -140,7 +140,7 @@ pub mod remote_execution_server {
         max_encoding_message_size: Option<usize>,
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: RemoteExecution> RemoteExecutionServer<T> {
+    impl<T: NetworkMessageService> NetworkMessageServiceServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -192,9 +192,10 @@ pub mod remote_execution_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for RemoteExecutionServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>>
+    for NetworkMessageServiceServer<T>
     where
-        T: RemoteExecution,
+        T: NetworkMessageService,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -210,11 +211,11 @@ pub mod remote_execution_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/aptos.remote_executor.v1.RemoteExecution/SimpleMsgExchange" => {
+                "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange" => {
                     #[allow(non_camel_case_types)]
-                    struct SimpleMsgExchangeSvc<T: RemoteExecution>(pub Arc<T>);
+                    struct SimpleMsgExchangeSvc<T: NetworkMessageService>(pub Arc<T>);
                     impl<
-                        T: RemoteExecution,
+                        T: NetworkMessageService,
                     > tonic::server::UnaryService<super::NetworkMessage>
                     for SimpleMsgExchangeSvc<T> {
                         type Response = super::Empty;
@@ -271,7 +272,7 @@ pub mod remote_execution_server {
             }
         }
     }
-    impl<T: RemoteExecution> Clone for RemoteExecutionServer<T> {
+    impl<T: NetworkMessageService> Clone for NetworkMessageServiceServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -283,7 +284,7 @@ pub mod remote_execution_server {
             }
         }
     }
-    impl<T: RemoteExecution> Clone for _Inner<T> {
+    impl<T: NetworkMessageService> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(Arc::clone(&self.0))
         }
@@ -293,7 +294,8 @@ pub mod remote_execution_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: RemoteExecution> tonic::server::NamedService for RemoteExecutionServer<T> {
-        const NAME: &'static str = "aptos.remote_executor.v1.RemoteExecution";
+    impl<T: NetworkMessageService> tonic::server::NamedService
+    for NetworkMessageServiceServer<T> {
+        const NAME: &'static str = "aptos.remote_executor.v1.NetworkMessageService";
     }
 }
