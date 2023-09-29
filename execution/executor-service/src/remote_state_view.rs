@@ -212,6 +212,12 @@ impl RemoteStateValueReceiver {
             .inner
             .into_iter()
             .for_each(|(state_key, state_value)| {
+                // Though we try to insert the state key during the 'pre_fetch_state_values' remote
+                // request, there is a possibility that the state key is not inserted before we
+                // receive and process the response here. To be on the safe side, we insert the
+                // state key here if it is not inserted already. This does not matter because we
+                // do not have versioning of the state view.
+                state_view_lock.insert_state_key(state_key.clone());
                 state_view_lock.set_state_value(&state_key, state_value);
             });
     }
