@@ -18,7 +18,18 @@ Important There is no upgrade mechanism for the staking contract from staking po
 
 ## Initialize a staking pool
 
-1. Create a staking pool by running the below command:
+Before initializing a staking pool, ensure that there is an existing owner account with 1M APT.
+
+1. Initialize CLI with a private key from an existing account, such as a wallet, or create a new account.
+
+```bash
+aptos init --profile mainnet-owner \
+  --network mainnet
+```
+
+You can either enter the private key from an existing wallet, or create new wallet address.
+
+2. Run the following command to initialize the staking pool:
 
 ```bash
 aptos stake create-staking-contract \
@@ -29,7 +40,7 @@ aptos stake create-staking-contract \
 --profile mainnet-owner
 ```
 
-2. Once the staking pool has been created, you can proceed to [connect to the Aptos Network](./connect-to-aptos-network.md).
+3. Once the staking pool has been initialized, you can proceed to [connect to the Aptos Network](./connect-to-aptos-network.md).
 
 ## Perform pool owner operations
 
@@ -38,18 +49,6 @@ aptos stake create-staking-contract \
 :::tip Testnet vs Mainnet
 The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
 :::
-
-### Initialize CLI
-
-Initialize CLI with a private key from an existing account, such as a wallet, or create a new account.
-
-```bash
-aptos init --profile mainnet-owner \
-  --network mainnet
-```
-
-You can either enter the private key from an existing wallet, or create new wallet address.
-
 
 ### Transfer coin between accounts
 
