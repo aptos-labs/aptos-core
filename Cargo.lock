@@ -2492,6 +2492,7 @@ dependencies = [
 name = "aptos-netcore"
 version = "0.1.0"
 dependencies = [
+ "aptos-logger",
  "aptos-memsocket",
  "aptos-proxy",
  "aptos-types",

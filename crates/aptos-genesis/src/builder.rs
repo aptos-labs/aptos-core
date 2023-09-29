@@ -526,6 +526,8 @@ impl Builder {
             .map(|i| self.generate_validator_config(i, &mut rng, &template))
             .collect::<anyhow::Result<Vec<ValidatorNodeConfig>>>()?;
 
+        println!("Debug: validators: {:?}", validators);
+
         // Build genesis
         let (genesis, waypoint) = self.genesis_ceremony(&mut validators, root_key.public_key())?;
 
@@ -550,10 +552,16 @@ impl Builder {
         let name = index.to_string();
 
         let mut override_config = template.clone();
+        println!("(OLD) Override config for validator {}: {:?}", index, override_config);
+
         let mut base_config = NodeConfig::default();
+        println!("(OLD) Base config for validator {}: {:?}", index, base_config);
         if let Some(init_config) = &self.init_config {
             (init_config)(index, &mut override_config, &mut base_config);
         }
+
+        println!("(NEW) Override config for validator {}: {:?}", index, override_config);
+        println!("(NEW) Base config for validator {}: {:?}", index, base_config);
 
         let mut validator = ValidatorNodeConfig::new(
             name,
@@ -565,6 +573,8 @@ impl Builder {
             // Default to 0% commission for local node building.
             0,
         )?;
+
+        println!("ValidatorNodeConfig for validator {}: {:?}", index, validator);
 
         validator.init_keys(Some(rng.gen()))?;
 

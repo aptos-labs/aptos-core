@@ -529,12 +529,12 @@ impl From<Protocol> for NetworkAddress {
     }
 }
 
+// TODO: figure out if we should switch on TCP/UDP type?
 impl From<SocketAddr> for NetworkAddress {
     fn from(sockaddr: SocketAddr) -> NetworkAddress {
         let ip_proto = Protocol::from(sockaddr.ip());
-        let tcp_proto = Protocol::Tcp(sockaddr.port());
         let udp_proto = Protocol::Udp(sockaddr.port());
-        NetworkAddress::from_protocols(vec![ip_proto, tcp_proto, udp_proto]).unwrap()
+        NetworkAddress::from_protocols(vec![ip_proto, udp_proto]).unwrap()
     }
 }
 

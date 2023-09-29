@@ -22,8 +22,8 @@ use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
-        chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
-        PeerId,
+        chain_id::ChainId, network_address::NetworkAddress, transaction::Transaction,
+        waypoint::Waypoint, AccountKey, LocalAccount, PeerId,
     },
 };
 use prometheus_http_query::response::{PromqlResult, Sample};
@@ -33,16 +33,15 @@ use std::{
     fs::File,
     io::Write,
     mem,
+    net::SocketAddr,
     num::NonZeroUsize,
     ops,
     path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
 };
-use std::net::SocketAddr;
+use kube::ResourceExt;
 use tempfile::TempDir;
-use url::quirks::port;
-use aptos_sdk::types::network_address::NetworkAddress;
 
 #[derive(Debug)]
 pub enum SwarmDirectory {
@@ -170,6 +169,22 @@ impl LocalSwarm {
             .with_init_genesis_config(init_genesis_config)
             .build(rng)?;
 
+        for validator in &validators {
+            // Print out the base listening address
+            if let Some(validator_network) = validator.config.base_config().validator_network.as_ref() {
+                println!("(BASE) Validator {} listening on {}", validator.name, validator_network.listen_address);
+            } else {
+                println!("(BASE) Validator {} listening on unknown", validator.name);
+            }
+
+            // Print out the override listening address
+            if let Some(validator_network) = validator.config.override_config().validator_network.as_ref() {
+                println!("(OVERRIDE) Validator {} listening on {}", validator.name, validator_network.listen_address);
+            } else {
+                println!("(OVERRIDE) Validator {} listening on unknown", validator.name);
+            }
+        }
+
         // Get the initial version to start the nodes with, either the one provided or fallback to
         // using the latest version
         let initial_version_actual = initial_version.unwrap_or_else(|| {
@@ -219,11 +234,12 @@ impl LocalSwarm {
                 validator_config.set_data_dir(validator.base_dir());
                 *validator.config_mut() = validator_config.clone();
 
-                // HACK!!
+                // HACK for local swarm: set listen address to UDP for validators!!
                 if let Some(validator_network) = validator_config.validator_network.as_mut() {
                     let addr = validator_network.listen_address.find_ip_addr().unwrap();
                     let port = validator_network.listen_address.find_port().unwrap();
-                    validator_network.listen_address = NetworkAddress::from_udp(SocketAddr::new(addr, port));
+                    validator_network.listen_address =
+                        NetworkAddress::from_udp(SocketAddr::new(addr, port));
                 }
 
                 // Since the validator's config has changed we need to save it
@@ -232,8 +248,6 @@ impl LocalSwarm {
                 Ok((validator.peer_id(), public_network))
             })
             .collect::<Result<HashMap<_, _>>>()?;
-
-        //panic!("Validator config: {:?}", validators);
 
         // We print out the root key to make it easy for users to deploy a local faucet
         let encoded_root_key = EncodingType::Hex.encode_key("root_key", &root_key)?;

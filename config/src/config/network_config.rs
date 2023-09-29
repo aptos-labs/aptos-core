@@ -140,7 +140,7 @@ impl NetworkConfig {
             discovery_method: DiscoveryMethod::None,
             discovery_methods: Vec::new(),
             identity: Identity::None,
-            listen_address: "/ip4/0.0.0.0/tcp/6180".parse().unwrap(),
+            listen_address: "/ip4/0.0.0.0/udp/6180".parse().unwrap(),
             mutual_authentication,
             network_id,
             runtime_threads: None,

@@ -272,6 +272,7 @@ impl PeerManagerBuilder {
 
         self.peer_manager = match self.listen_address.as_slice() {
             [Ip4(_), Udp(_)] | [Ip6(_), Udp(_)] => {
+                info!("Building a peer manager with UDP transport!");
                 let aptos_quic_transport = QuicTransport::new();
                 Some(TransportPeerManager::Quic(self.build_with_transport(
                     AptosNetTransport::new(
@@ -289,6 +290,7 @@ impl PeerManagerBuilder {
                 )))
             },
             [Ip4(_), Tcp(_)] | [Ip6(_), Tcp(_)] => {
+                info!("Building a peer manager with TCP transport!");
                 let mut aptos_tcp_transport = APTOS_TCP_TRANSPORT.clone();
                 let tcp_cfg = self.get_tcp_buffers_cfg();
                 aptos_tcp_transport.set_tcp_buffers(&tcp_cfg);
