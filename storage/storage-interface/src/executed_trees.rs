@@ -20,11 +20,11 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct ExecutedTrees {
     /// The in-memory representation of state after execution.
-    state: StateDelta,
+    pub state: StateDelta,
 
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
-    transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
+    pub transaction_accumulator: Arc<InMemoryTransactionAccumulator>,
 }
 
 impl ExecutedTrees {

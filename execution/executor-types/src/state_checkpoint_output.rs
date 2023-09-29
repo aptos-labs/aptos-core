@@ -58,7 +58,7 @@ pub struct StateCheckpointOutput {
     txns: TransactionsByStatus,
     per_version_state_updates: Vec<ShardedStateUpdates>,
     state_checkpoint_hashes: Vec<Option<HashValue>>,
-    state_updates_before_last_checkpoint: ShardedStateUpdates,
+    state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
     sharded_state_cache: ShardedStateCache,
 }
 
@@ -67,7 +67,7 @@ impl StateCheckpointOutput {
         txns: TransactionsByStatus,
         per_version_state_updates: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
-        state_updates_before_last_checkpoint: ShardedStateUpdates,
+        state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: ShardedStateCache,
     ) -> Self {
         Self {
@@ -89,7 +89,7 @@ impl StateCheckpointOutput {
         TransactionsByStatus,
         Vec<ShardedStateUpdates>,
         Vec<Option<HashValue>>,
-        ShardedStateUpdates,
+        Option<ShardedStateUpdates>,
         ShardedStateCache,
     ) {
         (

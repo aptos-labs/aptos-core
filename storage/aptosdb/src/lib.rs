@@ -81,6 +81,7 @@ use aptos_db_indexer::Indexer;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
@@ -1239,57 +1240,6 @@ impl AptosDB {
         self.ledger_db.metadata_db().write_schemas(ledger_batch)
     }
 
-    fn maybe_commit_state_merkle_db(
-        &self,
-        buffered_state: &mut BufferedState,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        latest_in_memory_state: StateDelta,
-        sync_commit: bool,
-    ) -> Result<()> {
-        let mut end_with_reconfig = false;
-        let updates_until_latest_checkpoint_since_current = {
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["updates_until_next_checkpoint_since_current"])
-                .start_timer();
-            if let Some(latest_checkpoint_version) = latest_in_memory_state.base_version {
-                if latest_checkpoint_version >= first_version {
-                    let idx = (latest_checkpoint_version - first_version) as usize;
-                    ensure!(
-                            txns_to_commit[idx].is_state_checkpoint(),
-                            "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
-                            latest_checkpoint_version,
-                            first_version + idx as u64
-                        );
-                    end_with_reconfig = txns_to_commit[idx].is_reconfig();
-                    let mut sharded_state_updates = create_empty_sharded_state_updates();
-                    sharded_state_updates.par_iter_mut().enumerate().for_each(
-                        |(shard_id, state_updates_shard)| {
-                            txns_to_commit[..=idx].iter().for_each(|txn_to_commit| {
-                                state_updates_shard
-                                    .extend(txn_to_commit.state_updates()[shard_id].clone());
-                            })
-                        },
-                    );
-                    Some(sharded_state_updates)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        };
-
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["buffered_state___update"])
-            .start_timer();
-        buffered_state.update(
-            updates_until_latest_checkpoint_since_current,
-            latest_in_memory_state,
-            end_with_reconfig || sync_commit,
-        )
-    }
-
     fn post_commit(
         &self,
         txns_to_commit: &[TransactionToCommit],
@@ -2086,65 +2036,10 @@ impl DbWriter for AptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
-            // Executing and committing from more than one threads not allowed -- consensus and
-            // state sync must hand over to each other after all pending execution and committing
-            // complete.
-            let _lock = self
-                .ledger_commit_lock
-                .try_lock()
-                .expect("Concurrent committing detected.");
-
-            self.save_transactions_validation(
-                txns_to_commit,
-                first_version,
-                base_state_version,
-                ledger_info_with_sigs,
-                &latest_in_memory_state,
-            )?;
-
-            let new_root_hash = self.calculate_and_commit_ledger_and_state_kv(
-                txns_to_commit,
-                first_version,
-                latest_in_memory_state.current.usage(),
-                None,
-                self.skip_index_and_usage,
-            )?;
-
-            {
-                let mut buffered_state = self.state_store.buffered_state().lock();
-                let last_version = first_version + txns_to_commit.len() as u64 - 1;
-
-                self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
-
-                self.maybe_commit_state_merkle_db(
-                    &mut buffered_state,
-                    txns_to_commit,
-                    first_version,
-                    latest_in_memory_state,
-                    sync_commit,
-                )?;
-            }
-
-            self.post_commit(txns_to_commit, first_version, ledger_info_with_sigs)
-        })
-    }
-
-    /// Same as save_transactions, but only for a whole block.
-    fn save_transaction_block(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        // TODO(grao): Consider remove this.
-        latest_in_memory_state: StateDelta,
-        block_state_updates: ShardedStateUpdates,
-        sharded_state_cache: &ShardedStateCache,
-    ) -> Result<()> {
-        gauged_api("save_transaction_block", || {
             // Executing and committing from more than one threads not allowed -- consensus and
             // state sync must hand over to each other after all pending execution and committing
             // complete.
@@ -2170,13 +2065,11 @@ impl DbWriter for AptosDB {
                 txns_to_commit,
                 first_version,
                 latest_in_memory_state.current.usage(),
-                Some(sharded_state_cache),
+                sharded_state_cache,
                 self.skip_index_and_usage,
             )?;
 
-            let _timer = OTHER_TIMERS_SECONDS
-                .with_label_values(&["save_transactions__others"])
-                .start_timer();
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["save_transactions__others"]);
             {
                 let mut buffered_state = self.state_store.buffered_state().lock();
                 let last_version = first_version + txns_to_commit.len() as u64 - 1;
@@ -2184,11 +2077,9 @@ impl DbWriter for AptosDB {
                 self.commit_ledger_info(last_version, new_root_hash, ledger_info_with_sigs)?;
 
                 if !txns_to_commit.is_empty() {
-                    let _timer = OTHER_TIMERS_SECONDS
-                        .with_label_values(&["buffered_state___update"])
-                        .start_timer();
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
                     buffered_state.update(
-                        Some(block_state_updates),
+                        state_updates_until_last_checkpoint,
                         latest_in_memory_state,
                         sync_commit || txns_to_commit.last().unwrap().is_reconfig(),
                     )?;

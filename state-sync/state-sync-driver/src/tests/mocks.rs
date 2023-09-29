@@ -16,8 +16,8 @@ use aptos_data_streaming_service::{
 };
 use aptos_executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use aptos_storage_interface::{
-    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
-    StateSnapshotReceiver,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbReaderWriter,
+    DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -34,6 +34,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueChunkWithProof},
+        ShardedStateUpdates,
     },
     transaction::{
         AccountTransactionsWithProof, TransactionListWithProof, TransactionOutputListWithProof,
@@ -147,6 +148,24 @@ mock! {
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> anyhow::Result<()>;
+
+        fn enqueue_chunk_by_execution<'a>(
+            &self,
+            txn_list_with_proof: TransactionListWithProof,
+            // Target LI that has been verified independently: the proofs are relative to this version.
+            verified_target_li: &LedgerInfoWithSignatures,
+            epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
+        ) -> Result<()>;
+
+        fn enqueue_chunk_by_transaction_outputs<'a>(
+            &self,
+            txn_output_list_with_proof: TransactionOutputListWithProof,
+            // Target LI that has been verified independently: the proofs are relative to this version.
+            verified_target_li: &LedgerInfoWithSignatures,
+            epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
+        ) -> Result<()>;
+
+        fn update_ledger(&self) -> Result<()>;
 
         fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
@@ -300,7 +319,7 @@ mock! {
             ledger_infos: &[LedgerInfoWithSignatures],
         ) -> Result<()>;
 
-        fn save_transactions<'a>(
+        fn save_transactions<'a, 'b>(
             &self,
             txns_to_commit: &[TransactionToCommit],
             first_version: Version,
@@ -308,6 +327,8 @@ mock! {
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
             sync_commit: bool,
             in_memory_state: StateDelta,
+            state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+            sharded_state_cache: Option<&'b ShardedStateCache>,
         ) -> Result<()>;
     }
 }
