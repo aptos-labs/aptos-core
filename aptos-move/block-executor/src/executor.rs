@@ -170,9 +170,10 @@ where
                 let mut maybe_error = maybe_error.lock();
                 *maybe_error = Some(Error::ModulePathReadWrite);
             }
-            return SchedulerTask::NoTask;
+            SchedulerTask::NoTask
+        } else {
+            scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
         }
-        scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
     fn validate(
