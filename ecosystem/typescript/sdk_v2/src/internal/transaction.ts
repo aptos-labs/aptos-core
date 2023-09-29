@@ -6,9 +6,8 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { getFullNode } from "../client";
+import { getFullNode, paginateWithCursor } from "../client";
 import { GasEstimation, PaginationArgs, TransactionResponse } from "../types";
-import { paginateWithCursor } from "../utils/paginate_with_cursor";
 
 export async function getTransactions(args: {
   aptosConfig: AptosConfig;
