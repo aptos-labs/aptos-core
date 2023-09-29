@@ -8,13 +8,40 @@ import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { PublicKey } from "./asymmetric_crypto";
 import { Ed25519PublicKey } from "./ed25519";
 
+/**
+ * A list of Authentication Key schemes that are supported by Aptos.
+ *
+ * Keys that start with `Derive` are solely used for deriving account addresses from
+ * other data. They are not used for signing transactions.
+ */
 export enum AuthenticationKeyScheme {
+  /**
+   * For Ed25519PublicKey
+   */
   Ed25519 = 0,
+  /**
+   * For MultiEd25519PublicKey
+   */
   MultiEd25519 = 1,
+  /**
+   * Derives an address using an AUID, used for objects
+   */
   DeriveAuid = 251,
+  /**
+   * Derives an address from another object address
+   */
   DeriveObjectAddressFromObject = 252,
+  /**
+   * Derives an address from a GUID, used for objects
+   */
   DeriveObjectAddressFromGuid = 253,
+  /**
+   * Derives an address from seed bytes, used for named objects
+   */
   DeriveObjectAddressFromSeed = 254,
+  /**
+   * Derives an address from seed bytes, used for resource accounts
+   */
   DeriveResourceAccountAddress = 255,
 }
 
@@ -28,10 +55,14 @@ export enum AuthenticationKeyScheme {
  * Account addresses can be derived from AuthenticationKey
  */
 export class AuthenticationKey {
-  // Length of AuthenticationKey in bytes(Uint8Array)
+  /**
+   * An authentication key is always a SHA3-256 hash of data, and is always 32 bytes.
+   */
   static readonly LENGTH: number = 32;
 
-  // Actual data of AuthenticationKey, in Hex format
+  /**
+   * The raw bytes of the authentication key.
+   */
   public readonly data: Hex;
 
   constructor(args: { data: HexInput }) {
@@ -51,15 +82,21 @@ export class AuthenticationKey {
     return this.data.toUint8Array();
   }
 
-  static fromBytesAndScheme(args: { hexInput: HexInput; scheme: AuthenticationKeyScheme }) {
-    const { hexInput, scheme } = args;
-    const inputBytes = Hex.fromHexInput({ hexInput }).toUint8Array();
-    const bytes = new Uint8Array(inputBytes.length + 1);
-    bytes.set(inputBytes);
-    bytes.set([scheme], inputBytes.length);
+  /**
+   * Creates an AuthenticationKey from seed bytes and a scheme
+   *
+   * This allows for the creation of AuthenticationKeys that are not derived from Public Keys directly
+   * @param args
+   */
+  private static fromBytesAndScheme(args: { bytes: HexInput; scheme: AuthenticationKeyScheme }) {
+    const { bytes, scheme } = args;
+    const inputBytes = Hex.fromHexInput({ hexInput: bytes }).toUint8Array();
+    const authKeyBytes = new Uint8Array(inputBytes.length + 1);
+    authKeyBytes.set(inputBytes);
+    authKeyBytes.set([scheme], inputBytes.length);
 
     const hash = sha3Hash.create();
-    hash.update(bytes);
+    hash.update(authKeyBytes);
 
     return new AuthenticationKey({ data: hash.digest() });
   }
@@ -83,7 +120,7 @@ export class AuthenticationKey {
     }
 
     const pubKeyBytes = publicKey.toUint8Array();
-    return AuthenticationKey.fromBytesAndScheme({ hexInput: pubKeyBytes, scheme });
+    return AuthenticationKey.fromBytesAndScheme({ bytes: pubKeyBytes, scheme });
   }
 
   /**
