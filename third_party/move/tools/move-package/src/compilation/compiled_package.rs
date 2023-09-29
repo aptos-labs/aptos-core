@@ -72,7 +72,7 @@ pub struct CompiledPackageInfo {
 }
 
 /// Represents a compiled package in memory.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CompiledPackage {
     /// Meta information about the compilation of this `CompiledPackage`
     pub compiled_package_info: CompiledPackageInfo,
@@ -542,7 +542,7 @@ impl CompiledPackage {
         resolution_graph: &ResolvedGraph,
         mut compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
         mut compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
-    ) -> Result<CompiledPackage> {
+    ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
         let immediate_dependencies = transitive_dependencies
             .iter()
             .filter(|(_, is_immediate, _, _, _)| *is_immediate)
@@ -692,8 +692,10 @@ impl CompiledPackage {
 
         let mut compiled_docs = None;
         let mut compiled_abis = None;
+        let mut move_model = None;
         if resolution_graph.build_options.generate_docs
             || resolution_graph.build_options.generate_abis
+            || resolution_graph.build_options.generate_move_model
         {
             let model = run_model_builder_with_options(
                 vec![sources_package_paths],
@@ -720,6 +722,10 @@ impl CompiledPackage {
                     &root_compiled_units,
                 ));
             }
+
+            if resolution_graph.build_options.generate_move_model {
+                move_model = Some(model)
+            }
         };
 
         let compiled_package = CompiledPackage {
@@ -740,7 +746,7 @@ impl CompiledPackage {
             bytecode_version,
         )?;
 
-        Ok(compiled_package)
+        Ok((compiled_package, move_model))
     }
 
     // We take the (restrictive) view that all filesystems are case insensitive to maximize

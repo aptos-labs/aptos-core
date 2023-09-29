@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::reroot_path;
-use crate::NativeFunctionRecord;
+use crate::{base::test_validation, NativeFunctionRecord};
 use anyhow::Result;
 use clap::*;
+use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_compiler::{
     diagnostics::{self, codes::Severity},
@@ -163,6 +164,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     let mut test_plan = None;
     build_config.test_mode = true;
     build_config.dev_mode = true;
+    build_config.generate_move_model = test_validation::needs_validation();
 
     // Build the resolution graph (resolution graph diagnostics are only needed for CLI commands so
     // ignore them by passing a vector as the writer)
@@ -203,7 +205,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // Move package system, to first grab the compilation env, construct the test plan from it, and
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
-    build_plan.compile_with_driver(
+    let (_, model_opt) = build_plan.compile_with_driver(
         writer,
         &CompilerConfig::default(),
         |compiler| {
@@ -231,6 +233,19 @@ pub fn run_move_unit_tests<W: Write + Send>(
         },
         unimplemented_v2_driver,
     )?;
+
+    // If configured, run extra validation
+    if test_validation::needs_validation() {
+        let model = &model_opt.expect("move model");
+        test_validation::validate(model);
+        if model.has_errors() {
+            model.report_diag(
+                &mut StandardStream::stderr(termcolor::ColorChoice::Auto),
+                codespan_reporting::diagnostic::Severity::Warning,
+            );
+            std::process::exit(1)
+        }
+    }
 
     let (test_plan, mut files, units) = test_plan.unwrap();
     files.extend(dep_file_map);

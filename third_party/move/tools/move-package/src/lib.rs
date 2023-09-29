@@ -114,6 +114,10 @@ pub struct BuildConfig {
     #[clap(name = "generate-abis", long = "abi", global = true)]
     pub generate_abis: bool,
 
+    /// Whether to generate a move model
+    #[clap(skip)]
+    pub generate_move_model: bool,
+
     /// Installation directory for compiled artifacts. Defaults to current directory.
     #[clap(long = "install-dir", value_parser, global = true)]
     pub install_dir: Option<PathBuf>,
@@ -199,7 +203,7 @@ impl BuildConfig {
         self,
         path: &Path,
         writer: &mut W,
-    ) -> Result<CompiledPackage> {
+    ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
         let config = self.compiler_config.clone(); // Need clone because of mut self
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();

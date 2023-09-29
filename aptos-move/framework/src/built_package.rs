@@ -125,6 +125,7 @@ pub fn build_model(
         architecture: None,
         generate_abis: false,
         generate_docs: false,
+        generate_move_model: false,
         install_dir: None,
         test_mode: false,
         force_recompilation: false,
@@ -158,6 +159,7 @@ impl BuiltPackage {
             architecture: None,
             generate_abis: options.with_abis,
             generate_docs: false,
+            generate_move_model: true,
             install_dir: options.install_dir.clone(),
             test_mode: false,
             force_recompilation: false,
@@ -172,20 +174,12 @@ impl BuiltPackage {
         };
 
         eprintln!("Compiling, may take a little while to download git dependencies...");
-        let mut package = build_config.compile_package_no_exit(&package_path, &mut stderr())?;
+        let (mut package, model_opt) =
+            build_config.compile_package_no_exit(&package_path, &mut stderr())?;
 
         // Build the Move model for extra processing and run extended checks as well derive
         // runtime metadata
-        let model = &build_model(
-            options.dev,
-            package_path.as_path(),
-            options.named_addresses.clone(),
-            None,
-            bytecode_version,
-            compiler_version,
-            skip_attribute_checks,
-            options.known_attributes.clone(),
-        )?;
+        let model = &model_opt.expect("move model");
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {
             let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
