@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Serializable, Serializer, Deserializer, Deserializable } from "../../src/bcs";
+import { Serializable, Serializer, Deserializer } from "../../src/bcs";
 
 describe("BCS Deserializer", () => {
   it("deserializes a non-empty string", () => {
@@ -132,13 +132,15 @@ describe("BCS Deserializer", () => {
 
   it("deserializes a single deserializable class", () => {
     // Define the MoveStruct class that implements the Deserializable interface
-    class MoveStruct implements Serializable {
+    class MoveStruct extends Serializable {
       constructor(
         public name: string,
         public description: string,
         public enabled: boolean,
         public vectorU8: Array<number>,
-      ) {}
+      ) {
+        super();
+      }
 
       serialize(serializer: Serializer): void {
         serializer.serializeStr(this.name);
@@ -177,7 +179,7 @@ describe("BCS Deserializer", () => {
   });
 
   it("deserializes and composes an abstract Deserializable class instance from composed deserialize calls", () => {
-    abstract class MoveStruct {
+    abstract class MoveStruct extends Serializable {
       abstract serialize(serializer: Serializer): void;
 
       static deserialize(deserializer: Deserializer): MoveStruct {
@@ -193,27 +195,15 @@ describe("BCS Deserializer", () => {
       }
     }
 
-    class MoveStructs implements Serializable {
-      constructor(public moveStruct1: MoveStruct, public moveStruct2: MoveStruct) {}
-
-      serialize(serializer: Serializer): void {
-        serializer.serialize(this.moveStruct1);
-        serializer.serialize(this.moveStruct2);
-      }
-
-      // deserialize two MoveStructs, potentially either MoveStructA or MoveStructB
-      static deserialize(deserializer: Deserializer): MoveStructs {
-        return new MoveStructs(MoveStruct.deserialize(deserializer), MoveStruct.deserialize(deserializer));
-      }
-    }
-
-    class MoveStructA implements Serializable {
+    class MoveStructA extends Serializable {
       constructor(
         public name: string,
         public description: string,
         public enabled: boolean,
         public vectorU8: Array<number>,
-      ) {}
+      ) {
+        super();
+      }
 
       serialize(serializer: Serializer): void {
         // enum variant index for the abstract MoveStruct class
@@ -237,13 +227,15 @@ describe("BCS Deserializer", () => {
         return new MoveStructA(name, description, enabled, vectorU8);
       }
     }
-    class MoveStructB implements Serializable {
+    class MoveStructB extends Serializable {
       constructor(
         public moveStructA: MoveStructA,
         public name: string,
         public description: string,
         public vectorU8: Array<number>,
-      ) {}
+      ) {
+        super();
+      }
 
       serialize(serializer: Serializer): void {
         // enum variant index for the abstract MoveStruct class

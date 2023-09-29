@@ -12,8 +12,23 @@ import {
 } from "./consts";
 import { AnyNumber, Uint16, Uint32, Uint8 } from "../types";
 
-export interface Serializable {
-  serialize(serializer: Serializer): void;
+// This class is intended to be used as a base class for all serializable types.
+// It can be used to facilitate composable serialization of a complex type and
+// in general to serialize a type to its BCS representation.
+export abstract class Serializable {
+  abstract serialize(serializer: Serializer): void;
+
+  /**
+   * Serializes a `Serializable` value to its BCS representation.
+   * This function is the Typescript SDK equivalent of `bcs::to_bytes` in Move.
+   * @param value The Serializable value to serialize
+   * @returns the byte buffer BCS representation of the value
+   */
+  bcsToBytes(): Uint8Array {
+    const serializer = new Serializer();
+    this.serialize(serializer);
+    return serializer.toUint8Array();
+  }
 }
 
 export class Serializer {
@@ -235,9 +250,9 @@ export class Serializer {
    *
    * @example
    * // Define the MoveStruct class that implements the Serializable interface
-   * class MoveStruct implements Serializable {
+   * class MoveStruct extends Serializable {
    *     constructor(
-   *         public creatorAddress: AccountAddress, // where AccountAddress implements Serializable
+   *         public creatorAddress: AccountAddress, // where AccountAddress extends Serializable
    *         public collectionName: string,
    *         public tokenName: string
    *     ) {}

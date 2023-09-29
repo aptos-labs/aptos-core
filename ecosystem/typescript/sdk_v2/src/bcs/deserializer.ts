@@ -5,7 +5,13 @@
 import { MAX_U32_NUMBER } from "./consts";
 import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "../types";
 
-export interface Deserializable<T> {
+// Since Typescript doesn't have abstract static methods, we use this interface to
+// require a static deserialize method for a Deserializable class.
+// It is not exported because it's not intended to be used, only to define
+// what types are allowed to be deserialized with the `Deserializer.deserializer(...)` function.
+// If you use it with a class like `MyClass implements Deserializable<T>`, Typescript will require
+// that you implement a non-static deserialize(), and we only want a static deserialize().
+interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
 }
 
@@ -190,8 +196,9 @@ export class Deserializer {
   }
 
   /**
-   * This function deserializes a Deserializable value. The bytes must be loaded into the Serializer already.
-   * Note that it does not take in the value, it takes in the class type of the value that implements Serializable.
+   * Deserializes a BCS Deserializable value.
+   *
+   * The serialized bytes must already be in the Deserializer buffer.
    *
    * The process of using this function is as follows:
    * 1. Serialize the value of class type T using its `serialize` function.
@@ -200,61 +207,11 @@ export class Deserializer {
    *
    * @param cls The Deserializable class to deserialize the buffered bytes into.
    *
-   * @example
-   * // Define the MoveStruct class that implements the Deserializable interface
-   *  class MoveStruct implements Serializable {
-   *    constructor(
-   *      public name: string,
-   *      public description: string,
-   *      public enabled: boolean,
-   *      public vectorU8: Array<number>,
-   *    ) {}
-   *
-   *    serialize(serializer: Serializer): void {
-   *      serializer.serializeStr(this.name);
-   *      serializer.serializeStr(this.description);
-   *      serializer.serializeBool(this.enabled);
-   *      serializer.serializeU32AsUleb128(this.vectorU8.length);
-   *      this.vectorU8.forEach((n) => serializer.serializeU8(n));
-   *    }
-   *
-   *    static deserialize(deserializer: Deserializer): MoveStruct {
-   *      const name = deserializer.deserializeStr();
-   *      const description = deserializer.deserializeStr();
-   *      const enabled = deserializer.deserializeBool();
-   *      const length = deserializer.deserializeUleb128AsU32();
-   *      const vectorU8 = new Array<number>();
-   *      for (let i = 0; i < length; i++) {
-   *        vectorU8.push(deserializer.deserializeU8());
-   *      }
-   *      return new MoveStruct(name, description, enabled, vectorU8);
-   *    }
-   *  }
-   *
-   * // Construct a MoveStruct
-   * const moveStruct = new MoveStruct("abc", "123", false, [1, 2, 3, 4]);
-   *
-   * // Serialize a MoveStruct instance.
-   * const serializer = new Serializer();
-   * serializer.serialize(moveStruct);
-   * const moveStructBcsBytes = serializer.toUint8Array();
-   *
-   * // Load the bytes into the Deserializer buffer
-   * const deserializer = new Deserializer(moveStructBcsBytes);
-   *
-   * // Deserialize the buffered bytes into an instance of MoveStruct
-   * const deserializedMoveStruct = deserializer.deserialize(MoveStruct);
-   * assert(deserializedMoveStruct.name === moveStruct.name);
-   * assert(deserializedMoveStruct.description === moveStruct.description);
-   * assert(deserializedMoveStruct.enabled === moveStruct.enabled);
-   * assert(deserializedMoveStruct.vectorU8.length === moveStruct.vectorU8.length);
-   * deserializeMoveStruct.vectorU8.forEach((n, i) => assert(n === moveStruct.vectorU8[i]));
-   *
    * @returns the deserialized value of class type T
    */
   deserialize<T>(cls: Deserializable<T>): T {
-    // NOTE: The `deserialize` method called by `cls` is defined in the `cls`'s
-    // Deserializable interface, not the one defined in this class.
+    // NOTE: `deserialize` in `cls.deserialize(this)` here is a static method defined in `cls`,
+    // It is separate from the `deserialize` instance method defined here in Deserializer.
     return cls.deserialize(this);
   }
 }
