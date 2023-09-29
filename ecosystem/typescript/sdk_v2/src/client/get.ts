@@ -5,16 +5,37 @@ import { AptosConfig } from "../api/aptos_config";
 import { AptosApiType } from "../utils/const";
 
 export type GetRequestOptions = {
+  /**
+   * The config for the API client
+   */
   aptosConfig: AptosConfig;
+  /**
+   * The type of API endpoint to call e.g. fullnode, indexer, etc
+   */
   type: AptosApiType;
-  name: string;
+  /**
+   * The name of the API method
+   */
+  originMethod: string;
+  /**
+   * The URL path to the API method
+   */
   path: string;
+  /**
+   * The content type of the request
+   */
   contentType?: string;
+  /**
+   * The query parameters for the request
+   */
   params?: Record<string, string | AnyNumber | boolean | undefined>;
+  /**
+   * Specific client overrides for this request to override aptosConfig
+   */
   overrides?: ClientConfig;
 };
 
-export type GetFullNodeRequestOptions = Omit<GetRequestOptions, "type">;
+export type GetAptosFullNodeRequestOptions = Omit<GetRequestOptions, "type">;
 
 /**
  * Main function to do a Get request
@@ -24,33 +45,36 @@ export type GetFullNodeRequestOptions = Omit<GetRequestOptions, "type">;
  * @returns
  */
 export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosResponse<Req, Res>> {
-  const url = options.aptosConfig.getRequestUrl(options.type);
+  const { aptosConfig, overrides, params, contentType, path, originMethod, type } = options;
+  const url = aptosConfig.getRequestUrl(type);
 
   const response: AptosResponse<Req, Res> = await aptosRequest<Req, Res>(
     {
       url,
       method: "GET",
-      name: options.name,
-      path: options.path,
-      contentType: options.contentType,
-      params: options.params,
+      originMethod,
+      path,
+      contentType,
+      params,
       overrides: {
-        ...options.aptosConfig,
-        ...options.overrides,
+        ...aptosConfig,
+        ...overrides,
       },
     },
-    options.aptosConfig,
+    aptosConfig,
   );
   return response;
 }
 
-export async function getFullNode<Req, Res>(options: GetFullNodeRequestOptions): Promise<AptosResponse<Req, Res>> {
+export async function getAptosFullNode<Req, Res>(
+  options: GetAptosFullNodeRequestOptions,
+): Promise<AptosResponse<Req, Res>> {
   return get<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
 }
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(
-  options: GetFullNodeRequestOptions,
+  options: GetAptosFullNodeRequestOptions,
 ): Promise<Res> {
   const out = [];
   let cursor: string | undefined;
@@ -59,9 +83,9 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
   while (true) {
     requestParams.start = cursor;
     // eslint-disable-next-line no-await-in-loop
-    const response = await getFullNode<Req, Res>({
+    const response = await getAptosFullNode<Req, Res>({
       aptosConfig: options.aptosConfig,
-      name: options.name,
+      originMethod: options.originMethod,
       path: options.path,
       params: requestParams,
       overrides: options.overrides,

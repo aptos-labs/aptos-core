@@ -6,7 +6,7 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { getFullNode, paginateWithCursor } from "../client";
+import { getAptosFullNode, paginateWithCursor } from "../client";
 import { AccountAddress, Hex } from "../core";
 import { queryIndexer } from "./general";
 import {
@@ -53,9 +53,9 @@ import {
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
-  const { data } = await getFullNode<{}, AccountData>({
+  const { data } = await getAptosFullNode<{}, AccountData>({
     aptosConfig,
-    name: "getInfo",
+    originMethod: "getInfo",
     path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
   });
   return data;
@@ -69,7 +69,7 @@ export async function getModules(args: {
   const { aptosConfig, accountAddress, options } = args;
   const data = await paginateWithCursor<{}, MoveModuleBytecode[]>({
     aptosConfig,
-    name: "getModules",
+    originMethod: "getModules",
     path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
     params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
   });
@@ -91,9 +91,9 @@ export async function getModule(args: {
   options?: LedgerVersion;
 }): Promise<MoveModuleBytecode> {
   const { aptosConfig, accountAddress, moduleName, options } = args;
-  const { data } = await getFullNode<{}, MoveModuleBytecode>({
+  const { data } = await getAptosFullNode<{}, MoveModuleBytecode>({
     aptosConfig,
-    name: "getModule",
+    originMethod: "getModule",
     path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
     params: { ledger_version: options?.ledgerVersion },
   });
@@ -108,7 +108,7 @@ export async function getTransactions(args: {
   const { aptosConfig, accountAddress, options } = args;
   const data = await paginateWithCursor<{}, TransactionResponse[]>({
     aptosConfig,
-    name: "getTransactions",
+    originMethod: "getTransactions",
     path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
     params: { start: options?.start, limit: options?.limit },
   });
@@ -123,7 +123,7 @@ export async function getResources(args: {
   const { aptosConfig, accountAddress, options } = args;
   const data = await paginateWithCursor<{}, MoveResource[]>({
     aptosConfig,
-    name: "getResources",
+    originMethod: "getResources",
     path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
     params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
   });
@@ -137,9 +137,9 @@ export async function getResource(args: {
   options?: LedgerVersion;
 }): Promise<MoveResource> {
   const { aptosConfig, accountAddress, resourceType, options } = args;
-  const { data } = await getFullNode<{}, MoveResource>({
+  const { data } = await getAptosFullNode<{}, MoveResource>({
     aptosConfig,
-    name: "getResource",
+    originMethod: "getResource",
     path: `accounts/${AccountAddress.fromHexInput({
       input: accountAddress,
     }).toString()}/resource/${resourceType}`,
@@ -169,7 +169,7 @@ export async function getAccountTokensCount(args: {
   const data = await queryIndexer<GetAccountTokensCountQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountTokensCount",
+    originMethod: "getAccountTokensCount",
   });
 
   return data.current_token_ownerships_v2_aggregate.aggregate;
@@ -209,7 +209,7 @@ export async function getAccountOwnedTokens(args: {
   const data = await queryIndexer<GetAccountOwnedTokensQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountOwnedTokens",
+    originMethod: "getAccountOwnedTokens",
   });
 
   return data.current_token_ownerships_v2;
@@ -252,7 +252,7 @@ export async function getAccountOwnedTokensFromCollectionAddress(args: {
   const data = await queryIndexer<GetAccountOwnedTokensFromCollectionQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountOwnedTokensFromCollectionAddress",
+    originMethod: "getAccountOwnedTokensFromCollectionAddress",
   });
 
   return data.current_token_ownerships_v2;
@@ -292,7 +292,7 @@ export async function getAccountCollectionsWithOwnedTokens(args: {
   const data = await queryIndexer<GetAccountCollectionsWithOwnedTokensQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountCollectionsWithOwnedTokens",
+    originMethod: "getAccountCollectionsWithOwnedTokens",
   });
 
   return data.current_collection_ownership_v2_view;
@@ -314,7 +314,7 @@ export async function getAccountTransactionsCount(args: {
   const data = await queryIndexer<GetAccountTransactionsCountQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountTransactionsCount",
+    originMethod: "getAccountTransactionsCount",
   });
 
   return data.account_transactions_aggregate.aggregate;
@@ -348,7 +348,7 @@ export async function getAccountCoinsData(args: {
   const data = await queryIndexer<GetAccountCoinsDataQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountCoinsData",
+    originMethod: "getAccountCoinsData",
   });
 
   return data.current_fungible_asset_balances;
@@ -369,7 +369,7 @@ export async function getAccountCoinsCount(args: {
   const data = await queryIndexer<GetAccountCoinsCountQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountCoinsCount",
+    originMethod: "getAccountCoinsCount",
   });
 
   return data.current_fungible_asset_balances_aggregate.aggregate;
@@ -401,7 +401,7 @@ export async function getAccountOwnedObjects(args: {
   const data = await queryIndexer<GetAccountOwnedObjectsQuery>({
     aptosConfig,
     query: graphqlQuery,
-    name: "getAccountOwnedObjects",
+    originMethod: "getAccountOwnedObjects",
   });
 
   return data.current_objects;

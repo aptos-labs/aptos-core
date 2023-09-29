@@ -6,7 +6,7 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { getFullNode, paginateWithCursor } from "../client";
+import { getAptosFullNode, paginateWithCursor } from "../client";
 import { GasEstimation, PaginationArgs, TransactionResponse } from "../types";
 
 export async function getTransactions(args: {
@@ -16,7 +16,7 @@ export async function getTransactions(args: {
   const { aptosConfig, options } = args;
   const data = await paginateWithCursor<{}, TransactionResponse[]>({
     aptosConfig,
-    name: "getTransactions",
+    originMethod: "getTransactions",
     path: "transactions",
     params: { start: options?.start, limit: options?.limit },
   });
@@ -25,9 +25,9 @@ export async function getTransactions(args: {
 
 export async function getGasPriceEstimation(args: { aptosConfig: AptosConfig }) {
   const { aptosConfig } = args;
-  const { data } = await getFullNode<{}, GasEstimation>({
+  const { data } = await getAptosFullNode<{}, GasEstimation>({
     aptosConfig,
-    name: "getGasPriceEstimation",
+    originMethod: "getGasPriceEstimation",
     path: "estimate_gas_price",
   });
   return data;
