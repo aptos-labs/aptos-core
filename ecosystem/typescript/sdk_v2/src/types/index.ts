@@ -82,6 +82,7 @@ export type AptosRequest = {
   path?: string;
   body?: any;
   contentType?: string;
+  acceptType?: string;
   params?: Record<string, string | AnyNumber | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;
