@@ -8,17 +8,25 @@ import { Hex } from "../core/hex";
 import { HexInput } from "../types";
 import { PublicKey, PrivateKey, Signature } from "./asymmetric_crypto";
 
+/**
+ * Represents the public key of an Ed25519 key pair.
+ */
 export class Ed25519PublicKey extends PublicKey {
-  // Correct length of the public key in bytes (Uint8Array)
+  /**
+   * Length of an Ed25519 public key
+   */
   static readonly LENGTH: number = 32;
 
-  // Hex value of the public key
+  /**
+   * Bytes of the public key
+   * @private
+   */
   private readonly key: Hex;
 
   /**
    * Create a new PublicKey instance from a Uint8Array or String.
    *
-   * @param args.bytes A HexInput (string or Uint8Array)
+   * @param args.hexInput A HexInput (string or Uint8Array)
    */
   constructor(args: { hexInput: HexInput }) {
     super();
@@ -50,7 +58,7 @@ export class Ed25519PublicKey extends PublicKey {
 
   /**
    * Verifies a signed data with a public key
-   * @param args.data a signed message
+   * @param args.message a signed message
    * @param args.signature the signature of the message
    */
   verifySignature(args: { message: HexInput; signature: Ed25519Signature }): boolean {
@@ -75,17 +83,25 @@ export class Ed25519PublicKey extends PublicKey {
   }
 }
 
+/**
+ * Represents the private key of an Ed25519 key pair.
+ */
 export class Ed25519PrivateKey extends PrivateKey {
-  // Correct length of the private key in bytes (Uint8Array)
+  /**
+   * Length of an Ed25519 private key
+   */
   static readonly LENGTH: number = 32;
 
-  // Private and public key pair
+  /**
+   * The Ed25519 signing key
+   * @private
+   */
   private readonly signingKeyPair: nacl.SignKeyPair;
 
   /**
    * Create a new PrivateKey instance from a Uint8Array or String.
    *
-   * @param value HexInput (string or Uint8Array)
+   * @param args.hexInput HexInput (string or Uint8Array)
    */
   constructor(args: { hexInput: HexInput }) {
     super();
@@ -161,13 +177,18 @@ export class Ed25519PrivateKey extends PrivateKey {
 }
 
 /**
- * The product of signing a message with a private key.
+ * A signature of a message signed using an Ed25519 private key
  */
 export class Ed25519Signature extends Signature {
-  // Correct length of the signature in bytes (Uint8Array)
+  /**
+   * Length of an Ed25519 signature
+   */
   static readonly LENGTH = 64;
 
-  // Hex value of the signature
+  /**
+   * The signature bytes
+   * @private
+   */
   private readonly data: Hex;
 
   constructor(args: { hexInput: HexInput }) {
