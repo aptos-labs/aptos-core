@@ -30,8 +30,8 @@ use crate::{
     },
     config::GlobalConfig,
     node::local_testnet::{
-        faucet::FaucetManager, node::NodeManager, processors::ProcessorManager,
-        ready_server::ReadyServerManager,
+        faucet::FaucetManager, indexer_api::IndexerApiManager, node::NodeManager,
+        processors::ProcessorManager, ready_server::ReadyServerManager, traits::ShutdownStep,
     },
 };
 use anyhow::Context;
@@ -41,7 +41,7 @@ use clap::Parser;
 use std::{
     collections::HashSet,
     fs::{create_dir_all, remove_dir_all},
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
 };
 use tokio::task::JoinHandle;
@@ -100,6 +100,7 @@ impl RunLocalTestnet {
     async fn wait_for_startup<'a>(
         &self,
         health_checkers: &HashSet<HealthChecker>,
+        test_dir: &Path,
     ) -> CliTypedResult<()> {
         let mut futures: Vec<Pin<Box<dyn futures::Future<Output = anyhow::Result<()>> + Send>>> =
             Vec::new();
@@ -135,8 +136,10 @@ impl RunLocalTestnet {
         for f in futures::future::join_all(futures).await {
             f.map_err(|err| {
                 CliError::UnexpectedError(format!(
-                    "One of the services failed to start up: {:?}",
-                    err
+                    "One of the services failed to start up: {:?}. \
+                    Please check the logs at {} for more information.",
+                    err,
+                    test_dir.display(),
                 ))
             })?;
         }
@@ -149,6 +152,10 @@ impl RunLocalTestnet {
 impl CliCommand<()> for RunLocalTestnet {
     fn command_name(&self) -> &'static str {
         "RunLocalTestnet"
+    }
+
+    fn jsonify_error_output(&self) -> bool {
+        false
     }
 
     async fn execute(mut self) -> CliTypedResult<()> {
@@ -225,11 +232,24 @@ impl CliCommand<()> for RunLocalTestnet {
             )
             .context("Failed to build processor service managers")?;
 
+            // We have already ensured that at least one processor is used when
+            // building the processor managers with `many_new`.
+            let processor_health_checkers = processor_managers[0].get_healthchecks();
+
             let mut processor_managers = processor_managers
                 .into_iter()
                 .map(|m| Box::new(m) as Box<dyn ServiceManager>)
                 .collect();
             managers.append(&mut processor_managers);
+
+            let indexer_api_manager = IndexerApiManager::new(
+                &self,
+                processor_health_checkers,
+                test_dir.clone(),
+                self.postgres_args.get_connection_string(None),
+            )
+            .context("Failed to build indexer API service manager")?;
+            managers.push(Box::new(indexer_api_manager));
         }
 
         // We put the node manager into managers at the end just so we have access to
@@ -247,6 +267,13 @@ impl CliCommand<()> for RunLocalTestnet {
             &self,
             health_checkers.clone(),
         )?));
+
+        // Collect steps to run on shutdown. We run these in reverse.
+        let shutdown_steps: Vec<Box<dyn ShutdownStep>> = managers
+            .iter()
+            .flat_map(|m| m.get_shutdown_steps())
+            .rev()
+            .collect();
 
         // Run any pre-run steps.
         for manager in &managers {
@@ -274,7 +301,7 @@ impl CliCommand<()> for RunLocalTestnet {
         }
 
         // Wait for all the services to start up.
-        self.wait_for_startup(&health_checkers).await?;
+        self.wait_for_startup(&health_checkers, &test_dir).await?;
 
         eprintln!("\nApplying post startup steps...");
 
@@ -288,21 +315,47 @@ impl CliCommand<()> for RunLocalTestnet {
 
         eprintln!("\nSetup is complete, you can now use the local testnet!");
 
+        // Create a task that listens for ctrl-c. We want to intercept it so we can run
+        // the shutdown steps before properly exiting. This is of course best effort,
+        // see `ShutdownStep` for more info. In particular, to speak to how "best effort"
+        // this really is, to make sure ctrl-c happens more or less instantly, we only
+        // register this handler after all the services have started.
+        tasks.push(tokio::spawn(async move {
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to register ctrl-c hook");
+        }));
+
         // Wait for all of the tasks. We should never get past this point unless
         // something goes goes wrong or the user signals for the process to end.
-        let (result, _, handles) = futures::future::select_all(tasks).await;
+        let num_tasks = tasks.len();
+        let (_, finished_future_index, _) = futures::future::select_all(tasks).await;
 
-        // Something ended unexpectedly, exit with any relevant information.
-        let finished_handles = handles
-            .into_iter()
-            .filter(|handle| handle.is_finished())
-            .map(|handle| handle.id())
-            .collect::<Vec<_>>();
-        let message = format!(
-            "One of the services ({:?}) stopped unexpectedly: {:?}",
-            finished_handles, result,
-        );
+        // Because we added the ctrl-c task last, we can figure out if that was the one
+        // that ended based on `finished_future_index`. We modify our messaging and the
+        // return value based on this.
+        let was_ctrl_c = finished_future_index == num_tasks - 1;
+        if was_ctrl_c {
+            eprintln!("\nReceived ctrl-c, running shutdown steps...");
+        } else {
+            eprintln!("\nOne of the futures exited unexpectedly, running shutdown steps...");
+        }
 
-        Err(CliError::UnexpectedError(message))
+        // Run shutdown steps, if any.
+        for shutdown_step in shutdown_steps {
+            shutdown_step
+                .run()
+                .await
+                .context("Failed to run shutdown step")?;
+        }
+
+        eprintln!("Done, goodbye!");
+
+        match was_ctrl_c {
+            true => Ok(()),
+            false => Err(CliError::UnexpectedError(
+                "One of the services stopped unexpectedly".to_string(),
+            )),
+        }
     }
 }

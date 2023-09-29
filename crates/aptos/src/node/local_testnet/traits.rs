@@ -75,6 +75,15 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
         vec![]
     }
 
+    /// The ServiceManager may return ShutdownSteps. The tool will run these on shutdown.
+    /// This is best effort, there is nothing we can do if part of the code aborts or
+    /// the process receives something like SIGKILL.
+    ///
+    /// See `ShutdownStep` for more information.
+    fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
+        vec![]
+    }
+
     /// This function is responsible for running the service. It should return an error
     /// if the service ends unexpectedly. It gets called by `run`.
     async fn run_service(self: Box<Self>) -> Result<()>;
@@ -82,9 +91,18 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
 
 /// If a service wants to do something after it is healthy, it can define a struct,
 /// implement this trait for it, and return an instance of it.
-//
-// For more information see `get_post_healthy_steps` in `ServiceManager`.
+///
+/// For more information see `get_post_healthy_steps` in `ServiceManager`.
 #[async_trait]
 pub trait PostHealthyStep: Debug + Send + Sync + 'static {
+    async fn run(self: Box<Self>) -> Result<()>;
+}
+
+/// If a service wants to do something on shutdown, it can define a struct,
+/// implement this trait for it, and return an instance of it.
+///
+/// For more information see `get_shutdown_steps` in `ServiceManager`.
+#[async_trait]
+pub trait ShutdownStep: Debug + Send + Sync + 'static {
     async fn run(self: Box<Self>) -> Result<()>;
 }
