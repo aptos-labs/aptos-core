@@ -1,7 +1,8 @@
 import { Aptos, AptosConfig } from "../../../src";
 import { Network } from "../../../src/utils/api-endpoints";
 
-// TODO add account getTransactions tests once sdk v2 supports faucet (which needs transaction operation support)
+// TODO
+// add account getTransactions tests once sdk v2 supports faucet (which needs transaction operation support)
 
 describe("account api", () => {
   describe("throws when account address in invalid", () => {

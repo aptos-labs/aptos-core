@@ -259,7 +259,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.71.1"
+rust-version = "1.72.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -543,6 +543,7 @@ num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 # TODO: Do we actually use serde?

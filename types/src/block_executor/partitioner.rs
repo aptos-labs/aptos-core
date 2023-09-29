@@ -96,7 +96,7 @@ impl CrossShardEdges {
         self.edges
             .entry(txn_idx)
             .or_insert_with(Vec::new)
-            .extend(storage_locations.into_iter());
+            .extend(storage_locations);
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&ShardedTxnIndex, &Vec<StorageLocation>)> {

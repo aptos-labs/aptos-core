@@ -9,32 +9,44 @@ use crate::{
     latency_monitor::LatencyMonitor,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
-    metrics::{set_gauge, start_request_timer, DataType},
+    metrics::{set_gauge, start_request_timer, DataType, PRIORITIZED_PEER, REGULAR_PEER},
+    utils,
+    utils::choose_peers_by_latency,
 };
-use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
-use aptos_logger::{debug, info, sample, sample::SampleRate, warn};
+use aptos_config::{
+    config::{AptosDataClientConfig, AptosDataPollerConfig},
+    network_id::PeerNetworkId,
+};
+use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_types::{
     requests::{DataRequest, StorageServiceRequest},
     responses::StorageServerSummary,
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use dashmap::DashSet;
 use futures::StreamExt;
-use std::{sync::Arc, time::Duration};
+use maplit::hashset;
+use rand::Rng;
+use std::{cmp, collections::HashSet, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 // Useful constants
 const GLOBAL_DATA_LOG_FREQ_SECS: u64 = 10;
 const GLOBAL_DATA_METRIC_FREQ_SECS: u64 = 1;
+const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
+const NUM_MILLISECONDS_IN_SECONDS: f64 = 1000.0;
 const POLLER_LOG_FREQ_SECS: u64 = 2;
-const REGULAR_PEER_SAMPLE_FREQ: u64 = 3;
 
-/// A poller for storage summaries that is responsible for periodically refreshing
-/// the view of advertised data in the network.
+/// A data summary poller that maintains state related to peer polling
+#[derive(Clone)]
 pub struct DataSummaryPoller {
     data_client_config: Arc<AptosDataClientConfig>, // The configuration for the data client
     data_client: AptosDataClient,                   // The data client through which to poll peers
-    poll_loop_interval: Duration,                   // The interval between polling loop executions
+    in_flight_priority_polls: Arc<DashSet<PeerNetworkId>>, // The set of priority peers with in-flight polls
+    in_flight_regular_polls: Arc<DashSet<PeerNetworkId>>, // The set of regular peers with in-flight polls
+    peers_and_metadata: Arc<PeersAndMetadata>,            // The peers and metadata
     runtime: Option<Handle>, // An optional runtime on which to spawn the poller threads
     storage: Arc<dyn DbReader>, // The reader interface to storage
     time_service: TimeService, // The service to monitor elapsed time
@@ -44,7 +56,7 @@ impl DataSummaryPoller {
     pub fn new(
         data_client_config: Arc<AptosDataClientConfig>,
         data_client: AptosDataClient,
-        poll_loop_interval: Duration,
+        peers_and_metadata: Arc<PeersAndMetadata>,
         runtime: Option<Handle>,
         storage: Arc<dyn DbReader>,
         time_service: TimeService,
@@ -52,137 +64,346 @@ impl DataSummaryPoller {
         Self {
             data_client_config,
             data_client,
-            poll_loop_interval,
+            in_flight_priority_polls: Arc::new(DashSet::new()),
+            in_flight_regular_polls: Arc::new(DashSet::new()),
+            peers_and_metadata,
             runtime,
             storage,
             time_service,
         }
     }
 
-    /// Runs the poller that continuously updates the global data summary
-    pub async fn start_poller(self) {
-        // Create and start the latency monitor
-        start_latency_monitor(
-            self.data_client_config.clone(),
-            self.data_client.clone(),
-            self.storage.clone(),
-            self.time_service.clone(),
-            self.runtime.clone(),
+    /// Returns the next set of peers to poll based on the priorities
+    pub(crate) fn identify_peers_to_poll(
+        &self,
+        poll_priority_peers: bool,
+    ) -> Result<HashSet<PeerNetworkId>, Error> {
+        // Fetch all priority and regular peers
+        let (priority_peers, regular_peers) = self.data_client.get_priority_and_regular_peers()?;
+
+        // Identify the peers to poll
+        let peers_to_poll = if poll_priority_peers {
+            self.get_priority_peers_to_poll(priority_peers)
+        } else {
+            self.get_regular_peers_to_poll(regular_peers)
+        };
+
+        Ok(peers_to_poll)
+    }
+
+    /// Identifies the next set of priority peers to poll from
+    /// the given list of all priority peers.
+    fn get_priority_peers_to_poll(
+        &self,
+        all_priority_peers: HashSet<PeerNetworkId>,
+    ) -> HashSet<PeerNetworkId> {
+        // Fetch the number of in-flight polls and update the metrics
+        let num_in_flight_polls = self.in_flight_priority_polls.len() as u64;
+        update_in_flight_metrics(PRIORITIZED_PEER, num_in_flight_polls);
+
+        // Ensure we don't go over the maximum number of in-flight polls
+        let data_poller_config = self.data_client_config.data_poller_config;
+        let max_num_in_flight_polls = data_poller_config.max_num_in_flight_priority_polls;
+        if num_in_flight_polls >= max_num_in_flight_polls {
+            return hashset![];
+        }
+
+        // Calculate the number of peers to poll this round
+        let max_num_peers_to_poll = max_num_in_flight_polls.saturating_sub(num_in_flight_polls);
+        let num_peers_to_poll = calculate_num_peers_to_poll(
+            &all_priority_peers,
+            max_num_peers_to_poll,
+            self.data_client_config.data_poller_config,
         );
 
-        // Start the poller
-        info!(
-            (LogSchema::new(LogEntry::DataSummaryPoller)
-                .message("Starting the Aptos data poller!"))
+        // Select a subset of the priority peers to poll
+        self.select_peers_to_poll(all_priority_peers, num_peers_to_poll)
+    }
+
+    /// Identifies the next set of regular peers to poll from
+    /// the given list of all regular peers.
+    fn get_regular_peers_to_poll(
+        &self,
+        all_regular_peers: HashSet<PeerNetworkId>,
+    ) -> HashSet<PeerNetworkId> {
+        // Fetch the number of in-flight polls and update the metrics
+        let num_in_flight_polls = self.in_flight_regular_polls.len() as u64;
+        update_in_flight_metrics(REGULAR_PEER, num_in_flight_polls);
+
+        // Ensure we don't go over the maximum number of in-flight polls
+        let data_poller_config = self.data_client_config.data_poller_config;
+        let max_num_in_flight_polls = data_poller_config.max_num_in_flight_regular_polls;
+        if num_in_flight_polls >= max_num_in_flight_polls {
+            return hashset![];
+        }
+
+        // Calculate the number of peers to poll this round
+        let max_num_peers_to_poll = max_num_in_flight_polls.saturating_sub(num_in_flight_polls);
+        let num_peers_to_poll = calculate_num_peers_to_poll(
+            &all_regular_peers,
+            max_num_peers_to_poll,
+            self.data_client_config.data_poller_config,
         );
-        let poll_loop_ticker = self.time_service.interval(self.poll_loop_interval);
-        futures::pin_mut!(poll_loop_ticker);
 
-        loop {
-            // Wait for next round before polling
-            poll_loop_ticker.next().await;
+        // Select a subset of the regular peers to poll
+        self.select_peers_to_poll(all_regular_peers, num_peers_to_poll)
+    }
 
-            // Update the global storage summary
-            if let Err(error) = self.data_client.update_global_summary_cache() {
+    /// Selects the peers to poll from the given peer
+    /// list and the number of peers to poll.
+    fn select_peers_to_poll(
+        &self,
+        mut potential_peers: HashSet<PeerNetworkId>,
+        num_peers_to_poll: u64,
+    ) -> HashSet<PeerNetworkId> {
+        // Filter out the peers that have an in-flight request
+        let peers_with_in_flight_polls = self.all_peers_with_in_flight_polls();
+        potential_peers = potential_peers
+            .difference(&peers_with_in_flight_polls)
+            .cloned()
+            .collect();
+
+        // Select the peers to poll
+        let maybe_peers_to_poll = match num_peers_to_poll {
+            0 => None, // Don't poll any peers
+            1 => {
+                // Choose randomly from the potential peers
+                utils::choose_random_peer(potential_peers).map(|peer| hashset![peer])
+            },
+            num_peers_to_poll => {
+                // Select half the peers randomly, and the other half weighted by latency
+                let num_peers_to_poll_randomly = num_peers_to_poll / 2;
+                let num_peers_to_poll_by_latency = num_peers_to_poll - num_peers_to_poll_randomly;
+
+                // Select the random peers
+                let random_peers_to_poll =
+                    utils::choose_random_peers(num_peers_to_poll_randomly, potential_peers.clone());
+
+                // Remove already selected peers
+                let potential_peers = potential_peers
+                    .difference(&random_peers_to_poll)
+                    .cloned()
+                    .collect();
+
+                // Select the latency weighted peers
+                let peers_to_poll_by_latency = choose_peers_by_latency(
+                    self.data_client_config.clone(),
+                    num_peers_to_poll_by_latency,
+                    potential_peers,
+                    self.peers_and_metadata.clone(),
+                    false,
+                );
+
+                // Return all peers to poll
+                let all_peers_to_poll = random_peers_to_poll
+                    .union(&peers_to_poll_by_latency)
+                    .cloned()
+                    .collect();
+                Some(all_peers_to_poll)
+            },
+        };
+        maybe_peers_to_poll.unwrap_or(hashset![])
+    }
+
+    /// Marks the given peers as having an in-flight poll request
+    pub(crate) fn in_flight_request_started(&self, is_priority_peer: bool, peer: &PeerNetworkId) {
+        // Get the current in-flight polls
+        let in_flight_polls = if is_priority_peer {
+            self.in_flight_priority_polls.clone()
+        } else {
+            self.in_flight_regular_polls.clone()
+        };
+
+        // Insert the new peer
+        if !in_flight_polls.insert(*peer) {
+            error!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message(&format!(
+                        "Peer already found with an in-flight poll! Priority: {:?}",
+                        is_priority_peer
+                    ))
+                    .peer(peer))
+            );
+        }
+    }
+
+    /// Marks the pending in-flight request as complete for the specified peer
+    pub(crate) fn in_flight_request_complete(&self, peer: &PeerNetworkId) {
+        // The priority of the peer might have changed since we
+        // last polled it, so we attempt to remove it from both
+        // the regular and priority in-flight requests.
+        if self.in_flight_priority_polls.remove(peer).is_none()
+            && self.in_flight_regular_polls.remove(peer).is_none()
+        {
+            error!(
+                (LogSchema::new(LogEntry::PeerStates)
+                    .event(LogEvent::PriorityAndRegularPeers)
+                    .message("Peer not found with an in-flight poll!")
+                    .peer(peer))
+            );
+        }
+    }
+
+    /// Returns all peers with in-flight polls (both priority and regular peers)
+    pub(crate) fn all_peers_with_in_flight_polls(&self) -> HashSet<PeerNetworkId> {
+        // Add the priority peers with in-flight polls
+        let mut peers_with_in_flight_polls = hashset![];
+        for peer in self.in_flight_priority_polls.iter() {
+            peers_with_in_flight_polls.insert(*peer);
+        }
+
+        // Add the regular peers with in-flight polls
+        for peer in self.in_flight_regular_polls.iter() {
+            peers_with_in_flight_polls.insert(*peer);
+        }
+
+        peers_with_in_flight_polls
+    }
+}
+
+/// Runs a thread that continuously polls peers and updates
+/// the global data summary.
+pub async fn start_poller(poller: DataSummaryPoller) {
+    // Create and start the latency monitor
+    start_latency_monitor(
+        poller.data_client_config.clone(),
+        poller.data_client.clone(),
+        poller.storage.clone(),
+        poller.time_service.clone(),
+        poller.runtime.clone(),
+    );
+
+    // Create the poll loop ticker
+    let data_poller_config = poller.data_client_config.data_poller_config;
+    let data_polling_interval = Duration::from_millis(data_poller_config.poll_loop_interval_ms);
+    let poll_loop_ticker = poller.time_service.interval(data_polling_interval);
+    futures::pin_mut!(poll_loop_ticker);
+
+    // Start the poller
+    let mut polling_round: u64 = 0;
+    info!((LogSchema::new(LogEntry::DataSummaryPoller).message("Starting the Aptos data poller!")));
+    loop {
+        // Wait for the next round before polling
+        poll_loop_ticker.next().await;
+
+        // Increment the round counter
+        polling_round = polling_round.wrapping_add(1);
+
+        // Update the global storage summary
+        if let Err(error) = poller.data_client.update_global_summary_cache() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
+                warn!(
+                    (LogSchema::new(LogEntry::DataSummaryPoller)
+                        .event(LogEvent::AggregateSummary)
+                        .message("Unable to update global summary cache!")
+                        .error(&error))
+                );
+            );
+        }
+
+        // Determine the peers to poll this round. If the round is even, poll
+        // the priority peers. Otherwise, poll the regular peers. This allows
+        // us to alternate between peer types and load balance requests.
+        let poll_priority_peers = polling_round % 2 == 0;
+
+        // Identify the peers to poll (if any)
+        let peers_to_poll = match poller.identify_peers_to_poll(poll_priority_peers) {
+            Ok(peers_to_poll) => peers_to_poll,
+            Err(error) => {
                 sample!(
                     SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
                     warn!(
                         (LogSchema::new(LogEntry::DataSummaryPoller)
-                            .event(LogEvent::AggregateSummary)
-                            .message("Unable to update global summary cache!")
+                            .event(LogEvent::PeerPollingError)
+                            .message("Unable to identify peers to poll!")
                             .error(&error))
                     );
                 );
-            }
-
-            // Fetch the prioritized and regular peers to poll (if any)
-            let prioritized_peer = self.try_fetch_peer(true);
-            let regular_peer = self.fetch_regular_peer(prioritized_peer.is_none());
-
-            // Ensure the peers to poll exist
-            if prioritized_peer.is_none() && regular_peer.is_none() {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
-                    debug!(
-                        (LogSchema::new(LogEntry::DataSummaryPoller)
-                            .event(LogEvent::NoPeersToPoll)
-                            .message("No prioritized or regular peers to poll this round!"))
-                    );
-                );
                 continue;
-            }
-
-            // Go through each peer and poll them individually
-            if let Some(prioritized_peer) = prioritized_peer {
-                poll_peer(
-                    self.data_client.clone(),
-                    prioritized_peer,
-                    self.runtime.clone(),
-                );
-            }
-            if let Some(regular_peer) = regular_peer {
-                poll_peer(self.data_client.clone(), regular_peer, self.runtime.clone());
-            }
-        }
-    }
-
-    /// Fetches the next regular peer to poll based on the sample frequency
-    pub(crate) fn fetch_regular_peer(&self, always_poll: bool) -> Option<PeerNetworkId> {
-        if always_poll {
-            self.try_fetch_peer(false)
-        } else {
-            sample!(SampleRate::Frequency(REGULAR_PEER_SAMPLE_FREQ), {
-                return self.try_fetch_peer(false);
-            });
-            None
-        }
-    }
-
-    /// Attempts to fetch the next peer to poll from the data client.
-    /// If an error is encountered, the error is logged and None is returned.
-    pub(crate) fn try_fetch_peer(&self, is_priority_peer: bool) -> Option<PeerNetworkId> {
-        let result = if is_priority_peer {
-            self.data_client.fetch_prioritized_peer_to_poll()
-        } else {
-            self.data_client.fetch_regular_peer_to_poll()
+            },
         };
-        result.unwrap_or_else(|error| {
-            log_poller_error(error);
-            None
-        })
+
+        // Verify that we have at least one peer to poll
+        if peers_to_poll.is_empty() {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
+                debug!(
+                    (LogSchema::new(LogEntry::DataSummaryPoller)
+                        .event(LogEvent::NoPeersToPoll)
+                        .message("No peers to poll this round!"))
+                );
+            );
+            continue;
+        }
+
+        // Go through each peer and poll them individually
+        for peer in peers_to_poll {
+            poll_peer(poller.clone(), poll_priority_peers, peer);
+        }
     }
 }
 
-/// Logs the given poller error based on the logging frequency
-fn log_poller_error(error: Error) {
-    sample!(
-        SampleRate::Duration(Duration::from_secs(POLLER_LOG_FREQ_SECS)),
-        warn!(
-            (LogSchema::new(LogEntry::StorageSummaryRequest)
-                .event(LogEvent::PeerPollingError)
-                .message("Unable to fetch peers to poll!")
-                .error(&error))
-        );
+/// Calculates the number of peers to poll this round
+pub(crate) fn calculate_num_peers_to_poll(
+    potential_peers: &HashSet<PeerNetworkId>,
+    max_num_peers_to_poll: u64,
+    data_poller_config: AptosDataPollerConfig,
+) -> u64 {
+    // Calculate the total number of peers to poll (per second)
+    let min_polls_per_second = data_poller_config.min_polls_per_second;
+    let peer_bucket_sizes = data_poller_config.peer_bucket_size;
+    let additional_polls_per_bucket = data_poller_config.additional_polls_per_peer_bucket;
+    let total_polls_per_second = min_polls_per_second
+        + (additional_polls_per_bucket * (potential_peers.len() as u64 / peer_bucket_sizes));
+
+    // Bound the number of polls per second by the maximum configurable value
+    let polls_per_second = cmp::min(
+        total_polls_per_second,
+        data_poller_config.max_polls_per_second,
     );
+
+    // Calculate the number of loop executions per second
+    let mut loops_per_second =
+        NUM_MILLISECONDS_IN_SECONDS / (data_poller_config.poll_loop_interval_ms as f64);
+    loops_per_second /= 2.0; // Divide by 2 because we poll priority and regular peers in alternating loops
+
+    // Calculate the number of peers to poll (per round)
+    let num_peers_to_poll = (polls_per_second as f64) / loops_per_second;
+
+    // Convert the number of peers to poll to a u64. To do this, we round the
+    // fractional part up to the nearest integer with an equal probability. For
+    // example, if the fractional part is 0.7, then we round up to 1 with 70%
+    // probability. This ensures that we poll the correct number of peers on average.
+    let round_up = rand::thread_rng().gen_bool(num_peers_to_poll.fract());
+    let num_peers_to_poll = if round_up {
+        num_peers_to_poll.ceil() as u64
+    } else {
+        num_peers_to_poll.floor() as u64
+    };
+
+    // Bound the number of peers to poll by the given maximum
+    cmp::min(num_peers_to_poll, max_num_peers_to_poll)
 }
 
 /// Spawns a dedicated poller for the given peer.
 pub(crate) fn poll_peer(
-    data_client: AptosDataClient,
+    data_summary_poller: DataSummaryPoller,
+    is_priority_peer: bool,
     peer: PeerNetworkId,
-    runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Mark the in-flight poll as started. We do this here to prevent
     // the main polling loop from selecting the same peer concurrently.
-    data_client.in_flight_request_started(&peer);
+    data_summary_poller.in_flight_request_started(is_priority_peer, &peer);
 
     // Create the poller for the peer
+    let runtime = data_summary_poller.runtime.clone();
     let poller = async move {
         // Construct the request for polling
         let data_request = DataRequest::GetStorageServerSummary;
-        let storage_request =
-            StorageServiceRequest::new(data_request, data_client.use_compression());
-        let request_timeout = data_client.get_response_timeout_ms();
+        let use_compression = data_summary_poller.data_client_config.use_compression;
+        let storage_request = StorageServiceRequest::new(data_request, use_compression);
 
         // Start the peer polling timer
         let timer = start_request_timer(
@@ -192,14 +413,16 @@ pub(crate) fn poll_peer(
         );
 
         // Fetch the storage summary for the peer and stop the timer
-        let result: crate::error::Result<StorageServerSummary> = data_client
+        let request_timeout = data_summary_poller.data_client_config.response_timeout_ms;
+        let result: crate::error::Result<StorageServerSummary> = data_summary_poller
+            .data_client
             .send_request_to_peer_and_decode(peer, storage_request, request_timeout)
             .await
             .map(Response::into_payload);
         drop(timer);
 
         // Mark the in-flight poll as now complete
-        data_client.in_flight_request_complete(&peer);
+        data_summary_poller.in_flight_request_complete(&peer);
 
         // Check the storage summary response
         let storage_summary = match result {
@@ -217,7 +440,9 @@ pub(crate) fn poll_peer(
         };
 
         // Update the summary for the peer
-        data_client.update_summary(peer, storage_summary);
+        data_summary_poller
+            .data_client
+            .update_peer_storage_summary(peer, storage_summary);
 
         // Log the new global data summary and update the metrics
         sample!(
@@ -227,13 +452,13 @@ pub(crate) fn poll_peer(
                     .event(LogEvent::AggregateSummary)
                     .message(&format!(
                         "Global data summary: {}",
-                        data_client.get_global_data_summary()
+                        data_summary_poller.data_client.get_global_data_summary()
                     )))
             );
         );
         sample!(
             SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_METRIC_FREQ_SECS)),
-            let global_data_summary = data_client.get_global_data_summary();
+            let global_data_summary = data_summary_poller.data_client.get_global_data_summary();
             update_advertised_data_metrics(global_data_summary);
         );
     };
@@ -320,4 +545,16 @@ fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
             );
         }
     }
+}
+
+/// Updates the metrics for the number of in-flight polls
+fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
+    sample!(
+        SampleRate::Frequency(IN_FLIGHT_METRICS_SAMPLE_FREQ),
+        set_gauge(
+            &metrics::IN_FLIGHT_POLLS,
+            label,
+            num_in_flight_polls,
+        );
+    );
 }

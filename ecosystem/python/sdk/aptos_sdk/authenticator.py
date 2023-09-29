@@ -15,9 +15,8 @@ class Authenticator:
     """
     Each transaction submitted to the Aptos blockchain contains a `TransactionAuthenticator`.
     During transaction execution, the executor will check if every `AccountAuthenticator`'s
-    signature on the transaction hash is well-formed and whether the sha3 hash of the
-    `AccountAuthenticator`'s `AuthenticationKeyPreimage` matches the `AuthenticationKey` stored
-    under the participating signer's account address.
+    signature on the transaction hash is well-formed and whether `AccountAuthenticator`'s  matches
+    the `AuthenticationKey` stored under the participating signer's account address.
     """
 
     ED25519: int = 0

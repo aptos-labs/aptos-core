@@ -305,7 +305,11 @@ pub trait Genesis: PrivateKey {
 pub(crate) mod private {
     pub trait Sealed {}
 
-    // Implement for the ed25519, multi-ed25519 signatures
+    impl Sealed for crate::bls12381::PrivateKey {}
+    impl Sealed for crate::bls12381::PublicKey {}
+    impl Sealed for crate::bls12381::Signature {}
+    impl Sealed for crate::bls12381::ProofOfPossession {}
+
     impl Sealed for crate::ed25519::Ed25519PrivateKey {}
     impl Sealed for crate::ed25519::Ed25519PublicKey {}
     impl Sealed for crate::ed25519::Ed25519Signature {}
@@ -314,12 +318,11 @@ pub(crate) mod private {
     impl Sealed for crate::multi_ed25519::MultiEd25519PublicKey {}
     impl Sealed for crate::multi_ed25519::MultiEd25519Signature {}
 
-    impl Sealed for crate::bls12381::PrivateKey {}
-    impl Sealed for crate::bls12381::PublicKey {}
-    impl Sealed for crate::bls12381::Signature {}
-    impl Sealed for crate::bls12381::ProofOfPossession {}
-
     impl Sealed for crate::ecdsa_p256::P256PrivateKey {}
     impl Sealed for crate::ecdsa_p256::P256PublicKey {}
     impl Sealed for crate::ecdsa_p256::P256Signature {}
+
+    impl Sealed for crate::secp256k1_ecdsa::PrivateKey {}
+    impl Sealed for crate::secp256k1_ecdsa::PublicKey {}
+    impl Sealed for crate::secp256k1_ecdsa::Signature {}
 }

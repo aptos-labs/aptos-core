@@ -43,16 +43,14 @@ pub struct Dag {
     storage: Arc<dyn DAGStorage>,
     initial_round: Round,
     epoch_state: Arc<EpochState>,
-
-    highest_committed_anchor_round: Round,
 }
 
 impl Dag {
     pub fn new(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
-        highest_committed_anchor_round: Round,
-        dag_window_size_config: usize,
+        initial_round: Round,
+        _dag_window_size_config: usize,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
@@ -78,18 +76,12 @@ impl Dag {
         if let Err(e) = storage.delete_certified_nodes(expired) {
             error!("Error deleting expired nodes: {:?}", e);
         }
-        let initial_round = if highest_committed_anchor_round <= dag_window_size_config as Round {
-            1
-        } else {
-            highest_committed_anchor_round.saturating_sub(dag_window_size_config as Round)
-        };
         Self {
             nodes_by_round,
             author_to_index,
             storage,
             initial_round,
             epoch_state,
-            highest_committed_anchor_round,
         }
     }
 
@@ -97,7 +89,6 @@ impl Dag {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         initial_round: Round,
-        highest_committed_anchor_round: Round,
     ) -> Self {
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let nodes_by_round = BTreeMap::new();
@@ -107,7 +98,6 @@ impl Dag {
             storage,
             initial_round,
             epoch_state,
-            highest_committed_anchor_round,
         }
     }
 
@@ -235,7 +225,7 @@ impl Dag {
     }
 
     fn reachable_filter(start: Vec<HashValue>) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
-        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start.into_iter());
+        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start);
         move |node| {
             if reachable.contains(&node.digest()) {
                 for parent in node.parents() {
@@ -363,9 +353,5 @@ impl Dag {
             }
         }
         None
-    }
-
-    pub(super) fn highest_committed_anchor_round(&self) -> Round {
-        self.highest_committed_anchor_round
     }
 }

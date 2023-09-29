@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -920,6 +920,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-peer-monitoring-service-types",
  "aptos-storage-interface",
  "aptos-storage-service-client",
  "aptos-storage-service-server",
@@ -935,7 +936,8 @@ dependencies = [
  "itertools",
  "maplit",
  "mockall",
- "rand 0.7.3",
+ "ordered-float 3.9.1",
+ "rand 0.8.5",
  "serde",
  "thiserror",
  "tokio",
@@ -2528,6 +2530,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-time-service",
  "aptos-types",
+ "arc-swap",
  "async-trait",
  "bcs 0.1.4",
  "bytes",
@@ -10434,6 +10437,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "3.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a54938017eacd63036332b4ae5c8a49fc8c0c1d6d629893057e4f13609edd06"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "os_str_bytes"
 version = "6.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12524,7 +12536,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3a1a3341211875ef120e117ea7fd5228530ae7e7036a779fdc9117be6b3282c"
 dependencies = [
- "ordered-float",
+ "ordered-float 2.10.0",
  "serde",
 ]
 

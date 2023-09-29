@@ -109,8 +109,7 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
 
-        // turn off becasue of timeout (property proved)
-        pragma verify = false;
+        pragma verify_duration_estimate = 200;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
 
