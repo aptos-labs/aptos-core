@@ -78,7 +78,7 @@ fn verify_dkg_transcript(
         dkg_session.target_epoch, dkg_session.dealer_epoch,
     );
     let verifier = ValidatorVerifier::from(&dkg_session.dealer_validator_set);
-    let (_, pvss_config) =
+    let pvss_config =
         build_dkg_pvss_config(dkg_session.dealer_epoch, &dkg_session.target_validator_set);
     let trxs: DKGTranscriptWrapper =
         bcs::from_bytes(dkg_session.serialized_transcript.as_slice()).unwrap();

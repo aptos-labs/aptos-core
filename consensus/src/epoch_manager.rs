@@ -703,13 +703,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Duration::from_millis(1000),    // dkg todo: choose a proper timeout, this includes network latency and verification and aggregation time
         ));
 
-        let dkg_manager = Arc::new(Mutex::new(DKGManager::new(
+        let dkg_manager = DKGManager::new(
             self.author,
             epoch_state.clone(),
             dkg_reliable_broadcast,
             self.config.safety_rules.backend.clone(),
             self.time_service.clone(),
-        )));
+        );
         //dkg todo: old instance is silently dropped. Is it fine? any clean-up needed?
         self.dkg_manager_wrapper = Arc::new(DKGManagerWrapper::WithDKG(dkg_manager.clone()));
 
@@ -922,7 +922,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     if let Some(my_index) = my_index {
                         let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(dkg_session.serialized_transcript.as_slice()).unwrap();
                         let dk = self.get_decrypt_key_for_dkg();
-                        let (_, dkg_pvss_config) = build_dkg_pvss_config(dkg_session.dealer_epoch, &validator_set);;
+                        let dkg_pvss_config = build_dkg_pvss_config(dkg_session.dealer_epoch, &validator_set);
                         let dealer_verifier: ValidatorVerifier = (&dkg_session.dealer_validator_set).into();
                         match trxs.verify(&dkg_pvss_config, &dealer_verifier) {
                             Ok(_) => {

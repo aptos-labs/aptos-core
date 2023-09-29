@@ -18,13 +18,13 @@ pub use types::{DKGAggNode, DKGMessage, DKGNetworkMessage, DKGNode};
 pub fn build_dkg_pvss_config(
     cur_epoch: u64,
     next_validator_set: &ValidatorSet,
-) -> (DKGRounding, DKGPvssConfig) {
+) -> DKGPvssConfig {
     let validator_addresses: Vec<Author> = next_validator_set
         .active_validators
         .iter()
         .map(|vi| vi.account_address)
         .collect();
-
+    
     let validator_stakes: Vec<u64> = next_validator_set
         .active_validators
         .iter()
@@ -65,5 +65,5 @@ pub fn build_dkg_pvss_config(
     let dkg_pvss_config =
         DKGPvssConfig::new(cur_epoch, wc_1.clone(), wc_2.clone(), pp, consensus_keys);
 
-    (dkg_rounding, dkg_pvss_config)
+    dkg_pvss_config
 }

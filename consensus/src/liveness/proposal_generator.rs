@@ -265,7 +265,7 @@ impl ProposalGenerator {
             let pvss_config = self.dkg_manager_wrapper.get_pvss_config().unwrap();
             let dkg_agg_node = self.dkg_manager_wrapper.take_agg_node().unwrap();
             debug!("[DKG]: epoch {} node {} generates DKG payload", dkg_agg_node.epoch(), self.author);
-            let payload = Payload::DKG(DKGPayload::new(dkg_agg_node, pvss_config));
+            let payload = Payload::DKG(DKGPayload::new(dkg_agg_node, pvss_config.clone()));
             let timestamp = self.time_service.get_current_timestamp();
             (payload, timestamp.as_micros() as u64)
         } else {

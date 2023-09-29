@@ -13,8 +13,14 @@ use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
+use thiserror::Error as ThisError;
 use std::{sync::Arc, time::Duration};
-use aptos_infallible::Mutex;
+
+#[derive(ThisError, Debug)]
+pub enum DKGRpcHandleError {
+    #[error("DKG store not initialized (can be expected)")]
+    DKGStoreNotInitialized,
+}
 
 pub trait DKGRpcHandler {
     type DKGRequest;
@@ -56,7 +62,7 @@ impl DKGNetworkHandler {
         author: Author,
         // dkg_rpc_rx: aptos_channel::Receiver<Author, IncomingDKGRequest>,
         epoch_state: Arc<EpochState>,
-        dkg_manager: Arc<Mutex<DKGManager>>,
+        dkg_manager: DKGManager,
     ) -> Self {
         Self {
             author,
@@ -75,14 +81,11 @@ impl DKGNetworkHandler {
         );
         while let Some(msg) = dkg_rpc_rx.next().await {
             let sender = msg.sender;
-            // if let Err(e) = self.process_rpc(msg).await {
-            //     warn!(error = ?e, "[DKG] error processing rpc from peer {:?}: {}", sender, e);
-            // }
             let mut handler = self.clone();
             
             tokio::task::spawn(async move {
                 if let Err(e) = handler.process_rpc(msg).await {
-                    warn!(error = ?e, "[DKG] error processing rpc from peer {:?}: {}", sender, e);
+                    warn!("[DKG] error processing rpc from peer {:?}: {}", sender, e);
                 }
             });
         }
@@ -124,11 +127,11 @@ impl DKGNetworkHandler {
 
 #[derive(Clone)]
 pub struct DKGNodeHandler {
-    dkg_manager: Arc<Mutex<DKGManager>>,
+    dkg_manager: DKGManager,
 }
 
 impl DKGNodeHandler {
-    pub fn new(dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
+    pub fn new(dkg_manager: DKGManager) -> Self {
         Self { dkg_manager }
     }
 }
@@ -141,23 +144,20 @@ impl DKGRpcHandler for DKGNodeHandler {
         let epoch = node.epoch();
         debug!("[DKG] Process DKG Node from {:?}", node.author());
         // dkg todo: persist the dkg nodes
-        match self.dkg_manager.lock().add_node(node) {
+        match self.dkg_manager.add_node(node) {
             Ok(_) => Ok(DKGNodeAck::new(epoch)),
-            Err(e) => {
-                error!("[DKG] Error when adding DKG node: {:?}", e);
-                Err(e)
-            },
+            Err(e) => Err(e),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct DKGAggNodeHandler {
-    dkg_manager: Arc<Mutex<DKGManager>>,
+    dkg_manager: DKGManager,
 }
 
 impl DKGAggNodeHandler {
-    pub fn new(dkg_manager: Arc<Mutex<DKGManager>>) -> Self {
+    pub fn new(dkg_manager: DKGManager) -> Self {
         Self { dkg_manager }
     }
 }
@@ -170,12 +170,9 @@ impl DKGRpcHandler for DKGAggNodeHandler {
         let epoch = agg_node.epoch();
         debug!("[DKG] Process DKG Aggregated Node: {:?}", agg_node.metadata());
         // dkg todo: persist the dkg nodes
-        match self.dkg_manager.lock().add_agg_node(agg_node) {
+        match self.dkg_manager.add_agg_node(agg_node) {
             Ok(_) => Ok(DKGAggNodeAck::new(epoch)),
-            Err(e) => {
-                error!("[DKG] Error when adding DKG aggregated node: {:?}", e);
-                Err(e)
-            },
+            Err(e) => Err(e),
         }
     }
 }
