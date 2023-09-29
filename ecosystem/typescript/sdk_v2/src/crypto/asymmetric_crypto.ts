@@ -28,8 +28,15 @@ export abstract class PublicKey extends Serializable {
   abstract serialize(serializer: Serializer): void;
 }
 
+/**
+ * An abstract representation of a private key.  This is used to sign transactions and
+ * derive the public key associated.
+ */
 export abstract class PrivateKey extends Serializable {
-  // Sign the given message with the private key.
+  /**
+   * Sign a message with the key
+   * @param args
+   */
   abstract sign(args: { message: HexInput }): Signature;
 
   /**
@@ -50,8 +57,14 @@ export abstract class PrivateKey extends Serializable {
   abstract publicKey(): PublicKey;
 }
 
+/**
+ * An abstract representation of a signature.  This is the product of signing a
+ * message and can be used with the PublicKey to verify the signature.
+ */
 export abstract class Signature extends Serializable {
-  // Convert the signature to bytes or Uint8Array.
+  /**
+   * Get the raw signature bytes
+   */
   abstract toUint8Array(): Uint8Array;
 
   /**
