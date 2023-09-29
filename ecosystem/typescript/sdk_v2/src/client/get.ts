@@ -66,7 +66,6 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
       params: requestParams,
       overrides: options.overrides,
     });
-    // eslint-disable-next-line no-underscore-dangle
     /**
      * the cursor is a "state key" from the API prespective. Client
      * should not need to "care" what it represents but just use it
@@ -75,7 +74,6 @@ export async function paginateWithCursor<Req extends Record<string, any>, Res ex
     cursor = response.headers["x-aptos-cursor"];
     // Now that we have the cursor (if any), we remove the headers before
     // adding these to the output of this function.
-    // eslint-disable-next-line no-underscore-dangle
     delete (response as any).headers;
     out.push(...response.data);
     if (cursor === null || cursor === undefined) {
