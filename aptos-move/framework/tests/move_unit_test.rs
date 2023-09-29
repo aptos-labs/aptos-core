@@ -4,7 +4,7 @@
 
 use aptos_framework::{extended_checks, path_in_crate};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_package::CompilerConfig;
@@ -46,7 +46,7 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     )
 }

@@ -6,7 +6,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_move_stdlib::natives::all_natives;
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, ident_str, identifier::Identifier};
 use move_ir_compiler::Compiler;
@@ -132,7 +132,7 @@ fn main() -> Result<()> {
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     );
 
