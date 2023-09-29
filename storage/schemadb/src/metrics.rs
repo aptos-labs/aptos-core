@@ -96,20 +96,20 @@ pub static APTOS_SCHEMADB_BATCH_COMMIT_BYTES: Lazy<HistogramVec> = Lazy::new(|| 
     .unwrap()
 });
 
-pub static APTOS_SCHEMADB_PUT_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
+pub static APTOS_SCHEMADB_PUT_BYTES_SAMPLED: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         // metric name
-        "aptos_schemadb_put_bytes",
+        "aptos_schemadb_put_bytes_sampled",
         // metric description
-        "Aptos schemadb put call puts data size in bytes",
+        "Aptos schemadb put call puts data size in bytes (sampled)",
         // metric labels (dimensions)
         &["cf_name"]
     )
     .unwrap()
 });
 
-pub static APTOS_SCHEMADB_DELETES: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_storage_deletes", "Aptos storage delete calls", &[
+pub static APTOS_SCHEMADB_DELETES_SAMPLED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("aptos_storage_deletes_sampled", "Aptos storage delete calls (sampled)", &[
         "cf_name"
     ])
     .unwrap()
