@@ -10,11 +10,15 @@ to synchronize configuration changes for the validators.
 -  [Struct `NewEpochEvent`](#0x1_reconfiguration_NewEpochEvent)
 -  [Resource `Configuration`](#0x1_reconfiguration_Configuration)
 -  [Resource `DisableReconfiguration`](#0x1_reconfiguration_DisableReconfiguration)
+-  [Resource `SlowReconfigureInProgress`](#0x1_reconfiguration_SlowReconfigureInProgress)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_reconfiguration_initialize)
 -  [Function `disable_reconfiguration`](#0x1_reconfiguration_disable_reconfiguration)
 -  [Function `enable_reconfiguration`](#0x1_reconfiguration_enable_reconfiguration)
 -  [Function `reconfiguration_enabled`](#0x1_reconfiguration_reconfiguration_enabled)
+-  [Function `slow_reconfigure_in_progress`](#0x1_reconfiguration_slow_reconfigure_in_progress)
+-  [Function `mark_slow_reconfigure_started`](#0x1_reconfiguration_mark_slow_reconfigure_started)
+-  [Function `mark_slow_reconfigure_terminated`](#0x1_reconfiguration_mark_slow_reconfigure_terminated)
 -  [Function `reconfigure`](#0x1_reconfiguration_reconfigure)
 -  [Function `last_reconfiguration_time`](#0x1_reconfiguration_last_reconfiguration_time)
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
@@ -24,6 +28,9 @@ to synchronize configuration changes for the validators.
     -  [Function `disable_reconfiguration`](#@Specification_1_disable_reconfiguration)
     -  [Function `enable_reconfiguration`](#@Specification_1_enable_reconfiguration)
     -  [Function `reconfiguration_enabled`](#@Specification_1_reconfiguration_enabled)
+    -  [Function `slow_reconfigure_in_progress`](#@Specification_1_slow_reconfigure_in_progress)
+    -  [Function `mark_slow_reconfigure_started`](#@Specification_1_mark_slow_reconfigure_started)
+    -  [Function `mark_slow_reconfigure_terminated`](#@Specification_1_mark_slow_reconfigure_terminated)
     -  [Function `reconfigure`](#@Specification_1_reconfigure)
     -  [Function `last_reconfiguration_time`](#@Specification_1_last_reconfiguration_time)
     -  [Function `current_epoch`](#@Specification_1_current_epoch)
@@ -124,6 +131,34 @@ aptos_framework system address
 
 
 <pre><code><b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a name="0x1_reconfiguration_SlowReconfigureInProgress"></a>
+
+## Resource `SlowReconfigureInProgress`
+
+A flag indicating that a slow reconfiguration is ongoing, If present under <code>aptos_framework</code> address.
+
+
+<pre><code><b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a> <b>has</b> key
 </code></pre>
 
 
@@ -317,6 +352,82 @@ This function should only be used for offline WriteSet generation purpose and sh
 
 </details>
 
+<a name="0x1_reconfiguration_slow_reconfigure_in_progress"></a>
+
+## Function `slow_reconfigure_in_progress`
+
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(): bool {
+    !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_reconfiguration_mark_slow_reconfigure_started"></a>
+
+## Function `mark_slow_reconfigure_started`
+
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_mark_slow_reconfigure_started">mark_slow_reconfigure_started</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_mark_slow_reconfigure_started">mark_slow_reconfigure_started</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(!<a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ECONFIGURATION">ECONFIGURATION</a>));
+    <b>move_to</b>(aptos_framework, <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a> {})
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_reconfiguration_mark_slow_reconfigure_terminated"></a>
+
+## Function `mark_slow_reconfigure_terminated`
+
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_mark_slow_reconfigure_terminated">mark_slow_reconfigure_terminated</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_mark_slow_reconfigure_terminated">mark_slow_reconfigure_terminated</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(<a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ECONFIGURATION">ECONFIGURATION</a>));
+    <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a> {} = <b>move_from</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework))
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_reconfiguration_reconfigure"></a>
 
 ## Function `reconfigure`
@@ -335,7 +446,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfigure</a>() <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
     // Do not do anything <b>if</b> <a href="genesis.md#0x1_genesis">genesis</a> <b>has</b> not finished.
-    <b>if</b> (<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>()) {
+    <b>if</b> (<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>() || <a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>()) {
         <b>return</b>
     };
 
@@ -597,6 +708,59 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 
 
 
+<a name="@Specification_1_slow_reconfigure_in_progress"></a>
+
+### Function `slow_reconfigure_in_progress`
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_mark_slow_reconfigure_started"></a>
+
+### Function `mark_slow_reconfigure_started`
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_mark_slow_reconfigure_started">mark_slow_reconfigure_started</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_DisableReconfiguration">DisableReconfiguration</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a name="@Specification_1_mark_slow_reconfigure_terminated"></a>
+
+### Function `mark_slow_reconfigure_terminated`
+
+
+<pre><code><b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_mark_slow_reconfigure_terminated">mark_slow_reconfigure_terminated</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="reconfiguration.md#0x1_reconfiguration_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a>;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a>&gt;(@aptos_framework);
+<b>ensures</b> !<b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureInProgress">SlowReconfigureInProgress</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
 <a name="@Specification_1_reconfigure"></a>
 
 ### Function `reconfigure`
@@ -614,7 +778,7 @@ Make sure the caller is admin and check the resource DisableReconfiguration.
 <b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_collect_and_distribute_gas_fees_enabled">features::spec_collect_and_distribute_gas_fees_enabled</a>() ==&gt; <a href="aptos_coin.md#0x1_aptos_coin_ExistsAptosCoin">aptos_coin::ExistsAptosCoin</a>;
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>aborts_if</b> <b>false</b>;
-<b>let</b> success = !(<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>())
+<b>let</b> success = !(<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>() || !<a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>())
     && <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() != <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time;
 <b>ensures</b> success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch == <b>old</b>(<b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).epoch) + 1;
 <b>ensures</b> success ==&gt; <b>global</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework).last_reconfiguration_time == <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>();

@@ -43,6 +43,9 @@ module aptos_framework::reconfiguration {
     /// aptos_framework system address
     struct DisableReconfiguration has key {}
 
+    /// A flag indicating that a slow reconfiguration is ongoing, If present under `aptos_framework` address.
+    struct SlowReconfigureInProgress has key {}
+
     /// The `Configuration` resource is in an invalid state
     const ECONFIGURATION: u64 = 1;
     /// A `Reconfiguration` resource is in an invalid state
@@ -92,10 +95,29 @@ module aptos_framework::reconfiguration {
         !exists<DisableReconfiguration>(@aptos_framework)
     }
 
+    fun slow_reconfigure_in_progress(): bool {
+        !exists<SlowReconfigureInProgress>(@aptos_framework)
+    }
+
+    ///
+    fun mark_slow_reconfigure_started(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(!slow_reconfigure_in_progress(), error::invalid_state(ECONFIGURATION));
+        move_to(aptos_framework, SlowReconfigureInProgress {})
+    }
+
+    ///
+    fun mark_slow_reconfigure_terminated(aptos_framework: &signer) acquires SlowReconfigureInProgress {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(slow_reconfigure_in_progress(), error::invalid_state(ECONFIGURATION));
+        SlowReconfigureInProgress {} = move_from<SlowReconfigureInProgress>(signer::address_of(aptos_framework))
+    }
+
+
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
         // Do not do anything if genesis has not finished.
-        if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
+        if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled() || slow_reconfigure_in_progress()) {
             return
         };
 
