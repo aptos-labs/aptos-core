@@ -14,6 +14,10 @@ use crate::{
         dag_fetcher::TFetchRequester,
         dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
+        observability::{
+            counters,
+            tracing::{observe_node, observe_round, NodeStage, RoundStage},
+        },
         types::{CertificateAckState, CertifiedNode, Node, SignatureBuilder},
     },
     payload_manager::PayloadManager,
@@ -51,7 +55,7 @@ pub(crate) struct DagDriver {
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
     current_round: Round,
     time_service: TimeService,
-    rb_abort_handle: Option<AbortHandle>,
+    rb_abort_handle: Option<(AbortHandle, u64)>,
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
     fetch_requester: Arc<FetchRequester>,
@@ -144,6 +148,7 @@ impl DagDriver {
 
     pub async fn enter_new_round(&mut self, new_round: Round) {
         debug!("entering new round {}", new_round);
+        counters::CURRENT_ROUND.set(new_round as i64);
         let strong_links = self
             .dag
             .read()
@@ -220,28 +225,40 @@ impl DagDriver {
 
     pub fn broadcast_node(&mut self, node: Node) {
         let rb = self.reliable_broadcast.clone();
+        let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let signature_builder =
             SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
-        let latest_ledger_info = self.ledger_info_provider.get_latest_ledger_info();
+        let latest_ledger_info = self.ledger_info_provider.clone();
+
         let round = node.round();
-        let core_task = self
-            .reliable_broadcast
-            .broadcast(node.clone(), signature_builder)
-            .then(move |certificate| {
-                let certified_node = CertifiedNode::new(node, certificate.signatures().to_owned());
-                let certified_node_msg =
-                    CertifiedNodeMessage::new(certified_node, latest_ledger_info);
-                rb.broadcast(certified_node_msg, cert_ack_set)
-            });
+        let node_clone = node.clone();
+        let timestamp = node.timestamp();
+        let node_broadcast = async move {
+            defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
+            rb.broadcast(node, signature_builder).await
+        };
+        let core_task = node_broadcast.then(move |certificate| {
+            defer!( observe_round(timestamp, RoundStage::CertifiedNodeBroadcasted); );
+            let certified_node =
+                CertifiedNode::new(node_clone, certificate.signatures().to_owned());
+            let certified_node_msg = CertifiedNodeMessage::new(
+                certified_node,
+                latest_ledger_info.get_latest_ledger_info(),
+            );
+            rb2.broadcast(certified_node_msg, cert_ack_set)
+        });
         let task = async move {
             debug!("Start reliable broadcast for round {}", round);
             core_task.await;
             debug!("Finish reliable broadcast for round {}", round);
         };
         tokio::spawn(Abortable::new(task, abort_registration));
-        if let Some(prev_handle) = self.rb_abort_handle.replace(abort_handle) {
+        if let Some((prev_handle, prev_round_timestamp)) =
+            self.rb_abort_handle.replace((abort_handle, timestamp))
+        {
+            observe_round(prev_round_timestamp, RoundStage::Finished);
             prev_handle.abort();
         }
     }
@@ -252,17 +269,18 @@ impl RpcHandler for DagDriver {
     type Request = CertifiedNode;
     type Response = CertifiedAck;
 
-    async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
-        let epoch = node.metadata().epoch();
+    async fn process(&mut self, certified_node: Self::Request) -> anyhow::Result<Self::Response> {
+        let epoch = certified_node.metadata().epoch();
         {
             let dag_reader = self.dag.read();
-            if dag_reader.exists(node.metadata()) {
+            if dag_reader.exists(certified_node.metadata()) {
                 return Ok(CertifiedAck::new(epoch));
             }
         }
+        observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
 
-        let node_metadata = node.metadata().clone();
-        self.add_node(node)
+        let node_metadata = certified_node.metadata().clone();
+        self.add_node(certified_node)
             .await
             .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 

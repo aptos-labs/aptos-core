@@ -5,6 +5,7 @@ use super::{dag_fetcher::TFetchRequester, storage::DAGStorage, NodeId};
 use crate::dag::{
     dag_network::RpcHandler,
     dag_store::Dag,
+    observability::tracing::{observe_node, NodeStage},
     types::{Node, NodeCertificate, Vote},
 };
 use anyhow::{bail, ensure};
@@ -148,6 +149,7 @@ impl RpcHandler for NodeBroadcastHandler {
 
     async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
         let node = self.validate(node)?;
+        observe_node(node.timestamp(), NodeStage::NodeReceived);
 
         let votes_by_peer = self
             .votes_by_round_peer

@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
+use crate::{
+    dag::observability::tracing::{observe_node, NodeStage},
+    network::TConsensusMsg,
+    network_interface::ConsensusMsg,
+};
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
@@ -254,6 +258,10 @@ impl Node {
 
     pub fn parents(&self) -> &[NodeCertificate] {
         &self.parents
+    }
+
+    pub fn timestamp(&self) -> u64 {
+        self.metadata.timestamp
     }
 
     pub fn parents_metadata(&self) -> impl Iterator<Item = &NodeMetadata> {
@@ -524,6 +532,7 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
                     .verifier
                     .aggregate_signatures(&self.partial_signatures)
                     .expect("Signature aggregation should succeed");
+                observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
                 NodeCertificate::new(self.metadata.clone(), aggregated_signature)
             }))
     }
