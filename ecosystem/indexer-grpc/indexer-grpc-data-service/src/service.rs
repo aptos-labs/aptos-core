@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    BYTES_READY_TO_TRANSFER_FROM_SERVER,
-    SHORT_CONNECTION_COUNT,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION,
+    PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL,
+    PROCESSED_VERSIONS_COUNT, SHORT_CONNECTION_COUNT,
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
@@ -262,6 +261,9 @@ impl RawData for RawDataServerWrapper {
                             transactions_count = Some(count - transaction_data.len() as u64);
                         }
                     };
+                    // Note: this is not the actual bytes transferred to the client.
+                    // This is the bytes consumed internally by the server
+                    // and ready to be transferred to the client.
                     let bytes_ready_to_transfer = transaction_data
                         .iter()
                         .map(|(encoded, _)| encoded.len())
@@ -270,7 +272,8 @@ impl RawData for RawDataServerWrapper {
                         .with_label_values(&[
                             request_metadata.request_token.as_str(),
                             request_metadata.request_email.as_str(),
-                        ]).inc_by(bytes_ready_to_transfer as i64);
+                        ])
+                        .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
                     let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
