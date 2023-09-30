@@ -118,6 +118,9 @@ impl RemoteStateViewClient {
     }
 
     fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>) {
+        state_keys.clone().into_iter().for_each(|state_key| {
+            self.state_view.read().unwrap().insert_state_key(state_key);
+        });
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
@@ -128,9 +131,6 @@ impl RemoteStateViewClient {
                     Self::send_state_value_request(shard_id, sender, state_keys);
                 });
             });
-        state_keys.into_iter().for_each(|state_key| {
-            self.state_view.read().unwrap().insert_state_key(state_key);
-        });
     }
 
     fn send_state_value_request(
@@ -212,12 +212,6 @@ impl RemoteStateValueReceiver {
             .inner
             .into_iter()
             .for_each(|(state_key, state_value)| {
-                // Though we try to insert the state key during the 'pre_fetch_state_values' remote
-                // request, there is a possibility that the state key is not inserted before we
-                // receive and process the response here. To be on the safe side, we insert the
-                // state key here if it is not inserted already. This does not matter because we
-                // do not have versioning of the state view.
-                state_view_lock.insert_state_key(state_key.clone());
                 state_view_lock.set_state_value(&state_key, state_value);
             });
     }
