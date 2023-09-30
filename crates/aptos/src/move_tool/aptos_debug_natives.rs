@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use aptos_vm::natives;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 
@@ -19,7 +19,7 @@ pub fn aptos_debug_natives(
         LATEST_GAS_FEATURE_VERSION,
         native_gas_parameters,
         misc_gas_params,
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     )
 }

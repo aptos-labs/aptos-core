@@ -12,7 +12,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainConfig, TimedFeatures},
+    on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
         SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
         Version,
@@ -235,7 +235,7 @@ impl AptosDebugger {
             LATEST_GAS_FEATURE_VERSION,
             ChainId::test().id(),
             features,
-            TimedFeatures::enable_all(),
+            TimedFeaturesBuilder::enable_all().build(),
             &state_view_storage,
         )
         .unwrap();
