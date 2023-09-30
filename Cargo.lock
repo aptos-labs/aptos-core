@@ -867,6 +867,7 @@ dependencies = [
  "ark-ff",
  "ark-serialize",
  "ark-std",
+ "base64 0.13.0",
  "bcs 0.1.4",
  "bitvec 1.0.1",
  "blake2",
@@ -3734,7 +3735,6 @@ version = "0.0.0"
 dependencies = [
  "again",
  "anyhow",
- "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-global-constants",
