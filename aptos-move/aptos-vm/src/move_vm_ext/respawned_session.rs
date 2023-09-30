@@ -18,10 +18,12 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
-    resolver::{ExecutorView, StateStorageView, TModuleView, TResourceView},
+    resolver::{ExecutorView, StateStorageView, TModuleView, TResourceGroupView, TResourceView},
     storage::ChangeSetConfigs,
 };
+use bytes::Bytes;
 use move_core_types::{
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
@@ -55,7 +57,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
         Ok(RespawnedSessionBuilder {
             executor_view,
-            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
+            resolver_builder: |executor_view| vm.as_move_resolver(executor_view, false),
             session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
             storage_refund,
         }
@@ -153,6 +155,36 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     }
 }
 
+impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
+    type Key = StateKey;
+    type Layout = MoveTypeLayout;
+    type Tag = StructTag;
+
+    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
+        // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
+        Ok(0)
+    }
+
+    fn get_resource_from_group(
+        &self,
+        state_key: &Self::Key,
+        resource_tag: &Self::Tag,
+        maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<Bytes>> {
+        self.change_set
+            .resource_group_write_set()
+            .get(state_key)
+            .and_then(|g| g.inner_ops.get(resource_tag))
+            .map(|op| op.extract_raw_bytes())
+            .ok_or(anyhow::Error::msg("Must be ignored immediately after"))
+            .or_else(|_| {
+                // Not found in change-set, fall back to the base executor view.
+                self.base
+                    .get_resource_from_group(state_key, resource_tag, maybe_layout)
+            })
+    }
+}
+
 impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     type Key = StateKey;
 
@@ -180,9 +212,13 @@ mod test {
     use crate::storage_adapter::AsExecutorView;
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::write_set::WriteOp;
-    use aptos_vm_types::check_change_set::CheckChangeSet;
-    use std::collections::HashMap;
+    use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
+    use aptos_vm_types::{change_set::GroupWrite, check_change_set::CheckChangeSet};
+    use move_core_types::{
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
+    };
+    use std::collections::{BTreeMap, HashMap};
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -215,6 +251,47 @@ mod test {
             .unwrap()
     }
 
+    fn read_resource_from_group(
+        view: &ExecutorViewWithChangeSet,
+        s: impl ToString,
+        tag: &StructTag,
+    ) -> u128 {
+        bcs::from_bytes(
+            &view
+                .get_resource_from_group(&key(s), tag, None)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn mock_tag_0() -> StructTag {
+        StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("a").unwrap(),
+            name: Identifier::new("a").unwrap(),
+            type_params: vec![TypeTag::U8],
+        }
+    }
+
+    fn mock_tag_1() -> StructTag {
+        StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("abcde").unwrap(),
+            name: Identifier::new("fgh").unwrap(),
+            type_params: vec![TypeTag::U64],
+        }
+    }
+
+    fn mock_tag_2() -> StructTag {
+        StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("abcdex").unwrap(),
+            name: Identifier::new("fghx").unwrap(),
+            type_params: vec![TypeTag::U128],
+        }
+    }
+
     #[test]
     fn test_change_set_state_view() {
         let mut state_view = FakeDataStore::default();
@@ -227,6 +304,13 @@ mod test {
         state_view.set_legacy(key("aggregator_base"), serialize(&50));
         state_view.set_legacy(key("aggregator_both"), serialize(&60));
         state_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
+
+        let tree: BTreeMap<StructTag, Bytes> = BTreeMap::from([
+            (mock_tag_0(), serialize(&100).into()),
+            (mock_tag_1(), serialize(&200).into()),
+        ]);
+        state_view.set_legacy(key("resource_group_base"), bcs::to_bytes(&tree).unwrap());
+        state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
 
         let resource_write_set = HashMap::from([
             (key("resource_both"), write(80)),
@@ -246,8 +330,26 @@ mod test {
         let aggregator_delta_set =
             HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
+        let resource_group_write_set = HashMap::from([
+            (key("resource_group_both"), GroupWrite {
+                metadata_op: WriteOp::Deletion, // should be irrelevant for the test
+                inner_ops: HashMap::from([
+                    (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
+                    (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
+                ]),
+            }),
+            (key("resource_group_write_set"), GroupWrite {
+                metadata_op: WriteOp::Deletion, // should be irrelevant for the test
+                inner_ops: HashMap::from([(
+                    mock_tag_1(),
+                    WriteOp::Modification(serialize(&5000).into()),
+                )]),
+            }),
+        ]);
+
         let change_set = VMChangeSet::new(
             resource_write_set,
+            resource_group_write_set,
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set,
@@ -271,5 +373,30 @@ mod test {
         assert_eq!(read_aggregator(&view, "aggregator_both"), 120);
         assert_eq!(read_aggregator(&view, "aggregator_write_set"), 130);
         assert_eq!(read_aggregator(&view, "aggregator_delta_set"), 71);
+
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_base", &mock_tag_0()),
+            100
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_base", &mock_tag_1()),
+            200
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_both", &mock_tag_0()),
+            1000
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_both", &mock_tag_1()),
+            200
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_both", &mock_tag_2()),
+            300
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_write_set", &mock_tag_1()),
+            5000
+        );
     }
 }

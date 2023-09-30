@@ -3872,6 +3872,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "ouroboros 0.15.6",
+ "paste",
  "proptest",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -3983,6 +3984,8 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "serde",
+ "test-case",
 ]
 
 [[package]]

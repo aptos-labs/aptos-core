@@ -44,7 +44,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = self.vm.as_move_resolver(executor_view);
+        let resolver = self.vm.as_move_resolver(executor_view, true);
         match self
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)

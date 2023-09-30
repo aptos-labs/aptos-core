@@ -21,7 +21,8 @@ pub trait AptosMoveResolver:
     + StateStorageView
     + AsExecutorView
 {
-    fn release_resource_group_cache(&self) -> HashMap<StateKey, BTreeMap<StructTag, Bytes>>;
+    fn release_resource_group_cache(&self)
+        -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>;
 }
 
 pub trait AsExecutorView {

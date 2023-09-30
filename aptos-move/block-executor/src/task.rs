@@ -55,6 +55,7 @@ pub trait ExecutorTask: Sync {
         &self,
         view: &impl TExecutorView<
             <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
             <Self::Txn as Transaction>::Identifier,
         >,

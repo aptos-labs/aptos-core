@@ -559,7 +559,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<K, MoveTypeLayout, ()>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout, ()>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,

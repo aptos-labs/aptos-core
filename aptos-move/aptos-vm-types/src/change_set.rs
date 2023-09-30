@@ -13,11 +13,29 @@ use aptos_types::{
     write_set::{WriteOp, WriteSetMut},
 };
 use move_binary_format::errors::Location;
-use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
-use std::collections::{
-    hash_map::Entry::{Occupied, Vacant},
-    HashMap,
+use move_core_types::{
+    language_storage::StructTag,
+    vm_status::{err_msg, StatusCode, VMStatus},
 };
+use std::{
+    collections::{
+        hash_map::Entry::{Occupied, Vacant},
+        HashMap,
+    },
+    hash::Hash,
+};
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+/// Describes an update to a resource group granularly, with WriteOps to affected
+/// member resources of the group, as well as a separate WriteOp for metadata and size.
+pub struct GroupWrite {
+    /// Op that contains the correct metadata, and the size of the group after the
+    /// updates encoded in the bytes (no bytes for deletion). The bytes will be
+    /// replaced with correct serialized group update to obtain storage WriteOp.
+    pub metadata_op: WriteOp,
+    /// Updates to individual group members. WriteOps are 'legacy', i.e. no metadata.
+    pub inner_ops: HashMap<StructTag, WriteOp>,
+}
 
 /// A change set produced by the VM.
 ///
@@ -26,6 +44,9 @@ use std::collections::{
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
     resource_write_set: HashMap<StateKey, WriteOp>,
+    // Prior to adding a dedicated write-set for resource groups, all resource group
+    // updates are merged into a single WriteOp included in the resource_write_set.
+    resource_group_write_set: HashMap<StateKey, GroupWrite>,
     module_write_set: HashMap<StateKey, WriteOp>,
     aggregator_write_set: HashMap<StateKey, WriteOp>,
     aggregator_delta_set: HashMap<StateKey, DeltaOp>,
@@ -52,6 +73,7 @@ impl VMChangeSet {
     pub fn empty() -> Self {
         Self {
             resource_write_set: HashMap::new(),
+            resource_group_write_set: HashMap::new(),
             module_write_set: HashMap::new(),
             aggregator_write_set: HashMap::new(),
             aggregator_delta_set: HashMap::new(),
@@ -61,6 +83,7 @@ impl VMChangeSet {
 
     pub fn new(
         resource_write_set: HashMap<StateKey, WriteOp>,
+        resource_group_write_set: HashMap<StateKey, GroupWrite>,
         module_write_set: HashMap<StateKey, WriteOp>,
         aggregator_write_set: HashMap<StateKey, WriteOp>,
         aggregator_delta_set: HashMap<StateKey, DeltaOp>,
@@ -69,6 +92,7 @@ impl VMChangeSet {
     ) -> anyhow::Result<Self, VMStatus> {
         let change_set = Self {
             resource_write_set,
+            resource_group_write_set,
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set,
@@ -86,6 +110,8 @@ impl VMChangeSet {
     /// **WARNING**: Has complexity O(#write_ops) because we need to iterate
     /// over blobs and split them into resources or modules. Only used to
     /// support transactions with write-set payload.
+    ///
+    /// Note: does not separate out individual resource group updates.
     pub fn try_from_storage_change_set(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
@@ -110,6 +136,7 @@ impl VMChangeSet {
 
         let change_set = Self {
             resource_write_set,
+            resource_group_write_set: HashMap::new(),
             module_write_set,
             aggregator_write_set: HashMap::new(),
             aggregator_delta_set: HashMap::new(),
@@ -122,6 +149,7 @@ impl VMChangeSet {
     pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
         let Self {
             resource_write_set,
+            resource_group_write_set: _,
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set: _,
@@ -140,14 +168,23 @@ impl VMChangeSet {
     }
 
     /// Converts VM-native change set into its storage representation with fully
-    /// serialized changes.
-    /// If deltas are not materialized the conversion fails.
+    /// serialized changes. The conversion fails if:
+    /// - deltas are not materialized.
+    /// - resource group writes are not (combined &) converted to resource writes.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
         if !self.aggregator_delta_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
                     "Cannot convert from VMChangeSet with non-materialized deltas to ChangeSet.",
+                ),
+            ));
+        }
+        if !self.resource_group_write_set.is_empty() {
+            return Err(VMStatus::error(
+                StatusCode::DATA_FORMAT_ERROR,
+                err_msg(
+                    "Cannot convert from VMChangeSet with non-combined resource group changes.",
                 ),
             ));
         }
@@ -176,6 +213,10 @@ impl VMChangeSet {
 
     pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
         &self.resource_write_set
+    }
+
+    pub fn resource_group_write_set(&self) -> &HashMap<StateKey, GroupWrite> {
+        &self.resource_group_write_set
     }
 
     pub fn module_write_set(&self) -> &HashMap<StateKey, WriteOp> {
@@ -211,6 +252,7 @@ impl VMChangeSet {
     ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
+            resource_group_write_set,
             module_write_set,
             mut aggregator_write_set,
             aggregator_delta_set,
@@ -235,6 +277,7 @@ impl VMChangeSet {
 
         Ok(Self {
             resource_write_set,
+            resource_group_write_set,
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set: HashMap::new(),
@@ -328,9 +371,9 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_writes(
-        write_set: &mut HashMap<StateKey, WriteOp>,
-        additional_write_set: HashMap<StateKey, WriteOp>,
+    fn squash_additional_writes<K: Hash + Eq + PartialEq>(
+        write_set: &mut HashMap<K, WriteOp>,
+        additional_write_set: HashMap<K, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
@@ -345,6 +388,47 @@ impl VMChangeSet {
         Ok(())
     }
 
+    fn squash_group_writes(
+        write_set: &mut HashMap<StateKey, GroupWrite>,
+        additional_write_set: HashMap<StateKey, GroupWrite>,
+    ) -> anyhow::Result<(), VMStatus> {
+        for (key, additional_update) in additional_write_set.into_iter() {
+            match write_set.entry(key) {
+                Occupied(mut group_entry) => {
+                    let GroupWrite {
+                        metadata_op: additional_metadata_op,
+                        inner_ops: additional_inner_ops,
+                    } = additional_update;
+
+                    // Squashing creation and deletion is a no-op. In that case, we have to
+                    // remove the old GroupWrite from the group write set.
+                    let noop = !WriteOp::squash(
+                        &mut group_entry.get_mut().metadata_op,
+                        additional_metadata_op,
+                    )
+                    .map_err(|e| {
+                        VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            err_msg(format!("Error while squashing two write ops: {}.", e)),
+                        )
+                    })?;
+                    if noop {
+                        group_entry.remove();
+                    } else {
+                        Self::squash_additional_writes(
+                            &mut group_entry.get_mut().inner_ops,
+                            additional_inner_ops,
+                        )?;
+                    }
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_update);
+                },
+            }
+        }
+        Ok(())
+    }
+
     pub fn squash_additional_change_set(
         &mut self,
         additional_change_set: Self,
@@ -352,6 +436,7 @@ impl VMChangeSet {
     ) -> anyhow::Result<(), VMStatus> {
         let Self {
             resource_write_set: additional_resource_write_set,
+            resource_group_write_set: additional_resource_group_write_set,
             module_write_set: additional_module_write_set,
             aggregator_write_set: additional_aggregator_write_set,
             aggregator_delta_set: additional_aggregator_delta_set,
@@ -368,6 +453,10 @@ impl VMChangeSet {
             &mut self.resource_write_set,
             additional_resource_write_set,
         )?;
+        Self::squash_group_writes(
+            &mut self.resource_group_write_set,
+            additional_resource_group_write_set,
+        )?;
         Self::squash_additional_writes(&mut self.module_write_set, additional_module_write_set)?;
         self.events.extend(additional_events);
 
@@ -378,5 +467,122 @@ impl VMChangeSet {
         use WriteOp::*;
         self.write_set_iter()
             .any(|(_key, op)| matches!(op, Creation(..) | CreationWithMetadata { .. }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::utils::{raw_metadata, write_op_with_metadata};
+    use claims::{assert_err, assert_ok, assert_some_eq};
+    use test_case::test_case;
+
+    #[test]
+    fn test_squash_groups_one_empty() {
+        let key_1 = StateKey::raw(vec![1]);
+        let key_2 = StateKey::raw(vec![2]);
+
+        let mut base_update = HashMap::new();
+        base_update.insert(key_1.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(0, 100),
+            inner_ops: HashMap::new(),
+        });
+        let mut additional_update = HashMap::new();
+        additional_update.insert(key_2.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(0, 200),
+            inner_ops: HashMap::new(),
+        });
+
+        assert_ok!(VMChangeSet::squash_group_writes(
+            &mut base_update,
+            additional_update
+        ));
+
+        assert_eq!(base_update.len(), 2);
+        assert_some_eq!(
+            base_update.get(&key_1).unwrap().metadata_op.metadata(),
+            &raw_metadata(100)
+        );
+        assert_some_eq!(
+            base_update.get(&key_2).unwrap().metadata_op.metadata(),
+            &raw_metadata(200)
+        );
+    }
+
+    #[test_case(0, 1)] // create, modify
+    #[test_case(1, 1)] // modify, modify
+    #[test_case(1, 2)] // modify, delete
+    #[test_case(2, 0)] // delete, create
+    fn test_squash_groups_mergeable_metadata(base_type_idx: u8, additional_type_idx: u8) {
+        let key_0 = StateKey::raw(vec![1]);
+
+        let mut base_update = HashMap::new();
+        let mut additional_update = HashMap::new();
+        base_update.insert(key_0.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(base_type_idx, 100),
+            inner_ops: HashMap::new(),
+        });
+        additional_update.insert(key_0.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(additional_type_idx, 200),
+            inner_ops: HashMap::new(),
+        });
+
+        assert_ok!(VMChangeSet::squash_group_writes(
+            &mut base_update,
+            additional_update
+        ));
+
+        assert_eq!(base_update.len(), 1);
+        assert_some_eq!(
+            base_update.get(&key_0).unwrap().metadata_op.metadata(),
+            // take the original metadata
+            &raw_metadata(100)
+        );
+    }
+
+    #[test_case(0, 0)] // create, create
+    #[test_case(1, 0)] // modify, create
+    #[test_case(2, 1)] // delete, modify
+    #[test_case(2, 2)] // delete, delete
+    fn test_squash_groups_error(base_type_idx: u8, additional_type_idx: u8) {
+        let key_0 = StateKey::raw(vec![1]);
+
+        let mut base_update = HashMap::new();
+        let mut additional_update = HashMap::new();
+        base_update.insert(key_0.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(base_type_idx, 100),
+            inner_ops: HashMap::new(),
+        });
+        additional_update.insert(key_0.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(additional_type_idx, 200),
+            inner_ops: HashMap::new(),
+        });
+
+        assert_err!(VMChangeSet::squash_group_writes(
+            &mut base_update,
+            additional_update
+        ));
+    }
+
+    #[test]
+    fn test_squash_groups_noop() {
+        let key_0 = StateKey::raw(vec![1]);
+
+        let mut base_update = HashMap::new();
+        let mut additional_update = HashMap::new();
+        base_update.insert(key_0.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(0, 100), // create
+            inner_ops: HashMap::new(),
+        });
+        additional_update.insert(key_0.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(2, 200), // delete
+            inner_ops: HashMap::new(),
+        });
+
+        assert_ok!(VMChangeSet::squash_group_writes(
+            &mut base_update,
+            additional_update
+        ));
+        assert!(base_update.is_empty(), "Must become a no-op");
     }
 }
