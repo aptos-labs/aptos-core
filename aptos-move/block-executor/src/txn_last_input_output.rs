@@ -154,13 +154,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     /// Does a transaction at txn_idx have SkipRest or Abort status.
-    pub(crate) fn block_truncated_at_idx(&self, txn_idx: TxnIndex) -> bool {
+    pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
             &self.outputs[txn_idx as usize]
                 .load_full()
                 .expect("[BlockSTM]: Execution output must be recorded after execution")
                 .output_status,
-            ExecutionStatus::SkipRest(_) | ExecutionStatus::Abort(_)
+            ExecutionStatus::SkipRest(_)
         )
     }
 

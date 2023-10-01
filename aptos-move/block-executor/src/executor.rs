@@ -272,10 +272,10 @@ where
                 }
             }
 
-            if last_input_output.execution_error(txn_idx).is_some() {
+            if let Some(err) = last_input_output.execution_error(txn_idx) {
                 if scheduler.halt() {
                     let mut maybe_error = maybe_error.lock();
-                    *maybe_error = last_input_output.execution_error(txn_idx);
+                    *maybe_error = Some(err);
                     info!(
                         "Block execution was aborted due to {:?}",
                         maybe_error.as_ref().unwrap()
@@ -286,7 +286,7 @@ where
 
             // Committed the last transaction, BlockSTM finishes execution.
             if txn_idx + 1 == scheduler.num_txns()
-                || last_input_output.block_truncated_at_idx(txn_idx)
+                || last_input_output.block_skips_rest_at_idx(txn_idx)
             {
                 if txn_idx + 1 == scheduler.num_txns() {
                     assert!(
@@ -296,24 +296,25 @@ where
                 }
 
                 // Either all txn committed, or a committed txn caused an early halt.
-                scheduler.halt();
+                if scheduler.halt() {
+                    counters::update_parallel_block_gas_counters(
+                        accumulated_fee_statement,
+                        (txn_idx + 1) as usize,
+                    );
+                    counters::update_parallel_txn_gas_counters(txn_fee_statements);
 
-                counters::update_parallel_block_gas_counters(
-                    accumulated_fee_statement,
-                    (txn_idx + 1) as usize,
-                );
-                counters::update_parallel_txn_gas_counters(txn_fee_statements);
-
-                let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
-                    + accumulated_fee_statement.io_gas_used();
-                info!(
-                    "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
-		     accumulated_non_storage_gas = {}, limit = {:?}",
-                    txn_idx + 1,
-                    scheduler.num_txns(),
-                    accumulated_non_storage_gas,
-                    maybe_block_gas_limit,
-                );
+                    let accumulated_non_storage_gas = accumulated_fee_statement
+                        .execution_gas_used()
+                        + accumulated_fee_statement.io_gas_used();
+                    info!(
+                        "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
+		         accumulated_non_storage_gas = {}, limit = {:?}",
+                        txn_idx + 1,
+                        scheduler.num_txns(),
+                        accumulated_non_storage_gas,
+                        maybe_block_gas_limit,
+                    );
+                }
                 break;
             }
         }
