@@ -16,6 +16,7 @@ use crate::{
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
     },
+    payload_manager::PayloadManager,
     test_utils::MockPayloadManager,
 };
 use aptos_consensus_types::common::{Author, Round};
@@ -139,6 +140,7 @@ async fn test_certified_node_handler() {
         signers[0].author(),
         epoch_state,
         dag,
+        Arc::new(PayloadManager::DirectMempool),
         Arc::new(MockPayloadManager::new(None)),
         rb,
         time_service,

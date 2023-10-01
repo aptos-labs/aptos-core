@@ -30,7 +30,7 @@ pub enum PayloadManager {
 }
 
 impl PayloadManager {
-    async fn request_transactions(
+    fn request_transactions(
         proofs: Vec<ProofOfStore>,
         block_timestamp: u64,
         batch_store: &BatchStore<NetworkSender>,
@@ -95,11 +95,7 @@ impl PayloadManager {
     }
 
     /// Called from consensus to pre-fetch the transaction behind the batches in the block.
-    pub async fn prefetch_payload_data(&self, block: &Block) {
-        let payload = match block.payload() {
-            Some(p) => p,
-            None => return,
-        };
+    pub fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
         match self {
             PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_store, _) => match payload {
@@ -107,10 +103,9 @@ impl PayloadManager {
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
-                            block.timestamp_usecs(),
+                            timestamp,
                             batch_store,
-                        )
-                        .await;
+                        );
                         proof_with_status
                             .status
                             .lock()
@@ -167,8 +162,7 @@ impl PayloadManager {
                                         proof_with_data.proofs.clone(),
                                         block.timestamp_usecs(),
                                         batch_store,
-                                    )
-                                    .await;
+                                    );
                                     // Could not get all data so requested again
                                     proof_with_data
                                         .status
@@ -184,8 +178,7 @@ impl PayloadManager {
                                         proof_with_data.proofs.clone(),
                                         block.timestamp_usecs(),
                                         batch_store,
-                                    )
-                                    .await;
+                                    );
                                     // Could not get all data so requested again
                                     proof_with_data
                                         .status

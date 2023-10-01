@@ -13,6 +13,7 @@ use std::collections::HashMap;
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
+    DagV1(DagConsensusConfigV1),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -23,6 +24,7 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.exclude_round
             },
+            _ => unimplemented!("method not supported"),
         }
     }
 
@@ -38,6 +40,7 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 config.max_failed_authors_to_store
             },
+            _ => unimplemented!("method not supported"),
         }
     }
 
@@ -47,6 +50,7 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
                 &config.proposer_election_type
             },
+            _ => unimplemented!("method not supported"),
         }
     }
 
@@ -54,6 +58,18 @@ impl OnChainConsensusConfig {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_config) => true,
+            OnChainConsensusConfig::DagV1(_) => false,
+        }
+    }
+
+    pub fn is_dag_enabled(&self) -> bool {
+        matches!(self, OnChainConsensusConfig::DagV1(_))
+    }
+
+    pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
+        match &self {
+            OnChainConsensusConfig::DagV1(config) => config,
+            _ => unreachable!("not a dag config"),
         }
     }
 }
@@ -187,6 +203,19 @@ pub struct ProposerAndVoterConfig {
     // representing a number of historical epochs (beyond the current one)
     // to consider.
     pub use_history_from_previous_epoch_max_count: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct DagConsensusConfigV1 {
+    pub dag_ordering_causal_history_window: usize,
+}
+
+impl Default for DagConsensusConfigV1 {
+    fn default() -> Self {
+        Self {
+            dag_ordering_causal_history_window: 1,
+        }
+    }
 }
 
 #[cfg(test)]
