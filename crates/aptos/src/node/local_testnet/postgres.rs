@@ -7,18 +7,25 @@ use super::{
     utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
 };
-use crate::node::local_testnet::utils::{setup_docker_logging, KillContainerShutdownStep};
+use crate::node::local_testnet::utils::{
+    get_docker, setup_docker_logging, KillContainerShutdownStep,
+};
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
+use bollard::{
+    container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions},
+    models::{HostConfig, PortBinding},
+};
 use clap::Parser;
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
-use maplit::hashset;
-use std::{collections::HashSet, path::PathBuf, process::Stdio};
-use tokio::process::Command;
-use tracing::info;
+use futures::TryStreamExt;
+use maplit::{hashmap, hashset};
+use std::{collections::HashSet, path::PathBuf};
+use tracing::{info, warn};
 
 const POSTGRES_CONTAINER_NAME: &str = "local-testnet-postgres";
 const POSTGRES_IMAGE: &str = "postgres:14.9";
+const POSTGRES_DEFAULT_PORT: u16 = 5432;
 
 /// Args related to running postgres in the local testnet.
 #[derive(Clone, Debug, Parser)]
@@ -181,49 +188,61 @@ impl ServiceManager for PostgresManager {
         }
 
         // Let the user know where to go to see logs for postgres.
-        let (stdout, stderr) =
-            setup_docker_logging(&self.test_dir, "postgres", POSTGRES_CONTAINER_NAME)?;
+        setup_docker_logging(&self.test_dir, "postgres", POSTGRES_CONTAINER_NAME)?;
 
-        let port = self.args.get_postgres_port();
+        let options = Some(CreateContainerOptions {
+            name: POSTGRES_CONTAINER_NAME,
+            ..Default::default()
+        });
 
-        let mut command = Command::new("docker");
-        command
-            .arg("run")
-            .arg("-q")
-            .arg("--rm")
-            .arg("--tty")
-            .arg("--name")
-            .arg(POSTGRES_CONTAINER_NAME)
-            .arg("-p")
-            .arg(format!("127.0.0.1:{}:5432", port))
-            .arg("-e")
-            .arg("POSTGRES_HOST_AUTH_METHOD=trust")
-            .arg("-e")
-            .arg(format!("POSTGRES_USER={}", self.args.postgres_user))
-            .arg("-e")
-            .arg(format!("POSTGRES_DB={}", self.args.postgres_database))
-            .arg(POSTGRES_IMAGE)
-            .stdin(Stdio::null())
-            .stdout(stdout)
-            .stderr(stderr);
+        let port = self.args.get_postgres_port().to_string();
+        let exposed_ports = Some(hashmap! {POSTGRES_DEFAULT_PORT.to_string() => hashmap!{}});
+        let host_config = Some(HostConfig {
+            port_bindings: Some(hashmap! {
+                POSTGRES_DEFAULT_PORT.to_string() => Some(vec![PortBinding {
+                    host_ip: Some("127.0.0.1".to_string()),
+                    host_port: Some(port),
+                }]),
+            }),
+            ..Default::default()
+        });
 
-        info!("Running command: {:?}", command);
+        let config = Config {
+            image: Some(POSTGRES_IMAGE.to_string()),
+            tty: Some(true),
+            exposed_ports,
+            host_config,
+            env: Some(vec![
+                "POSTGRES_HOST_AUTH_METHOD=trust".to_string(),
+                format!("POSTGRES_USER={}", self.args.postgres_user),
+                format!("POSTGRES_DB={}", self.args.postgres_database),
+            ]),
+            ..Default::default()
+        };
 
-        let child = command
-            .spawn()
+        let docker = get_docker()?;
+
+        let id = docker.create_container(options, config).await?.id;
+
+        docker
+            .start_container(&id, None::<StartContainerOptions<&str>>)
+            .await
             .context("Failed to start postgres container")?;
 
-        // When sigint is received the container can error out, which we don't want to
-        // show to the user, so we log instead.
-        match child.wait_with_output().await {
-            Ok(output) => {
-                // Print nothing, this probably implies ctrl+C.
-                info!("Postgres stopped with output: {:?}", output);
-            },
-            Err(err) => {
-                info!("Postgres stopped unexpectedly with error: {}", err);
-            },
-        }
+        // Wait for the container to stop, which it never should unless we receive
+        // ctrl-c.
+        let wait = docker
+            .wait_container(
+                &id,
+                Some(WaitContainerOptions {
+                    condition: "not-running",
+                }),
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .context("Failed to wait on postgres container")?;
+
+        warn!("Postgres container stopped: {:?}", wait.last());
 
         Ok(())
     }
