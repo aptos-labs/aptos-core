@@ -878,7 +878,7 @@ pub fn parse_dns_udp(protos: &[Protocol]) -> Option<((IpFilter, &DnsName, u16), 
 
     let (prefix, suffix) = protos.split_at(2);
     match prefix {
-        [Dns(name), Udp(port)] => Some(((IpFilter::Any, name, *port), suffix)),
+        [Dns(name), Udp(port)] => Some(((IpFilter::OnlyIp4, name, *port), suffix)), // HACK!!
         [Dns4(name), Udp(port)] => Some(((IpFilter::OnlyIp4, name, *port), suffix)),
         [Dns6(name), Udp(port)] => Some(((IpFilter::OnlyIp6, name, *port), suffix)),
         _ => None,
