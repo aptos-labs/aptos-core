@@ -37,7 +37,7 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
+        Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder, ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
@@ -714,8 +714,9 @@ impl FakeExecutor {
         iterations: u64,
     ) -> u128 {
         // FIXME: should probably read the timestamp from storage.
-        let timed_features =
-            TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+        let timed_features = TimedFeaturesBuilder::enable_all()
+            .with_override_profile(TimedFeatureOverride::Testing)
+            .build();
 
         let resolver = self.data_store.as_move_resolver();
 
@@ -787,8 +788,9 @@ impl FakeExecutor {
 
         let (write_set, _events) = {
             // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            let timed_features = TimedFeaturesBuilder::enable_all()
+                .with_override_profile(TimedFeatureOverride::Testing)
+                .build();
 
             let resolver = self.data_store.as_move_resolver();
 
@@ -864,8 +866,9 @@ impl FakeExecutor {
     ) {
         let (write_set, events) = {
             // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            let timed_features = TimedFeaturesBuilder::enable_all()
+                .with_override_profile(TimedFeatureOverride::Testing)
+                .build();
 
             let resolver = self.data_store.as_move_resolver();
 
@@ -939,7 +942,7 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
-            TimedFeatures::enable_all(),
+            TimedFeaturesBuilder::enable_all().build(),
             &resolver,
         )
         .unwrap();
