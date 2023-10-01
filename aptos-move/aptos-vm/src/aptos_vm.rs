@@ -27,6 +27,7 @@ use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
+use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
@@ -1509,6 +1510,17 @@ impl AptosVM {
     }
 }
 
+pub static APTOS_VM_EXEC_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_vm_exec_seconds",
+        // metric description
+        "The time spent in seconds in rayon thread pool in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 // Executor external API
 impl VMExecutor for AptosVM {
     /// Execute a block of `transactions`. The output vector will have the exact same length as the
@@ -1521,6 +1533,7 @@ impl VMExecutor for AptosVM {
         state_view: &(impl StateView + Sync),
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = APTOS_VM_EXEC_SECONDS.start_timer();
         fail_point!("move_adapter::execute_block", |_| {
             Err(VMStatus::error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,

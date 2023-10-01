@@ -64,6 +64,17 @@ pub static PROCESS_COUNTERS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static BY_TXN_EXEC_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "by_txn_exec_seconds",
+        // metric description
+        "The time spent in seconds in rayon thread pool in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 pub struct ChunkOutput {
     /// Input transactions.
     pub transactions: Vec<Transaction>,
@@ -100,6 +111,7 @@ impl ChunkOutput {
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
+        let _timer = BY_TXN_EXEC_SECONDS.start_timer();
         let txn_clone_time = TXN_CLONE_SECONDS.start_timer();
         let txn_clone = transactions.clone();
         drop(txn_clone_time);
