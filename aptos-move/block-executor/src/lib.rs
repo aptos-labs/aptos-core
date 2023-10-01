@@ -146,6 +146,7 @@ mod scheduler;
 pub mod task;
 pub mod txn_commit_hook;
 pub mod txn_last_input_output;
+pub mod txn_provider;
 #[cfg(test)]
 mod unit_tests;
 pub mod view;

@@ -33,6 +33,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use std::{cell::RefCell, fmt::Debug, sync::atomic::AtomicU32};
+use crate::txn_provider::TxnProviderTrait1;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -62,17 +63,17 @@ impl ReadResult {
     }
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: Executable, TP: TxnProviderTrait1> {
     versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
-    scheduler: &'a Scheduler,
+    scheduler: &'a Scheduler<TP>,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
 }
 
-impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
+impl<'a, T: Transaction, X: Executable, TP: TxnProviderTrait1> ParallelState<'a, T, X, TP> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
-        shared_scheduler: &'a Scheduler,
+        shared_scheduler: &'a Scheduler<TP>,
         shared_counter: &'a AtomicU32,
     ) -> Self {
         Self {
@@ -221,8 +222,8 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) _counter: &'a u32,
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
-    Sync(ParallelState<'a, T, X>),
+pub(crate) enum ViewState<'a, T: Transaction, X: Executable, TP: TxnProviderTrait1> {
+    Sync(ParallelState<'a, T, X, TP>),
     Unsync(SequentialState<'a, T, X>),
 }
 
@@ -231,16 +232,16 @@ pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> {
     base_view: &'a S,
-    latest_view: ViewState<'a, T, X>,
+    latest_view: ViewState<'a, T, X, TP>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> LatestView<'a, T, S, X, TP> {
     pub(crate) fn new(
         base_view: &'a S,
-        latest_view: ViewState<'a, T, X>,
+        latest_view: ViewState<'a, T, X, TP>,
         txn_idx: TxnIndex,
     ) -> Self {
         Self {
@@ -335,8 +336,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
-    for LatestView<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> TResourceView
+    for LatestView<'a, T, S, X, TP>
 {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
@@ -382,8 +383,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
-    for LatestView<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> TModuleView
+    for LatestView<'a, T, S, X, TP>
 {
     type Key = T::Key;
 
@@ -418,8 +419,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
-    for LatestView<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> StateStorageView
+    for LatestView<'a, T, S, X, TP>
 {
     fn id(&self) -> StateViewId {
         self.base_view.id()
@@ -430,8 +431,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
-    for LatestView<'a, T, S, X>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> TAggregatorView
+    for LatestView<'a, T, S, X, TP>
 {
     type IdentifierV1 = T::Key;
     type IdentifierV2 = T::Identifier;

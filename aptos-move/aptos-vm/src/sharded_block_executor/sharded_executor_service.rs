@@ -24,6 +24,8 @@ use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+use crate::aptos_vm::RAYON_EXEC_POOL;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -123,12 +125,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
+                let txns = transactions
+                    .into_iter()
+                    .map(|txn| txn.into_txn().into_txn())
+                    .collect();
+                let pre_processed_txns = RAYON_EXEC_POOL.install(||{BlockAptosVM::verify_transactions(txns)});
+
+                let txn_provider = Arc::new(DefaultTxnProvider::new(pre_processed_txns));
                 let ret = BlockAptosVM::execute_block(
                     executor_thread_pool,
-                    transactions
-                        .into_iter()
-                        .map(|txn| txn.into_txn().into_txn())
-                        .collect(),
+                    txn_provider,
                     aggr_overridden_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
