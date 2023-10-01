@@ -40,7 +40,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use kube::ResourceExt;
 use tempfile::TempDir;
 
 #[derive(Debug)]
@@ -171,17 +170,33 @@ impl LocalSwarm {
 
         for validator in &validators {
             // Print out the base listening address
-            if let Some(validator_network) = validator.config.base_config().validator_network.as_ref() {
-                println!("(BASE) Validator {} listening on {}", validator.name, validator_network.listen_address);
+            if let Some(validator_network) =
+                validator.config.base_config().validator_network.as_ref()
+            {
+                println!(
+                    "(BASE) Validator {} listening on {}",
+                    validator.name, validator_network.listen_address
+                );
             } else {
                 println!("(BASE) Validator {} listening on unknown", validator.name);
             }
 
             // Print out the override listening address
-            if let Some(validator_network) = validator.config.override_config().validator_network.as_ref() {
-                println!("(OVERRIDE) Validator {} listening on {}", validator.name, validator_network.listen_address);
+            if let Some(validator_network) = validator
+                .config
+                .override_config()
+                .validator_network
+                .as_ref()
+            {
+                println!(
+                    "(OVERRIDE) Validator {} listening on {}",
+                    validator.name, validator_network.listen_address
+                );
             } else {
-                println!("(OVERRIDE) Validator {} listening on unknown", validator.name);
+                println!(
+                    "(OVERRIDE) Validator {} listening on unknown",
+                    validator.name
+                );
             }
         }
 

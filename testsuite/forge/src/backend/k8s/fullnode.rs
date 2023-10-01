@@ -312,7 +312,7 @@ pub fn get_default_pfn_node_config() -> NodeConfig {
         full_node_networks: vec![NetworkConfig {
             network_id: NetworkId::Public,
             discovery_method: DiscoveryMethod::Onchain,
-            // defaults to listening on "/ip4/0.0.0.0/tcp/6180"
+            // defaults to listening on "/ip4/0.0.0.0/udp/6180"
             ..NetworkConfig::default()
         }],
         api: ApiConfig {

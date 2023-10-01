@@ -24,7 +24,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio_util::compat::{Compat, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
@@ -66,6 +66,8 @@ impl Transport for QuicTransport {
             return Err(utils::invalid_addr_error(&addr));
         }
 
+        info!("Is listening address IPv6? {:?}", ipaddr.is_ipv6());
+
         // If the server endpoint doesn't exist, create it
         info!("Creating server endpoint!");
         if self.server_endpoint.is_none() {
@@ -84,6 +86,11 @@ impl Transport for QuicTransport {
 
             // Create the QUIC connection listener
             let quic_connection_listener = QuicConnectionListener::new(server_endpoint);
+
+            info!(
+                "Created the QUIC connection listener at: {:?}!",
+                listen_addr
+            );
 
             Ok((quic_connection_listener, listen_addr))
         } else {
@@ -105,7 +112,7 @@ impl Transport for QuicTransport {
             .ok_or_else(|| utils::invalid_addr_error(&addr))?;
 
         // Get the server endpoint. Note: `listen_on()` should have been called already.
-        info!("Getting the server endpoint!");
+        info!("Getting the server endpoint for protos: {:?}!", protos);
         let server_endpoint = self.server_endpoint.clone().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::Other,
@@ -152,6 +159,14 @@ pub async fn connect_to_remote(
             )
         })?;
 
+    info!("Connected to the remote server at: {:?}", socket_addr);
+
+    info!(
+        "Connecting object state: remote address {:?}, local IP {:?}",
+        connecting.remote_address(),
+        connecting.local_ip(),
+    );
+
     // Transform the connecting future into a connection
     Ok(connecting.await?)
 }
@@ -168,7 +183,7 @@ pub async fn resolve_and_connect(
     create_quic_connection(connection).await
 }
 
-/// Attempts to connect to the remote address
+/// Attempts to connect to the remote addressc
 async fn open_connection_to_remote(
     server_endpoint: quinn::Endpoint,
     addr: NetworkAddress,
@@ -193,15 +208,42 @@ async fn resolve_dns_and_connect(
     dns_name: &DnsName,
     port: u16,
 ) -> Result<Connection, Error> {
+    // Resolve the DNS name without filters and print
+    for addr in utils::resolve_with_filter(IpFilter::Any, dns_name.as_ref(), port).await? {
+        info!("Resolved DNS name ({:?}) to: {:?}", dns_name, addr);
+    }
+    // Resolve the DNS name and filter and print
+    for addr in utils::resolve_with_filter(ip_filter, dns_name.as_ref(), port).await? {
+        info!("Resolved DNS name ({:?}) to: {:?}", dns_name, addr);
+    }
+
     // Resolve the DNS name and filter
     let socketaddr_iter = utils::resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
     let mut last_err = None;
 
     // Connect to the first socket address that works
     for socketaddr in socketaddr_iter {
+        info!(
+            "Attempting to connect to DNS resolved socket address: {:?}",
+            socketaddr
+        );
         match connect_to_remote(server_endpoint.clone(), socketaddr.port(), socketaddr.ip()).await {
-            Ok(connection) => return Ok(connection),
-            Err(err) => last_err = Some(err),
+            Ok(connection) => {
+                info!(
+                    "Connected to the remote server socket address: {:?}",
+                    socketaddr
+                );
+                return Ok(connection);
+            },
+            Err(err) => {
+                last_err = {
+                    info!(
+                        "Failed to connect to socket address: {:?}. Error: {:?}",
+                        socketaddr, err
+                    );
+                    Some(err)
+                }
+            },
         }
     }
 
@@ -371,7 +413,10 @@ impl Future for PendingQuicConnection {
 
 /// Creates a QUIC connection from a QUINN connection
 async fn create_quic_connection(connection: quinn::Connection) -> io::Result<QuicConnection> {
-    QuicConnection::new(connection).await
+    info!("Creating QUIC connection from QUINN connection!");
+    let connection = QuicConnection::new(connection).await;
+    info!("Created QUIC connection from QUINN connection!");
+    connection
 }
 
 /// A wrapper around a quinn Connection that implements the AsyncRead/AsyncWrite traits
@@ -558,7 +603,8 @@ fn configure_client() -> quinn::ClientConfig {
 fn create_transport_config() -> Arc<quinn::TransportConfig> {
     let mut transport_config = quinn::TransportConfig::default();
 
-    transport_config.max_idle_timeout(None);
+    transport_config.max_idle_timeout(Some(Duration::from_secs(120).try_into().unwrap()));
+    transport_config.keep_alive_interval(Some(Duration::from_secs(60)));
 
     Arc::new(transport_config)
 }
@@ -593,11 +639,21 @@ fn create_server_endpoint(
     ipaddr: IpAddr,
     port: u16,
 ) -> Result<quinn::Endpoint, <QuicTransport as Transport>::Error> {
+    info!(
+        "Creating the server endpoint at: {:?}:{:?}. This will call bind!",
+        ipaddr, port
+    );
+
     // Create the QUIC server configuration
     let (server_config, _server_certificate) = configure_server()?;
 
     // Create the QUIC server endpoint
     let socket_addr = SocketAddr::new(ipaddr, port);
+    info!(
+        "For socket address: {:?}, is IPV6? {:?}",
+        socket_addr,
+        socket_addr.is_ipv6()
+    );
     let mut server_endpoint = quinn::Endpoint::server(server_config, socket_addr)?;
     server_endpoint.set_default_client_config(configure_client()); // Required to skip certificate verification
 
@@ -606,7 +662,6 @@ fn create_server_endpoint(
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
     use super::*;
     use crate::transport::{utils::resolve_with_filter, ConnectionOrigin, Transport, TransportExt};
     use aptos_types::{network_address::IpFilter, PeerId};
@@ -615,7 +670,7 @@ mod test {
         io::{AsyncReadExt, AsyncWriteExt},
         StreamExt,
     };
-    use std::time::Duration;
+    use std::{str::FromStr, time::Duration};
     use tokio::{runtime::Runtime, time::timeout};
 
     #[tokio::test]
@@ -810,7 +865,8 @@ mod test {
         parse_ip_udp(protos)
             .map(|_| ())
             .or_else(|| parse_dns_udp(protos).map(|_| ()))
-            .ok_or_else(|| utils::invalid_addr_error(&address)).unwrap();
+            .ok_or_else(|| utils::invalid_addr_error(&address))
+            .unwrap();
 
         // Test only part of the protos
         let address = NetworkAddress::from_str("/dns/aptos-node-1-validator/udp/6180/").unwrap();
@@ -818,7 +874,8 @@ mod test {
         parse_ip_udp(protos)
             .map(|_| ())
             .or_else(|| parse_dns_udp(protos).map(|_| ()))
-            .ok_or_else(|| utils::invalid_addr_error(&address)).unwrap();
+            .ok_or_else(|| utils::invalid_addr_error(&address))
+            .unwrap();
     }
 
     #[test]
