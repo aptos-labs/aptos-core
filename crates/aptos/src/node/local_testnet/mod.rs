@@ -91,6 +91,10 @@ pub struct RunLocalTestnet {
 
     #[clap(flatten)]
     prompt_options: PromptOptions,
+
+    /// By default, tracing output goes to files. With this set, it goes to stdout.
+    #[clap(long, hide = true)]
+    log_to_stdout: bool,
 }
 
 impl RunLocalTestnet {
@@ -189,10 +193,15 @@ impl CliCommand<()> for RunLocalTestnet {
 
         // Set up logging for anything that uses tracing. These logs will go to
         // different directories based on the name of the runtime.
-        let td = test_dir.clone();
-        let make_writer =
-            move || ThreadNameMakeWriter::new(td.clone()).make_writer() as Box<dyn std::io::Write>;
-        setup_logging(Some(Box::new(make_writer)));
+        if self.log_to_stdout {
+            setup_logging(None);
+        } else {
+            let td = test_dir.clone();
+            let make_writer = move || {
+                ThreadNameMakeWriter::new(td.clone()).make_writer() as Box<dyn std::io::Write>
+            };
+            setup_logging(Some(Box::new(make_writer)));
+        }
 
         let mut managers: Vec<Box<dyn ServiceManager>> = Vec::new();
 
@@ -283,7 +292,7 @@ impl CliCommand<()> for RunLocalTestnet {
         }
 
         eprintln!(
-            "Readiness endpoint: http://0.0.0.0:{}/\n",
+            "\nReadiness endpoint: http://0.0.0.0:{}/\n",
             self.ready_server_args.ready_server_listen_port,
         );
 
