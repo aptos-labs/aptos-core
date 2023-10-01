@@ -1268,31 +1268,6 @@ impl AptosVM {
         }
     }
 
-    fn read_change_set(
-        &self,
-        executor_view: &dyn ExecutorView,
-        change_set: &VMChangeSet,
-    ) -> Result<(), VMStatus> {
-        assert!(
-            change_set.aggregator_v1_write_set().is_empty(),
-            "Waypoint change set should not have any aggregator writes."
-        );
-
-        // All Move executions satisfy the read-before-write property. Thus we need to read each
-        // access path that the write set is going to update.
-        for state_key in change_set.module_write_set().keys() {
-            executor_view
-                .get_module_state_value(state_key)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        }
-        for state_key in change_set.resource_write_set().keys() {
-            executor_view
-                .get_resource_state_value(state_key, None)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
-        }
-        Ok(())
-    }
-
     fn validate_waypoint_change_set(
         change_set: &VMChangeSet,
         log_context: &AdapterLogSchema,
@@ -1332,7 +1307,19 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_change_set(resolver.as_executor_view(), &change_set)?;
+        // All Move executions satisfy the read-before-write property. Thus we need to read each
+        // access path that the write set is going to update.
+        let executor_view = resolver.as_executor_view();
+        for state_key in change_set.module_write_set().keys() {
+            executor_view
+                .get_module_state_value(state_key)
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+        }
+        for state_key in change_set.resource_write_set().keys() {
+            executor_view
+                .get_resource_state_value(state_key, None)
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+        }
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
