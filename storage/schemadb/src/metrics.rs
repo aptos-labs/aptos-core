@@ -109,8 +109,10 @@ pub static APTOS_SCHEMADB_PUT_BYTES_SAMPLED: Lazy<HistogramVec> = Lazy::new(|| {
 });
 
 pub static APTOS_SCHEMADB_DELETES_SAMPLED: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_storage_deletes_sampled", "Aptos storage delete calls (sampled)", &[
-        "cf_name"
-    ])
+    register_int_counter_vec!(
+        "aptos_storage_deletes_sampled",
+        "Aptos storage delete calls (sampled)",
+        &["cf_name"]
+    )
     .unwrap()
 });

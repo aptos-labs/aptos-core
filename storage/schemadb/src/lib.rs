@@ -22,8 +22,9 @@ pub mod iterator;
 use crate::{
     metrics::{
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES, APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
-        APTOS_SCHEMADB_DELETES_SAMPLED, APTOS_SCHEMADB_GET_BYTES, APTOS_SCHEMADB_GET_LATENCY_SECONDS,
-        APTOS_SCHEMADB_ITER_BYTES, APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES_SAMPLED,
+        APTOS_SCHEMADB_DELETES_SAMPLED, APTOS_SCHEMADB_GET_BYTES,
+        APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_ITER_BYTES,
+        APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES_SAMPLED,
         APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
@@ -262,7 +263,9 @@ impl DB {
                                 .observe((key.len() + value.len()) as f64);
                         },
                         WriteOp::Deletion { key: _ } => {
-                            APTOS_SCHEMADB_DELETES_SAMPLED.with_label_values(&[cf_name]).inc();
+                            APTOS_SCHEMADB_DELETES_SAMPLED
+                                .with_label_values(&[cf_name])
+                                .inc();
                         },
                     }
                 }
