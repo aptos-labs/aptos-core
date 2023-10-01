@@ -3,7 +3,7 @@
 
 use super::reroot_path;
 use crate::{base::test_validation, NativeFunctionRecord};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::*;
 use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
@@ -238,12 +238,15 @@ pub fn run_move_unit_tests<W: Write + Send>(
     if test_validation::needs_validation() {
         let model = &model_opt.expect("move model");
         test_validation::validate(model);
-        if model.has_errors() {
+        let diag_count = model.diag_count(codespan_reporting::diagnostic::Severity::Warning);
+        if diag_count > 0 {
             model.report_diag(
                 &mut StandardStream::stderr(termcolor::ColorChoice::Auto),
                 codespan_reporting::diagnostic::Severity::Warning,
             );
-            std::process::exit(1)
+            if model.has_errors() {
+                bail!("compilation failed")
+            }
         }
     }
 

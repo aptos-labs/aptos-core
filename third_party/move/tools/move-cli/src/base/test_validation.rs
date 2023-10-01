@@ -5,6 +5,7 @@
 //! This module manages validation of the unit tests, in addition to standard compiler
 //! checking.
 
+use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_model::model::GlobalEnv;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
@@ -30,4 +31,23 @@ pub(crate) fn validate(env: &GlobalEnv) {
     if let Some(h) = &*VALIDATION_HOOK.lock().unwrap() {
         (*h)(env)
     }
+}
+
+pub fn has_errors_then_report(model: &GlobalEnv) -> bool {
+    let mut has_errors = false;
+    model.report_diag_with_filter(
+        &mut StandardStream::stderr(termcolor::ColorChoice::Auto),
+        |d| {
+            let include = d.labels.iter().all(|l| {
+                let fname = model.get_file(l.file_id).to_string_lossy();
+                !fname.contains("aptos-framework/sources")
+                    && !fname.contains("aptos-stdlib/sources")
+            });
+            if include && d.severity == codespan_reporting::diagnostic::Severity::Error {
+                has_errors = true;
+            }
+            include
+        },
+    );
+    has_errors
 }

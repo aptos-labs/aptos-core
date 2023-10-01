@@ -72,6 +72,8 @@ pub struct BuildOptions {
     pub compiler_version: Option<CompilerVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
+    #[clap(long)]
+    pub check_test_code: bool,
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
 }
@@ -96,6 +98,7 @@ impl Default for BuildOptions {
             bytecode_version: None,
             compiler_version: None,
             skip_attribute_checks: false,
+            check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
         }
     }
@@ -126,6 +129,7 @@ pub fn build_model(
         generate_abis: false,
         generate_docs: false,
         generate_move_model: false,
+        full_model_generation: false,
         install_dir: None,
         test_mode: false,
         force_recompilation: false,
@@ -160,6 +164,7 @@ impl BuiltPackage {
             generate_abis: options.with_abis,
             generate_docs: false,
             generate_move_model: true,
+            full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
             test_mode: false,
             force_recompilation: false,
@@ -177,8 +182,7 @@ impl BuiltPackage {
         let (mut package, model_opt) =
             build_config.compile_package_no_exit(&package_path, &mut stderr())?;
 
-        // Build the Move model for extra processing and run extended checks as well derive
-        // runtime metadata
+        // Run extended checks as well derive runtime metadata
         let model = &model_opt.expect("move model");
         let runtime_metadata = extended_checks::run_extended_checks(model);
         if model.diag_count(Severity::Warning) > 0 {

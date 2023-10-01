@@ -17,7 +17,7 @@ use move_compiler::{
     diagnostics::{report_diagnostics_to_color_buffer, report_warnings, FilesSourceText},
     Compiler,
 };
-use move_model::model::GlobalEnv;
+use move_model::model;
 use petgraph::algo::toposort;
 use std::{collections::BTreeSet, io::Write, path::Path};
 #[cfg(feature = "evm-backend")]
@@ -127,7 +127,7 @@ impl BuildPlan {
         &self,
         config: &CompilerConfig,
         writer: &mut W,
-    ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
+    ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         self.compile_with_driver(
             writer,
             config,
@@ -158,7 +158,7 @@ impl BuildPlan {
         config: &CompilerConfig,
         compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
         compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
-    ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
+    ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
         let root_package = &self.resolution_graph.package_table[&self.root];
         let project_root = match &self.resolution_graph.build_options.install_dir {
             Some(under_path) => under_path.clone(),
