@@ -64,7 +64,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
 
 impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
 where
-    T: Transaction,
+    T: Transaction + std::fmt::Debug,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
@@ -271,6 +271,8 @@ where
         // (i.e. not re-execute unless some other part of the validation fails or
         // until commit, but mark as estimates).
 
+        // println!("Validation for txn {} with read_set {:?}", idx_to_validate, read_set);
+
         // TODO: validate modules when there is no r/w fallback.
         Ok(
             read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
@@ -335,13 +337,18 @@ where
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        must_pass: bool,
     ) -> ::std::result::Result<bool, PanicError> {
         let read_set = last_input_output
             .read_set(txn_idx)
             .expect("Read set must be recorded");
 
         let mut execution_still_valid =
-            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?;
+            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx, must_pass)?;
+
+        if must_pass && !execution_still_valid {
+            panic!();
+        }
 
         if execution_still_valid {
             if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
@@ -350,10 +357,16 @@ where
                     .try_commit(txn_idx, delayed_field_ids.collect())
                 {
                     match e {
-                        CommitError::ReExecutionNeeded(_) => {
+                        CommitError::ReExecutionNeeded(e) => {
+                            if must_pass {
+                                panic!("try_commit failed for txn {} due to {:?}", txn_idx, e);
+                            }
                             execution_still_valid = false;
                         },
                         CommitError::CodeInvariantError(msg) => {
+                            if must_pass {
+                                panic!("try_commit failed for txn {} due to {:?}", txn_idx, msg);
+                            }
                             return Err(code_invariant_error(msg));
                         },
                     }
@@ -381,7 +394,10 @@ where
         block: &[T],
     ) -> ::std::result::Result<(), PanicOr<ModulePathReadWrite>> {
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
-            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
+            println!("CommitReady: {}", txn_idx);
+            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output, false)? {
+                println!("CommitReady: invalid: {}", txn_idx);
+
                 // Transaction needs to be re-executed, one final time.
 
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
@@ -389,6 +405,9 @@ where
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit
                 // Because of that, we can also ignore _updates_outside result.
+
+                println!("Re-executing {} from prepare_and_queue_commit_ready_txns", txn_idx);
+
                 let _updates_outside = Self::execute(
                     txn_idx,
                     incarnation + 1,
@@ -405,7 +424,7 @@ where
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
                 if !validation_result
-                    || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
+                    || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output, true)
                         .unwrap_or(false)
                 {
                     return Err(code_invariant_error(format!(
@@ -509,10 +528,12 @@ where
         let mut patched_resource_write_set = HashMap::new();
         if let Some(resource_write_set) = resource_write_set {
             for (key, (write_op, layout)) in resource_write_set.iter() {
+                // println!("Write set key {:?}, is layout: {}", key, layout.is_some());
                 // layout is Some(_) if it contains a delayed field
                 if let Some(layout) = layout {
                     if !write_op.is_deletion() {
                         write_set_keys.insert(key.clone());
+                        println!("patching bytes from write set for key {:?}", key);
                         let patched_bytes = match latest_view
                             .replace_identifiers_with_values(write_op.bytes().unwrap(), layout)
                         {
@@ -575,17 +596,20 @@ where
             let read_set = last_input_output.read_set(txn_idx);
             if let Some(read_set) = read_set {
                 for (key, data_read) in read_set.get_read_values_with_delayed_fields() {
+                    // println!("Read set key {:?}, and read: {:?}", key, data_read);
                     if write_set_keys.contains(key) {
                         continue;
                     }
                     // layout is Some(_) if it contains an delayed field
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                        println!("[{}] post_commit: trying to patch bytes from read set for key {:?}", txn_idx, key);
                         if let Some(patched_value) = Self::replace_ids_with_values(
                             value.clone(),
                             layout,
                             latest_view,
                             &delayed_field_keys,
                         ) {
+                            println!("patched bytes from read set for key {:?}", key);
                             patched_resource_write_set.insert(key.clone(), patched_value);
                         }
                     }
@@ -834,6 +858,7 @@ where
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
                     let valid = Self::validate(txn_idx, last_input_output, versioned_cache)?;
+                    // println!("Validated {} from worker_loop: {}", txn_idx, valid);
                     Self::update_on_validation(
                         txn_idx,
                         incarnation,
@@ -849,6 +874,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
+                    println!("Executing {} from worker_loop", txn_idx);
                     let updates_outside = Self::execute(
                         txn_idx,
                         incarnation,

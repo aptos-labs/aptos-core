@@ -125,6 +125,7 @@ impl Aggregator {
 
     /// Implements logic for adding to an aggregator.
     pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
+        println!("  agg({}, max={}).add({})", self.value, self.max_value, value);
         let math = BoundedMath::new(self.max_value);
         match self.state {
             AggregatorState::Data => {
@@ -132,6 +133,7 @@ impl Aggregator {
                 self.value = math
                     .unsigned_add(self.value, value)
                     .map_err(addition_error)?;
+                println!("  agg({}, max={}).add({}) Ok()", self.value, self.max_value, value);
                 return Ok(());
             },
             AggregatorState::PositiveDelta => {
@@ -158,6 +160,7 @@ impl Aggregator {
 
         // Record side-effects of addition in history.
         self.record();
+        println!("  agg({}, max={}).add({}) Ok()", self.value, self.max_value, value);
         Ok(())
     }
 

@@ -177,9 +177,20 @@ impl<'r> TransactionDataCache<'r> {
                     return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))
                 },
             };
+
+            // if format!("{:?}", ty).contains("aggregator_v2") && !format!("{:?}", ty).contains("AggregatorInTable") {
+            //     println!("getting layout for type with agg_v2 {:?}", ty);
+            // }
+
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
                 loader.type_to_type_layout_with_identifier_mappings(ty)?;
+
+            if format!("{:?}", ty).contains("aggregator_v2") && !format!("{:?}", ty).contains("AggregatorInTable") {
+                if !has_aggregator_lifting {
+                    println!("WARNING: Type {:?} with layout {:?} should have aggregator lifting", ty, ty_layout);
+                }
+            }
 
             let module = loader.get_module(&ty_tag.module_id());
             let metadata: &[Metadata] = match &module {

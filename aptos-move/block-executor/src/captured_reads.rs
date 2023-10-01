@@ -145,7 +145,7 @@ impl<V: TransactionWrite> DataRead<V> {
 /// Additional state regarding groups that may be provided to the VM during transaction
 /// execution and is captured. There may be a DataRead per tag within the group, and also
 /// the group size (also computed based on speculative information in MVHashMap).
-#[derive(Derivative)]
+#[derive(Derivative, Debug)]
 #[derivative(Default(bound = ""))]
 struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
@@ -252,13 +252,17 @@ impl DelayedFieldRead {
                     ..
                 },
             ) => {
+                println!("Upgrade comparison {:?} {:?}", v1, h2);
                 if let Ok(v1) = v1.clone().into_aggregator_value() {
                     if h2.validate_against_base_value(v1, *m2).is_ok() {
+                        println!("Upgrade comparison  - contains");
                         DataReadComparison::Contains
                     } else {
+                        println!("Upgrade comparison  - Inconsistent");
                         DataReadComparison::Inconsistent
                     }
                 } else {
+                    println!("Upgrade comparison  - Inconsistent");
                     DataReadComparison::Inconsistent
                 }
             },
@@ -273,7 +277,7 @@ impl DelayedFieldRead {
 /// If not possible, then after proper resolution from MVHashMap/storage, they should be
 /// captured. This enforces an invariant that 'capture_read' will never be called with a
 /// read that has a kind <= already captured read (for that key / tag).
-#[derive(Derivative)]
+#[derive(Derivative, Debug)]
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct CapturedReads<T: Transaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
@@ -375,6 +379,9 @@ impl<T: Transaction> CapturedReads<T> {
         maybe_tag: Option<T::Tag>,
         read: DataRead<T::Value>,
     ) -> anyhow::Result<()> {
+        // if format!("{:?}", state_key).contains("aggregator_v2") {
+        //     println!("Capturing read {:?} {:?} {:?}", state_key, maybe_tag, read);
+        // }
         let ret = match maybe_tag {
             Some(tag) => {
                 let group = self.group_reads.entry(state_key).or_default();
@@ -567,39 +574,56 @@ impl<T: Transaction> CapturedReads<T> {
         &self,
         delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
         idx_to_validate: TxnIndex,
+        must_pass: bool,
     ) -> Result<bool, PanicError> {
         if self.speculative_failure {
+            if must_pass {
+                panic!();
+            }
             return Ok(false);
         }
 
         use MVDelayedFieldsError::*;
+        println!("   Validating delayed_field_reads for {} and ids {:?}", idx_to_validate, self.delayed_field_reads.keys());
         for (id, read_value) in &self.delayed_field_reads {
             match delayed_fields.read_latest_committed_value(
                 id,
                 idx_to_validate,
                 ReadPosition::BeforeCurrentTxn,
             ) {
-                Ok(current_value) => match read_value {
-                    DelayedFieldRead::Value { value, .. } => {
-                        if value != &current_value {
-                            return Ok(false);
-                        }
-                    },
-                    DelayedFieldRead::HistoryBounded {
-                        restriction,
-                        max_value,
-                        ..
-                    } => match restriction.validate_against_base_value(
-                        current_value.into_aggregator_value()?,
-                        *max_value,
-                    ) {
-                        Ok(_) => {},
-                        Err(_) => {
-                            return Ok(false);
+                Ok(current_value) => {
+                    println!("      [{}] Validating {:?}: captured read {:?}, current committed {:?}, current materialized read {:?}", idx_to_validate, id, read_value, current_value, delayed_fields.read(id, idx_to_validate));
+                    match read_value {
+                        DelayedFieldRead::Value { value, .. } => {
+                            if value != &current_value {
+                                if must_pass {
+                                    panic!("for id {:?}:  {:?} != {:?}", id, value, current_value);
+                                }
+                                return Ok(false);
+                            }
                         },
-                    },
+                        DelayedFieldRead::HistoryBounded {
+                            restriction,
+                            max_value,
+                            ..
+                        } => match restriction.validate_against_base_value(
+                            current_value.into_aggregator_value()?,
+                            *max_value,
+                        ) {
+                            Ok(_) => {},
+                            Err(e) => {
+                                if must_pass {
+                                    panic!("{:?}", e);
+                                }
+                                return Ok(false);
+                            },
+                        },
+                    }
                 },
                 Err(NotFound) | Err(Dependency(_)) | Err(DeltaApplicationFailure) => {
+                    if must_pass {
+                        panic!();
+                    }
                     return Ok(false);
                 },
             }

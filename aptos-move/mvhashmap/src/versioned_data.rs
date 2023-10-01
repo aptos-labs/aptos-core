@@ -254,10 +254,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         key: &K,
         txn_idx: TxnIndex,
     ) -> anyhow::Result<MVDataOutput<V>, MVDataError> {
-        self.values
+        let result = self.values
             .get(key)
             .map(|v| v.read(txn_idx))
-            .unwrap_or(Err(MVDataError::Uninitialized))
+            .unwrap_or(Err(MVDataError::Uninitialized));
+        // println!("Fetching data in {} for {:?} -> {:?}", txn_idx, key, result.is_ok());
+        result
     }
 
     pub fn provide_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {

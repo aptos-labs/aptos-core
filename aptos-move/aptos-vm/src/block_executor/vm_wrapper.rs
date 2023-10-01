@@ -92,12 +92,14 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
+                    println!("Executed: {:?}, with delayed field changes: {:?} and status: {:?}", txn_idx, vm_output.change_set().delayed_field_change_set(), vm_status);
                     ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
             // execute_single_transaction only returns an error when transactions that should never fail
             // (BlockMetadataTransaction and GenesisTransaction) return an error themselves.
             Err(err) => {
+                println!("Got an abort, something really bad happened: {:?}", err);
                 if err.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         err.message().cloned().unwrap_or_default(),

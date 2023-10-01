@@ -169,6 +169,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         match self.change_set.delayed_field_change_set().get(id) {
             Some(Create(value)) => Ok(value.clone()),
             Some(Apply(apply)) => {
+                println!("Fetching for {:?} in respowned session, with apply : {:?}", id, apply);
                 let base_value = match apply.get_apply_base_id(id) {
                     ApplyBase::Previous(base_id) => {
                         self.base_executor_view.get_delayed_field_value(&base_id)?

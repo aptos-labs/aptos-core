@@ -217,6 +217,11 @@ fn create_aggregator_impl(
         0
     };
 
+    println!(
+        "\tsuccess native_create_aggregator() = agg(value={}, max={})",
+        value_field_value, max_value
+    );
+
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         create_value_by_type(ty_arg, value_field_value)?,
         create_value_by_type(ty_arg, max_value)?,
@@ -239,6 +244,12 @@ fn native_create_aggregator(
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
     let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
+
+    println!(
+        "native_create_aggregator(max={}, {})",
+        max_value,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
 
     create_aggregator_impl(context, &ty_args[0], max_value)
 }
@@ -270,6 +281,12 @@ fn native_create_unbounded_aggregator(
         }
     };
 
+    println!(
+        "native_create_unbounded_aggregator() = {:?}, {}",
+        max_value,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     create_aggregator_impl(context, &ty_args[0], max_value)
 }
 
@@ -291,6 +308,14 @@ fn native_try_add(
     let agg_struct = safely_pop_arg!(args, StructRef);
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
+    println!(
+        "native_try_add(agg(max={}, value={}), input={}, {})",
+        agg_max_value,
+        agg_value,
+        input,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
         let id = aggregator_value_field_as_id(agg_value)?;
@@ -310,6 +335,8 @@ fn native_try_add(
             Err(_) => false,
         }
     };
+
+    println!("\tsuccess native_try_add() = {}", result_value);
 
     Ok(smallvec![Value::bool(result_value)])
 }
@@ -332,6 +359,14 @@ fn native_try_sub(
     let agg_struct = safely_pop_arg!(args, StructRef);
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
+    println!(
+        "native_try_sub(agg(max={}, value={}), input={}, {})",
+        agg_max_value,
+        agg_value,
+        input,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
         let id = aggregator_value_field_as_id(agg_value)?;
@@ -351,6 +386,9 @@ fn native_try_sub(
             Err(_) => false,
         }
     };
+
+    println!("\tsuccess native_try_sub() = {}", result_value);
+
     Ok(smallvec![Value::bool(result_value)])
 }
 
@@ -372,6 +410,13 @@ fn native_read(
     let (agg_value, agg_max_value) =
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
+    println!(
+        "native_read(agg(max={}, value={}), {})",
+        agg_max_value,
+        agg_value,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, delayed_field_data) = get_context_data(context);
         let id = aggregator_value_field_as_id(agg_value)?;
@@ -381,10 +426,17 @@ fn native_read(
     };
 
     if result_value > agg_max_value {
+        println!(
+            "\tnative_read() = {}, which is above {}",
+            result_value, agg_max_value
+        );
         return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
         )));
     };
+
+    println!("\tsuccess native_read() = {}", result_value);
+
     Ok(smallvec![create_value_by_type(&ty_args[0], result_value)?])
 }
 
@@ -406,6 +458,13 @@ fn native_snapshot(
     let (agg_value, agg_max_value) =
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
+    println!(
+        "native_snapshot(agg(max={}, value={}), {})",
+        agg_max_value,
+        agg_value,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
         let aggregator_id = aggregator_value_field_as_id(agg_value)?;
@@ -415,6 +474,8 @@ fn native_snapshot(
     } else {
         agg_value
     };
+
+    println!("\tsuccess native_snapshot() = {}", result_value);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         create_value_by_type(&ty_args[0], result_value)?
@@ -439,6 +500,12 @@ fn native_create_snapshot(
     let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
 
+    println!(
+        "native_create_snapshot({:?}, {})",
+        input,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
         let snapshot_id = delayed_field_data.create_new_snapshot(input, resolver);
@@ -446,6 +513,8 @@ fn native_create_snapshot(
     } else {
         input
     };
+
+    println!("\tsuccess native_create_snapshot() = {:?}", result_value);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         snapshot_type.create_snapshot_value_by_type(result_value)?
@@ -506,6 +575,12 @@ fn native_read_snapshot(
     let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
+    println!(
+        "native_read_snapshot(snap(value={:?}), {})",
+        snapshot_value,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
 
@@ -514,6 +589,8 @@ fn native_read_snapshot(
     } else {
         snapshot_value
     };
+
+    println!("\tsuccess native_read_snapshot() = {:?}", result_value);
 
     Ok(smallvec![
         snapshot_type.create_snapshot_value_by_type(result_value)?
@@ -570,6 +647,14 @@ fn native_string_concat(
 
     context.charge(STRING_UTILS_PER_BYTE * NumBytes::new((prefix.len() + suffix.len()) as u64))?;
 
+    println!(
+        "native_string_concat(prefix={:?}, snapshot={:?}, suffix={:?}, {})",
+        prefix,
+        snapshot_value,
+        suffix,
+        context.aggregator_v2_delayed_fields_enabled()
+    );
+
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
 
@@ -584,6 +669,8 @@ fn native_string_concat(
             SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value),
         )
     };
+
+    println!("\tsuccess native_string_concat() = {:?}", result_value);
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         SnapshotType::String.create_snapshot_value_by_type(result_value)?

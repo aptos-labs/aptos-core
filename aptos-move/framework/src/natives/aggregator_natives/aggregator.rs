@@ -10,6 +10,8 @@ use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
+use once_cell::sync::Lazy;
+use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -37,12 +39,25 @@ fn native_add(
     let input = safely_pop_arg!(args, u128);
     let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
+    if id.as_state_key() != Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {
+        println!(
+            "native_add(agg(max={}, id={:?}), input={})",
+            max_value,
+            id,
+            input,
+        );
+    }
+
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let aggregator = aggregator_data.get_aggregator(id.clone(), max_value)?;
 
     aggregator.add(input)?;
+
+    if id.as_state_key() != Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {
+        println!("\tnative_add()");
+    }
 
     Ok(smallvec![])
 }
@@ -65,12 +80,23 @@ fn native_read(
     // Extract information from aggregator struct reference.
     let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
+    println!(
+        "native_read(agg(max={}, id={:?}))",
+        max_value,
+        id,
+    );
+
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id.clone(), max_value)?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+
+    println!(
+        "\tnative_read() = {}",
+        value,
+    );
 
     Ok(smallvec![Value::u128(value)])
 }
@@ -95,12 +121,25 @@ fn native_sub(
     let input = safely_pop_arg!(args, u128);
     let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
+    if id.as_state_key() != Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {
+        println!(
+            "native_sub(agg(max={}, id={:?}), input={})",
+            max_value,
+            id,
+            input,
+        );
+    }
+
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let aggregator = aggregator_data.get_aggregator(id.clone(), max_value)?;
 
     aggregator.sub(input)?;
+
+    if id.as_state_key() != Lazy::force(&TOTAL_SUPPLY_STATE_KEY) {
+        println!("\tnative_sub()");
+    }
 
     Ok(smallvec![])
 }

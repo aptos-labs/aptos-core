@@ -489,6 +489,8 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             ));
         }
 
+        println!("try_commit({}): validating delayed fields: {:?}", idx_to_commit, ids);
+
         let mut derived_ids = Vec::new();
 
         for id in ids {
@@ -501,6 +503,8 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                 .get(&idx_to_commit)
                 .expect("Value in commit at that transaction version needs to be in the HashMap");
 
+            println!("\ttry_commit({}): validating delayed field {:?}: {:?}", idx_to_commit, id, &**entry_to_commit);
+
             let new_entry = match &**entry_to_commit {
                 VersionEntry::Value(_, None) => None,
                 // remove delta in the commit
@@ -509,6 +513,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                     let prev_value = versioned_value.read_latest_committed_value(idx_to_commit)
                         .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for Apply(AggregatorDelta) during commit: {:?}", e)))?;
                     if let DelayedFieldValue::Aggregator(base) = prev_value {
+                        // println!("\ttry_commit({}) validating: base={}, delta={:?}", idx_to_commit, base, delta);
                         let new_value = delta.apply_to(base).map_err(|e| {
                             CommitError::ReExecutionNeeded(format!(
                                 "Failed to apply delta to base: {:?}",
@@ -559,6 +564,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             };
 
             if let Some(new_entry) = new_entry {
+                println!("\ttry commit({}) Insert final value for {:?} : {:?}", idx_to_commit, id, new_entry);
                 versioned_value.insert_final_value(idx_to_commit, new_entry);
             }
         }
@@ -619,11 +625,14 @@ impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
         id: &K,
         txn_idx: TxnIndex,
     ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
-        let read_res = self
+        let full_value =  self
             .values
             .get(id)
-            .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))?
-            .read(txn_idx)?;
+            .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))?;
+
+        println!("        [{}] Read called on {:?}, all versions: {:?}", txn_idx, id, full_value.value());
+
+        let read_res = full_value.read(txn_idx)?;
         // The lock on id is out of scope.
 
         match read_res {

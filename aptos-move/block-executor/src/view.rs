@@ -17,6 +17,7 @@ use aptos_aggregator::{
     },
 };
 use aptos_logger::error;
+use aptos_logger::prelude::{sample, SampleRate};
 use aptos_mvhashmap::{
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVModulesError, MVModulesOutput, TxnIndex,
@@ -56,7 +57,7 @@ use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
-    },
+    }, time::Duration,
 };
 
 /// A struct which describes the result of the read from the proxy. The client
@@ -112,6 +113,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
         .get_delayed_field_by_kind(id, DelayedFieldReadKind::Value);
     if let Some(data) = delayed_read {
         if let DelayedFieldRead::Value { value, .. } = data {
+            println!(" get_delayed_field_value_impl({:?}) read already captured value: {:?}", id, value);
             return Ok(value);
         } else {
             let err =
@@ -133,6 +135,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
                         value: value.clone(),
                     },
                 )?;
+                println!(" get_delayed_field_value_impl({:?}) fetched new value {:?}", id, value);
                 return Ok(value);
             },
             Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
@@ -338,6 +341,8 @@ fn wait_for_dependency(
     txn_idx: TxnIndex,
     dep_idx: TxnIndex,
 ) -> bool {
+    sample!(SampleRate::Duration(Duration::from_secs(1)), println!("{} waiting on dependency {}", txn_idx, dep_idx));
+
     match wait_for.wait_for_dependency(txn_idx, dep_idx) {
         DependencyResult::Dependency(dep_condition) => {
             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
@@ -425,10 +430,17 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         loop {
             match self.versioned_map.data().fetch_data(key, txn_idx) {
                 Ok(Versioned(version, v, layout)) => {
+                    if format!("{:?}", key).contains("aggregator_v2") && !format!("{:?}", key).contains("AggregatorInTable") {
+                        // println!("Read {:?} {:?} with value {:?} and layout {:?}", key, version, v, layout);
+                        if layout.is_none() {
+                            println!("WARNING: read of agg v2 {:?} {:?} with value {:?} and layout {:?}", key, version, v, layout);
+                        }
+                    }
                     let data_read = DataRead::Versioned(version, v.clone(), layout)
                         .downcast(target_kind)
                         .expect("Downcast from Versioned must succeed");
 
+                    // println!("Capturing read from {} for {:?}: {:?}", txn_idx, key, data_read);
                     if self
                         .captured_reads
                         .borrow_mut()
@@ -463,6 +475,8 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     return ReadResult::from_data_read(data_read);
                 },
                 Err(Uninitialized) | Err(Unresolved(_)) => {
+                    // println!("NOT Capturing read from {} for {:?}", txn_idx, key);
+
                     // The underlying assumption here for not recording anything about the read is
                     // that the caller is expected to initialize the contents and serve the reads
                     // solely via the 'fetch_read' interface. Thus, the later, successful read,
@@ -647,9 +661,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         // resource, so we have to replace the actual values with
                         // identifiers.
                         (Some(state_value), Some(layout)) => {
+                            println!("  Replacing values with identifiers for {:?}, initial value: {:?}", state_key, state_value);
                             let res = self.replace_values_with_identifiers(state_value, layout);
                             match res {
-                                Ok((value, _)) => Some(value),
+                                Ok((value, ids)) => {
+                                    println!("  Replaced values with identifiers for {:?}: {:?}, patched value {:?}", state_key, ids, value);
+                                    Some(value)
+                                },
                                 Err(err) => {
                                     // TODO(aggregator): This means replacement failed
                                     //       and most likely there is a bug. Log the error
@@ -668,7 +686,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 },
                             }
                         },
-                        (from_storage, _) => from_storage,
+                        (from_storage, None) => {
+                            // println!("  No aggregators in {:?} to replace", state_key);
+                            // if format!("{:?}", state_key).contains("aggregator_v2") {
+                            //     panic!("aggregator_v2 in {:?}", state_key);
+                            // }
+                            from_storage
+                        },
+                        (None, Some(_)) => None,
                     };
 
                     // This base value can also be used to resolve AggregatorV1 directly from
@@ -679,8 +704,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         maybe_layout.cloned().map(Arc::new),
                     );
 
+                    if format!("{:?}", state_key).contains("aggregator_v2") && !format!("{:?}", state_key).contains("AggregatorInTable") {
+                        println!("Putting storage read into versioned data map for {:?} with layout {:?}", state_key, maybe_layout);
+                        if maybe_layout.is_none() {
+                            println!("WARNING: agg v2 type {:?} without layout", state_key);
+                        }
+                    }
+
                     // In case of concurrent storage fetches, we cannot use our value,
-                    // but need to fetch it from versioned_map again.
+                    // but need to fetch it from versioned_map again.>>>>>>> 296c802bee (printlns)
                     ret = state.read_data_by_kind(state_key, self.txn_idx, kind);
                 }
 
@@ -1018,6 +1050,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     ) -> TransformationResult<Value> {
         let id = self.generate_delayed_field_id();
         let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
+        println!("   Setting delayed field {:?} to {:?}", id, base_value);
         match &self.latest_view.latest_view {
             ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
             ViewState::Unsync(state) => {
@@ -1037,7 +1070,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
         self.delayed_field_keys.borrow_mut().insert(id);
-        match &self.latest_view.latest_view {
+        let result = match &self.latest_view.latest_view {
             ViewState::Sync(state) => Ok(state
                 .versioned_map
                 .delayed_fields()
@@ -1048,7 +1081,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 .read_delayed_field(id)
                 .expect("Delayed field value for ID must always exist in sequential execution")
                 .try_into_move_value(layout)?),
-        }
+        };
+        println!("   Replacing id {:?} with value {:?}", id, result);
+        result
     }
 }
 

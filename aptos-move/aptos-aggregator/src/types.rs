@@ -39,6 +39,7 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
         "Delayed logic code invariant broken (there is a bug in the code), {:?}",
         message
     );
+    println!("{}", msg);
     error!("{}", msg);
     PanicError::CodeInvariantError(msg)
 }

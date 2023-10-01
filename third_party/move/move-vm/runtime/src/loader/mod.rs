@@ -1892,6 +1892,8 @@ impl Loader {
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(struct_layout_info) = &struct_info.struct_layout_info {
+                    // println!("cached {:?}<{:?}> has_identifier_mappings: {}", name, ty_args, struct_layout_info.has_identifier_mappings);
+
                     *count += struct_layout_info.node_count;
                     return Ok((
                         struct_layout_info.struct_layout.clone(),
@@ -1932,7 +1934,8 @@ impl Loader {
         }
 
         let has_identifier_mappings =
-            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+            maybe_mapping.is_some() || field_has_identifier_mappings.iter().any(|b| *b);
+        // println!("computed {:?}<{:?}> has_identifier_mappings: {}, self: {:?}, fields: {:?}", name, ty_args, has_identifier_mappings, maybe_mapping, field_has_identifier_mappings);
 
         let field_node_count = *count - count_before;
         let struct_layout = MoveStructLayout::new(field_layouts);

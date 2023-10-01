@@ -728,6 +728,7 @@ inherits = "release"
 debug = true
 overflow-checks = true
 debug-assertions = true
+panic = "abort"
 
 [profile.bench]
 debug = true

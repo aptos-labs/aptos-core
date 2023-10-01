@@ -12,6 +12,15 @@ publish = { workspace = true }
 repository = { workspace = true }
 rust-version = { workspace = true }
 
+[profile.release]
+panic = 'abort'
+
+[profile.dev]
+panic = 'abort'
+
+[profile.ci]
+panic = 'abort'
+
 [dependencies]
 anyhow = { workspace = true }
 aptos-block-executor = { workspace = true }
