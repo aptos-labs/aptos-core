@@ -5,12 +5,11 @@
 import { MAX_U32_NUMBER } from "./consts";
 import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "../types";
 
-// Since Typescript doesn't have abstract static methods, we use this interface to
-// require a static deserialize method for a Deserializable class.
-// It is not exported because it's not intended to be used, only to define
-// what types are allowed to be deserialized with the `Deserializer.deserializer(...)` function.
-// If you use it with a class like `MyClass implements Deserializable<T>`, Typescript will require
-// that you implement a non-static deserialize(), and we only want a static deserialize().
+/**
+ * This interface exists solely for the `deserialize` function in the `Deserializer` class.
+ * It is not exported because exporting it results in more typing errors than it prevents
+ * due to Typescript's lack of support for static methods in abstract classes and interfaces.
+ */
 interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
 }
@@ -196,16 +195,15 @@ export class Deserializer {
   }
 
   /**
-   * Deserializes a BCS Deserializable value.
+   * Helper function that primarily exists to support alternative syntax for deserialization.
+   * That is, if we have a `const deserializer: new Deserializer(...)`, instead of having to use
+   * `MyClass.deserialize(deserializer)`, we can call `deserializer.deserialize(MyClass)`.
    *
-   * The serialized bytes must already be in the Deserializer buffer.
-   *
-   * The process of using this function is as follows:
-   * 1. Serialize the value of class type T using its `serialize` function.
-   * 2. Get the serialized bytes and pass them into the Deserializer constructor.
-   * 3. Call this function with your newly constructed Deserializer, as `deserializer.deserialize(ClassType)`
-   *
-   * @param cls The Deserializable class to deserialize the buffered bytes into.
+   * @example const deserializer = new Deserializer(new Uint8Array([1, 2, 3]));
+   * const value = deserializer.deserialize(MyClass); // where MyClass has a `deserialize` function
+   * // value is now an instance of MyClass
+   * // equivalent to `const value = MyClass.deserialize(deserializer)`
+   * @param cls The BCS-deserializable class to deserialize the buffered bytes into.
    *
    * @returns the deserialized value of class type T
    */

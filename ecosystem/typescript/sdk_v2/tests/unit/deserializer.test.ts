@@ -171,7 +171,7 @@ describe("BCS Deserializer", () => {
     // Load the bytes into the Deserializer buffer
     const deserializer = new Deserializer(moveStructBcsBytes);
     // Deserialize the buffered bytes into an instance of MoveStruct
-    const deserializedMoveStruct = deserializer.deserialize(MoveStruct);
+    const deserializedMoveStruct = MoveStruct.deserialize(deserializer);
     expect(deserializedMoveStruct.name).toEqual(moveStruct.name);
     expect(deserializedMoveStruct.description).toEqual(moveStruct.description);
     expect(deserializedMoveStruct.enabled).toEqual(moveStruct.enabled);
