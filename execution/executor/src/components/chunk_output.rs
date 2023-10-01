@@ -10,6 +10,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
 use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     state_delta::StateDelta,
@@ -39,6 +40,28 @@ pub static SHARDED_BLOCK_EXECUTOR: Lazy<
 > = Lazy::new(|| {
     let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
     Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
+});
+
+pub static TXN_CLONE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_txn_clone_seconds",
+        // metric description
+        "The time spent in seconds in rayon thread pool in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
+pub static PROCESS_COUNTERS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "process_counters_seconds",
+        // metric description
+        "The time spent in seconds in rayon thread pool in parallel execution",
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
 });
 
 pub struct ChunkOutput {
@@ -77,13 +100,18 @@ impl ChunkOutput {
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
+        let txn_clone_time = TXN_CLONE_SECONDS.start_timer();
+        let txn_clone = transactions.clone();
+        drop(txn_clone_time);
         let transaction_outputs =
-            Self::execute_block::<V>(transactions.clone(), &state_view, maybe_block_gas_limit)?;
+            Self::execute_block::<V>(txn_clone, &state_view, maybe_block_gas_limit)?;
 
         // to print txn output for debugging, uncomment:
         // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
 
+        let process_counters_time = PROCESS_COUNTERS_SECONDS.start_timer();
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+        drop(process_counters_time);
 
         Ok(Self {
             transactions,
