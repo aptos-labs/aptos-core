@@ -2,12 +2,14 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
+use std::hash::Hash;
 use std::slice::Iter;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, mpsc, Mutex};
 use std::sync::mpsc::{Receiver, Sender};
 use dashmap::DashSet;
 use rayon::Scope;
+use serde::Serialize;
 use aptos_logger::info;
 use aptos_mvhashmap::MVHashMap;
 use aptos_mvhashmap::types::TxnIndex;
@@ -19,17 +21,6 @@ use crate::errors::Error;
 use crate::scheduler::Scheduler;
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
-
-#[derive(Clone, Debug)]
-pub struct RemoteCommit<TO: TransactionOutput, TE: Debug> {
-    pub global_txn_idx: TxnIndex,
-    pub txn_output: Arc<TxnOutput<TO, TE>>,
-}
-
-pub enum ShardingMsg<TO: TransactionOutput, TE: Debug> {
-    RemoteCommit(RemoteCommit<TO, TE>),
-    Shutdown,
-}
 
 /// The transaction index operations that are implemented differently between unsharded execution and sharded execution.
 pub trait TxnIndexProvider {
@@ -81,7 +72,10 @@ pub trait BlockSTMPlugin<T: Transaction, TO, TE>
     fn txn(&self, idx: TxnIndex) -> &T;
 
     /// Run a loop to receive remote txn output and unblock local txns.
-    fn run_sharding_msg_loop<TAG, X: Executable + 'static>(&self, mv_cache: &MVHashMap<T::Key, TAG, T::Value, X>, scheduler: &Scheduler<Self>);
+    fn run_sharding_msg_loop<TAG, X>(&self, mv_cache: &MVHashMap<T::Key, TAG, T::Value, X>, scheduler: &Scheduler<Self>)
+    where
+        TAG: Hash + Clone + Eq + PartialEq + Debug + Serialize,
+        X: Executable + 'static;
 
     /// Stop the loop above.
     fn shutdown_receiver(&self);

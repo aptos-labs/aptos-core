@@ -10,6 +10,8 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
 };
+use crate::block_executor::partitioner::PartitionedTransactions::{V2, V3};
+use crate::state_store::state_key::StateKey;
 
 pub type ShardId = usize;
 pub type TxnIndex = usize;
@@ -448,10 +450,52 @@ impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
     }
 }
 
+
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct PartitionedTransactions {
+pub enum PartitionedTransactions {
+    V2(PartitionedTransactionsV2),
+    V3(PartitionedTransactionsV3),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartitionedTransactionsV2 {
     pub sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
     pub global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+}
+
+/// The input of a shard in sharded execution V3.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartitionV3 {
+    pub block_id: [u8; 32],
+    pub txns: Vec<AnalyzedTransaction>,
+    pub global_idxs: Vec<u32>,
+    pub key_sets_by_dep: HashMap<u32, HashSet<StateKey>>,
+    pub follower_shard_sets: Vec<Vec<usize>>,
+}
+
+impl PartitionV3 {
+    pub fn num_txns(&self) -> usize {
+        self.txns.len()
+    }
+
+    pub fn add_checkpoint_txn(&mut self, txn_idx: u32, txn: AnalyzedTransaction) {
+        self.txns.push(txn);
+        self.global_idxs.push(txn_idx);
+        self.follower_shard_sets.push(vec![]);
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartitionedTransactionsV3 {
+    pub block_id: [u8; 32],
+    pub partitions: Vec<PartitionV3>,
+    pub global_idx_sets_by_shard: Vec<Vec<TxnIndex>>,
+}
+
+impl PartitionedTransactionsV3 {
+    pub fn num_txns(&self) -> usize {
+        self.partitions.iter().map(|partition| partition.num_txns()).sum::<usize>()
+    }
 }
 
 impl PartitionedTransactions {
@@ -459,17 +503,17 @@ impl PartitionedTransactions {
         sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
         global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
     ) -> Self {
-        Self {
+        V2(PartitionedTransactionsV2 {
             sharded_txns,
             global_txns,
-        }
+        })
     }
 
     pub fn empty() -> Self {
-        Self {
+        V2(PartitionedTransactionsV2 {
             sharded_txns: Vec::new(),
             global_txns: Vec::new(),
-        }
+        })
     }
 
     pub fn into(
@@ -478,56 +522,103 @@ impl PartitionedTransactions {
         Vec<SubBlocksForShard<AnalyzedTransaction>>,
         Vec<TransactionWithDependencies<AnalyzedTransaction>>,
     ) {
-        (self.sharded_txns, self.global_txns)
+        match self {
+            V2(obj) => (obj.sharded_txns, obj.global_txns),
+            _ => todo!(),
+        }
     }
 
     pub fn num_shards(&self) -> usize {
-        self.sharded_txns.len()
+        match self {
+            V2(obj) => obj.sharded_txns.len(),
+            V3(obj) => obj.partitions.len(),
+        }
     }
 
     pub fn sharded_txns(&self) -> &[SubBlocksForShard<AnalyzedTransaction>] {
-        &self.sharded_txns
+        match self {
+            V2(obj) => &obj.sharded_txns,
+            _ => unreachable!(),
+        }
     }
 
     pub fn num_sharded_txns(&self) -> usize {
-        self.sharded_txns
-            .iter()
-            .map(|sub_blocks| sub_blocks.num_txns())
-            .sum::<usize>()
+        match self {
+            V2(obj) => {
+                obj.sharded_txns
+                    .iter()
+                    .map(|sub_blocks| sub_blocks.num_txns())
+                    .sum::<usize>()
+            },
+            V3(obj) => {
+                obj.partitions.iter()
+                    .map(|partition| partition.num_txns())
+                    .sum::<usize>()
+            },
+        }
     }
 
     pub fn num_txns(&self) -> usize {
-        self.num_sharded_txns() + self.global_txns.len()
+        match self {
+            V2(obj) => self.num_sharded_txns() + obj.global_txns.len(),
+            V3(obj) => obj.num_txns(),
+        }
     }
 
     pub fn add_checkpoint_txn(&mut self, last_txn: Transaction) {
         assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
-        let txn_with_deps =
-            TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
-        if !self.global_txns.is_empty() {
-            self.global_txns.push(txn_with_deps);
-        } else {
-            self.sharded_txns
-                .last_mut()
-                .unwrap()
-                .sub_blocks
-                .last_mut()
-                .unwrap()
-                .transactions
-                .push(txn_with_deps)
+        match self {
+            V2(obj) => {
+                let txn_with_deps =
+                    TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
+                if !obj.global_txns.is_empty() {
+                    obj.global_txns.push(txn_with_deps);
+                } else {
+                    obj.sharded_txns
+                        .last_mut()
+                        .unwrap()
+                        .sub_blocks
+                        .last_mut()
+                        .unwrap()
+                        .transactions
+                        .push(txn_with_deps)
+                }
+            }
+            V3(obj) => {
+                // Append the txn to the last shard.
+                let analyzed_txn = AnalyzedTransaction::from(last_txn);
+                let txn_idx = obj.num_txns() as u32;
+                obj.partitions.last_mut().unwrap().add_checkpoint_txn(txn_idx, analyzed_txn);
+            }
         }
     }
 
     pub fn flatten(transactions: PartitionedTransactions) -> Vec<AnalyzedTransaction> {
-        SubBlocksForShard::flatten(transactions.sharded_txns)
-            .into_iter()
-            .chain(
-                transactions
-                    .global_txns
+        match transactions {
+            V2(obj) => {
+                SubBlocksForShard::flatten(obj.sharded_txns)
                     .into_iter()
-                    .map(|txn| txn.into_txn()),
-            )
-            .collect()
+                    .chain(
+                        obj
+                            .global_txns
+                            .into_iter()
+                            .map(|txn| txn.into_txn()),
+                    )
+                    .collect()
+            }
+            V3(obj) => {
+                let num_txns = obj.num_txns();
+                let PartitionedTransactionsV3{ partitions, .. } = obj;
+                let mut ret: Vec<Option<AnalyzedTransaction>> = vec![None; num_txns];
+                for partition in partitions {
+                    let PartitionV3 { txns, global_idxs, .. } = partition;
+                    for (txn, global_idx) in txns.into_iter().zip(global_idxs.into_iter()) {
+                        ret[global_idx as usize] = Some(txn);
+                    }
+                }
+                ret.into_iter().map(Option::unwrap).collect()
+            }
+        }
     }
 }
 

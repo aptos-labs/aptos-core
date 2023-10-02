@@ -19,6 +19,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use aptos_types::block_executor::partitioner::PartitionedTransactionsV3;
 
 #[allow(dead_code)]
 pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
@@ -132,5 +133,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         let execution_results = self.get_output_from_shards()?;
 
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
+    }
+
+    fn execute_block_v3(&self, state_view: Arc<S>, transactions: PartitionedTransactionsV3, concurrency_level_per_shard: usize, maybe_block_gas_limit: Option<u64>) -> Result<Vec<TransactionOutput>, VMStatus> {
+        todo!()
     }
 }

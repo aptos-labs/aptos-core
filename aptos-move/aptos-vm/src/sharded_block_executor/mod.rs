@@ -17,6 +17,10 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
+use std::collections::{HashMap, HashSet};
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::block_executor::partitioner::PartitionV3;
+use aptos_types::state_store::state_key::StateKey;
 
 pub mod aggr_overridden_state_view;
 pub mod coordinator_client;
@@ -44,7 +48,15 @@ pub enum ExecutorShardCommand<S> {
         usize,
         Option<u64>,
     ),
+    ExecuteV3Partition(ExecuteV3PartitionCommand<S>),
     Stop,
+}
+
+pub struct ExecuteV3PartitionCommand<S> {
+    pub state_view: Arc<S>,
+    pub partition: PartitionV3,
+    pub concurrency_level_per_shard: usize,
+    pub maybe_block_gas_limit: Option<u64>,
 }
 
 impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExecutor<S, C> {
@@ -81,6 +93,16 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
+
+        if let PartitionedTransactions::V3(obj) = transactions {
+            return self.executor_client.execute_block_v3(
+                state_view,
+                obj,
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            );
+        }
+
         let (sharded_output, global_output) = self
             .executor_client
             .execute_block(
