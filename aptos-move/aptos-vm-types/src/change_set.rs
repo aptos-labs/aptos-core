@@ -12,7 +12,7 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
-use move_binary_format::errors::Location;
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     language_storage::StructTag,
     vm_status::{err_msg, StatusCode, VMStatus},
@@ -38,6 +38,20 @@ pub struct GroupWrite {
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
     pub inner_ops: HashMap<StructTag, WriteOp>,
+}
+
+impl GroupWrite {
+    /// Utility method that extracts the serialized group size from metadata_op.
+    pub fn encoded_group_size(&self) -> VMResult<u64> {
+        self.metadata_op
+            .bytes()
+            .map_or(Ok(0), |b| bcs::from_bytes::<u64>(b))
+            .map_err(|_| {
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Error deserializing group size".to_string())
+                    .finish(Location::Undefined)
+            })
+    }
 }
 
 /// A change set produced by the VM.
@@ -212,6 +226,12 @@ impl VMChangeSet {
             .iter_mut()
             .chain(self.module_write_set.iter_mut())
             .chain(self.aggregator_write_set.iter_mut())
+    }
+
+    pub fn group_write_set_iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (&StateKey, &mut GroupWrite)> {
+        self.resource_group_write_set.iter_mut()
     }
 
     pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
@@ -487,8 +507,54 @@ mod tests {
     use crate::tests::utils::{
         mock_tag_0, mock_tag_1, mock_tag_2, raw_metadata, write_op_with_metadata,
     };
-    use claims::{assert_err, assert_ok, assert_some_eq};
+    use bytes::Bytes;
+    use claims::{assert_err, assert_ok, assert_ok_eq, assert_some_eq};
     use test_case::test_case;
+
+    macro_rules! assert_group_write_size {
+        ($g:expr, $s:expr) => {{
+            let group_write = GroupWrite {
+                metadata_op: $g,
+                inner_ops: HashMap::new(),
+            };
+            assert_ok_eq!(group_write.encoded_group_size(), $s);
+        }};
+    }
+
+    #[test]
+    fn test_group_write_size() {
+        // Deletions should lead to size 0.
+        assert_group_write_size!(WriteOp::Deletion, 0);
+        assert_group_write_size!(
+            WriteOp::DeletionWithMetadata {
+                metadata: raw_metadata(10)
+            },
+            0
+        );
+
+        let sizes = [20, 100, 45279432, 5];
+        let encoded_sizes: Vec<Bytes> = sizes
+            .iter()
+            .filter_map(|size| bcs::to_bytes(size).ok().map(|v| v.into()))
+            .collect();
+
+        assert_group_write_size!(WriteOp::Creation(encoded_sizes[0].clone()), sizes[0]);
+        assert_group_write_size!(
+            WriteOp::CreationWithMetadata {
+                data: encoded_sizes[1].clone(),
+                metadata: raw_metadata(20)
+            },
+            sizes[1]
+        );
+        assert_group_write_size!(WriteOp::Modification(encoded_sizes[2].clone()), sizes[2]);
+        assert_group_write_size!(
+            WriteOp::ModificationWithMetadata {
+                data: encoded_sizes[3].clone(),
+                metadata: raw_metadata(30)
+            },
+            sizes[3]
+        );
+    }
 
     #[test]
     fn test_squash_groups_one_empty() {

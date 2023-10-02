@@ -39,6 +39,13 @@ use std::{
     sync::Arc,
 };
 
+pub(crate) enum ResourceGroupChangeSet {
+    // Merged resource groups op.
+    V0(HashMap<StateKey, MoveStorageOp<Bytes>>),
+    // Granular ops to individual resources within a group.
+    V1(HashMap<StateKey, HashMap<StructTag, MoveStorageOp<Bytes>>>),
+}
+
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
     Txn {
@@ -208,12 +215,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data does't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
+    ///
+    /// V1 Resource group change set behavior keeps ops for individual resources separate, not
+    /// merging them into the a single op corresponding to the whole resource group (V0).
     fn split_and_merge_resource_groups<C: AccessPathCache>(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
         change_set: MoveChangeSet,
         ap_cache: &mut C,
-    ) -> VMResult<(MoveChangeSet, HashMap<StateKey, MoveStorageOp<Bytes>>)> {
+    ) -> VMResult<(MoveChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -223,14 +233,15 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         };
         let mut change_set_filtered = MoveChangeSet::new();
 
-        let mut resource_group_change_set = HashMap::new();
-        // TODO: with the new resource group handling, the cache will be provided only for
-        // backwards compatibility.
-        let mut resource_group_cache = remote
-            .release_resource_group_cache()
-            .expect("Cache must be provided w. current resource group handling");
+        let mut maybe_resource_group_cache = remote.release_resource_group_cache();
+        let mut resource_group_change_set = if maybe_resource_group_cache.is_some() {
+            ResourceGroupChangeSet::V0(HashMap::new())
+        } else {
+            ResourceGroupChangeSet::V1(HashMap::new())
+        };
         for (addr, account_changeset) in change_set.into_inner() {
-            let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
+            let mut resource_groups: BTreeMap<StructTag, HashMap<StructTag, MoveStorageOp<Bytes>>> =
+                BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
@@ -241,11 +252,14 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                     });
 
                 if let Some(resource_group_tag) = resource_group_tag {
-                    resource_groups
+                    if resource_groups
                         .entry(resource_group_tag)
-                        .or_insert_with(AccountChangeSet::new)
-                        .add_resource_op(struct_tag, blob_op)
-                        .map_err(|_| common_error())?;
+                        .or_insert_with(HashMap::new)
+                        .insert(struct_tag, blob_op)
+                        .is_some()
+                    {
+                        return Err(common_error());
+                    }
                 } else {
                     resources_filtered.insert(struct_tag, blob_op);
                 }
@@ -262,44 +276,68 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key = StateKey::access_path(
                     ap_cache.get_resource_group_path(addr, resource_group_tag),
                 );
+                match &mut resource_group_change_set {
+                    ResourceGroupChangeSet::V0(v0_changes) => {
+                        let mut source_data = maybe_resource_group_cache
+                            .as_mut()
+                            .expect("V0 cache must be set")
+                            .remove(&state_key)
+                            .unwrap_or_default();
+                        let create = source_data.is_empty();
 
-                let mut source_data = resource_group_cache.remove(&state_key).unwrap_or_default();
-                let create = source_data.is_empty();
+                        for (struct_tag, current_op) in resources {
+                            match current_op {
+                                MoveStorageOp::Delete => {
+                                    source_data.remove(&struct_tag).ok_or_else(common_error)?;
+                                },
+                                MoveStorageOp::Modify(new_data) => {
+                                    let data = source_data
+                                        .get_mut(&struct_tag)
+                                        .ok_or_else(common_error)?;
+                                    *data = new_data;
+                                },
+                                MoveStorageOp::New(data) => {
+                                    let data = source_data.insert(struct_tag, data);
+                                    if data.is_some() {
+                                        return Err(common_error());
+                                    }
+                                },
+                            }
+                        }
 
-                for (struct_tag, current_op) in resources.into_resources() {
-                    match current_op {
-                        MoveStorageOp::Delete => {
-                            source_data.remove(&struct_tag).ok_or_else(common_error)?;
-                        },
-                        MoveStorageOp::Modify(new_data) => {
-                            let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
-                            *data = new_data;
-                        },
-                        MoveStorageOp::New(data) => {
-                            let data = source_data.insert(struct_tag, data);
-                            if data.is_some() {
+                        let op = if source_data.is_empty() {
+                            MoveStorageOp::Delete
+                        } else if create {
+                            MoveStorageOp::New(
+                                bcs::to_bytes(&source_data)
+                                    .map_err(|_| common_error())?
+                                    .into(),
+                            )
+                        } else {
+                            MoveStorageOp::Modify(
+                                bcs::to_bytes(&source_data)
+                                    .map_err(|_| common_error())?
+                                    .into(),
+                            )
+                        };
+                        v0_changes.insert(state_key, op);
+                    },
+                    ResourceGroupChangeSet::V1(v1_changes) => {
+                        // Maintain the behavior of failing the transaction on resource
+                        // group member existence invariants.
+                        for (struct_tag, current_op) in resources.iter() {
+                            let exists = remote
+                                .resource_exists_in_group(&state_key, struct_tag)
+                                .map_err(|_| common_error())?;
+                            if matches!(current_op, MoveStorageOp::New(_)) == exists {
+                                // Deletion and Modification require resource to exist,
+                                // while creation requires the resource to not exist.
                                 return Err(common_error());
                             }
-                        },
-                    }
+                        }
+                        v1_changes.insert(state_key, resources);
+                    },
                 }
-
-                let op = if source_data.is_empty() {
-                    MoveStorageOp::Delete
-                } else if create {
-                    MoveStorageOp::New(
-                        bcs::to_bytes(&source_data)
-                            .map_err(|_| common_error())?
-                            .into(),
-                    )
-                } else {
-                    MoveStorageOp::Modify(
-                        bcs::to_bytes(&source_data)
-                            .map_err(|_| common_error())?
-                            .into(),
-                    )
-                };
-                resource_group_change_set.insert(state_key, op);
             }
         }
 
@@ -309,7 +347,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
         change_set: MoveChangeSet,
-        resource_group_change_set: HashMap<StateKey, MoveStorageOp<Bytes>>,
+        resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
@@ -317,6 +355,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
         let mut resource_write_set = HashMap::new();
+        let mut resource_group_write_set = HashMap::new();
         let mut module_write_set = HashMap::new();
         let mut aggregator_write_set = HashMap::new();
         let mut aggregator_delta_set = HashMap::new();
@@ -342,9 +381,19 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (state_key, blob_op) in resource_group_change_set {
-            let op = woc.convert_resource(&state_key, blob_op, false)?;
-            resource_write_set.insert(state_key, op);
+        match resource_group_change_set {
+            ResourceGroupChangeSet::V0(v0_changes) => {
+                for (state_key, blob_op) in v0_changes {
+                    let op = woc.convert_resource(&state_key, blob_op, false)?;
+                    resource_write_set.insert(state_key, op);
+                }
+            },
+            ResourceGroupChangeSet::V1(v1_changes) => {
+                for (state_key, resources) in v1_changes {
+                    let group_write = woc.convert_resource_group_v1(&state_key, resources)?;
+                    resource_group_write_set.insert(state_key, group_write);
+                }
+            },
         }
 
         for (handle, change) in table_change_set.changes {
@@ -375,8 +424,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         VMChangeSet::new(
             resource_write_set,
-            // TODO: properly populate resource group write-set.
-            HashMap::new(),
+            resource_group_write_set,
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set,

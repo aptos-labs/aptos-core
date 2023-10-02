@@ -535,6 +535,9 @@ impl AptosVM {
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
+        for (key, group_write) in change_set.resource_group_write_set().iter() {
+            gas_meter.charge_io_gas_for_group_write(key, group_write)?;
+        }
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(
             &mut change_set,

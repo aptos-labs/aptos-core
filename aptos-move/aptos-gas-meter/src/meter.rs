@@ -7,6 +7,7 @@ use aptos_gas_schedule::gas_params::{instr::*, txn::*};
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
+use aptos_vm_types::change_set::GroupWrite;
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -489,7 +490,28 @@ where
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
-        let cost = self.storage_gas_params().pricing.io_gas_per_write(key, op);
+        let cost = self
+            .storage_gas_params()
+            .pricing
+            .io_gas_per_write(key, op, None);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_io_gas_for_group_write(
+        &mut self,
+        key: &StateKey,
+        group_write: &GroupWrite,
+    ) -> VMResult<()> {
+        let group_size = group_write.encoded_group_size()?;
+        let cost = self.storage_gas_params().pricing.io_gas_per_write(
+            key,
+            &group_write.metadata_op,
+            Some(group_size),
+        );
+
         self.algebra
             .charge_io(cost)
             .map_err(|e| e.finish(Location::Undefined))
@@ -503,8 +525,15 @@ where
         self.vm_gas_params().txn.storage_fee_refund_for_slot(op)
     }
 
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
-        self.vm_gas_params().txn.storage_fee_for_bytes(key, op)
+    fn storage_fee_for_state_bytes(
+        &self,
+        key: &StateKey,
+        op: &WriteOp,
+        maybe_group_size: Option<u64>,
+    ) -> Fee {
+        self.vm_gas_params()
+            .txn
+            .storage_fee_for_bytes(key, op, maybe_group_size)
     }
 
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {

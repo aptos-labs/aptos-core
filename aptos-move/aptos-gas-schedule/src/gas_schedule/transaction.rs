@@ -221,9 +221,15 @@ impl TransactionGasParameters {
         }
     }
 
-    pub fn storage_fee_for_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
+    pub fn storage_fee_for_bytes(
+        &self,
+        key: &StateKey,
+        op: &WriteOp,
+        maybe_group_size: Option<u64>,
+    ) -> Fee {
         if let Some(data) = op.bytes() {
-            let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);
+            let size = NumBytes::new(key.size() as u64)
+                + NumBytes::new(maybe_group_size.unwrap_or(data.len() as u64));
             if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
                 return excess * self.storage_fee_per_excess_state_byte;
             }

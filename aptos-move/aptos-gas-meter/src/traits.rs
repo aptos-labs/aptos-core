@@ -6,7 +6,10 @@ use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
     contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
+use aptos_vm_types::{
+    change_set::{GroupWrite, VMChangeSet},
+    storage::StorageGasParameters,
+};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::gas_algebra::{InternalGas, InternalGasUnit, NumBytes};
 use move_vm_types::gas::GasMeter as MoveGasMeter;
@@ -103,14 +106,32 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// storage costs.
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()>;
 
+    /// Charges IO gas for a resource group write set item. Group writes contain encoded size
+    /// of the group instead of raw bytes in the WriteOp (the bytes are populated at the
+    /// end of block execution).
+    ///
+    /// This is to be differentiated from the storage fee, which is meant to cover the long-term
+    /// storage costs.
+    fn charge_io_gas_for_group_write(
+        &mut self,
+        key: &StateKey,
+        group_write: &GroupWrite,
+    ) -> VMResult<()>;
+
     /// Calculates the storage fee for a state slot allocation.
     fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
 
     /// Calculates the storage fee refund for a state slot deallocation.
     fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
 
-    /// Calculates the storage fee for state bytes.
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee;
+    /// Calculates the storage fee for state bytes. If maybe_group_size is provided, then it
+    /// must be used instead of the data size in op, as op contains placeholer bytes.
+    fn storage_fee_for_state_bytes(
+        &self,
+        key: &StateKey,
+        op: &WriteOp,
+        maybe_group_size: Option<u64>,
+    ) -> Fee;
 
     /// Calculates the storage fee for an event.
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -153,13 +174,30 @@ pub trait AptosGasMeter: MoveGasMeter {
         for (key, op) in change_set.write_set_iter_mut() {
             let slot_fee = self.storage_fee_for_state_slot(op);
             let refund = self.storage_fee_refund_for_state_slot(op);
-            let bytes_fee = self.storage_fee_for_state_bytes(key, op);
+            let bytes_fee = self.storage_fee_for_state_bytes(key, op, None);
 
             Self::maybe_record_storage_deposit(op, slot_fee);
             total_refund += refund;
 
-            write_fee += slot_fee + bytes_fee
+            write_fee += slot_fee + bytes_fee;
         }
+
+        for (key, group_write) in change_set.group_write_set_iter_mut() {
+            let group_size = group_write.encoded_group_size()?;
+            let group_metadata_op = &mut group_write.metadata_op;
+
+            let slot_fee = self.storage_fee_for_state_slot(group_metadata_op);
+            let refund = self.storage_fee_refund_for_state_slot(group_metadata_op);
+
+            Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
+            total_refund += refund;
+
+            let bytes_fee =
+                self.storage_fee_for_state_bytes(key, group_metadata_op, Some(group_size));
+
+            write_fee += slot_fee + bytes_fee;
+        }
+
         let event_fee = change_set.events().iter().fold(Fee::new(0), |acc, event| {
             acc + self.storage_fee_per_event(event)
         });
