@@ -2,14 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_block_partitioner::{
-    pre_partition::{
-        connected_component::config::ConnectedComponentPartitionerConfig,
-        default_pre_partitioner_config, uniform_partitioner::config::UniformPartitionerConfig,
-        PrePartitionerConfig,
-    },
-    v2::config::PartitionerV2Config,
-};
+use aptos_block_partitioner::{PartitionerConfig, pre_partition::{
+    connected_component::config::ConnectedComponentPartitionerConfig,
+    default_pre_partitioner_config, uniform_partitioner::config::UniformPartitionerConfig,
+    PrePartitionerConfig,
+}, v2::config::PartitionerV2Config, V3RandomPartitionerConfig};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
@@ -152,17 +149,18 @@ impl PipelineOpt {
         }
     }
 
-    fn partitioner_config(&self) -> PartitionerV2Config {
+    fn partitioner_config(&self) -> Box<dyn PartitionerConfig> {
         match self.partitioner_version.as_deref() {
-            Some("v2") => PartitionerV2Config {
+            Some("v2") => Box::new(PartitionerV2Config {
                 num_threads: self.partitioner_v2_num_threads,
                 max_partitioning_rounds: self.max_partitioning_rounds,
                 cross_shard_dep_avoid_threshold: self.partitioner_cross_shard_dep_avoid_threshold,
                 dashmap_num_shards: self.partitioner_v2_dashmap_num_shards,
                 partition_last_round: !self.use_global_executor,
                 pre_partitioner_config: self.pre_partitioner_config(),
-            },
-            None => PartitionerV2Config::default(),
+            }),
+            Some("v3-random") => Box::new(V3RandomPartitionerConfig {}),
+            None => Box::new(PartitionerV2Config::default()),
             _ => panic!(
                 "Unknown partitioner version: {:?}",
                 self.partitioner_version

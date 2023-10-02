@@ -24,6 +24,7 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+use aptos_block_partitioner::PartitionerConfig;
 
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
@@ -38,7 +39,8 @@ pub struct PipelineConfig {
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
-    pub partitioner_config: PartitionerV2Config,
+    #[derivative(Default(value = "Box::new(PartitionerV2Config::default())"))]
+    pub partitioner_config: Box<dyn PartitionerConfig>,
 }
 
 pub struct Pipeline<V> {
@@ -108,7 +110,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, &config.partitioner_config);
+            BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config.as_ref());
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 

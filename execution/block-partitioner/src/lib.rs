@@ -23,6 +23,15 @@ pub trait PartitionerConfig: Debug {
     fn build(&self) -> Box<dyn BlockPartitioner>;
 }
 
+#[derive(Debug)]
+pub struct V3RandomPartitionerConfig {}
+impl PartitionerConfig for V3RandomPartitionerConfig {
+    fn build(&self) -> Box<dyn BlockPartitioner> {
+        todo!()
+    }
+}
+
+
 #[cfg(test)]
 mod tests;
 
