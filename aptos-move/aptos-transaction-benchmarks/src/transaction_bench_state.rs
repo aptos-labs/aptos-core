@@ -32,6 +32,7 @@ use aptos_vm::{
 };
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 
 pub struct TransactionBenchState<S> {
     num_transactions: usize,
@@ -205,12 +206,15 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
+        let preprocessed_txns = BlockAptosVM::verify_transactions(transactions);
+        let txn_provider = Arc::new(DefaultTxnProvider::new(preprocessed_txns));
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            txn_provider,
             self.state_view.as_ref(),
             1,
             maybe_block_gas_limit,
@@ -254,12 +258,15 @@ where
     ) -> (Vec<TransactionOutput>, usize) {
         let block_size = transactions.len();
         let timer = Instant::now();
+        let preprocessed_txns = BlockAptosVM::verify_transactions(transactions);
+        let txn_provider = Arc::new(DefaultTxnProvider::new(preprocessed_txns));
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _
         >(
             Arc::clone(&RAYON_EXEC_POOL),
-            transactions,
+            txn_provider,
             self.state_view.as_ref(),
             concurrency_level_per_shard,
             maybe_block_gas_limit,
