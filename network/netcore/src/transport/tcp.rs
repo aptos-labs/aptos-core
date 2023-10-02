@@ -4,6 +4,7 @@
 
 //! TCP Transport
 use crate::transport::Transport;
+use aptos_logger::prelude::*;
 use aptos_proxy::Proxy;
 use aptos_types::{
     network_address::{parse_dns_tcp, parse_ip_tcp, parse_tcp, IpFilter, NetworkAddress},
@@ -102,11 +103,14 @@ impl Transport for TcpTransport {
         &self,
         addr: NetworkAddress,
     ) -> Result<(Self::Listener, NetworkAddress), Self::Error> {
+        info!("Listening on: {}", addr);
         let ((ipaddr, port), addr_suffix) =
             parse_ip_tcp(addr.as_slice()).ok_or_else(|| invalid_addr_error(&addr))?;
         if !addr_suffix.is_empty() {
             return Err(invalid_addr_error(&addr));
         }
+
+        info!("Is listening address IPv6? {:?}", ipaddr.is_ipv6());
 
         let addr = SocketAddr::new(ipaddr, port);
 
@@ -115,6 +119,8 @@ impl Transport for TcpTransport {
         } else {
             tokio::net::TcpSocket::new_v6()?
         };
+
+        info!("Calling bind on: {}", addr);
 
         if let Some(rx_buf) = self.tcp_buff_cfg.inbound_rx_buffer_bytes {
             socket.set_recv_buffer_size(rx_buf)?;
@@ -137,7 +143,9 @@ impl Transport for TcpTransport {
         ))
     }
 
-    fn dial(&self, _peer_id: PeerId, addr: NetworkAddress) -> Result<Self::Outbound, Self::Error> {
+    fn dial(&self, peer_id: PeerId, addr: NetworkAddress) -> Result<Self::Outbound, Self::Error> {
+        info!("Dialing peer {:?} at address: {:?}", peer_id, addr);
+
         let protos = addr.as_slice();
 
         // ensure addr is well formed to save some work before potentially
@@ -225,6 +233,8 @@ pub async fn resolve_and_connect(
     addr: NetworkAddress,
     tcp_buff_cfg: TCPBufferCfg,
 ) -> io::Result<TcpStream> {
+    info!("Resolve and connect: {:?}", addr);
+
     let protos = addr.as_slice();
 
     if let Some(((ipaddr, port), _addr_suffix)) = parse_ip_tcp(protos) {
@@ -232,12 +242,30 @@ pub async fn resolve_and_connect(
         // extra resolving or filtering.
         connect_with_config(port, ipaddr, tcp_buff_cfg).await
     } else if let Some(((ip_filter, dns_name, port), _addr_suffix)) = parse_dns_tcp(protos) {
+        // Resolve the DNS name without filters and print
+        for addr in resolve_with_filter(IpFilter::Any, dns_name.as_ref(), port).await? {
+            info!(
+                "Resolved DNS name without filtering ({:?}) to: {:?}",
+                dns_name, addr
+            );
+        }
+
+        // Resolve the DNS name and filter and print
+        for addr in resolve_with_filter(ip_filter, dns_name.as_ref(), port).await? {
+            info!("Resolved DNS name ({:?}) to: {:?}", dns_name, addr);
+        }
+
         // resolve dns name and filter
         let socketaddr_iter = resolve_with_filter(ip_filter, dns_name.as_ref(), port).await?;
         let mut last_err = None;
 
         // try to connect until the first succeeds
         for socketaddr in socketaddr_iter {
+            info!(
+                "Attempting to connect to DNS resolved socket address: {:?}",
+                socketaddr
+            );
+
             match connect_with_config(socketaddr.port(), socketaddr.ip(), tcp_buff_cfg).await {
                 Ok(stream) => return Ok(stream),
                 Err(err) => last_err = Some(err),
