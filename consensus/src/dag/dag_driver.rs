@@ -16,6 +16,7 @@ use crate::{
         dag_store::Dag,
         observability::{
             counters,
+            logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
         types::{CertificateAckState, CertifiedNode, Node, SignatureBuilder},
@@ -85,11 +86,6 @@ impl DagDriver {
             .get_strong_links_for_round(highest_round, &epoch_state.verifier)
             .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round);
 
-        debug!(
-            "highest_round: {}, current_round: {}",
-            highest_round, highest_strong_links_round
-        );
-
         let mut driver = Self {
             author,
             epoch_state,
@@ -110,6 +106,10 @@ impl DagDriver {
         if let Some(node) =
             pending_node.filter(|node| node.round() == highest_strong_links_round + 1)
         {
+            debug!(
+                LogSchema::new(LogEvent::NewRound).round(node.round()),
+                "Resume round"
+            );
             driver.current_round = node.round();
             driver.broadcast_node(node);
         } else {
@@ -147,7 +147,7 @@ impl DagDriver {
     }
 
     pub async fn enter_new_round(&mut self, new_round: Round) {
-        debug!("entering new round {}", new_round);
+        debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
         counters::CURRENT_ROUND.set(new_round as i64);
         let strong_links = self
             .dag
@@ -236,10 +236,17 @@ impl DagDriver {
         let node_clone = node.clone();
         let timestamp = node.timestamp();
         let node_broadcast = async move {
+            debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
+
             defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
             rb.broadcast(node, signature_builder).await
         };
         let core_task = node_broadcast.then(move |certificate| {
+            debug!(
+                LogSchema::new(LogEvent::BroadcastCertifiedNode),
+                id = node_clone.id()
+            );
+
             defer!( observe_round(timestamp, RoundStage::CertifiedNodeBroadcasted); );
             let certified_node =
                 CertifiedNode::new(node_clone, certificate.signatures().to_owned());
@@ -271,6 +278,9 @@ impl RpcHandler for DagDriver {
 
     async fn process(&mut self, certified_node: Self::Request) -> anyhow::Result<Self::Response> {
         let epoch = certified_node.metadata().epoch();
+        debug!(LogSchema::new(LogEvent::ReceiveCertifiedNode)
+            .remote_peer(*certified_node.author())
+            .round(certified_node.round()));
         {
             let dag_reader = self.dag.read();
             if dag_reader.exists(certified_node.metadata()) {

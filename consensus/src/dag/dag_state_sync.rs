@@ -226,7 +226,6 @@ impl DagStateSynchronizer {
             },
         }
 
-        // State sync
         self.state_computer.sync_to(commit_li.clone()).await?;
 
         Ok(Arc::into_inner(sync_dag_store).map(|r| r.into_inner()))
