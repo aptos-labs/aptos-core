@@ -1734,7 +1734,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         /* remove vfns: .with_initial_fullnode_count(12) */
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 500_000,
+            mempool_backlog: 150_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // consensus and quorum store configs copied from the consensus-only suite
