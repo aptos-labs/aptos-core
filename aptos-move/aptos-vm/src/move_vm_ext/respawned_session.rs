@@ -6,13 +6,11 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    resolver::{AggregatorReadMode, TAggregatorView},
-};
+use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
+    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },

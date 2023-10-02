@@ -4,10 +4,12 @@
 use crate::{
     captured_reads::CapturedReads,
     errors::Error,
-    task::{ExecutionStatus, Transaction, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
 };
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{fee_statement::FeeStatement, write_set::WriteOp};
+use aptos_types::{
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction, write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -40,7 +42,11 @@ impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
     }
 }
 
-pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
+pub struct TxnLastInputOutput<
+    T: BlockExecutableTransaction,
+    O: TransactionOutput<Txn = T>,
+    E: Debug,
+> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
@@ -54,7 +60,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     module_read_write_intersection: AtomicBool,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
+impl<T: BlockExecutableTransaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     TxnLastInputOutput<T, O, E>
 {
     pub fn new(num_txns: TxnIndex) -> Self {

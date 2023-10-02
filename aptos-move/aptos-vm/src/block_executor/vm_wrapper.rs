@@ -2,15 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    adapter_common::{PreprocessedTransaction, VMAdapter},
-    aptos_vm::AptosVM,
-    block_executor::AptosTransactionOutput,
-};
+use crate::{adapter_common::VMAdapter, aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
+use aptos_types::transaction::SignatureVerifiedTransaction;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::ExecutorView;
 use move_core_types::vm_status::VMStatus;
@@ -24,7 +21,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
-    type Txn = PreprocessedTransaction;
+    type Txn = SignatureVerifiedTransaction;
 
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
@@ -42,7 +39,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     fn execute_transaction(
         &self,
         executor_view: &impl ExecutorView,
-        txn: &PreprocessedTransaction,
+        txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {

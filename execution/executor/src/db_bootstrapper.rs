@@ -23,7 +23,7 @@ use aptos_types::{
     on_chain_config::ConfigurationResource,
     state_store::state_key::StateKey,
     timestamp::TimestampResource,
-    transaction::{Transaction, Version},
+    transaction::{into_signature_verified, Transaction, Version},
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;
@@ -137,7 +137,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     };
 
     let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
-        vec![genesis_txn.clone()].into(),
+        vec![into_signature_verified(genesis_txn.clone())].into(),
         base_state_view,
         None,
     )?

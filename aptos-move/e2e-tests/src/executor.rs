@@ -41,8 +41,9 @@ use aptos_types::{
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
-        TransactionStatus, VMValidatorResult,
+        into_signature_verified_block, ExecutionStatus, SignatureVerifiedTransaction,
+        SignedTransaction, Transaction, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -73,6 +74,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
+
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
@@ -446,7 +448,7 @@ impl FakeExecutor {
 
     pub fn execute_transaction_block_parallel(
         &self,
-        txn_block: Vec<Transaction>,
+        txn_block: &[SignatureVerifiedTransaction],
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
@@ -475,7 +477,9 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
+        let sig_verified_block = into_signature_verified_block(txn_block);
+
+        let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
 
         let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
             no_parallel
@@ -484,7 +488,7 @@ impl FakeExecutor {
         };
 
         if !no_parallel {
-            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            let parallel_output = self.execute_transaction_block_parallel(&sig_verified_block);
             assert_eq!(output, parallel_output);
         }
 
@@ -651,7 +655,7 @@ impl FakeExecutor {
             failed_proposer_indices,
             self.block_time,
         );
-        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
+        txn_block.insert(0, Transaction::BlockMetadataTransaction(new_block_metadata));
 
         let outputs = self
             .execute_transaction_block(txn_block)

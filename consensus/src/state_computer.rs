@@ -22,15 +22,30 @@ use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResul
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
-    account_address::AccountAddress, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::Transaction,
+    account_address::AccountAddress,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
+    transaction::{into_signature_verified, SignatureVerifiedTransaction, Transaction},
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
+use once_cell::sync::Lazy;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
+
+pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 type NotificationType = (
     Box<dyn FnOnce() + Send + Sync>,
@@ -144,10 +159,17 @@ impl StateComputer for ExecutionProxy {
             maybe_block_gas_limit,
         );
 
+        let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
+            transactions_to_execute
+                .into_par_iter()
+                .map(|txn| into_signature_verified(txn))
+                .collect::<Vec<_>>()
+        });
+
         let fut = self
             .execution_pipeline
             .queue(
-                (block_id, transactions_to_execute).into(),
+                (block_id, sig_verified_txns).into(),
                 parent_block_id,
                 maybe_block_gas_limit,
             )

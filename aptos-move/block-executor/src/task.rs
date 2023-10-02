@@ -5,15 +5,11 @@
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    contract_event::ReadWriteEvent,
-    executable::ModulePath,
-    fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp},
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction, write_set::WriteOp,
 };
 use aptos_vm_types::resolver::TExecutorView;
 use move_core_types::value::MoveTypeLayout;
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -28,30 +24,6 @@ pub enum ExecutionStatus<O, E> {
     SkipRest(O),
 }
 
-/// Trait that defines a transaction type that can be executed by the block executor. A transaction
-/// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
-    /// specifying a tag, and output requires merging all resources together (Note: this may change
-    /// in the future if write-set format changes to be per-resource, could be more performant).
-    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
-    type Tag: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + DeserializeOwned
-        + Serialize;
-    /// AggregatorV2 identifier type.
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
-    type Value: Send + Sync + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
-}
-
 /// Inference result of a transaction.
 pub struct Accesses<K> {
     pub keys_read: Vec<K>,
@@ -62,7 +34,7 @@ pub struct Accesses<K> {
 // TODO: Sync should not be required. Sync is only introduced because this trait occurs as a phantom type of executor struct.
 pub trait ExecutorTask: Sync {
     /// Type of transaction and its associated key and value.
-    type Txn: Transaction;
+    type Txn: BlockExecutableTransaction;
 
     /// The output of a transaction. This should contain the side effect of this transaction.
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
@@ -81,9 +53,9 @@ pub trait ExecutorTask: Sync {
     fn execute_transaction(
         &self,
         view: &impl TExecutorView<
-            <Self::Txn as Transaction>::Key,
+            <Self::Txn as BlockExecutableTransaction>::Key,
             MoveTypeLayout,
-            <Self::Txn as Transaction>::Identifier,
+            <Self::Txn as BlockExecutableTransaction>::Identifier,
         >,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
@@ -94,27 +66,38 @@ pub trait ExecutorTask: Sync {
 /// Trait for execution result of a single transaction.
 pub trait TransactionOutput: Send + Sync + Debug {
     /// Type of transaction and its associated key and value.
-    type Txn: Transaction;
+    type Txn: BlockExecutableTransaction;
 
     /// Get the writes of a transaction from its output, separately for resources, modules and
     /// aggregator_v1.
     fn resource_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> HashMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        <Self::Txn as BlockExecutableTransaction>::Value,
+    >;
 
     fn module_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> HashMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        <Self::Txn as BlockExecutableTransaction>::Value,
+    >;
 
     fn aggregator_v1_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> HashMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        <Self::Txn as BlockExecutableTransaction>::Value,
+    >;
 
     /// Get the aggregator deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+    fn aggregator_v1_delta_set(
+        &self,
+    ) -> HashMap<<Self::Txn as BlockExecutableTransaction>::Key, DeltaOp>;
 
     /// Get the events of a transaction from its output.
-    fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;
+    fn get_events(&self) -> Vec<<Self::Txn as BlockExecutableTransaction>::Event>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
@@ -124,7 +107,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// materialized and incorporated during execution).
     fn incorporate_delta_writes(
         &self,
-        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        delta_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
     );
 
     /// Return the fee statement of the transaction.

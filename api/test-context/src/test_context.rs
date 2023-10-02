@@ -593,15 +593,16 @@ impl TestContext {
     pub async fn commit_block(&mut self, signed_txns: &[SignedTransaction]) {
         let metadata = self.new_block_metadata();
         let timestamp = metadata.timestamp_usecs();
-        let txns: Vec<Transaction> = std::iter::once(Transaction::BlockMetadata(metadata.clone()))
-            .chain(
-                signed_txns
-                    .iter()
-                    .cloned()
-                    .map(Transaction::UserTransaction),
-            )
-            .chain(once(Transaction::StateCheckpoint(metadata.id())))
-            .collect();
+        let txns: Vec<Transaction> =
+            std::iter::once(Transaction::BlockMetadataTransaction(metadata.clone()))
+                .chain(
+                    signed_txns
+                        .iter()
+                        .cloned()
+                        .map(Transaction::UserTransaction),
+                )
+                .chain(once(Transaction::StateCheckpoint(metadata.id())))
+                .collect();
 
         // Check that txn execution was successful.
         let parent_id = self.executor.committed_block_id();

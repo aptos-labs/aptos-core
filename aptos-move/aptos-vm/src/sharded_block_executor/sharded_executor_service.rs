@@ -18,7 +18,9 @@ use aptos_types::{
     block_executor::partitioner::{
         ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
     },
-    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, SignatureVerifiedTransaction, TransactionOutput,
+    },
 };
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
@@ -114,6 +116,13 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             TOTAL_SUPPLY_AGGR_BASE_VAL,
         ));
 
+        // TODO(skedia) : Implement signature verification into sharding.
+        let signature_verified_transactions: Vec<SignatureVerifiedTransaction> = transactions
+            .into_iter()
+            .map(|txn| SignatureVerifiedTransaction::Valid(txn.into_txn().into_txn()))
+            .collect();
+        let executor_thread_pool_clone = executor_thread_pool.clone();
+
         executor_thread_pool.clone().scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
@@ -125,10 +134,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
                     executor_thread_pool,
-                    transactions
-                        .into_iter()
-                        .map(|txn| txn.into_txn().into_txn())
-                        .collect(),
+                    &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
@@ -152,8 +158,13 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
                 }
                 callback.send(ret).unwrap();
+                executor_thread_pool_clone.spawn(move || {
+                    // Explicit async drop
+                    drop(signature_verified_transactions);
+                });
             });
         });
+
         block_on(callback_receiver).unwrap()
     }
 

@@ -32,8 +32,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus, Version,
+        into_signature_verified, SignatureVerifiedTransaction, Transaction, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -207,12 +208,19 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             num_txns,
         )?;
 
+        // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
+        // as only transactions with verified signatures are committed to the storage.
+        let sig_verified_txns = transactions
+            .into_iter()
+            .map(into_signature_verified)
+            .collect::<Vec<_>>();
+
         // Execute transactions.
         let state_view = self.state_view(&latest_view)?;
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
             // State sync executor shouldn't have block gas limit.
-            ChunkOutput::by_transaction_execution::<V>(transactions.into(), state_view, None)?
+            ChunkOutput::by_transaction_execution::<V>(sig_verified_txns.into(), state_view, None)?
         };
         let executed_chunk = Self::apply_chunk_output_for_state_sync(
             verified_target_li,
@@ -540,7 +548,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .iter()
             .take((end_version - begin_version) as usize)
             .cloned()
-            .collect::<Vec<Transaction>>();
+            .map(into_signature_verified)
+            .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
         let chunk_output =

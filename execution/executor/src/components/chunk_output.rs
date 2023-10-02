@@ -21,7 +21,10 @@ use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        ExecutionStatus, SignatureVerifiedTransaction, Transaction, TransactionOutput,
+        TransactionStatus,
+    },
 };
 use aptos_vm::{
     sharded_block_executor::{
@@ -107,26 +110,18 @@ impl ChunkOutput {
     }
 
     fn by_transaction_execution_unsharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let _timer = BY_TXN_EXEC_SECONDS.start_timer();
-        let txn_clone_time = TXN_CLONE_SECONDS.start_timer();
-        let txn_clone = transactions.clone();
-        drop(txn_clone_time);
         let transaction_outputs =
-            Self::execute_block::<V>(txn_clone, &state_view, maybe_block_gas_limit)?;
+            Self::execute_block::<V>(&transactions, &state_view, maybe_block_gas_limit)?;
 
-        // to print txn output for debugging, uncomment:
-        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
-
-        let process_counters_time = PROCESS_COUNTERS_SECONDS.start_timer();
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
-        drop(process_counters_time);
+        // update_counters_for_processed_chunk(transactions, &transaction_outputs, "executed");
 
         Ok(Self {
-            transactions,
+            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
@@ -239,7 +234,7 @@ impl ChunkOutput {
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
@@ -256,7 +251,7 @@ impl ChunkOutput {
     /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
     #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
@@ -358,7 +353,7 @@ pub fn update_counters_for_processed_chunk(
         let kind = match txn {
             Transaction::UserTransaction(_) => "user_transaction",
             Transaction::GenesisTransaction(_) => "genesis",
-            Transaction::BlockMetadata(_) => "block_metadata",
+            Transaction::BlockMetadataTransaction(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
         };
 

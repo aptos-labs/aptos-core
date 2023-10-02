@@ -878,7 +878,9 @@ impl Transaction {
                 (TransactionType::User, Some(user_txn), txn.info, txn.events)
             },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
-            BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
+            BlockMetadataTransaction(_) => {
+                (TransactionType::BlockMetadata, None, txn.info, txn.events)
+            },
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
         };
 

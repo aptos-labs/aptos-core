@@ -78,7 +78,7 @@ impl TransactionBlockExecutor for MockVM {
 
 impl VMExecutor for MockVM {
     fn execute_block(
-        transactions: Vec<Transaction>,
+        _transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

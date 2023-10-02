@@ -24,8 +24,8 @@ use aptos_types::{
     event::EventKey,
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        Transaction, Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
-        WriteSetPayload,
+        into_signature_verified_block, Transaction, Transaction::UserTransaction,
+        TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -80,7 +80,7 @@ pub fn test_execution_with_storage_impl_inner(
     let txn_factory = TransactionFactory::new(ChainId::test());
 
     let block1_id = gen_block_id(1);
-    let block1_meta = Transaction::BlockMetadata(BlockMetadata::new(
+    let block1_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
         block1_id,
         1,
         0,
@@ -139,7 +139,7 @@ pub fn test_execution_with_storage_impl_inner(
     ];
 
     let block2_id = gen_block_id(2);
-    let block2_meta = Transaction::BlockMetadata(BlockMetadata::new(
+    let block2_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
         block2_id,
         2,
         0,
@@ -153,7 +153,7 @@ pub fn test_execution_with_storage_impl_inner(
     let block2 = vec![block2_meta, UserTransaction(reconfig2)];
 
     let block3_id = gen_block_id(3);
-    let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
+    let block3_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
         block3_id,
         2,
         1,
@@ -173,7 +173,7 @@ pub fn test_execution_with_storage_impl_inner(
 
     let output1 = executor
         .execute_block(
-            (block1_id, block1.clone()).into(),
+            (block1_id, into_signature_verified_block(block1.clone())).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -376,7 +376,7 @@ pub fn test_execution_with_storage_impl_inner(
     // Execute block 2, 3, 4
     let output2 = executor
         .execute_block(
-            (block2_id, block2).into(),
+            (block2_id, into_signature_verified_block(block2)).into(),
             epoch2_genesis_id,
             BLOCK_GAS_LIMIT,
         )
@@ -395,7 +395,7 @@ pub fn test_execution_with_storage_impl_inner(
 
     let output3 = executor
         .execute_block(
-            (block3_id, block3.clone()).into(),
+            (block3_id, into_signature_verified_block(block3.clone())).into(),
             epoch3_genesis_id,
             BLOCK_GAS_LIMIT,
         )

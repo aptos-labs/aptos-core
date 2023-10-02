@@ -17,7 +17,10 @@ use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
-    transaction::{Transaction, TransactionOutput, TransactionToCommit, Version},
+    transaction::{
+        into_signature_verified_block, SignatureVerifiedTransaction, Transaction,
+        TransactionOutput, TransactionToCommit, Version,
+    },
     vm_status::VMStatus,
 };
 use aptos_vm::{
@@ -43,8 +46,12 @@ pub fn fuzz_execute_and_commit_blocks(
     let mut block_ids = vec![];
     for block in blocks {
         let block_id = block.0;
-        let _execution_results =
-            executor.execute_block(block.into(), parent_block_id, BLOCK_GAS_LIMIT);
+        let sig_verified_block = into_signature_verified_block(block.1);
+        let _execution_results = executor.execute_block(
+            (block_id, sig_verified_block).into(),
+            parent_block_id,
+            BLOCK_GAS_LIMIT,
+        );
         parent_block_id = block_id;
         block_ids.push(block_id);
     }
@@ -79,7 +86,7 @@ impl VMExecutor for FakeVM {
     }
 
     fn execute_block(
-        _transactions: Vec<Transaction>,
+        _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

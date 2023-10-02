@@ -46,16 +46,24 @@ mod multisig;
 mod script;
 mod transaction_argument;
 
-use crate::fee_statement::FeeStatement;
+use crate::{
+    aggregator::AggregatorID,
+    contract_event::ReadWriteEvent,
+    executable::ModulePath,
+    fee_statement::FeeStatement,
+    state_store::state_key::StateKey,
+    write_set::{TransactionWrite, WriteOp},
+};
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
-use move_core_types::vm_status::AbortLocation;
+use move_core_types::{language_storage::StructTag, vm_status::AbortLocation};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
+use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -574,7 +582,43 @@ impl Deref for SignatureCheckedTransaction {
     }
 }
 
-impl fmt::Debug for SignedTransaction {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SignatureVerifiedTransaction {
+    Valid(Transaction),
+    Invalid(Transaction),
+}
+impl SignatureVerifiedTransaction {
+    pub fn into_inner(self) -> Transaction {
+        match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn,
+            SignatureVerifiedTransaction::Invalid(txn) => txn,
+        }
+    }
+}
+
+impl BlockExecutableTransaction for SignatureVerifiedTransaction {
+    type Event = ContractEvent;
+    type Identifier = AggregatorID;
+    type Key = StateKey;
+    type Tag = StructTag;
+    type Value = WriteOp;
+}
+
+pub fn into_signature_verified_block(txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
+    txns.into_iter().map(into_signature_verified).collect()
+}
+
+pub fn into_signature_verified(txn: Transaction) -> SignatureVerifiedTransaction {
+    match txn {
+        Transaction::UserTransaction(txn) => match txn.verify_signature() {
+            Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
+            Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+        },
+        _ => SignatureVerifiedTransaction::Valid(txn),
+    }
+}
+
+impl Debug for SignedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -734,6 +778,11 @@ impl SignedTransaction {
     pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
         // self.authenticator.verify(&self.raw_txn)?;
         Ok(SignatureCheckedTransaction(self))
+    }
+
+    pub fn verify_signature(&self) -> Result<()> {
+        self.authenticator.verify(&self.raw_txn)?;
+        Ok(())
     }
 
     /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
@@ -1746,7 +1795,7 @@ pub enum Transaction {
     GenesisTransaction(WriteSetPayload),
 
     /// Transaction to update the block metadata resource at the beginning of a block.
-    BlockMetadata(BlockMetadata),
+    BlockMetadataTransaction(BlockMetadata),
 
     /// Transaction to let the executor update the global state tree and record the root hash
     /// in the TransactionInfo
@@ -1764,7 +1813,7 @@ impl Transaction {
 
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
-            Transaction::BlockMetadata(v1) => Some(v1),
+            Transaction::BlockMetadataTransaction(v1) => Some(v1),
             _ => None,
         }
     }
@@ -1777,7 +1826,9 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
-            Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
+            Transaction::BlockMetadataTransaction(_block_metadata) => {
+                String::from("block_metadata")
+            },
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
         }
@@ -1793,4 +1844,28 @@ impl TryFrom<Transaction> for SignedTransaction {
             _ => Err(format_err!("Not a user transaction.")),
         }
     }
+}
+
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
+/// transaction will write to a key value storage as their side effect.
+pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
+    /// specifying a tag, and output requires merging all resources together (Note: this may change
+    /// in the future if write-set format changes to be per-resource, could be more performant).
+    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
+    type Tag: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + DeserializeOwned
+        + Serialize;
+    /// AggregatorV2 identifier type.
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
+    type Value: Send + Sync + Clone + TransactionWrite;
+    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

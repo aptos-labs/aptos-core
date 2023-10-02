@@ -5,10 +5,9 @@
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_types::{
-    block_metadata::BlockMetadata,
     transaction::{
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionStatus,
-        WriteSetPayload,
+        SignatureCheckedTransaction, SignatureVerifiedTransaction, SignedTransaction,
+        TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
 };
@@ -39,7 +38,7 @@ pub trait VMAdapter {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        transaction: &SignatureCheckedTransaction,
+        transaction: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus>;
 
@@ -49,7 +48,7 @@ pub trait VMAdapter {
     /// Execute a single transaction.
     fn execute_single_transaction(
         &self,
-        txn: &PreprocessedTransaction,
+        txn: &SignatureVerifiedTransaction,
         data_cache: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
@@ -58,7 +57,7 @@ pub trait VMAdapter {
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
-        transaction: &SignatureCheckedTransaction,
+        transaction: &SignedTransaction,
         allow_too_new: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -73,39 +72,6 @@ pub trait VMAdapter {
             },
             _ => Ok(()),
         }
-    }
-}
-
-/// Transactions after signature checking:
-/// Waypoints and BlockPrologues are not signed and are unaffected by signature checking,
-/// but a user transaction or writeset transaction is transformed to a SignatureCheckedTransaction.
-#[derive(Clone, Debug)]
-pub enum PreprocessedTransaction {
-    UserTransaction(Box<SignatureCheckedTransaction>),
-    WaypointWriteSet(WriteSetPayload),
-    BlockMetadata(BlockMetadata),
-    InvalidSignature,
-    StateCheckpoint,
-}
-
-/// Check the signature (if any) of a transaction. If the signature is OK, the result
-/// is a PreprocessedTransaction, where a user transaction is translated to a
-/// SignatureCheckedTransaction and also categorized into either a UserTransaction
-/// or a WriteSet transaction.
-pub fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> PreprocessedTransaction {
-    match txn {
-        Transaction::BlockMetadata(b) => PreprocessedTransaction::BlockMetadata(b),
-        Transaction::GenesisTransaction(ws) => PreprocessedTransaction::WaypointWriteSet(ws),
-        Transaction::UserTransaction(txn) => {
-            let checked_txn = match A::check_signature(txn) {
-                Ok(checked_txn) => checked_txn,
-                _ => {
-                    return PreprocessedTransaction::InvalidSignature;
-                },
-            };
-            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
-        },
-        Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }
 }
 

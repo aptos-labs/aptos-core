@@ -211,7 +211,11 @@ impl AnalyzedTransaction {
 
     pub fn analyzed_transaction_for_block_metadata(block_meta: BlockMetadata) -> Self {
         // TODO(ptx): Add read hints for block metadata
-        AnalyzedTransaction::new(Transaction::BlockMetadata(block_meta), vec![], vec![])
+        AnalyzedTransaction::new(
+            Transaction::BlockMetadataTransaction(block_meta),
+            vec![],
+            vec![],
+        )
     }
 
     pub fn analyzed_transaction_for_state_checkpoint(hash_value: HashValue) -> Self {
@@ -296,7 +300,7 @@ impl From<Transaction> for AnalyzedTransaction {
                 },
                 _ => todo!("Only entry function transactions are supported for now"),
             },
-            Transaction::BlockMetadata(block_meta) => {
+            Transaction::BlockMetadataTransaction(block_meta) => {
                 Self::analyzed_transaction_for_block_metadata(block_meta)
             },
             Transaction::StateCheckpoint(hash_value) => {

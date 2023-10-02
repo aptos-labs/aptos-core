@@ -382,7 +382,7 @@ impl Block {
         if block_gas_limit.is_some() {
             // After the per-block gas limit change, StateCheckpoint txn
             // is inserted after block execution
-            once(Transaction::BlockMetadata(
+            once(Transaction::BlockMetadataTransaction(
                 self.new_block_metadata(validators),
             ))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
@@ -390,7 +390,7 @@ impl Block {
         } else {
             // Before the per-block gas limit change, StateCheckpoint txn
             // is inserted here for compatibility.
-            once(Transaction::BlockMetadata(
+            once(Transaction::BlockMetadataTransaction(
                 self.new_block_metadata(validators),
             ))
             .chain(txns.into_iter().map(Transaction::UserTransaction))

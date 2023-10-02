@@ -31,7 +31,7 @@ use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
-    transaction::{Transaction, TransactionOutput},
+    transaction::{SignatureVerifiedTransaction, TransactionOutput},
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -44,7 +44,7 @@ pub struct PtxBlockExecutor;
 
 impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

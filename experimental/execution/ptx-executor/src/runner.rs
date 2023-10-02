@@ -20,11 +20,7 @@ use aptos_types::{
     transaction::Transaction,
     write_set::TransactionWrite,
 };
-use aptos_vm::{
-    adapter_common::{preprocess_transaction, VMAdapter},
-    storage_adapter::AsExecutorView,
-    AptosVM,
-};
+use aptos_vm::{adapter_common::VMAdapter, storage_adapter::AsExecutorView, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};

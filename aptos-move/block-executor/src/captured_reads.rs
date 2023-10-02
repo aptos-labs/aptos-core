@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::Transaction;
 use anyhow::bail;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     versioned_data::VersionedData,
     versioned_group_data::VersionedGroupData,
 };
-use aptos_types::{state_store::state_value::StateValueMetadataKind, write_set::TransactionWrite};
+use aptos_types::{
+    state_store::state_value::StateValueMetadataKind, transaction::BlockExecutableTransaction,
+    write_set::TransactionWrite,
+};
 use derivative::Derivative;
 use std::{
     collections::{
@@ -135,7 +137,7 @@ impl<V: TransactionWrite> DataRead<V> {
 /// the group size (also computed based on speculative information in MVHashMap).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-struct GroupRead<T: Transaction> {
+struct GroupRead<T: BlockExecutableTransaction> {
     /// The size of the resource group can be read (used for gas charging).
     speculative_size: Option<u64>,
     /// Reads to individual resources in the group, keyed by a tag.
@@ -151,7 +153,7 @@ struct GroupRead<T: Transaction> {
 /// read that has a kind <= already captured read (for that key / tag).
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct CapturedReads<T: Transaction> {
+pub(crate) struct CapturedReads<T: BlockExecutableTransaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     // Currently, we record paths for triggering module R/W fallback.
@@ -177,7 +179,7 @@ enum UpdateResult {
     Inconsistency(String),
 }
 
-impl<T: Transaction> CapturedReads<T> {
+impl<T: BlockExecutableTransaction> CapturedReads<T> {
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
     // consistency and ensures that the most comprehensive read is recorded.
     fn update_entry<K, V: TransactionWrite>(
@@ -356,13 +358,11 @@ impl<T: Transaction> CapturedReads<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        proptest_types::types::{KeyType, MockEvent, ValueType},
-        task::Transaction,
-    };
+    use crate::proptest_types::types::{KeyType, MockEvent, ValueType};
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
+        transaction::BlockExecutableTransaction,
     };
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
     use test_case::test_case;
@@ -523,7 +523,7 @@ mod test {
     #[derive(Clone, Debug)]
     struct TestTransactionType {}
 
-    impl Transaction for TestTransactionType {
+    impl BlockExecutableTransaction for TestTransactionType {
         type Event = MockEvent;
         type Identifier = ();
         type Key = KeyType<u32>;

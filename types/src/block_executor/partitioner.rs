@@ -2,7 +2,7 @@
 
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
-    Transaction,
+    SignatureVerifiedTransaction, Transaction,
 };
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
@@ -442,8 +442,8 @@ impl ExecutableBlock {
     }
 }
 
-impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
-    fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
+impl From<(HashValue, Vec<SignatureVerifiedTransaction>)> for ExecutableBlock {
+    fn from((block_id, transactions): (HashValue, Vec<SignatureVerifiedTransaction>)) -> Self {
         Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
     }
 }
@@ -533,7 +533,7 @@ impl PartitionedTransactions {
 
 // Represents the transactions in a block that are ready to be executed.
 pub enum ExecutableTransactions {
-    Unsharded(Vec<Transaction>),
+    Unsharded(Vec<SignatureVerifiedTransaction>),
     Sharded(PartitionedTransactions),
 }
 
@@ -546,8 +546,8 @@ impl ExecutableTransactions {
     }
 }
 
-impl From<Vec<Transaction>> for ExecutableTransactions {
-    fn from(txns: Vec<Transaction>) -> Self {
+impl From<Vec<SignatureVerifiedTransaction>> for ExecutableTransactions {
+    fn from(txns: Vec<SignatureVerifiedTransaction>) -> Self {
         Self::Unsharded(txns)
     }
 }

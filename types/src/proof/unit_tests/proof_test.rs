@@ -395,7 +395,7 @@ fn test_transaction_info_list_with_proof() {
 fn test_transaction_list_with_proof() {
     // Create test event and transaction
     let event = create_event();
-    let transactions = vec![Transaction::BlockMetadata(BlockMetadata::new(
+    let transactions = vec![Transaction::BlockMetadataTransaction(BlockMetadata::new(
         HashValue::random(),
         0,
         0,
@@ -470,7 +470,7 @@ fn test_transaction_list_with_proof() {
 #[test]
 fn test_transaction_and_output_list_with_proof() {
     // Create test transaction, event and transaction output
-    let transaction = Transaction::BlockMetadata(BlockMetadata::new(
+    let transaction = Transaction::BlockMetadataTransaction(BlockMetadata::new(
         HashValue::random(),
         0,
         0,
