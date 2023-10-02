@@ -95,17 +95,11 @@ jobs:
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Install AWS CLI
-        shell: bash
-        run: |
-          scripts/dev_setup.sh -b -i awscli
-          echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
-
-      - name: Install s5cmd
-        shell: bash
-        run: |
-          scripts/dev_setup.sh -b -i s5cmd
-          echo "${HOME}/bin/" >> $GITHUB_PATH # default INSTALL_DIR to path
+      - name: Install GCloud SDK
+        uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
 
       - name: Build CLI binaries in release mode
         shell: bash
