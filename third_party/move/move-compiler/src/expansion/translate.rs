@@ -736,7 +736,6 @@ fn check_module_name(context: &mut Context, ident_loc: &Loc, mident: &ModuleIden
             ));
         },
         Some(_module) => {
-            // BUGBUG TODO: need a custom message, use _module, maybe
             check_for_deprecated_module_use(context, mident);
         },
     }
