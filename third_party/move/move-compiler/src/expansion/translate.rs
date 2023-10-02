@@ -587,7 +587,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
     }
 }
 
-// If attributes contains a #![deprecated] attribute, then returns the location of the attribute.
+/// If attributes contains a `#[deprecated]` attribute, then returns the location of the attribute.
 fn deprecated_attribute_location(attributes: &[P::Attributes]) -> Option<Loc> {
     attributes
         .iter()
@@ -853,7 +853,6 @@ fn module_members(
     m: &P::ModuleDefinition,
     mident: &ModuleIdent,
 ) {
-    // let mident = sp(m.name.loc(), ModuleIdent_::new(address, m.name));
     if !always_add && members.contains_key(mident) {
         return;
     }
