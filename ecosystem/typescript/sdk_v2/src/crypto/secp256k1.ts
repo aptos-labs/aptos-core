@@ -74,11 +74,6 @@ export class Secp256k1PublicKey extends PublicKey {
     const bytes = deserializer.deserializeBytes();
     return new Secp256k1PublicKey({ hexInput: bytes });
   }
-
-  // eslint-disable-next-line class-methods-use-this,@typescript-eslint/no-unused-vars
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Not implemented");
-  }
 }
 
 /**
@@ -147,11 +142,6 @@ export class Secp256k1PrivateKey extends PrivateKey {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Secp256k1PrivateKey {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): Secp256k1PrivateKey {
@@ -225,11 +215,6 @@ export class Secp256k1Signature extends Signature {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.data.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Secp256k1Signature {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): Secp256k1Signature {
