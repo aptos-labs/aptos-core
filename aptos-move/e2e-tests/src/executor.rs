@@ -73,6 +73,8 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
+use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
+
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
@@ -448,9 +450,11 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
+        let preprocess_txn = BlockAptosVM::verify_transactions(txn_block);
+        let txn_provider = Arc::new(DefaultTxnProvider::new(preprocess_txn));
+        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>, _>(
             self.executor_thread_pool.clone(),
-            txn_block,
+            txn_provider,
             &self.data_store,
             usize::min(4, num_cpus::get()),
             None,

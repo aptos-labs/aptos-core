@@ -129,7 +129,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     .into_iter()
                     .map(|txn| txn.into_txn().into_txn())
                     .collect();
-                let pre_processed_txns = RAYON_EXEC_POOL.install(||{BlockAptosVM::verify_transactions(txns)});
+                let pre_processed_txns = executor_thread_pool.install(||{BlockAptosVM::verify_transactions(txns)});
 
                 let txn_provider = Arc::new(DefaultTxnProvider::new(pre_processed_txns));
                 let ret = BlockAptosVM::execute_block(

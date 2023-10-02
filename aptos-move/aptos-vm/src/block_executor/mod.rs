@@ -183,7 +183,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    pub(crate) fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
+    pub fn verify_transactions(transactions: Vec<Transaction>) -> Vec<PreprocessedTransaction> {
         transactions
             .into_par_iter()
             .with_min_len(25)
