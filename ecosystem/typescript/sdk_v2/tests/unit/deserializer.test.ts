@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { Account } from "../../src/api/account";
 import { Serializable, Serializer, Deserializer } from "../../src/bcs";
+import { AccountAddress } from "../../src/core";
 
 describe("BCS Deserializer", () => {
   it("deserializes a non-empty string", () => {
@@ -128,6 +130,22 @@ describe("BCS Deserializer", () => {
       deserializer.deserializeStr();
       deserializer.deserializeStr();
     }).toThrow("Reached to the end of buffer");
+  });
+
+  it("deserializes a vector of Deserializable types correctly", () => {
+    const addresses = new Array<AccountAddress>(
+      AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0x0123456789abcdef" }),
+    );
+    const serializer = new Serializer();
+    serializer.serializeVector(addresses);
+    const serializedBytes = serializer.toUint8Array();
+    const deserializer = new Deserializer(serializedBytes);
+    const deserializedAddresses = deserializer.deserializeVector(AccountAddress);
+    addresses.forEach((address, i) => {
+      expect(address.equals(deserializedAddresses[i])).toBeTruthy();
+    });
   });
 
   it("deserializes a single deserializable class", () => {

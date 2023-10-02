@@ -277,10 +277,36 @@ export class Serializer {
    *
    * @returns the serializer instance
    */
-  serialize<T extends Serializable>(value: T) {
+  serialize<T extends Serializable>(value: T): void {
     // NOTE: The `serialize` method called by `value` is defined in `value`'s
     // Serializable interface, not the one defined in this class.
     value.serialize(this);
+  }
+
+  /**
+   * Serializes an array of BCS Serializable values to a serializer instance.
+   * Note that this does not return anything- the bytes are added to the serializer instance's byte buffer.
+   *
+   * @param values The array of BCS Serializable values
+   * @example
+   * const addresses = new Array<AccountAddress>(
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x2" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xb" }),
+   * );
+   * const serializer = new Serializer();
+   * serializer.serializeVector(addresses);
+   * const serializedBytes = serializer.toUint8Array();
+   * // serializedBytes is now the BCS-serialized bytes
+   * // The equivalent value in Move would be:
+   * // `bcs::to_bytes(&vector<address> [@0x1, @0x2, @0xa, @0xb])`;
+   */
+  serializeVector<T extends Serializable>(values: Array<T>): void {
+    this.serializeU32AsUleb128(values.length);
+    values.forEach((item) => {
+      item.serialize(this);
+    });
   }
 }
 

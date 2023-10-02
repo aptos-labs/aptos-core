@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Serializable, Serializer } from "../../src/bcs/serializer";
+import { AccountAddress } from "../../src/core";
 
 describe("BCS Serializer", () => {
   let serializer: Serializer;
@@ -222,6 +223,24 @@ describe("BCS Serializer", () => {
     expect(() => {
       const serializer = new Serializer(-1);
     }).toThrow();
+  });
+
+  it("serializes a vector of Serializable types correctly", () => {
+    const addresses = new Array<AccountAddress>(
+      AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0x0123456789abcdef" }),
+    );
+    const serializer = new Serializer();
+    serializer.serializeVector(addresses);
+    const serializedBytes = serializer.toUint8Array();
+    expect(serializedBytes).toEqual(
+      new Uint8Array([
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0a, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+      ]),
+    );
   });
 
   it("serializes multiple Serializable values", () => {
