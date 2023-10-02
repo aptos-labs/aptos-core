@@ -97,11 +97,6 @@ export class MultiEd25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Method not implemented.");
-  }
-
   static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
     const bytes = deserializer.deserializeBytes();
     const threshold = bytes[bytes.length - 1];
@@ -238,11 +233,6 @@ export class MultiEd25519Signature extends Signature {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Signature {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519Signature {

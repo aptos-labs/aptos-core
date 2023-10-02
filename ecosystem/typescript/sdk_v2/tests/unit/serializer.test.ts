@@ -225,13 +225,15 @@ describe("BCS Serializer", () => {
   });
 
   it("serializes multiple Serializable values", () => {
-    class MoveStructA implements Serializable {
+    class MoveStructA extends Serializable {
       constructor(
         public name: string,
         public description: string,
         public enabled: boolean,
         public vectorU8: Array<number>,
-      ) {}
+      ) {
+        super();
+      }
 
       serialize(serializer: Serializer): void {
         serializer.serializeStr(this.name);
@@ -241,13 +243,15 @@ describe("BCS Serializer", () => {
         this.vectorU8.forEach((n) => serializer.serializeU8(n));
       }
     }
-    class MoveStructB implements Serializable {
+    class MoveStructB extends Serializable {
       constructor(
         public moveStructA: MoveStructA,
         public name: string,
         public description: string,
         public vectorU8: Array<number>,
-      ) {}
+      ) {
+        super();
+      }
 
       serialize(serializer: Serializer): void {
         serializer.serialize(this.moveStructA);
