@@ -128,7 +128,7 @@ export class Secp256k1PrivateKey extends PrivateKey {
   /**
    * Sign the given message with the private key.
    * The `lowS` option is default to `true`
-   * lowS: true prohibits signatures which have (sig.s >= CURVE.n/2n) and is compatible with BTC/ETH.
+   * lowS: true prohibits signatures which have (sig.s >= CURVE.n/2n).
    *
    * @param args.message in HexInput format
    * @returns Signature
@@ -159,6 +159,11 @@ export class Secp256k1PrivateKey extends PrivateKey {
     return new Secp256k1PrivateKey({ hexInput });
   }
 
+  /**
+   * Derive the Secp256k1PublicKey from this private key.
+   * 
+   * @returns Secp256k1PublicKey
+   */
   publicKey(): Secp256k1PublicKey {
     const bytes = secp256k1.getPublicKey(this.key.toUint8Array());
     return new Secp256k1PublicKey({ hexInput: bytes });
