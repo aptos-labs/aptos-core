@@ -1,5 +1,5 @@
 [package]
-name = "aggregator_test"
+name = "aggregator_v2_test"
 version = "0.0.0"
 
 [dependencies]
