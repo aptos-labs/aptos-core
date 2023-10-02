@@ -5,6 +5,7 @@
 mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
+pub mod inliner;
 mod options;
 pub mod pipeline;
 
@@ -44,8 +45,21 @@ pub fn run_move_compiler(
     options: Options,
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     // Run context check.
-    let env = run_checker(options.clone())?;
+    let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
+
+    if options.debug {
+        eprintln!("After error check, GlobalEnv={}", env.dump_env());
+    }
+
+    // Run inlining.
+    inliner::run_inlining(&mut env, options.debug);
+    check_errors(&env, error_writer, "inlining")?;
+
+    if options.debug {
+        eprintln!("After inlining, GlobalEnv={}", env.dump_env());
+    }
+
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
@@ -123,10 +137,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
     }
     while let Some(id) = todo.pop_first() {
         done.insert(id);
+        let func_env = env.get_function(id);
         let data = bytecode_generator::generate_bytecode(env, id);
         targets.insert_target_data(&id, FunctionVariant::Baseline, data);
-        for callee in env
-            .get_function(id)
+        for callee in func_env
             .get_called_functions()
             .expect("called functions available")
         {

@@ -3662,7 +3662,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 result_type: entry.result_type.clone(),
                 access_specifiers,
                 spec: spec.into(),
-                def,
+                def: def.into(),
                 called_funs: None,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),

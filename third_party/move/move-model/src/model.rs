@@ -57,7 +57,10 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
-use move_command_line_common::{address::NumericalAddress, files::FileHash};
+use move_command_line_common::{
+    address::NumericalAddress, env::read_bool_env_var, files::FileHash,
+};
+use move_compiler::command_line as cli;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -66,13 +69,16 @@ use move_core_types::{
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use num::ToPrimitive;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     any::{Any, TypeId},
+    backtrace::{Backtrace, BacktraceStatus},
     cell::{Ref, RefCell, RefMut},
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter, Write},
+    ops::Deref,
     rc::Rc,
 };
 
@@ -757,6 +763,21 @@ impl GlobalEnv {
         target_modules
     }
 
+    fn add_backtrace(msg: &str, is_bug: bool) -> String {
+        static DEBUG_COMPILER: Lazy<bool> =
+            Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
+        if is_bug || *DEBUG_COMPILER {
+            let bt = Backtrace::capture();
+            if BacktraceStatus::Captured == bt.status() {
+                format!("{}\nBacktrace: {:#?}", msg, bt)
+            } else {
+                msg.to_owned()
+            }
+        } else {
+            msg.to_owned()
+        }
+    }
+
     /// Adds documentation for a file.
     pub fn add_documentation(&mut self, file_id: FileId, docs: BTreeMap<ByteIndex, String>) {
         self.doc_comments.insert(file_id, docs);
@@ -779,16 +800,18 @@ impl GlobalEnv {
 
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
+        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
         let diag = Diagnostic::new(severity)
-            .with_message(msg)
+            .with_message(new_msg)
             .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
         self.add_diag(diag);
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
+        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
         let diag = Diagnostic::new(severity)
-            .with_message(msg)
+            .with_message(new_msg)
             .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
         let diag = diag.with_notes(notes);
         self.add_diag(diag);
@@ -802,8 +825,9 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
+        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
         let diag = Diagnostic::new(severity)
-            .with_message(msg)
+            .with_message(new_msg)
             .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
         let labels = labels
             .into_iter()
@@ -1839,6 +1863,32 @@ impl GlobalEnv {
             .clone()
             .unwrap_or(Address::Numerical(AccountAddress::TWO))
     }
+
+    // Removes all functions not matching the predicate from
+    //   module_data fields function_data and function_idx_to_id
+    //   remaining function_data fields called_funs and calling_funs
+    pub fn filter_functions<F>(&mut self, mut predicate: F)
+    where
+        F: FnMut(&QualifiedId<FunId>) -> bool,
+    {
+        for module_data in self.module_data.iter_mut() {
+            let module_id = module_data.id;
+            module_data
+                .function_data
+                .retain(|fun_id, _| !predicate(&module_id.qualified(*fun_id)));
+            module_data
+                .function_idx_to_id
+                .retain(|_, fun_id| !predicate(&module_id.qualified(*fun_id)));
+            module_data.function_data.values_mut().for_each(|fun_data| {
+                if let Some(called_funs) = fun_data.called_funs.as_mut() {
+                    called_funs.retain(|qfun_id| !predicate(qfun_id))
+                }
+                if let Some(calling_funs) = &mut *fun_data.calling_funs.borrow_mut() {
+                    calling_funs.retain(|qfun_id| !predicate(qfun_id))
+                }
+            });
+        }
+    }
 }
 
 impl Default for GlobalEnv {
@@ -1918,68 +1968,7 @@ impl GlobalEnv {
                 }
             }
             for fun in module.get_functions() {
-                emit!(writer, "{}", fun.get_header_string());
-                if let Some(specs) = fun.get_access_specifiers() {
-                    emitln!(writer);
-                    writer.indent();
-                    for spec in specs {
-                        if spec.negated {
-                            emit!(writer, "!")
-                        }
-                        match &spec.kind {
-                            AccessKind::Reads => emit!(writer, "reads "),
-                            AccessKind::Writes => emit!(writer, "writes "),
-                            AccessKind::Acquires => emit!(writer, "acquires "),
-                        }
-                        match &spec.resource.1 {
-                            ResourceSpecifier::Any => emit!(writer, "*"),
-                            ResourceSpecifier::DeclaredAtAddress(addr) => {
-                                emit!(
-                                    writer,
-                                    "0x{}::*",
-                                    addr.expect_numerical().short_str_lossless()
-                                )
-                            },
-                            ResourceSpecifier::DeclaredInModule(mid) => {
-                                emit!(writer, "{}::*", self.get_module(*mid).get_full_name_str())
-                            },
-                            ResourceSpecifier::Resource(sid) => {
-                                emit!(writer, "{}", sid.to_type().display(tctx))
-                            },
-                        }
-                        emit!(writer, "(");
-                        match &spec.address.1 {
-                            AddressSpecifier::Any => emit!(writer, "*"),
-                            AddressSpecifier::Address(addr) => {
-                                emit!(writer, "0x{}", addr.expect_numerical().short_str_lossless())
-                            },
-                            AddressSpecifier::Parameter(sym) => {
-                                emit!(writer, "{}", sym.display(self.symbol_pool()))
-                            },
-                            AddressSpecifier::Call(fun, sym) => emit!(
-                                writer,
-                                "{}({})",
-                                self.get_function(fun.to_qualified_id()).get_full_name_str(),
-                                sym.display(self.symbol_pool())
-                            ),
-                        }
-                        emitln!(writer, ")")
-                    }
-                    writer.unindent()
-                }
-                if let Some(exp) = fun.get_def() {
-                    emitln!(writer, " {");
-                    writer.indent();
-                    emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
-                    writer.unindent();
-                    emitln!(writer, "}");
-                } else {
-                    emitln!(writer, ";");
-                }
-                let spec = fun.get_spec();
-                if !spec.conditions.is_empty() {
-                    emitln!(writer, "{}", self.display(&*spec))
-                }
+                self.dump_fun_internal(&writer, tctx, &fun);
             }
             for (_, fun) in module.get_spec_funs() {
                 emit!(
@@ -2002,6 +1991,78 @@ impl GlobalEnv {
             emitln!(writer, "}} // end {}", module.get_full_name_str())
         }
         writer.extract_result()
+    }
+
+    pub fn dump_fun(&self, fun: &FunctionEnv) -> String {
+        let tctx = &self.get_type_display_ctx();
+        let writer = CodeWriter::new(self.internal_loc());
+        self.dump_fun_internal(&writer, tctx, fun);
+        writer.extract_result()
+    }
+
+    fn dump_fun_internal(&self, writer: &CodeWriter, tctx: &TypeDisplayContext, fun: &FunctionEnv) {
+        emit!(writer, "{}", fun.get_header_string());
+        if let Some(specs) = fun.get_access_specifiers() {
+            emitln!(writer);
+            writer.indent();
+            for spec in specs {
+                if spec.negated {
+                    emit!(writer, "!")
+                }
+                match &spec.kind {
+                    AccessKind::Reads => emit!(writer, "reads "),
+                    AccessKind::Writes => emit!(writer, "writes "),
+                    AccessKind::Acquires => emit!(writer, "acquires "),
+                }
+                match &spec.resource.1 {
+                    ResourceSpecifier::Any => emit!(writer, "*"),
+                    ResourceSpecifier::DeclaredAtAddress(addr) => {
+                        emit!(
+                            writer,
+                            "0x{}::*",
+                            addr.expect_numerical().short_str_lossless()
+                        )
+                    },
+                    ResourceSpecifier::DeclaredInModule(mid) => {
+                        emit!(writer, "{}::*", self.get_module(*mid).get_full_name_str())
+                    },
+                    ResourceSpecifier::Resource(sid) => {
+                        emit!(writer, "{}", sid.to_type().display(tctx))
+                    },
+                }
+                emit!(writer, "(");
+                match &spec.address.1 {
+                    AddressSpecifier::Any => emit!(writer, "*"),
+                    AddressSpecifier::Address(addr) => {
+                        emit!(writer, "0x{}", addr.expect_numerical().short_str_lossless())
+                    },
+                    AddressSpecifier::Parameter(sym) => {
+                        emit!(writer, "{}", sym.display(self.symbol_pool()))
+                    },
+                    AddressSpecifier::Call(fun, sym) => emit!(
+                        writer,
+                        "{}({})",
+                        self.get_function(fun.to_qualified_id()).get_full_name_str(),
+                        sym.display(self.symbol_pool())
+                    ),
+                }
+                emitln!(writer, ")")
+            }
+            writer.unindent()
+        }
+        if let Some(exp) = fun.get_def().deref() {
+            emitln!(writer, " {");
+            writer.indent();
+            emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
+            writer.unindent();
+            emitln!(writer, "}");
+        } else {
+            emitln!(writer, ";");
+        }
+        let spec = fun.get_spec();
+        if !spec.conditions.is_empty() {
+            emitln!(writer, "{}", self.display(spec.deref()))
+        }
     }
 
     /// Helper to create a string for a function signature.
@@ -2369,7 +2430,11 @@ impl<'env> ModuleEnv<'env> {
 
     /// Gets a FunctionEnv by id.
     pub fn into_function(self, id: FunId) -> FunctionEnv<'env> {
-        let data = self.data.function_data.get(&id).expect("FunId undefined");
+        let data = self
+            .data
+            .function_data
+            .get(&id)
+            .unwrap_or_else(|| panic!("FunId {} undefined", id.0.display(self.symbol_pool())));
         FunctionEnv {
             module_env: self,
             data,
@@ -3245,7 +3310,7 @@ pub struct FunctionData {
 
     /// Optional definition associated with this function. The definition is available if
     /// the model is build with option `ModelBuilderOptions::compile_via_model`.
-    pub(crate) def: Option<Exp>,
+    pub(crate) def: RefCell<Option<Exp>>,
 
     /// A cache for the called functions.
     pub(crate) called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
@@ -3255,6 +3320,12 @@ pub struct FunctionData {
 
     /// A cache for the transitive closure of the called functions.
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+}
+
+impl FunctionData {
+    pub fn is_inline(&self) -> bool {
+        self.kind == FunctionKind::Inline
+    }
 }
 
 /// Kind of a function,
@@ -3764,8 +3835,13 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns associated definition. The definition of the function, in Exp form, is available
     /// if the model is build with `ModelBuilderOptions::compile_via_model`
-    pub fn get_def(&self) -> Option<&Exp> {
-        self.data.def.as_ref()
+    pub fn get_def(&'env self) -> Ref<Option<Exp>> {
+        self.data.def.borrow()
+    }
+
+    /// Replaces mutable reference to associated definition, allowing modification.
+    pub fn get_mut_def(&'env self) -> RefMut<Option<Exp>> {
+        self.data.def.borrow_mut()
     }
 
     /// Returns the acquired global resource types, if a bytecode module is attached.

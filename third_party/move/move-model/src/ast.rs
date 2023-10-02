@@ -451,20 +451,29 @@ pub enum ExpData {
     /// some other source into expressions. Consumers of expressions should assume this
     /// variant is not present and can panic when seeing it.
     Invalid(NodeId),
+
     /// Represents a value.
     Value(NodeId, Value),
+
     /// Represents a reference to a local variable introduced in the AST.
     LocalVar(NodeId, Symbol),
+
     /// Represents a reference to a temporary used in bytecode, if this expression is associated
     /// with bytecode.
+    /// Seems to also be used to represent a parameter to a function, where TempIndex indicates the
+    /// index into the list of function parameters.
     Temporary(NodeId, TempIndex),
+
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
     Call(NodeId, Operation, Vec<Exp>),
+
     /// Represents an invocation of a function value, as a lambda.
     Invoke(NodeId, Exp, Vec<Exp>),
+
     /// Represents a lambda.
     Lambda(NodeId, Pattern, Exp),
+
     /// Represents a quantified formula over multiple variables and ranges.
     Quant(
         NodeId,
@@ -478,9 +487,11 @@ pub enum ExpData {
         /// Body
         Exp,
     ),
+
     /// Represents a block `Block(id, pattern, optional_binding, scope)` which binds
     /// a pattern, making the bound variables available in scope.
     Block(NodeId, Pattern, Option<Exp>, Exp),
+
     /// Represents a conditional.
     IfElse(NodeId, Exp, Exp, Exp),
 
@@ -488,17 +499,25 @@ pub enum ExpData {
     // Subsequent expressions only appear in imperative context
     /// Represents the return from a function
     Return(NodeId, Exp),
+
     /// Represents a sequence of effects, the last value also being the result.
     Sequence(NodeId, Vec<Exp>),
+
     /// Represents a loop, with a body expression.
     Loop(NodeId, Exp),
+
     /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
     /// loop is continued (true) or broken (false).
     LoopCont(NodeId, bool),
-    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.
+
+    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.  Note that Assign
+    /// does *not* introduce new variables; they apparently be introduced by a Block or Lambda, or
+    /// as a function formal parameter.
     Assign(NodeId, Pattern, Exp),
+
     /// Mutation of a lhs reference, as in `*lhs = rhs`.
     Mutate(NodeId, Exp, Exp),
+
     /// Represents a specification block, type is ().
     SpecBlock(NodeId, Spec),
 }
@@ -613,11 +632,12 @@ impl ExpData {
         ids
     }
 
-    /// Returns the free local variables, inclusive their types, used in this expression.
-    /// Result is ordered by occurrence.
-    pub fn free_vars(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
-        let mut vars = vec![];
-        let mut shadowed = vec![]; // Should be multiset but don't have this
+    /// Visits free local variables with node id in this expression.
+    fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
+    where
+        F: FnMut(&NodeId, &Symbol),
+    {
+        let mut shadowed: BTreeMap<Symbol, usize> = BTreeMap::new();
         let mut visitor = |up: bool, e: &ExpData| {
             use ExpData::*;
             let decls = match e {
@@ -631,40 +651,69 @@ impl ExpData {
                 _ => vec![],
             };
             if !up {
-                shadowed.extend(decls.iter());
-            } else {
-                for sym in decls {
-                    if let Some(pos) = shadowed.iter().position(|s| *s == sym) {
-                        // Remove one instance of this symbol. The same symbol can appear
-                        // multiple times in `shadowed`.
-                        shadowed.remove(pos);
+                // Visit the Assigned pat on the way down, before visiting the RHS expression
+                if let Assign(_, pat, _) = e {
+                    for (id, sym) in pat.vars().iter() {
+                        if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                            node_symbol_visitor(id, sym);
+                        }
+                    }
+                } else {
+                    for sym in &decls {
+                        shadowed
+                            .entry(*sym)
+                            .and_modify(|curr| *curr += 1)
+                            .or_insert(1);
                     }
                 }
+            }
+            if up {
                 if let LocalVar(id, sym) = e {
-                    if !shadowed.contains(sym) && !vars.iter().any(|(s, _)| s == sym) {
-                        vars.push((*sym, env.get_node_type(*id)));
+                    if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                        node_symbol_visitor(id, sym);
+                    }
+                } else {
+                    for sym in &decls {
+                        if let Some(x) = shadowed.get_mut(sym) {
+                            *x -= 1;
+                        }
                     }
                 }
             }
         };
         self.visit_pre_post(&mut visitor);
+    }
+
+    /// Returns the free local variables, inclusive their types, used in this expression.
+    /// Result is ordered by occurrence.
+    pub fn free_vars(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
+        let mut vars = vec![];
+        let var_collector = |id: &NodeId, sym: &Symbol| {
+            if !vars.iter().any(|(s, _)| s == sym) {
+                vars.push((*sym, env.get_node_type(*id)));
+            }
+        };
+        self.visit_free_local_vars(var_collector);
         vars
     }
 
     /// Returns the free local variables with node id in this expression
     pub fn free_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
         let mut vars = BTreeMap::new();
-        let mut visitor = |up: bool, e: &ExpData| {
-            use ExpData::*;
-            if up {
-                if let LocalVar(id, sym) = e {
-                    if !vars.iter().any(|(s, _)| s == sym) {
-                        vars.insert(*sym, *id);
-                    }
-                }
-            }
+        let var_to_node_collector = |id: &NodeId, sym: &Symbol| {
+            vars.insert(*sym, *id);
         };
-        self.visit_pre_post(&mut visitor);
+        self.visit_free_local_vars(var_to_node_collector);
+        vars
+    }
+
+    /// Returns just the free local variables in this expression.
+    pub fn get_free_local_vars(&self) -> BTreeSet<Symbol> {
+        let mut vars = BTreeSet::new();
+        let just_vars_collector = |_id: &NodeId, sym: &Symbol| {
+            vars.insert(*sym);
+        };
+        self.visit_free_local_vars(just_vars_collector);
         vars
     }
 
@@ -721,6 +770,21 @@ impl ExpData {
         let mut visitor = |e: &ExpData| {
             if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
                 called.insert(mid.qualified(*fid));
+            }
+        };
+        self.visit(&mut visitor);
+        called
+    }
+
+    /// Returns the Move functions called by this expression, along with nodes of call sites.
+    pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
+        let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = e {
+                called
+                    .entry(mid.qualified(*fid))
+                    .or_default()
+                    .insert(*node_id);
             }
         };
         self.visit(&mut visitor);

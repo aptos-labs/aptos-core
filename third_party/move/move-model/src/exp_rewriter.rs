@@ -9,7 +9,7 @@ use crate::{
     ty::Type,
 };
 use itertools::Itertools;
-use std::collections::{BTreeSet, VecDeque};
+use std::collections::BTreeSet;
 
 /// Rewriter for expressions, allowing to substitute locals by expressions as well as instantiate
 /// types.
@@ -17,7 +17,7 @@ pub struct ExpRewriter<'env, 'rewriter> {
     env: &'env GlobalEnv,
     replacer: &'rewriter mut dyn FnMut(NodeId, RewriteTarget) -> Option<Exp>,
     type_args: &'rewriter [Type],
-    shadowed: VecDeque<BTreeSet<Symbol>>,
+    shadowed: Vec<BTreeSet<Symbol>>,
 }
 
 /// A target for expression rewrites of either an `Exp::LocalVar` or an `Exp::Temporary`.
@@ -39,7 +39,7 @@ impl<'env, 'rewriter> ExpRewriter<'env, 'rewriter> {
             env,
             replacer,
             type_args: &[],
-            shadowed: VecDeque::new(),
+            shadowed: Vec::new(),
         }
     }
 
@@ -52,6 +52,15 @@ impl<'env, 'rewriter> ExpRewriter<'env, 'rewriter> {
 }
 
 impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
+    fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {
+        self.shadowed
+            .push(vars.map(|(_node_id, symbol)| *symbol).collect())
+    }
+
+    fn rewrite_exit_scope(&mut self) {
+        self.shadowed.pop();
+    }
+
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
         for vars in &self.shadowed {
             if vars.contains(&sym) {
@@ -146,7 +155,7 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Exp> {
         None
     }
-    fn rewrite_pattern(&mut self, pat: &Pattern) -> Option<Pattern> {
+    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
         None
     }
     fn rewrite_quant(
@@ -247,7 +256,7 @@ pub trait ExpRewriterFunctions {
             },
             Lambda(id, pat, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat);
+                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope();
@@ -261,13 +270,14 @@ pub trait ExpRewriterFunctions {
             },
             Block(id, pat, binding, body) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat);
+                // Note that `binding` expr must be evaluated *before* we enter new pattern scope.
                 let (binding_changed, new_binding) = if let Some(b) = binding {
                     let (changed, b) = self.internal_rewrite_exp(b);
                     (changed, Some(b))
                 } else {
                     (false, None)
                 };
+                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 self.rewrite_enter_scope(new_pat.vars().iter());
                 let (body_changed, new_body) = self.internal_rewrite_exp(body);
                 self.rewrite_exit_scope();
@@ -376,8 +386,8 @@ pub trait ExpRewriterFunctions {
             },
             Assign(id, lhs, rhs) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (lhs_changed, new_lhs) = self.internal_rewrite_pattern(lhs);
                 let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
+                let (lhs_changed, new_lhs) = self.internal_rewrite_pattern(lhs, false);
                 if id_changed || lhs_changed || rhs_changed {
                     Assign(new_id, new_lhs, new_rhs).into_exp()
                 } else {
@@ -386,8 +396,8 @@ pub trait ExpRewriterFunctions {
             },
             Mutate(id, lhs, rhs) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
-                let (lhs_changed, new_lhs) = self.internal_rewrite_exp(lhs);
                 let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
+                let (lhs_changed, new_lhs) = self.internal_rewrite_exp(lhs);
                 if id_changed || lhs_changed || rhs_changed {
                     Mutate(new_id, new_lhs, new_rhs).into_exp()
                 } else {
@@ -409,8 +419,8 @@ pub trait ExpRewriterFunctions {
         }
     }
 
-    fn internal_rewrite_pattern(&mut self, pat: &Pattern) -> (bool, Pattern) {
-        if let Some(new_pat) = self.rewrite_pattern(pat) {
+    fn internal_rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> (bool, Pattern) {
+        if let Some(new_pat) = self.rewrite_pattern(pat, entering_scope) {
             (true, new_pat)
         } else {
             (false, pat.clone())
@@ -496,7 +506,7 @@ pub trait ExpRewriterFunctions {
         let new_ranges = ranges
             .iter()
             .map(|(pat, exp)| {
-                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat);
+                let (pat_changed, new_pat) = self.internal_rewrite_pattern(pat, true);
                 change = change || pat_changed;
                 let (exp_changed, new_exp) = self.internal_rewrite_exp(exp);
                 change = change || exp_changed;

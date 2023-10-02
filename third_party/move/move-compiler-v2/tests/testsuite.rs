@@ -7,6 +7,7 @@ use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
+    inliner,
     pipeline::{
         livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
     },
@@ -133,8 +134,23 @@ impl TestConfig {
         let test_output = RefCell::new(String::new());
 
         // Run context checker
-        let env = move_compiler_v2::run_checker(options)?;
-        let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+        let mut env = move_compiler_v2::run_checker(options.clone())?;
+        let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+
+        if ok {
+            if options.debug {
+                eprint!("After error check, GlobalEnv={}", env.dump_env());
+            }
+
+            // Run inlining.
+            inliner::run_inlining(&mut env, options.debug);
+            ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+
+            if options.debug {
+                eprint!("After inlining, GlobalEnv={}", env.dump_env());
+            }
+        }
+
         if ok && self.dump_ast {
             let out = &mut test_output.borrow_mut();
             out.push_str("// ---- Model Dump\n");
