@@ -96,7 +96,7 @@ spec aptos_framework::reconfiguration {
 
         // The ensure conditions of the reconfigure function are not fully written, because there is a new cycle in it,
         // but its existing ensure conditions satisfy hp.
-        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled() || !slow_reconfigure_in_progress())
+        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
             && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         // The property below is not proved within 500s and still cause an timeout
         // property 3: Synchronization of NewEpochEvent counter with configuration epoch.
@@ -113,24 +113,5 @@ spec aptos_framework::reconfiguration {
         // property 2: The reconfiguration status may be determined at any time without causing an abort, indicating whether or not the system allows reconfiguration.
         aborts_if false;
         ensures result == !exists<DisableReconfiguration>(@aptos_framework);
-    }
-
-    spec slow_reconfigure_in_progress {
-        aborts_if false;
-        ensures result == !exists<SlowReconfigureInProgress>(@aptos_framework);
-    }
-
-
-    spec mark_slow_reconfigure_started(aptos_framework: &signer) {
-        include AbortsIfNotAptosFramework;
-        aborts_if exists<DisableReconfiguration>(@aptos_framework);
-        ensures exists<DisableReconfiguration>(@aptos_framework);
-    }
-
-    spec mark_slow_reconfigure_terminated(aptos_framework: &signer) {
-        use aptos_framework::reconfiguration::SlowReconfigureInProgress;
-        include AbortsIfNotAptosFramework;
-        aborts_if !exists<SlowReconfigureInProgress>(@aptos_framework);
-        ensures !exists<SlowReconfigureInProgress>(@aptos_framework);
     }
 }
