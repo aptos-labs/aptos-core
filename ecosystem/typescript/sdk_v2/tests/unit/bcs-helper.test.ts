@@ -31,7 +31,7 @@ describe("Tests for the Serializable class", () => {
     values.forEach((value) => {
       value.serialize(serializer);
       serializer2.serialize(value);
-      bytes = new Uint8Array([...bytes, ...value.toUint8Array()]);
+      bytes = new Uint8Array([...bytes, ...value.bcsToBytes()]);
     });
     expect(serializer.toUint8Array()).toEqual(serializer2.toUint8Array());
     expect(serializer.toUint8Array()).toEqual(bytes);
@@ -65,10 +65,10 @@ describe("Tests for the Serializable class", () => {
       const value = values[i];
       const bytes = serializedValues[i];
       serializer.serialize(value);
-      expect(value.toUint8Array()).toEqual(bytes);
+      expect(value.bcsToBytes()).toEqual(bytes);
 
       // for the overall buffer
-      serializedBytes = new Uint8Array([...serializedBytes, ...value.toUint8Array()]);
+      serializedBytes = new Uint8Array([...serializedBytes, ...value.bcsToBytes()]);
     });
 
     expect(serializer.toUint8Array()).toEqual(serializedBytes);
@@ -91,7 +91,7 @@ describe("Tests for the Serializable class", () => {
       const value = values[i];
       const type = types[i];
       serializer.serialize(value);
-      const deserializer = new Deserializer(value.toUint8Array());
+      const deserializer = new Deserializer(value.bcsToBytes());
       const deserializedValue = type.deserialize(deserializer);
       expect(deserializedValue.value).toEqual(value.value);
     });
@@ -127,7 +127,7 @@ describe("Tests for the Serializable class", () => {
     someOptionValues.forEach((_, i) => {
       const value = someOptionValues[i];
       const bytes = someBytes[i];
-      expect(value.toUint8Array()).toEqual(bytes);
+      expect(value.bcsToBytes()).toEqual(bytes);
 
       // serializer for entire buffer comparison later
       serializer.serialize(value);
@@ -177,7 +177,7 @@ describe("Tests for the Serializable class", () => {
     noneOptionValues.forEach((_, i) => {
       const value = noneOptionValues[i];
       const bytes = noneBytes[i];
-      expect(value.toUint8Array()).toEqual(bytes);
+      expect(value.bcsToBytes()).toEqual(bytes);
 
       // serializer for entire buffer comparison later
       serializer.serialize(value);
@@ -240,7 +240,7 @@ describe("Tests for the Serializable class", () => {
       new MoveOption(),
     ]);
     const optionBoolVectorBytes = new Uint8Array([3, 1, 1, 1, 0, 0]);
-    expect(optionBoolVectorBytes).toEqual(optionBoolVector.toUint8Array());
+    expect(optionBoolVectorBytes).toEqual(optionBoolVector.bcsToBytes());
 
     const deserializer = new Deserializer(optionBoolVectorBytes);
 
@@ -256,7 +256,7 @@ describe("Tests for the Serializable class", () => {
     }
 
     const deserializedMoveOptionBoolVector = VectorOptionBools.deserialize(deserializer);
-    expect(deserializedMoveOptionBoolVector.toUint8Array()).toEqual(optionBoolVector.toUint8Array());
+    expect(deserializedMoveOptionBoolVector.bcsToBytes()).toEqual(optionBoolVector.bcsToBytes());
     deserializedMoveOptionBoolVector.values.forEach((option, i) => {
       if (option.isSome()) {
         expect(option.unwrap().value).toEqual(optionBoolVector.values[i].unwrap().value);
@@ -291,7 +291,7 @@ describe("Tests for the Serializable class", () => {
       ...optionVectorOptionBool_2_Bytes,
       ...optionVectorOptionBool_3_Bytes,
     ]);
-    expect(vecOfVecsBytes).toEqual(vecOfVecs.toUint8Array());
+    expect(vecOfVecsBytes).toEqual(vecOfVecs.bcsToBytes());
 
     const deserializer = new Deserializer(vecOfVecsBytes);
     const deserializer2 = new Deserializer(vecOfVecsBytes);
@@ -324,8 +324,8 @@ describe("Tests for the Serializable class", () => {
 
     const deserializedOptionVectorOptionBoolVector = VectorOptionVectorOptionBools.deserialize(deserializer);
     const deserializedOptionVectorOptionBoolVector2 = Vector.deserialize(deserializer2, OptionVectorOptionBools);
-    expect(deserializedOptionVectorOptionBoolVector.toUint8Array()).toEqual(
-      deserializedOptionVectorOptionBoolVector2.toUint8Array(),
+    expect(deserializedOptionVectorOptionBoolVector.bcsToBytes()).toEqual(
+      deserializedOptionVectorOptionBoolVector2.bcsToBytes(),
     );
   });
 
@@ -355,14 +355,14 @@ describe("Tests for the Serializable class", () => {
     ]);
     const stringVectorBytes = new Uint8Array([3, 3, 97, 98, 99, 3, 100, 101, 102, 3, 103, 104, 105]);
 
-    expect(boolVectorFrom.toUint8Array()).toEqual(boolVectorBytes);
-    expect(u8VectorFrom.toUint8Array()).toEqual(u8VectorBytes);
-    expect(u16VectorFrom.toUint8Array()).toEqual(u16VectorBytes);
-    expect(u32VectorFrom.toUint8Array()).toEqual(u32VectorBytes);
-    expect(u64VectorFrom.toUint8Array()).toEqual(u64VectorBytes);
-    expect(u128VectorFrom.toUint8Array()).toEqual(u128VectorBytes);
-    expect(u256VectorFrom.toUint8Array()).toEqual(u256VectorBytes);
-    expect(stringVectorFrom.toUint8Array()).toEqual(stringVectorBytes);
+    expect(boolVectorFrom.bcsToBytes()).toEqual(boolVectorBytes);
+    expect(u8VectorFrom.bcsToBytes()).toEqual(u8VectorBytes);
+    expect(u16VectorFrom.bcsToBytes()).toEqual(u16VectorBytes);
+    expect(u32VectorFrom.bcsToBytes()).toEqual(u32VectorBytes);
+    expect(u64VectorFrom.bcsToBytes()).toEqual(u64VectorBytes);
+    expect(u128VectorFrom.bcsToBytes()).toEqual(u128VectorBytes);
+    expect(u256VectorFrom.bcsToBytes()).toEqual(u256VectorBytes);
+    expect(stringVectorFrom.bcsToBytes()).toEqual(stringVectorBytes);
   });
 
   it("serializes all manually constructed vector types the same way as the equivalent factory methods", () => {
@@ -383,14 +383,14 @@ describe("Tests for the Serializable class", () => {
     const stringVector = new Vector([new MoveString("abc"), new MoveString("def"), new MoveString("ghi")]);
     const stringVectorFrom = Vector.String(["abc", "def", "ghi"]);
 
-    expect(boolVector.toUint8Array()).toEqual(boolVectorFrom.toUint8Array());
-    expect(u8Vector.toUint8Array()).toEqual(u8VectorFrom.toUint8Array());
-    expect(u16Vector.toUint8Array()).toEqual(u16VectorFrom.toUint8Array());
-    expect(u32Vector.toUint8Array()).toEqual(u32VectorFrom.toUint8Array());
-    expect(u64Vector.toUint8Array()).toEqual(u64VectorFrom.toUint8Array());
-    expect(u128Vector.toUint8Array()).toEqual(u128VectorFrom.toUint8Array());
-    expect(u256Vector.toUint8Array()).toEqual(u256VectorFrom.toUint8Array());
-    expect(stringVector.toUint8Array()).toEqual(stringVectorFrom.toUint8Array());
+    expect(boolVector.bcsToBytes()).toEqual(boolVectorFrom.bcsToBytes());
+    expect(u8Vector.bcsToBytes()).toEqual(u8VectorFrom.bcsToBytes());
+    expect(u16Vector.bcsToBytes()).toEqual(u16VectorFrom.bcsToBytes());
+    expect(u32Vector.bcsToBytes()).toEqual(u32VectorFrom.bcsToBytes());
+    expect(u64Vector.bcsToBytes()).toEqual(u64VectorFrom.bcsToBytes());
+    expect(u128Vector.bcsToBytes()).toEqual(u128VectorFrom.bcsToBytes());
+    expect(u256Vector.bcsToBytes()).toEqual(u256VectorFrom.bcsToBytes());
+    expect(stringVector.bcsToBytes()).toEqual(stringVectorFrom.bcsToBytes());
   });
 
   it("serializes and deserializes a complex class correctly", () => {
@@ -503,8 +503,8 @@ describe("Tests for the Serializable class", () => {
     ]);
 
     expect(serializer.toUint8Array()).toEqual(complexSerializableBytes);
-    expect(complexSerializable.toUint8Array()).toEqual(complexSerializableBytes);
-    const deserializer = new Deserializer(complexSerializable.toUint8Array());
+    expect(complexSerializable.bcsToBytes()).toEqual(complexSerializableBytes);
+    const deserializer = new Deserializer(complexSerializable.bcsToBytes());
     const deserializedComplexSerializable = ComplexSerializable.deserialize(deserializer);
     expect(deserializedComplexSerializable.myU8.value).toEqual(complexSerializable.myU8.value);
     expect(deserializedComplexSerializable.myU16.value).toEqual(complexSerializable.myU16.value);
@@ -564,15 +564,15 @@ describe("Tests for the Serializable class", () => {
     const moduleAddressBytes = new Uint8Array([
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     ]);
-    const moduleNameBytes = new MoveString(val.moduleName).toUint8Array();
-    const structNameBytes = new MoveString(val.structName).toUint8Array();
-    const functionNameBytes = new MoveString(val.functionName).toUint8Array();
-    const chainIdBytes = new U8(val.chainId).toUint8Array();
-    const sequenceNumberBytes = new U64(val.sequenceNumber).toUint8Array();
-    const sourceAddressBytes = val.sourceAddress.toUint8Array();
-    const recipientAddressBytes = val.recipientAddress.toUint8Array();
+    const moduleNameBytes = new MoveString(val.moduleName).bcsToBytes();
+    const structNameBytes = new MoveString(val.structName).bcsToBytes();
+    const functionNameBytes = new MoveString(val.functionName).bcsToBytes();
+    const chainIdBytes = new U8(val.chainId).bcsToBytes();
+    const sequenceNumberBytes = new U64(val.sequenceNumber).bcsToBytes();
+    const sourceAddressBytes = val.sourceAddress.bcsToBytes();
+    const recipientAddressBytes = val.recipientAddress.bcsToBytes();
 
-    expect(val.toUint8Array()).toEqual(
+    expect(val.bcsToBytes()).toEqual(
       new Uint8Array([
         ...moduleAddressBytes,
         ...moduleNameBytes,

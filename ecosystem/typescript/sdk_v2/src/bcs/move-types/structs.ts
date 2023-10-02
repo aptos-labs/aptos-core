@@ -30,7 +30,7 @@ export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString
  *   Vector.U8([1, 2, 3, 4]),
  *   Vector.U8([5, 6, 7, 8]),
  * ]);
- * 
+ *
  * // vector<Option<u8>> [ std::option::some<u8>(1), std::option::some<u8>(2) ];
  * const vecOfOptionU8s = new Vector<MoveOption<U8>>([
  *    MoveOption.U8(1),

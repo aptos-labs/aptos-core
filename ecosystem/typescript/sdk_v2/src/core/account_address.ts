@@ -392,37 +392,4 @@ export class AccountAddress extends Serializable {
     if (this.data.length !== other.data.length) return false;
     return this.data.every((value, index) => value === other.data[index]);
   }
-
-  /**
-   * Serializes an AccountAddress
-   *
-   * NOTE: If you are looking to serialize an AccountAddress and get the bytes in the same call,
-   * please use the .toUint8Array() function.
-   *
-   * @example
-   * const serializer = new Serializer();
-   * const accountAddress = AccountAddress.fromHexInput({ input: "0x1" });
-   * accountAddress.serialize(serializer);
-   * const accountAddressBcsBytes = serializer.toUint8Array();
-   * // or
-   * const accountAddressBcsBytes = accountAddress.toUint8Array();
-   * @param serializer: the Serializer instance to serialize bytes to
-   * @returns a Uint8Array of the serialized AccountAddress
-   */
-  serialize(serializer: Serializer): void {
-    serializer.serializeFixedBytes(this.data);
-  }
-
-  /**
-   * Deserializes an AccountAddress
-   *
-   * @param deserializer: the Deserializer instance to deserialize bytes from
-   * @returns an AccountAddress instance
-   * @throws Error if bytes are invalid
-   * @example
-   * const accountAddress = AccountAddress.deserialize(deserializer);
-   */
-  static deserialize(deserializer: Deserializer): AccountAddress {
-    return new AccountAddress({ data: deserializer.deserializeFixedBytes(AccountAddress.LENGTH) });
-  }
 }
