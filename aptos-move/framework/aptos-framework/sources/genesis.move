@@ -365,7 +365,7 @@ module aptos_framework::genesis {
             validator.consensus_pubkey,
             validator.proof_of_possession,
         );
-        stake::update_network_and_fullnode_addresses(
+        stake::force_update_network_and_fullnode_addresses(
             operator,
             pool_address,
             validator.network_addresses,

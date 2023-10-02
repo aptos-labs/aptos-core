@@ -78,8 +78,8 @@ module aptos_framework::stake {
     const EINVALID_LOCKUP: u64 = 18;
     /// Table to store collected transaction fees for each validator already exists.
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
-    /// TBD
-    const EVALIDATOR_SET_CHANGES_DISABLED: u64 = 19;
+    /// User-level validator set change temporarily disabled.
+    const EVALIDATOR_SET_CHANGES_DISABLED: u64 = 20;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -269,6 +269,7 @@ module aptos_framework::stake {
     }
 
     /// A flag indicating that validator set changes should be rejected, if present under the system account.
+    /// Will be set when DKG starts and unset when DKG terminates.
     struct ValidatorSetChangeDisabled has drop, key {}
 
     public fun validator_set_change_enabled(): bool {
@@ -449,6 +450,9 @@ module aptos_framework::stake {
     }
 
     /// Allow on chain governance to remove validators from the validator set.
+    ///
+    /// This is a system-level validator set change, therefore not affected by user-level locking.
+    /// Caller should ensure a fast reconfiguration is triggered after this.
     public fun remove_validators(
         aptos_framework: &signer,
         validators: &vector<address>,
@@ -2804,7 +2808,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @0x1, validator_1 = @0x123, validator_2 = @0x234)]
-    #[expected_failure(abort_code = 0x030013, location = Self)]
+    #[expected_failure(abort_code = 0x030014, location = Self)]
     fun leave_validator_set_should_fail_when_flag_is_set(
         aptos_framework: &signer,
         validator_1: &signer,
