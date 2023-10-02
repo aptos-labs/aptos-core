@@ -10,7 +10,7 @@
 //! ```
 //! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
 //! use aptos_crypto::{
-//!     ecdsa_p256::*,
+//!     p256_ecdsa::*,
 //!     traits::{Signature, SigningKey, Uniform},
 //!     test_utils::KeyPair
 //! };

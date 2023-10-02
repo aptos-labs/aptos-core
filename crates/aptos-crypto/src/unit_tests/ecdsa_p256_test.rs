@@ -5,7 +5,7 @@
 
 use crate as aptos_crypto;
 use crate::{
-    ecdsa_p256::{P256_SIGNATURE_LENGTH, P256PublicKey, P256_PUBLIC_KEY_LENGTH, P256_PRIVATE_KEY_LENGTH, P256PrivateKey, P256Signature, ORDER_HALF}, 
+    p256_ecdsa::{P256_SIGNATURE_LENGTH, P256PublicKey, P256_PUBLIC_KEY_LENGTH, P256_PRIVATE_KEY_LENGTH, P256PrivateKey, P256Signature, ORDER_HALF}, 
     test_utils::{
         random_serializable_struct,
         uniform_keypair_strategy,

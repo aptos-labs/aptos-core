@@ -6,7 +6,7 @@
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
 use crate::{
-    ecdsa_p256::{P256Signature, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
+    p256_ecdsa::{P256Signature, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
     hash::CryptoHash,
     traits::*,
 };
@@ -120,7 +120,7 @@ impl Uniform for P256PrivateKey {
     where
        R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
-        let mut bytes: [u8; P256_PRIVATE_KEY_LENGTH] = Default::default();
+        let mut bytes = [0u8; P256_PRIVATE_KEY_LENGTH];
         rng.fill_bytes(&mut bytes);
         P256PrivateKey(p256::ecdsa::SigningKey::from_slice(&bytes[..]).unwrap())
     }
@@ -238,7 +238,7 @@ impl Length for P256PublicKey {
 
 impl ValidCryptoMaterial for P256PublicKey {
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.to_sec1_bytes().to_vec()
+        self.to_bytes().to_vec()
     }
 }
 
