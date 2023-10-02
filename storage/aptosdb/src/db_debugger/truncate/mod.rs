@@ -7,6 +7,7 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
+        version_data::VersionDataSchema,
     },
     state_merkle_db::StateMerkleDb,
     utils::truncation_helper::{
@@ -94,28 +95,56 @@ impl Cmd {
         let state_merkle_db_version = get_current_version_in_state_merkle_db(&state_merkle_db)?
             .expect("Current version of state merkle db must exist.");
 
+        let mut target_version = self.target_version;
+
         assert_le!(overall_version, ledger_db_version);
         assert_le!(overall_version, state_kv_db_version);
         assert_le!(state_merkle_db_version, overall_version);
-        assert_le!(self.target_version, overall_version);
+        assert_le!(target_version, overall_version);
 
         println!(
             "overall_version: {}, ledger_db_version: {}, state_kv_db_version: {}, state_merkle_db_version: {}, target_version: {}",
-            overall_version, ledger_db_version, state_kv_db_version, state_merkle_db_version, self.target_version,
+            overall_version, ledger_db_version, state_kv_db_version, state_merkle_db_version, target_version,
         );
+
+        if ledger_db
+            .metadata_db()
+            .get::<VersionDataSchema>(&target_version)?
+            .is_none()
+        {
+            println!(
+                "Unable to truncate to version {}, since there is no VersionData on that version.",
+                target_version
+            );
+            println!(
+                "Trying to fallback to the largest valid version before version {}.",
+                target_version,
+            );
+            let mut iter = ledger_db
+                .metadata_db()
+                .iter::<VersionDataSchema>(ReadOptions::default())?;
+            iter.seek_for_prev(&target_version)?;
+            match iter.next().transpose()? {
+                Some((previous_valid_version, _)) => {
+                    println!("Fallback to version {previous_valid_version}.");
+                    target_version = previous_valid_version;
+                },
+                None => panic!("Unable to find a valid version."),
+            };
+        }
 
         // TODO(grao): We are using a brute force implementation for now. We might be able to make
         // it faster, since our data is append only.
-        if self.target_version < state_merkle_db_version {
+        if target_version < state_merkle_db_version {
             let state_merkle_target_version = Self::find_tree_root_at_or_before(
                 ledger_db.metadata_db(),
                 &state_merkle_db,
-                self.target_version,
+                target_version,
             )?
             .unwrap_or_else(|| {
                 panic!(
                     "Could not find a valid root before or at version {}, maybe it was pruned?",
-                    self.target_version
+                    target_version
                 )
             });
 
@@ -130,7 +159,7 @@ impl Cmd {
         println!("Starting ledger db and state kv db truncation...");
         ledger_db.metadata_db().put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
-            &DbMetadataValue::Version(self.target_version),
+            &DbMetadataValue::Version(target_version),
         )?;
         StateStore::sync_commit_progress(
             Arc::clone(&ledger_db),
@@ -142,7 +171,7 @@ impl Cmd {
         if let Some(state_merkle_db_version) =
             get_current_version_in_state_merkle_db(&state_merkle_db)?
         {
-            if state_merkle_db_version < self.target_version {
+            if state_merkle_db_version < target_version {
                 println!(
                     "Trying to catch up state merkle db, by replaying write set in ledger db."
                 );
@@ -243,7 +272,7 @@ mod test {
 
             drop(db);
 
-            let target_version = db_version - 70;
+            let mut target_version = db_version - 70;
 
             let cmd = Cmd {
                 db_dir: tmp_dir.path().to_path_buf(),
@@ -258,7 +287,8 @@ mod test {
 
             let db = if input.1 { AptosDB::new_for_test_with_sharding(&tmp_dir, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD) } else { AptosDB::new_for_test(&tmp_dir) };
             let db_version = db.get_latest_version().unwrap();
-            prop_assert_eq!(db_version, target_version);
+            prop_assert!(db_version <= target_version);
+            target_version = db_version;
 
             let txn_list_with_proof = db.get_transactions(0, db_version + 1, db_version, true).unwrap();
             prop_assert_eq!(txn_list_with_proof.transactions.len() as u64, db_version + 1);
