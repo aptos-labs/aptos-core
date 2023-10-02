@@ -39,7 +39,7 @@ use move_core_types::{language_storage::StructTag, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
-use aptos_block_executor::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
+use aptos_block_executor::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -194,7 +194,7 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnProviderTrait1 + TxnProviderTrait2<PreprocessedTransaction, AptosTransactionOutput, VMStatus> + Send + Sync + 'static
+        TP: TxnIndexProvider + BlockSTMPlugin<PreprocessedTransaction, AptosTransactionOutput, VMStatus> + Send + Sync + 'static
     >(
         executor_thread_pool: Arc<ThreadPool>,
         txn_provider: Arc<TP>,

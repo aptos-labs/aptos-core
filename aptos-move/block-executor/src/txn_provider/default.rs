@@ -11,7 +11,7 @@ use move_core_types::account_address::AccountAddress;
 use crate::scheduler::Scheduler;
 use crate::task::{Transaction, TransactionOutput};
 use crate::txn_last_input_output::TxnOutput;
-use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
+use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
 
 /// Some logic of vanilla BlockSTM.
 pub struct DefaultTxnProvider<T> {
@@ -28,7 +28,7 @@ impl<T> DefaultTxnProvider<T> {
     }
 }
 
-impl<T> TxnProviderTrait1 for DefaultTxnProvider<T> {
+impl<T> TxnIndexProvider for DefaultTxnProvider<T> {
     fn end_txn_idx(&self) -> TxnIndex {
         self.txns.len() as TxnIndex
     }
@@ -53,7 +53,7 @@ impl<T> TxnProviderTrait1 for DefaultTxnProvider<T> {
         self.txns()
     }
 
-    fn local_rank(&self, idx: TxnIndex) -> usize {
+    fn local_index(&self, idx: TxnIndex) -> usize {
         idx as usize
     }
 
@@ -74,7 +74,7 @@ impl<T> TxnProviderTrait1 for DefaultTxnProvider<T> {
     }
 }
 
-impl<T, TO, TE> TxnProviderTrait2<T, TO, TE> for DefaultTxnProvider<T>
+impl<T, TO, TE> BlockSTMPlugin<T, TO, TE> for DefaultTxnProvider<T>
     where
         T: Transaction,
         TO: TransactionOutput<Txn = T>,
@@ -100,7 +100,7 @@ impl<T, TO, TE> TxnProviderTrait2<T, TO, TE> for DefaultTxnProvider<T>
         // Nothing to do.
     }
 
-    fn commit_strategy(&self) -> u8 {
-        0
+    fn use_dedicated_committing_thread(&self) -> bool {
+        false
     }
 }

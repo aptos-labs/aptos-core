@@ -17,7 +17,7 @@ use std::{
     },
 };
 use std::collections::HashMap;
-use crate::txn_provider::TxnProviderTrait1;
+use crate::txn_provider::TxnIndexProvider;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
@@ -242,7 +242,7 @@ pub struct Scheduler<P: ?Sized> {
 }
 
 /// Public Interfaces for the Scheduler
-impl<TP: TxnProviderTrait1> Scheduler<TP> {
+impl<TP: TxnIndexProvider> Scheduler<TP> {
     pub fn new(txn_provider: Arc<TP>) -> Self {
         // Empty block should early return and not create a scheduler.
         assert!(txn_provider.num_txns() > 0, "No scheduler needed for 0 transactions");
@@ -641,7 +641,7 @@ impl<TP: TxnProviderTrait1> Scheduler<TP> {
 }
 
 /// Private functions of the Scheduler
-impl<TP: TxnProviderTrait1> Scheduler<TP> {
+impl<TP: TxnIndexProvider> Scheduler<TP> {
     fn unpack_validation_idx(validation_idx: u64) -> (TxnIndex, Wave) {
         (
             (validation_idx & TXN_IDX_MASK) as TxnIndex,

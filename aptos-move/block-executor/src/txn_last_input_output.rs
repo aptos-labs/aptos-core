@@ -21,7 +21,7 @@ use std::{
         Arc,
     },
 };
-use crate::txn_provider::TxnProviderTrait1;
+use crate::txn_provider::TxnIndexProvider;
 
 type TxnInput<T> = CapturedReads<T>;
 
@@ -59,7 +59,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     TxnLastInputOutput<T, O, E>
 {
-    pub fn new<P: TxnProviderTrait1>(txn_provider: Arc<P>) -> Self {
+    pub fn new<P: TxnIndexProvider>(txn_provider: Arc<P>) -> Self {
         Self {
             inputs: txn_provider.txns().into_iter()
                 .map(|idx| (idx, CachePadded::new(ArcSwapOption::empty())))

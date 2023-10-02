@@ -41,7 +41,7 @@ use std::{
         Arc,
     },
 };
-use crate::txn_provider::{TxnProviderTrait1, TxnProviderTrait2};
+use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -92,7 +92,7 @@ where
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
     X: Executable + 'static,
-    TP: TxnProviderTrait1 + TxnProviderTrait2<T, E::Output, E::Error> + Send + Sync + 'static,
+    TP: TxnIndexProvider + BlockSTMPlugin<T, E::Output, E::Error> + Send + Sync + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -321,7 +321,7 @@ where
 
                 counters::update_parallel_block_gas_counters(
                     accumulated_fee_statement,
-                    txn_provider.local_rank(txn_idx) + 1,
+                    txn_provider.local_index(txn_idx) + 1,
                 );
                 counters::update_parallel_txn_gas_counters(txn_fee_statements);
 
@@ -330,7 +330,7 @@ where
                 info!(
                     "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
 		     accumulated_non_storage_gas = {}, limit = {:?}",
-                    txn_provider.local_rank(txn_idx) + 1,
+                    txn_provider.local_index(txn_idx) + 1,
                     txn_provider.num_txns(),
                     accumulated_non_storage_gas,
                     maybe_block_gas_limit,

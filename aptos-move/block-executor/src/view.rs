@@ -33,7 +33,7 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use std::{cell::RefCell, fmt::Debug, sync::atomic::AtomicU32};
-use crate::txn_provider::TxnProviderTrait1;
+use crate::txn_provider::TxnIndexProvider;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -63,14 +63,14 @@ impl ReadResult {
     }
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable, TP: TxnProviderTrait1> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: Executable, TP: TxnIndexProvider> {
     versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
     scheduler: &'a Scheduler<TP>,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
 }
 
-impl<'a, T: Transaction, X: Executable, TP: TxnProviderTrait1> ParallelState<'a, T, X, TP> {
+impl<'a, T: Transaction, X: Executable, TP: TxnIndexProvider> ParallelState<'a, T, X, TP> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
         shared_scheduler: &'a Scheduler<TP>,
@@ -222,7 +222,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) _counter: &'a u32,
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable, TP: TxnProviderTrait1> {
+pub(crate) enum ViewState<'a, T: Transaction, X: Executable, TP: TxnIndexProvider> {
     Sync(ParallelState<'a, T, X, TP>),
     Unsync(SequentialState<'a, T, X>),
 }
@@ -232,13 +232,13 @@ pub(crate) enum ViewState<'a, T: Transaction, X: Executable, TP: TxnProviderTrai
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> {
     base_view: &'a S,
     latest_view: ViewState<'a, T, X, TP>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> LatestView<'a, T, S, X, TP> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> LatestView<'a, T, S, X, TP> {
     pub(crate) fn new(
         base_view: &'a S,
         latest_view: ViewState<'a, T, X, TP>,
@@ -336,7 +336,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProv
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> TResourceView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TResourceView
     for LatestView<'a, T, S, X, TP>
 {
     type Key = T::Key;
@@ -383,7 +383,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProv
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> TModuleView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TModuleView
     for LatestView<'a, T, S, X, TP>
 {
     type Key = T::Key;
@@ -419,7 +419,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProv
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> StateStorageView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> StateStorageView
     for LatestView<'a, T, S, X, TP>
 {
     fn id(&self) -> StateViewId {
@@ -431,7 +431,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProv
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnProviderTrait1> TAggregatorView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TAggregatorView
     for LatestView<'a, T, S, X, TP>
 {
     type IdentifierV1 = T::Key;
