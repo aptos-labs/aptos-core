@@ -289,7 +289,6 @@ export class Serializer {
    *
    * @param values The array of BCS Serializable values
    * @example
-   * const serializer = new Serializer();
    * const addresses = new Array<AccountAddress>(
    *   AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
    *   AccountAddress.fromHexInputRelaxed({ input: "0x2" }),
