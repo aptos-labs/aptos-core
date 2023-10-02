@@ -39,7 +39,9 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::{Transaction, TransactionPayload, TransactionStatus},
+    transaction::{
+        into_signature_verified_block, Transaction, TransactionPayload, TransactionStatus,
+    },
 };
 use aptos_vm::AptosVM;
 use aptos_vm_validator::vm_validator::VMValidator;
@@ -608,7 +610,11 @@ impl TestContext {
         let parent_id = self.executor.committed_block_id();
         let result = self
             .executor
-            .execute_block((metadata.id(), txns.clone()).into(), parent_id, None)
+            .execute_block(
+                (metadata.id(), into_signature_verified_block(txns.clone())).into(),
+                parent_id,
+                None,
+            )
             .unwrap();
         let mut compute_status = result.compute_status().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);

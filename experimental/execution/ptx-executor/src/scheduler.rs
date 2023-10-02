@@ -16,7 +16,7 @@ use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::Transaction,
+    transaction::SignatureVerifiedTransaction,
 };
 use rayon::Scope;
 use std::sync::mpsc::{channel, Sender};
@@ -79,7 +79,7 @@ impl PtxSchedulerClient {
     pub fn add_transaction(
         &self,
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashSet<(StateKey, TxnIdx)>,
     ) {
         trace!("add_txn {}", txn_idx);
@@ -111,7 +111,7 @@ enum Command {
     },
     AddTransaction {
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashSet<(StateKey, TxnIdx)>,
     },
     FinishBlock,
@@ -124,13 +124,13 @@ enum StateValueState {
 }
 
 struct PendingTransaction {
-    transaction: Transaction,
+    transaction: SignatureVerifiedTransaction,
     pending_dependencies: HashSet<VersionedKey>,
     met_dependencies: HashMap<StateKey, Option<StateValue>>,
 }
 
 impl PendingTransaction {
-    fn new(transaction: Transaction) -> Self {
+    fn new(transaction: SignatureVerifiedTransaction) -> Self {
         Self {
             transaction,
             pending_dependencies: HashSet::new(),
@@ -220,7 +220,7 @@ impl Worker {
     pub fn add_transaction(
         &mut self,
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashSet<VersionedKey>,
     ) {
         let _timer = TIMER.timer_with(&["scheduler_add_txn"]);

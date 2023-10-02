@@ -6,7 +6,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
-    transaction::Transaction,
+    transaction::{into_signature_verified_block, Transaction},
 };
 use std::time::Instant;
 
@@ -41,7 +41,7 @@ impl BlockPartitioningStage {
         );
         let block_id = HashValue::random();
         let block: ExecutableBlock = match &self.maybe_partitioner {
-            None => (block_id, txns).into(),
+            None => (block_id, into_signature_verified_block(txns)).into(),
             Some(partitioner) => {
                 let last_txn = txns.pop().unwrap();
                 let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();

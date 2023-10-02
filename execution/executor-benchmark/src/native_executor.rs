@@ -348,7 +348,7 @@ impl TransactionBlockExecutor for NativeExecutor {
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             transactions
                 .par_iter()
-                .map(|txn| match &txn {
+                .map(|txn| match &txn.inner() {
                     Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
                     Transaction::UserTransaction(user_txn) => match user_txn.payload() {
                         aptos_types::transaction::TransactionPayload::EntryFunction(f) => {
@@ -412,7 +412,7 @@ impl TransactionBlockExecutor for NativeExecutor {
                 .collect::<Result<Vec<_>>>()
         })?;
         Ok(ChunkOutput {
-            transactions,
+            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })

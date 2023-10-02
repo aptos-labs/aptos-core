@@ -24,8 +24,9 @@ use aptos_types::{
     event::EventKey,
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        into_signature_verified_block, Transaction, Transaction::UserTransaction,
-        TransactionListWithProof, TransactionWithProof, WriteSetPayload,
+        into_signature_verified_block, SignatureVerifiedTransaction, Transaction,
+        Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
+        WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -124,7 +125,7 @@ pub fn test_execution_with_storage_impl_inner(
     let reconfig1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(100)));
 
-    let block1: Vec<_> = vec![
+    let block1: Vec<_> = into_signature_verified_block(vec![
         block1_meta,
         UserTransaction(tx1),
         UserTransaction(tx2),
@@ -136,7 +137,7 @@ pub fn test_execution_with_storage_impl_inner(
         UserTransaction(txn5),
         UserTransaction(txn6),
         UserTransaction(reconfig1),
-    ];
+    ]);
 
     let block2_id = gen_block_id(2);
     let block2_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
@@ -173,7 +174,7 @@ pub fn test_execution_with_storage_impl_inner(
 
     let output1 = executor
         .execute_block(
-            (block1_id, into_signature_verified_block(block1.clone())).into(),
+            (block1_id, block1.clone()).into(),
             parent_block_id,
             BLOCK_GAS_LIMIT,
         )
@@ -273,7 +274,8 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transactions(3, 12, current_version, false)
         .unwrap();
-    verify_transactions(&transaction_list_with_proof, &block1[2..]).unwrap();
+    let expected_txns: Vec<Transaction> = block1[2..].iter().map(|t| t.inner().clone()).collect();
+    verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
     // With sharding enabled, we won't have indices for event, skip the checks.
     if !force_sharding {
@@ -376,7 +378,7 @@ pub fn test_execution_with_storage_impl_inner(
     // Execute block 2, 3, 4
     let output2 = executor
         .execute_block(
-            (block2_id, into_signature_verified_block(block2)).into(),
+            (block2_id, block2).into(),
             epoch2_genesis_id,
             BLOCK_GAS_LIMIT,
         )
@@ -395,7 +397,7 @@ pub fn test_execution_with_storage_impl_inner(
 
     let output3 = executor
         .execute_block(
-            (block3_id, into_signature_verified_block(block3.clone())).into(),
+            (block3_id, block3.clone()).into(),
             epoch3_genesis_id,
             BLOCK_GAS_LIMIT,
         )
@@ -448,7 +450,8 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transactions(14, 15 + diff, current_version, false)
         .unwrap();
-    verify_transactions(&transaction_list_with_proof, &block3).unwrap();
+    let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.inner().clone()).collect();
+    verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
     // With sharding enabled, we won't have indices for event, skip the checks.
     if !force_sharding {
@@ -586,12 +589,12 @@ pub fn verify_transactions(
 
 pub fn verify_committed_txn_status(
     txn_with_proof: &TransactionWithProof,
-    expected_txn: &Transaction,
+    expected_txn: &SignatureVerifiedTransaction,
 ) -> Result<()> {
     let txn = &txn_with_proof.transaction;
 
     ensure!(
-        expected_txn == txn,
+        expected_txn.inner() == txn,
         "The two transactions do not match. Expected txn: {:?}, returned txn: {:?}",
         expected_txn,
         txn,

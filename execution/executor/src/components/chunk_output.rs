@@ -148,7 +148,7 @@ impl ChunkOutput {
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
-                .map(|t| t.into_txn())
+                .map(|t| t.into_txn().into_inner())
                 .collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),

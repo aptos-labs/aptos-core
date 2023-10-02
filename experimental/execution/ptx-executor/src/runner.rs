@@ -17,7 +17,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::Transaction,
+    transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
 use aptos_vm::{adapter_common::VMAdapter, storage_adapter::AsExecutorView, AptosVM};
@@ -75,7 +75,7 @@ enum Command {
     },
     AddTransaction {
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashMap<StateKey, Option<StateValue>>,
     },
     FinishBlock,
@@ -97,7 +97,7 @@ impl PtxRunnerClient {
     pub fn add_transaction(
         &self,
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashMap<StateKey, Option<StateValue>>,
     ) {
         self.send_to_manager(Command::AddTransaction {
@@ -157,7 +157,7 @@ impl WorkerManager {
     fn add_transaction(
         &mut self,
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashMap<StateKey, Option<StateValue>>,
     ) {
         // wait for next available worker
@@ -190,7 +190,7 @@ impl WorkerManager {
 enum WorkerCommand {
     ExecuteTransaction {
         txn_idx: TxnIdx,
-        transaction: Transaction,
+        transaction: SignatureVerifiedTransaction,
         dependencies: HashMap<StateKey, Option<StateValue>>,
     },
     Finish,
@@ -256,22 +256,16 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                 } => {
                     let _total = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_total_with_drops"]);
                     let _total1 = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_total"]);
-                    let _pre = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_pre_vm"]);
                     trace!("worker {} gonna run txn {}", self.worker_index, txn_idx);
                     let state_view =
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
-                    let preprocessed_txn = {
-                        let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "preprocess_txn"]);
-                        preprocess_transaction::<AptosVM>(transaction)
-                    };
-                    drop(_pre);
 
                     let executor_view = state_view.as_executor_view();
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
-                            &preprocessed_txn,
+                            &transaction,
                             &vm.as_move_resolver(&executor_view),
                             &log_context,
                         )

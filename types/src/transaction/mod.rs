@@ -582,13 +582,20 @@ impl Deref for SignatureCheckedTransaction {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SignatureVerifiedTransaction {
     Valid(Transaction),
     Invalid(Transaction),
 }
 impl SignatureVerifiedTransaction {
     pub fn into_inner(self) -> Transaction {
+        match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn,
+            SignatureVerifiedTransaction::Invalid(txn) => txn,
+        }
+    }
+
+    pub fn inner(&self) -> &Transaction {
         match self {
             SignatureVerifiedTransaction::Valid(txn) => txn,
             SignatureVerifiedTransaction::Invalid(txn) => txn,

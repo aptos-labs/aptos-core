@@ -20,7 +20,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
-    transaction::{Transaction, WriteSetPayload},
+    transaction::{into_signature_verified_block, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };
@@ -140,7 +140,7 @@ fn test_reconfiguration() {
         Some(aptos_stdlib::version_set_version(42)),
     );
 
-    let txn_block = vec![txn1, txn2, txn3];
+    let txn_block = into_signature_verified_block(vec![txn1, txn2, txn3]);
     let block_id = gen_block_id(1);
     let vm_output = executor
         .execute_block(

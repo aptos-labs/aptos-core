@@ -194,7 +194,10 @@ mod test_utils {
     };
     use aptos_types::{
         block_executor::partitioner::PartitionedTransactions,
-        transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
+        transaction::{
+            analyzed_transaction::AnalyzedTransaction, SignatureVerifiedTransaction, Transaction,
+            TransactionOutput,
+        },
     };
     use aptos_vm::{
         sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -297,12 +300,13 @@ mod test_utils {
             )
             .unwrap();
 
-        let ordered_txns: Vec<Transaction> = PartitionedTransactions::flatten(partitioned_txns)
-            .into_iter()
-            .map(|t| t.into_txn())
-            .collect();
+        let ordered_txns: Vec<SignatureVerifiedTransaction> =
+            PartitionedTransactions::flatten(partitioned_txns)
+                .into_iter()
+                .map(|t| t.into_txn())
+                .collect();
         let unsharded_txn_output =
-            AptosVM::execute_block(ordered_txns, executor.data_store(), None).unwrap();
+            AptosVM::execute_block(&ordered_txns, executor.data_store(), None).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -329,17 +333,18 @@ mod test_utils {
                 let receiver = &accounts[(j + i) % num_accounts].lock().unwrap();
                 let transfer_amount = 1_000;
                 let txn = generate_p2p_txn(sender, receiver, transfer_amount);
-                txn_hash_to_account.insert(txn.transaction().hash(), sender_addr);
+                txn_hash_to_account.insert(txn.transaction().inner().hash(), sender_addr);
                 transactions.push(txn)
             }
         }
 
         let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
-        let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
-            .into_iter()
-            .map(|t| t.into_txn())
-            .collect();
+        let execution_ordered_txns: Vec<SignatureVerifiedTransaction> =
+            PartitionedTransactions::flatten(partitioned_txns.clone())
+                .into_iter()
+                .map(|t| t.into_txn())
+                .collect();
         let sharded_txn_output = sharded_block_executor
             .execute_block(
                 Arc::new(executor.data_store().clone()),
@@ -350,7 +355,7 @@ mod test_utils {
             .unwrap();
 
         let unsharded_txn_output =
-            AptosVM::execute_block(execution_ordered_txns, executor.data_store(), None).unwrap();
+            AptosVM::execute_block(&execution_ordered_txns, executor.data_store(), None).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 
@@ -387,10 +392,11 @@ mod test_utils {
 
         let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
-        let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
-            .into_iter()
-            .map(|t| t.into_txn())
-            .collect();
+        let execution_ordered_txns: Vec<SignatureVerifiedTransaction> =
+            PartitionedTransactions::flatten(partitioned_txns.clone())
+                .into_iter()
+                .map(|t| t.into_txn())
+                .collect();
 
         let sharded_txn_output = sharded_block_executor
             .execute_block(
@@ -402,7 +408,7 @@ mod test_utils {
             .unwrap();
 
         let unsharded_txn_output =
-            AptosVM::execute_block(execution_ordered_txns, executor.data_store(), None).unwrap();
+            AptosVM::execute_block(&execution_ordered_txns, executor.data_store(), None).unwrap();
         compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
     }
 }

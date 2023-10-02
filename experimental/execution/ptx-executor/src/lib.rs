@@ -81,7 +81,7 @@ impl VMExecutor for PtxBlockExecutor {
 
             // Feed the transactions down the pipeline.
             for txn in transactions {
-                analyzer.analyze_transaction(txn);
+                analyzer.analyze_transaction(txn.clone());
             }
             analyzer.finish_block();
 

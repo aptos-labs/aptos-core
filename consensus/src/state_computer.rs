@@ -162,7 +162,7 @@ impl StateComputer for ExecutionProxy {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             transactions_to_execute
                 .into_par_iter()
-                .map(|txn| into_signature_verified(txn))
+                .map(into_signature_verified)
                 .collect::<Vec<_>>()
         });
 

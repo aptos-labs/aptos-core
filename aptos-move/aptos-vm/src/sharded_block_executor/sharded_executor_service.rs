@@ -116,10 +116,9 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             TOTAL_SUPPLY_AGGR_BASE_VAL,
         ));
 
-        // TODO(skedia) : Implement signature verification into sharding.
         let signature_verified_transactions: Vec<SignatureVerifiedTransaction> = transactions
             .into_iter()
-            .map(|txn| SignatureVerifiedTransaction::Valid(txn.into_txn().into_txn()))
+            .map(|txn| txn.into_txn().into_txn())
             .collect();
         let executor_thread_pool_clone = executor_thread_pool.clone();
 

@@ -168,7 +168,7 @@ where
                 self.block_partitioner.as_ref().unwrap().partition(
                     txns.iter()
                         .skip(1)
-                        .map(|txn| txn.into_inner().clone().into())
+                        .map(|txn| txn.inner().clone().into())
                         .collect::<Vec<AnalyzedTransaction>>(),
                     self.sharded_block_executor.as_ref().unwrap().num_shards(),
                 ),
@@ -309,7 +309,7 @@ where
         let (output, seq_tps) = if run_seq {
             println!("Sequential execution starts...");
             let (output, tps) =
-                self.execute_benchmark_sequential(transactions, maybe_block_gas_limit);
+                self.execute_benchmark_sequential(&transactions, maybe_block_gas_limit);
             println!("Sequential execution finishes, TPS = {}", tps);
             (output, tps)
         } else {

@@ -10,7 +10,10 @@ use aptos_types::{
     account_address::AccountAddress,
     block_executor::partitioner::PartitionedTransactions,
     state_store::state_key::StateKeyInner,
-    transaction::{analyzed_transaction::AnalyzedTransaction, Transaction, TransactionOutput},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction, SignatureVerifiedTransaction, Transaction,
+        TransactionOutput,
+    },
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -125,15 +128,12 @@ pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>
             None,
         )
         .unwrap();
-    let unsharded_txn_output = AptosVM::execute_block(
+    let txns: Vec<SignatureVerifiedTransaction> =
         PartitionedTransactions::flatten(partitioned_txns)
             .into_iter()
             .map(|t| t.into_txn())
-            .collect(),
-        executor.data_store(),
-        None,
-    )
-    .unwrap();
+            .collect();
+    let unsharded_txn_output = AptosVM::execute_block(&txns, executor.data_store(), None).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }
 
@@ -159,7 +159,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
             let receiver = &accounts[(j + i) % num_accounts].lock().unwrap();
             let transfer_amount = 1_000;
             let txn = generate_p2p_txn(sender, receiver, transfer_amount);
-            txn_hash_to_account.insert(txn.transaction().hash(), sender_addr);
+            txn_hash_to_account.insert(txn.transaction().inner().hash(), sender_addr);
             transactions.push(txn)
         }
     }
@@ -171,10 +171,11 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         .build();
     let partitioned_txns = partitioner.partition(transactions.clone(), num_shards);
 
-    let execution_ordered_txns = PartitionedTransactions::flatten(partitioned_txns.clone())
-        .into_iter()
-        .map(|t| t.into_txn())
-        .collect();
+    let execution_ordered_txns: Vec<SignatureVerifiedTransaction> =
+        PartitionedTransactions::flatten(partitioned_txns.clone())
+            .into_iter()
+            .map(|t| t.into_txn())
+            .collect();
     let sharded_txn_output = sharded_block_executor
         .execute_block(
             Arc::new(executor.data_store().clone()),
@@ -185,6 +186,6 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
         .unwrap();
 
     let unsharded_txn_output =
-        AptosVM::execute_block(execution_ordered_txns, executor.data_store(), None).unwrap();
+        AptosVM::execute_block(&execution_ordered_txns, executor.data_store(), None).unwrap();
     compare_txn_outputs(unsharded_txn_output, sharded_txn_output);
 }

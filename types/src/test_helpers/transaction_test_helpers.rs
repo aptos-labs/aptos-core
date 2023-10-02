@@ -6,8 +6,9 @@ use crate::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AccountAuthenticator, Module, RawTransaction, RawTransactionWithData,
-        Script, SignedTransaction, Transaction, TransactionPayload,
+        authenticator::AccountAuthenticator, into_signature_verified_block, Module, RawTransaction,
+        RawTransactionWithData, Script, SignatureVerifiedTransaction, SignedTransaction,
+        Transaction, TransactionPayload,
     },
 };
 use aptos_crypto::{ed25519::*, traits::*, HashValue};
@@ -246,9 +247,9 @@ pub fn get_test_txn_with_chain_id(
 pub fn block(
     mut user_txns: Vec<Transaction>,
     maybe_block_gas_limit: Option<u64>,
-) -> Vec<Transaction> {
+) -> Vec<SignatureVerifiedTransaction> {
     if maybe_block_gas_limit.is_none() {
         user_txns.push(Transaction::StateCheckpoint(HashValue::random()));
     }
-    user_txns
+    into_signature_verified_block(user_txns)
 }
