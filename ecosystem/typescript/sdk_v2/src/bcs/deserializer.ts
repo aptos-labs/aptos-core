@@ -212,4 +212,18 @@ export class Deserializer {
     // It is separate from the `deserialize` instance method defined here in Deserializer.
     return cls.deserialize(this);
   }
+
+  /**
+   * Deserializes an array of BCS Deserializable values.
+   *
+   * The serialized bytes must already be loaded into the Deserializer buffer.
+   */
+  deserializeVector<T>(cls: Deserializable<T>): Array<T> {
+    const length = this.deserializeUleb128AsU32();
+    const vector = new Array<T>();
+    for (let i = 0; i < length; i += 1) {
+      vector.push(this.deserialize(cls));
+    }
+    return vector;
+  }
 }

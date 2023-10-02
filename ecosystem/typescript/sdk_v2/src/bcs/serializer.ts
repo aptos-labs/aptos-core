@@ -282,6 +282,13 @@ export class Serializer {
     // Serializable interface, not the one defined in this class.
     value.serialize(this);
   }
+
+  serializeVector<T extends Serializable>(values: Array<T>) {
+    this.serializeU32AsUleb128(values.length);
+    values.forEach((item) => {
+      item.serialize(this);
+    });
+  }
 }
 
 /**
