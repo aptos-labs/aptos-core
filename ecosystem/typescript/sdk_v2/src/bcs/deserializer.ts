@@ -214,9 +214,28 @@ export class Deserializer {
   }
 
   /**
-   * Deserializes an array of BCS Deserializable values.
+   * Deserializes an array of BCS Deserializable values given an existing Deserializer
+   * instance with a loaded byte buffer.
    *
-   * The serialized bytes must already be loaded into the Deserializer buffer.
+   * @param cls The BCS-deserializable class to deserialize the buffered bytes into.
+   * @example
+   * // serialize a vector of addresses
+   * const serializer = new Serializer();
+   * const addresses = new Array<AccountAddress>(
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x2" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xb" }),
+   * );
+   * const serializer = new Serializer();
+   * serializer.serializeVector(addresses);
+   * const serializedBytes = serializer.toUint8Array();
+   *
+   * // deserialize the bytes into an array of addresses
+   * const deserializer = new Deserializer(serializedBytes);
+   * const deserializedAddresses = deserializer.deserializeVector(AccountAddress);
+   * // deserializedAddresses is now an array of AccountAddress instances
+   * @returns an array of deserialized values of type T
    */
   deserializeVector<T>(cls: Deserializable<T>): Array<T> {
     const length = this.deserializeUleb128AsU32();
