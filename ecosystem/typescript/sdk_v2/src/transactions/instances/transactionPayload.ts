@@ -9,6 +9,7 @@ import { TransactionPayloadVariants } from "../../types";
 import { TypeTag } from "../typeTag/typeTag";
 import { U8 } from "../../bcs/serializable/move-primitives";
 import { MoveVector } from "../../bcs/serializable/move-structs";
+import { FixedBytes } from "../../bcs/serializable/fixed-bytes";
 
 /**
  * Representation of the supported Transaction Payload

@@ -25,3 +25,8 @@ export enum Network {
   LOCAL = "local",
   CUSTOM = "custom",
 }
+
+export const NetworkToChainId: Record<string, number> = {
+  mainnet: 1,
+  testnet: 2,
+};
