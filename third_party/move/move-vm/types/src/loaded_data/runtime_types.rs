@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::loaded_data::instance_uid::{GlobalCache, InstanceUID};
 use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
@@ -11,9 +12,15 @@ use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
+use once_cell::sync::Lazy;
 use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
+
+pub static GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE: Lazy<GlobalCache<StructIdentifier>> =
+    Lazy::new(|| GlobalCache::new());
+
+pub type StructIdentifierUID = InstanceUID<'static, StructIdentifier>;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
@@ -115,7 +122,7 @@ pub struct StructType {
     pub phantom_ty_args_mask: Vec<bool>,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Arc<StructIdentifier>,
+    pub name: StructIdentifierUID,
 }
 
 impl StructType {
@@ -123,7 +130,6 @@ impl StructType {
         self.type_parameters.iter().map(|param| &param.constraints)
     }
 }
-
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct CachedStructIndex(pub usize);
 
@@ -144,12 +150,12 @@ pub enum Type {
     Signer,
     Vector(Box<Type>),
     Struct {
-        name: Arc<StructIdentifier>,
+        name: StructIdentifierUID,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
         ability: AbilitySet,
     },
     StructInstantiation {
-        name: Arc<StructIdentifier>,
+        name: StructIdentifierUID,
         ty_args: Arc<Vec<Type>>,
         #[derivative(PartialEq = "ignore", Hash = "ignore")]
         base_ability_set: AbilitySet,
@@ -366,11 +372,11 @@ impl Type {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    ty.abilities()?
-                ])
-            },
+            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![ty.abilities()?],
+            ),
             Type::Struct { ability, .. } => Ok(*ability),
             Type::StructInstantiation {
                 ty_args,

@@ -5,4 +5,5 @@
 //!
 //! This module contains the loaded definition of code data used in runtime.
 
+pub mod instance_uid;
 pub mod runtime_types;

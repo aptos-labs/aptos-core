@@ -4,14 +4,14 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
+use move_vm_types::loaded_data::runtime_types::{StructIdentifierUID, Type};
 use std::sync::Arc;
 
 // `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
 pub fn intern_type(
     module: BinaryIndexedView,
     tok: &SignatureToken,
-    struct_name_table: &[Arc<StructIdentifier>],
+    struct_name_table: &[StructIdentifierUID],
 ) -> PartialVMResult<Type> {
     let res = match tok {
         SignatureToken::Bool => Type::Bool,

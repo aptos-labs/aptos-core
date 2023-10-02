@@ -38,10 +38,13 @@ pub(crate) struct FunctionId {
 
 type ConstructorMap = Lazy<BTreeMap<String, FunctionId>>;
 static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
-    [("0x1::string::String", FunctionId {
-        module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
-        func_name: ident_str!("utf8"),
-    })]
+    [(
+        "0x1::string::String",
+        FunctionId {
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
+            func_name: ident_str!("utf8"),
+        },
+    )]
     .into_iter()
     .map(|(s, validator)| (s.to_string(), validator))
     .collect()
@@ -49,32 +52,56 @@ static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
 
 static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     [
-        ("0x1::string::String", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
-            func_name: ident_str!("utf8"),
-        }),
-        ("0x1::object::Object", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("object"))),
-            func_name: ident_str!("address_to_object"),
-        }),
-        ("0x1::option::Option", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))),
-            func_name: ident_str!("from_vec"),
-        }),
-        ("0x1::fixed_point32::FixedPoint32", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("fixed_point32")),
-            ),
-            func_name: ident_str!("create_from_raw_value"),
-        }),
-        ("0x1::fixed_point64::FixedPoint64", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("fixed_point64")),
-            ),
-            func_name: ident_str!("create_from_raw_value"),
-        }),
+        (
+            "0x1::string::String",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("string")),
+                ),
+                func_name: ident_str!("utf8"),
+            },
+        ),
+        (
+            "0x1::object::Object",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("object")),
+                ),
+                func_name: ident_str!("address_to_object"),
+            },
+        ),
+        (
+            "0x1::option::Option",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("option")),
+                ),
+                func_name: ident_str!("from_vec"),
+            },
+        ),
+        (
+            "0x1::fixed_point32::FixedPoint32",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("fixed_point32")),
+                ),
+                func_name: ident_str!("create_from_raw_value"),
+            },
+        ),
+        (
+            "0x1::fixed_point64::FixedPoint64",
+            FunctionId {
+                module_id: ModuleId::new(
+                    AccountAddress::ONE,
+                    Identifier::from(ident_str!("fixed_point64")),
+                ),
+                func_name: ident_str!("create_from_raw_value"),
+            },
+        ),
     ]
     .into_iter()
     .map(|(s, validator)| (s.to_string(), validator))
@@ -189,7 +216,11 @@ pub(crate) fn is_valid_txn_arg(typ: &Type, allowed_structs: &ConstructorMap) -> 
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
         Vector(inner) => is_valid_txn_arg(inner, allowed_structs),
         Struct { name, .. } | StructInstantiation { name, .. } => {
-            let full_name = format!("{}::{}", name.module.short_str_lossless(), name.name);
+            let full_name = format!(
+                "{}::{}",
+                name.uncompressed().module.short_str_lossless(),
+                name.uncompressed().name
+            );
             allowed_structs.contains_key(&full_name)
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
@@ -313,7 +344,11 @@ pub(crate) fn recursively_construct_arg(
         Struct { name, .. } | StructInstantiation { name, .. } => {
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
-            let full_name = format!("{}::{}", name.module.short_str_lossless(), name.name);
+            let full_name = format!(
+                "{}::{}",
+                name.uncompressed().module.short_str_lossless(),
+                name.uncompressed().name
+            );
             let constructor = allowed_structs
                 .get(&full_name)
                 .ok_or_else(invalid_signature)?;

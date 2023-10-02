@@ -9853,6 +9853,7 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
+ "dashmap",
  "derivative",
  "move-binary-format",
  "move-core-types",

@@ -25,7 +25,10 @@ use move_core_types::{
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructIdentifier, StructType, Type};
+use move_vm_types::loaded_data::runtime_types::{
+    DepthFormula, StructIdentifier, StructIdentifierUID, StructType, Type,
+    GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE,
+};
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
@@ -1169,11 +1172,11 @@ impl Loader {
 
     pub(crate) fn get_struct_type_by_identifier(
         &self,
-        name: &StructIdentifier,
+        name: &StructIdentifierUID,
     ) -> PartialVMResult<Arc<StructType>> {
         self.module_cache
             .read()
-            .resolve_struct_by_name(&name.name, &name.module)
+            .resolve_struct_by_name(&name.uncompressed().name, &name.uncompressed().module)
     }
 }
 
@@ -1558,10 +1561,12 @@ impl Script {
                         .finish(Location::Script),
                 );
             }
-            struct_names.push(Arc::new(StructIdentifier {
-                module: module_id,
-                name: struct_name.to_owned(),
-            }));
+            struct_names.push(
+                GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE.compress(StructIdentifier {
+                    module: module_id,
+                    name: struct_name.to_owned(),
+                }),
+            );
         }
 
         let mut function_refs = vec![];
@@ -1736,15 +1741,15 @@ impl StructInfoCache {
 
 #[derive(Clone)]
 pub(crate) struct TypeCache {
-    structs: HashMap<StructIdentifier, HashMap<Vec<Type>, StructInfoCache>>,
-    depth_formula: HashMap<StructIdentifier, DepthFormula>,
+    structs: BTreeMap<StructIdentifierUID, HashMap<Vec<Type>, StructInfoCache>>,
+    depth_formula: BTreeMap<StructIdentifierUID, DepthFormula>,
 }
 
 impl TypeCache {
     fn new() -> Self {
         Self {
-            structs: HashMap::new(),
-            depth_formula: HashMap::new(),
+            structs: BTreeMap::new(),
+            depth_formula: BTreeMap::new(),
         }
     }
 }
@@ -1782,7 +1787,7 @@ impl PseudoGasContext {
 impl Loader {
     fn struct_name_to_type_tag(
         &self,
-        name: &StructIdentifier,
+        name: &StructIdentifierUID,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
@@ -1802,9 +1807,9 @@ impl Loader {
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_tag = StructTag {
-            address: *name.module.address(),
-            module: name.module.name().to_owned(),
-            name: name.name.clone(),
+            address: *name.uncompressed().module.address(),
+            module: name.uncompressed().module.name().to_owned(),
+            name: name.uncompressed().name.clone(),
             type_params: ty_arg_tags,
         };
 
@@ -1880,7 +1885,7 @@ impl Loader {
 
     fn struct_name_to_type_layout(
         &self,
-        name: &StructIdentifier,
+        name: &StructIdentifierUID,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -2002,7 +2007,7 @@ impl Loader {
 
     fn struct_name_to_fully_annotated_layout(
         &self,
-        name: &StructIdentifier,
+        name: &StructIdentifierUID,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -2104,7 +2109,7 @@ impl Loader {
 
     pub(crate) fn calculate_depth_of_struct(
         &self,
-        name: &StructIdentifier,
+        name: &StructIdentifierUID,
     ) -> PartialVMResult<DepthFormula> {
         if let Some(depth_formula) = self.type_cache.read().depth_formula.get(name) {
             return Ok(depth_formula.clone());
