@@ -6496,6 +6496,7 @@ dependencies = [
  "rstest",
  "serde",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
