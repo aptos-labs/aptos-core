@@ -14,7 +14,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata, resolver::MoveResolver,
 };
-use std::{collections::BTreeSet, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct MoveVM {
@@ -102,14 +102,6 @@ impl MoveVM {
     /// TODO: new loader architecture
     pub fn flush_loader_cache_if_invalidated(&self) {
         self.runtime.loader().flush_if_invalidated()
-    }
-
-    /// Gets and clears module cache hits. This is hack which allows the adapter to see module
-    /// reads if executing multiple transactions in a VM. Without this, the adapter only sees
-    /// the first load of a module.
-    /// TODO: new loader architecture
-    pub fn get_and_clear_module_cache_hits(&self) -> BTreeSet<ModuleId> {
-        self.runtime.loader().get_and_clear_module_cache_hits()
     }
 
     /// Attempts to discover metadata in a given module with given key. Availability

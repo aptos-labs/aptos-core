@@ -252,35 +252,6 @@ impl Loader {
         &self.vm_config
     }
 
-    /// Gets and clears module cache hits. A cache hit may also be caused indirectly by
-    /// loading a function or a type. This not only returns the direct hit, but also
-    /// indirect ones, that is all dependencies.
-    pub(crate) fn get_and_clear_module_cache_hits(&self) -> BTreeSet<ModuleId> {
-        let mut result = BTreeSet::new();
-        let hits: BTreeSet<ModuleId> = std::mem::take(&mut self.module_cache_hits.write());
-        for id in hits {
-            self.transitive_dep_closure(&id, &mut result)
-        }
-        result
-    }
-
-    fn transitive_dep_closure(&self, id: &ModuleId, visited: &mut BTreeSet<ModuleId>) {
-        if !visited.insert(id.clone()) {
-            return;
-        }
-        let deps = self
-            .module_cache
-            .read()
-            .modules
-            .get(id)
-            .unwrap()
-            .module
-            .immediate_dependencies();
-        for dep in deps {
-            self.transitive_dep_closure(&dep, visited)
-        }
-    }
-
     /// Flush this cache if it is marked as invalidated.
     pub(crate) fn flush_if_invalidated(&self) {
         let mut invalidated = self.invalidated.write();
@@ -836,7 +807,7 @@ impl Loader {
         id: &ModuleId,
         data_store: &TransactionDataCache,
     ) -> VMResult<Arc<Module>> {
-        self.load_module_internal(id, &BTreeMap::new(), &BTreeSet::new(), data_store)
+        self.load_module_internal(id, data_store)
     }
 
     // Load the transitive closure of the target module first, and then verify that the modules in
@@ -844,8 +815,6 @@ impl Loader {
     fn load_module_internal(
         &self,
         id: &ModuleId,
-        bundle_verified: &BTreeMap<ModuleId, CompiledModule>,
-        bundle_unverified: &BTreeSet<ModuleId>,
         data_store: &TransactionDataCache,
     ) -> VMResult<Arc<Module>> {
         // if the module is already in the code cache, load the cached version
@@ -857,8 +826,8 @@ impl Loader {
         // otherwise, load the transitive closure of the target module
         let module_ref = self.load_and_verify_module_and_dependencies_and_friends(
             id,
-            bundle_verified,
-            bundle_unverified,
+            &BTreeMap::new(),
+            &BTreeSet::new(),
             data_store,
             /* allow_module_loading_failure */ true,
             /* dependencies_depth */ 0,
@@ -867,8 +836,8 @@ impl Loader {
         // verify that the transitive closure does not have cycles
         self.verify_module_cyclic_relations(
             module_ref.module(),
-            bundle_verified,
-            bundle_unverified,
+            &BTreeMap::new(),
+            &BTreeSet::new(),
         )
         .map_err(expect_no_verification_errors)?;
         Ok(module_ref)
