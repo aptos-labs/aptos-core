@@ -29,6 +29,8 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use std::net::SocketAddr;
+use aptos_executor::components::chunk_output;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -106,6 +108,10 @@ pub struct PipelineOpt {
     allow_aborts: bool,
     #[clap(long, default_value = "1")]
     num_executor_shards: usize,
+    #[clap(long)]
+    remote_sharding: bool,
+    #[clap(long, num_args = 1..)]
+    pub remote_executor_addresses: Option<Vec<SocketAddr>>,
     #[clap(long)]
     use_global_executor: bool,
     #[clap(long, default_value = "4")]
@@ -434,6 +440,10 @@ fn main() {
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
+    chunk_output::set_remote_sharding(opt.pipeline_opt.remote_sharding);
+    if opt.pipeline_opt.remote_executor_addresses.is_some() {
+        chunk_output::set_remote_addresses(opt.pipeline_opt.remote_executor_addresses.clone().unwrap());
+    }
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);
