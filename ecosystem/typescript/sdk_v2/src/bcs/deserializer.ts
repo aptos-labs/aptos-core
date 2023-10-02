@@ -220,7 +220,6 @@ export class Deserializer {
    * @param cls The BCS-deserializable class to deserialize the buffered bytes into.
    * @example
    * // serialize a vector of addresses
-   * const serializer = new Serializer();
    * const addresses = new Array<AccountAddress>(
    *   AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
    *   AccountAddress.fromHexInputRelaxed({ input: "0x2" }),
