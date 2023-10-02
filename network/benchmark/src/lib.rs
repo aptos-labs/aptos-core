@@ -324,10 +324,10 @@ pub async fn direct_sender(
     let start = time_service.now_unix_time().as_micros() as u64;
     loop {
         ticker.next().await;
-        if start + 1_000_000 > time_service.now_unix_time().as_micros() as u64 {
+        if start + 15_000_000 > time_service.now_unix_time().as_micros() as u64 {
             ticker.next().await;
         }
-        if start + 2_000_000 > time_service.now_unix_time().as_micros() as u64 {
+        if start + 30_000_000 > time_service.now_unix_time().as_micros() as u64 {
             ticker.next().await;
         }
 
