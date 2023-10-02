@@ -68,6 +68,20 @@ mainnet_runner_mapping = [
 ]
 
 
+def replay_with_retry(*args):
+    MAX_RETRIES = 3
+    attempt = 0
+    while attempt < MAX_RETRIES:
+        (n, return_code) = replay_verify_partition(*args)
+        if return_code == 0:
+            return (n, return_code)
+        elif attempt < MAX_RETRIES - 1:
+            print(f"Attempt {attempt + 1} failed for arguments {args}. Retrying.")
+            attempt += 1
+        else:
+            return (n, return_code)
+
+
 def replay_verify_partition(
     n: int,
     N: int,
@@ -199,7 +213,7 @@ def main():
 
     with Pool(N) as p:
         all_partitions = p.starmap(
-            replay_verify_partition,
+            replay_with_retry,
             [
                 (
                     n,
