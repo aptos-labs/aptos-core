@@ -760,7 +760,6 @@ where
                             .unwrap(),
                         );
                     }
-                    println!("Updates : {:?}", updates);
                     for (id, value) in updates.into_iter() {
                         data_map.write_aggregator(id, value);
                     }
