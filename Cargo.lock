@@ -9068,6 +9068,7 @@ dependencies = [
  "move-docgen",
  "move-errmapgen",
  "move-ir-types",
+ "move-model",
  "move-package",
  "move-prover",
  "move-resource-viewer",
