@@ -190,6 +190,7 @@ spec aptos_framework::stake {
     }
 
     spec on_new_epoch {
+        pragma verify = false;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
@@ -218,9 +219,8 @@ spec aptos_framework::stake {
         pragma verify = false;
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
-        aborts_if !exists<StakePool>(pool_address);
-        aborts_if !exists<ValidatorConfig>(pool_address);
-        aborts_if global<ValidatorConfig>(pool_address).validator_index >= len(validator_perf.validators);
+
+        include UpdateStakePoolAbortsIf;
 
         let stake_pool = global<StakePool>(pool_address);
         let validator_config = global<ValidatorConfig>(pool_address);
@@ -262,13 +262,34 @@ spec aptos_framework::stake {
         };
     }
 
+    spec schema UpdateStakePoolAbortsIf {
+        use aptos_std::type_info;
+
+        pool_address: address;
+        validator_perf: ValidatorPerformance;
+
+        aborts_if !exists<StakePool>(pool_address);
+        aborts_if !exists<ValidatorConfig>(pool_address);
+        aborts_if global<ValidatorConfig>(pool_address).validator_index >= len(validator_perf.validators);
+
+        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
+        aborts_if !exists<ValidatorFees>(aptos_addr);
+
+        let stake_pool = global<StakePool>(pool_address);
+
+        include DistributeRewardsAbortsIf {stake: stake_pool.active};
+        include DistributeRewardsAbortsIf {stake: stake_pool.pending_inactive};
+    }
+
     spec distribute_rewards {
         include ResourceRequirement;
         requires rewards_rate <= MAX_REWARDS_RATE;
         requires rewards_rate_denominator > 0;
         requires rewards_rate <= rewards_rate_denominator;
         requires num_successful_proposals <= num_total_proposals;
-        aborts_if false;
+
+        include DistributeRewardsAbortsIf;
+
         ensures old(stake.value) > 0 ==>
             result == spec_rewards_amount(
                 old(stake.value),
@@ -285,6 +306,28 @@ spec aptos_framework::stake {
                 rewards_rate_denominator);
         ensures old(stake.value) == 0 ==> result == 0;
         ensures old(stake.value) == 0 ==> stake.value == old(stake.value);
+    }
+
+    spec schema DistributeRewardsAbortsIf {
+        use aptos_std::type_info;
+
+        stake: Coin<AptosCoin>;
+        num_successful_proposals: num;
+        num_total_proposals: num;
+        rewards_rate: num;
+        rewards_rate_denominator: num;
+
+        let stake_amount = coin::value(stake);
+        let rewards_amount = if (stake_amount > 0) {
+            spec_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+        } else {
+            0
+        };
+        let amount = rewards_amount;
+        let addr = type_info::type_of<AptosCoin>().account_address;
+        aborts_if (rewards_amount > 0) && !exists<coin::CoinInfo<AptosCoin>>(addr);
+        modifies global<coin::CoinInfo<AptosCoin>>(addr);
+        include (rewards_amount > 0) ==> coin::CoinAddAbortsIf<AptosCoin> { amount: amount };
     }
 
     spec calculate_rewards_amount {
