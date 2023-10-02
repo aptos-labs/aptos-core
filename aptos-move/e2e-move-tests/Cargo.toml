@@ -44,5 +44,8 @@ rstest = { workspace = true }
 serde = { workspace = true }
 tempfile = { workspace = true }
 
+[dev-dependencies]
+test-case = { workspace = true }
+
 [lib]
 doctest = false

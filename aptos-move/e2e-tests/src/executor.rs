@@ -491,7 +491,18 @@ impl FakeExecutor {
 
         if !no_parallel {
             let parallel_output = self.execute_transaction_block_parallel(&sig_verified_block);
-            assert_eq!(output, parallel_output);
+
+            // make more granular comparison, to be able to understand test failures better
+            if output.is_ok() && parallel_output.is_ok() {
+                let seq_txn_output = output.as_ref().unwrap();
+                let par_txn_output = parallel_output.as_ref().unwrap();
+                assert_eq!(seq_txn_output.len(), par_txn_output.len());
+                for (idx, (seq_output, par_output)) in seq_txn_output.iter().zip(par_txn_output.iter()).enumerate() {
+                    assert_eq!(seq_output, par_output, "first transaction output mismatch at index {}", idx);
+                }
+            } else {
+                assert_eq!(output, parallel_output);
+            }
         }
 
         if let Some(logger) = &self.executed_output {
