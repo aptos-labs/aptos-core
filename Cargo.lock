@@ -1240,6 +1240,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-drop-helper",
+ "aptos-executor-service",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-experimental-runtimes",

@@ -9,7 +9,7 @@ use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
 use aptos_infallible::Mutex;
-use aptos_logger::{sample, sample::SampleRate, warn};
+use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     state_delta::StateDelta,
@@ -28,21 +28,70 @@ use aptos_types::{
 };
 use aptos_vm::{
     sharded_block_executor::{
-        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
+        local_executor_shard::LocalExecutorService,
         ShardedBlockExecutor,
     },
     AptosVM, VMExecutor,
 };
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use std::{ops::Deref, sync::Arc, time::Duration};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use aptos_executor_service::remote_executor_client::{COORDINATOR_PORT, RemoteExecutorClient};
+use aptos_secure_net::network_controller::NetworkController;
+use aptos_vm::sharded_block_executor::executor_client::ExecutorClient;
+use aptos_vm::sharded_block_executor::local_executor_shard::LocalExecutorClient;
+
+static REMOTE_SHARDING: OnceCell<bool> = OnceCell::new();
+static REMOTE_ADDRESSES: OnceCell<Vec<SocketAddr>> = OnceCell::new();
+
+/// Sets the flag when invoked the first time.
+pub fn set_remote_sharding(enable: bool) {
+    REMOTE_SHARDING.set(enable).ok();
+}
+
+pub fn get_remote_sharding() -> bool {
+    match REMOTE_SHARDING.get() {
+        Some(value) => *value,
+        None => false,
+    }
+}
+
+pub fn set_remote_addresses(addresses: Vec<SocketAddr>) {
+    REMOTE_ADDRESSES.set(addresses).ok();
+}
+
+pub fn get_remote_addresses() -> Vec<SocketAddr> {
+    match REMOTE_ADDRESSES.get() {
+        Some(value) => value.clone(),
+        None => vec![],
+    }
+}
 
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<
     Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
 > = Lazy::new(|| {
+    info!("*********** LOCAL_SHARDED_BLOCK_EXECUTOR");
     let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
     Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
+});
+
+pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
+    Arc<Mutex<ShardedBlockExecutor<CachedStateView, RemoteExecutorClient<CachedStateView>>>>,
+> = Lazy::new(|| {
+    info!("*********** REMOTE_SHARDED_BLOCK_EXECUTOR");
+    let coordinator_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT);
+    let mut controller = NetworkController::new(
+        "remote-executor-coordinator".to_string(),
+        coordinator_address,
+        5000,
+    );
+    let remote_shard_addresses = get_remote_addresses();
+    let remote_executor_client =
+        RemoteExecutorClient::new(remote_shard_addresses, &mut controller, None);
+    controller.start();
+    Arc::new(Mutex::new(ShardedBlockExecutor::new(remote_executor_client)))
 });
 
 pub struct ChunkOutput {
@@ -188,12 +237,21 @@ impl ChunkOutput {
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block_sharded(
-            SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            partitioned_txns,
-            state_view,
-            maybe_block_gas_limit,
-        )?)
+        if get_remote_sharding() {
+            Ok(V::execute_block_sharded(
+                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                maybe_block_gas_limit,
+            )?)
+        } else {
+            Ok(V::execute_block_sharded(
+                SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                maybe_block_gas_limit,
+            )?)
+        }
     }
 
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns

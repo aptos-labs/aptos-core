@@ -20,6 +20,8 @@ use std::{
     thread,
 };
 
+pub static COORDINATOR_PORT: u16 = 52200;
+
 #[allow(dead_code)]
 pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     state_view_service: Arc<RemoteStateViewService<S>>,
