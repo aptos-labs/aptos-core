@@ -180,7 +180,7 @@ impl ExecutedBlock {
         self.state_compute_result.reconfig_events().to_vec()
     }
 
-    pub fn dkg_events(&self) -> Vec<ContractEvent> {
+    pub fn dkg_event(&self) -> Vec<ContractEvent> {
         self.state_compute_result.dkg_events().to_vec()
     }
 

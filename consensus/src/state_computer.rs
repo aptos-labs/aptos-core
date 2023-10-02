@@ -164,7 +164,6 @@ impl StateComputer for ExecutionProxy {
             )
             .await;
 
-        let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().clone();
         Box::pin(async move {
             debug!(
                 block_id = block_id,
@@ -183,14 +182,6 @@ impl StateComputer for ExecutionProxy {
                 );
             }
 
-            // trigger the start of dkg after compute instead of commit to ensure pvss_config is always available for execution; otherwise it is possible one validator executes pvss trx before dkg starts
-            if compute_result.has_dkg_event() {
-                let dkg_events = compute_result.dkg_events().clone().to_vec();
-
-                // trigger the start of dkg
-                dkg_manager_wrapper.unwrap().start_dkg(dkg_events).await;
-            }
-
             Ok(compute_result)
         })
     }
@@ -207,6 +198,7 @@ impl StateComputer for ExecutionProxy {
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
         let mut reconfig_events = Vec::new();
+        let mut dkg_events = Vec::new();
         let mut has_dkg_payloads = false;
         let mut payloads = Vec::new();
         let logical_time = LogicalTime::new(
@@ -248,6 +240,7 @@ impl StateComputer for ExecutionProxy {
                 maybe_randomness,
             ));
             reconfig_events.extend(block.reconfig_event());
+            dkg_events.extend(block.dkg_event());
         }
 
         let executor = self.executor.clone();
@@ -272,6 +265,12 @@ impl StateComputer for ExecutionProxy {
             .send((Box::new(wrapped_callback), txns, reconfig_events))
             .await
             .expect("Failed to send async state sync notification");
+
+        // trigger the start of dkg
+        if !dkg_events.is_empty() {
+            let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
+            dkg_manager_wrapper.start_dkg(dkg_events).await;
+        }
         
         // finish dkg when the aggregated transcript is committed
         if has_dkg_payloads {
