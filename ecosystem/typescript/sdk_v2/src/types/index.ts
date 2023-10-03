@@ -155,6 +155,10 @@ export type PendingTransactionResponse = {
   signature?: TransactionSignature;
 };
 
+export function isPendingTransaction(txn: TransactionResponse): txn is PendingTransactionResponse {
+  return txn.type === "pending_transaction";
+}
+
 export type UserTransactionResponse = {
   type: string;
   version: string;
