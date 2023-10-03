@@ -36,7 +36,7 @@ use std::{
     collections::HashMap,
     marker::PhantomData,
     ops::DerefMut,
-    sync::{atomic::AtomicU32, Arc},
+    sync::{atomic::AtomicU32, Arc, Barrier},
 };
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -389,7 +389,10 @@ where
         base_view: &S,
         shared_counter: &AtomicU32,
         txn_fee_state: &Mutex<(FeeStatement, Vec<FeeStatement>)>,
+        debug_barrier: &Barrier,
     ) {
+        debug_barrier.wait();
+
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -492,6 +495,8 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let debug_barrier = Barrier::new(self.concurrency_level as usize);
+
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
@@ -505,6 +510,7 @@ where
                         base_view,
                         &shared_counter,
                         &txn_fee_state,
+                        &debug_barrier,
                     );
                 });
             }
