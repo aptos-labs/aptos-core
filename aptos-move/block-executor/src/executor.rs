@@ -453,7 +453,7 @@ where
         // then include the resource in the write set.
         let aggregator_v2_keys = last_input_output.aggregator_v2_keys(txn_idx);
         let read_set = last_input_output.read_set(txn_idx);
-        // TODO: Gives some error with this `mut`. See if we can avoid `mut` here.
+        // TODO: Gives some error without this `mut`. See if we can avoid `mut` here.
         if let Some(mut aggregator_v2_keys) = aggregator_v2_keys {
             if let Some(read_set) = read_set {
                 for (key, data_read) in read_set.as_ref().data_reads.iter() {
@@ -475,9 +475,7 @@ where
                                     if changed_aggregator {
                                         let mut patched_value = value.as_ref().clone();
                                         patched_value.set_bytes(patched_bytes);
-                                        // TODO: Is the patched_value of type `WriteOp`? How to convert this to WriteOp?
-                                        patched_resource_write_set
-                                            .insert(key.clone(), patched_value);
+                                        patched_resource_write_set.insert(key.clone(), patched_value);
                                     }
                                 },
                                 Err(_) => unreachable!(

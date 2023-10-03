@@ -40,6 +40,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    cell::RefCell,
 };
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
@@ -697,14 +698,16 @@ where
 
     fn incorporate_materialized_txn_output(
         &self,
-        _aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
         _patched_resource_write_set: HashMap<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         >,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) {
-        todo!()
+        assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
+        // TODO: Set the patched resource write set and events. But that requires the function
+        // to take &mut self as input
     }
 
     fn fee_statement(&self) -> FeeStatement {

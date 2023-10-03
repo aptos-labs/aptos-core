@@ -104,18 +104,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    // fn update_resource_write_set(
-    //     &self,
-    //     resource_write_set: HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>
-    // ) {
-    //     self.vm_output
-    //         .lock()
-    //         .as_ref()
-    //         .expect("Output to be set to update writes")
-    //         .change_set()
-    //         .update_resource_write_set(resource_write_set);
-    // }
-
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn module_write_set(&self) -> HashMap<StateKey, WriteOp> {
