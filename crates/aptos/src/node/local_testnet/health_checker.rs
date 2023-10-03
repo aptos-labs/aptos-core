@@ -14,10 +14,10 @@ const MAX_WAIT_S: u64 = 35;
 const WAIT_INTERVAL_MS: u64 = 150;
 
 /// This provides a single place to define a variety of different healthchecks.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub enum HealthChecker {
     /// Check that an HTTP API is up. The second param is the name of the HTTP service.
-    Http(Url, &'static str),
+    Http(Url, String),
     /// Check that the node API is up. This is just a specific case of Http for extra
     /// guarantees around liveliness.
     NodeApi(Url),
@@ -100,6 +100,14 @@ impl HealthChecker {
             HealthChecker::DataServiceGrpc(url) => url.as_str(),
         }
     }
+
+    /// Given a port, make an instance of HealthChecker::Http targeting 127.0.0.1.
+    pub fn http_checker_from_port(port: u16, name: String) -> Self {
+        Self::Http(
+            Url::parse(&format!("http://127.0.0.1:{}", port,)).unwrap(),
+            name,
+        )
+    }
 }
 
 impl std::fmt::Display for HealthChecker {
@@ -123,15 +131,25 @@ where
     let start = Instant::now();
     let mut started_successfully = false;
 
+    let mut last_error_message = None;
     while start.elapsed() < max_wait {
-        if check_fn().await.is_ok() {
-            started_successfully = true;
-            break;
+        match check_fn().await {
+            Ok(_) => {
+                started_successfully = true;
+                break;
+            },
+            Err(err) => {
+                last_error_message = Some(format!("{:#}", err));
+            },
         }
         tokio::time::sleep(wait_interval).await
     }
 
     if !started_successfully {
+        let error_message = match last_error_message {
+            Some(last_error_message) => format!("{}: {}", error_message, last_error_message),
+            None => error_message,
+        };
         return Err(CliError::UnexpectedError(error_message));
     }
 

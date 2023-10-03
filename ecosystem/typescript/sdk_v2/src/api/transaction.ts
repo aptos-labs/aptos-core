@@ -17,9 +17,7 @@ export class Transaction {
    *
    * @returns Array of on-chain transactions
    */
-  async getTransactions(args: {
-    options?: PaginationArgs;
-  }): Promise<TransactionResponse[]> {
+  async getTransactions(args: { options?: PaginationArgs }): Promise<TransactionResponse[]> {
     const transactions = await getTransactions({ aptosConfig: this.config, ...args });
     return transactions;
   }

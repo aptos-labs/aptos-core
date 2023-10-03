@@ -4,14 +4,12 @@ use super::{
     dag_driver::DagDriver,
     dag_fetcher::{FetchRequestHandler, FetchWaiter},
     dag_state_sync::{StateSyncStatus, StateSyncTrigger},
-    types::TDAGMessage,
     CertifiedNode, Node,
 };
 use crate::{
     dag::{dag_network::RpcHandler, rb_handler::NodeBroadcastHandler, types::DAGMessage},
     network::{IncomingDAGRequest, TConsensusMsg},
 };
-use anyhow::bail;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_logger::{debug, warn};
@@ -60,7 +58,7 @@ impl NetworkHandler {
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {
-                Some(msg) = dag_rpc_rx.next() => {
+                msg = dag_rpc_rx.select_next_some() => {
                     match self.process_rpc(msg).await {
                         Ok(sync_status) => {
                             if matches!(sync_status, StateSyncStatus::NeedsSync(_) | StateSyncStatus::EpochEnds) {
@@ -95,36 +93,20 @@ impl NetworkHandler {
         }
     }
 
-    fn verify_incoming_rpc(&self, dag_message: &DAGMessage) -> Result<(), anyhow::Error> {
-        match dag_message {
-            DAGMessage::NodeMsg(node) => node.verify(&self.epoch_state.verifier),
-            DAGMessage::CertifiedNodeMsg(certified_node) => {
-                certified_node.verify(&self.epoch_state.verifier)
-            },
-            DAGMessage::FetchRequest(request) => request.verify(&self.epoch_state.verifier),
-            _ => Err(anyhow::anyhow!(
-                "unexpected rpc message{:?}",
-                std::mem::discriminant(dag_message)
-            )),
-        }
-    }
-
     async fn process_rpc(
         &mut self,
         rpc_request: IncomingDAGRequest,
     ) -> anyhow::Result<StateSyncStatus> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
 
-        let author = dag_message
-            .author()
-            .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
-        if author != rpc_request.sender {
-            bail!("message author and network author mismatch");
-        }
+        debug!(
+            "processing rpc message {} from {}",
+            dag_message.name(),
+            rpc_request.sender
+        );
 
         let response: anyhow::Result<DAGMessage> = {
-            let verification_result = self.verify_incoming_rpc(&dag_message);
-            match verification_result {
+            match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
                 Ok(_) => match dag_message {
                     DAGMessage::NodeMsg(node) => {
                         self.node_receiver.process(node).await.map(|r| r.into())
@@ -150,7 +132,10 @@ impl NetworkHandler {
             }
         };
 
-        debug!("responding to rpc: {:?}", response);
+        debug!(
+            "responding to process_rpc {:?}",
+            response.as_ref().map(|r| r.name())
+        );
 
         let response = response
             .and_then(|response_msg| {

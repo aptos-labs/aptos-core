@@ -17,7 +17,7 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{Features, TimedFeatures},
+    on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
 };
 #[cfg(feature = "testing")]
 use aptos_types::{
@@ -109,7 +109,7 @@ pub fn assert_no_test_natives(err_msg: &str) {
             LATEST_GAS_FEATURE_VERSION,
             NativeGasParameters::zeros(),
             MiscGasParameters::zeros(),
-            TimedFeatures::enable_all(),
+            TimedFeaturesBuilder::enable_all().build(),
             Features::default()
         )
         .into_iter()
