@@ -177,7 +177,6 @@ impl BlockAptosVM {
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
             // Speculation is disabled in Miscellaneous context, which is used by testing and
