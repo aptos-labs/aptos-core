@@ -89,7 +89,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-        // maybe_error: &Mutex<Option<Error<E::Error>>>,
+        maybe_error: &Mutex<Option<Error<E::Error>>>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
@@ -165,18 +165,15 @@ where
             }
         }
 
-        let _ignore = last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
-        scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
-
-        // if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
-        //     if scheduler.halt() {
-        //         let mut maybe_error = maybe_error.lock();
-        //         *maybe_error = Some(Error::ModulePathReadWrite);
-        //     }
-        //     SchedulerTask::NoTask
-        // } else {
-        //     scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
-        // }
+        if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
+            if scheduler.halt() {
+                let mut maybe_error = maybe_error.lock();
+                *maybe_error = Some(Error::ModulePathReadWrite);
+            }
+            SchedulerTask::NoTask
+        } else {
+            scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
+        }
     }
 
     fn validate(
@@ -459,7 +456,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    // let (_, _, maybe_error) = shared_commit_state.get();
+                    let (_, _, maybe_error) = shared_commit_state.get();
                     Self::execute(
                         txn_idx,
                         incarnation,
@@ -470,13 +467,14 @@ where
                         &executor,
                         base_view,
                         ParallelState::new(versioned_cache, scheduler, shared_counter),
-                        // maybe_error,
+                        maybe_error,
                     )
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
-                    *lock.lock() = DependencyStatus::Resolved;
+                    let mut lock = lock.lock();
+                    *lock = DependencyStatus::Resolved;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
 

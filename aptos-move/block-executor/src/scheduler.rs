@@ -639,7 +639,8 @@ impl Scheduler {
                 | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
                     // Mark parallel execution halted due to reasons like module r/w intersection.
-                    *lock.lock() = DependencyStatus::ExecutionHalted;
+                    let mut lock = lock.lock();
+                    *lock = DependencyStatus::ExecutionHalted;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
                 },
@@ -829,9 +830,6 @@ impl Scheduler {
     /// Return false when the execution is halted.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) -> bool {
         let mut status = self.txn_status[txn_idx as usize].0.write();
-        if self.done_marker.load(Ordering::Acquire) {
-            return false;
-        }
         match *status {
             ExecutionStatus::Executing(incarnation) => {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
