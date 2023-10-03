@@ -5,7 +5,7 @@ use crate::natives::aggregator_natives::{
     helpers_v1::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
-use aptos_aggregator::types::AggregatorVersionedID;
+use aptos_aggregator::types::{AggregatorVersionedID, ReadPosition};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
@@ -41,7 +41,7 @@ fn native_add(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    aggregator.try_add(aggregator_context.resolver, value)?;
+    aggregator.try_add(value, aggregator_context.resolver)?;
     Ok(smallvec![])
 }
 
@@ -68,7 +68,10 @@ fn native_read(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
 
-    let value = aggregator.read_aggregated_aggregator_value(aggregator_context.resolver)?;
+    let value = aggregator.read_aggregated_aggregator_value(
+        aggregator_context.resolver,
+        ReadPosition::AfterCurrentTxn,
+    )?;
 
     Ok(smallvec![Value::u128(value)])
 }
@@ -97,7 +100,7 @@ fn native_sub(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    aggregator.try_sub(aggregator_context.resolver, value)?;
+    aggregator.try_sub(value, aggregator_context.resolver)?;
     Ok(smallvec![])
 }
 

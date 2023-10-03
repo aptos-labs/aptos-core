@@ -8,6 +8,7 @@ use crate::{
 };
 use move_binary_format::errors::PartialVMResult;
 
+// TODO To be renamed to DelayedApplyChange
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AggregatorApplyChange<I: Clone> {
     AggregatorDelta {
@@ -27,6 +28,7 @@ pub enum AggregatorApplyChange<I: Clone> {
     },
 }
 
+// TODO To be renamed to DelayedChange
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AggregatorChange<I: Clone> {
     Create(AggregatorValue),

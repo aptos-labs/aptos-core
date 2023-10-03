@@ -45,6 +45,7 @@ pub enum AggregatorError {
     WrongVersionID,
 }
 
+// TODO To be renamed to DelayedFieldID
 /// Ephemeral identifier type used by aggregators V2.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AggregatorID(u64);
@@ -149,10 +150,12 @@ impl TryFrom<AggregatorVersionedID> for StateKey {
     }
 }
 
+// TODO To be renamed to DelayedFieldValue
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AggregatorValue {
     Aggregator(u128),
     Snapshot(u128),
+    // TODO probably change to Derived(Arc<Vec<u8>>) to make copying predictably costly
     Derived(Vec<u8>),
 }
 
@@ -304,4 +307,9 @@ impl SnapshotToStringFormula {
             },
         }
     }
+}
+
+pub enum ReadPosition {
+    BeforeCurrentTxn,
+    AfterCurrentTxn,
 }
