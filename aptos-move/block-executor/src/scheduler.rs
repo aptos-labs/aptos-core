@@ -831,6 +831,9 @@ impl Scheduler {
     /// Return false when the execution is halted.
     fn suspend(&self, txn_idx: TxnIndex, dep_condvar: DependencyCondvar) -> bool {
         let mut status = self.txn_status[txn_idx as usize].0.write();
+        if self.done_marker.load(Ordering::Acquire) {
+            return false;
+        }
         match *status {
             ExecutionStatus::Executing(incarnation) => {
                 *status = ExecutionStatus::Suspended(incarnation, dep_condvar);
