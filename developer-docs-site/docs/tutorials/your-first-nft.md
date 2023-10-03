@@ -349,24 +349,24 @@ To create a token, the creator must specify an associated collection. A token mu
 <Tabs groupId="sdk-examples">
   <TabItem value="typescript" label="Typescript">
 
-Your application will call `createToken`:
+Your application will call `mint`:
 ```ts
 :!: static/sdks/typescript/examples/typescript/simple_aptos_token.ts section_5
 ```
 
-This is the function signature of `createToken`. It returns a transaction hash:
+This is the function signature of `mint`. It returns a transaction hash:
 ```ts
 :!: static/sdks/typescript/src/plugins/aptos_token.ts mint
 ```
   </TabItem>
   <TabItem value="python" label="Python">
 
-Your application will call `create_token`:
+Your application will call `mint_token`:
 ```python
 :!: static/sdks/python/examples/simple_aptos_token.py section_5
 ```
 
-This is the function signature of `create_token`. It returns a transaction hash:
+This is the function signature of `mint_token`. It returns a transaction hash:
 ```python
 :!: static/sdks/python/aptos_sdk/aptos_token_client.py mint_token
 ```
