@@ -2119,7 +2119,7 @@ impl DbWriter for AptosDB {
                 first_version,
                 latest_in_memory_state.current.usage(),
                 None,
-                /*skip_index_and_usage=*/ false,
+                self.skip_index_and_usage,
             )?;
 
             {
