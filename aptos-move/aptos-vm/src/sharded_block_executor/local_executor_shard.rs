@@ -16,9 +16,12 @@ use std::{sync::Arc, thread};
 use std::arch::aarch64::vld4_dup_f32;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
-use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardCommit, CrossShardMessage};
+use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardTxnResult, CrossShardMessage};
 use aptos_types::block_executor::partitioner::PartitionedTransactionsV3;
+use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
+use crate::adapter_common::PreprocessedTransaction;
 use crate::block_executor::AptosTransactionOutput;
+use crate::sharded_block_executor::sharded_aggregator_service::get_state_value;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -237,7 +240,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
                 Ok(txn_output_lists) => {
                     for txn_output_list in txn_output_lists { // This loop should only have 1 iteration.
                         for (local_idx, txn_output) in txn_output_list.into_iter().enumerate() {
-                            output_vec[global_idx_sets_by_shard[shard_idx][local_idx]] = Some(txn_output);
+                            output_vec[global_idx_sets_by_shard[shard_idx][local_idx] as usize] = Some(txn_output);
                         }
                     }
                 }
@@ -246,6 +249,16 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
                 }
             }
         }
+
+        //sharding v3 todo: Update total supply
+        // let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
+        //
+        // for output_ref in output_vec.iter_mut() {
+        //     let output = output_ref.as_mut().unwrap();
+        //     if let Some(delta) = output.write_set().get_total_supply() {
+        //         output.update_total_supply()
+        //     }
+        // }
 
         let ret = output_vec.into_iter().map(|output| output.unwrap()).collect();
         Ok(ret)
@@ -365,8 +378,8 @@ impl CrossShardClient for LocalCrossShardClient {
 }
 
 pub struct LocalCrossShardClientV3 {
-    txs: Vec<Sender<CrossShardMessage<AptosTransactionOutput, VMStatus>>>,
-    rx: Receiver<CrossShardMessage<AptosTransactionOutput, VMStatus>>,
+    txs: Vec<Sender<CrossShardMessage<PreprocessedTransaction, VMStatus>>>,
+    rx: Receiver<CrossShardMessage<PreprocessedTransaction, VMStatus>>,
 }
 
 impl LocalCrossShardClientV3 {
@@ -374,7 +387,7 @@ impl LocalCrossShardClientV3 {
         let mut txs = vec![];
         let mut rxs = vec![];
         for _ in 0..num_shards {
-            let (tx, rx) = unbounded::<CrossShardMessage<AptosTransactionOutput, VMStatus>>();
+            let (tx, rx) = unbounded::<CrossShardMessage<PreprocessedTransaction, VMStatus>>();
             txs.push(tx);
             rxs.push(rx);
         }
@@ -382,12 +395,12 @@ impl LocalCrossShardClientV3 {
     }
 }
 
-impl CrossShardClientForV3<AptosTransactionOutput, VMStatus> for LocalCrossShardClientV3 {
-    fn send(&self, shard_idx: usize, output: CrossShardMessage<AptosTransactionOutput, VMStatus>) {
+impl CrossShardClientForV3<PreprocessedTransaction, VMStatus> for LocalCrossShardClientV3 {
+    fn send(&self, shard_idx: usize, output: CrossShardMessage<PreprocessedTransaction, VMStatus>) {
         self.txs[shard_idx].send(output).unwrap();
     }
 
-    fn recv(&self) -> CrossShardMessage<AptosTransactionOutput, VMStatus> {
+    fn recv(&self) -> CrossShardMessage<PreprocessedTransaction, VMStatus> {
         self.rx.recv().unwrap()
     }
 }

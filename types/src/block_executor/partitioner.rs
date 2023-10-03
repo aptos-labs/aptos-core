@@ -464,13 +464,14 @@ pub struct PartitionedTransactionsV2 {
 }
 
 /// The input of a shard in sharded execution V3.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct PartitionV3 {
     pub block_id: [u8; 32],
     pub txns: Vec<AnalyzedTransaction>,
     pub global_idxs: Vec<u32>,
+    pub local_idx_by_global: HashMap<u32, usize>,
     pub key_sets_by_dep: HashMap<u32, HashSet<StateKey>>,
-    pub follower_shard_sets: Vec<Vec<usize>>,
+    pub follower_shard_sets: Vec<HashSet<usize>>,
 }
 
 impl PartitionV3 {
@@ -478,18 +479,31 @@ impl PartitionV3 {
         self.txns.len()
     }
 
-    pub fn add_checkpoint_txn(&mut self, txn_idx: u32, txn: AnalyzedTransaction) {
+    pub fn append_txn(&mut self, txn_idx: u32, txn: AnalyzedTransaction) {
+        let local_idx = self.txns.len();
         self.txns.push(txn);
+        self.follower_shard_sets.push(HashSet::new());
         self.global_idxs.push(txn_idx);
-        self.follower_shard_sets.push(vec![]);
+        self.local_idx_by_global.insert(txn_idx, local_idx);
+    }
+
+    pub fn insert_follower_shard(&mut self, src_global_idx: u32, follower_shard_idx: usize) {
+        let local_idx = *self.local_idx_by_global.get(&src_global_idx).unwrap();
+        self.follower_shard_sets[local_idx].insert(follower_shard_idx);
+    }
+
+    pub fn insert_remote_dependency(&mut self, owner_txn_idx: u32, key: StateKey) {
+        if !self.local_idx_by_global.contains_key(&owner_txn_idx) {
+            self.key_sets_by_dep.entry(owner_txn_idx).or_insert_with(HashSet::new).insert(key);
+        }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartitionedTransactionsV3 {
-    pub block_id: [u8; 32],
+    pub block_id: [u8; 32], //TODO: debugging only, clean up
     pub partitions: Vec<PartitionV3>,
-    pub global_idx_sets_by_shard: Vec<Vec<TxnIndex>>,
+    pub global_idx_sets_by_shard: Vec<Vec<u32>>,
 }
 
 impl PartitionedTransactionsV3 {
@@ -588,7 +602,8 @@ impl PartitionedTransactions {
                 // Append the txn to the last shard.
                 let analyzed_txn = AnalyzedTransaction::from(last_txn);
                 let txn_idx = obj.num_txns() as u32;
-                obj.partitions.last_mut().unwrap().add_checkpoint_txn(txn_idx, analyzed_txn);
+                obj.partitions.last_mut().unwrap().append_txn(txn_idx, analyzed_txn);
+                obj.global_idx_sets_by_shard.last_mut().unwrap().push(txn_idx);
             }
         }
     }

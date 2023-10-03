@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error<E> {
     /// The same module access path for module was both read & written during speculative executions.
     /// This may trigger a race due to the Move-VM loader cache implementation, and mitigation requires

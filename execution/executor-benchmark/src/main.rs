@@ -4,9 +4,9 @@
 
 use aptos_block_partitioner::{PartitionerConfig, pre_partition::{
     connected_component::config::ConnectedComponentPartitionerConfig,
-    default_pre_partitioner_config, uniform_partitioner::config::UniformPartitionerConfig,
-    PrePartitionerConfig,
-}, v2::config::PartitionerV2Config, V3RandomPartitionerConfig};
+    default_pre_partitioner_config, PrePartitionerConfig,
+    uniform_partitioner::config::UniformPartitionerConfig,
+}, v2::config::PartitionerV2Config};
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
@@ -15,7 +15,7 @@ use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::Pipeli
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
-use aptos_metrics_core::{register_int_gauge, IntGauge};
+use aptos_metrics_core::{IntGauge, register_int_gauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
 use aptos_transaction_generator_lib::args::TransactionTypeArg;
@@ -26,6 +26,7 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_block_partitioner::v3::V3NaivePartitionerConfig;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -159,7 +160,7 @@ impl PipelineOpt {
                 partition_last_round: !self.use_global_executor,
                 pre_partitioner_config: self.pre_partitioner_config(),
             }),
-            Some("v3-random") => Box::new(V3RandomPartitionerConfig {}),
+            Some("v3-naive") => Box::new(V3NaivePartitionerConfig {}),
             None => Box::new(PartitionerV2Config::default()),
             _ => panic!(
                 "Unknown partitioner version: {:?}",

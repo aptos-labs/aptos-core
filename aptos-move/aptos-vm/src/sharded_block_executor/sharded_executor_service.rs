@@ -25,7 +25,7 @@ use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, ShardedTxnProvider};
 use aptos_types::block_executor::partitioner::PartitionV3;
-use crate::adapter_common::preprocess_transaction;
+use crate::adapter_common::{preprocess_transaction, PreprocessedTransaction};
 use crate::aptos_vm::RAYON_EXEC_POOL;
 use crate::sharded_block_executor::ExecuteV3PartitionCommand;
 use rayon::iter::ParallelIterator;
@@ -37,7 +37,7 @@ pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     coordinator_client: Arc<dyn CoordinatorClient<S>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
-    v3_client: Arc<dyn CrossShardClientForV3<AptosTransactionOutput, VMStatus>>
+    v3_client: Arc<dyn CrossShardClientForV3<PreprocessedTransaction, VMStatus>>
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
@@ -47,7 +47,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         num_threads: usize,
         coordinator_client: Arc<dyn CoordinatorClient<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
-        v3_client: Arc<dyn CrossShardClientForV3<AptosTransactionOutput, VMStatus>>,
+        v3_client: Arc<dyn CrossShardClientForV3<PreprocessedTransaction, VMStatus>>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -238,7 +238,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 },
                 ExecutorShardCommand::ExecuteV3Partition(cmd) => {
                     let ExecuteV3PartitionCommand{ state_view, partition, concurrency_level_per_shard, maybe_block_gas_limit } = cmd;
-                    let PartitionV3 { block_id, txns, global_idxs, key_sets_by_dep, follower_shard_sets } = partition;
+                    let PartitionV3 { block_id, txns, global_idxs, local_idx_by_global, key_sets_by_dep, follower_shard_sets } = partition;
                     let processed_txns = self.executor_thread_pool.install(|| {
                         txns.into_par_iter().with_min_len(25)
                             .map(|analyzed_txn|{
@@ -254,10 +254,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         self.v3_client.clone(),
                         processed_txns,
                         global_idxs,
+                        local_idx_by_global,
                         key_sets_by_dep,
                         follower_shard_sets,
                     );
 
+                    disable_speculative_logging();
                     let result = BlockAptosVM::execute_block(
                         self.executor_thread_pool.clone(),
                         Arc::new(txn_provider),

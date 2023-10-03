@@ -7,10 +7,11 @@ use std::sync::Arc;
 use aptos_mvhashmap::MVHashMap;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::executable::Executable;
+use aptos_types::write_set::WriteOp;
 use move_core_types::account_address::AccountAddress;
 use crate::scheduler::Scheduler;
 use crate::task::{Transaction, TransactionOutput};
-use crate::txn_last_input_output::TxnOutput;
+use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
 use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
 
 /// Some logic of vanilla BlockSTM.
@@ -84,7 +85,7 @@ impl<T, TO, TE> BlockSTMPlugin<T, TO, TE> for DefaultTxnProvider<T>
         vec![]
     }
 
-    fn run_sharding_msg_loop<TAG, X: Executable + 'static>(&self, _mv_cache: &MVHashMap<T::Key, TAG, T::Value, X>, _scheduler: &Scheduler<Self>) {
+    fn run_sharding_msg_loop<X: Executable + 'static>(&self, _mv_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>, _scheduler: &Scheduler<Self>) {
         // Nothing to do.
     }
 
@@ -96,7 +97,7 @@ impl<T, TO, TE> BlockSTMPlugin<T, TO, TE> for DefaultTxnProvider<T>
         &self.txns[idx as usize]
     }
 
-    fn on_local_commit(&self, _txn_idx: TxnIndex, _txn_output: Arc<TxnOutput<TO, TE>>) {
+    fn on_local_commit(&self, _txn_idx: TxnIndex, _last_input_output: &TxnLastInputOutput<T, TO, TE>, _delta_writes: &Vec<(T::Key, WriteOp)>) {
         // Nothing to do.
     }
 

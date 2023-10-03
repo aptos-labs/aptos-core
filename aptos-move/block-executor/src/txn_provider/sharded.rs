@@ -4,33 +4,37 @@ use std::fmt::Debug;
 use aptos_mvhashmap::types::TxnIndex;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::slice::Iter;
 use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::{Receiver, Sender};
 use dashmap::DashSet;
 use serde::Serialize;
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_logger::info;
 use aptos_mvhashmap::MVHashMap;
 use aptos_types::block_executor::partitioner::PartitionV3;
 use aptos_types::executable::Executable;
+use aptos_types::write_set::WriteOp;
+use crate::errors::Error;
 use crate::scheduler::Scheduler;
 use crate::task::{ExecutionStatus, Transaction, TransactionOutput};
 use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
 use crate::txn_provider::{BlockSTMPlugin, TxnIndexProvider};
 
-pub enum CrossShardMessage<TO: TransactionOutput, TE: Debug> {
-    Commit(CrossShardCommit<TO, TE>),
+pub enum CrossShardMessage<T: Transaction, TE: Debug> {
+    Commit(CrossShardTxnResult<T, TE>),
     Shutdown,
 }
 
-pub struct CrossShardCommit<TO: TransactionOutput, TE: Debug> {
+pub struct CrossShardTxnResult<T: Transaction, TE: Debug> {
     pub global_txn_idx: TxnIndex,
-    pub txn_output: Arc<TxnOutput<TO, TE>>, //TODO: get rid of Arc so it can work with cross-machine sharding.
+    pub result: ExecutionStatus<ConcreteTxnOutput<T>, Error<TE>>,
 }
 
-pub trait CrossShardClientForV3<TO: TransactionOutput, TE: Debug>: Send + Sync {
-    fn send(&self, shard_idx: usize, output: CrossShardMessage<TO, TE>);
-    fn recv(&self) -> CrossShardMessage<TO, TE>;
+pub trait CrossShardClientForV3<T: Transaction, TE: Debug>: Send + Sync {
+    fn send(&self, shard_idx: usize, output: CrossShardMessage<T, TE>);
+    fn recv(&self) -> CrossShardMessage<T, TE>;
 }
 
 /// A BlockSTM plug-in that allows distributed execution with multiple BlockSTM instances.
@@ -50,29 +54,30 @@ pub struct ShardedTxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> 
     pub remote_dependencies: HashMap<TxnIndex, HashSet<T::Key>>,
 
     /// Maps a local txn to every shard that contain at least 1 follower.
-    pub follower_shard_sets: Vec<Vec<usize>>,
+    pub follower_shard_sets: Vec<HashSet<usize>>,
 
     remote_committed_txns: DashSet<TxnIndex>,
-    cross_shard_client: Arc<dyn CrossShardClientForV3<TO, TE>>,
+    cross_shard_client: Arc<dyn CrossShardClientForV3<T, TE>>,
+    phantom: PhantomData<TO>,
 }
 
-impl<TX, TO, TE> ShardedTxnProvider<TX, TO, TE>
+impl<T, TO, TE> ShardedTxnProvider<T, TO, TE>
     where
-        TX: Transaction,
-        TO: TransactionOutput<Txn = TX>,
+        T: Transaction,
+        TO: TransactionOutput<Txn = T>,
         TE: Debug + Send + Clone,
 {
     pub fn new(
         block_id: [u8; 32],
         num_shards: usize,
         shard_idx: usize,
-        cross_shard_client: Arc<dyn CrossShardClientForV3<TO, TE>>,
-        txns: Vec<TX>,
+        cross_shard_client: Arc<dyn CrossShardClientForV3<T, TE>>,
+        txns: Vec<T>,
         global_idxs: Vec<TxnIndex>,
-        remote_dependencies: HashMap<TxnIndex, HashSet<TX::Key>>,
-        follower_shard_sets: Vec<Vec<usize>>,
+        local_idxs_by_global: HashMap<TxnIndex, usize>,
+        remote_dependencies: HashMap<TxnIndex, HashSet<T::Key>>,
+        follower_shard_sets: Vec<HashSet<usize>>,
     ) -> Self {
-        let local_idxs_by_global = global_idxs.iter().enumerate().map(|(local_idx, &global_idx)| (global_idx, local_idx)).collect();
         Self {
             block_id,
             num_shards,
@@ -84,10 +89,11 @@ impl<TX, TO, TE> ShardedTxnProvider<TX, TO, TE>
             follower_shard_sets,
             remote_committed_txns: Default::default(),
             cross_shard_client,
+            phantom: Default::default(),
         }
     }
 
-    pub fn txn(&self, idx: TxnIndex) -> &TX {
+    pub fn txn(&self, idx: TxnIndex) -> &T {
         let local_rank = self.local_idxs_by_global.get(&idx).copied().unwrap();
         &self.txns[local_rank]
     }
@@ -100,31 +106,25 @@ impl<TX, TO, TE> ShardedTxnProvider<TX, TO, TE>
         self.txns.len()
     }
 
-    fn apply_updates_to_mv<TAG, X>(
+    fn apply_updates_to_mv<X: Executable + 'static>(
         &self,
-        versioned_cache: &MVHashMap<TX::Key, TAG, TX::Value, X>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         global_txn_idx: TxnIndex,
-        output: &TO
-    ) where
-        TAG: Hash + Clone + Eq + PartialEq + Debug + Serialize,
-        X: Executable + 'static,
-    {
+        txn_output: ConcreteTxnOutput<T>,
+    ) {
+        let ConcreteTxnOutput { resource_write_set, module_write_set, aggregator_v1_write_set, aggregator_v1_delta_set } = txn_output;
         // First, apply writes.
-        let write_version = (global_txn_idx, 0);
-        for (k, v) in output
-            .resource_write_set()
-            .into_iter()
-            .chain(output.aggregator_v1_write_set().into_iter())
+        for (k, v) in resource_write_set.into_iter().chain(aggregator_v1_write_set.into_iter())
         {
             versioned_cache.data().write(k, global_txn_idx, 0, v);
         }
 
-        for (k, v) in output.module_write_set().into_iter() {
+        for (k, v) in module_write_set.into_iter() {
             versioned_cache.modules().write(k, global_txn_idx, v);
         }
 
         // Then, apply deltas.
-        for (k, d) in output.aggregator_v1_delta_set().into_iter() {
+        for (k, d) in aggregator_v1_delta_set.into_iter() {
             versioned_cache.data().add_delta(k, global_txn_idx, d);
         }
     }
@@ -203,18 +203,20 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
             .collect()
     }
 
-    fn run_sharding_msg_loop<TAG, X>(
+    fn txn(&self, idx: TxnIndex) -> &TX {
+        let local_rank = self.local_idxs_by_global.get(&idx).copied().unwrap();
+        &self.txns[local_rank]
+    }
+
+    fn run_sharding_msg_loop<X: Executable + 'static>(
         &self,
-        mv: &MVHashMap<TX::Key, TAG, TX::Value, X>,
+        mv: &MVHashMap<TX::Key, TX::Tag, TX::Value, X>,
         scheduler: &Scheduler<Self>
-    ) where
-        TAG: Hash + Clone + Eq + PartialEq + Debug + Serialize,
-        X: Executable + 'static
-    {
+    ) {
         loop {
             match self.cross_shard_client.recv() {
-                CrossShardMessage::Commit(CrossShardCommit{ global_txn_idx, txn_output }) => {
-                    match txn_output.output_status() {
+                CrossShardMessage::Commit(CrossShardTxnResult { global_txn_idx, result }) => {
+                    match result {
                         ExecutionStatus::Success(output) => {
                             self.apply_updates_to_mv(mv, global_txn_idx, output);
                         }
@@ -222,7 +224,7 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
                             self.apply_updates_to_mv(mv, global_txn_idx, output);
                         }
                         ExecutionStatus::Abort(_) => {
-                            //sharding todo: anything to do here?
+                            //sharding todo: what to do here?
                         }
                     }
                     self.remote_committed_txns.insert(global_txn_idx);
@@ -237,21 +239,48 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
         self.cross_shard_client.send(self.shard_idx, CrossShardMessage::Shutdown);
     }
 
-    fn txn(&self, idx: TxnIndex) -> &TX {
-        let local_rank = self.local_idxs_by_global.get(&idx).copied().unwrap();
-        &self.txns[local_rank]
-    }
+    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<TX, TO, TE>, _delta_writes: &Vec<(TX::Key, WriteOp)>) {
+        let txn_output = last_input_output.txn_output(txn_idx).unwrap();
+        let concrete_status = match txn_output.output_status() {
+            ExecutionStatus::Success(obj) => {
+                ExecutionStatus::Success(ConcreteTxnOutput::new(obj))
+            }
+            ExecutionStatus::SkipRest(obj) => {
+                ExecutionStatus::SkipRest(ConcreteTxnOutput::new(obj))
+            }
+            ExecutionStatus::Abort(obj) => {
+                ExecutionStatus::Abort(obj.clone())
+            }
+        };
 
-    fn on_local_commit(&self, txn_idx: TxnIndex, txn_output: Arc<TxnOutput<TO, TE>>) {
         let txn_local_index = self.local_index(txn_idx);
         for &shard_id in &self.follower_shard_sets[txn_local_index] {
             self.cross_shard_client.send(
                 shard_id,
-                CrossShardMessage::Commit(CrossShardCommit{ global_txn_idx: txn_idx, txn_output: txn_output.clone() }));
+                CrossShardMessage::Commit(CrossShardTxnResult { global_txn_idx: txn_idx, result: concrete_status.clone() }));
         }
     }
 
     fn use_dedicated_committing_thread(&self) -> bool {
         true
+    }
+}
+
+#[derive(Clone)]
+pub struct ConcreteTxnOutput<T: Transaction> {
+    pub resource_write_set: HashMap<T::Key, T::Value>,
+    pub module_write_set: HashMap<T::Key, T::Value>,
+    pub aggregator_v1_write_set: HashMap<T::Key, T::Value>,
+    pub aggregator_v1_delta_set: HashMap<T::Key, DeltaOp>,
+}
+
+impl<T: Transaction> ConcreteTxnOutput<T> {
+    pub fn new<TO: TransactionOutput<Txn = T>>(txn_output: &TO) -> Self {
+        Self {
+            resource_write_set: txn_output.resource_write_set(),
+            module_write_set: txn_output.module_write_set(),
+            aggregator_v1_write_set: txn_output.aggregator_v1_write_set(),
+            aggregator_v1_delta_set: txn_output.aggregator_v1_delta_set(),
+        }
     }
 }

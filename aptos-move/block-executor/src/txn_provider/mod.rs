@@ -72,16 +72,13 @@ pub trait BlockSTMPlugin<T: Transaction, TO, TE>
     fn txn(&self, idx: TxnIndex) -> &T;
 
     /// Run a loop to receive remote txn output and unblock local txns.
-    fn run_sharding_msg_loop<TAG, X>(&self, mv_cache: &MVHashMap<T::Key, TAG, T::Value, X>, scheduler: &Scheduler<Self>)
-    where
-        TAG: Hash + Clone + Eq + PartialEq + Debug + Serialize,
-        X: Executable + 'static;
+    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>, scheduler: &Scheduler<Self>);
 
     /// Stop the loop above.
     fn shutdown_receiver(&self);
 
     /// Some extra processing once a local txn is committed.
-    fn on_local_commit(&self, txn_idx: TxnIndex, txn_output: Arc<TxnOutput<TO, TE>>);
+    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<T, TO, TE>, delta_writes: &Vec<(T::Key, WriteOp)>);
 
     /// Return whether a dedicated committing thread should be used in BlockSTM.
     fn use_dedicated_committing_thread(&self) -> bool;

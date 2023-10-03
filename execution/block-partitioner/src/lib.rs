@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod v2;
+pub mod v3;
 
 pub mod test_utils;
 
@@ -21,14 +22,6 @@ pub mod pre_partition;
 
 pub trait PartitionerConfig: Debug {
     fn build(&self) -> Box<dyn BlockPartitioner>;
-}
-
-#[derive(Debug)]
-pub struct V3RandomPartitionerConfig {}
-impl PartitionerConfig for V3RandomPartitionerConfig {
-    fn build(&self) -> Box<dyn BlockPartitioner> {
-        todo!()
-    }
 }
 
 

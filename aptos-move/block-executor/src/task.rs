@@ -16,7 +16,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully.
     Success(O),
