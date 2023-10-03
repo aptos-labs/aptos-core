@@ -136,6 +136,9 @@ and threads that perform these tasks can already detect validation failures
 due to the ESTIMATE markers on memory locations, instead of waiting for a
 subsequent incarnation to finish.
  **/
+#[macro_use(defer)]
+extern crate scopeguard;
+
 mod captured_reads;
 pub mod counters;
 pub mod errors;
