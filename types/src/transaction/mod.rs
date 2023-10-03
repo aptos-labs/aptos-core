@@ -783,7 +783,7 @@ impl SignedTransaction {
     /// Checks that the signature of given transaction. Returns `Ok(SignatureCheckedTransaction)` if
     /// the signature is valid.
     pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
-        // self.authenticator.verify(&self.raw_txn)?;
+        self.authenticator.verify(&self.raw_txn)?;
         Ok(SignatureCheckedTransaction(self))
     }
 
