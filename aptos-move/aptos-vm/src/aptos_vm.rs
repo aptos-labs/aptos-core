@@ -1846,9 +1846,9 @@ impl VMAdapter for AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );
-                            },
-                        // Ignore Storage Error as it can be intentionally triggered by parallel execution.
-                        StatusCode::STORAGE_ERROR => (),
+                        },
+                        // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
+                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.

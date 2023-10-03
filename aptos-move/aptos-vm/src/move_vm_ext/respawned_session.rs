@@ -28,6 +28,7 @@ use aptos_vm_types::{
     storage::ChangeSetConfigs,
 };
 use bytes::Bytes;
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -175,7 +176,9 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
                     // For Current, call on self to include current change!
                     ApplyBase::Current(base_id) => self.get_aggregator_v2_value(&base_id, mode)?,
                 };
-                Ok(apply.apply_to_base(base_value)?)
+                Ok(apply
+                    .apply_to_base(base_value)
+                    .map_err(PartialVMError::from)?)
             },
             None => self.base.get_aggregator_v2_value(id, mode),
         }

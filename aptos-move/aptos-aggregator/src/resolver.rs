@@ -14,7 +14,7 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use move_binary_format::errors::Location;
+use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// Defines different ways `AggregatorResolver` can be used to read its value
@@ -95,15 +95,21 @@ pub trait TAggregatorView {
     ) -> anyhow::Result<WriteOp, VMStatus> {
         let base = self
             .get_aggregator_v1_value(id, mode)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?
+            .map_err(|e| {
+                VMStatus::error(
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                    Some(e.to_string()),
+                )
+            })?
             .ok_or_else(|| {
                 VMStatus::error(
-                    StatusCode::STORAGE_ERROR,
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some("Cannot convert delta for deleted aggregator".to_string()),
                 )
             })?;
         delta_op
             .apply_to(base)
+            .map_err(PartialVMError::from)
             .map_err(|partial_error| partial_error.finish(Location::Undefined).into_vm_status())
             .map(|result| WriteOp::Modification(serialize(&result).into()))
     }

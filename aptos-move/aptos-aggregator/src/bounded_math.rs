@@ -1,65 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_logger::error;
-use move_binary_format::errors::PartialVMError;
-use move_core_types::vm_status::StatusCode;
-
-// When bounded math operation overflows
-// Generally means addition exceeded limit.
-pub(crate) const EBOUND_OVERFLOW: u64 = 0x02_0001;
-
-/// When bounded math operation underflows
-/// Generally means subtraction went below 0.
-pub(crate) const EBOUND_UNDERFLOW: u64 = 0x02_0002;
-
-/// When updating the aggregator start value (due to read operations
-/// or at the end of the transaction), we realize that mistakenly raised
-/// an overflow in one of the previus try_add operation.
-pub(crate) const EEXPECTED_OVERFLOW: u64 = 0x02_0003;
-
-/// When updating the aggregator start value (due to read operations
-/// or at the end of the transaction), we realize that mistakenly raised
-/// an underflow in one of the previus try_sub operation.
-pub(crate) const EEXPECTED_UNDERFLOW: u64 = 0x02_0004;
-
-pub(crate) const ECODE_INVARIANT_BROKEN: u64 = 0x02_0005;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum BoundedMathError {
     Overflow,
     Underflow,
-}
-
-/// Error for delta application. Can be used by delta partial functions
-/// to return descriptive error messages and an appropriate error code.
-pub(crate) fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
-    PartialVMError::new(StatusCode::ABORTED)
-        .with_message(message.to_string())
-        .with_sub_status(code)
-}
-
-pub fn code_invariant_error<T: std::fmt::Debug>(message: T) -> PartialVMError {
-    error!(
-        "Aggregator code invariant broken (there is a bug in the code), {:?}",
-        message
-    );
-    abort_error(
-        format!(
-            "Aggregator code invariant broken (there is a bug in the code), {:?}",
-            message
-        ),
-        ECODE_INVARIANT_BROKEN,
-    )
-}
-
-impl From<BoundedMathError> for PartialVMError {
-    fn from(err: BoundedMathError) -> Self {
-        match err {
-            BoundedMathError::Overflow => abort_error("Overflow", EBOUND_OVERFLOW),
-            BoundedMathError::Underflow => abort_error("Underflow", EBOUND_UNDERFLOW),
-        }
-    }
 }
 
 pub type BoundedMathResult<T> = ::std::result::Result<T, BoundedMathError>;
@@ -80,10 +25,6 @@ pub fn ok_underflow<T>(value: BoundedMathResult<T>) -> BoundedMathResult<Option<
     }
 }
 
-pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PartialVMError> {
-    value.map_err(code_invariant_error)
-}
-
 fn negate_error<T>(result: BoundedMathResult<T>) -> BoundedMathResult<T> {
     result.map_err(|err| match err {
         BoundedMathError::Overflow => BoundedMathError::Underflow,
@@ -100,6 +41,10 @@ pub struct BoundedMath {
 impl BoundedMath {
     pub fn new(max_value: u128) -> Self {
         Self { max_value }
+    }
+
+    pub fn get_max_value(&self) -> u128 {
+        self.max_value
     }
 
     pub fn unsigned_add(&self, base: u128, value: u128) -> BoundedMathResult<u128> {
