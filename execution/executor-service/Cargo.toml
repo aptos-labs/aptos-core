@@ -29,6 +29,7 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 crossbeam-channel = { workspace = true }
+ctrlc = "3.4.0"
 dashmap = { workspace = true }
 itertools = { workspace = true }
 num_cpus = { workspace = true }

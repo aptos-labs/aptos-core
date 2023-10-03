@@ -21,7 +21,7 @@ use aptos_types::{
 };
 use dashmap::DashMap;
 
-pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 50000;
+pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
 
 pub struct RemoteStateView {
     state_values: DashMap<StateKey, RemoteStateValue>,
