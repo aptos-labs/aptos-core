@@ -1,7 +1,7 @@
 import { AptosConfig } from "../api/aptos_config";
 import { AnyNumber, ClientConfig } from "../types";
 import { aptosRequest } from "./core";
-import { AptosResponse } from "./types";
+import { AptosResponse, MimeType } from "./types";
 import { AptosApiType } from "../utils/const";
 
 export type PostRequestOptions = {
@@ -22,9 +22,13 @@ export type PostRequestOptions = {
    */
   path: string;
   /**
-   * The content type of the request
+   * The content type of the request body
    */
-  contentType?: string;
+  contentType?: MimeType;
+  /**
+   * The accepted content type of the response of the API
+   */
+  acceptType?: MimeType;
   /**
    * The query parameters for the request
    */
@@ -48,7 +52,7 @@ export type PostAptosFullNodeRequestOptions = Omit<PostRequestOptions, "type">;
  * @returns
  */
 export async function post<Req, Res>(options: PostRequestOptions): Promise<AptosResponse<Req, Res>> {
-  const { type, originMethod, path, body, contentType, params, aptosConfig, overrides } = options;
+  const { type, originMethod, path, body, acceptType, contentType, params, aptosConfig, overrides } = options;
   const url = aptosConfig.getRequestUrl(type);
 
   const response: AptosResponse<Req, Res> = await aptosRequest<Req, Res>(
@@ -58,7 +62,8 @@ export async function post<Req, Res>(options: PostRequestOptions): Promise<Aptos
       originMethod,
       path,
       body,
-      contentType,
+      contentType: contentType?.valueOf(),
+      acceptType: acceptType?.valueOf(),
       params,
       overrides: {
         ...aptosConfig,
