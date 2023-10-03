@@ -1296,6 +1296,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -3269,12 +3270,16 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-protos",
  "aptos-retrier",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
  "serde",
  "thiserror",
+ "tokio",
+ "tonic 0.10.0",
+ "tonic-reflection",
 ]
 
 [[package]]
