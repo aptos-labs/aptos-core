@@ -110,7 +110,6 @@ aptos move run --function-id 0x1::staking_contract::update_commision \
 --profile mainnet-owner
 ```
 
-## Perform operator operations
 
 ## Checking your stake pool information
 
