@@ -4,6 +4,7 @@
 mod aptos_debug_natives;
 pub mod coverage;
 mod disassembler;
+mod generate;
 mod manifest;
 pub mod package_hooks;
 mod show;
@@ -83,6 +84,8 @@ pub enum MoveTool {
     Disassemble(Disassemble),
     Document(DocumentPackage),
     Download(DownloadPackage),
+    #[clap(subcommand)]
+    Generate(generate::GenerateTool),
     Init(InitPackage),
     List(ListPackage),
     Prove(ProvePackage),
@@ -110,6 +113,7 @@ impl MoveTool {
             MoveTool::Disassemble(tool) => tool.execute_serialized().await,
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
+            MoveTool::Generate(tool) => tool.execute().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,

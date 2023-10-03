@@ -246,6 +246,7 @@ dependencies = [
  "aptos-ledger",
  "aptos-logger",
  "aptos-move-debugger",
+ "aptos-move-graphql-schema",
  "aptos-network-checker",
  "aptos-node",
  "aptos-protos 1.1.2",
