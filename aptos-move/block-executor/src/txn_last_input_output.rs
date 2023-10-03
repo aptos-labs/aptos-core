@@ -215,6 +215,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
+    pub(crate) fn resource_write_set(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<HashMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
+        self.outputs[txn_idx as usize]
+            .load_full()
+            .and_then(|txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.resource_write_set())
+                },
+                ExecutionStatus::Abort(_) => None,
+            })
+    }
+
     pub(crate) fn aggregator_v2_keys(
         &self,
         txn_idx: TxnIndex,
@@ -230,7 +244,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
+    pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             vec![],
             |txn_output| match &txn_output.output_status {
@@ -260,12 +274,33 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    // Called when a transaction is committed to record WriteOps for materialized aggregator values
+    // // Called when a transaction is committed to record WriteOps for materialized aggregator values
+    // // corresponding to the (deltas) in the recorded final output of the transaction.
+    // pub(crate) fn record_delta_writes(
+    //     &self,
+    //     txn_idx: TxnIndex,
+    //     delta_writes: Vec<(T::Key, WriteOp)>,
+    // ) {
+    //     match &self.outputs[txn_idx as usize]
+    //         .load_full()
+    //         .expect("Output must exist")
+    //         .output_status
+    //     {
+    //         ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+    //             t.incorporate_delta_writes(delta_writes);
+    //         },
+    //         ExecutionStatus::Abort(_) => {},
+    //     };
+    // }
+
+    // Called when a transaction is committed to record WriteOps for materialized aggregator v1 values
     // corresponding to the (deltas) in the recorded final output of the transaction.
-    pub(crate) fn record_delta_writes(
+    pub(crate) fn record_materialized_txn_output(
         &self,
         txn_idx: TxnIndex,
         delta_writes: Vec<(T::Key, WriteOp)>,
+        patched_resource_write_set: HashMap<T::Key, T::Value>,
+        patched_events: Vec<T::Event>,
     ) {
         match &self.outputs[txn_idx as usize]
             .load_full()
@@ -273,7 +308,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             .output_status
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                t.incorporate_delta_writes(delta_writes);
+                t.incorporate_materialized_txn_output(
+                    delta_writes,
+                    patched_resource_write_set,
+                    patched_events,
+                );
             },
             ExecutionStatus::Abort(_) => {},
         };
