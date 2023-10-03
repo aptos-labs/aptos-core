@@ -275,7 +275,7 @@ impl ForgeConfig {
                 helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
             }
             if let Some(override_config) = &fullnode_override_node_config {
-                helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
+                helm_values["fullnode"]["config"] = override_config.get_yaml().unwrap();
             }
             if multi_region_config {
                 helm_values["multicluster"]["enabled"] = true.into();
