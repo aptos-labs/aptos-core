@@ -16,6 +16,7 @@
 //! Internally both the client and server leverage a NetworkStream that communications in blocks
 //! where a block is a length prefixed array of bytes.
 
+pub mod grpc_network_service;
 pub mod network_controller;
 
 use aptos_logger::{info, trace, warn, Schema};

@@ -123,6 +123,11 @@ def parse_args():
         default="/tmp/aptos-cli-tests",
         help="Where we'll run CLI commands from (in the host system). Default: %(default)s",
     )
+    parser.add_argument(
+        "--no-pull-always",
+        action="store_true",
+        help='If set, do not set "--pull always" when running the local testnet. Necessary for using local images.',
+    )
     args = parser.parse_args()
     return args
 
@@ -189,7 +194,9 @@ def main():
     pathlib.Path(args.working_directory).mkdir(parents=True, exist_ok=True)
 
     # Run a node + faucet and wait for them to start up.
-    container_name = run_node(args.base_network, args.image_repo_with_project)
+    container_name = run_node(
+        args.base_network, args.image_repo_with_project, not args.no_pull_always
+    )
 
     # We run these in a try finally so that if something goes wrong, such as the
     # local testnet not starting up correctly or some unexpected error in the

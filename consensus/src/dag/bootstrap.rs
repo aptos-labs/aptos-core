@@ -19,6 +19,7 @@ use crate::{
     dag::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         dag_state_sync::StateSyncStatus,
+        observability::logging::{LogEvent, LogSchema},
     },
     experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
@@ -208,9 +209,8 @@ impl DagBootstrapper {
             let (parent_block_info, ledger_info) =
                 compute_initial_block_and_ledger_info(ledger_info_from_storage);
             debug!(
-                "Starting DAG instance for epoch {} round {}",
-                self.epoch_state.epoch,
-                ledger_info.commit_info().round(),
+                LogSchema::new(LogEvent::Start).round(ledger_info.commit_info().round()),
+                epoch = self.epoch_state.epoch,
             );
 
             let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
@@ -266,7 +266,11 @@ impl DagBootstrapper {
                     match sync_status {
                         StateSyncStatus::NeedsSync(certified_node_msg) => {
                             let highest_committed_anchor_round = ledger_info_provider.get_highest_committed_anchor_round();
-                            debug!("state sync notification received for round {}, dag round {}, ordered round {:?} commit round {} ", certified_node_msg.round(), dag_store.read().highest_round(), dag_store.read().highest_ordered_anchor_round(), highest_committed_anchor_round);
+                            debug!(LogSchema::new(LogEvent::StateSync).round(dag_store.read().highest_round()),
+                                target_round = certified_node_msg.round(),
+                                local_ordered_round = dag_store.read().highest_ordered_anchor_round(),
+                                local_committed_round = highest_committed_anchor_round
+                            );
                             let dag_fetcher = DagFetcher::new(self.epoch_state.clone(), self.dag_network_sender.clone(), self.time_service.clone());
 
                             let sync_future = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone(), highest_committed_anchor_round);

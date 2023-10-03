@@ -56,6 +56,7 @@ pub fn run_tests_for_pkg(
 
 pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::configure_for_unit_test();
+    extended_checks::configure_extended_checks_for_unit_test();
     natives::aptos_natives(
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),

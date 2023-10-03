@@ -72,7 +72,7 @@ export class Ed25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): PublicKey {
+  static deserialize(deserializer: Deserializer): Ed25519PublicKey {
     const bytes = deserializer.deserializeBytes();
     return new Ed25519PublicKey({ hexInput: bytes });
   }
@@ -160,7 +160,13 @@ export class Ed25519PrivateKey extends PrivateKey {
     return new Ed25519PrivateKey({ hexInput: keyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH) });
   }
 
-  publicKey(): PublicKey {
+
+  /**
+   * Derive the Ed25519PublicKey for this private key.
+   * 
+   * @returns Ed25519PublicKey
+   */
+  publicKey(): Ed25519PublicKey {
     const bytes = this.signingKeyPair.publicKey;
     return new Ed25519PublicKey({ hexInput: bytes });
   }
