@@ -78,6 +78,7 @@ members = [
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
+    "crates/aptos-move-graphql/scalars",
     "crates/aptos-network-checker",
     "crates/aptos-node-identity",
     "crates/aptos-openapi",
@@ -371,6 +372,7 @@ aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
+aptos-move-graphql-scalars = { path = "crates/aptos-move-graphql/scalars" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }

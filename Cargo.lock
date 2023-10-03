@@ -2592,6 +2592,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-move-graphql-scalars"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "move-core-types",
+ "once_cell",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-move-stdlib"
 version = "0.1.1"
 dependencies = [
