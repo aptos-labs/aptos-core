@@ -6,33 +6,40 @@ import json
 
 from aptos_sdk.account import Account
 from aptos_sdk.account_address import AccountAddress
+from aptos_sdk.aptos_token_client import (
+    AptosTokenClient,
+    Collection,
+    Object,
+    PropertyMap,
+    ReadObject,
+    Token,
+)
 from aptos_sdk.async_client import FaucetClient, RestClient
-from aptos_sdk.aptos_token_client import AptosTokenClient
-
-from aptos_sdk.aptos_token_client import ReadObject
-from aptos_sdk.aptos_token_client import Collection
-from aptos_sdk.aptos_token_client import Object
-from aptos_sdk.aptos_token_client import PropertyMap
-from aptos_sdk.aptos_token_client import Token
 
 from .common import FAUCET_URL, NODE_URL
-from typing import Any, List
+
 
 def get_owner(obj: ReadObject) -> AccountAddress:
     return obj.resources[Object].owner
 
+
 # :!:>section_6
-async def get_collection_data(token_client: AptosTokenClient, collection_addr: AccountAddress) -> dict[str, str]:
+async def get_collection_data(
+    token_client: AptosTokenClient, collection_addr: AccountAddress
+) -> dict[str, str]:
     collection = (await token_client.read_object(collection_addr)).resources[Collection]
     return {
         "creator": str(collection.creator),
         "name": str(collection.name),
         "description": str(collection.description),
         "uri": str(collection.uri),
-    } # <:!:section_6
+    }  # <:!:section_6
+
 
 # :!:>get_token_data
-async def get_token_data(token_client: AptosTokenClient, token_addr: AccountAddress) -> dict[str, str]:
+async def get_token_data(
+    token_client: AptosTokenClient, token_addr: AccountAddress
+) -> dict[str, str]:
     token = (await token_client.read_object(token_addr)).resources[Token]
     return {
         "collection": str(token.collection),
@@ -40,18 +47,18 @@ async def get_token_data(token_client: AptosTokenClient, token_addr: AccountAddr
         "name": str(token.name),
         "uri": str(token.uri),
         "index": str(token.index),
-    } # <:!:get_token_data
+    }  # <:!:get_token_data
 
 
 async def main():
     # Create API and faucet clients.
     # :!:>section_1a
     rest_client = RestClient(NODE_URL)
-    faucet_client = FaucetClient(FAUCET_URL, rest_client) # <:!:section_1a
+    faucet_client = FaucetClient(FAUCET_URL, rest_client)  # <:!:section_1a
 
     # Create client for working with the token module.
     # :!:>section_1b
-    token_client = AptosTokenClient(rest_client) # <:!:section_1b
+    token_client = AptosTokenClient(rest_client)  # <:!:section_1b
 
     # :!:>section_2
     alice = Account.generate()
@@ -59,13 +66,9 @@ async def main():
 
     collection_name = "Alice's"
     token_name = "Alice's first token"
-    property_version = 0
 
     # :!:>owners
-    owners = {
-        str(alice.address()): "Alice",
-        str(bob.address()): "Bob"
-    } # <:!:owners
+    owners = {str(alice.address()): "Alice", str(bob.address()): "Bob"}  # <:!:owners
 
     print("\n=== Addresses ===")
     print(f"Alice: {alice.address()}")
@@ -103,7 +106,7 @@ async def main():
         True,
         0,
         1,
-    ) # <:!:section_4
+    )  # <:!:section_4
     await rest_client.wait_for_transaction(txn_hash)
 
     collection_addr = AccountAddress.for_named_collection(
@@ -118,17 +121,17 @@ async def main():
         token_name,
         "https://aptos.dev/img/nyan.jpeg",
         PropertyMap([]),
-    ) # <:!:section_5
+    )  # <:!:section_5
     await rest_client.wait_for_transaction(txn_hash)
 
     minted_tokens = await token_client.tokens_minted_from_transaction(txn_hash)
     assert len(minted_tokens) == 1
 
     collection_data = await get_collection_data(token_client, collection_addr)
-    print(f"\nCollection data: " + json.dumps({
-        "address": str(collection_addr),
-        **collection_data
-    }, indent=4))
+    print(
+        "\nCollection data: "
+        + json.dumps({"address": str(collection_addr), **collection_data}, indent=4)
+    )
 
     token_addr: AccountAddress = minted_tokens[0]
 
@@ -136,13 +139,14 @@ async def main():
     # :!:>section_7
     obj_resources = await token_client.read_object(token_addr)
     owner = str(get_owner(obj_resources))
-    print(f"\nToken owner: {owners[owner]}") # <:!:section_7
+    print(f"\nToken owner: {owners[owner]}")  # <:!:section_7
     token_data = await get_token_data(token_client, token_addr)
-    print(f"Token data: " + json.dumps({
-        "address": str(token_addr),
-        "owner": owner,
-        **token_data
-    }, indent=4))
+    print(
+        "Token data: "
+        + json.dumps(
+            {"address": str(token_addr), "owner": owner, **token_data}, indent=4
+        )
+    )
 
     # Transfer the token to Bob
     # :!:>section_8
@@ -152,12 +156,12 @@ async def main():
         token_addr,
         bob.address(),
     )
-    await rest_client.wait_for_transaction(txn_hash) # <:!:section_8
+    await rest_client.wait_for_transaction(txn_hash)  # <:!:section_8
 
     # Read the object owner
     # :!:>section_9
     obj_resources = await token_client.read_object(token_addr)
-    print(f"Token owner: {owners[str(get_owner(obj_resources))]}") # <:!:section_9
+    print(f"Token owner: {owners[str(get_owner(obj_resources))]}")  # <:!:section_9
 
     # Transfer the token back to Alice
     # :!:>section_10
@@ -167,13 +171,13 @@ async def main():
         token_addr,
         alice.address(),
     )
-    await rest_client.wait_for_transaction(txn_hash) # <:!:section_10
+    await rest_client.wait_for_transaction(txn_hash)  # <:!:section_10
 
     # Read the object owner one last time
     # :!:>section_11
     obj_resources = await token_client.read_object(token_addr)
-    print(f"Token owner: {owners[str(get_owner(obj_resources))]}\n") # <:!:section_11
-    
+    print(f"Token owner: {owners[str(get_owner(obj_resources))]}\n")  # <:!:section_11
+
     await rest_client.close()
 
 

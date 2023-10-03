@@ -382,6 +382,7 @@ class AptosTokenClient:
         )
 
         return TransactionPayload(payload)
+
     # :!:>create_collection
     async def create_collection(
         self,

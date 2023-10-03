@@ -24,7 +24,7 @@ Install your preferred SDK from the below list:
 
 ## Step 2: Run the example
 
-Each SDK provides an `examples` directory. This tutorial covers the `simple-aptos-token` example.
+Each SDK provides an `examples` directory. This tutorial covers the `simple_aptos_token` example.
 
 Clone the `aptos-core` repo:
 ```bash
@@ -62,9 +62,9 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
   poetry install
   ```
 
-  Run the Python [`simple-aptos-token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-aptos-token.py) example:
+  Run the Python [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_aptos_token.py) example:
   ```bash
-  poetry run python -m examples.simple-aptos-token
+  poetry run python -m examples.simple_aptos_token
   ```
   </TabItem>
 </Tabs>
@@ -73,7 +73,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core
 
 ## Step 3: Understand the output
 
-The following output should appear after executing the `simple-aptos-token` example, though some values will be different:
+The following output should appear after executing the `simple_aptos_token` example, though some values will be different:
 
 <Tabs groupId="sdk-output">
 <TabItem value="typescript" label="Typescript">
@@ -201,7 +201,7 @@ See [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ec
   <TabItem value="python" label="Python">
 
 :::tip See the full code
-See [`simple-aptos-token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple-aptos-token.py) for the complete code as you follow the below steps.
+See [`simple_aptos_token`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/simple_aptos_token.py) for the complete code as you follow the below steps.
 :::
   </TabItem>
 </Tabs>
@@ -235,13 +235,13 @@ Using the API client we can create a `TokenClient` that we use for common token 
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_1a
+:!: static/sdks/python/examples/simple_aptos_token.py section_1a
 ```
 
 Using the API client we can create a `TokenClient` that we use for common token operations such as creating collections and tokens, transferring them, claiming them, and so on.
 
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_1b
+:!: static/sdks/python/examples/simple_aptos_token.py section_1b
 ```
 
 [`common.py`](https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/python/sdk/examples/common.py) initializes these values as follows:
@@ -277,7 +277,7 @@ The next step is to create two accounts locally. [Accounts](../concepts/accounts
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_2
+:!: static/sdks/python/examples/simple_aptos_token.py section_2
 ```
   </TabItem>
 </Tabs>
@@ -302,7 +302,7 @@ In order to actually instantiate the Account on-chain, it must be explicitly cre
   <TabItem value="python" label="Python">
 
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_3
+:!: static/sdks/python/examples/simple_aptos_token.py section_3
 ```
   </TabItem>
 </Tabs>
@@ -330,7 +330,7 @@ This is the function signature of `createCollection`. It returns a transaction h
 
 Your application will call `create_collection`:
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_4
+:!: static/sdks/python/examples/simple_aptos_token.py section_4
 ```
 
 This is the function signature of `create_collection`. It returns a transaction hash:
@@ -363,7 +363,7 @@ This is the function signature of `createToken`. It returns a transaction hash:
 
 Your application will call `create_token`:
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_5
+:!: static/sdks/python/examples/simple_aptos_token.py section_5
 ```
 
 This is the function signature of `create_token`. It returns a transaction hash:
@@ -402,12 +402,12 @@ Here's how `getTokenData` queries the token metadata using the [indexer client](
 
 To read a collection's metadata:
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py section_6
+:!: static/sdks/python/examples/simple_aptos_token.py section_6
 ```
 
 To read a token's metadata:
 ```python
-:!: static/sdks/python/examples/simple-aptos-token.py get_token_data
+:!: static/sdks/python/examples/simple_aptos_token.py get_token_data
 ```
 
   </TabItem>
@@ -433,11 +433,11 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
   <TabItem value="python" label="Python">
 
 ```python title="Get the object's resources and parse the owner"
-:!: static/sdks/python/examples/simple-aptos-token.py section_7
+:!: static/sdks/python/examples/simple_aptos_token.py section_7
 ```
 
 ```python title="How the owners dictionary is defined"
-:!: static/sdks/python/examples/simple-aptos-token.py owners
+:!: static/sdks/python/examples/simple_aptos_token.py owners
 ```
 
   </TabItem>
@@ -480,7 +480,7 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
   <TabItem value="python" label="Python">
 
 ```python title="Transfer the token to Bob"
-:!: static/sdks/python/examples/simple-aptos-token.py section_8
+:!: static/sdks/python/examples/simple_aptos_token.py section_8
 ```
 
 ```python title="How the transfer_token function is defined"
@@ -488,15 +488,15 @@ Each object created from the `aptos_token.move` contract is a distinct asset. Th
 ```
 
 ```python title="Read the owner"
-:!: static/sdks/python/examples/simple-aptos-token.py section_9
+:!: static/sdks/python/examples/simple_aptos_token.py section_9
 ```
 
 ```python title="Transfer the token back to Alice"
-:!: static/sdks/python/examples/simple-aptos-token.py section_10
+:!: static/sdks/python/examples/simple_aptos_token.py section_10
 ```
 
 ```python title="Read the owner again"
-:!: static/sdks/python/examples/simple-aptos-token.py section_11
+:!: static/sdks/python/examples/simple_aptos_token.py section_11
 ```
 
 
