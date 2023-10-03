@@ -398,10 +398,10 @@ where
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
 
-        let is_coordinator = scheduler.should_coordinate_commits();
+        // let is_coordinator = scheduler.should_coordinate_commits();
 
         loop {
-            if is_coordinator {
+            if scheduler.should_coordinate_commits() {
                 self.coordinator_commit_hook(
                     self.maybe_block_gas_limit,
                     scheduler,
@@ -409,7 +409,7 @@ where
                     last_input_output,
                     txn_fee_state,
                 );
-                // scheduler.coordinating_commits_mark_done();
+                scheduler.coordinating_commits_mark_done();
             }
 
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
