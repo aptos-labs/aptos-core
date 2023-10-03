@@ -79,9 +79,9 @@ pub static CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 /// Count of the short connections; i.e., < 10 seconds.
 pub static SHORT_CONNECTION_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-        "indexer_grpc_data_service_short_connection_by_user_count",
+        "indexer_grpc_data_service_short_connection_by_user_processor_count",
         "Count of the short connections; i.e., < 10 seconds",
-        &["request_token", "email"],
+        &["request_token", "email", "processor"],
     )
     .unwrap()
 });
