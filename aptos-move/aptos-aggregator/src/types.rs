@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bounded_math::code_invariant_error,
+    bounded_math::SignedU128,
     utils::{
         bytes_to_string, from_utf8_bytes, is_string_layout, string_to_bytes, to_utf8_bytes,
         u128_to_u64,
     },
 };
+use aptos_logger::error;
 use aptos_types::state_store::{state_key::StateKey, table::TableHandle};
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     value::{IdentifierMappingKind, MoveTypeLayout},
@@ -19,7 +20,7 @@ use move_vm_types::values::{Struct, Value};
 
 /// Types which implement this trait can be converted to a Move value.
 pub trait TryIntoMoveValue: Sized {
-    type Error: std::fmt::Display;
+    type Error: std::fmt::Debug;
 
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error>;
 }
@@ -28,7 +29,7 @@ pub trait TryIntoMoveValue: Sized {
 pub trait TryFromMoveValue: Sized {
     // Allows to pass extra information from the caller.
     type Hint;
-    type Error: std::fmt::Display;
+    type Error: std::fmt::Debug;
 
     fn try_from_move_value(
         layout: &MoveTypeLayout,
@@ -37,13 +38,151 @@ pub trait TryFromMoveValue: Sized {
     ) -> Result<Self, Self::Error>;
 }
 
-pub type AggregatorResult<T> = Result<T, AggregatorError>;
-
-// TODO: Use this instead of PartialVM errors.
-#[derive(Debug)]
-pub enum AggregatorError {
-    WrongVersionID,
+// represents something that should never happen - i.e. a code invariant error,
+// which we would generally just panic, but since we are inside of the VM,
+// we cannot do that.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PanicError {
+    CodeInvariantError(String),
 }
+
+impl ToString for PanicError {
+    fn to_string(&self) -> String {
+        match self {
+            PanicError::CodeInvariantError(e) => e.clone(),
+        }
+    }
+}
+
+// Wrapping another error, to add a variant that represents
+// something that should never happen - i.e. a code invariant error,
+// which we would generally just panic, but since we are inside of the VM,
+// we cannot do that.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PanicOr<T: std::fmt::Debug> {
+    CodeInvariantError(String),
+    Or(T),
+}
+
+pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
+    let msg = format!(
+        "Delayed logic code invariant broken (there is a bug in the code), {:?}",
+        message
+    );
+    error!("{}", msg);
+    PanicError::CodeInvariantError(msg)
+}
+
+pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
+    value.map_err(code_invariant_error)
+}
+
+impl<T: std::fmt::Debug> From<PanicError> for PanicOr<T> {
+    fn from(err: PanicError) -> Self {
+        match err {
+            PanicError::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
+        }
+    }
+}
+
+pub trait NonPanic {}
+
+impl<T: std::fmt::Debug + NonPanic> From<T> for PanicOr<T> {
+    fn from(err: T) -> Self {
+        PanicOr::Or(err)
+    }
+}
+
+impl From<PanicError> for PartialVMError {
+    fn from(err: PanicError) -> Self {
+        PartialVMError::from(PanicOr::<()>::from(err))
+    }
+}
+
+impl From<DelayedFieldsSpeculativeError> for PartialVMError {
+    fn from(err: DelayedFieldsSpeculativeError) -> Self {
+        PartialVMError::from(PanicOr::from(err))
+    }
+}
+
+impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
+    fn from(err: &PanicOr<T>) -> Self {
+        match err {
+            PanicOr::CodeInvariantError(_) => StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+        }
+    }
+}
+
+impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
+    fn from(err: PanicOr<T>) -> Self {
+        match err {
+            PanicOr::CodeInvariantError(msg) => {
+                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
+                    .with_message(msg)
+            },
+            PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                .with_message(format!("{:?}", err)),
+        }
+    }
+}
+
+/// Different reaons for why applying new start_value doesn't
+/// satisfy history bounds
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeltaApplicationFailureReason {
+    /// max_achieved wouldn't be within bounds
+    Overflow,
+    /// min_achieved wouldn't be within bounds
+    Underflow,
+    /// min_overflow wouldn't cause overflow any more
+    ExpectedOverflow,
+    /// max_underflow wouldn't cause underflow any more
+    ExpectedUnderflow,
+}
+
+/// Different reasons for why merging two Deltas (value + history) failed,
+/// because newer one couldn't be offsetted by the delta value
+/// of the older one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeltaHistoryMergeOffsetFailureReason {
+    /// If we offset achieved, it exceeds bounds
+    AchievedExceedsBounds,
+    /// if we offset failure (overflow/underflow), it cannot
+    /// exceed bounds any more (because it went on the opposite side of 0)
+    FailureNotExceedingBoundsAnyMore,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DelayedFieldsSpeculativeError {
+    /// DelayedField with given ID couldn't be found
+    /// (due to speculative nature), but must exist.
+    NotFound(AggregatorID),
+    /// Applying new start_value doesn't satisfy history bounds.
+    DeltaApplication {
+        base_value: u128,
+        max_value: u128,
+        delta: SignedU128,
+        reason: DeltaApplicationFailureReason,
+    },
+    /// Merging two Deltas (value + history) failed, because newer
+    /// one couldn't be offsetted by the delta value of the older one.
+    DeltaHistoryMergeOffset {
+        target: u128,
+        delta: SignedU128,
+        max_value: u128,
+        reason: DeltaHistoryMergeOffsetFailureReason,
+    },
+    /// Merging two Deltas (value + history) failed, because no value
+    /// could satisfy both achieved and failure (overflow/underflow)
+    /// bounds, as they now overlap.
+    DeltaHistoryMergeAchievedAndFailureOverlap {
+        achieved: SignedU128,
+        overflow: SignedU128,
+    },
+}
+
+impl NonPanic for DelayedFieldsSpeculativeError {}
 
 // TODO To be renamed to DelayedFieldID
 /// Ephemeral identifier type used by aggregators V2.
@@ -68,7 +207,7 @@ impl From<u64> for AggregatorID {
 }
 
 impl TryIntoMoveValue for AggregatorID {
-    type Error = PartialVMError;
+    type Error = PanicError;
 
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
         Ok(match layout {
@@ -76,19 +215,17 @@ impl TryIntoMoveValue for AggregatorID {
             MoveTypeLayout::U128 => Value::u128(self.0 as u128),
             layout if is_string_layout(layout) => bytes_to_string(to_utf8_bytes(self.0)),
             _ => {
-                return Err(
-                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
-                        "Failed to convert {:?} into a Move value with {} layout",
-                        self, layout
-                    )),
-                )
+                return Err(code_invariant_error(format!(
+                    "Failed to convert {:?} into a Move value with {} layout",
+                    self, layout
+                )))
             },
         })
     }
 }
 
 impl TryFromMoveValue for AggregatorID {
-    type Error = PartialVMError;
+    type Error = PanicError;
     type Hint = ();
 
     fn try_from_move_value(
@@ -96,23 +233,24 @@ impl TryFromMoveValue for AggregatorID {
         value: Value,
         _hint: &Self::Hint,
     ) -> Result<Self, Self::Error> {
-        Ok(Self::new(match layout {
-            MoveTypeLayout::U64 => value.value_as::<u64>()?,
-            MoveTypeLayout::U128 => u128_to_u64(value.value_as::<u128>()?)?,
-            layout if is_string_layout(layout) => {
-                let bytes = string_to_bytes(value.value_as::<Struct>()?)?;
-                from_utf8_bytes(bytes)?
-            },
+        // Since we put the value there, we should be able to read it back,
+        // unless there is a bug in the code - so we expect_ok() throughout.
+        expect_ok(match layout {
+            MoveTypeLayout::U64 => value.value_as::<u64>(),
+            MoveTypeLayout::U128 => value.value_as::<u128>().and_then(u128_to_u64),
+            layout if is_string_layout(layout) => value
+                .value_as::<Struct>()
+                .and_then(string_to_bytes)
+                .and_then(from_utf8_bytes),
             // We use value to ID conversion in serialization.
-            _ => {
-                return Err(
-                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
-                        "Failed to convert a Move value with {} layout into an identifier",
-                        layout
-                    )),
-                )
-            },
-        }))
+            _ => Err(
+                PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
+                    "Failed to convert a Move value with {} layout into an identifier",
+                    layout
+                )),
+            ),
+        })
+        .map(Self::new)
     }
 }
 
@@ -140,12 +278,12 @@ impl AggregatorVersionedID {
 }
 
 impl TryFrom<AggregatorVersionedID> for StateKey {
-    type Error = AggregatorError;
+    type Error = PanicError;
 
     fn try_from(vid: AggregatorVersionedID) -> Result<Self, Self::Error> {
         match vid {
             AggregatorVersionedID::V1(state_key) => Ok(state_key),
-            AggregatorVersionedID::V2(_) => Err(AggregatorError::WrongVersionID),
+            AggregatorVersionedID::V2(_) => Err(code_invariant_error("wrong version id")),
         }
     }
 }
@@ -160,7 +298,7 @@ pub enum AggregatorValue {
 }
 
 impl AggregatorValue {
-    pub fn into_aggregator_value(self) -> PartialVMResult<u128> {
+    pub fn into_aggregator_value(self) -> Result<u128, PanicError> {
         match self {
             AggregatorValue::Aggregator(value) => Ok(value),
             AggregatorValue::Snapshot(_) => Err(code_invariant_error(
@@ -172,7 +310,7 @@ impl AggregatorValue {
         }
     }
 
-    pub fn into_snapshot_value(self) -> PartialVMResult<u128> {
+    pub fn into_snapshot_value(self) -> Result<u128, PanicError> {
         match self {
             AggregatorValue::Snapshot(value) => Ok(value),
             AggregatorValue::Aggregator(_) => Err(code_invariant_error(
@@ -184,7 +322,7 @@ impl AggregatorValue {
         }
     }
 
-    pub fn into_derived_value(self) -> PartialVMResult<Vec<u8>> {
+    pub fn into_derived_value(self) -> Result<Vec<u8>, PanicError> {
         match self {
             AggregatorValue::Derived(value) => Ok(value),
             AggregatorValue::Aggregator(_) => Err(code_invariant_error(
@@ -264,7 +402,7 @@ pub enum SnapshotValue {
 }
 
 impl SnapshotValue {
-    pub fn into_aggregator_value(self) -> PartialVMResult<u128> {
+    pub fn into_aggregator_value(self) -> Result<u128, PanicError> {
         match self {
             SnapshotValue::Integer(value) => Ok(value),
             SnapshotValue::String(_) => Err(code_invariant_error(
@@ -275,9 +413,9 @@ impl SnapshotValue {
 }
 
 impl TryFrom<AggregatorValue> for SnapshotValue {
-    type Error = PartialVMError;
+    type Error = PanicError;
 
-    fn try_from(value: AggregatorValue) -> PartialVMResult<SnapshotValue> {
+    fn try_from(value: AggregatorValue) -> Result<SnapshotValue, PanicError> {
         match value {
             AggregatorValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling SnapshotValue::try_from on AggregatorValue(Aggregator)",

@@ -24,6 +24,7 @@ use aptos_vm_types::{
     resolver::{ExecutorView, StateStorageView, TModuleView, TResourceView},
     storage::ChangeSetConfigs,
 };
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
@@ -156,7 +157,9 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
                     // For Current, call on self to include current change!
                     ApplyBase::Current(base_id) => self.get_aggregator_v2_value(&base_id, mode)?,
                 };
-                Ok(apply.apply_to_base(base_value)?)
+                Ok(apply
+                    .apply_to_base(base_value)
+                    .map_err(PartialVMError::from)?)
             },
             None => self.base.get_aggregator_v2_value(id, mode),
         }

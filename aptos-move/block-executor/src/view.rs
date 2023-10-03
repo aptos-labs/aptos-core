@@ -9,7 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delta_change_set::serialize,
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorValue, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
+    types::{AggregatorValue, PanicOr, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -124,7 +124,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         &self,
         id: T::Identifier,
         txn_idx: TxnIndex,
-    ) -> Result<AggregatorValue, MVAggregatorsError> {
+    ) -> Result<AggregatorValue, PanicOr<MVAggregatorsError>> {
         match self.versioned_map.aggregators().read(id, txn_idx) {
             Ok(value) => {
                 if self
@@ -134,12 +134,17 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     .is_err()
                 {
                     // Inconsistency in recorded reads.
-                    Err(MVAggregatorsError::DeltaApplicationFailure)
+                    Err(PanicOr::Or(MVAggregatorsError::DeltaApplicationFailure))
                 } else {
                     Ok(value)
                 }
             },
-            Err(e) => Err(e),
+            Err(e) => {
+                self.captured_reads
+                    .borrow_mut()
+                    .capture_delayed_field_read_error(&e);
+                Err(e)
+            },
         }
     }
 
@@ -451,11 +456,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 match ret {
                     // ExecutionHalted indicates that the parallel execution is halted.
                     // The read should return immediately and log the error.
-                    // For now we use STORAGE_ERROR as the VM will not log the speculative error,
+                    // For now we use SPECULATIVE_EXECUTION_ABORT_ERROR as the VM
+                    // will not log the speculative error,
                     // so no actual error will be logged once the execution is halted and
                     // the speculative logging is flushed.
                     ReadResult::HaltSpeculativeExecution(msg) => Err(anyhow::Error::new(
-                        VMStatus::error(StatusCode::STORAGE_ERROR, Some(msg)),
+                        VMStatus::error(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR, Some(msg)),
                     )),
                     ReadResult::Uninitialized => {
                         unreachable!("base value must already be recorded in the MV data structure")
@@ -601,28 +607,31 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         mode: AggregatorReadMode,
     ) -> anyhow::Result<aptos_aggregator::types::AggregatorValue> {
         match &self.latest_view {
-            ViewState::Sync(state) => {
-                let result = match mode {
-                    AggregatorReadMode::Aggregated => {
-                        state.read_aggregator_v2_aggregated_value(*id, self.txn_idx)
-                    },
-                    AggregatorReadMode::LastCommitted => state
-                        .read_aggregator_v2_last_committed_value(
-                            *id,
-                            self.txn_idx,
-                            ReadPosition::BeforeCurrentTxn,
-                        ),
-                };
-                result.map_err(|e| {
-                    anyhow::Error::new(VMStatus::error(
-                        StatusCode::STORAGE_ERROR,
-                        Some(format!("Error during read: {:?}", e)),
-                    ))
-                })
+            ViewState::Sync(state) => match mode {
+                AggregatorReadMode::Aggregated => state
+                    .read_aggregator_v2_aggregated_value(*id, self.txn_idx)
+                    .map_err(|e| {
+                        anyhow::Error::new(VMStatus::error(
+                            StatusCode::from(&e),
+                            Some(format!("Error during read: {:?}", e)),
+                        ))
+                    }),
+                AggregatorReadMode::LastCommitted => state
+                    .read_aggregator_v2_last_committed_value(
+                        *id,
+                        self.txn_idx,
+                        ReadPosition::BeforeCurrentTxn,
+                    )
+                    .map_err(|e| {
+                        anyhow::Error::new(VMStatus::error(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                            Some(format!("Error during read: {:?}", e)),
+                        ))
+                    }),
             },
             ViewState::Unsync(state) => state.unsync_map.fetch_aggregator(id).ok_or_else(|| {
                 anyhow::Error::new(VMStatus::error(
-                    StatusCode::STORAGE_ERROR,
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some(format!("Aggregator for id {:?} doesn't exist", id)),
                 ))
             }),
@@ -666,7 +675,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
             },
         };
         id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(e.to_string()))
+            .map_err(|e| TransformationError(format!("{:?}", e)))
     }
 
     fn identifier_to_value(
@@ -675,7 +684,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         identifier_value: Value,
     ) -> TransformationResult<Value> {
         let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(e.to_string()))?;
+            .map_err(|e| TransformationError(format!("{:?}", e)))?;
         match &self.latest_view {
             ViewState::Sync(state) => Ok(state
                 .read_aggregator_v2_last_committed_value(
