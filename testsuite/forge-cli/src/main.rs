@@ -1708,7 +1708,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        /* remove vfns: .with_initial_fullnode_count(12) */
+        .with_initial_fullnode_count(12)
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 500_000,
@@ -1724,6 +1724,15 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
+            // Higher concurrency level
+            config.execution.concurrency_level = 48;
+
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.split_ledger_db = true;
+            config.storage.rocksdb_configs.use_sharded_state_merkle_db = true;
+            config.storage.rocksdb_configs.skip_index_and_usage = true;
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Higher concurrency level
             config.execution.concurrency_level = 48;
 

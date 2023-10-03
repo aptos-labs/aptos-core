@@ -53,7 +53,7 @@ pub use executed_trees::ExecutedTrees;
 
 // This is last line of defense against large queries slipping through external facing interfaces,
 // like the API and State Sync, etc.
-pub const MAX_REQUEST_LIMIT: u64 = 10000;
+pub const MAX_REQUEST_LIMIT: u64 = 100_000;
 
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
