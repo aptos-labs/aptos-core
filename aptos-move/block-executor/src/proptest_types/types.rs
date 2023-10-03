@@ -696,6 +696,20 @@ where
         assert_ok!(self.materialized_delta_writes.set(delta_writes));
     }
 
+    fn incorporate_materialized_txn_output(
+        &self,
+        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        _patched_resource_write_set: HashMap<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        >,
+        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
+    ) {
+        assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
+        // TODO: Set the patched resource write set and events. But that requires the function
+        // to take &mut self as input
+    }
+
     fn fee_statement(&self) -> FeeStatement {
         // First argument is supposed to be total (not important for the test though).
         // Next two arguments are different kinds of execution gas that are counted

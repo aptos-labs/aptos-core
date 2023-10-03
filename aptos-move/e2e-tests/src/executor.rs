@@ -497,8 +497,14 @@ impl FakeExecutor {
                 let seq_txn_output = output.as_ref().unwrap();
                 let par_txn_output = parallel_output.as_ref().unwrap();
                 assert_eq!(seq_txn_output.len(), par_txn_output.len());
-                for (idx, (seq_output, par_output)) in seq_txn_output.iter().zip(par_txn_output.iter()).enumerate() {
-                    assert_eq!(seq_output, par_output, "first transaction output mismatch at index {}", idx);
+                for (idx, (seq_output, par_output)) in
+                    seq_txn_output.iter().zip(par_txn_output.iter()).enumerate()
+                {
+                    assert_eq!(
+                        seq_output, par_output,
+                        "first transaction output mismatch at index {}",
+                        idx
+                    );
                 }
             } else {
                 assert_eq!(output, parallel_output);
