@@ -13,6 +13,7 @@ pub struct NetbenchConfig {
     pub enable_direct_send_testing: bool, // Whether or not to enable direct send test mode
     pub direct_send_data_size: usize,     // The amount of data to send in each request
     pub direct_send_per_second: u64,      // The interval (microseconds) between requests
+    pub direct_send_ramp_up_ms: Option<u64>, // The interval (milliseconds) for each ramp up phase
 
     pub enable_rpc_testing: bool,
     pub rpc_data_size: usize,
@@ -30,6 +31,7 @@ impl Default for NetbenchConfig {
             enable_direct_send_testing: false,
             direct_send_data_size: 100 * 1024, // 100 KB
             direct_send_per_second: 1_000,
+            direct_send_ramp_up_ms: Some(30_000), // 30 seconds
 
             enable_rpc_testing: false,
             rpc_data_size: 100 * 1024,
