@@ -41,7 +41,19 @@ use aptos_types::{
 use aptos_vm::VMExecutor;
 use fail::fail_point;
 use itertools::multizip;
+use once_cell::sync::Lazy;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{iter::once, marker::PhantomData, sync::Arc};
+
+pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -210,10 +222,12 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
         // as only transactions with verified signatures are committed to the storage.
-        let sig_verified_txns = transactions
-            .into_iter()
-            .map(into_signature_verified)
-            .collect::<Vec<_>>();
+        let sig_verified_txns = SIG_VERIFY_POOL.install(|| {
+            transactions
+                .into_par_iter()
+                .map(into_signature_verified)
+                .collect::<Vec<_>>()
+        });
 
         // Execute transactions.
         let state_view = self.state_view(&latest_view)?;
