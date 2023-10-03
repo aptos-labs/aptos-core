@@ -1,5 +1,6 @@
 import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { AccountAddress } from "../../core";
+import { RustEnumTransactionArgumentVariants } from "../../types";
 
 /**
  * Representation of a Transaction Argument that can serialized and deserialized
@@ -14,29 +15,26 @@ export abstract class TransactionArgument extends Serializable {
    * Deserialize a Transaction Argument
    */
   static deserialize(deserializer: Deserializer): TransactionArgument {
+    // index enum variant
     const index = deserializer.deserializeUleb128AsU32();
-    /**
-     * index is represented in rust as an enum
-     * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/transaction_argument.rs#L11}
-     */
     switch (index) {
-      case 0:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU8:
         return TransactionArgumentU8.load(deserializer);
-      case 1:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU64:
         return TransactionArgumentU64.load(deserializer);
-      case 2:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU128:
         return TransactionArgumentU128.load(deserializer);
-      case 3:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentAddress:
         return TransactionArgumentAddress.load(deserializer);
-      case 4:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU8Vector:
         return TransactionArgumentU8Vector.load(deserializer);
-      case 5:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentBool:
         return TransactionArgumentBool.load(deserializer);
-      case 6:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU16:
         return TransactionArgumentU16.load(deserializer);
-      case 7:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU32:
         return TransactionArgumentU32.load(deserializer);
-      case 8:
+      case RustEnumTransactionArgumentVariants.TransactionArgumentU256:
         return TransactionArgumentU256.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionArgument: ${index}`);
@@ -53,7 +51,7 @@ export class TransactionArgumentU8 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(0);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU8);
     serializer.serializeU8(this.value);
   }
 
@@ -72,7 +70,7 @@ export class TransactionArgumentU16 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(6);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU16);
     serializer.serializeU16(this.value);
   }
 
@@ -91,7 +89,7 @@ export class TransactionArgumentU32 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(7);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU32);
     serializer.serializeU32(this.value);
   }
 
@@ -110,7 +108,7 @@ export class TransactionArgumentU64 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU64);
     serializer.serializeU64(this.value);
   }
 
@@ -129,7 +127,7 @@ export class TransactionArgumentU128 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(2);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU128);
     serializer.serializeU128(this.value);
   }
 
@@ -148,7 +146,7 @@ export class TransactionArgumentU256 extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(8);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU256);
     serializer.serializeU256(this.value);
   }
 
@@ -167,7 +165,7 @@ export class TransactionArgumentAddress extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(3);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentAddress);
     this.value.serialize(serializer);
   }
 
@@ -186,7 +184,7 @@ export class TransactionArgumentU8Vector extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(4);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentU8Vector);
     serializer.serializeBytes(this.value);
   }
 
@@ -205,7 +203,7 @@ export class TransactionArgumentBool extends TransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(5);
+    serializer.serializeU32AsUleb128(RustEnumTransactionArgumentVariants.TransactionArgumentBool);
     serializer.serializeBool(this.value);
   }
 

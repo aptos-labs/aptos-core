@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/naming-convention */
+
 import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { AccountAddress } from "../../core";
 import { Identifier } from "./identifier";
 import { TransactionArgument } from "./transactionArguments";
 import { ModuleId } from "./moduleId";
+import { RustEnumTransactionPayloadVariants } from "../../types";
 
 /**
  * Representation of the supported Transaction Payload
@@ -18,18 +21,14 @@ export abstract class TransactionPayload extends Serializable {
    * Deserialize a Transaction Payload
    */
   static deserialize(deserializer: Deserializer): TransactionPayload {
+    // index enum variant
     const index = deserializer.deserializeUleb128AsU32();
-    /**
-     * index is represented in rust as an enum
-     * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L478}
-     */
     switch (index) {
-      case 0:
+      case RustEnumTransactionPayloadVariants.TransactionPayloadScript:
         return TransactionPayloadScript.load(deserializer);
-      // TODO: change to 1 once ModuleBundle has been removed from rust
-      case 2:
+      case RustEnumTransactionPayloadVariants.TransactionPayloadEntryFunction:
         return TransactionPayloadEntryFunction.load(deserializer);
-      case 3:
+      case RustEnumTransactionPayloadVariants.TransactionPayloadMultisig:
         return TransactionPayloadMultisig.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
@@ -49,7 +48,7 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(0);
+    serializer.serializeU32AsUleb128(RustEnumTransactionPayloadVariants.TransactionPayloadScript);
     this.script.serialize(serializer);
   }
 
@@ -71,7 +70,7 @@ export class TransactionPayloadEntryFunction extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(2);
+    serializer.serializeU32AsUleb128(RustEnumTransactionPayloadVariants.TransactionPayloadEntryFunction);
     this.entryFunction.serialize(serializer);
   }
 
@@ -93,7 +92,7 @@ export class TransactionPayloadMultisig extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(3);
+    serializer.serializeU32AsUleb128(RustEnumTransactionPayloadVariants.TransactionPayloadMultisig);
     this.multiSig.serialize(serializer);
   }
 
@@ -144,7 +143,7 @@ export class EntryFunction {
   serialize(serializer: Serializer): void {
     this.module_name.serialize(serializer);
     this.function_name.serialize(serializer);
-    serializer.serializeVector<TypeTag>(this.ty_args);
+    serializer.serializeVector<TypeTag>(this.type_args);
 
     serializer.serializeU32AsUleb128(this.args.length);
     this.args.forEach((item: Uint8Array) => {
@@ -155,7 +154,7 @@ export class EntryFunction {
   static deserialize(deserializer: Deserializer): EntryFunction {
     const module_name = ModuleId.deserialize(deserializer);
     const function_name = Identifier.deserialize(deserializer);
-    const ty_args = deserializer.deserializeVector(TypeTag);
+    const type_args = deserializer.deserializeVector(TypeTag);
 
     const length = deserializer.deserializeUleb128AsU32();
     const list: Array<Uint8Array> = [];
@@ -164,7 +163,7 @@ export class EntryFunction {
     }
 
     const args = list;
-    return new EntryFunction(module_name, function_name, ty_args, args);
+    return new EntryFunction(module_name, function_name, type_args, args);
   }
 }
 
