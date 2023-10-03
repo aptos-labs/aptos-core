@@ -124,6 +124,19 @@ pub trait TransactionOutput: Send + Sync + Debug {
         delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
     );
 
+    /// In parallel execution, will be called once per transaction when the output is
+    /// ready to be committed. In sequential execution, won't be called (deltas are
+    /// materialized and incorporated during execution).
+    fn incorporate_materialized_txn_output(
+        &self,
+        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        patched_resource_write_set: HashMap<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        >,
+        patched_events: Vec<<Self::Txn as Transaction>::Event>,
+    );
+
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;
 }
