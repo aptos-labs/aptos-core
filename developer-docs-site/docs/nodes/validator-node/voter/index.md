@@ -25,5 +25,5 @@ To participate as a voter in the Aptos governance, follow the below steps.
 ### Steps Using Aptos CLI
 
 1. Get your stake pool info `aptos node get-stake-pool --owner-address <owner-address> --url <REST API for the network>`
-2. To see the list of proposal `aptos governance list-proposals --url https://mainnet.aptoslabs.com`
+2. To see the list of proposal `aptos governance list-proposals --url https://mainnet.aptoslabs.com/v1`
 3. To vote on a proposal `aptos governance vote --proposal-id <PROPOSAL_ID> --pool-address <POOL_ADDRESS> --url <URL> --profile <profile>`
