@@ -43,6 +43,26 @@ export enum RustEnumTransactionVariants {
 }
 
 /**
+ * Transaction Authenticator enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L44}
+ */
+export enum RustEnumTransactionAuthenticatorVariant {
+  TransactionAuthenticatorEd25519 = 0,
+  TransactionAuthenticatorMultiEd25519 = 1,
+  TransactionAuthenticatorMultiAgent = 2,
+  TransactionAuthenticatorFeePayer = 4,
+}
+
+/**
+ * Transaction Authenticator enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L414}
+ */
+export enum RustEnumAccountAuthenticatorVariant {
+  AccountAuthenticatorEd25519 = 0,
+  AccountAuthenticatorMultiEd25519 = 1,
+}
+
+/**
  * BCS types
  */
 export type Uint8 = number;
