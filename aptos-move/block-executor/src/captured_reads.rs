@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use aptos_aggregator::types::{AggregatorValue, ReadPosition};
+use aptos_aggregator::types::{AggregatorValue, PanicOr, ReadPosition};
 use aptos_mvhashmap::{
     types::{MVAggregatorsError, MVDataError, MVDataOutput, TxnIndex, Version},
     versioned_aggregators::VersionedAggregators,
@@ -304,6 +304,13 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
+    pub(crate) fn capture_delayed_field_read_error(&mut self, e: &PanicOr<MVAggregatorsError>) {
+        match e {
+            PanicOr::CodeInvariantError(_) => self.incorrect_use = true,
+            PanicOr::Or(_) => self.speculative_failure = true,
+        };
+    }
+
     // If maybe_tag is provided, then we check the group, otherwise, normal reads.
     pub(crate) fn get_by_kind(
         &self,
@@ -326,6 +333,10 @@ impl<T: Transaction> CapturedReads<T> {
                 .get(state_key)
                 .and_then(|r| r.downcast(kind)),
         }
+    }
+
+    pub(crate) fn validate_incorrect_use(&self) -> bool {
+        self.incorrect_use
     }
 
     pub(crate) fn validate_data_reads(
