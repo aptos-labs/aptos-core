@@ -3,21 +3,20 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver};
+use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver, natives::aptos_natives_with_builder};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
+use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::on_chain_config::OnChainConfig;
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
-    identifier::Identifier,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::StatusCode,
 };
-use move_vm_runtime::{config::VMConfig, move_vm::MoveVM, native_functions::NativeFunction};
+use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
@@ -33,23 +32,23 @@ static WARM_VM_CACHE: Lazy<WarmVmCache> = Lazy::new(|| WarmVmCache {
 
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        native_builder: SafeNativeBuilder,
         vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
-        WARM_VM_CACHE.get(natives, vm_config, resolver)
+        WARM_VM_CACHE.get(native_builder, vm_config, resolver)
     }
 
     fn get(
         &self,
-        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        mut native_builder: SafeNativeBuilder,
         vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
         let _timer = TIMER.timer_with(&["warm_vm_get"]);
         let id = {
             let _timer = TIMER.timer_with(&["get_warm_vm_id"]);
-            WarmVmId::new(&vm_config, resolver)?
+            WarmVmId::new(&native_builder, &vm_config, resolver)?
         };
 
         if let Some(vm) = self.cache.read().get(&id) {
@@ -65,7 +64,10 @@ impl WarmVmCache {
                 return Ok(vm.clone());
             }
 
-            let vm = MoveVM::new_with_config(natives, vm_config)?;
+            let vm = MoveVM::new_with_config(
+                aptos_natives_with_builder(&mut native_builder),
+                vm_config,
+            )?;
             Self::warm_vm_up(&vm, resolver);
 
             // Not using LruCache because its `::get()` requires &mut self
@@ -96,13 +98,23 @@ impl WarmVmCache {
 
 #[derive(Eq, Hash, PartialEq)]
 struct WarmVmId {
+    natives: Bytes,
     vm_config: Bytes,
     core_packages_registry: Option<Bytes>,
 }
 
 impl WarmVmId {
-    fn new(vm_config: &VMConfig, resolver: &impl AptosMoveResolver) -> VMResult<Self> {
+    fn new(
+        native_builder: &SafeNativeBuilder,
+        vm_config: &VMConfig,
+        resolver: &impl AptosMoveResolver,
+    ) -> VMResult<Self> {
+        let natives = {
+            let _timer = TIMER.timer_with(&["serialize_native_builder"]);
+            native_builder.id_bytes()
+        };
         Ok(Self {
+            natives,
             vm_config: Self::vm_config_bytes(vm_config),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
         })

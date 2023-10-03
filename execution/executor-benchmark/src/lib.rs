@@ -480,7 +480,7 @@ fn add_accounts_impl<V>(
     let now_version = db.reader.get_latest_version().unwrap();
     let delta_v = now_version - start_version;
     info!(
-        "Overall TPS: account creation: {} txn/s",
+        "Overall TPS: create_db: account creation: {} txn/s",
         delta_v as f32 / elapsed,
     );
 

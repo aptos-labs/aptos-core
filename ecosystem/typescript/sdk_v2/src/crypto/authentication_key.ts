@@ -3,34 +3,29 @@
 
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { AccountAddress, Hex } from "../core";
-import { HexInput } from "../types";
+import { AuthenticationKeyScheme, HexInput } from "../types";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { PublicKey } from "./asymmetric_crypto";
+import { Ed25519PublicKey } from "./ed25519";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
  * their private key(s) associated with the account without changing the address that hosts their account.
  * @see {@link https://aptos.dev/concepts/accounts | Account Basics}
- * 
+ *
  * Note: AuthenticationKey only supports Ed25519 and MultiEd25519 public keys for now.
  *
  * Account addresses can be derived from AuthenticationKey
  */
 export class AuthenticationKey {
-  // Length of AuthenticationKey in bytes(Uint8Array)
+  /**
+   * An authentication key is always a SHA3-256 hash of data, and is always 32 bytes.
+   */
   static readonly LENGTH: number = 32;
 
-  // Scheme identifier for MultiEd25519 signatures used to derive authentication keys for MultiEd25519 public keys
-  static readonly MULTI_ED25519_SCHEME: number = 1;
-
-  // Scheme identifier for Ed25519 signatures used to derive authentication key for MultiEd25519 public key
-  static readonly ED25519_SCHEME: number = 0;
-
-  // Scheme identifier used when hashing an account's address together with a seed to derive the address (not the
-  // authentication key) of a resource account.
-  static readonly DERIVE_RESOURCE_ACCOUNT_SCHEME: number = 255;
-
-  // Actual data of AuthenticationKey, in Hex format
+  /**
+   * The raw bytes of the authentication key.
+   */
   public readonly data: Hex;
 
   constructor(args: { data: HexInput }) {
@@ -51,23 +46,20 @@ export class AuthenticationKey {
   }
 
   /**
-   * Converts a K-of-N MultiEd25519PublicKey to AuthenticationKey with:
-   * `auth_key = sha3-256(p_1 | … | p_n | K | 0x01)`. `K` represents the K-of-N required for
-   * authenticating the transaction. `0x01` is the 1-byte scheme for multisig.
+   * Creates an AuthenticationKey from seed bytes and a scheme
    *
-   * @param multiPublicKey A K-of-N MultiPublicKey
-   * @returns AuthenticationKey
+   * This allows for the creation of AuthenticationKeys that are not derived from Public Keys directly
+   * @param args
    */
-  static fromMultiPublicKey(args: { multiPublicKey: MultiEd25519PublicKey }): AuthenticationKey {
-    const { multiPublicKey } = args;
-    const multiPubKeyBytes = multiPublicKey.toUint8Array();
-
-    const bytes = new Uint8Array(multiPubKeyBytes.length + 1);
-    bytes.set(multiPubKeyBytes);
-    bytes.set([AuthenticationKey.MULTI_ED25519_SCHEME], multiPubKeyBytes.length);
+  private static fromBytesAndScheme(args: { bytes: HexInput; scheme: AuthenticationKeyScheme }) {
+    const { bytes, scheme } = args;
+    const inputBytes = Hex.fromHexInput({ hexInput: bytes }).toUint8Array();
+    const authKeyBytes = new Uint8Array(inputBytes.length + 1);
+    authKeyBytes.set(inputBytes);
+    authKeyBytes.set([scheme], inputBytes.length);
 
     const hash = sha3Hash.create();
-    hash.update(bytes);
+    hash.update(authKeyBytes);
 
     return new AuthenticationKey({ data: hash.digest() });
   }
@@ -80,16 +72,18 @@ export class AuthenticationKey {
    */
   static fromPublicKey(args: { publicKey: PublicKey }): AuthenticationKey {
     const { publicKey } = args;
+
+    let scheme: number;
+    if (publicKey instanceof Ed25519PublicKey) {
+      scheme = AuthenticationKeyScheme.Ed25519.valueOf();
+    } else if (publicKey instanceof MultiEd25519PublicKey) {
+      scheme = AuthenticationKeyScheme.MultiEd25519.valueOf();
+    } else {
+      throw new Error("No supported authentication scheme for public key");
+    }
+
     const pubKeyBytes = publicKey.toUint8Array();
-
-    const bytes = new Uint8Array(pubKeyBytes.length + 1);
-    bytes.set(pubKeyBytes);
-    bytes.set([AuthenticationKey.ED25519_SCHEME], pubKeyBytes.length);
-
-    const hash = sha3Hash.create();
-    hash.update(bytes);
-
-    return new AuthenticationKey({ data: hash.digest() });
+    return AuthenticationKey.fromBytesAndScheme({ bytes: pubKeyBytes, scheme });
   }
 
   /**

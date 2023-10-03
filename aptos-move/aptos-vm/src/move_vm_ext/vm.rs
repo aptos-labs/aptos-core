@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId},
-    natives::aptos_natives_with_builder,
-};
+use crate::move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId};
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
@@ -89,7 +86,7 @@ impl MoveVmExt {
 
         Ok(Self {
             inner: WarmVmCache::get_warm_vm(
-                aptos_natives_with_builder(&mut builder),
+                builder,
                 VMConfig {
                     verifier: verifier_config,
                     max_binary_format_version,

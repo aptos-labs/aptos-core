@@ -9,7 +9,7 @@ use crate::dag::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -59,12 +59,14 @@ impl Dag {
         let mut expired = vec![];
         let mut nodes_by_round = BTreeMap::new();
         for (digest, certified_node) in all_nodes {
-            if certified_node.metadata().epoch() == epoch {
+            if certified_node.metadata().epoch() == epoch && certified_node.round() >= initial_round
+            {
                 let arc_node = Arc::new(certified_node);
                 let index = *author_to_index
                     .get(arc_node.metadata().author())
                     .expect("Author from certified node should exist");
                 let round = arc_node.metadata().round();
+                debug!("Recovered node {} from storage", arc_node.id());
                 nodes_by_round
                     .entry(round)
                     .or_insert_with(|| vec![None; num_validators])[index] =
@@ -140,6 +142,7 @@ impl Dag {
 
         // mutate after all checks pass
         self.storage.save_certified_node(&node)?;
+        debug!("Added node {}", node.id());
         round_ref[index] = Some(NodeStatus::Unordered(node.clone()));
         Ok(())
     }
@@ -320,7 +323,7 @@ impl Dag {
 
         let bitmask = self
             .nodes_by_round
-            .range(lowest_round..target_round)
+            .range(lowest_round..=target_round)
             .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
             .collect();
 

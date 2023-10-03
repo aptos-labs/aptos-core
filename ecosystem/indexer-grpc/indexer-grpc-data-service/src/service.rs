@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    SHORT_CONNECTION_COUNT,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION,
+    PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL,
+    PROCESSED_VERSIONS_COUNT, SHORT_CONNECTION_COUNT,
 };
 use anyhow::Context;
 use aptos_indexer_grpc_utils::{
@@ -261,6 +261,19 @@ impl RawData for RawDataServerWrapper {
                             transactions_count = Some(count - transaction_data.len() as u64);
                         }
                     };
+                    // Note: this is not the actual bytes transferred to the client.
+                    // This is the bytes consumed internally by the server
+                    // and ready to be transferred to the client.
+                    let bytes_ready_to_transfer = transaction_data
+                        .iter()
+                        .map(|(encoded, _)| encoded.len())
+                        .sum::<usize>();
+                    BYTES_READY_TO_TRANSFER_FROM_SERVER
+                        .with_label_values(&[
+                            request_metadata.request_token.as_str(),
+                            request_metadata.request_email.as_str(),
+                        ])
+                        .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
                     let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
@@ -280,20 +293,20 @@ impl RawData for RawDataServerWrapper {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
-                                    request_metadata.request_user_classification.as_str(),
-                                    request_metadata.request_name.as_str(),
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_email.as_str(),
                                 ])
                                 .set(current_batch_size as i64);
                             LATEST_PROCESSED_VERSION
                                 .with_label_values(&[
-                                    request_metadata.request_user_classification.as_str(),
-                                    request_metadata.request_name.as_str(),
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_email.as_str(),
                                 ])
                                 .set(end_of_batch_version as i64);
                             PROCESSED_VERSIONS_COUNT
                                 .with_label_values(&[
-                                    request_metadata.request_user_classification.as_str(),
-                                    request_metadata.request_name.as_str(),
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_email.as_str(),
                                 ])
                                 .inc_by(current_batch_size as u64);
                             if let Some(data_latency_in_secs) = data_latency_in_secs {
@@ -302,8 +315,8 @@ impl RawData for RawDataServerWrapper {
                                 if current_batch_size % BLOB_STORAGE_SIZE != 0 {
                                     PROCESSED_LATENCY_IN_SECS
                                         .with_label_values(&[
-                                            request_metadata.request_user_classification.as_str(),
-                                            request_metadata.request_name.as_str(),
+                                            request_metadata.request_token.as_str(),
+                                            request_metadata.request_email.as_str(),
                                         ])
                                         .set(data_latency_in_secs);
                                     PROCESSED_LATENCY_IN_SECS_ALL
