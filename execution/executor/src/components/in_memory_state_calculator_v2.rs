@@ -6,6 +6,7 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_executor_types::{ParsedTransactionOutput, ProofReader};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_logger::info;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
@@ -173,10 +174,6 @@ impl InMemoryStateCalculatorV2 {
             latest_checkpoint_version = Some(first_version + index as u64);
         }
 
-        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
-            drop(frozen_base);
-        });
-
         let current_version = first_version + num_txns as u64 - 1;
         // We need to calculate the SMT at the end of the chunk, if it is not already calculated.
         let current_tree = if last_checkpoint_index == Some(num_txns - 1) {
@@ -198,6 +195,10 @@ impl InMemoryStateCalculatorV2 {
             )?
         };
 
+        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
+            drop(frozen_base);
+        });
+
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint
         } else {
@@ -209,6 +210,14 @@ impl InMemoryStateCalculatorV2 {
             .for_each(|(base, delta)| base.extend(delta));
             updates_since_latest_checkpoint
         };
+
+        info!(
+            "last_checkpoint_index {last_checkpoint_index:?}, result_state: {latest_checkpoint_version:?} {:?} {:?} {current_version} {:?} {:?}",
+            latest_checkpoint.root_hash(),
+            latest_checkpoint.usage(),
+            current_tree.root_hash(),
+            current_tree.usage(),
+        );
 
         let result_state = StateDelta::new(
             latest_checkpoint.clone(),

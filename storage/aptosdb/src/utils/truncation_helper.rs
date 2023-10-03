@@ -63,6 +63,8 @@ pub(crate) fn get_state_merkle_commit_progress(
     )
 }
 
+// TODO(grao): Not all target version is valid. e.g. If we turn on skip_index_and_usage, we can
+// only truncate to a point with usage persisted (end of chunk or block).
 pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {
     let event_store = EventStore::new(ledger_db.event_db_arc());
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
