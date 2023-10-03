@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Deserializable, Deserializer, Serializable, Serializer } from "../bcs";
+import { Serializable, Serializer } from "../bcs";
 import { HexInput } from "../types";
 
 /**
  * An abstract representation of a public key.  All Asymmetric key pairs will use this to
  * verify signatures and for authentication keys.
  */
-export abstract class PublicKey implements Serializable, Deserializable<PublicKey> {
+export abstract class PublicKey extends Serializable {
   /**
    * Verifies that the private key associated with this public key signed the message with the given signature.
    * @param args
@@ -25,9 +25,6 @@ export abstract class PublicKey implements Serializable, Deserializable<PublicKe
    */
   abstract toString(): string;
 
-  // TODO: This should be a static method.
-  abstract deserialize(deserializer: Deserializer): PublicKey;
-
   abstract serialize(serializer: Serializer): void;
 }
 
@@ -35,7 +32,7 @@ export abstract class PublicKey implements Serializable, Deserializable<PublicKe
  * An abstract representation of a private key.  This is used to sign transactions and
  * derive the public key associated.
  */
-export abstract class PrivateKey implements Serializable, Deserializable<PrivateKey> {
+export abstract class PrivateKey extends Serializable {
   /**
    * Sign a message with the key
    * @param args
@@ -52,9 +49,6 @@ export abstract class PrivateKey implements Serializable, Deserializable<Private
    */
   abstract toString(): string;
 
-  // TODO: This should be a static method.
-  abstract deserialize(deserializer: Deserializer): PrivateKey;
-
   abstract serialize(serializer: Serializer): void;
 
   /**
@@ -67,7 +61,7 @@ export abstract class PrivateKey implements Serializable, Deserializable<Private
  * An abstract representation of a signature.  This is the product of signing a
  * message and can be used with the PublicKey to verify the signature.
  */
-export abstract class Signature implements Serializable, Deserializable<Signature> {
+export abstract class Signature extends Serializable {
   /**
    * Get the raw signature bytes
    */
@@ -77,9 +71,6 @@ export abstract class Signature implements Serializable, Deserializable<Signatur
    * Get the signature as a hex string with a 0x prefix e.g. 0x123456...
    */
   abstract toString(): string;
-
-  // TODO: This should be a static method.
-  abstract deserialize(deserializer: Deserializer): Signature;
 
   abstract serialize(serializer: Serializer): void;
 }

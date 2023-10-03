@@ -23,7 +23,7 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        TimedFeatures, APTOS_MAX_KNOWN_VERSION,
+        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -110,7 +110,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
     )
     .unwrap();
@@ -219,7 +219,7 @@ pub fn encode_genesis_change_set(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
     )
     .unwrap();
@@ -906,7 +906,7 @@ pub fn test_genesis_module_publishing() {
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
     )
     .unwrap();

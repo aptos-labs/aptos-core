@@ -29,7 +29,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::{
         ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
-        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, Version,
+        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, TimedFeaturesBuilder, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -146,10 +146,11 @@ impl AptosVMImpl {
             .map(|config| config.last_reconfiguration_time())
             .unwrap_or(0);
 
-        let mut timed_features = TimedFeatures::new(chain_id, timestamp);
+        let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
         if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
-            timed_features = timed_features.with_override_profile(profile)
+            timed_features_builder = timed_features_builder.with_override_profile(profile)
         }
+        let timed_features = timed_features_builder.build();
 
         let move_vm = MoveVmExt::new(
             native_gas_params,
