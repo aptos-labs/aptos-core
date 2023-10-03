@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{
+    delta_change_set::DeltaOp,
+    types::{DelayedFieldsSpeculativeError, PanicOr},
+};
 use aptos_crypto::hash::HashValue;
 use aptos_types::executable::ExecutableDescriptor;
 use move_core_types::value::MoveTypeLayout;
@@ -100,6 +103,17 @@ pub enum MVAggregatorsError {
     /// (either it violated the limits when not supposed to, or vice versa).
     /// Note: we can return affected indices to optimize invalidations by the caller.
     DeltaApplicationFailure,
+}
+
+impl MVAggregatorsError {
+    pub fn from_panic_or(
+        err: PanicOr<DelayedFieldsSpeculativeError>,
+    ) -> PanicOr<MVAggregatorsError> {
+        match err {
+            PanicOr::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
+            PanicOr::Or(_) => PanicOr::Or(MVAggregatorsError::DeltaApplicationFailure),
+        }
+    }
 }
 
 // In order to store base vales at the lowest index, i.e. at index 0, without conflicting
