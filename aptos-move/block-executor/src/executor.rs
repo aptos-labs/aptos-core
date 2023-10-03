@@ -459,7 +459,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    let (_, _, maybe_error) = shared_commit_state.get();
+                    // let (_, _, maybe_error) = shared_commit_state.get();
                     Self::execute(
                         txn_idx,
                         incarnation,
