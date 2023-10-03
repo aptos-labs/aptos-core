@@ -24,6 +24,10 @@ pub static COORDINATOR_PORT: u16 = 52200;
 
 #[allow(dead_code)]
 pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
+    // The network controller used to create channels to send and receive messages. We want the
+    // network controller to be owned by the executor client so that it is alive for the entire
+    // lifetime of the executor client.
+    network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
     command_txs: Arc<Vec<Mutex<Sender<Message>>>>,
@@ -40,7 +44,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
 impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
     pub fn new(
         remote_shard_addresses: Vec<SocketAddr>,
-        controller: &mut NetworkController,
+        mut controller: NetworkController,
         num_threads: Option<usize>,
     ) -> Self {
         let num_threads = num_threads.unwrap_or_else(num_cpus::get);
@@ -50,6 +54,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 .build()
                 .unwrap(),
         );
+        let controller_mut_ref = &mut controller;
         let (command_txs, result_rxs) = remote_shard_addresses
             .iter()
             .enumerate()
@@ -57,14 +62,14 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let command_tx =
-                    Mutex::new(controller.create_outbound_channel(*address, execute_command_type));
-                let result_rx = controller.create_inbound_channel(execute_result_type);
+                    Mutex::new(controller_mut_ref.create_outbound_channel(*address, execute_command_type));
+                let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
             })
             .unzip();
 
         let state_view_service = Arc::new(RemoteStateViewService::new(
-            controller,
+            controller_mut_ref,
             remote_shard_addresses,
             None,
         ));
@@ -76,7 +81,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             .spawn(move || state_view_service_clone.start())
             .unwrap();
 
+        controller.start();
+
         Self {
+            network_controller: controller,
             state_view_service,
             _join_handle: Some(join_handle),
             command_txs: Arc::new(command_txs),
@@ -134,5 +142,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         let execution_results = self.get_output_from_shards()?;
 
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
+    }
+
+    fn shutdown(&mut self) {
+        self.network_controller.shutdown();
     }
 }

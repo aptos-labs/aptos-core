@@ -112,4 +112,8 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
 
         Ok(aggregated_results)
     }
+
+    pub fn shutdown(&mut self) {
+        self.executor_client.shutdown();
+    }
 }

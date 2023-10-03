@@ -15,14 +15,13 @@ pub fn create_thread_remote_executor_shards(
     num_shards: usize,
     num_threads: Option<usize>,
 ) -> (
-    NetworkController,
     RemoteExecutorClient<FakeDataStore>,
     Vec<ThreadExecutorService>,
 ) {
     // First create the coordinator.
     let listen_port = utils::get_available_port();
     let coordinator_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listen_port);
-    let mut controller = NetworkController::new(
+    let controller = NetworkController::new(
         "remote-executor-coordinator".to_string(),
         coordinator_address,
         5000,
@@ -50,8 +49,8 @@ pub fn create_thread_remote_executor_shards(
         .collect::<Vec<_>>();
 
     let remote_executor_client =
-        RemoteExecutorClient::new(remote_shard_addresses, &mut controller, None);
-    (controller, remote_executor_client, remote_executor_services)
+        RemoteExecutorClient::new(remote_shard_addresses, controller, None);
+    (remote_executor_client, remote_executor_services)
 }
 
 #[test]
@@ -59,9 +58,9 @@ fn test_sharded_block_executor_no_conflict() {
     use std::thread;
 
     let num_shards = 8;
-    let (mut controller, executor_client, mut executor_services) =
+    let (executor_client, mut executor_services) =
         create_thread_remote_executor_shards(num_shards, Some(2));
-    controller.start();
+    //controller.start();
     let sharded_block_executor = ShardedBlockExecutor::new(executor_client);
 
     // wait for the servers to be ready before sending messages
@@ -70,7 +69,6 @@ fn test_sharded_block_executor_no_conflict() {
 
     test_utils::test_sharded_block_executor_no_conflict(sharded_block_executor);
 
-    controller.shutdown();
     executor_services.iter_mut().for_each(|executor_service| {
         executor_service.shutdown();
     });
@@ -81,9 +79,9 @@ fn test_sharded_block_executor_with_conflict() {
     use std::thread;
 
     let num_shards = 8;
-    let (mut controller, executor_client, mut executor_services) =
+    let (executor_client, mut executor_services) =
         create_thread_remote_executor_shards(num_shards, Some(2));
-    controller.start();
+    //controller.start();
     let sharded_block_executor = ShardedBlockExecutor::new(executor_client);
 
     // wait for the servers to be ready before sending messages
@@ -92,7 +90,6 @@ fn test_sharded_block_executor_with_conflict() {
 
     test_utils::sharded_block_executor_with_conflict(sharded_block_executor, 2);
 
-    controller.shutdown();
     executor_services.iter_mut().for_each(|executor_service| {
         executor_service.shutdown();
     });

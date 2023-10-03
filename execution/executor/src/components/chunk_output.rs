@@ -40,7 +40,7 @@ use std::{ops::Deref, sync::Arc, time::Duration};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use aptos_executor_service::remote_executor_client::{COORDINATOR_PORT, RemoteExecutorClient};
 use aptos_secure_net::network_controller::NetworkController;
-use aptos_vm::sharded_block_executor::executor_client::ExecutorClient;
+//use aptos_vm::sharded_block_executor::executor_client::ExecutorClient;
 use aptos_vm::sharded_block_executor::local_executor_shard::LocalExecutorClient;
 
 static REMOTE_SHARDING: OnceCell<bool> = OnceCell::new();
@@ -82,15 +82,14 @@ pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
 > = Lazy::new(|| {
     info!("*********** REMOTE_SHARDED_BLOCK_EXECUTOR");
     let coordinator_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT);
-    let mut controller = NetworkController::new(
+    let controller = NetworkController::new(
         "remote-executor-coordinator".to_string(),
         coordinator_address,
         5000,
     );
     let remote_shard_addresses = get_remote_addresses();
     let remote_executor_client =
-        RemoteExecutorClient::new(remote_shard_addresses, &mut controller, None);
-    controller.start();
+        RemoteExecutorClient::new(remote_shard_addresses, controller, None);
     Arc::new(Mutex::new(ShardedBlockExecutor::new(remote_executor_client)))
 });
 
@@ -157,7 +156,6 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
@@ -238,12 +236,16 @@ impl ChunkOutput {
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         if get_remote_sharding() {
-            Ok(V::execute_block_sharded(
-                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+            //let mut remote_sharded_block_executor = REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref();
+            let mut remote_sharded_block_executor = REMOTE_SHARDED_BLOCK_EXECUTOR.lock();
+            let res = Ok(V::execute_block_sharded(
+                remote_sharded_block_executor.deref(),
                 partitioned_txns,
                 state_view,
                 maybe_block_gas_limit,
-            )?)
+            )?);
+            remote_sharded_block_executor.shutdown();
+            res
         } else {
             Ok(V::execute_block_sharded(
                 SHARDED_BLOCK_EXECUTOR.lock().deref(),

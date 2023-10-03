@@ -42,4 +42,6 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ShardedExecutionOutput, VMStatus>;
+
+    fn shutdown(&mut self);
 }
