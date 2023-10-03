@@ -4,7 +4,7 @@
 
 use aptos_framework::{extended_checks, path_in_crate};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{Features, TimedFeatures};
+use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_package::CompilerConfig;
@@ -41,12 +41,13 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
 pub fn aptos_test_natives() -> NativeFunctionTable {
     // By side effect, configure for unit tests
     natives::configure_for_unit_test();
+    extended_checks::configure_extended_checks_for_unit_test();
     // move_stdlib has the testing feature enabled to include debug native functions
     natives::aptos_natives(
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     )
 }

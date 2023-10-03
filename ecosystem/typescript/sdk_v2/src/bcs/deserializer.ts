@@ -3,9 +3,13 @@
 
 /* eslint-disable no-bitwise */
 import { MAX_U32_NUMBER } from "./consts";
-import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "./types";
+import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "../types";
 
-// The class must implement a static deserialize method.
+/**
+ * This interface exists solely for the `deserialize` function in the `Deserializer` class.
+ * It is not exported because exporting it results in more typing errors than it prevents
+ * due to Typescript's lack of support for static methods in abstract classes and interfaces.
+ */
 interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
 }
@@ -188,5 +192,56 @@ export class Deserializer {
     }
 
     return Number(value);
+  }
+
+  /**
+   * Helper function that primarily exists to support alternative syntax for deserialization.
+   * That is, if we have a `const deserializer: new Deserializer(...)`, instead of having to use
+   * `MyClass.deserialize(deserializer)`, we can call `deserializer.deserialize(MyClass)`.
+   *
+   * @example const deserializer = new Deserializer(new Uint8Array([1, 2, 3]));
+   * const value = deserializer.deserialize(MyClass); // where MyClass has a `deserialize` function
+   * // value is now an instance of MyClass
+   * // equivalent to `const value = MyClass.deserialize(deserializer)`
+   * @param cls The BCS-deserializable class to deserialize the buffered bytes into.
+   *
+   * @returns the deserialized value of class type T
+   */
+  deserialize<T>(cls: Deserializable<T>): T {
+    // NOTE: `deserialize` in `cls.deserialize(this)` here is a static method defined in `cls`,
+    // It is separate from the `deserialize` instance method defined here in Deserializer.
+    return cls.deserialize(this);
+  }
+
+  /**
+   * Deserializes an array of BCS Deserializable values given an existing Deserializer
+   * instance with a loaded byte buffer.
+   *
+   * @param cls The BCS-deserializable class to deserialize the buffered bytes into.
+   * @example
+   * // serialize a vector of addresses
+   * const addresses = new Array<AccountAddress>(
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x2" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xb" }),
+   * );
+   * const serializer = new Serializer();
+   * serializer.serializeVector(addresses);
+   * const serializedBytes = serializer.toUint8Array();
+   *
+   * // deserialize the bytes into an array of addresses
+   * const deserializer = new Deserializer(serializedBytes);
+   * const deserializedAddresses = deserializer.deserializeVector(AccountAddress);
+   * // deserializedAddresses is now an array of AccountAddress instances
+   * @returns an array of deserialized values of type T
+   */
+  deserializeVector<T>(cls: Deserializable<T>): Array<T> {
+    const length = this.deserializeUleb128AsU32();
+    const vector = new Array<T>();
+    for (let i = 0; i < length; i += 1) {
+      vector.push(this.deserialize(cls));
+    }
+    return vector;
   }
 }

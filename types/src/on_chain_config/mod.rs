@@ -8,6 +8,7 @@ use crate::{
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};
+use bytes::Bytes;
 use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
@@ -44,7 +45,7 @@ pub use self::{
         TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
-    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
+    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
@@ -123,7 +124,7 @@ impl<P: OnChainConfigProvider> OnChainConfigPayload<P> {
 
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>>;
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes>;
 }
 
 /// Trait to be implemented by a Rust struct representation of an on-chain config

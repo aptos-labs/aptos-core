@@ -1,16 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ParsedTransactionOutput, ProofReader};
-use anyhow::{anyhow, bail, Result};
+use crate::ProofReader;
+use anyhow::{bail, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
-use aptos_state_view::account_with_state_cache::AsAccountWithStateCache;
 use aptos_storage_interface::{cached_state_view::StateCache, state_delta::StateDelta};
 use aptos_types::{
-    account_config::CORE_CODE_ADDRESS,
-    account_view::AccountView,
-    epoch_state::EpochState,
     event::EventKey,
     on_chain_config,
     state_store::{
@@ -101,72 +97,6 @@ impl InMemoryStateCalculator {
         }
     }
 
-    pub fn calculate_for_transaction_chunk(
-        mut self,
-        to_keep: &[(Transaction, ParsedTransactionOutput)],
-        new_epoch: bool,
-    ) -> Result<(
-        Vec<HashMap<StateKey, Option<StateValue>>>,
-        Vec<Option<HashValue>>,
-        StateDelta,
-        Option<EpochState>,
-    )> {
-        let num_txns = to_keep.len();
-        let mut state_updates_vec = Vec::with_capacity(num_txns);
-        let mut state_checkpoint_hashes = Vec::with_capacity(num_txns);
-
-        for (txn, txn_output) in to_keep {
-            let (state_updates, state_checkpoint_hash) = self.add_transaction(txn, txn_output)?;
-            state_updates_vec.push(state_updates);
-            state_checkpoint_hashes.push(state_checkpoint_hash);
-        }
-        let (result_state, accounts) = self.finish()?;
-
-        // Get the updated validator set from updated account state.
-        let next_epoch_state = if new_epoch {
-            Some(Self::parse_validator_set(&accounts)?)
-        } else {
-            None
-        };
-
-        Ok((
-            state_updates_vec,
-            state_checkpoint_hashes,
-            result_state,
-            next_epoch_state,
-        ))
-    }
-
-    fn add_transaction(
-        &mut self,
-        txn: &Transaction,
-        txn_output: &ParsedTransactionOutput,
-    ) -> Result<(HashMap<StateKey, Option<StateValue>>, Option<HashValue>)> {
-        let updated_state_kvs = process_write_set(
-            Some(txn),
-            &mut self.state_cache,
-            &mut self.usage,
-            txn_output.write_set().clone(),
-        )?;
-        updated_state_kvs.iter().for_each(|(k, v)| {
-            self.updates_after_latest[k.get_shard_id() as usize].insert(k.clone(), v.clone());
-        });
-        self.next_version += 1;
-
-        if txn_output.is_reconfig() {
-            Ok((updated_state_kvs, Some(self.make_checkpoint()?)))
-        } else {
-            match txn {
-                Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
-                    Ok((updated_state_kvs, None))
-                },
-                Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
-                    Ok((updated_state_kvs, Some(self.make_checkpoint()?)))
-                },
-            }
-        }
-    }
-
     fn make_checkpoint(&mut self) -> Result<HashValue> {
         // Update SMT.
         let smt_updates: Vec<_> = self
@@ -190,21 +120,6 @@ impl InMemoryStateCalculator {
         Ok(root_hash)
     }
 
-    fn parse_validator_set(state_cache: &HashMap<StateKey, StateValue>) -> Result<EpochState> {
-        let account_state_view = state_cache.as_account_with_state_cache(&CORE_CODE_ADDRESS);
-        let validator_set = account_state_view
-            .get_validator_set()?
-            .ok_or_else(|| anyhow!("ValidatorSet not touched on epoch change"))?;
-        let configuration = account_state_view
-            .get_configuration_resource()?
-            .ok_or_else(|| anyhow!("Configuration resource not touched on epoch change"))?;
-
-        Ok(EpochState {
-            epoch: configuration.epoch(),
-            verifier: (&validator_set).into(),
-        })
-    }
-
     fn finish(mut self) -> Result<(StateDelta, HashMap<StateKey, StateValue>)> {
         let smt_updates: Vec<_> = self
             .updates_after_latest
@@ -218,7 +133,7 @@ impl InMemoryStateCalculator {
 
         zip_eq(
             self.updates_between_checkpoint_and_latest.iter_mut(),
-            self.updates_after_latest.into_iter(),
+            self.updates_after_latest,
         )
         .for_each(|(base, delta)| {
             base.extend(delta);

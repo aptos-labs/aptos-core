@@ -44,12 +44,12 @@ use aptos_types::{
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
 use aptos_utils::aptos_try;
-use aptos_vm::{
-    data_cache::{AsMoveResolver, StorageAdapter},
-    move_vm_ext::AptosMoveResolver,
-};
+use aptos_vm::data_cache::AsMoveResolver;
 use futures::{channel::oneshot, SinkExt};
-use move_core_types::language_storage::{ModuleId, StructTag};
+use move_core_types::{
+    language_storage::{ModuleId, StructTag},
+    resolver::ModuleResolver,
+};
 use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
@@ -259,9 +259,11 @@ impl Context {
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
-        self.db
+        Ok(self
+            .db
             .state_view_at_version(Some(version))?
-            .get_state_value_bytes(state_key)
+            .get_state_value_bytes(state_key)?
+            .map(|val| val.to_vec()))
     }
 
     pub fn get_state_value_poem<E: InternalError>(
@@ -318,11 +320,11 @@ impl Context {
                     StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
                             Ok(Path::Resource(struct_tag)) => {
-                                Some(Ok((struct_tag, v.into_bytes())))
+                                Some(Ok((struct_tag, v.bytes().to_vec())))
                             }
                             // TODO: Consider expanding to Path::Resource
                             Ok(Path::ResourceGroup(struct_tag)) => {
-                                Some(Ok((struct_tag, v.into_bytes())))
+                                Some(Ok((struct_tag, v.bytes().to_vec())))
                             }
                             Ok(Path::Code(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
@@ -349,7 +351,7 @@ impl Context {
             .into_iter()
             .map(|(key, value)| {
                 let is_resource_group =
-                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
+                    |resolver: &dyn ModuleResolver, struct_tag: &StructTag| -> bool {
                         aptos_try!({
                             let md = aptos_framework::get_metadata(
                                 &resolver.get_module_metadata(&struct_tag.module_id()),
@@ -410,7 +412,7 @@ impl Context {
                 Ok((k, v)) => match k.inner() {
                     StateKeyInner::AccessPath(AccessPath { address: _, path }) => {
                         match Path::try_from(path.as_slice()) {
-                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.into_bytes()))),
+                            Ok(Path::Code(module_id)) => Some(Ok((module_id, v.bytes().to_vec()))),
                             Ok(Path::Resource(_)) | Ok(Path::ResourceGroup(_)) => None,
                             Err(e) => Some(Err(anyhow::Error::from(e))),
                         }
@@ -668,7 +670,7 @@ impl Context {
 
         transactions_and_outputs
             .into_iter()
-            .zip(infos.into_iter())
+            .zip(infos)
             .enumerate()
             .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;
@@ -1153,17 +1155,17 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StorageAdapter::new(&state_view);
+            let resolver = state_view.as_move_resolver();
 
             let gas_schedule_params =
-                match GasScheduleV2::fetch_config(&storage_adapter).and_then(|gas_schedule| {
+                match GasScheduleV2::fetch_config(&resolver).and_then(|gas_schedule| {
                     let feature_version = gas_schedule.feature_version;
                     let gas_schedule = gas_schedule.to_btree_map();
                     AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, feature_version)
                         .ok()
                 }) {
                     Some(gas_schedule) => Ok(gas_schedule),
-                    None => GasSchedule::fetch_config(&storage_adapter)
+                    None => GasSchedule::fetch_config(&resolver)
                         .and_then(|gas_schedule| {
                             let gas_schedule = gas_schedule.to_btree_map();
                             AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule, 0).ok()
@@ -1218,9 +1220,9 @@ impl Context {
                 .map_err(|e| {
                     E::internal_with_code(e, AptosErrorCode::InternalError, ledger_info)
                 })?;
-            let storage_adapter = StorageAdapter::new(&state_view);
+            let resolver = state_view.as_move_resolver();
 
-            let block_gas_limit = OnChainExecutionConfig::fetch_config(&storage_adapter)
+            let block_gas_limit = OnChainExecutionConfig::fetch_config(&resolver)
                 .and_then(|config| config.block_gas_limit());
 
             // Update the cache

@@ -8,7 +8,7 @@ module 0x42.Priv {
     }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.Priv {
     foo() {
     label b0:
@@ -16,7 +16,7 @@ module 0x42.Priv {
     }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.Pub {
     public entry foo() {
     label b0:
@@ -24,7 +24,7 @@ module 0x42.Pub {
     }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.Pub {
     public foo() {
     label b0:
@@ -32,7 +32,7 @@ module 0x42.Pub {
     }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.Fr {
     public(friend) entry foo() {
     label b0:
@@ -40,7 +40,7 @@ module 0x42.Fr {
     }
 }
 
-//# publish
+//# publish --verbose
 module 0x42.Fr {
     public(friend) foo() {
     label b0:

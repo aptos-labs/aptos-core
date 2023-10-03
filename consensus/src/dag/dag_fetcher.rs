@@ -5,12 +5,13 @@ use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
 use crate::dag::{
     dag_network::TDAGNetworkSender,
     dag_store::Dag,
+    observability::logging::{LogEvent, LogSchema},
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
@@ -187,6 +188,12 @@ impl DagFetcherService {
     ) -> anyhow::Result<()> {
         let remote_request = {
             let dag_reader = self.dag.read();
+            ensure!(
+                node.round() > dag_reader.lowest_incomplete_round(),
+                "Already synced beyond requested round {}, lowest incomplete round {}",
+                node.round(),
+                dag_reader.lowest_incomplete_round()
+            );
 
             let missing_parents: Vec<NodeMetadata> = dag_reader
                 .filter_missing(node.parents_metadata())
@@ -247,6 +254,12 @@ impl TDagFetcher for DagFetcher {
         responders: Vec<Author>,
         dag: Arc<RwLock<Dag>>,
     ) -> anyhow::Result<()> {
+        debug!(
+            LogSchema::new(LogEvent::FetchNodes),
+            start_round = remote_request.start_round(),
+            target_round = remote_request.target_round(),
+            missing_nodes = remote_request.exists_bitmask().num_missing(),
+        );
         let mut rpc = RpcWithFallback::new(
             responders,
             remote_request.clone().into(),
@@ -273,7 +286,7 @@ impl TDagFetcher for DagFetcher {
                     }
                 }
 
-                if dag.read().all_exists(remote_request.targets().iter()) {
+                if dag.read().all_exists(remote_request.targets()) {
                     return Ok(());
                 }
             }
@@ -303,11 +316,12 @@ impl FetchRequestHandler {
     }
 }
 
+#[async_trait]
 impl RpcHandler for FetchRequestHandler {
     type Request = RemoteFetchRequest;
     type Response = FetchResponse;
 
-    fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response> {
         let dag_reader = self.dag.read();
 
         // `Certified Node`: In the good case, there should exist at least one honest validator that
@@ -316,8 +330,14 @@ impl RpcHandler for FetchRequestHandler {
         // `Node`: In the good case, the sender of the Node should have the parents in its local DAG
         // to satisfy this request.
         ensure!(
-            dag_reader.all_exists(message.targets().iter()),
+            dag_reader.all_exists(message.targets()),
             FetchRequestHandleError::TargetsMissing
+        );
+
+        debug!(
+            LogSchema::new(LogEvent::ReceiveFetchNodes).round(dag_reader.highest_round()),
+            start_round = message.start_round(),
+            target_round = message.target_round(),
         );
 
         let certified_nodes: Vec<_> = dag_reader

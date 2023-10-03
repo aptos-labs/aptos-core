@@ -351,7 +351,7 @@ impl ConsensusConfig {
 
 impl ConfigSanitizer for ConsensusConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {

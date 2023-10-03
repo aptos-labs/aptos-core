@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Serializer } from "../../src/bcs";
-import { Deserializer } from "../../src/bcs/deserializer";
+import { Account } from "../../src/api/account";
+import { Serializable, Serializer, Deserializer } from "../../src/bcs";
+import { AccountAddress } from "../../src/core";
 
 describe("BCS Deserializer", () => {
   it("deserializes a non-empty string", () => {
@@ -129,5 +130,196 @@ describe("BCS Deserializer", () => {
       deserializer.deserializeStr();
       deserializer.deserializeStr();
     }).toThrow("Reached to the end of buffer");
+  });
+
+  it("deserializes a vector of Deserializable types correctly", () => {
+    const addresses = new Array<AccountAddress>(
+      AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0x0123456789abcdef" }),
+    );
+    const serializer = new Serializer();
+    serializer.serializeVector(addresses);
+    const serializedBytes = serializer.toUint8Array();
+    const deserializer = new Deserializer(serializedBytes);
+    const deserializedAddresses = deserializer.deserializeVector(AccountAddress);
+    addresses.forEach((address, i) => {
+      expect(address.equals(deserializedAddresses[i])).toBeTruthy();
+    });
+  });
+
+  it("deserializes a single deserializable class", () => {
+    // Define the MoveStruct class that implements the Deserializable interface
+    class MoveStruct extends Serializable {
+      constructor(
+        public name: string,
+        public description: string,
+        public enabled: boolean,
+        public vectorU8: Array<number>,
+      ) {
+        super();
+      }
+
+      serialize(serializer: Serializer): void {
+        serializer.serializeStr(this.name);
+        serializer.serializeStr(this.description);
+        serializer.serializeBool(this.enabled);
+        serializer.serializeU32AsUleb128(this.vectorU8.length);
+        this.vectorU8.forEach((n) => serializer.serializeU8(n));
+      }
+
+      static deserialize(deserializer: Deserializer): MoveStruct {
+        const name = deserializer.deserializeStr();
+        const description = deserializer.deserializeStr();
+        const enabled = deserializer.deserializeBool();
+        const length = deserializer.deserializeUleb128AsU32();
+        const vectorU8 = new Array<number>();
+        for (let i = 0; i < length; i++) {
+          vectorU8.push(deserializer.deserializeU8());
+        }
+        return new MoveStruct(name, description, enabled, vectorU8);
+      }
+    }
+    // Construct a MoveStruct
+    const moveStruct = new MoveStruct("abc", "123", false, [1, 2, 3, 4]);
+    // Serialize a MoveStruct instance.
+    const serializer = new Serializer();
+    serializer.serialize(moveStruct);
+    const moveStructBcsBytes = serializer.toUint8Array();
+    // Load the bytes into the Deserializer buffer
+    const deserializer = new Deserializer(moveStructBcsBytes);
+    // Deserialize the buffered bytes into an instance of MoveStruct
+    const deserializedMoveStruct = MoveStruct.deserialize(deserializer);
+    expect(deserializedMoveStruct.name).toEqual(moveStruct.name);
+    expect(deserializedMoveStruct.description).toEqual(moveStruct.description);
+    expect(deserializedMoveStruct.enabled).toEqual(moveStruct.enabled);
+    expect(deserializedMoveStruct.vectorU8).toEqual(moveStruct.vectorU8);
+  });
+
+  it("deserializes and composes an abstract Deserializable class instance from composed deserialize calls", () => {
+    abstract class MoveStruct extends Serializable {
+      abstract serialize(serializer: Serializer): void;
+
+      static deserialize(deserializer: Deserializer): MoveStruct {
+        const index = deserializer.deserializeUleb128AsU32();
+        switch (index) {
+          case 0:
+            return MoveStructA.load(deserializer);
+          case 1:
+            return MoveStructB.load(deserializer);
+          default:
+            throw new Error("Invalid variant index");
+        }
+      }
+    }
+
+    class MoveStructA extends Serializable {
+      constructor(
+        public name: string,
+        public description: string,
+        public enabled: boolean,
+        public vectorU8: Array<number>,
+      ) {
+        super();
+      }
+
+      serialize(serializer: Serializer): void {
+        // enum variant index for the abstract MoveStruct class
+        serializer.serializeU32AsUleb128(0);
+        serializer.serializeStr(this.name);
+        serializer.serializeStr(this.description);
+        serializer.serializeBool(this.enabled);
+        serializer.serializeU32AsUleb128(this.vectorU8.length);
+        this.vectorU8.forEach((n) => serializer.serializeU8(n));
+      }
+
+      static load(deserializer: Deserializer): MoveStructA {
+        const name = deserializer.deserializeStr();
+        const description = deserializer.deserializeStr();
+        const enabled = deserializer.deserializeBool();
+        const length = deserializer.deserializeUleb128AsU32();
+        const vectorU8 = new Array<number>();
+        for (let i = 0; i < length; i++) {
+          vectorU8.push(deserializer.deserializeU8());
+        }
+        return new MoveStructA(name, description, enabled, vectorU8);
+      }
+    }
+    class MoveStructB extends Serializable {
+      constructor(
+        public moveStructA: MoveStructA,
+        public name: string,
+        public description: string,
+        public vectorU8: Array<number>,
+      ) {
+        super();
+      }
+
+      serialize(serializer: Serializer): void {
+        // enum variant index for the abstract MoveStruct class
+        serializer.serializeU32AsUleb128(1);
+        serializer.serialize(this.moveStructA);
+        serializer.serializeStr(this.name);
+        serializer.serializeStr(this.description);
+        serializer.serializeU32AsUleb128(this.vectorU8.length);
+        this.vectorU8.forEach((n) => serializer.serializeU8(n));
+      }
+
+      static load(deserializer: Deserializer): MoveStructB {
+        // note we cannot use MoveStructA.load here because we need to pop off the variant index first
+        const moveStructA = MoveStruct.deserialize(deserializer) as MoveStructA;
+        const name = deserializer.deserializeStr();
+        const description = deserializer.deserializeStr();
+        const length = deserializer.deserializeUleb128AsU32();
+        const vectorU8 = new Array<number>();
+        for (let i = 0; i < length; i++) {
+          vectorU8.push(deserializer.deserializeU8());
+        }
+        return new MoveStructB(moveStructA, name, description, vectorU8);
+      }
+    }
+
+    // in a real e2e flow, we might get a stream of BCS-serialized bytes that we deserialize,
+    // say as a wallet in a dapp, we need to deserialize the payload and read its inner fields.
+    // The payload could be of multiple types, so we need to first deserialize the variant index
+    // and then deserialize the payload based on the variant index.
+    //
+    // The abstract MoveStruct class is used to demonstrate this process.
+
+    // Construct a MoveStructA and a MoveStructB, which consists of a MoveStructA inside it
+    const moveStructA = new MoveStructA("abc", "123", false, [1, 2, 3, 4]);
+    const moveStructAInsideB = new MoveStructA("def", "456", true, [5, 6, 7, 8]);
+    const moveStructB = new MoveStructB(moveStructAInsideB, "ghi", "789", [9, 10, 11, 12]);
+
+    // say for some reason we serialize two MoveStructs into a single byte array
+    // and we want to deserialize them back into two MoveStruct instances later
+    const serializer = new Serializer();
+    serializer.serialize(moveStructA);
+    serializer.serialize(moveStructB);
+    const serializedBytes = serializer.toUint8Array();
+
+    // We receive the serializedBytes somewhere else, and
+    // load the bytes into the Deserializer buffer
+    const deserializer = new Deserializer(serializedBytes);
+    // we extract each one, and typecast them because we are expecting MoveStructA and then MoveStructB
+    const deserializedMoveStructA = deserializer.deserialize(MoveStruct) as MoveStructA;
+    const deserializedMoveStructB = deserializer.deserialize(MoveStruct) as MoveStructB;
+
+    // This is the MoveStructA by itself
+    expect(deserializedMoveStructA.name).toEqual("abc");
+    expect(deserializedMoveStructA.description).toEqual("123");
+    expect(deserializedMoveStructA.enabled).toEqual(false);
+    expect(deserializedMoveStructA.vectorU8).toEqual([1, 2, 3, 4]);
+
+    // This is the MoveStructB by itself
+    // Which consists of a MoveStructA and some other fields
+    expect(deserializedMoveStructB.moveStructA.name).toEqual("def");
+    expect(deserializedMoveStructB.moveStructA.description).toEqual("456");
+    expect(deserializedMoveStructB.moveStructA.enabled).toEqual(true);
+    expect(deserializedMoveStructB.moveStructA.vectorU8).toEqual([5, 6, 7, 8]);
+
+    expect(deserializedMoveStructB.name).toEqual("ghi");
+    expect(deserializedMoveStructB.description).toEqual("789");
+    expect(deserializedMoveStructB.vectorU8).toEqual([9, 10, 11, 12]);
   });
 });

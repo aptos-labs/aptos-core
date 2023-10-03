@@ -4,7 +4,7 @@ use crate::{
     network_controller::{error::Error, Message, MessageType, NetworkMessage},
     NetworkServer,
 };
-use aptos_logger::error;
+use aptos_logger::{error, warn};
 use crossbeam_channel::Sender;
 use std::{
     collections::HashMap,
@@ -70,7 +70,7 @@ impl InboundHandler {
             // Send the message to the registered handler
             handler.send(message).unwrap();
         } else {
-            println!("No handler registered for message type: {:?}", message_type);
+            warn!("No handler registered for message type: {:?}", message_type);
         }
     }
 
@@ -90,7 +90,10 @@ impl InboundHandler {
             // Send the message to the registered handler
             handler.send(msg)?;
         } else {
-            println!("No handler registered for sender: {:?}", sender);
+            warn!(
+                "No handler registered for sender: {:?} and msg type {:?}",
+                sender, message_type
+            );
         }
         Ok(())
     }

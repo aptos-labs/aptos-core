@@ -184,7 +184,7 @@ impl From<hex::FromHexError> for CliError {
 
 impl From<anyhow::Error> for CliError {
     fn from(e: anyhow::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
+        CliError::UnexpectedError(format!("{:#}", e))
     }
 }
 
@@ -999,7 +999,7 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
 }
 
 pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAddress {
-    AccountAddress::new(*auth_key.derived_address())
+    AccountAddress::new(*auth_key.account_address())
 }
 
 #[derive(Debug, Parser)]
@@ -1125,6 +1125,12 @@ pub struct MovePackageDir {
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
+
+    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
+    /// NOTE: this behavior will become the default in the future.
+    /// See https://github.com/aptos-labs/aptos-core/issues/10335
+    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
+    pub check_test_code: bool,
 }
 
 impl MovePackageDir {
@@ -1138,6 +1144,7 @@ impl MovePackageDir {
             bytecode_version: None,
             compiler_version: None,
             skip_attribute_checks: false,
+            check_test_code: false,
         }
     }
 
@@ -1178,11 +1185,7 @@ impl FromStr for AccountAddressWrapper {
 
 /// Loads an account arg and allows for naming based on profiles
 pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
-    if str.starts_with("0x") {
-        AccountAddress::from_hex_literal(str).map_err(|err| {
-            CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
-        })
-    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+    if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
     } else if let Some(Some(account_address)) =
         CliConfig::load_profile(Some(str), ConfigSearchMode::CurrentDirAndParents)?
@@ -1222,12 +1225,6 @@ impl FromStr for MoveManifestAccountWrapper {
 pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, CliError> {
     if str == "_" {
         Ok(None)
-    } else if str.starts_with("0x") {
-        AccountAddress::from_hex_literal(str)
-            .map(Some)
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
-            })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
     } else if let Some(Some(private_key)) =

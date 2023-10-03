@@ -101,7 +101,7 @@ impl GenesisCommitter {
 
     pub fn commit(self) -> Result<()> {
         self.db.save_transactions(
-            &self.output.transactions_to_commit()?,
+            self.output.transactions_to_commit(),
             self.output.result_view.txn_accumulator().version(),
             self.base_state_version,
             self.output.ledger_info.as_ref(),
@@ -141,7 +141,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         base_state_view,
         None,
     )?
-    .apply_to_ledger(&executed_trees, None)?;
+    .apply_to_ledger(&executed_trees, None, None)?;
     ensure!(
         !output.to_commit.is_empty(),
         "Genesis txn execution failed."

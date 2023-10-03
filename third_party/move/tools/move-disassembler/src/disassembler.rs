@@ -171,14 +171,14 @@ impl<'a> Disassembler<'a> {
         } else if let Some(alias) = self.module_aliases.get(&module_id) {
             Some(format!(
                 "use {}::{} as {};",
-                module_id.address(),
+                module_id.address().to_hex(),
                 module_id.name(),
                 alias
             ))
         } else {
             Some(format!(
                 "use {}::{};",
-                module_id.address(),
+                module_id.address().to_hex(),
                 module_id.name()
             ))
         }
@@ -453,7 +453,7 @@ impl<'a> Disassembler<'a> {
                 .into_iter()
                 .enumerate()
                 .map(|(local_idx, local)| format!("L{}:\t{}", local_idx, local))
-                .chain(bytecode.into_iter())
+                .chain(bytecode)
                 .collect();
             format!(" {{\n{}\n}}", body_iter.join("\n"))
         }

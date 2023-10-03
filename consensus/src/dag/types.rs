@@ -1,7 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
+use crate::{
+    dag::observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
+    network::TConsensusMsg,
+    network_interface::ConsensusMsg,
+};
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
@@ -12,15 +19,23 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_logger::debug;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
+    ledger_info::LedgerInfoWithSignatures,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::{cmp::min, collections::HashSet, ops::Deref, sync::Arc};
+use std::{
+    cmp::min,
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    ops::Deref,
+    sync::Arc,
+};
 
 pub trait TDAGMessage: Into<DAGMessage> + TryFrom<DAGMessage> {
     fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
@@ -249,6 +264,10 @@ impl Node {
         &self.parents
     }
 
+    pub fn timestamp(&self) -> u64 {
+        self.metadata.timestamp
+    }
+
     pub fn parents_metadata(&self) -> impl Iterator<Item = &NodeMetadata> {
         self.parents().iter().map(|cert| &cert.metadata)
     }
@@ -348,6 +367,16 @@ impl NodeId {
     }
 }
 
+impl Display for NodeId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NodeId: [epoch: {}, round: {}, author: {}]",
+            self.epoch, self.round, self.author
+        )
+    }
+}
+
 /// Quorum signatures over the node digest
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct NodeCertificate {
@@ -398,6 +427,14 @@ impl CertifiedNode {
     pub fn certificate(&self) -> NodeCertificate {
         NodeCertificate::new(self.node.metadata.clone(), self.signatures.clone())
     }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+
+        verifier
+            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
+            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+    }
 }
 
 impl Deref for CertifiedNode {
@@ -408,13 +445,40 @@ impl Deref for CertifiedNode {
     }
 }
 
-impl TDAGMessage for CertifiedNode {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        ensure!(self.digest() == self.calculate_digest(), "invalid digest");
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct CertifiedNodeMessage {
+    inner: CertifiedNode,
+    ledger_info: LedgerInfoWithSignatures,
+}
 
-        verifier
-            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
-            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+impl CertifiedNodeMessage {
+    pub fn new(node: CertifiedNode, ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            inner: node,
+            ledger_info,
+        }
+    }
+
+    pub fn certified_node(self) -> CertifiedNode {
+        self.inner
+    }
+
+    pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
+        &self.ledger_info
+    }
+}
+
+impl Deref for CertifiedNodeMessage {
+    type Target = CertifiedNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl TDAGMessage for CertifiedNodeMessage {
+    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.inner.verify(verifier)
     }
 }
 
@@ -460,6 +524,9 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
+        debug!(LogSchema::new(LogEvent::ReceiveVote)
+            .remote_peer(peer)
+            .round(self.metadata.round()));
         self.partial_signatures.add_signature(peer, ack.signature);
         Ok(self
             .epoch_state
@@ -472,6 +539,7 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
                     .verifier
                     .aggregate_signatures(&self.partial_signatures)
                     .expect("Signature aggregation should succeed");
+                observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
                 NodeCertificate::new(self.metadata.clone(), aggregated_signature)
             }))
     }
@@ -505,9 +573,10 @@ impl CertifiedAck {
 impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
-    type Message = CertifiedNode;
+    type Message = CertifiedNodeMessage;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        debug!(LogSchema::new(LogEvent::ReceiveAck).remote_peer(peer));
         self.received.insert(peer);
         if self.received.len() == self.num_validators {
             Ok(Some(()))
@@ -528,10 +597,10 @@ pub struct RemoteFetchRequest {
 }
 
 impl RemoteFetchRequest {
-    pub fn new(epoch: u64, parents: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
+    pub fn new(epoch: u64, targets: Vec<NodeMetadata>, exists_bitmask: DagSnapshotBitmask) -> Self {
         Self {
             epoch,
-            targets: parents,
+            targets,
             exists_bitmask,
         }
     }
@@ -540,12 +609,20 @@ impl RemoteFetchRequest {
         self.epoch
     }
 
-    pub fn targets(&self) -> &[NodeMetadata] {
-        &self.targets
+    pub fn targets(&self) -> impl Iterator<Item = &NodeMetadata> + Clone {
+        self.targets.iter()
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
         &self.exists_bitmask
+    }
+
+    pub fn start_round(&self) -> Round {
+        self.exists_bitmask.first_round()
+    }
+
+    pub fn target_round(&self) -> Round {
+        self.targets[0].round
     }
 }
 
@@ -619,7 +696,7 @@ impl core::fmt::Debug for DAGNetworkMessage {
 pub enum DAGMessage {
     NodeMsg(Node),
     VoteMsg(Vote),
-    CertifiedNodeMsg(CertifiedNode),
+    CertifiedNodeMsg(CertifiedNodeMessage),
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
@@ -742,6 +819,13 @@ impl DagSnapshotBitmask {
             .get(round_idx)
             .and_then(|round| round.get(author_idx).cloned())
             .unwrap_or(false)
+    }
+
+    pub fn num_missing(&self) -> usize {
+        self.bitmask
+            .iter()
+            .map(|round| round.iter().map(|exist| !*exist as usize).sum::<usize>())
+            .sum::<usize>()
     }
 
     pub fn first_round(&self) -> Round {

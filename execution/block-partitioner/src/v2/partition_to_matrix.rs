@@ -64,15 +64,9 @@ impl PartitionerV2 {
             (0..state.num_executor_shards)
                 .into_par_iter()
                 .for_each(|shard_id| {
-                    remaining_txns[shard_id]
-                        .par_iter()
-                        .for_each(|&ori_txn_idx| {
-                            state.update_trackers_on_accepting(
-                                ori_txn_idx,
-                                last_round_id,
-                                shard_id,
-                            );
-                        });
+                    remaining_txns[shard_id].par_iter().for_each(|&txn_idx| {
+                        state.update_trackers_on_accepting(txn_idx, last_round_id, shard_id);
+                    });
                 });
         });
         state.finalized_txn_matrix.push(remaining_txns);
@@ -109,6 +103,7 @@ impl PartitionerV2 {
             discarded.push(RwLock::new(Vec::with_capacity(txns.len())));
         }
 
+        // Initialize a table to keep track of the minimum discarded PrePartitionedTxnIdx.
         let min_discard_table: DashMap<SenderIdx, AtomicUsize> =
             DashMap::with_shard_amount(state.dashmap_num_shards);
 
@@ -123,9 +118,10 @@ impl PartitionerV2 {
                 .into_par_iter()
                 .for_each(|(shard_id, txn_idxs)| {
                     txn_idxs.into_par_iter().for_each(|txn_idx| {
+                        let ori_txn_idx = state.ori_idxs_by_pre_partitioned[txn_idx];
                         let mut in_round_conflict_detected = false;
-                        let write_set = state.write_sets[txn_idx].read().unwrap();
-                        let read_set = state.read_sets[txn_idx].read().unwrap();
+                        let write_set = state.write_sets[ori_txn_idx].read().unwrap();
+                        let read_set = state.read_sets[ori_txn_idx].read().unwrap();
                         for &key_idx in write_set.iter().chain(read_set.iter()) {
                             if state.key_owned_by_another_shard(shard_id, key_idx) {
                                 in_round_conflict_detected = true;
@@ -134,7 +130,7 @@ impl PartitionerV2 {
                         }
 
                         if in_round_conflict_detected {
-                            let sender = state.sender_idx(txn_idx);
+                            let sender = state.sender_idx(ori_txn_idx);
                             min_discard_table
                                 .entry(sender)
                                 .or_insert_with(|| AtomicUsize::new(usize::MAX))
@@ -157,20 +153,18 @@ impl PartitionerV2 {
                 .into_par_iter()
                 .for_each(|(shard_id, txn_idxs)| {
                     let txn_idxs = mem::take(&mut *txn_idxs.write().unwrap());
-                    txn_idxs.into_par_iter().for_each(|ori_txn_idx| {
+                    txn_idxs.into_par_iter().for_each(|txn_idx| {
+                        let ori_txn_idx = state.ori_idxs_by_pre_partitioned[txn_idx];
                         let sender_idx = state.sender_idx(ori_txn_idx);
                         let min_discarded = min_discard_table
                             .get(&sender_idx)
                             .map(|kv| kv.load(Ordering::SeqCst))
                             .unwrap_or(usize::MAX);
-                        if ori_txn_idx < min_discarded {
-                            state.update_trackers_on_accepting(ori_txn_idx, round_id, shard_id);
-                            finally_accepted[shard_id]
-                                .write()
-                                .unwrap()
-                                .push(ori_txn_idx);
+                        if txn_idx < min_discarded {
+                            state.update_trackers_on_accepting(txn_idx, round_id, shard_id);
+                            finally_accepted[shard_id].write().unwrap().push(txn_idx);
                         } else {
-                            discarded[shard_id].write().unwrap().push(ori_txn_idx);
+                            discarded[shard_id].write().unwrap().push(txn_idx);
                         }
                     });
                 });
@@ -201,7 +195,8 @@ impl PartitionerV2 {
             }
         }
 
-        state.new_txn_idxs = (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
+        state.final_idxs_by_pre_partitioned =
+            (0..state.num_txns()).map(|_tid| RwLock::new(0)).collect();
 
         state.thread_pool.install(|| {
             (0..num_rounds).into_par_iter().for_each(|round_id| {
@@ -214,7 +209,9 @@ impl PartitionerV2 {
                             .for_each(|pos_in_sub_block| {
                                 let txn_idx = state.finalized_txn_matrix[round_id][shard_id]
                                     [pos_in_sub_block];
-                                *state.new_txn_idxs[txn_idx].write().unwrap() =
+                                *state.final_idxs_by_pre_partitioned[txn_idx]
+                                    .write()
+                                    .unwrap() =
                                     state.start_index_matrix[round_id][shard_id] + pos_in_sub_block;
                             });
                     });

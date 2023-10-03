@@ -13,7 +13,8 @@ use crate::{
         byte_string, hex_string,
     },
     parser::ast::{
-        self as P, Ability, ConstantName, Field, FunctionName, ModuleName, StructName, Var,
+        self as P, Ability, ConstantName, Field, FunctionName, ModuleMember, ModuleName,
+        StructName, Var,
     },
     shared::{
         known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
@@ -26,7 +27,6 @@ use crate::{
 use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     iter::IntoIterator,
@@ -47,7 +47,6 @@ struct Context<'env, 'map> {
     in_spec_context: bool,
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
-    in_aptos_stdlib: bool, // TODO(https://github.com/aptos-labs/aptos-core/issues/9410) remove after bugfix propagates.
 }
 impl<'env, 'map> Context<'env, 'map> {
     fn new(
@@ -62,7 +61,6 @@ impl<'env, 'map> Context<'env, 'map> {
             aliases: AliasMap::new(),
             is_source_definition: false,
             in_spec_context: false,
-            in_aptos_stdlib: false,
             exp_specs: BTreeMap::new(),
         }
     }
@@ -394,32 +392,6 @@ fn set_sender_address(
     })
 }
 
-// This is a hack to recognize APTOS StdLib to avoid warnings on some old errors.
-// This will be removed after library attributes are cleaned up.
-// (See https://github.com/aptos-labs/aptos-core/issues/9410)
-fn module_is_in_aptos_stdlib(module_address: Option<Spanned<Address>>) -> bool {
-    const APTOS_STDLIB_NAME: &str = "aptos_std";
-    static APTOS_STDLIB_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
-        Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
-    match &module_address {
-        Some(spanned_address) => {
-            let address = spanned_address.value;
-            match address {
-                Address::Numerical(optional_name, spanned_numerical_address) => match optional_name
-                {
-                    Some(spanned_symbol) => {
-                        (&spanned_symbol.value as &str) == APTOS_STDLIB_NAME
-                            && (spanned_numerical_address.value == *APTOS_STDLIB_NUMERICAL_ADDRESS)
-                    },
-                    None => false,
-                },
-                Address::NamedUnassigned(_) => false,
-            }
-        },
-        None => false,
-    }
-}
-
 fn module_(
     context: &mut Context,
     package_name: Option<Symbol>,
@@ -434,7 +406,6 @@ fn module_(
         name,
         members,
     } = mdef;
-    context.in_aptos_stdlib = module_is_in_aptos_stdlib(module_address);
     let attributes = flatten_attributes(context, AttributePosition::Module, attributes);
 
     assert!(context.address.is_none());
@@ -457,6 +428,20 @@ fn module_(
 
     let mut new_scope = AliasMapBuilder::new();
     module_self_aliases(&mut new_scope, &current_module);
+
+    // Make a copy of the original UseDecls, to be passed on to the expansion AST before they are
+    // processed here.
+    let use_decls = members
+        .iter()
+        .filter_map(|member| {
+            if let ModuleMember::Use(decl) = member {
+                Some(decl.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let members = members
         .into_iter()
         .filter_map(|member| aliases_from_member(context, &mut new_scope, &current_module, member))
@@ -502,6 +487,7 @@ fn module_(
         constants,
         functions,
         specs,
+        use_decls,
     };
     (current_module, def)
 }
@@ -528,7 +514,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
     } = pscript;
 
     let attributes = flatten_attributes(context, AttributePosition::Script, attributes);
-    let new_scope = uses(context, puses);
+    let new_scope = uses(context, puses.clone());
     let old_aliases = context.aliases.add_and_shadow_all(new_scope);
     assert!(
         old_aliases.is_empty(),
@@ -583,6 +569,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
         function_name,
         function,
         specs,
+        use_decls: puses,
     }
 }
 
@@ -617,16 +604,13 @@ fn unique_attributes(
                 let flags = &context.env.flags();
                 if !flags.skip_attribute_checks() {
                     let known_attributes = &context.env.get_known_attributes();
-                    // TODO(See https://github.com/aptos-labs/aptos-core/issues/9410) remove after bugfix propagates.
                     if !is_nested && !known_attributes.contains(sym.as_str()) {
-                        if !context.in_aptos_stdlib {
-                            let msg = format!("Attribute name '{}' is unknown (use --{} CLI option to ignore); known attributes are '{:?}'.",
-					      sym.as_str(),
-					      SKIP_ATTRIBUTE_CHECKS, known_attributes);
-                            context
-                                .env
-                                .add_diag(diag!(Declarations::UnknownAttribute, (nloc, msg)));
-                        }
+                        let msg = format!("Attribute name '{}' is unknown (use --{} CLI option to ignore); known attributes are '{:?}'.",
+					                      sym.as_str(),
+					                      SKIP_ATTRIBUTE_CHECKS, known_attributes);
+                        context
+                            .env
+                            .add_diag(diag!(Declarations::UnknownAttribute, (nloc, msg)));
                     } else if is_nested && known_attributes.contains(sym.as_str()) {
                         let msg = format!(
                             "Known attribute '{}' is not expected in a nested attribute position.",

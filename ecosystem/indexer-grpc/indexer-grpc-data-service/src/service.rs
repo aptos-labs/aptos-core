@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    SHORT_CONNECTION_COUNT,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION,
+    PROCESSED_BATCH_SIZE, PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL,
+    PROCESSED_VERSIONS_COUNT, SHORT_CONNECTION_COUNT,
 };
+use anyhow::Context;
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
@@ -15,7 +16,9 @@ use aptos_indexer_grpc_utils::{
         BLOB_STORAGE_SIZE, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER, MESSAGE_SIZE_LIMIT,
     },
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs, EncodedTransactionWithVersion,
+    time_diff_since_pb_timestamp_in_secs,
+    types::RedisUrl,
+    EncodedTransactionWithVersion,
 };
 use aptos_logger::prelude::{sample, SampleRate};
 use aptos_moving_average::MovingAverage;
@@ -49,9 +52,6 @@ const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // TODO(larry): fix all errors treated as transient errors.
 const TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS: u64 = 1000;
 
-// Default max response channel size.
-const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
-
 // The server will retry to send the response to the client and give up after RESPONSE_CHANNEL_SEND_TIMEOUT.
 // This is to prevent the server from being occupied by a slow client.
 const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
@@ -65,23 +65,24 @@ const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
-    pub data_service_response_channel_size: Option<usize>,
+    pub data_service_response_channel_size: usize,
 }
 
 impl RawDataServerWrapper {
     pub fn new(
-        redis_address: String,
+        redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
-        data_service_response_channel_size: Option<usize>,
-    ) -> Self {
-        Self {
+        data_service_response_channel_size: usize,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             redis_client: Arc::new(
-                redis::Client::open(format!("redis://{}", redis_address))
-                    .expect("Create redis client failed."),
+                redis::Client::open(redis_address.0.clone()).with_context(|| {
+                    format!("Failed to create redis client for {}", redis_address)
+                })?,
             ),
             file_store_config,
             data_service_response_channel_size,
-        }
+        })
     }
 }
 
@@ -123,10 +124,7 @@ impl RawData for RawDataServerWrapper {
         let transactions_count = request.transactions_count;
 
         // Response channel to stream the data to the client.
-        let (tx, rx) = channel(
-            self.data_service_response_channel_size
-                .unwrap_or(DEFAULT_MAX_RESPONSE_CHANNEL_SIZE),
-        );
+        let (tx, rx) = channel(self.data_service_response_channel_size);
         let mut current_version = match &request.starting_version {
             Some(version) => *version,
             None => {
@@ -263,6 +261,19 @@ impl RawData for RawDataServerWrapper {
                             transactions_count = Some(count - transaction_data.len() as u64);
                         }
                     };
+                    // Note: this is not the actual bytes transferred to the client.
+                    // This is the bytes consumed internally by the server
+                    // and ready to be transferred to the client.
+                    let bytes_ready_to_transfer = transaction_data
+                        .iter()
+                        .map(|(encoded, _)| encoded.len())
+                        .sum::<usize>();
+                    BYTES_READY_TO_TRANSFER_FROM_SERVER
+                        .with_label_values(&[
+                            request_metadata.request_token.as_str(),
+                            request_metadata.request_email.as_str(),
+                        ])
+                        .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
                     let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
@@ -282,20 +293,20 @@ impl RawData for RawDataServerWrapper {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
-                                    request_metadata.request_user_classification.as_str(),
-                                    request_metadata.request_name.as_str(),
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_email.as_str(),
                                 ])
                                 .set(current_batch_size as i64);
                             LATEST_PROCESSED_VERSION
                                 .with_label_values(&[
-                                    request_metadata.request_user_classification.as_str(),
-                                    request_metadata.request_name.as_str(),
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_email.as_str(),
                                 ])
                                 .set(end_of_batch_version as i64);
                             PROCESSED_VERSIONS_COUNT
                                 .with_label_values(&[
-                                    request_metadata.request_user_classification.as_str(),
-                                    request_metadata.request_name.as_str(),
+                                    request_metadata.request_token.as_str(),
+                                    request_metadata.request_email.as_str(),
                                 ])
                                 .inc_by(current_batch_size as u64);
                             if let Some(data_latency_in_secs) = data_latency_in_secs {
@@ -304,8 +315,8 @@ impl RawData for RawDataServerWrapper {
                                 if current_batch_size % BLOB_STORAGE_SIZE != 0 {
                                     PROCESSED_LATENCY_IN_SECS
                                         .with_label_values(&[
-                                            request_metadata.request_user_classification.as_str(),
-                                            request_metadata.request_name.as_str(),
+                                            request_metadata.request_token.as_str(),
+                                            request_metadata.request_email.as_str(),
                                         ])
                                         .set(data_latency_in_secs);
                                     PROCESSED_LATENCY_IN_SECS_ALL

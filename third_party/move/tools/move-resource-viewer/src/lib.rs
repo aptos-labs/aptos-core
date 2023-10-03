@@ -92,7 +92,11 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
 
     // TODO
     pub fn get_resource_bytes(&self, addr: &AccountAddress, tag: &StructTag) -> Option<Vec<u8>> {
-        self.cache.state.get_resource(addr, tag).ok()?
+        self.cache
+            .state
+            .get_resource(addr, tag)
+            .ok()?
+            .map(|b| b.to_vec())
     }
 
     pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {
@@ -179,7 +183,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
                 .cache
                 .get_field_names(&ty)?
                 .into_iter()
-                .zip(runtime.into_iter())
+                .zip(runtime)
                 .collect(),
             MoveStruct::WithFields(fields) | MoveStruct::WithTypes { fields, .. } => fields,
         })
@@ -212,10 +216,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
         Ok(AnnotatedMoveStruct {
             abilities: ty.abilities.0,
             type_: struct_tag,
-            value: field_names
-                .into_iter()
-                .zip(annotated_fields.into_iter())
-                .collect(),
+            value: field_names.into_iter().zip(annotated_fields).collect(),
         })
     }
 

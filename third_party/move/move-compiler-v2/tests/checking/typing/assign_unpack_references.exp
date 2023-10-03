@@ -55,4 +55,7 @@ module 0x8675309::M {
           }
         }
     }
+    spec fun $t0();
+    spec fun $t1();
+    spec fun $t2();
 } // end 0x8675309::M

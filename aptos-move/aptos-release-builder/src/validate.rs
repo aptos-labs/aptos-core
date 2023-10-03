@@ -7,6 +7,7 @@ use aptos::{
     common::types::CliCommand,
     governance::{ExecuteProposal, SubmitProposal, SubmitVote},
     move_tool::{RunFunction, RunScript},
+    stake::IncreaseLockup,
 };
 use aptos_api_types::U64;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -355,6 +356,18 @@ impl NetworkConfig {
     }
 }
 
+async fn increase_lockup(validator_address: &str, validator_key: &str) -> Result<()> {
+    let args = vec![
+        "--private-key",
+        validator_key,
+        "--sender-account",
+        validator_address,
+        "--assume-yes",
+    ];
+    IncreaseLockup::parse_from(args).execute().await?;
+    Ok(())
+}
+
 async fn execute_release(
     release_config: ReleaseConfig,
     network_config: NetworkConfig,
@@ -371,6 +384,14 @@ async fn execute_release(
     };
     release_config.generate_release_proposal_scripts(proposal_folder)?;
 
+    // Increase lockup
+    increase_lockup(
+        network_config.validator_account.to_string().as_str(),
+        network_config.validator_key.to_string().as_str(),
+    )
+    .await?;
+
+    // Execute proposals
     for proposal in &release_config.proposals {
         let mut proposal_path = proposal_folder.to_path_buf();
         proposal_path.push("sources");
@@ -398,14 +419,6 @@ async fn execute_release(
                     .submit_and_execute_multi_step_proposal(&proposal.metadata, script_paths)
                     .await?;
 
-                network_config.set_fast_resolve(43200).await?;
-            },
-            ExecutionMode::SingleStep => {
-                network_config.set_fast_resolve(30).await?;
-                // Single step governance proposal;
-                network_config
-                    .submit_and_execute_proposal(&proposal.metadata, script_paths)
-                    .await?;
                 network_config.set_fast_resolve(43200).await?;
             },
             ExecutionMode::RootSigner => {
