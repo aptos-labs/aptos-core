@@ -158,7 +158,7 @@ struct GroupRead<T: Transaction> {
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct CapturedReads<T: Transaction> {
-    data_reads: HashMap<T::Key, DataRead<T::Value>>,
+    pub(crate) data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     // Currently, we record paths for triggering module R/W fallback.
     // TODO: implement a general functionality once the fallback is removed.
