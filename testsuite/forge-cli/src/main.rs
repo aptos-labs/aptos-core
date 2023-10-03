@@ -1419,7 +1419,7 @@ fn net_bench_two_region_env() -> ForgeConfig {
 
 fn net_bench_two_region_env_small_messages() -> ForgeConfig {
     net_bench_two_region_inner(Arc::new(
-        netbench_config_10_megabytes_per_sec_small_messages,
+        netbench_config_12_megabytes_per_sec_small_messages,
     ))
 }
 
