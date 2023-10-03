@@ -417,9 +417,11 @@ where
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
 
+        let is_coordinator = scheduler.should_coordinate_commits();
+
         loop {
             // Priorotize committing validated transactions
-            while scheduler.should_coordinate_commits() {
+            while is_coordinator {
                 self.prepare_and_queue_commit_ready_txns(
                     self.maybe_block_gas_limit,
                     scheduler,

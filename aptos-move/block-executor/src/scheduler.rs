@@ -36,12 +36,12 @@ impl ArmedLock {
 
     pub fn try_lock(&self) -> bool {
         self.locked
-            .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
+            .compare_exchange(3, 0, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
     }
 
     pub fn unlock(&self) {
-        self.locked.fetch_or(3, Ordering::Release);
+        self.locked.fetch_or(0, Ordering::Release);
     }
 
     pub fn arm(&self) {
