@@ -5,6 +5,7 @@ use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
 use crate::dag::{
     dag_network::TDAGNetworkSender,
     dag_store::Dag,
+    observability::logging::{LogEvent, LogSchema},
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::{anyhow, ensure};
@@ -253,7 +254,12 @@ impl TDagFetcher for DagFetcher {
         responders: Vec<Author>,
         dag: Arc<RwLock<Dag>>,
     ) -> anyhow::Result<()> {
-        debug!("Start fetch request: {:?}", remote_request);
+        debug!(
+            LogSchema::new(LogEvent::FetchNodes),
+            start_round = remote_request.start_round(),
+            target_round = remote_request.target_round(),
+            missing_nodes = remote_request.exists_bitmask().num_missing(),
+        );
         let mut rpc = RpcWithFallback::new(
             responders,
             remote_request.clone().into(),
@@ -326,6 +332,12 @@ impl RpcHandler for FetchRequestHandler {
         ensure!(
             dag_reader.all_exists(message.targets()),
             FetchRequestHandleError::TargetsMissing
+        );
+
+        debug!(
+            LogSchema::new(LogEvent::ReceiveFetchNodes).round(dag_reader.highest_round()),
+            start_round = message.start_round(),
+            target_round = message.target_round(),
         );
 
         let certified_nodes: Vec<_> = dag_reader

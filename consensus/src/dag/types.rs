@@ -1,7 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
+use crate::{
+    dag::observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
+    network::TConsensusMsg,
+    network_interface::ConsensusMsg,
+};
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
@@ -12,6 +19,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_logger::debug;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
@@ -254,6 +262,10 @@ impl Node {
 
     pub fn parents(&self) -> &[NodeCertificate] {
         &self.parents
+    }
+
+    pub fn timestamp(&self) -> u64 {
+        self.metadata.timestamp
     }
 
     pub fn parents_metadata(&self) -> impl Iterator<Item = &NodeMetadata> {
@@ -512,6 +524,9 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
+        debug!(LogSchema::new(LogEvent::ReceiveVote)
+            .remote_peer(peer)
+            .round(self.metadata.round()));
         self.partial_signatures.add_signature(peer, ack.signature);
         Ok(self
             .epoch_state
@@ -524,6 +539,7 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
                     .verifier
                     .aggregate_signatures(&self.partial_signatures)
                     .expect("Signature aggregation should succeed");
+                observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
                 NodeCertificate::new(self.metadata.clone(), aggregated_signature)
             }))
     }
@@ -560,6 +576,7 @@ impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Message = CertifiedNodeMessage;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        debug!(LogSchema::new(LogEvent::ReceiveAck).remote_peer(peer));
         self.received.insert(peer);
         if self.received.len() == self.num_validators {
             Ok(Some(()))
@@ -598,6 +615,14 @@ impl RemoteFetchRequest {
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
         &self.exists_bitmask
+    }
+
+    pub fn start_round(&self) -> Round {
+        self.exists_bitmask.first_round()
+    }
+
+    pub fn target_round(&self) -> Round {
+        self.targets[0].round
     }
 }
 
@@ -794,6 +819,13 @@ impl DagSnapshotBitmask {
             .get(round_idx)
             .and_then(|round| round.get(author_idx).cloned())
             .unwrap_or(false)
+    }
+
+    pub fn num_missing(&self) -> usize {
+        self.bitmask
+            .iter()
+            .map(|round| round.iter().map(|exist| !*exist as usize).sum::<usize>())
+            .sum::<usize>()
     }
 
     pub fn first_round(&self) -> Round {

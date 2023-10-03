@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::GET_NEXT_TASK_SECONDS;
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use concurrent_queue::{ConcurrentQueue, PopError};
@@ -404,7 +403,6 @@ impl Scheduler {
 
     /// Return the next task for the thread.
     pub fn next_task(&self) -> SchedulerTask {
-        let _timer = GET_NEXT_TASK_SECONDS.start_timer();
         loop {
             if self.done() {
                 // No more tasks.

@@ -786,9 +786,11 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "rayon",
+ "scopeguard",
  "serde",
  "serde_bytes",
  "serde_json",
+ "strum_macros",
  "tempfile",
  "thiserror",
  "tokio",
@@ -3189,6 +3191,7 @@ dependencies = [
  "byteorder",
  "once_cell",
  "proptest",
+ "rand 0.7.3",
  "rocksdb",
 ]
 
