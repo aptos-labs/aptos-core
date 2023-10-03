@@ -1,0 +1,19 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.remote_executor.v1;
+
+message NetworkMessage {
+    bytes message = 1;
+    string message_type = 2;
+}
+
+message Empty {
+
+}
+
+service NetworkMessageService {
+    rpc SimpleMsgExchange(NetworkMessage) returns (Empty);
+}
