@@ -5,7 +5,7 @@ use crate::{
     delta_change_set::DeltaOp,
     types::{
         code_invariant_error, AggregatorValue, DelayedFieldsSpeculativeError, PanicOr,
-        PanicOrResult, SnapshotToStringFormula,
+        SnapshotToStringFormula,
     },
 };
 
@@ -69,7 +69,7 @@ impl<I: Copy + Clone> AggregatorApplyChange<I> {
     pub fn apply_to_base(
         &self,
         base_value: AggregatorValue,
-    ) -> PanicOrResult<AggregatorValue, DelayedFieldsSpeculativeError> {
+    ) -> Result<AggregatorValue, PanicOr<DelayedFieldsSpeculativeError>> {
         use AggregatorApplyChange::*;
 
         Ok(match self {
@@ -117,7 +117,7 @@ impl<I: Copy + Clone> AggregatorChange<I> {
     pub fn merge_two_changes(
         prev_change: Option<&AggregatorChange<I>>,
         next_change: &AggregatorChange<I>,
-    ) -> PanicOrResult<AggregatorChange<I>, DelayedFieldsSpeculativeError> {
+    ) -> Result<AggregatorChange<I>, PanicOr<DelayedFieldsSpeculativeError>> {
         use AggregatorApplyChange::*;
         use AggregatorChange::*;
         use AggregatorValue::*;

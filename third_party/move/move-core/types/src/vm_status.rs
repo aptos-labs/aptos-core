@@ -731,11 +731,14 @@ pub enum StatusCode {
     DUPLICATE_NATIVE_FUNCTION = 2022,
     // code invariant error while handling delayed fields, should never happen,
     // always indicates a code bug.
+    // Unlike regular CODE_INVARIANT_ERROR, this is a signal to BlockSTM,
+    // which it might do something about (i.e. fallback to sequential execution)
     DELAYED_FIELDS_CODE_INVARIANT_ERROR = 2023,
-    // Speculative error during handling of delayed fields, means that
-    // the transaction needs to be re-executed.
+    // Speculative error means that there was an issue because of speculative
+    // reads provided to the transaction, and the transaction needs to
+    // be re-executed.
     // Should never be committed on chain
-    DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR = 2024,
+    SPECULATIVE_EXECUTION_ABORT_ERROR = 2024,
 
     // Reserved error code for future use
     RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2025,

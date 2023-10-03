@@ -5,7 +5,7 @@ use crate::{
     bounded_math::{ok_overflow, ok_underflow, BoundedMath, SignedU128},
     types::{
         expect_ok, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason,
-        DeltaHistoryMergeOffsetFailureReason, PanicOrResult,
+        DeltaHistoryMergeOffsetFailureReason, PanicOr,
     },
 };
 
@@ -288,7 +288,7 @@ impl DeltaHistory {
 
         if new_min_overflow.is_some_and(|v| v <= new_max_achieved) {
             return Err(
-                DelayedFieldsSpeculativeError::DeltaHistoryMergeAchievedAndOverflowOverlap {
+                DelayedFieldsSpeculativeError::DeltaHistoryMergeAchievedAndFailureOverlap {
                     achieved: SignedU128::Positive(new_max_achieved),
                     overflow: SignedU128::Positive(new_min_overflow.unwrap()),
                 },
@@ -296,7 +296,7 @@ impl DeltaHistory {
         }
         if new_max_underflow.is_some_and(|v| v <= new_min_achieved) {
             return Err(
-                DelayedFieldsSpeculativeError::DeltaHistoryMergeAchievedAndOverflowOverlap {
+                DelayedFieldsSpeculativeError::DeltaHistoryMergeAchievedAndFailureOverlap {
                     achieved: SignedU128::Negative(new_min_achieved),
                     overflow: SignedU128::Negative(new_max_underflow.unwrap()),
                 },
@@ -317,7 +317,7 @@ pub fn merge_data_and_delta(
     delta: &SignedU128,
     history: &DeltaHistory,
     max_value: u128,
-) -> PanicOrResult<u128, DelayedFieldsSpeculativeError> {
+) -> Result<u128, PanicOr<DelayedFieldsSpeculativeError>> {
     // First, validate if the current delta operation can be applied to the base.
     history.validate_against_base_value(prev_value, max_value)?;
     // Then, apply the delta. Since history was validated, this should never fail.
@@ -332,7 +332,7 @@ pub fn merge_two_deltas(
     next_delta: &SignedU128,
     next_history: &DeltaHistory,
     max_value: u128,
-) -> PanicOrResult<(SignedU128, DeltaHistory), DelayedFieldsSpeculativeError> {
+) -> Result<(SignedU128, DeltaHistory), PanicOr<DelayedFieldsSpeculativeError>> {
     let new_history = next_history.offset_and_merge_history(prev_delta, prev_history, max_value)?;
     let new_delta = expect_ok(BoundedMath::new(max_value).signed_add(prev_delta, next_delta))?;
     Ok((new_delta, new_history))

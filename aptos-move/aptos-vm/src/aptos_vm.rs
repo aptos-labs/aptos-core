@@ -1283,16 +1283,12 @@ impl AptosVM {
         for state_key in change_set.module_write_set().keys() {
             executor_view
                 .get_module_state_value(state_key)
-                .map_err(|_| {
-                    VMStatus::error(StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR, None)
-                })?;
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         for state_key in change_set.resource_write_set().keys() {
             executor_view
                 .get_resource_state_value(state_key, None)
-                .map_err(|_| {
-                    VMStatus::error(StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR, None)
-                })?;
+                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         Ok(())
     }
@@ -1774,8 +1770,8 @@ impl VMAdapter for AptosVM {
                                 vm_status,
                             );
                         },
-                        // Ignore Storage Error as it can be intentionally triggered by parallel execution.
-                        StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR => (),
+                        // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
+                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.

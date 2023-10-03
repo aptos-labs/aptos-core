@@ -95,13 +95,13 @@ pub trait TAggregatorView {
             .get_aggregator_v1_value(id, mode)
             .map_err(|e| {
                 VMStatus::error(
-                    StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some(e.to_string()),
                 )
             })?
             .ok_or_else(|| {
                 VMStatus::error(
-                    StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some("Cannot convert delta for deleted aggregator".to_string()),
                 )
             })?;

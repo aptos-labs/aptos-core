@@ -7,8 +7,8 @@ use crate::{
     resolver::{AggregatorReadMode, AggregatorResolver},
     types::{
         code_invariant_error, expect_ok, AggregatorID, AggregatorValue, AggregatorVersionedID,
-        DelayedFieldsSpeculativeError, PanicError, PanicOr, PanicOrResult, ReadPosition,
-        SnapshotToStringFormula, SnapshotValue,
+        DelayedFieldsSpeculativeError, PanicError, PanicOr, ReadPosition, SnapshotToStringFormula,
+        SnapshotValue,
     },
 };
 use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
@@ -135,7 +135,7 @@ fn get_aggregator_v2_value_from_storage(
     id: &AggregatorID,
     resolver: &dyn AggregatorResolver,
     mode: AggregatorReadMode,
-) -> PanicOrResult<AggregatorValue, DelayedFieldsSpeculativeError> {
+) -> Result<AggregatorValue, PanicOr<DelayedFieldsSpeculativeError>> {
     // TODO transform unexpected errors into PanicError
     resolver
         .get_aggregator_v2_value(id, mode)

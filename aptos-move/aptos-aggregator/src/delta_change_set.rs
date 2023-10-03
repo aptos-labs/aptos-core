@@ -8,7 +8,7 @@
 use crate::{
     bounded_math::SignedU128,
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
-    types::{code_invariant_error, DelayedFieldsSpeculativeError, PanicOrResult},
+    types::{code_invariant_error, DelayedFieldsSpeculativeError, PanicOr},
 };
 
 /// Represents an update from aggregator's operation.
@@ -39,14 +39,14 @@ impl DeltaOp {
 
     /// Returns the result of delta application to `base` or error if
     /// postcondition is not satisfied.
-    pub fn apply_to(&self, base: u128) -> PanicOrResult<u128, DelayedFieldsSpeculativeError> {
+    pub fn apply_to(&self, base: u128) -> Result<u128, PanicOr<DelayedFieldsSpeculativeError>> {
         merge_data_and_delta(base, &self.update, &self.history, self.max_value)
     }
 
     pub fn create_merged_delta(
         prev_delta: &DeltaOp,
         next_delta: &DeltaOp,
-    ) -> PanicOrResult<DeltaOp, DelayedFieldsSpeculativeError> {
+    ) -> Result<DeltaOp, PanicOr<DelayedFieldsSpeculativeError>> {
         if prev_delta.max_value != next_delta.max_value {
             Err(code_invariant_error(
                 "Cannot merge deltas with different limits",
@@ -70,7 +70,7 @@ impl DeltaOp {
     pub fn merge_with_previous_delta(
         &mut self,
         previous_delta: DeltaOp,
-    ) -> PanicOrResult<(), DelayedFieldsSpeculativeError> {
+    ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
         *self = Self::create_merged_delta(&previous_delta, self)?;
         Ok(())
     }
@@ -80,7 +80,7 @@ impl DeltaOp {
     pub fn merge_with_next_delta(
         &mut self,
         next_delta: DeltaOp,
-    ) -> PanicOrResult<(), DelayedFieldsSpeculativeError> {
+    ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
         *self = Self::create_merged_delta(self, &next_delta)?;
         Ok(())
     }
@@ -402,7 +402,7 @@ mod test {
                 AggregatorReadMode::Aggregated
             ),
             Err(VMStatus::Error {
-                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 message: Some(_),
                 sub_status: None
             })
@@ -421,7 +421,7 @@ mod test {
             _mode: AggregatorReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
@@ -432,7 +432,7 @@ mod test {
             _mode: AggregatorReadMode,
         ) -> anyhow::Result<AggregatorValue> {
             Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
@@ -453,7 +453,7 @@ mod test {
                 AggregatorReadMode::Aggregated
             ),
             Err(VMStatus::Error {
-                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 message: Some(_),
                 sub_status: None
             })
@@ -500,7 +500,7 @@ mod test {
                 AggregatorReadMode::Aggregated
             ),
             Err(VMStatus::ExecutionFailure {
-                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 ..
             })
         );
@@ -511,7 +511,7 @@ mod test {
                 AggregatorReadMode::Aggregated
             ),
             Err(VMStatus::ExecutionFailure {
-                status_code: StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 ..
             })
         );

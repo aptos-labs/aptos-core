@@ -96,7 +96,7 @@ impl CategorizeError for VMStatus {
     fn categorize(&self) -> ErrorCategory {
         match self.status_code() {
             StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR => ErrorCategory::CodeInvariantError,
-            StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR => {
+            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => {
                 ErrorCategory::SpeculativeExecutionError
             },
             _ => ErrorCategory::ValidError,

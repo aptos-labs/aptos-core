@@ -4,9 +4,7 @@
 use crate::types::{AtomicTxnIndex, MVAggregatorsError, TxnIndex};
 use aptos_aggregator::{
     aggregator_change_set::{AggregatorApplyChange, AggregatorChange, ApplyBase},
-    types::{
-        code_invariant_error, AggregatorValue, PanicError, PanicOr, PanicOrResult, ReadPosition,
-    },
+    types::{code_invariant_error, AggregatorValue, PanicError, PanicOr, ReadPosition},
 };
 use claims::assert_matches;
 use crossbeam::utils::CachePadded;
@@ -214,7 +212,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         &self,
         iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &CachePadded<VersionEntry<K>>)>,
         suffix: &AggregatorApplyChange<K>,
-    ) -> PanicOrResult<VersionedRead<K>, MVAggregatorsError> {
+    ) -> Result<VersionedRead<K>, PanicOr<MVAggregatorsError>> {
         use AggregatorApplyChange::*;
         use EstimatedEntry::*;
         use VersionEntry::*;
@@ -277,7 +275,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     // Reads a given aggregator value at a given version (transaction index) and produces
     // a ReadResult if successful, which is either a u128 value, or a snapshot specifying
     // a different aggregator (with ID) at a given version and a delta to apply on top.
-    fn read(&self, txn_idx: TxnIndex) -> PanicOrResult<VersionedRead<K>, MVAggregatorsError> {
+    fn read(&self, txn_idx: TxnIndex) -> Result<VersionedRead<K>, PanicOr<MVAggregatorsError>> {
         use EstimatedEntry::*;
         use MVAggregatorsError::*;
         use VersionEntry::*;
@@ -416,7 +414,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
         id: K,
         txn_idx: TxnIndex,
         change: AggregatorChange<K>,
-    ) -> PanicOrResult<(), MVAggregatorsError> {
+    ) -> Result<(), PanicOr<MVAggregatorsError>> {
         match change {
             AggregatorChange::Create(value) => self.initialize_delayed_field(id, txn_idx, value)?,
             AggregatorChange::Apply(apply) => match &apply {
@@ -442,7 +440,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
         &self,
         id: K,
         txn_idx: TxnIndex,
-    ) -> PanicOrResult<AggregatorValue, MVAggregatorsError> {
+    ) -> Result<AggregatorValue, PanicOr<MVAggregatorsError>> {
         let read_res = self
             .values
             .get(&id)

@@ -10,9 +10,7 @@ use crate::{
 use aptos_aggregator::{
     delta_change_set::serialize,
     resolver::{AggregatorReadMode, TAggregatorView},
-    types::{
-        AggregatorValue, PanicOr, PanicOrResult, ReadPosition, TryFromMoveValue, TryIntoMoveValue,
-    },
+    types::{AggregatorValue, PanicOr, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -126,7 +124,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         &self,
         id: T::Identifier,
         txn_idx: TxnIndex,
-    ) -> PanicOrResult<AggregatorValue, MVAggregatorsError> {
+    ) -> Result<AggregatorValue, PanicOr<MVAggregatorsError>> {
         match self.versioned_map.aggregators().read(id, txn_idx) {
             Ok(value) => {
                 if self
@@ -458,16 +456,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 match ret {
                     // ExecutionHalted indicates that the parallel execution is halted.
                     // The read should return immediately and log the error.
-                    // For now we use DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR as the VM
+                    // For now we use SPECULATIVE_EXECUTION_ABORT_ERROR as the VM
                     // will not log the speculative error,
                     // so no actual error will be logged once the execution is halted and
                     // the speculative logging is flushed.
-                    ReadResult::HaltSpeculativeExecution(msg) => {
-                        Err(anyhow::Error::new(VMStatus::error(
-                            StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
-                            Some(msg),
-                        )))
-                    },
+                    ReadResult::HaltSpeculativeExecution(msg) => Err(anyhow::Error::new(
+                        VMStatus::error(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR, Some(msg)),
+                    )),
                     ReadResult::Uninitialized => {
                         unreachable!("base value must already be recorded in the MV data structure")
                     },
@@ -629,14 +624,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
                     )
                     .map_err(|e| {
                         anyhow::Error::new(VMStatus::error(
-                            StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                             Some(format!("Error during read: {:?}", e)),
                         ))
                     }),
             },
             ViewState::Unsync(state) => state.unsync_map.fetch_aggregator(id).ok_or_else(|| {
                 anyhow::Error::new(VMStatus::error(
-                    StatusCode::DELAYED_FIELDS_SPECULATIVE_ABORT_ERROR,
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some(format!("Aggregator for id {:?} doesn't exist", id)),
                 ))
             }),
