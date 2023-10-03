@@ -648,7 +648,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(e.to_string()))?;
         match &self.latest_view {
-            // TODO are we at this point always supposed to read a value this transaction committed (i.e. AfterCurrentTxn)?
             ViewState::Sync(state) => Ok(state
                 .read_aggregator_v2_last_committed_value(
                     id,

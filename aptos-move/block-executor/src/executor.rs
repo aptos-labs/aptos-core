@@ -34,6 +34,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use claims::assert_none;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -247,6 +248,11 @@ where
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
         // Note: we validate delayed field reads only at try_commit.
+        // TODO: potentially add some basic validation.
+        // TODO: potentially add more sophisticated validation, but if it fails,
+        // we mark it as a soft failure, requires some new statuses in the scheduler
+        // (i.e. not re-execute unless some other part of the validation fails or
+        // until commit, but mark as estimates).
 
         // TODO: validate modules when there is no r/w fallback.
         let valid = read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
@@ -725,8 +731,8 @@ where
                     for (id, change) in output.aggregator_v2_change_set().into_iter() {
                         match change {
                             AggregatorChange::Create(value) => {
-                                assert!(
-                                    data_map.fetch_aggregator(&id).is_none(),
+                                assert_none!(
+                                    data_map.fetch_aggregator(&id),
                                     "Sequential execution must not create duplicate aggregators"
                                 );
                                 updates.insert(id, value);

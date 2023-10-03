@@ -374,7 +374,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
 
         assert_none!(
             self.values.insert(id, created),
-            "VerionedValue when creating aggregator ID may not already exist"
+            "VersionedValue when creating aggregator ID may not already exist"
         );
     }
 
@@ -392,7 +392,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
 
         assert_none!(
             self.values.insert(id, created),
-            "VerionedValue when creating aggregator ID may not already exist"
+            "VersionedValue when creating aggregator ID may not already exist"
         );
     }
 
@@ -442,7 +442,8 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
     }
 
     /// Returns the committed value from largest transaction index that is
-    /// strictly smaller than the given current_txn_idx.
+    /// smaller than the given current_txn_idx (read_position defined whether
+    /// inclusively or exclusively from the current transaction itself).
     pub fn read_latest_committed_value(
         &self,
         id: K,
