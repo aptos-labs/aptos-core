@@ -6,17 +6,29 @@ use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
-    transaction::{into_signature_verified_block, Transaction},
+    transaction::{into_signature_verified, SignatureVerifiedTransaction, Transaction},
 };
-use std::time::Instant;
+use once_cell::sync::Lazy;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::{sync::Arc, time::Instant};
 
-pub(crate) struct BlockPartitioningStage {
+pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
+
+pub(crate) struct BlockPreparationStage {
     num_executor_shards: usize,
     num_blocks_processed: usize,
     maybe_partitioner: Option<Box<dyn BlockPartitioner>>,
 }
 
-impl BlockPartitioningStage {
+impl BlockPreparationStage {
     pub fn new(num_shards: usize, partitioner_config: &dyn PartitionerConfig) -> Self {
         let maybe_partitioner = if num_shards <= 1 {
             None
@@ -32,7 +44,7 @@ impl BlockPartitioningStage {
         }
     }
 
-    pub fn process(&mut self, mut txns: Vec<Transaction>) -> ExecuteBlockMessage {
+    pub fn process(&mut self, txns: Vec<Transaction>) -> ExecuteBlockMessage {
         let current_block_start_time = Instant::now();
         info!(
             "In iteration {}, received {:?} transactions.",
@@ -40,11 +52,18 @@ impl BlockPartitioningStage {
             txns.len()
         );
         let block_id = HashValue::random();
+        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> =
+            SIG_VERIFY_POOL.install(|| {
+                txns.into_par_iter()
+                    .map(into_signature_verified)
+                    .collect::<Vec<_>>()
+            });
         let block: ExecutableBlock = match &self.maybe_partitioner {
-            None => (block_id, into_signature_verified_block(txns)).into(),
+            None => (block_id, sig_verified_txns).into(),
             Some(partitioner) => {
-                let last_txn = txns.pop().unwrap();
-                let analyzed_transactions = txns.into_iter().map(|t| t.into()).collect();
+                let last_txn = sig_verified_txns.pop().unwrap();
+                let analyzed_transactions =
+                    sig_verified_txns.into_iter().map(|t| t.into()).collect();
                 let timer = TIMER.with_label_values(&["partition"]).start_timer();
                 let mut partitioned_txns =
                     partitioner.partition(analyzed_transactions, self.num_executor_shards);
