@@ -216,6 +216,10 @@ pub(crate) mod test {
         fn as_state_value(&self) -> Option<StateValue> {
             unimplemented!("Irrelevant for the test")
         }
+
+        fn set_bytes(&mut self, bytes: Bytes) {
+            self.bytes = bytes;
+        }
     }
 
     // Generate a Vec deterministically based on txn_idx and incarnation.

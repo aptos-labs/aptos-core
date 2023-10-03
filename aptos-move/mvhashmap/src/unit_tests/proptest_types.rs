@@ -76,6 +76,10 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     fn as_state_value(&self) -> Option<StateValue> {
         unimplemented!("Irrelevant for the test")
     }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        self.maybe_bytes = Some(bytes);
+    }
 }
 
 enum Data<V> {

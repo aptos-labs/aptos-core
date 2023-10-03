@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    captured_reads::DataRead,
     counters,
     counters::{
         PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
@@ -29,17 +30,19 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::TStateView;
 use aptos_types::{
+    contract_event::ReadWriteEvent,
     executable::Executable,
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use bytes::Bytes;
 use claims::assert_none;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     sync::{
         atomic::AtomicU32,
@@ -409,13 +412,106 @@ where
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        scheduler: &Scheduler,
+        shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
     ) {
-        let delta_keys = last_input_output.delta_keys(txn_idx);
-        let _events = last_input_output.events(txn_idx);
-        let mut delta_writes = Vec::with_capacity(delta_keys.len());
-        for k in delta_keys.into_iter() {
+        println!("worker commit hook called");
+        let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
+        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
+
+        // For each aggregator v2 in resource write set, replace the identifiers with values.
+        let mut write_set_keys = HashSet::new();
+        let resource_write_set = last_input_output.resource_write_set(txn_idx);
+        let mut patched_resource_write_set = HashMap::new();
+        if let Some(resource_write_set) = resource_write_set {
+            for (key, (write_op, layout)) in resource_write_set.iter() {
+                // layout is Some(_) if it contains an aggregator
+                if let Some(layout) = layout {
+                    if !write_op.is_deletion() {
+                        write_set_keys.insert(key.clone());
+                        let patched_bytes = match latest_view
+                            .replace_identifiers_with_values(write_op.bytes().unwrap(), layout)
+                        {
+                            Ok((bytes, _)) => bytes,
+                            Err(_) => unreachable!("Failed to replace identifiers with values"),
+                        };
+                        let mut patched_write_op = write_op.clone();
+                        patched_write_op.set_bytes(patched_bytes);
+                        patched_resource_write_set.insert(key.clone(), patched_write_op);
+                    }
+                }
+            }
+        }
+
+        // For each resource that satisfies the following conditions,
+        //     1. Resource is in read set
+        //     2. Resource is not in write set
+        // replace the aggregator v2 identifiers in the resource with corresponding values.
+        // If any of the aggregator v2 identifiers in the resource are part of aggregator_v2_write_set,
+        // then include the resource in the write set.
+        let aggregator_v2_keys = last_input_output.aggregator_v2_keys(txn_idx);
+        if let Some(aggregator_v2_keys) = aggregator_v2_keys {
+            let aggregator_v2_keys = aggregator_v2_keys.collect::<HashSet<_>>();
+            let read_set = last_input_output.read_set(txn_idx);
+            if let Some(read_set) = read_set {
+                for (key, data_read) in read_set.as_ref().data_reads.iter() {
+                    if write_set_keys.contains(key) {
+                        continue;
+                    }
+                    // layout is Some(_) if it contains an aggregator
+                    if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                        if let Some(value_bytes) = value.bytes() {
+                            match latest_view.replace_identifiers_with_values(value_bytes, layout) {
+                                Ok((patched_bytes, aggregator_v2_keys_in_resource)) => {
+                                    if !aggregator_v2_keys
+                                        .is_disjoint(&aggregator_v2_keys_in_resource)
+                                    {
+                                        let mut patched_value = value.as_ref().clone();
+                                        patched_value.set_bytes(patched_bytes);
+                                        patched_resource_write_set
+                                            .insert(key.clone(), patched_value);
+                                    }
+                                },
+                                Err(_) => unreachable!(
+                                    "Failed to replace identifiers with values in read set"
+                                ),
+                            };
+                        } else {
+                            // TODO: Is this unreachable?
+                            unreachable!("Data read value must exist");
+                        }
+                    }
+                }
+            }
+        }
+
+        // For each aggregator v2 in the event, replace aggregator v2 identifier with value.
+        let events = last_input_output.events(txn_idx);
+        let mut patched_events = vec![];
+        for (event, layout) in events {
+            if let Some(layout) = layout {
+                let (_, _, _, event_data) = event.get_event_data();
+                match latest_view
+                    .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
+                {
+                    Ok((bytes, _)) => {
+                        let mut patched_event = event.clone();
+                        patched_event.update_event_data(bytes.to_vec());
+                        patched_events.push(patched_event);
+                    },
+                    Err(_) => unreachable!("Failed to replace identifiers with values in event"),
+                }
+            } else {
+                patched_events.push(event);
+            }
+        }
+
+        // Materialize all the aggregator v1 deltas.
+        let aggregator_v1_delta_keys = last_input_output.aggregator_v1_delta_keys(txn_idx);
+        let mut aggregator_v1_delta_writes = Vec::with_capacity(aggregator_v1_delta_keys.len());
+        for k in aggregator_v1_delta_keys.into_iter() {
             // Note that delta materialization happens concurrently, but under concurrent
             // commit_hooks (which may be dispatched by the coordinator), threads may end up
             // contending on delta materialization of the same aggregator. However, the
@@ -448,9 +544,16 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta).into())));
+            aggregator_v1_delta_writes
+                .push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
-        last_input_output.record_delta_writes(txn_idx, delta_writes);
+
+        last_input_output.record_materialized_txn_output(
+            txn_idx,
+            aggregator_v1_delta_writes,
+            patched_resource_write_set,
+            patched_events,
+        );
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
@@ -512,6 +615,8 @@ where
                         self.worker_commit_hook(
                             txn_idx,
                             versioned_cache,
+                            scheduler,
+                            shared_counter,
                             last_input_output,
                             base_view,
                         );
@@ -561,6 +666,8 @@ where
                             self.worker_commit_hook(
                                 txn_idx,
                                 versioned_cache,
+                                scheduler,
+                                shared_counter,
                                 last_input_output,
                                 base_view,
                             );
@@ -771,6 +878,7 @@ where
                     }
 
                     // No delta writes are needed for sequential execution.
+                    // TODO: Should we replace this with output.incorporate_materialized_txn_output(..)?
                     output.incorporate_delta_writes(vec![]);
 
                     //
