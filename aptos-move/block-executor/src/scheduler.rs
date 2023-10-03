@@ -30,7 +30,7 @@ pub struct ArmedLock {
 impl ArmedLock {
     pub fn new() -> Self {
         Self {
-            locked: AtomicU64::new(1),
+            locked: AtomicU64::new(3),
         }
     }
 
@@ -41,11 +41,11 @@ impl ArmedLock {
     }
 
     pub fn unlock(&self) {
-        self.locked.fetch_or(1, Ordering::Release);
+        self.locked.fetch_or(3, Ordering::Release);
     }
 
     pub fn arm(&self) {
-        self.locked.fetch_or(2, Ordering::Release);
+        self.locked.fetch_or(0, Ordering::Release);
     }
 }
 
