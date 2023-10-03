@@ -477,7 +477,7 @@ where
                                         patched_value.set_bytes(patched_bytes);
                                         // TODO: Is the patched_value of type `WriteOp`? How to convert this to WriteOp?
                                         patched_resource_write_set
-                                            .insert(key.clone(), WriteOp::Modification(patched_value.into()));
+                                            .insert(key.clone(), patched_value);
                                     }
                                 },
                                 Err(_) => unreachable!(
@@ -879,6 +879,7 @@ where
                     }
 
                     // No delta writes are needed for sequential execution.
+                    // TODO: Should we replace this with output.incorporate_materialized_txn_output(..)?
                     output.incorporate_delta_writes(vec![]);
 
                     //

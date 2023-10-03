@@ -210,7 +210,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn resource_write_set(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<HashMap<T::Key, (WriteOp, Option<Arc<MoveTypeLayout>>)>> {
+    ) -> Option<HashMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
