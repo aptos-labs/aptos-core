@@ -13,7 +13,6 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
-use std::arch::aarch64::vld4_dup_f32;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::channel;
 use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardTxnResult, CrossShardMessage};
