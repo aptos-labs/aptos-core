@@ -631,7 +631,7 @@ module aptos_framework::voting {
     }
 
     #[view]
-    public fun get_resolution_time<ProposalType: store>(
+    public fun get_resolution_time_secs<ProposalType: store>(
         voting_forum_address: address,
         proposal_id: u64,
     ): u64 acquires VotingForum {
