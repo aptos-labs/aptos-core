@@ -8,6 +8,41 @@ export * from "./indexer";
 export type HexInput = string | Uint8Array;
 
 /**
+ * Transaction argumtns enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/transaction_argument.rs#L11}
+ */
+export enum RustEnumTransactionArgumentVariants {
+  TransactionArgumentU8 = 0,
+  TransactionArgumentU64 = 1,
+  TransactionArgumentU128 = 2,
+  TransactionArgumentAddress = 3,
+  TransactionArgumentU8Vector = 4,
+  TransactionArgumentBool = 5,
+  TransactionArgumentU16 = 6,
+  TransactionArgumentU32 = 7,
+  TransactionArgumentU256 = 8,
+}
+
+/**
+ * Transaction payload enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L478}
+ */
+export enum RustEnumTransactionPayloadVariants {
+  TransactionPayloadScript = 0,
+  TransactionPayloadEntryFunction = 2,
+  TransactionPayloadMultisig = 3,
+}
+
+/**
+ * Transaction variants enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L440}
+ */
+export enum RustEnumTransactionVariants {
+  MultiAgentTransaction = 0,
+  FeePayerTransaction = 1,
+}
+
+/**
  * BCS types
  */
 export type Uint8 = number;
