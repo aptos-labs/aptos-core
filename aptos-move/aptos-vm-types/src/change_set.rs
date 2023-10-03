@@ -221,9 +221,8 @@ impl VMChangeSet {
             .extend(patched_resource_writes.map(|(k, v)| (k, (v, None))))
     }
 
-    /// The events are replaced with patched events, where the aggregator v2
-    /// identifiers are replaced with values,
-    pub(crate) fn replace_events(&mut self, patched_events: impl Iterator<Item = ContractEvent>) {
+    /// The events are set to the input events.
+    pub(crate) fn set_events(&mut self, patched_events: impl Iterator<Item = ContractEvent>) {
         self.events = patched_events
             .map(|event| (event, None))
             .collect::<Vec<_>>();

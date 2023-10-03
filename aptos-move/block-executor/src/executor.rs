@@ -42,7 +42,7 @@ use num_cpus;
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     sync::{
         atomic::AtomicU32,
@@ -139,8 +139,7 @@ where
         let txn = &signature_verified_block[idx_to_execute as usize];
 
         // VM execution.
-        let sync_view =
-            LatestView::<T, S, X>::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
+        let sync_view = LatestView::new(base_view, ViewState::Sync(latest_view), idx_to_execute);
         let execute_result = executor.execute_transaction(&sync_view, txn, idx_to_execute, false);
 
         let mut prev_modified_keys = last_input_output
@@ -423,24 +422,25 @@ where
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
 
         // For each aggregator v2 in resource write set, replace the identifiers with values.
-        let mut write_set_keys = vec![];
+        let mut write_set_keys = HashSet::new();
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let mut patched_resource_write_set = HashMap::new();
         if let Some(resource_write_set) = resource_write_set {
             for (key, (write_op, layout)) in resource_write_set.iter() {
                 // layout is Some(_) if it contains an aggregator
-                if layout.is_some() && !write_op.is_deletion() {
-                    write_set_keys.push(key.clone());
-                    let patched_bytes = match latest_view.replace_identifiers_with_values(
-                        write_op.bytes().unwrap(),
-                        layout.as_ref().unwrap(),
-                    ) {
-                        Ok((bytes, _)) => bytes,
-                        Err(_) => unreachable!("Failed to replace identifiers with values"),
-                    };
-                    let mut patched_write_op = write_op.clone();
-                    patched_write_op.set_bytes(patched_bytes);
-                    patched_resource_write_set.insert(key.clone(), patched_write_op);
+                if let Some(layout) = layout {
+                    if !write_op.is_deletion() {
+                        write_set_keys.insert(key.clone());
+                        let patched_bytes = match latest_view
+                            .replace_identifiers_with_values(write_op.bytes().unwrap(), layout)
+                        {
+                            Ok((bytes, _)) => bytes,
+                            Err(_) => unreachable!("Failed to replace identifiers with values"),
+                        };
+                        let mut patched_write_op = write_op.clone();
+                        patched_write_op.set_bytes(patched_bytes);
+                        patched_resource_write_set.insert(key.clone(), patched_write_op);
+                    }
                 }
             }
         }
@@ -452,9 +452,9 @@ where
         // If any of the aggregator v2 identifiers in the resource are part of aggregator_v2_write_set,
         // then include the resource in the write set.
         let aggregator_v2_keys = last_input_output.aggregator_v2_keys(txn_idx);
-        let read_set = last_input_output.read_set(txn_idx);
-        // TODO: Gives some error without this `mut`. See if we can avoid `mut` here.
-        if let Some(mut aggregator_v2_keys) = aggregator_v2_keys {
+        if let Some(aggregator_v2_keys) = aggregator_v2_keys {
+            let aggregator_v2_keys = aggregator_v2_keys.collect::<HashSet<_>>();
+            let read_set = last_input_output.read_set(txn_idx);
             if let Some(read_set) = read_set {
                 for (key, data_read) in read_set.as_ref().data_reads.iter() {
                     if write_set_keys.contains(key) {
@@ -465,17 +465,13 @@ where
                         if let Some(value_bytes) = value.bytes() {
                             match latest_view.replace_identifiers_with_values(value_bytes, layout) {
                                 Ok((patched_bytes, aggregator_v2_keys_in_resource)) => {
-                                    let mut changed_aggregator = false;
-                                    for aggregator_v2_key in aggregator_v2_keys_in_resource {
-                                        if aggregator_v2_keys.any(|key| key == aggregator_v2_key) {
-                                            changed_aggregator = true;
-                                            break;
-                                        }
-                                    }
-                                    if changed_aggregator {
+                                    if !aggregator_v2_keys
+                                        .is_disjoint(&aggregator_v2_keys_in_resource)
+                                    {
                                         let mut patched_value = value.as_ref().clone();
                                         patched_value.set_bytes(patched_bytes);
-                                        patched_resource_write_set.insert(key.clone(), patched_value);
+                                        patched_resource_write_set
+                                            .insert(key.clone(), patched_value);
                                     }
                                 },
                                 Err(_) => unreachable!(

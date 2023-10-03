@@ -173,7 +173,7 @@ impl VMOutput {
             self.change_set().events().len(),
             "Different number of events and patched events in the output."
         );
-        self.change_set.replace_events(patched_events.into_iter());
+        self.change_set.set_events(patched_events.into_iter());
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set

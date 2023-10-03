@@ -40,7 +40,6 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    cell::RefCell,
 };
 
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.

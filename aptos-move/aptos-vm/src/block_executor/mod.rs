@@ -196,7 +196,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                     self.vm_output
                         .lock()
                         .take()
-                        .expect("Output must be set to combine with deltas")
+                        .expect("Output must be set to incorporate materialized data")
                         .into_transaction_output_with_materialized_write_set(
                             aggregator_v1_writes,
                             patched_resource_write_set,
@@ -204,7 +204,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         ),
                 )
                 .is_ok(),
-            "Could not combine VMOutput with deltas"
+            "Could not combine VMOutput with the patched resource and event data"
         );
     }
 
