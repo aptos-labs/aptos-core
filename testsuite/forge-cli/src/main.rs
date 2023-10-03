@@ -1368,12 +1368,12 @@ fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.direct_send_per_second = 1000;
 }
 
-fn netbench_config_10_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_12_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
     netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 100;
+    netbench_config.direct_send_per_second = 120;
 }
 
 /// Currently sending 16 MB/s outbound gets 12 MB/s inbound.
@@ -1400,7 +1400,7 @@ fn net_bench_two_region_inner(
     netbench_config_fn: Arc<dyn Fn(&mut NetbenchConfig) + Send + Sync>,
 ) -> ForgeConfig {
     ForgeConfig::default()
-        .add_network_test(wrap_with_two_region_env(Delay::new(180)))
+        .add_network_test(wrap_with_two_region_env(Delay::new(300)))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(move |config, _| {
             // Use a target that is not too much higher than the achievable throughput, to avoid
