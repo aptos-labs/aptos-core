@@ -8,7 +8,6 @@ import { Identifier } from "./identifier";
  */
 export class ModuleId {
   public readonly address: AccountAddress;
-
   public readonly name: Identifier;
 
   /**

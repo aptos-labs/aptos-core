@@ -101,12 +101,25 @@ export abstract class RawTransactionWithData {
    * Deserialize a Raw Transaction With Data
    */
   static deserialize(deserializer: Deserializer): RawTransactionWithData {
+<<<<<<< HEAD
     // undex enum variant
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case RustEnumTransactionVariants.MultiAgentTransaction:
         return MultiAgentRawTransaction.load(deserializer);
       case RustEnumTransactionVariants.FeePayerTransaction:
+=======
+    const index = deserializer.deserializeUleb128AsU32();
+    /**
+     * index is represented in rust as an enum
+     * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L440}
+     */
+
+    switch (index) {
+      case 0:
+        return MultiAgentRawTransaction.load(deserializer);
+      case 1:
+>>>>>>> d3cd71d259 (transaction types)
         return FeePayerRawTransaction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for RawTransactionWithData: ${index}`);
@@ -135,7 +148,12 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
   }
 
   serialize(serializer: Serializer): void {
+<<<<<<< HEAD
     serializer.serializeU32AsUleb128(RustEnumTransactionVariants.MultiAgentTransaction);
+=======
+    // enum variant index
+    serializer.serializeU32AsUleb128(0);
+>>>>>>> d3cd71d259 (transaction types)
     this.raw_txn.serialize(serializer);
     serializer.serializeVector<TransactionArgument>(this.secondary_signer_addresses);
   }
@@ -179,7 +197,12 @@ export class FeePayerRawTransaction extends RawTransactionWithData {
   }
 
   serialize(serializer: Serializer): void {
+<<<<<<< HEAD
     serializer.serializeU32AsUleb128(RustEnumTransactionVariants.FeePayerTransaction);
+=======
+    // enum variant index
+    serializer.serializeU32AsUleb128(1);
+>>>>>>> d3cd71d259 (transaction types)
     this.raw_txn.serialize(serializer);
     serializer.serializeVector<TransactionArgument>(this.secondary_signer_addresses);
     this.fee_payer_address.serialize(serializer);
