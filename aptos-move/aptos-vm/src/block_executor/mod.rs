@@ -104,6 +104,18 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
+    // fn update_resource_write_set(
+    //     &self,
+    //     resource_write_set: HashMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>
+    // ) {
+    //     self.vm_output
+    //         .lock()
+    //         .as_ref()
+    //         .expect("Output to be set to update writes")
+    //         .change_set()
+    //         .update_resource_write_set(resource_write_set);
+    // }
+
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn module_write_set(&self) -> HashMap<StateKey, WriteOp> {
@@ -175,6 +187,26 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .take()
                         .expect("Output must be set to combine with deltas")
                         .into_transaction_output_with_materialized_deltas(delta_writes),
+                )
+                .is_ok(),
+            "Could not combine VMOutput with deltas"
+        );
+    }
+
+    fn incorporate_materialized_txn_output(
+            &self,
+            aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutorTransaction>::Key, WriteOp)>,
+            patched_resource_write_set: HashMap<<Self::Txn as BlockExecutorTransaction>::Key, WriteOp>,
+            patched_events: Vec<<Self::Txn as BlockExecutorTransaction>::Event>,
+        ) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.vm_output
+                        .lock()
+                        .take()
+                        .expect("Output must be set to combine with deltas")
+                        .into_transaction_output_with_materialized_write_set(aggregator_v1_writes, patched_resource_write_set, patched_events),
                 )
                 .is_ok(),
             "Could not combine VMOutput with deltas"

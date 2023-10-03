@@ -7,10 +7,10 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::WriteOp, contract_event::ContractEvent, //contract_event::ContractEvent,
 };
 use move_core_types::vm_status::VMStatus;
-
+use std::collections::HashMap;
 /// Output produced by the VM after executing a transaction.
 ///
 /// **WARNING**: This type should only be used inside the VM. For storage backends,
@@ -53,6 +53,10 @@ impl VMOutput {
 
     pub fn change_set(&self) -> &VMChangeSet {
         &self.change_set
+    }
+
+    pub fn change_set_mut(&mut self) -> &mut VMChangeSet {
+        &mut self.change_set
     }
 
     pub fn gas_used(&self) -> u64 {
@@ -118,21 +122,55 @@ impl VMOutput {
     /// externally by the caller beforehand.
     pub fn into_transaction_output_with_materialized_deltas(
         mut self,
-        materialized_deltas: Vec<(StateKey, WriteOp)>,
+        materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         assert_eq!(
-            materialized_deltas.len(),
+            materialized_aggregator_v1_deltas.len(),
             self.change_set().aggregator_v1_delta_set().len(),
             "Different number of materialized deltas and deltas in the output."
         );
         debug_assert!(
-            materialized_deltas
+            materialized_aggregator_v1_deltas
                 .iter()
                 .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k)),
             "Materialized aggregator writes contain a key which does not exist in delta set."
         );
         self.change_set
-            .extend_aggregator_write_set(materialized_deltas.into_iter());
+            .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
+
+        let (vm_change_set, gas_used, status) = self.unpack();
+        let (write_set, events) = vm_change_set
+            .into_storage_change_set_unchecked()
+            .into_inner();
+        TransactionOutput::new(write_set, events, gas_used, status)
+    }
+
+    pub fn into_transaction_output_with_materialized_write_set(
+        mut self,
+        materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
+        patched_resource_write_set: HashMap<StateKey, WriteOp>,
+        patched_events: Vec<ContractEvent>
+    ) -> TransactionOutput {
+        assert_eq!(
+            materialized_aggregator_v1_deltas.len(),
+            self.change_set().aggregator_v1_delta_set().len(),
+            "Different number of materialized deltas and deltas in the output."
+        );
+        debug_assert!(
+            materialized_aggregator_v1_deltas
+                .iter()
+                .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k)),
+                "Materialized aggregator writes contain a key which does not exist in delta set."
+        );
+        self.change_set.extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
+        self.change_set.extend_resource_write_set(patched_resource_write_set.into_iter());
+        
+        assert_eq!(
+            patched_events.len(),
+            self.change_set().events().len(),
+            "Different number of events and patched events in the output."
+        );
+        self.change_set.replace_events(patched_events.into_iter());
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set

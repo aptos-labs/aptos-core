@@ -31,14 +31,15 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
+use bytes::Bytes;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_types::{
     value_transformation::{
-        deserialize_and_replace_values_with_ids, TransformationError, TransformationResult,
-        ValueToIdentifierMapping,
+        deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
+        TransformationError, TransformationResult, ValueToIdentifierMapping,
     },
     values::Value,
 };
@@ -362,6 +363,33 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 })
                 .map(|b| b.into())
         })
+    }
+
+    /// Given a state value, performs deserialization-serialization round-trip
+    /// to replace any aggregator / snapshot values.
+    pub(crate) fn replace_identifiers_with_values(
+        &self,
+        bytes: &Bytes,
+        layout: &MoveTypeLayout,
+    ) -> anyhow::Result<(Bytes, Vec<T::Identifier>)> {
+        // TODO: Find a way to replace this with Self::IdentifierV2
+        // This call will replace all occurrences of aggregator / snapshot
+        // identifiers with values with the same type layout.
+        let value = Value::simple_deserialize(bytes, layout).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to deserialize resource during value replacement: {:?}",
+                bytes
+            )
+        })?;
+        //TODO: Returns the vector of aggregator ids found in the resource
+        Ok((
+            serialize_and_replace_ids_with_values(&value, layout, self)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Failed to serialize resource during value replacement")
+                })?
+                .into(),
+            vec![],
+        ))
     }
 
     fn get_resource_state_value_impl(

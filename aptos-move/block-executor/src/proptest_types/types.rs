@@ -204,6 +204,10 @@ impl TransactionWrite for ValueType {
             None => StateValue::new_legacy(bytes),
         })
     }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        self.bytes = bytes.into();
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -633,7 +637,7 @@ where
     // TODO: Assigning MoveTypeLayout as None for all the writes for now. That means, the
     // the resources do not have any aggregators embededded in them. Change it to test
     // resources with aggregators as well.
-    fn resource_write_set(&self) -> HashMap<K, (V, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
