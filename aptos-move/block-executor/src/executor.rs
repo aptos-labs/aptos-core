@@ -165,7 +165,7 @@ where
             }
         }
 
-        _ignore = last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
+        let _ignore = last_input_output.record(idx_to_execute, sync_view.take_reads(), result);
         scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
 
         // if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
