@@ -95,7 +95,9 @@ impl ValueToIdentifierMapping for MockStateView {
     ) -> TransformationResult<Value> {
         let mut mapping = self.mapping.borrow_mut();
         let identifier = mapping.len() as u64;
-        let identifier_value = AggregatorID::new(identifier).try_into_move_value(layout)?;
+        let identifier_value = AggregatorID::new(identifier)
+            .try_into_move_value(layout)
+            .map_err(PartialVMError::from)?;
 
         mapping.insert(identifier, value);
         Ok(identifier_value)
@@ -107,7 +109,9 @@ impl ValueToIdentifierMapping for MockStateView {
         identifier: Value,
     ) -> TransformationResult<Value> {
         let mapping = self.mapping.borrow();
-        let identifier = AggregatorID::try_from_move_value(layout, identifier, &())?.as_u64();
+        let identifier = AggregatorID::try_from_move_value(layout, identifier, &())
+            .map_err(PartialVMError::from)?
+            .as_u64();
 
         Ok(mapping
             .get(&identifier)
