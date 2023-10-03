@@ -3,8 +3,10 @@
 
 use crate::task::Transaction;
 use anyhow::bail;
+use aptos_aggregator::types::{AggregatorValue, ReadPosition};
 use aptos_mvhashmap::{
-    types::{MVDataError, MVDataOutput, TxnIndex, Version},
+    types::{MVAggregatorsError, MVDataError, MVDataOutput, TxnIndex, Version},
+    versioned_aggregators::VersionedAggregators,
     versioned_data::VersionedData,
     versioned_group_data::VersionedGroupData,
 };
@@ -160,6 +162,8 @@ pub(crate) struct CapturedReads<T: Transaction> {
     // TODO: implement a general functionality once the fallback is removed.
     pub(crate) module_reads: Vec<T::Key>,
 
+    delayed_field_reads: HashMap<T::Identifier, AggregatorValue>,
+
     /// If there is a speculative failure (e.g. delta application failure, or an
     /// observed inconsistency), the transaction output is irrelevant (must be
     /// discarded and transaction re-executed). We have a global flag, as which
@@ -264,6 +268,40 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
+    pub(crate) fn capture_delayed_field_read(
+        &mut self,
+        id: T::Identifier,
+        value: AggregatorValue,
+    ) -> anyhow::Result<()> {
+        let ret = match self.delayed_field_reads.entry(id) {
+            Vacant(e) => {
+                e.insert(value);
+                UpdateResult::Inserted
+            },
+            Occupied(mut e) => {
+                let existing_read = e.get_mut();
+                if value == *existing_read {
+                    UpdateResult::Updated
+                } else {
+                    UpdateResult::Inconsistency(format!(
+                        "Read {:?} must be consistent with the already stored read {:?}",
+                        value, existing_read
+                    ))
+                }
+            },
+        };
+
+        match ret {
+            UpdateResult::IncorrectUse(_) => unreachable!(),
+            UpdateResult::Inconsistency(m) => {
+                // Record speculative failure.
+                self.speculative_failure = true;
+                bail!(m);
+            },
+            UpdateResult::Updated | UpdateResult::Inserted => Ok(()),
+        }
+    }
+
     // If maybe_tag is provided, then we check the group, otherwise, normal reads.
     pub(crate) fn get_by_kind(
         &self,
@@ -347,6 +385,29 @@ impl<T: Transaction> CapturedReads<T> {
                         )
                     })
             })
+        })
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn validate_delayed_field_reads(
+        &self,
+        delayed_fields: &VersionedAggregators<T::Identifier>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.speculative_failure {
+            return false;
+        }
+
+        use MVAggregatorsError::*;
+        self.delayed_field_reads.iter().all(|(id, read_value)| {
+            match delayed_fields.read_latest_committed_value(
+                *id,
+                idx_to_validate,
+                ReadPosition::BeforeCurrentTxn,
+            ) {
+                Ok(current_value) => read_value == &current_value,
+                Err(NotFound) | Err(Dependency(_)) | Err(DeltaApplicationFailure) => false,
+            }
         })
     }
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_logger::error;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
 
 // When bounded math operation overflows
@@ -80,7 +80,7 @@ pub fn ok_underflow<T>(value: BoundedMathResult<T>) -> BoundedMathResult<Option<
     }
 }
 
-pub fn expect_ok<T>(value: BoundedMathResult<T>) -> PartialVMResult<T> {
+pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PartialVMError> {
     value.map_err(code_invariant_error)
 }
 

@@ -16,7 +16,7 @@ use aptos_aggregator::{
     aggregator_extension::AggregatorData,
     bounded_math::BoundedMath,
     resolver::AggregatorResolver,
-    types::{AggregatorVersionedID, SnapshotToStringFormula, SnapshotValue},
+    types::{AggregatorVersionedID, ReadPosition, SnapshotToStringFormula, SnapshotValue},
     utils::{string_to_bytes, to_utf8_bytes, u128_to_u64},
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -243,7 +243,7 @@ fn native_try_add(
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
         let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
-        aggregator.try_add(resolver, input)?
+        aggregator.try_add(input, resolver)?
     } else {
         let math = BoundedMath::new(agg_max_value);
         match math.unsigned_add(agg_value, input) {
@@ -277,7 +277,7 @@ fn native_try_sub(
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
         let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
-        aggregator.try_sub(resolver, input)?
+        aggregator.try_sub(input, resolver)?
     } else {
         let math = BoundedMath::new(agg_max_value);
         match math.unsigned_subtract(agg_value, input) {
@@ -310,7 +310,7 @@ fn native_read(
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
         let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
-        aggregator.read_aggregated_aggregator_value(resolver)?
+        aggregator.read_aggregated_aggregator_value(resolver, ReadPosition::AfterCurrentTxn)?
     } else {
         agg_value
     };
@@ -494,7 +494,7 @@ fn native_string_concat(
         let aggregator_id = aggregator_value_field_as_id(snapshot_value)?;
         SnapshotValue::Integer(
             aggregator_data
-                .string_concat(aggregator_id, resolver, prefix, suffix)
+                .string_concat(aggregator_id, prefix, suffix, resolver)
                 .as_u64() as u128,
         )
     } else {
