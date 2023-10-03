@@ -147,7 +147,9 @@ impl ValidatorVerifier {
         let quorum_voting_power = if validator_infos.is_empty() {
             0
         } else {
-            total_voting_power * 2 / 3 + 1
+            // By quoram intersection f+1 is the minimum quorum size.
+            // testing with 1/3 of the total voting power.
+            total_voting_power/3 + 1
         };
         Self::build_index(validator_infos, quorum_voting_power, total_voting_power)
     }
