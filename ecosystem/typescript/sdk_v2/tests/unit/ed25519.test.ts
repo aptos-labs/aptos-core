@@ -156,6 +156,13 @@ describe("PrivateKey", () => {
     const anotherPrivateKey = Ed25519PrivateKey.generate();
     expect(anotherPrivateKey.toString()).not.toEqual(privateKey.toString());
   });
+
+  it("should derive the public key correctly", () => {
+    const privateKey = new Ed25519PrivateKey({ hexInput: ed25519.privateKey });
+    const publicKey = privateKey.publicKey();
+    expect(publicKey).toBeInstanceOf(Ed25519PublicKey);
+    expect(publicKey.toString()).toEqual(ed25519.publicKey);
+  });
 });
 
 describe("Signature", () => {
