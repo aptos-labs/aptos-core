@@ -421,7 +421,7 @@ where
 
         loop {
             // Priorotize committing validated transactions
-            while is_coordinator {
+            if is_coordinator {
                 self.prepare_and_queue_commit_ready_txns(
                     self.maybe_block_gas_limit,
                     scheduler,
