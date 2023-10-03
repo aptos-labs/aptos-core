@@ -8,6 +8,61 @@ export * from "./indexer";
 export type HexInput = string | Uint8Array;
 
 /**
+ * Transaction argumtns enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/transaction_argument.rs#L11}
+ */
+export enum RustEnumTransactionArgumentVariants {
+  TransactionArgumentU8 = 0,
+  TransactionArgumentU64 = 1,
+  TransactionArgumentU128 = 2,
+  TransactionArgumentAddress = 3,
+  TransactionArgumentU8Vector = 4,
+  TransactionArgumentBool = 5,
+  TransactionArgumentU16 = 6,
+  TransactionArgumentU32 = 7,
+  TransactionArgumentU256 = 8,
+}
+
+/**
+ * Transaction payload enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L478}
+ */
+export enum RustEnumTransactionPayloadVariants {
+  TransactionPayloadScript = 0,
+  TransactionPayloadEntryFunction = 2,
+  TransactionPayloadMultisig = 3,
+}
+
+/**
+ * Transaction variants enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L440}
+ */
+export enum RustEnumTransactionVariants {
+  MultiAgentTransaction = 0,
+  FeePayerTransaction = 1,
+}
+
+/**
+ * Transaction Authenticator enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L44}
+ */
+export enum RustEnumTransactionAuthenticatorVariant {
+  TransactionAuthenticatorEd25519 = 0,
+  TransactionAuthenticatorMultiEd25519 = 1,
+  TransactionAuthenticatorMultiAgent = 2,
+  TransactionAuthenticatorFeePayer = 4,
+}
+
+/**
+ * Transaction Authenticator enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L414}
+ */
+export enum RustEnumAccountAuthenticatorVariant {
+  AccountAuthenticatorEd25519 = 0,
+  AccountAuthenticatorMultiEd25519 = 1,
+}
+
+/**
  * BCS types
  */
 export type Uint8 = number;
@@ -79,9 +134,10 @@ export type ClientConfig = {
 export type AptosRequest = {
   url: string;
   method: "GET" | "POST";
-  endpoint?: string;
+  path?: string;
   body?: any;
   contentType?: string;
+  acceptType?: string;
   params?: Record<string, string | AnyNumber | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;
@@ -780,3 +836,40 @@ export type TableItemRequest = {
    */
   key: any;
 };
+
+/**
+ * A list of Authentication Key schemes that are supported by Aptos.
+ *
+ * Keys that start with `Derive` are solely used for deriving account addresses from
+ * other data. They are not used for signing transactions.
+ */
+export enum AuthenticationKeyScheme {
+  /**
+   * For Ed25519PublicKey
+   */
+  Ed25519 = 0,
+  /**
+   * For MultiEd25519PublicKey
+   */
+  MultiEd25519 = 1,
+  /**
+   * Derives an address using an AUID, used for objects
+   */
+  DeriveAuid = 251,
+  /**
+   * Derives an address from another object address
+   */
+  DeriveObjectAddressFromObject = 252,
+  /**
+   * Derives an address from a GUID, used for objects
+   */
+  DeriveObjectAddressFromGuid = 253,
+  /**
+   * Derives an address from seed bytes, used for named objects
+   */
+  DeriveObjectAddressFromSeed = 254,
+  /**
+   * Derives an address from seed bytes, used for resource accounts
+   */
+  DeriveResourceAccountAddress = 255,
+}

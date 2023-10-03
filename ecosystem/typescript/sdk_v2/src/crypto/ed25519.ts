@@ -8,11 +8,19 @@ import { Hex } from "../core/hex";
 import { HexInput } from "../types";
 import { PublicKey, PrivateKey, Signature } from "./asymmetric_crypto";
 
+/**
+ * Represents the public key of an Ed25519 key pair.
+ */
 export class Ed25519PublicKey extends PublicKey {
-  // Correct length of the public key in bytes (Uint8Array)
+  /**
+   * Length of an Ed25519 public key
+   */
   static readonly LENGTH: number = 32;
 
-  // Hex value of the public key
+  /**
+   * Bytes of the public key
+   * @private
+   */
   private readonly key: Hex;
 
   /**
@@ -23,8 +31,7 @@ export class Ed25519PublicKey extends PublicKey {
   constructor(args: { hexInput: HexInput }) {
     super();
 
-    const { hexInput } = args;
-    const hex = Hex.fromHexInput({ hexInput });
+    const hex = Hex.fromHexInput(args);
     if (hex.toUint8Array().length !== Ed25519PublicKey.LENGTH) {
       throw new Error(`PublicKey length should be ${Ed25519PublicKey.LENGTH}`);
     }
@@ -51,12 +58,12 @@ export class Ed25519PublicKey extends PublicKey {
 
   /**
    * Verifies a signed data with a public key
-   * @param args.data a signed message
+   * @param args.message a signed message
    * @param args.signature the signature of the message
    */
-  verifySignature(args: { data: HexInput; signature: Ed25519Signature }): boolean {
-    const { data, signature } = args;
-    const rawMessage = Hex.fromHexInput({ hexInput: data }).toUint8Array();
+  verifySignature(args: { message: HexInput; signature: Ed25519Signature }): boolean {
+    const { message, signature } = args;
+    const rawMessage = Hex.fromHexInput({ hexInput: message }).toUint8Array();
     const rawSignature = Hex.fromHexInput({ hexInput: signature.toUint8Array() }).toUint8Array();
     return nacl.sign.detached.verify(rawMessage, rawSignature, this.key.toUint8Array());
   }
@@ -65,34 +72,36 @@ export class Ed25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Method not implemented.");
-  }
-
-  static deserialize(deserializer: Deserializer): PublicKey {
-    const value = deserializer.deserializeBytes();
-    return new Ed25519PublicKey({ hexInput: value });
+  static deserialize(deserializer: Deserializer): Ed25519PublicKey {
+    const bytes = deserializer.deserializeBytes();
+    return new Ed25519PublicKey({ hexInput: bytes });
   }
 }
 
+/**
+ * Represents the private key of an Ed25519 key pair.
+ */
 export class Ed25519PrivateKey extends PrivateKey {
-  // Correct length of the private key in bytes (Uint8Array)
+  /**
+   * Length of an Ed25519 private key
+   */
   static readonly LENGTH: number = 32;
 
-  // Private and public key pair
+  /**
+   * The Ed25519 signing key
+   * @private
+   */
   private readonly signingKeyPair: nacl.SignKeyPair;
 
   /**
    * Create a new PrivateKey instance from a Uint8Array or String.
    *
-   * @param value HexInput (string or Uint8Array)
+   * @param args.hexInput HexInput (string or Uint8Array)
    */
-  constructor(args: { value: HexInput }) {
+  constructor(args: { hexInput: HexInput }) {
     super();
 
-    const { value } = args;
-    const privateKeyHex = Hex.fromHexInput({ hexInput: value });
+    const privateKeyHex = Hex.fromHexInput(args);
     if (privateKeyHex.toUint8Array().length !== Ed25519PrivateKey.LENGTH) {
       throw new Error(`PrivateKey length should be ${Ed25519PrivateKey.LENGTH}`);
     }
@@ -129,21 +138,16 @@ export class Ed25519PrivateKey extends PrivateKey {
   sign(args: { message: HexInput }): Ed25519Signature {
     const hex = Hex.fromHexInput({ hexInput: args.message });
     const signature = nacl.sign.detached(hex.toUint8Array(), this.signingKeyPair.secretKey);
-    return new Ed25519Signature({ data: signature });
+    return new Ed25519Signature({ hexInput: signature });
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Ed25519PrivateKey {
-    throw new Error("Method not implemented.");
-  }
-
   static deserialize(deserializer: Deserializer): Ed25519PrivateKey {
-    const value = deserializer.deserializeBytes();
-    return new Ed25519PrivateKey({ value });
+    const bytes = deserializer.deserializeBytes();
+    return new Ed25519PrivateKey({ hexInput: bytes });
   }
 
   /**
@@ -153,24 +157,39 @@ export class Ed25519PrivateKey extends PrivateKey {
    */
   static generate(): Ed25519PrivateKey {
     const keyPair = nacl.sign.keyPair();
-    return new Ed25519PrivateKey({ value: keyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH) });
+    return new Ed25519PrivateKey({ hexInput: keyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH) });
+  }
+
+
+  /**
+   * Derive the Ed25519PublicKey for this private key.
+   * 
+   * @returns Ed25519PublicKey
+   */
+  publicKey(): Ed25519PublicKey {
+    const bytes = this.signingKeyPair.publicKey;
+    return new Ed25519PublicKey({ hexInput: bytes });
   }
 }
 
 /**
- * The product of signing a message with a private key.
+ * A signature of a message signed using an Ed25519 private key
  */
 export class Ed25519Signature extends Signature {
-  // Correct length of the signature in bytes (Uint8Array)
+  /**
+   * Length of an Ed25519 signature
+   */
   static readonly LENGTH = 64;
 
-  // Hex value of the signature
+  /**
+   * The signature bytes
+   * @private
+   */
   private readonly data: Hex;
 
-  constructor(args: { data: HexInput }) {
+  constructor(args: { hexInput: HexInput }) {
     super();
-
-    const hex = Hex.fromHexInput({ hexInput: args.data });
+    const hex = Hex.fromHexInput(args);
     if (hex.toUint8Array().length !== Ed25519Signature.LENGTH) {
       throw new Error(`Signature length should be ${Ed25519Signature.LENGTH}`);
     }
@@ -200,13 +219,8 @@ export class Ed25519Signature extends Signature {
     serializer.serializeBytes(this.data.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Ed25519Signature {
-    throw new Error("Method not implemented.");
-  }
-
   static deserialize(deserializer: Deserializer): Ed25519Signature {
-    const data = deserializer.deserializeBytes();
-    return new Ed25519Signature({ data });
+    const bytes = deserializer.deserializeBytes();
+    return new Ed25519Signature({ hexInput: bytes });
   }
 }
