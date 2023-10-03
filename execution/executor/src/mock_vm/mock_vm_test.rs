@@ -11,7 +11,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::into_signature_verified_block,
+    transaction::signature_verified_transaction::into_signature_verified_block,
     write_set::WriteOp,
 };
 use aptos_vm::VMExecutor;

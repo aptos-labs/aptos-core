@@ -23,7 +23,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
-    transaction::BlockExecutableTransaction,
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
@@ -62,14 +62,14 @@ impl ReadResult {
     }
 }
 
-pub(crate) struct ParallelState<'a, T: BlockExecutableTransaction, X: Executable> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
     scheduler: &'a Scheduler,
     _counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
 }
 
-impl<'a, T: BlockExecutableTransaction, X: Executable> ParallelState<'a, T, X> {
+impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X>,
         shared_scheduler: &'a Scheduler,
@@ -216,12 +216,12 @@ impl<'a, T: BlockExecutableTransaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-pub(crate) struct SequentialState<'a, T: BlockExecutableTransaction, X: Executable> {
+pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
     pub(crate) _counter: &'a u32,
 }
 
-pub(crate) enum ViewState<'a, T: BlockExecutableTransaction, X: Executable> {
+pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
     Sync(ParallelState<'a, T, X>),
     Unsync(SequentialState<'a, T, X>),
 }
@@ -231,20 +231,13 @@ pub(crate) enum ViewState<'a, T: BlockExecutableTransaction, X: Executable> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<
-    'a,
-    T: BlockExecutableTransaction,
-    S: TStateView<Key = T::Key>,
-    X: Executable,
-> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
     latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executable>
-    LatestView<'a, T, S, X>
-{
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
         latest_view: ViewState<'a, T, X>,
@@ -342,7 +335,7 @@ impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executab
     }
 }
 
-impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
@@ -389,7 +382,7 @@ impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executab
     }
 }
 
-impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
@@ -425,7 +418,7 @@ impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executab
     }
 }
 
-impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
     for LatestView<'a, T, S, X>
 {
     fn id(&self) -> StateViewId {
@@ -437,7 +430,7 @@ impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executab
     }
 }
 
-impl<'a, T: BlockExecutableTransaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
     for LatestView<'a, T, S, X>
 {
     type IdentifierV1 = T::Key;

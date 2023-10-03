@@ -195,7 +195,8 @@ mod test_utils {
     use aptos_types::{
         block_executor::partitioner::PartitionedTransactions,
         transaction::{
-            analyzed_transaction::AnalyzedTransaction, SignatureVerifiedTransaction, Transaction,
+            analyzed_transaction::AnalyzedTransaction,
+            signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
             TransactionOutput,
         },
     };

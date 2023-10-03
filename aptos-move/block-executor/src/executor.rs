@@ -27,7 +27,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     executable::Executable,
     fee_statement::FeeStatement,
-    transaction::BlockExecutableTransaction,
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -51,7 +51,7 @@ pub struct BlockExecutor<T, E, S, L, X> {
 
 impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
 where
-    T: BlockExecutableTransaction,
+    T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,

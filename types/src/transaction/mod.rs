@@ -44,19 +44,16 @@ mod change_set;
 mod module;
 mod multisig;
 mod script;
+pub mod signature_verified_transaction;
 mod transaction_argument;
 
 use crate::{
-    aggregator::AggregatorID,
-    contract_event::ReadWriteEvent,
-    executable::ModulePath,
-    fee_statement::FeeStatement,
-    state_store::state_key::StateKey,
-    write_set::{TransactionWrite, WriteOp},
+    contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
+    write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
-use move_core_types::{language_storage::StructTag, vm_status::AbortLocation};
+use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -579,49 +576,6 @@ impl Deref for SignatureCheckedTransaction {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum SignatureVerifiedTransaction {
-    Valid(Transaction),
-    Invalid(Transaction),
-}
-impl SignatureVerifiedTransaction {
-    pub fn into_inner(self) -> Transaction {
-        match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn,
-            SignatureVerifiedTransaction::Invalid(txn) => txn,
-        }
-    }
-
-    pub fn inner(&self) -> &Transaction {
-        match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn,
-            SignatureVerifiedTransaction::Invalid(txn) => txn,
-        }
-    }
-}
-
-impl BlockExecutableTransaction for SignatureVerifiedTransaction {
-    type Event = ContractEvent;
-    type Identifier = AggregatorID;
-    type Key = StateKey;
-    type Tag = StructTag;
-    type Value = WriteOp;
-}
-
-pub fn into_signature_verified_block(txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
-    txns.into_iter().map(into_signature_verified).collect()
-}
-
-pub fn into_signature_verified(txn: Transaction) -> SignatureVerifiedTransaction {
-    match txn {
-        Transaction::UserTransaction(txn) => match txn.verify_signature() {
-            Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
-            Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
-        },
-        _ => SignatureVerifiedTransaction::Valid(txn),
     }
 }
 

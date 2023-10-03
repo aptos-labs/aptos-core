@@ -32,9 +32,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
-        into_signature_verified, SignatureVerifiedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus, Version,
+        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
+        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -42,7 +42,7 @@ use aptos_vm::VMExecutor;
 use fail::fail_point;
 use itertools::multizip;
 use once_cell::sync::Lazy;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{iter::once, marker::PhantomData, sync::Arc};
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -225,6 +225,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         let sig_verified_txns = SIG_VERIFY_POOL.install(|| {
             transactions
                 .into_par_iter()
+                .with_min_len(25)
                 .map(into_signature_verified)
                 .collect::<Vec<_>>()
         });

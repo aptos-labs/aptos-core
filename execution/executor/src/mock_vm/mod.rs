@@ -25,9 +25,9 @@ use aptos_types::{
     },
     state_store::state_key::StateKey,
     transaction::{
-        ChangeSet, ExecutionStatus, RawTransaction, Script, SignatureVerifiedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionOutput, TransactionPayload,
-        TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, ChangeSet, ExecutionStatus,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionArgument,
+        TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},

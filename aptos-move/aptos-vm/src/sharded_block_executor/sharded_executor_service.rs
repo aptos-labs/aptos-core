@@ -19,7 +19,8 @@ use aptos_types::{
         ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
     },
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, SignatureVerifiedTransaction, TransactionOutput,
+        analyzed_transaction::AnalyzedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
     },
 };
 use aptos_vm_logging::disable_speculative_logging;

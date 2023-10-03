@@ -24,9 +24,12 @@ use aptos_types::{
     event::EventKey,
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        into_signature_verified_block, SignatureVerifiedTransaction, Transaction,
-        Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
-        WriteSetPayload,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        Transaction,
+        Transaction::UserTransaction,
+        TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,

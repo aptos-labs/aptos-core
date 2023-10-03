@@ -17,8 +17,11 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet},
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, into_signature_verified_block, ExecutionStatus,
-        SignatureVerifiedTransaction, Transaction, TransactionOutput, TransactionStatus,
+        analyzed_transaction::AnalyzedTransaction,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
     vm_status::VMStatus,
 };

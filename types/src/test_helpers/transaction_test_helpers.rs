@@ -6,9 +6,12 @@ use crate::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AccountAuthenticator, into_signature_verified_block, Module, RawTransaction,
-        RawTransactionWithData, Script, SignatureVerifiedTransaction, SignedTransaction,
-        Transaction, TransactionPayload,
+        authenticator::AccountAuthenticator,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        Module, RawTransaction, RawTransactionWithData, Script, SignedTransaction, Transaction,
+        TransactionPayload,
     },
 };
 use aptos_crypto::{ed25519::*, traits::*, HashValue};

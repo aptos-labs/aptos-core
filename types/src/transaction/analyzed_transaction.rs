@@ -8,7 +8,8 @@ use crate::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        into_signature_verified, SignatureVerifiedTransaction, Transaction, TransactionPayload,
+        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
+        Transaction, TransactionPayload,
     },
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};

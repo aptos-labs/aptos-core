@@ -8,7 +8,8 @@ use crate::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    fee_statement::FeeStatement, transaction::BlockExecutableTransaction, write_set::WriteOp,
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -42,11 +43,7 @@ impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
     }
 }
 
-pub struct TxnLastInputOutput<
-    T: BlockExecutableTransaction,
-    O: TransactionOutput<Txn = T>,
-    E: Debug,
-> {
+pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
@@ -60,7 +57,7 @@ pub struct TxnLastInputOutput<
     module_read_write_intersection: AtomicBool,
 }
 
-impl<T: BlockExecutableTransaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
+impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     TxnLastInputOutput<T, O, E>
 {
     pub fn new(num_txns: TxnIndex) -> Self {

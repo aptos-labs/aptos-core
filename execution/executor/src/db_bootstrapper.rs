@@ -23,7 +23,7 @@ use aptos_types::{
     on_chain_config::ConfigurationResource,
     state_store::state_key::StateKey,
     timestamp::TimestampResource,
-    transaction::{into_signature_verified, Transaction, Version},
+    transaction::{signature_verified_transaction::into_signature_verified, Transaction, Version},
     waypoint::Waypoint,
 };
 use aptos_vm::VMExecutor;

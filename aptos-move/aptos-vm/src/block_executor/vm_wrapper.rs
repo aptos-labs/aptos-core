@@ -7,7 +7,7 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::transaction::SignatureVerifiedTransaction;
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::ExecutorView;
 use move_core_types::vm_status::VMStatus;

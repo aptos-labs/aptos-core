@@ -40,7 +40,8 @@ use aptos_types::{
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
-        into_signature_verified_block, Transaction, TransactionPayload, TransactionStatus,
+        signature_verified_transaction::into_signature_verified_block, Transaction,
+        TransactionPayload, TransactionStatus,
     },
 };
 use aptos_vm::AptosVM;

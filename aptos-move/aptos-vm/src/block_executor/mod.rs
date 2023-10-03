@@ -21,7 +21,10 @@ use aptos_types::{
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
-    transaction::{SignatureVerifiedTransaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+        TransactionStatus,
+    },
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};

@@ -20,7 +20,9 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
-    transaction::{into_signature_verified_block, Transaction, WriteSetPayload},
+    transaction::{
+        signature_verified_transaction::into_signature_verified_block, Transaction, WriteSetPayload,
+    },
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };

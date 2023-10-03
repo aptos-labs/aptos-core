@@ -8,8 +8,8 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    state_store::state_value::StateValueMetadataKind, transaction::BlockExecutableTransaction,
-    write_set::TransactionWrite,
+    state_store::state_value::StateValueMetadataKind,
+    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use derivative::Derivative;
 use std::{
@@ -137,7 +137,7 @@ impl<V: TransactionWrite> DataRead<V> {
 /// the group size (also computed based on speculative information in MVHashMap).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-struct GroupRead<T: BlockExecutableTransaction> {
+struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
     speculative_size: Option<u64>,
     /// Reads to individual resources in the group, keyed by a tag.
@@ -153,7 +153,7 @@ struct GroupRead<T: BlockExecutableTransaction> {
 /// read that has a kind <= already captured read (for that key / tag).
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct CapturedReads<T: BlockExecutableTransaction> {
+pub(crate) struct CapturedReads<T: Transaction> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     // Currently, we record paths for triggering module R/W fallback.
@@ -179,7 +179,7 @@ enum UpdateResult {
     Inconsistency(String),
 }
 
-impl<T: BlockExecutableTransaction> CapturedReads<T> {
+impl<T: Transaction> CapturedReads<T> {
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
     // consistency and ensures that the most comprehensive read is recorded.
     fn update_entry<K, V: TransactionWrite>(

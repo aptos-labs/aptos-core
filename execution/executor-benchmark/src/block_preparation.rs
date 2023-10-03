@@ -6,10 +6,13 @@ use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
-    transaction::{into_signature_verified, SignatureVerifiedTransaction, Transaction},
+    transaction::{
+        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
+        Transaction,
+    },
 };
 use once_cell::sync::Lazy;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{sync::Arc, time::Instant};
 
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -55,6 +58,7 @@ impl BlockPreparationStage {
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             SIG_VERIFY_POOL.install(|| {
                 txns.into_par_iter()
+                    .with_min_len(25)
                     .map(into_signature_verified)
                     .collect::<Vec<_>>()
             });

@@ -12,11 +12,14 @@ use aptos_executor_types::{
 use aptos_logger::{debug, error};
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
-    transaction::{into_signature_verified, SignatureVerifiedTransaction, Transaction},
+    transaction::{
+        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
+        Transaction,
+    },
 };
 use fail::fail_point;
 use once_cell::sync::Lazy;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
@@ -31,7 +34,6 @@ pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 pub struct ExecutionPipeline {
     prepare_block_tx: mpsc::UnboundedSender<PrepareBlockCommand>,
-    execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
 }
 
 impl ExecutionPipeline {
@@ -39,20 +41,14 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
-        runtime.spawn(Self::prepare_block(
-            prepare_block_rx,
-            execute_block_tx.clone(),
-        ));
+        runtime.spawn(Self::prepare_block(prepare_block_rx, execute_block_tx));
         runtime.spawn(Self::execute_stage(
             execute_block_rx,
             ledger_apply_tx,
             executor.clone(),
         ));
         runtime.spawn(Self::ledger_apply_stage(ledger_apply_rx, executor));
-        Self {
-            prepare_block_tx,
-            execute_block_tx,
-        }
+        Self { prepare_block_tx }
     }
 
     pub async fn queue(
@@ -106,6 +102,7 @@ impl ExecutionPipeline {
                         .install(|| {
                             txns_to_execute
                                 .into_par_iter()
+                                .with_min_len(25)
                                 .map(into_signature_verified)
                                 .collect::<Vec<_>>()
                         });

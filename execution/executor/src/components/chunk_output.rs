@@ -21,8 +21,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     transaction::{
-        ExecutionStatus, SignatureVerifiedTransaction, Transaction, TransactionOutput,
-        TransactionStatus,
+        signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
+        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
     },
 };
 use aptos_vm::{
@@ -127,7 +127,7 @@ impl ChunkOutput {
         let (transactions, transaction_outputs): (Vec<_>, Vec<_>) =
             transactions_and_outputs.into_iter().unzip();
 
-        update_counters_for_output_chunk(&transactions, &transaction_outputs, "output");
+        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "output");
 
         // collect all accounts touched and dedup
         let write_set = transaction_outputs
@@ -244,11 +244,13 @@ impl ChunkOutput {
     }
 }
 
-pub fn update_counters_for_processed_chunk(
-    transactions: &[SignatureVerifiedTransaction],
+pub fn update_counters_for_processed_chunk<T>(
+    transactions: &[T],
     transaction_outputs: &[TransactionOutput],
     process_type: &str,
-) {
+) where
+    T: TransactionProvider,
+{
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
@@ -315,7 +317,7 @@ pub fn update_counters_for_processed_chunk(
             TransactionStatus::Retry => ("retry", "", "".to_string()),
         };
 
-        let kind = match txn.inner() {
+        let kind = match txn.get_transaction() {
             Transaction::UserTransaction(_) => "user_transaction",
             Transaction::GenesisTransaction(_) => "genesis",
             Transaction::BlockMetadata(_) => "block_metadata",
@@ -338,179 +340,7 @@ pub fn update_counters_for_processed_chunk(
                 .inc();
         }
 
-        if let Transaction::UserTransaction(user_txn) = txn.inner() {
-            match user_txn.payload() {
-                aptos_types::transaction::TransactionPayload::Script(_script) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "script", state])
-                        .inc();
-                },
-                aptos_types::transaction::TransactionPayload::EntryFunction(function) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "function", state])
-                        .inc();
-
-                    let is_core = function.module().address() == &CORE_CODE_ADDRESS;
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_MODULE
-                        .with_label_values(&[
-                            detailed_counters_label,
-                            process_type,
-                            if is_core { "core" } else { "user" },
-                            if detailed_counters {
-                                function.module().name().as_str()
-                            } else if is_core {
-                                "core_module"
-                            } else {
-                                "user_module"
-                            },
-                            state,
-                        ])
-                        .inc();
-                    if is_core && detailed_counters {
-                        metrics::APTOS_PROCESSED_USER_TRANSACTIONS_ENTRY_FUNCTION_CORE_METHOD
-                            .with_label_values(&[
-                                process_type,
-                                function.module().name().as_str(),
-                                function.function().as_str(),
-                                state,
-                            ])
-                            .inc();
-                    }
-                },
-                aptos_types::transaction::TransactionPayload::Multisig(_) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "multisig", state])
-                        .inc();
-                },
-
-                // Deprecated. Will be removed in the future.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_module) => {
-                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
-                        .with_label_values(&[process_type, "module", state])
-                        .inc();
-                },
-            }
-        }
-
-        for event in output.events() {
-            let (is_core, creation_number) = match event {
-                ContractEvent::V1(v1) => (
-                    v1.key().get_creator_address() == CORE_CODE_ADDRESS,
-                    if detailed_counters {
-                        v1.key().get_creation_number().to_string()
-                    } else {
-                        "event".to_string()
-                    },
-                ),
-                ContractEvent::V2(_v2) => (false, "event".to_string()),
-            };
-            metrics::APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS
-                .with_label_values(&[
-                    detailed_counters_label,
-                    process_type,
-                    if is_core { "core" } else { "user" },
-                    &creation_number,
-                ])
-                .inc();
-        }
-    }
-}
-
-pub fn update_counters_for_output_chunk(
-    transactions: &[Transaction],
-    transaction_outputs: &[TransactionOutput],
-    process_type: &str,
-) {
-    let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
-    let detailed_counters_label = if detailed_counters { "true" } else { "false" };
-    if transactions.len() != transaction_outputs.len() {
-        warn!(
-            "Chunk lenthgs don't match: txns: {} and outputs: {}",
-            transactions.len(),
-            transaction_outputs.len()
-        );
-    }
-
-    for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
-        let (state, reason, error_code) = match output.status() {
-            TransactionStatus::Keep(execution_status) => match execution_status {
-                ExecutionStatus::Success => ("keep_success", "", "".to_string()),
-                ExecutionStatus::OutOfGas => ("keep_rejected", "OutOfGas", "error".to_string()),
-                ExecutionStatus::MoveAbort { info, .. } => (
-                    "keep_rejected",
-                    "MoveAbort",
-                    if detailed_counters {
-                        info.as_ref()
-                            .map(|v| v.reason_name.to_lowercase())
-                            .unwrap_or_else(|| "none".to_string())
-                    } else {
-                        "error".to_string()
-                    },
-                ),
-                ExecutionStatus::ExecutionFailure { .. } => {
-                    ("keep_rejected", "ExecutionFailure", "error".to_string())
-                },
-                ExecutionStatus::MiscellaneousError(e) => (
-                    "keep_rejected",
-                    "MiscellaneousError",
-                    if detailed_counters {
-                        e.map(|v| format!("{:?}", v).to_lowercase())
-                            .unwrap_or_else(|| "none".to_string())
-                    } else {
-                        "error".to_string()
-                    },
-                ),
-            },
-            TransactionStatus::Discard(discard_status_code) => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(15)),
-                    warn!(
-                        "Txn being discarded is {:?} with status code {:?}",
-                        txn, discard_status_code
-                    )
-                );
-                (
-                    // Specialize duplicate txns for alerts
-                    if *discard_status_code == StatusCode::SEQUENCE_NUMBER_TOO_OLD {
-                        "discard_sequence_number_too_old"
-                    } else {
-                        "discard"
-                    },
-                    "error_code",
-                    if detailed_counters {
-                        format!("{:?}", discard_status_code).to_lowercase()
-                    } else {
-                        "error".to_string()
-                    },
-                )
-            },
-            TransactionStatus::Retry => ("retry", "", "".to_string()),
-        };
-
-        let kind = match txn {
-            Transaction::UserTransaction(_) => "user_transaction",
-            Transaction::GenesisTransaction(_) => "genesis",
-            Transaction::BlockMetadata(_) => "block_metadata",
-            Transaction::StateCheckpoint(_) => "state_checkpoint",
-        };
-
-        metrics::APTOS_PROCESSED_TXNS_COUNT
-            .with_label_values(&[process_type, kind, state])
-            .inc();
-
-        if !error_code.is_empty() {
-            metrics::APTOS_PROCESSED_FAILED_TXNS_REASON_COUNT
-                .with_label_values(&[
-                    detailed_counters_label,
-                    process_type,
-                    state,
-                    reason,
-                    &error_code,
-                ])
-                .inc();
-        }
-
-        if let Transaction::UserTransaction(user_txn) = txn {
+        if let Transaction::UserTransaction(user_txn) = txn.get_transaction() {
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE

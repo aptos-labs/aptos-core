@@ -31,7 +31,9 @@ use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
-    transaction::{SignatureVerifiedTransaction, TransactionOutput},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+    },
 };
 use aptos_vm::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},

@@ -33,9 +33,10 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        into_signature_verified, ExecutionStatus, RawTransaction, Script,
-        SignatureVerifiedTransaction, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };

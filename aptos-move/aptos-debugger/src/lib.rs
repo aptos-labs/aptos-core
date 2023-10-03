@@ -14,8 +14,9 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
-        into_signature_verified, SignatureVerifiedTransaction, SignedTransaction, Transaction,
-        TransactionInfo, TransactionOutput, TransactionPayload, Version,
+        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
+        SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
+        Version,
     },
     vm_status::VMStatus,
 };

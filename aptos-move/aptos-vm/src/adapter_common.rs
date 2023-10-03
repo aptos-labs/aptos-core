@@ -6,8 +6,8 @@ use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_types::{
     transaction::{
-        SignatureCheckedTransaction, SignatureVerifiedTransaction, SignedTransaction,
-        TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, SignatureCheckedTransaction,
+        SignedTransaction, TransactionStatus,
     },
     vm_status::{StatusCode, VMStatus},
 };

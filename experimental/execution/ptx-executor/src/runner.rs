@@ -17,7 +17,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::SignatureVerifiedTransaction,
+    transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
 use aptos_vm::{adapter_common::VMAdapter, storage_adapter::AsExecutorView, AptosVM};

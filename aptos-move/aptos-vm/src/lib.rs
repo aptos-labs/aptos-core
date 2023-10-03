@@ -127,7 +127,8 @@ use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
     transaction::{
-        SignatureVerifiedTransaction, SignedTransaction, TransactionOutput, VMValidatorResult,
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };

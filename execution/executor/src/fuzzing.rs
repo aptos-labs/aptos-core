@@ -18,8 +18,10 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
     transaction::{
-        into_signature_verified_block, SignatureVerifiedTransaction, Transaction,
-        TransactionOutput, TransactionToCommit, Version,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        Transaction, TransactionOutput, TransactionToCommit, Version,
     },
     vm_status::VMStatus,
 };
