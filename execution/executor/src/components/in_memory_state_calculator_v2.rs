@@ -242,7 +242,7 @@ impl InMemoryStateCalculatorV2 {
             return true;
         }
         match txn {
-            Transaction::BlockMetadataTransaction(_) | Transaction::UserTransaction(_) => false,
+            Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => false,
             Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
         }
     }

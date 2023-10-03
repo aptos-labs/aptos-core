@@ -113,7 +113,7 @@ impl TransactionAnalysis {
 
         match txn {
             UserTransaction(signed_txn) => signed_txn.raw_txn_bytes_len(),
-            GenesisTransaction(_) | BlockMetadataTransaction(_) | StateCheckpoint(_) => {
+            GenesisTransaction(_) | BlockMetadata(_) | StateCheckpoint(_) => {
                 bcs::to_bytes(txn).expect("Txn should serialize").len()
             },
         }

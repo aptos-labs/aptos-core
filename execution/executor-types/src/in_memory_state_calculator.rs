@@ -247,7 +247,7 @@ fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
     // maybe other writeset transactions).
     match transaction {
         Transaction::GenesisTransaction(_) => (),
-        Transaction::BlockMetadataTransaction(_) | Transaction::UserTransaction(_) => {
+        Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
             bail!("Write set should be a subset of read set.")
         },
         Transaction::StateCheckpoint(_) => {},

@@ -81,7 +81,7 @@ pub fn test_execution_with_storage_impl_inner(
     let txn_factory = TransactionFactory::new(ChainId::test());
 
     let block1_id = gen_block_id(1);
-    let block1_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
+    let block1_meta = Transaction::BlockMetadata(BlockMetadata::new(
         block1_id,
         1,
         0,
@@ -140,7 +140,7 @@ pub fn test_execution_with_storage_impl_inner(
     ]);
 
     let block2_id = gen_block_id(2);
-    let block2_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
+    let block2_meta = Transaction::BlockMetadata(BlockMetadata::new(
         block2_id,
         2,
         0,
@@ -154,7 +154,7 @@ pub fn test_execution_with_storage_impl_inner(
     let block2 = vec![block2_meta, UserTransaction(reconfig2)];
 
     let block3_id = gen_block_id(3);
-    let block3_meta = Transaction::BlockMetadataTransaction(BlockMetadata::new(
+    let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
         block3_id,
         2,
         1,

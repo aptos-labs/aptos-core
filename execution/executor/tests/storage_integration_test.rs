@@ -121,7 +121,7 @@ fn test_reconfiguration() {
         Some(aptos_stdlib::aptos_coin_mint(validator_account, 1_000_000)),
     );
     // txn2 = a dummy block prologue to bump the timer.
-    let txn2 = Transaction::BlockMetadataTransaction(BlockMetadata::new(
+    let txn2 = Transaction::BlockMetadata(BlockMetadata::new(
         gen_block_id(1),
         0,
         1,

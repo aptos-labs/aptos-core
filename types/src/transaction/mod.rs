@@ -1802,7 +1802,7 @@ pub enum Transaction {
     GenesisTransaction(WriteSetPayload),
 
     /// Transaction to update the block metadata resource at the beginning of a block.
-    BlockMetadataTransaction(BlockMetadata),
+    BlockMetadata(BlockMetadata),
 
     /// Transaction to let the executor update the global state tree and record the root hash
     /// in the TransactionInfo
@@ -1820,7 +1820,7 @@ impl Transaction {
 
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
-            Transaction::BlockMetadataTransaction(v1) => Some(v1),
+            Transaction::BlockMetadata(v1) => Some(v1),
             _ => None,
         }
     }
@@ -1833,9 +1833,7 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
-            Transaction::BlockMetadataTransaction(_block_metadata) => {
-                String::from("block_metadata")
-            },
+            Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
         }

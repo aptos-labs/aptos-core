@@ -155,7 +155,7 @@ where
             1,
         );
 
-        transactions.insert(0, Transaction::BlockMetadataTransaction(new_block));
+        transactions.insert(0, Transaction::BlockMetadata(new_block));
         into_signature_verified_block(transactions)
     }
 

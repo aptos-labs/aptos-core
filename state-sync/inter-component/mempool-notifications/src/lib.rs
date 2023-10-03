@@ -370,7 +370,7 @@ mod tests {
     }
 
     fn create_block_metadata_transaction() -> Transaction {
-        Transaction::BlockMetadataTransaction(BlockMetadata::new(
+        Transaction::BlockMetadata(BlockMetadata::new(
             HashValue::new([0; HashValue::LENGTH]),
             0,
             300000001,

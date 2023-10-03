@@ -655,7 +655,7 @@ impl FakeExecutor {
             failed_proposer_indices,
             self.block_time,
         );
-        txn_block.insert(0, Transaction::BlockMetadataTransaction(new_block_metadata));
+        txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
 
         let outputs = self
             .execute_transaction_block(txn_block)

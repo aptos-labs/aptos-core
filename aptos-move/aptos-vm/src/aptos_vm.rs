@@ -39,7 +39,8 @@ use aptos_types::{
         MultisigTransactionPayload, SignatureCheckedTransaction, SignatureVerifiedTransaction,
         SignedTransaction, Transaction,
         Transaction::{
-            BlockMetadataTransaction, GenesisTransaction, StateCheckpoint, UserTransaction,
+            BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
+            UserTransaction,
         },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,

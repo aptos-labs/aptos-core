@@ -1084,7 +1084,7 @@ async fn parse_block_transactions(
             TransactionType::BlockMetadata => {
                 assert!(matches!(
                     actual_txn.transaction,
-                    aptos_types::transaction::Transaction::BlockMetadataTransaction(_)
+                    aptos_types::transaction::Transaction::BlockMetadata(_)
                 ));
                 assert!(transaction.operations.is_empty());
             },

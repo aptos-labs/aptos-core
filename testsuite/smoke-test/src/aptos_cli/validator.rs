@@ -492,7 +492,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
                 info!("from {}, seq_num {}", txn.sender(), txn.sequence_number());
                 block_txns.push(txn);
             },
-            aptos_types::transaction::Transaction::BlockMetadataTransaction(b) => {
+            aptos_types::transaction::Transaction::BlockMetadata(b) => {
                 info!("block metadata {}", b.round());
 
                 let senders = accounts.iter().map(|a| a.address()).collect::<HashSet<_>>();
