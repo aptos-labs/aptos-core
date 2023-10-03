@@ -217,8 +217,8 @@ pub(crate) mod test {
             unimplemented!("Irrelevant for the test")
         }
 
-        fn set_bytes(&mut self, _bytes: Bytes) {
-            unimplemented!("Irrelevant for the test")
+        fn set_bytes(&mut self, bytes: Bytes) {
+            self.bytes = bytes;
         }
     }
 
