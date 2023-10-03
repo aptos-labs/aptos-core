@@ -299,13 +299,18 @@ pub async fn run_netbench_service(
 const BLAB_MICROS: u64 = 100_000;
 
 /// Determine how many extra ticks to wait for during ramp up
-fn get_num_ramp_up_ticks(ramp_up_ms: u64, counter: u64, start_micros: u64, now_micros: u64) -> u64 {
+fn get_num_ramp_up_ticks(
+    ramp_up_micros: u64,
+    counter: u64,
+    start_micros: u64,
+    now_micros: u64,
+) -> u64 {
     #[allow(clippy::if_same_then_else)]
-    if start_micros + ramp_up_ms > now_micros {
+    if start_micros + ramp_up_micros > now_micros {
         2 // send every 3 ticks
-    } else if start_micros + ramp_up_ms * 2 > now_micros {
+    } else if start_micros + ramp_up_micros * 2 > now_micros {
         1 // send every 2 ticks
-    } else if start_micros + ramp_up_ms * 3 > now_micros && counter % 2 == 0 {
+    } else if start_micros + ramp_up_micros * 3 > now_micros && counter % 2 == 0 {
         1 // send every 1.5 ticks
     } else {
         0 // ramp up complete
@@ -341,7 +346,7 @@ pub async fn direct_sender(
 
         if let Some(ramp_up_ms) = config.direct_send_ramp_up_ms {
             let num_ramp_up_ticks = get_num_ramp_up_ticks(
-                ramp_up_ms,
+                ramp_up_ms * 1000,
                 counter,
                 start,
                 time_service.now_unix_time().as_micros() as u64,
