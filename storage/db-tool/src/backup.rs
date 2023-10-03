@@ -54,6 +54,8 @@ pub enum OneShotQueryType {
         about = "Queries the latest epoch and versions of the existing backups in the storage."
     )]
     BackupStorageState(OneShotQueryBackupStorageStateOpt),
+    #[clap(about = "Queries the epochs of the existing snapshots in the storage.")]
+    SnapshotsBeforeVersion(OneShotQuerySnapshotsOpt),
 }
 
 #[derive(Parser)]
@@ -61,7 +63,16 @@ pub struct OneShotQueryNodeStateOpt {
     #[clap(flatten)]
     client: BackupServiceClientOpt,
 }
-
+#[derive(Parser)]
+pub struct OneShotQuerySnapshotsOpt {
+    #[clap(flatten)]
+    metadata_cache: MetadataCacheOpt,
+    #[clap(flatten)]
+    concurrent_downloads: ConcurrentDownloadsOpt,
+    #[clap(flatten)]
+    storage: DBToolStorageOpt,
+    version: Version,
+}
 #[derive(Parser)]
 pub struct OneShotQueryBackupStorageStateOpt {
     #[clap(flatten)]
@@ -232,6 +243,17 @@ impl Command {
                     )
                     .await?;
                     println!("{}", view.get_storage_state()?)
+                },
+                OneShotQueryType::SnapshotsBeforeVersion(opt) => {
+                    let view = cache::sync_and_load(
+                        &opt.metadata_cache,
+                        opt.storage.init_storage().await?,
+                        opt.concurrent_downloads.get(),
+                    )
+                    .await?;
+                    let version = opt.version;
+                    let epochs = view.get_state_snapshot_epochs_before_version(version);
+                    println!("epochs before version {}: {:?}", version, epochs);
                 },
             },
             Command::Verify(opt) => {

@@ -5,6 +5,7 @@
 use crate::{
     backup_types::state_snapshot::manifest::{StateSnapshotBackup, StateSnapshotChunk},
     metadata::Metadata,
+    metrics::backup::STATE_SNAPSHOT_DURATIONS,
     storage::{BackupHandleRef, BackupStorage, FileHandle, ShellSafeName},
     utils::{
         backup_service_client::BackupServiceClient, read_record_bytes::ReadRecordBytes,
@@ -70,6 +71,9 @@ impl StateSnapshotBackupController {
     }
 
     async fn run_impl(mut self) -> Result<FileHandle> {
+        let pre_timer = STATE_SNAPSHOT_DURATIONS
+            .with_label_values(&["pre-downloading"])
+            .start_timer();
         self.version = Some(self.get_version_for_epoch_ending(self.epoch).await?);
         let backup_handle = self
             .storage
@@ -88,7 +92,10 @@ impl StateSnapshotBackupController {
         let mut chunk_first_key = Self::parse_key(&prev_record_bytes)?;
         let mut current_idx: usize = 0;
         let mut chunk_first_idx: usize = 0;
-
+        pre_timer.observe_duration();
+        let download_chunksize_timer = STATE_SNAPSHOT_DURATIONS
+            .with_label_values(&["download-chunksize"])
+            .start_timer();
         let start = Instant::now();
         while let Some(record_bytes) = state_snapshot_file.read_record_bytes().await? {
             if should_cut_chunk(&chunk_bytes, &record_bytes, self.max_chunk_size) {
@@ -133,8 +140,13 @@ impl StateSnapshotBackupController {
             )
             .await?;
         chunks.push(chunk);
-
-        self.write_manifest(&backup_handle, chunks).await
+        download_chunksize_timer.observe_duration();
+        let writer_timer = STATE_SNAPSHOT_DURATIONS
+            .with_label_values(&["writer"])
+            .start_timer();
+        let res = self.write_manifest(&backup_handle, chunks).await;
+        writer_timer.observe_duration();
+        res
     }
 }
 

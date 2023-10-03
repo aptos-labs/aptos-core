@@ -5,6 +5,7 @@
 use crate::{
     backup_types::epoch_ending::manifest::{EpochEndingBackup, EpochEndingChunk},
     metadata::Metadata,
+    metrics::backup::EPOCH_ENDING_DURATIONS,
     storage::{BackupHandleRef, BackupStorage, FileHandle, ShellSafeName},
     utils::{
         backup_service_client::BackupServiceClient, read_record_bytes::ReadRecordBytes,
@@ -76,6 +77,9 @@ impl EpochEndingBackupController {
             .storage
             .create_backup_with_random_suffix(&self.backup_name())
             .await?;
+        let pre_timer = EPOCH_ENDING_DURATIONS
+            .with_label_values(&["pre-download"])
+            .start_timer();
 
         let mut chunks = Vec::new();
         let mut waypoints = Vec::new();
@@ -88,6 +92,10 @@ impl EpochEndingBackupController {
         let mut current_epoch: u64 = self.start_epoch;
         let mut chunk_first_epoch: u64 = self.start_epoch;
 
+        pre_timer.observe_duration();
+        let download_chunksize_timer = EPOCH_ENDING_DURATIONS
+            .with_label_values(&["download-chunksize"])
+            .start_timer();
         while let Some(record_bytes) = ledger_infos_file.read_record_bytes().await? {
             if should_cut_chunk(&chunk_bytes, &record_bytes, self.max_chunk_size) {
                 let chunk = self
@@ -120,8 +128,14 @@ impl EpochEndingBackupController {
             )
             .await?;
         chunks.push(chunk);
+        download_chunksize_timer.observe_duration();
 
-        self.write_manifest(&backup_handle, waypoints, chunks).await
+        let writer_timer = EPOCH_ENDING_DURATIONS
+            .with_label_values(&["writer"])
+            .start_timer();
+        let res = self.write_manifest(&backup_handle, waypoints, chunks).await;
+        writer_timer.observe_duration();
+        res
     }
 
     fn backup_name(&self) -> String {

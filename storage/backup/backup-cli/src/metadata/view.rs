@@ -101,6 +101,18 @@ impl MetadataView {
         })
     }
 
+    /// Get all the state snapshot epochs before the input version
+    pub fn get_state_snapshot_epochs_before_version(&self, version: Version) -> Vec<u64> {
+        let res = self
+            .state_snapshot_backups
+            .iter()
+            .sorted()
+            .filter(|m| m.version <= version)
+            .map(|m| m.epoch)
+            .collect();
+        res;
+    }
+
     pub fn select_latest_compaction_timestamps(&self) -> Option<CompactionTimestampsMeta> {
         self.compaction_timestamps.clone()
     }

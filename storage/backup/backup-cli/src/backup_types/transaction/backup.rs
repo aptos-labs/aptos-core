@@ -5,6 +5,7 @@
 use crate::{
     backup_types::transaction::manifest::{TransactionBackup, TransactionChunk},
     metadata::Metadata,
+    metrics::backup::TXN_DURATIONS,
     storage::{BackupHandleRef, BackupStorage, FileHandle, ShellSafeName},
     utils::{
         backup_service_client::BackupServiceClient, read_record_bytes::ReadRecordBytes,
@@ -68,6 +69,9 @@ impl TransactionBackupController {
 
 impl TransactionBackupController {
     async fn run_impl(self) -> Result<FileHandle> {
+        let pre_timer = TXN_DURATIONS
+            .with_label_values(&["pre-downloading"])
+            .start_timer();
         let backup_handle = self
             .storage
             .create_backup_with_random_suffix(&self.backup_name())
@@ -82,6 +86,11 @@ impl TransactionBackupController {
             .await?;
         let mut current_ver: u64 = self.start_version;
         let mut chunk_first_ver: u64 = self.start_version;
+        pre_timer.observe_duration();
+
+        let chunksize_timer = TXN_DURATIONS
+            .with_label_values(&["download-chunksize"])
+            .start_timer();
 
         while let Some(record_bytes) = transactions_file.read_record_bytes().await? {
             if should_cut_chunk(&chunk_bytes, &record_bytes, self.max_chunk_size) {
@@ -120,9 +129,13 @@ impl TransactionBackupController {
             )
             .await?;
         chunks.push(chunk);
-
-        self.write_manifest(&backup_handle, self.start_version, current_ver - 1, chunks)
-            .await
+        chunksize_timer.observe_duration();
+        let writer_timer = TXN_DURATIONS.with_label_values(&["writer"]).start_timer();
+        let res = self
+            .write_manifest(&backup_handle, self.start_version, current_ver - 1, chunks)
+            .await;
+        writer_timer.observe_duration();
+        res
     }
 
     fn backup_name(&self) -> String {
