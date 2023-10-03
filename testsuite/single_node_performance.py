@@ -125,9 +125,7 @@ SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
 else:
-    DB_CONFIG_FLAGS = (
-        "--split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage"
-    )
+    DB_CONFIG_FLAGS = "--enable-storage-sharding"
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
