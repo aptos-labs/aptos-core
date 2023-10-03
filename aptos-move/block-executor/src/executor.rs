@@ -36,8 +36,8 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
-use claims::assert_none;
 use bytes::Bytes;
+use claims::assert_none;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -495,7 +495,7 @@ where
 
         // For each aggregator v2 in the event, replace aggregator v2 identifier with value.
         let events = last_input_output.events(txn_idx);
-        let patched_events = vec![];
+        let mut patched_events = vec![];
         for (event, layout) in events {
             if let Some(layout) = layout {
                 let (_, _, _, event_data) = event.get_event_data();
@@ -554,7 +554,12 @@ where
                 .push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
 
-        last_input_output.record_materialized_txn_output(txn_idx, aggregator_v1_delta_writes, patched_resource_write_set, patched_events);
+        last_input_output.record_materialized_txn_output(
+            txn_idx,
+            aggregator_v1_delta_writes,
+            patched_resource_write_set,
+            patched_events,
+        );
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();

@@ -4,10 +4,11 @@
 use crate::change_set::VMChangeSet;
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_types::{
+    contract_event::ContractEvent, //contract_event::ContractEvent,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp, contract_event::ContractEvent, //contract_event::ContractEvent,
+    write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
 use std::collections::HashMap;
@@ -149,7 +150,7 @@ impl VMOutput {
         mut self,
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
         patched_resource_write_set: HashMap<StateKey, WriteOp>,
-        patched_events: Vec<ContractEvent>
+        patched_events: Vec<ContractEvent>,
     ) -> TransactionOutput {
         assert_eq!(
             materialized_aggregator_v1_deltas.len(),
@@ -160,11 +161,13 @@ impl VMOutput {
             materialized_aggregator_v1_deltas
                 .iter()
                 .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k)),
-                "Materialized aggregator writes contain a key which does not exist in delta set."
+            "Materialized aggregator writes contain a key which does not exist in delta set."
         );
-        self.change_set.extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
-        self.change_set.extend_resource_write_set(patched_resource_write_set.into_iter());
-        
+        self.change_set
+            .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
+        self.change_set
+            .extend_resource_write_set(patched_resource_write_set.into_iter());
+
         assert_eq!(
             patched_events.len(),
             self.change_set().events().len(),

@@ -266,24 +266,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    // Called when a transaction is committed to record WriteOps for materialized aggregator values
-    // corresponding to the (deltas) in the recorded final output of the transaction.
-    pub(crate) fn record_delta_writes(
-        &self,
-        txn_idx: TxnIndex,
-        delta_writes: Vec<(T::Key, WriteOp)>,
-    ) {
-        match &self.outputs[txn_idx as usize]
-            .load_full()
-            .expect("Output must exist")
-            .output_status
-        {
-            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                t.incorporate_delta_writes(delta_writes);
-            },
-            ExecutionStatus::Abort(_) => {},
-        };
-    }
+    // // Called when a transaction is committed to record WriteOps for materialized aggregator values
+    // // corresponding to the (deltas) in the recorded final output of the transaction.
+    // pub(crate) fn record_delta_writes(
+    //     &self,
+    //     txn_idx: TxnIndex,
+    //     delta_writes: Vec<(T::Key, WriteOp)>,
+    // ) {
+    //     match &self.outputs[txn_idx as usize]
+    //         .load_full()
+    //         .expect("Output must exist")
+    //         .output_status
+    //     {
+    //         ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+    //             t.incorporate_delta_writes(delta_writes);
+    //         },
+    //         ExecutionStatus::Abort(_) => {},
+    //     };
+    // }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator v1 values
     // corresponding to the (deltas) in the recorded final output of the transaction.
@@ -291,7 +291,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
         delta_writes: Vec<(T::Key, WriteOp)>,
-        patched_resource_write_set: HashMap<T::Key, WriteOp>,
+        patched_resource_write_set: HashMap<T::Key, T::Value>,
         patched_events: Vec<T::Event>,
     ) {
         match &self.outputs[txn_idx as usize]
@@ -300,7 +300,11 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             .output_status
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                t.incorporate_materialized_txn_output(delta_writes, patched_resource_write_set, patched_events);
+                t.incorporate_materialized_txn_output(
+                    delta_writes,
+                    patched_resource_write_set,
+                    patched_events,
+                );
             },
             ExecutionStatus::Abort(_) => {},
         };

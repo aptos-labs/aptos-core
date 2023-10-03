@@ -194,11 +194,14 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     fn incorporate_materialized_txn_output(
-            &self,
-            aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutorTransaction>::Key, WriteOp)>,
-            patched_resource_write_set: HashMap<<Self::Txn as BlockExecutorTransaction>::Key, WriteOp>,
-            patched_events: Vec<<Self::Txn as BlockExecutorTransaction>::Event>,
-        ) {
+        &self,
+        aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutorTransaction>::Key, WriteOp)>,
+        patched_resource_write_set: HashMap<
+            <Self::Txn as BlockExecutorTransaction>::Key,
+            <Self::Txn as BlockExecutorTransaction>::Value,
+        >,
+        patched_events: Vec<<Self::Txn as BlockExecutorTransaction>::Event>,
+    ) {
         assert!(
             self.committed_output
                 .set(
@@ -206,7 +209,11 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .lock()
                         .take()
                         .expect("Output must be set to combine with deltas")
-                        .into_transaction_output_with_materialized_write_set(aggregator_v1_writes, patched_resource_write_set, patched_events),
+                        .into_transaction_output_with_materialized_write_set(
+                            aggregator_v1_writes,
+                            patched_resource_write_set,
+                            patched_events
+                        ),
                 )
                 .is_ok(),
             "Could not combine VMOutput with deltas"

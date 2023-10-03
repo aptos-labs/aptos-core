@@ -637,7 +637,7 @@ where
     // TODO: Assigning MoveTypeLayout as None for all the writes for now. That means, the
     // the resources do not have any aggregators embededded in them. Change it to test
     // resources with aggregators as well.
-    fn resource_write_set(&self) -> HashMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
+    fn resource_write_set(&self) -> HashMap<K, (V, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
@@ -693,6 +693,18 @@ where
 
     fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
         assert_ok!(self.materialized_delta_writes.set(delta_writes));
+    }
+
+    fn incorporate_materialized_txn_output(
+        &self,
+        _aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        _patched_resource_write_set: HashMap<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        >,
+        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
+    ) {
+        todo!()
     }
 
     fn fee_statement(&self) -> FeeStatement {
