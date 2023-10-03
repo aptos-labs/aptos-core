@@ -213,17 +213,17 @@ mod test {
         assert!(aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(500), 500)
             .unwrap()
-            .try_add(context.resolver, 150)
+            .try_add(150, context.resolver)
             .unwrap());
         assert!(aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
             .unwrap()
-            .try_add(context.resolver, 100)
+            .try_add(100, context.resolver)
             .unwrap());
         assert!(aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(700), 700)
             .unwrap()
-            .try_add(context.resolver, 200)
+            .try_add(200, context.resolver)
             .unwrap());
 
         aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(100));
@@ -322,7 +322,7 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(900), 900)
                 .unwrap()
-                .try_add(context.resolver, 200),
+                .try_add(200, context.resolver),
             true
         );
 
@@ -330,7 +330,7 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(900), 900)
                 .unwrap()
-                .try_sub(context.resolver, 501),
+                .try_sub(501, context.resolver),
             false
         );
 
@@ -348,7 +348,7 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(900), 900)
                 .unwrap()
-                .try_add(context.resolver, 300),
+                .try_add(300, context.resolver),
             true
         );
 
@@ -361,7 +361,7 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(900), 900)
                 .unwrap()
-                .try_add(context.resolver, 100),
+                .try_add(100, context.resolver),
             true
         );
 
@@ -369,7 +369,7 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(900), 900)
                 .unwrap()
-                .try_add(context.resolver, 51),
+                .try_add(51, context.resolver),
             false
         );
 
@@ -378,7 +378,7 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(2000), 2000)
                 .unwrap()
-                .try_add(context.resolver, 500),
+                .try_add(500, context.resolver),
             true
         );
 
@@ -390,9 +390,9 @@ mod test {
         assert_eq!(
             aggregator_data.string_concat(
                 AggregatorID::new(2200),
-                context.resolver,
                 "prefix".as_bytes().to_vec(),
-                "suffix".as_bytes().to_vec()
+                "suffix".as_bytes().to_vec(),
+                context.resolver,
             ),
             AggregatorID::new(4)
         );
@@ -401,14 +401,14 @@ mod test {
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(2000), 2000)
                 .unwrap()
-                .try_add(context.resolver, 1700),
+                .try_add(1700, context.resolver),
             false
         );
         assert_ok_eq!(
             aggregator_data
                 .get_aggregator(AggregatorVersionedID::v2(2000), 2000)
                 .unwrap()
-                .try_sub(context.resolver, 501),
+                .try_sub(501, context.resolver),
             false
         );
     }
