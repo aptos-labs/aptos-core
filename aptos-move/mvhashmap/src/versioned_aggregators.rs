@@ -3,8 +3,8 @@
 
 use crate::types::{AtomicTxnIndex, MVAggregatorsError, TxnIndex};
 use aptos_aggregator::{
-    aggregator_change_set::{AggregatorApplyChange, ApplyBase},
-    types::AggregatorValue,
+    aggregator_change_set::{AggregatorApplyChange, AggregatorChange, ApplyBase},
+    types::{AggregatorValue, ReadPosition},
 };
 use claims::{assert_matches, assert_none};
 use crossbeam::utils::CachePadded;
@@ -313,6 +313,8 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     }
 }
 
+// TODO To be renamed to VersionedDelayedFields
+//
 /// Maps each ID (access path) to an internal VersionedValue, managing versioned updates to the
 /// specified aggregator (which handles both Aggregator, and AggregatorSnapshot).
 ///
@@ -366,14 +368,51 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
 
     /// Must be called when an aggregator creation with a given ID and initial value is observed
     /// in the outputs of txn_idx.
-    pub fn create_aggregator(&self, id: K, txn_idx: TxnIndex, value: AggregatorValue) {
+    pub fn initialize_delayed_field(&self, id: K, txn_idx: TxnIndex, value: AggregatorValue) {
         let mut created = VersionedValue::new(None);
         created.insert(txn_idx, VersionEntry::Value(value, None));
 
         assert_none!(
             self.values.insert(id, created),
-            "VerionedValue when creating aggregator ID may not already exist"
+            "VersionedValue when creating aggregator ID may not already exist"
         );
+    }
+
+    /// Must be called when a snapshot (delta or derived) creation with a given ID
+    /// and initial apply is observed.
+    /// This should be only called when apply applies on top of different ID.
+    pub fn initialize_dependent_delayed_field(
+        &self,
+        id: K,
+        txn_idx: TxnIndex,
+        apply: AggregatorApplyChange<K>,
+    ) {
+        let mut created = VersionedValue::new(None);
+        created.insert(txn_idx, VersionEntry::Apply(apply));
+
+        assert_none!(
+            self.values.insert(id, created),
+            "VersionedValue when creating aggregator ID may not already exist"
+        );
+    }
+
+    pub fn record_change(&self, id: K, txn_idx: TxnIndex, change: AggregatorChange<K>) {
+        match change {
+            AggregatorChange::Create(value) => self.initialize_delayed_field(id, txn_idx, value),
+            AggregatorChange::Apply(apply) => match &apply {
+                AggregatorApplyChange::AggregatorDelta { .. } => {
+                    self.values
+                        .get_mut(&id)
+                        // TODO we probably cannot panic here any more (i.e. in V2 this might not be guaranteed)
+                        .expect("VersionedValue for an (resolved) ID must already exist")
+                        .insert(txn_idx, VersionEntry::Apply(apply))
+                },
+                AggregatorApplyChange::SnapshotDelta { .. }
+                | AggregatorApplyChange::SnapshotDerived { .. } => {
+                    self.initialize_dependent_delayed_field(id, txn_idx, apply)
+                },
+            },
+        };
     }
 
     /// The caller must maintain the invariant that prior to calling the methods below w.
@@ -402,46 +441,27 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedAggregators<K> {
         }
     }
 
-    /// This method is intended to be called during transaction execution (e.g. for getting
-    /// a rough value of an aggregator cheaply for branch prediction). Hence, the 'calling'
-    /// transaction may not be committed yet, and there is no reason to provide txn_idx.
+    /// Returns the committed value from largest transaction index that is
+    /// smaller than the given current_txn_idx (read_position defined whether
+    /// inclusively or exclusively from the current transaction itself).
     pub fn read_latest_committed_value(
         &self,
         id: K,
+        current_txn_idx: TxnIndex,
+        read_position: ReadPosition,
     ) -> Result<AggregatorValue, MVAggregatorsError> {
         self.values
             .get_mut(&id)
-            .expect("VersionedValue for an (resolved) ID must already exist")
-            .read_latest_committed_value(self.next_idx_to_commit.load(Ordering::Relaxed))
-    }
-
-    /// If a value was derived from applying delta to a speculatively read value, we also
-    /// provide a delta. This is useful for the optimization where if the txn aborts and
-    /// the entry is marked as an estimate, reads may be able to bypass the Estimate entry
-    /// by optimistically applying the previous delta.
-    ///
-    /// Record value can also be used to finalize committed values in the data-structure,
-    /// in order to avoid potentially costly delta traversals in reads. Due to a use in
-    /// read_latest_committed_value, called frequently (as a part of aggregator implementation),
-    /// Upon commit Snapshot and Delta entries are all required to be replaced with Values.
-    pub fn record_value(
-        &self,
-        id: K,
-        txn_idx: TxnIndex,
-        value: AggregatorValue,
-        maybe_apply: Option<AggregatorApplyChange<K>>,
-    ) {
-        self.values
-            .get_mut(&id)
-            .expect("VersionedValue for an (resolved) ID must already exist")
-            .insert(txn_idx, VersionEntry::Value(value, maybe_apply));
-    }
-
-    pub fn record_apply(&self, id: K, txn_idx: TxnIndex, apply: AggregatorApplyChange<K>) {
-        self.values
-            .get_mut(&id)
-            .expect("VersionedValue for an (resolved) ID must already exist")
-            .insert(txn_idx, VersionEntry::Apply(apply));
+            .ok_or(MVAggregatorsError::NotFound)
+            .and_then(|v| {
+                v.read_latest_committed_value(
+                    match read_position {
+                        ReadPosition::BeforeCurrentTxn => current_txn_idx,
+                        ReadPosition::AfterCurrentTxn => current_txn_idx + 1,
+                    }
+                    .min(self.next_idx_to_commit.load(Ordering::Relaxed)),
+                )
+            })
     }
 
     pub fn mark_estimate(&self, id: K, txn_idx: TxnIndex) {
