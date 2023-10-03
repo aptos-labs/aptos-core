@@ -186,8 +186,7 @@ impl RemoteStateValueReceiver {
     }
 
     fn start(&self) {
-        loop {
-            let message = self.kv_rx.recv().unwrap();
+        while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();
             let shard_id = self.shard_id;
             self.thread_pool.spawn(move || {
