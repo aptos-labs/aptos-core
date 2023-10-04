@@ -121,7 +121,12 @@ class MultiPublicKey(asymmetric_crypto.PublicKey):
         return f"{self.threshold}-of-{len(self.keys)} Multi-Ed25519 public key"
 
     def verify(self, data: bytes, signature: asymmetric_crypto.Signature) -> bool:
-        raise NotImplementedError()
+        try:
+            signature = cast(MultiSignature, signature)
+            self.key.verify(data, signature.data())
+        except Exception:
+            return False
+        return True
 
     @staticmethod
     def from_crypto_bytes(indata: bytes) -> MultiPublicKey:
@@ -182,16 +187,23 @@ class Signature(asymmetric_crypto.Signature):
 
 
 class MultiSignature(asymmetric_crypto.Signature):
-    signatures: List[Signature]
-    bitmap: bytes
+    signatures: List[(int, Signature)]
     BITMAP_NUM_OF_BYTES: int = 4
 
-    def __init__(self, signatures: List[Signature], bitmap: bytes):
-        assert (
-            len(bitmap) == self.BITMAP_NUM_OF_BYTES
-        ), f"bitmap length must be {self.BITMAP_NUM_OF_BYTES}"
+    def __init__(self, signatures: List[(int, Signature)]):
+        for signature in signatures:
+            assert (
+                signature[0] < self.BITMAP_NUM_OF_BYTES * 8
+            ), f"bitmap value exceeds maximum value"
         self.signatures = signatures
-        self.bitmap = bitmap
+
+    def __eq__(self, other: object):
+        if not isinstance(other, MultiSignature):
+            return NotImplemented
+        return self.signatures == other.signatures
+
+    def __str__(self) -> str:
+        return f"{self.signatures}"
 
     @staticmethod
     def from_key_map(
@@ -200,27 +212,46 @@ class MultiSignature(asymmetric_crypto.Signature):
     ) -> MultiSignature:
         signatures = []
 
-        bitmap = 0
         for entry in signatures_map:
-            signatures.append(entry[1])
-            index = public_key.keys.index(entry[0])
-            shift = 31 - index  # 32 bit positions, left to right.
-            bitmap = bitmap | (1 << shift)
-
-        # 4-byte big endian bitmap.
-        bitmap_bytes = bitmap.to_bytes(MultiSignature.BITMAP_NUM_OF_BYTES, "big")
-
-        return MultiSignature(signatures, bitmap_bytes)
+            signatures.append((public_key.keys.index(entry[0]), entry[1]))
+        return MultiSignature(signatures)
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> MultiSignature:
-        raise NotImplementedError()
+        signature_bytes = deserializer.to_bytes()
+        count = len(signature_bytes) // Signature.LENGTH
+        assert count * Signature.LENGTH + MultiSignature.BITMAP_NUM_OF_BYTES == len(
+            signature_bytes
+        ), f"MultiSignature length is invalid"
+
+        bitmap = int.from_bytes(signature_bytes[-4:], "big")
+
+        current = 0
+        position = 0
+        signatures = []
+        while current < count:
+            to_check = 1 << (31 - position)
+            if to_check & bitmap:
+                left = current * Signature.LENGTH
+                signature = Signature(signature_bytes[left : left + Signature.LENGTH])
+                signatures.append((position, signature))
+                current += 1
+            position += 1
+
+        return MultiSignature(signatures)
 
     def serialize(self, serializer: Serializer):
         signature_bytes = bytearray()
+        bitmap = 0
+
         for signature in self.signatures:
-            signature_bytes.extend(signature.data())
-        signature_bytes.extend(self.bitmap)
+            shift = 31 - signature[0]
+            bitmap = bitmap | (1 << shift)
+            signature_bytes.extend(signature[1].data())
+
+        signature_bytes.extend(
+            bitmap.to_bytes(MultiSignature.BITMAP_NUM_OF_BYTES, "big")
+        )
         serializer.to_bytes(signature_bytes)
 
 
@@ -310,6 +341,9 @@ class Test(unittest.TestCase):
             "40000000"
         )
         self.assertEqual(multisig_signature_bcs, expected_multisig_signature_bcs)
+        deserializer = Deserializer(bytes.fromhex(expected_multisig_signature_bcs))
+        multisig_signature_deserialized = deserializer.struct(MultiSignature)
+        self.assertEqual(multisig_signature_deserialized, multisig_signature)
 
     def test_multisig_range_checks(self):
         # Generate public keys.
