@@ -4,14 +4,13 @@
 use crate::{
     delta_change_set::DeltaOp,
     types::{
-        code_invariant_error, AggregatorValue, DelayedFieldsSpeculativeError, PanicOr,
+        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
         SnapshotToStringFormula,
     },
 };
 
-// TODO To be renamed to DelayedApplyChange
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AggregatorApplyChange<I: Clone> {
+pub enum DelayedApplyChange<I: Clone> {
     AggregatorDelta {
         delta: DeltaOp,
     },
@@ -29,11 +28,10 @@ pub enum AggregatorApplyChange<I: Clone> {
     },
 }
 
-// TODO To be renamed to DelayedChange
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AggregatorChange<I: Clone> {
-    Create(AggregatorValue),
-    Apply(AggregatorApplyChange<I>),
+pub enum DelayedChange<I: Clone> {
+    Create(DelayedFieldValue),
+    Apply(DelayedApplyChange<I>),
 }
 
 // Contains information on top of which value should AggregatorApplyChange be applied.
@@ -48,9 +46,9 @@ pub enum ApplyBase<I: Clone> {
     Current(I),
 }
 
-impl<I: Copy + Clone> AggregatorApplyChange<I> {
+impl<I: Copy + Clone> DelayedApplyChange<I> {
     pub fn get_apply_base_id_option(&self) -> Option<ApplyBase<I>> {
-        use AggregatorApplyChange::*;
+        use DelayedApplyChange::*;
 
         match self {
             AggregatorDelta { .. } => None,
@@ -68,25 +66,25 @@ impl<I: Copy + Clone> AggregatorApplyChange<I> {
 
     pub fn apply_to_base(
         &self,
-        base_value: AggregatorValue,
-    ) -> Result<AggregatorValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        use AggregatorApplyChange::*;
+        base_value: DelayedFieldValue,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        use DelayedApplyChange::*;
 
         Ok(match self {
             AggregatorDelta { delta } => {
-                AggregatorValue::Aggregator(delta.apply_to(base_value.into_aggregator_value()?)?)
+                DelayedFieldValue::Aggregator(delta.apply_to(base_value.into_aggregator_value()?)?)
             },
             SnapshotDelta { delta, .. } => {
-                AggregatorValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
+                DelayedFieldValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
             },
             SnapshotDerived { formula, .. } => {
-                AggregatorValue::Derived(formula.apply_to(base_value.into_snapshot_value()?))
+                DelayedFieldValue::Derived(formula.apply_to(base_value.into_snapshot_value()?))
             },
         })
     }
 }
 
-impl<I: Copy + Clone> AggregatorChange<I> {
+impl<I: Copy + Clone> DelayedChange<I> {
     // When squashing a new change on top of the old one, sometimes we need to know the change
     // from a different AggregatorID to be able to merge them together.
     // In particular SnapshotDelta represents a change from the aggregator at the beginning of the transaction,
@@ -97,8 +95,8 @@ impl<I: Copy + Clone> AggregatorChange<I> {
     // the correct squashing of snapshot depends on the change for the base aggregator. I.e. the correct output would be:
     // agg1 -> Delta(+9), snap(base=agg1, Delta(+5))
     pub fn get_merge_dependent_id(&self) -> Option<I> {
-        use AggregatorApplyChange::*;
-        use AggregatorChange::*;
+        use DelayedApplyChange::*;
+        use DelayedChange::*;
 
         match self {
             // Only SnapshotDelta merging logic depends on current aggregator change
@@ -115,12 +113,12 @@ impl<I: Copy + Clone> AggregatorChange<I> {
     /// If get_merge_dependent_id() returns None, prev_change is required to be for the
     /// same AggregatorID as next_change.
     pub fn merge_two_changes(
-        prev_change: Option<&AggregatorChange<I>>,
-        next_change: &AggregatorChange<I>,
-    ) -> Result<AggregatorChange<I>, PanicOr<DelayedFieldsSpeculativeError>> {
-        use AggregatorApplyChange::*;
-        use AggregatorChange::*;
-        use AggregatorValue::*;
+        prev_change: Option<&DelayedChange<I>>,
+        next_change: &DelayedChange<I>,
+    ) -> Result<DelayedChange<I>, PanicOr<DelayedFieldsSpeculativeError>> {
+        use DelayedApplyChange::*;
+        use DelayedChange::*;
+        use DelayedFieldValue::*;
 
         // There are only few valid cases for merging:
         // - next_change being AggregatorDelta, and prev_change being Aggregator Create or Delta
@@ -164,15 +162,15 @@ impl<I: Copy + Clone> AggregatorChange<I> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{bounded_math::SignedU128, delta_math::DeltaHistory, types::AggregatorID};
+    use crate::{bounded_math::SignedU128, delta_math::DeltaHistory, types::DelayedFieldID};
     use claims::{assert_err, assert_ok};
-    use AggregatorApplyChange::*;
-    use AggregatorChange::*;
-    use AggregatorValue::*;
+    use DelayedApplyChange::*;
+    use DelayedChange::*;
+    use DelayedFieldValue::*;
 
     #[test]
     fn test_merge_aggregator_data_into_delta() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Aggregator(20));
+        let aggregator_change1: DelayedChange<DelayedFieldID> = Create(Aggregator(20));
 
         let aggregator_change2 = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
@@ -192,12 +190,12 @@ mod test {
         });
 
         let result =
-            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
+            DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
         let merged = result.unwrap();
 
         assert_eq!(merged, Create(Aggregator(30)));
-        assert_err!(AggregatorChange::merge_two_changes(
+        assert_err!(DelayedChange::merge_two_changes(
             Some(&merged),
             &aggregator_change3
         ));
@@ -205,15 +203,15 @@ mod test {
 
     #[test]
     fn test_merge_data_into_data() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Create(Aggregator(20));
+        let aggregator_change1: DelayedChange<DelayedFieldID> = Create(Aggregator(20));
         let aggregator_change2 = Create(Aggregator(50));
         let aggregator_change3 = Create(Aggregator(70));
 
-        assert_err!(AggregatorChange::merge_two_changes(
+        assert_err!(DelayedChange::merge_two_changes(
             Some(&aggregator_change1),
             &aggregator_change2
         ));
-        assert_err!(AggregatorChange::merge_two_changes(
+        assert_err!(DelayedChange::merge_two_changes(
             Some(&aggregator_change2),
             &aggregator_change3
         ));
@@ -221,7 +219,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
+        let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
                 max_achieved_positive_delta: 30,
                 min_achieved_negative_delta: 15,
@@ -239,7 +237,7 @@ mod test {
         });
 
         let result =
-            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
+            DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
 
         assert_eq!(
@@ -257,7 +255,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta2() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
+        let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Negative(40), 100, DeltaHistory {
                 max_achieved_positive_delta: 20,
                 min_achieved_negative_delta: 59,
@@ -275,7 +273,7 @@ mod test {
         });
 
         let result_1 =
-            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
+            DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result_1);
         let merged_1 = result_1.unwrap();
 
@@ -299,7 +297,7 @@ mod test {
             }),
         });
 
-        let result_2 = AggregatorChange::merge_two_changes(Some(&merged_1), &aggregator_change3);
+        let result_2 = DelayedChange::merge_two_changes(Some(&merged_1), &aggregator_change3);
         assert_ok!(&result_2);
 
         assert_eq!(
@@ -317,7 +315,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta3() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
+        let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(20), 100, DeltaHistory {
                 max_achieved_positive_delta: 20,
                 min_achieved_negative_delta: 60,
@@ -334,7 +332,7 @@ mod test {
             }),
         });
         let result =
-            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
+            DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
 
         assert_eq!(
@@ -352,7 +350,7 @@ mod test {
 
     #[test]
     fn test_merge_delta_into_delta4() {
-        let aggregator_change1: AggregatorChange<AggregatorID> = Apply(AggregatorDelta {
+        let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Negative(20), 100, DeltaHistory {
                 max_achieved_positive_delta: 20,
                 min_achieved_negative_delta: 60,
@@ -369,7 +367,7 @@ mod test {
             }),
         });
         let result =
-            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
+            DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
         assert_ok!(&result);
 
         assert_eq!(
@@ -396,7 +394,7 @@ mod test {
             }),
         });
         let snapshot_change_2 = Apply(SnapshotDelta {
-            base_aggregator: AggregatorID::new(1),
+            base_aggregator: DelayedFieldID::new(1),
             delta: DeltaOp::new(SignedU128::Positive(2), 100, DeltaHistory {
                 max_achieved_positive_delta: 6,
                 min_achieved_negative_delta: 0,
@@ -406,13 +404,13 @@ mod test {
         });
 
         let result =
-            AggregatorChange::merge_two_changes(Some(&aggregator_change1), &snapshot_change_2);
+            DelayedChange::merge_two_changes(Some(&aggregator_change1), &snapshot_change_2);
         assert_ok!(&result);
 
         assert_eq!(
             result.unwrap(),
             Apply(SnapshotDelta {
-                base_aggregator: AggregatorID::new(1),
+                base_aggregator: DelayedFieldID::new(1),
                 delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
                     max_achieved_positive_delta: 9,
                     min_achieved_negative_delta: 0,

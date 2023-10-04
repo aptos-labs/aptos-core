@@ -7,9 +7,9 @@ use crate::{
     output::VMOutput,
 };
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
+    delayed_change::DelayedChange,
     delta_change_set::{delta_add, serialize, DeltaOp},
-    types::AggregatorID,
+    types::DelayedFieldID,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -148,7 +148,7 @@ pub(crate) fn build_change_set(
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange<AggregatorID>)>,
+    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
 ) -> VMChangeSet {
     VMChangeSet::new(
         BTreeMap::from_iter(resource_write_set),
@@ -156,7 +156,7 @@ pub(crate) fn build_change_set(
         BTreeMap::from_iter(module_write_set),
         BTreeMap::from_iter(aggregator_v1_write_set),
         BTreeMap::from_iter(aggregator_v1_delta_set),
-        BTreeMap::from_iter(aggregator_v2_change_set),
+        BTreeMap::from_iter(delayed_field_change_set),
         vec![],
         &MockChangeSetChecker,
     )
@@ -170,7 +170,7 @@ pub(crate) fn build_vm_output(
     module_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_write_set: impl IntoIterator<Item = (StateKey, WriteOp)>,
     aggregator_v1_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
-    aggregator_v2_change_set: impl IntoIterator<Item = (AggregatorID, AggregatorChange<AggregatorID>)>,
+    delayed_field_change_set: impl IntoIterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)>,
 ) -> VMOutput {
     const GAS_USED: u64 = 100;
     const STATUS: TransactionStatus = TransactionStatus::Keep(ExecutionStatus::Success);
@@ -181,7 +181,7 @@ pub(crate) fn build_vm_output(
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            aggregator_v2_change_set,
+            delayed_field_change_set,
         ),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,

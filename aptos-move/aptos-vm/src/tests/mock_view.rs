@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::types::{AggregatorID, TryFromMoveValue, TryIntoMoveValue};
+use aptos_aggregator::types::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use bytes::Bytes;
@@ -95,7 +95,7 @@ impl ValueToIdentifierMapping for MockStateView {
     ) -> TransformationResult<Value> {
         let mut mapping = self.mapping.borrow_mut();
         let identifier = mapping.len() as u64;
-        let identifier_value = AggregatorID::new(identifier)
+        let identifier_value = DelayedFieldID::new(identifier)
             .try_into_move_value(layout)
             .map_err(PartialVMError::from)?;
 
@@ -109,7 +109,7 @@ impl ValueToIdentifierMapping for MockStateView {
         identifier: Value,
     ) -> TransformationResult<Value> {
         let mapping = self.mapping.borrow();
-        let identifier = AggregatorID::try_from_move_value(layout, identifier, &())
+        let identifier = DelayedFieldID::try_from_move_value(layout, identifier, &())
             .map_err(PartialVMError::from)?
             .as_u64();
 

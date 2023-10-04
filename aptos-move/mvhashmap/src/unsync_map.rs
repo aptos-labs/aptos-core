@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types::MVModulesOutput, utils::module_hash};
-use aptos_aggregator::types::AggregatorValue;
+use aptos_aggregator::types::DelayedFieldValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
@@ -21,7 +21,7 @@ pub struct UnsyncMap<K: ModulePath, V: TransactionWrite, X: Executable, I: Copy>
     map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
-    aggregator_map: RefCell<HashMap<I, AggregatorValue>>,
+    delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 }
 
 impl<
@@ -36,7 +36,7 @@ impl<
             map: RefCell::new(HashMap::new()),
             executable_cache: RefCell::new(HashMap::new()),
             executable_bytes: RefCell::new(0),
-            aggregator_map: RefCell::new(HashMap::new()),
+            delayed_field_map: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -53,7 +53,7 @@ impl<
             map: RefCell::new(HashMap::new()),
             executable_cache: RefCell::new(HashMap::new()),
             executable_bytes: RefCell::new(0),
-            aggregator_map: RefCell::new(HashMap::new()),
+            delayed_field_map: RefCell::new(HashMap::new()),
         }
     }
 
@@ -75,8 +75,8 @@ impl<
         })
     }
 
-    pub fn fetch_aggregator(&self, id: &I) -> Option<AggregatorValue> {
-        self.aggregator_map.borrow().get(id).cloned()
+    pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
+        self.delayed_field_map.borrow().get(id).cloned()
     }
 
     pub fn write(&self, key: K, value: V) {
@@ -106,7 +106,7 @@ impl<
         *self.executable_bytes.borrow()
     }
 
-    pub fn write_aggregator(&self, id: I, value: AggregatorValue) {
-        self.aggregator_map.borrow_mut().insert(id, value);
+    pub fn write_delayed_field(&self, id: I, value: DelayedFieldValue) {
+        self.delayed_field_map.borrow_mut().insert(id, value);
     }
 }
