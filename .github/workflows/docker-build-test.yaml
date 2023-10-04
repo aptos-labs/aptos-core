@@ -279,7 +279,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -309,7 +308,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -338,7 +336,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -361,7 +358,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
