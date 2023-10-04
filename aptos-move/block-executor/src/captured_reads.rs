@@ -574,9 +574,10 @@ mod test {
     }
 
     fn raw_metadata() -> StateValueMetadataKind {
-        Some(StateValueMetadata::new(5, &CurrentTimeMicroseconds {
-            microseconds: 7,
-        }))
+        Some(StateValueMetadata::new(
+            5,
+            &CurrentTimeMicroseconds { microseconds: 7 },
+        ))
     }
 
     #[test]

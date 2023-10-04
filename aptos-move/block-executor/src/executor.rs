@@ -418,6 +418,18 @@ where
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
 
+        let drain_commit_queue = || {
+            while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
+                self.materialize_txn_commit(
+                    txn_idx,
+                    versioned_cache,
+                    last_input_output,
+                    base_view,
+                    final_results,
+                );
+            }
+        };
+
         loop {
             // Priorotize committing validated transactions
             if scheduler.should_coordinate_commits() {
@@ -431,17 +443,7 @@ where
                 scheduler.queueing_commits_mark_done();
             }
 
-            {
-                while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                    self.materialize_txn_commit(
-                        txn_idx,
-                        versioned_cache,
-                        last_input_output,
-                        base_view,
-                        final_results,
-                    );
-                }
-            }
+            drain_commit_queue();
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => Self::validate(
@@ -480,19 +482,11 @@ where
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
 
-                    SchedulerTask::NoTask
+                    scheduler.next_task()
                 },
                 SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
-                    while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                        self.materialize_txn_commit(
-                            txn_idx,
-                            versioned_cache,
-                            last_input_output,
-                            base_view,
-                            final_results,
-                        );
-                    }
+                    drain_commit_queue();
                     break;
                 },
             }
