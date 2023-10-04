@@ -2,11 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
-    delta_change_set::DeltaOp,
-    types::{TryFromMoveValue, TryIntoMoveValue},
-};
+use aptos_aggregator::{delayed_change::DelayedChange, delta_change_set::DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
@@ -17,7 +13,6 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 /// The execution result of a transaction
@@ -128,12 +123,12 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Get the aggregator V1 deltas of a transaction from its output.
     fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
-    /// Get the aggregator V2 changes of a transaction from its output.
-    fn aggregator_v2_change_set(
+    /// Get the delayed field changes of a transaction from its output.
+    fn delayed_field_change_set(
         &self,
     ) -> HashMap<
         <Self::Txn as Transaction>::Identifier,
-        AggregatorChange<<Self::Txn as Transaction>::Identifier>,
+        DelayedChange<<Self::Txn as Transaction>::Identifier>,
     >;
 
     /// Get the events of a transaction from its output.

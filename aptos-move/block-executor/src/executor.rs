@@ -12,24 +12,21 @@ use crate::{
     errors::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    task::{
-        CategorizeError, ErrorCategory, ExecutionStatus, ExecutorTask, Transaction,
-        TransactionOutput,
-    },
+    task::{CategorizeError, ErrorCategory, ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
-    aggregator_change_set::{AggregatorChange, ApplyBase},
+    delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
     types::{expect_ok, PanicOr},
 };
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVAggregatorsError, TxnIndex},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex},
     unsync_map::UnsyncMap,
-    versioned_aggregators::CommitError,
+    versioned_delayed_fields::CommitError,
     MVHashMap,
 };
 use aptos_state_view::TStateView;
@@ -117,7 +114,7 @@ where
             .map_or(HashMap::new(), |keys| keys.collect());
 
         // let mut prev_modified_aggregators = last_input_output
-        //     .aggregator_v2_keys(idx_to_execute)
+        //     .delayed_field_keys(idx_to_execute)
         //     .map_or(HashSet::new(), |keys| keys.collect());
 
         let mut speculative_inconsistent = false;
@@ -155,7 +152,7 @@ where
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
 
-            for (id, change) in output.aggregator_v2_change_set().into_iter() {
+            for (id, change) in output.delayed_field_change_set().into_iter() {
                 // if !prev_modified_aggregators.remove(&id) {
                 //     updates_outside = true;
                 // }
@@ -163,7 +160,7 @@ where
                 // TODO: figure out if change should update updates_outside
                 if let Err(e) =
                     versioned_cache
-                        .aggregators()
+                        .delayed_fields()
                         .record_change(id, idx_to_execute, change)
                 {
                     match e {
@@ -218,7 +215,7 @@ where
         let mut read_set = sync_view.take_reads();
         if speculative_inconsistent {
             read_set.capture_delayed_field_read_error(&PanicOr::Or(
-                MVAggregatorsError::DeltaApplicationFailure,
+                MVDelayedFieldsError::DeltaApplicationFailure,
             ));
         }
 
@@ -280,10 +277,10 @@ where
                 }
             }
 
-            if let Some(keys) = last_input_output.aggregator_v2_keys(idx_to_validate) {
+            if let Some(keys) = last_input_output.delayed_field_keys(idx_to_validate) {
                 for k in keys {
                     versioned_cache
-                        .aggregators()
+                        .delayed_fields()
                         .mark_estimate(&k, idx_to_validate);
                 }
             }
@@ -318,7 +315,7 @@ where
                 .read_set(txn_idx)
                 .expect("Read set must be recorded");
             let mut execution_still_valid =
-                read_set.validate_delayed_field_reads(versioned_cache.aggregators(), txn_idx);
+                read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx);
 
             match last_input_output.output_category(txn_idx) {
                 Some(ErrorCategory::SpeculativeExecutionError) => {
@@ -331,10 +328,10 @@ where
             };
 
             if execution_still_valid {
-                if let Some(aggregator_ids) = last_input_output.aggregator_v2_keys(txn_idx) {
+                if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
                     if let Err(e) = versioned_cache
-                        .aggregators()
-                        .try_commit(txn_idx, aggregator_ids.collect())
+                        .delayed_fields()
+                        .try_commit(txn_idx, delayed_field_ids.collect())
                     {
                         match e {
                             CommitError::ReExecutionNeeded(_) => {
@@ -450,13 +447,13 @@ where
         let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
 
-        // For each aggregator v2 in resource write set, replace the identifiers with values.
+        // For each delayed field in resource write set, replace the identifiers with values.
         let mut write_set_keys = HashSet::new();
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let mut patched_resource_write_set = HashMap::new();
         if let Some(resource_write_set) = resource_write_set {
             for (key, (write_op, layout)) in resource_write_set.iter() {
-                // layout is Some(_) if it contains an aggregator
+                // layout is Some(_) if it contains a delayed field
                 if let Some(layout) = layout {
                     if !write_op.is_deletion() {
                         write_set_keys.insert(key.clone());
@@ -477,25 +474,25 @@ where
         // For each resource that satisfies the following conditions,
         //     1. Resource is in read set
         //     2. Resource is not in write set
-        // replace the aggregator v2 identifiers in the resource with corresponding values.
-        // If any of the aggregator v2 identifiers in the resource are part of aggregator_v2_write_set,
+        // replace the delayed field identifiers in the resource with corresponding values.
+        // If any of the delayed field identifiers in the resource are part of delayed_field_write_set,
         // then include the resource in the write set.
-        let aggregator_v2_keys = last_input_output.aggregator_v2_keys(txn_idx);
-        if let Some(aggregator_v2_keys) = aggregator_v2_keys {
-            let aggregator_v2_keys = aggregator_v2_keys.collect::<HashSet<_>>();
+        let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
+        if let Some(delayed_field_keys) = delayed_field_keys {
+            let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
             let read_set = last_input_output.read_set(txn_idx);
             if let Some(read_set) = read_set {
                 for (key, data_read) in read_set.as_ref().data_reads.iter() {
                     if write_set_keys.contains(key) {
                         continue;
                     }
-                    // layout is Some(_) if it contains an aggregator
+                    // layout is Some(_) if it contains an delayed field
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
                         if let Some(value_bytes) = value.bytes() {
                             match latest_view.replace_identifiers_with_values(value_bytes, layout) {
-                                Ok((patched_bytes, aggregator_v2_keys_in_resource)) => {
-                                    if !aggregator_v2_keys
-                                        .is_disjoint(&aggregator_v2_keys_in_resource)
+                                Ok((patched_bytes, delayed_field_keys_in_resource)) => {
+                                    if !delayed_field_keys
+                                        .is_disjoint(&delayed_field_keys_in_resource)
                                     {
                                         let mut patched_value = value.as_ref().clone();
                                         patched_value.set_bytes(patched_bytes);
@@ -516,7 +513,7 @@ where
             }
         }
 
-        // For each aggregator v2 in the event, replace aggregator v2 identifier with value.
+        // For each delayed field in the event, replace delayed field identifier with value.
         let events = last_input_output.events(txn_idx);
         let mut patched_events = vec![];
         for (event, layout) in events {
@@ -840,22 +837,22 @@ where
                     // or do exchange on every transaction, so this logic might change
                     let mut second_phase = Vec::new();
                     let mut updates = HashMap::new();
-                    for (id, change) in output.aggregator_v2_change_set().into_iter() {
+                    for (id, change) in output.delayed_field_change_set().into_iter() {
                         match change {
-                            AggregatorChange::Create(value) => {
+                            DelayedChange::Create(value) => {
                                 assert_none!(
-                                    data_map.fetch_aggregator(&id),
+                                    data_map.fetch_delayed_field(&id),
                                     "Sequential execution must not create duplicate aggregators"
                                 );
                                 updates.insert(id, value);
                             },
-                            AggregatorChange::Apply(apply) => {
+                            DelayedChange::Apply(apply) => {
                                 match apply.get_apply_base_id(&id) {
                                     ApplyBase::Previous(base_id) => {
                                         updates.insert(
                                             id,
                                             expect_ok(apply.apply_to_base(
-                                                data_map.fetch_aggregator(&base_id).unwrap(),
+                                                data_map.fetch_delayed_field(&base_id).unwrap(),
                                             ))
                                             .unwrap(),
                                         );
@@ -872,14 +869,14 @@ where
                             id,
                             expect_ok(apply.apply_to_base(
                                 updates.get(&base_id).cloned().unwrap_or_else(|| {
-                                    data_map.fetch_aggregator(&base_id).unwrap()
+                                    data_map.fetch_delayed_field(&base_id).unwrap()
                                 }),
                             ))
                             .unwrap(),
                         );
                     }
                     for (id, value) in updates.into_iter() {
-                        data_map.write_aggregator(id, value);
+                        data_map.write_delayed_field(id, value);
                     }
 
                     // No delta writes are needed for sequential execution.

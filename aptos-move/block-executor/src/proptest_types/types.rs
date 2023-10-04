@@ -2,11 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
+use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
+    delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    types::AggregatorID,
+    types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -21,7 +21,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
-    transaction::BlockExecutableTransaction,
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::resolver::TExecutorView;
@@ -309,10 +309,10 @@ impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
         V: Clone + Send + Sync + TransactionWrite + 'static,
         E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
-    > BlockExecutableTransaction for MockTransaction<K, V, E>
+    > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
-    type Identifier = AggregatorID;
+    type Identifier = DelayedFieldID;
     type Key = K;
     type Tag = u32;
     type Value = V;
@@ -567,7 +567,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<K, MoveTypeLayout, AggregatorID>,
+        view: &impl TExecutorView<K, MoveTypeLayout, DelayedFieldID>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -665,11 +665,11 @@ where
         self.deltas.iter().cloned().collect()
     }
 
-    fn aggregator_v2_change_set(
+    fn delayed_field_change_set(
         &self,
     ) -> HashMap<
         <Self::Txn as Transaction>::Identifier,
-        AggregatorChange<<Self::Txn as Transaction>::Identifier>,
+        DelayedChange<<Self::Txn as Transaction>::Identifier>,
     > {
         // TODO: add aggregators V2 to the proptest?
         HashMap::new()

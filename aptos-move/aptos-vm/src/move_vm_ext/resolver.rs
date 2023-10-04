@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_aggregator::resolver::DelayedFieldResolver;
 use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{ExecutorView, StateStorageView, StateValueMetadataResolver};
@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 /// top of storage, e.g. get resources from resource groups, etc.
 /// MoveResolver implements ResourceResolver and ModuleResolver
 pub trait AptosMoveResolver:
-    AggregatorResolver
+    DelayedFieldResolver
     + ConfigStorage
     + MoveResolver
     + TableResolver

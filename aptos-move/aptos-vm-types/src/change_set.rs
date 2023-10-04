@@ -3,10 +3,10 @@
 
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
+    delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
-    resolver::{AggregatorReadMode, AggregatorResolver},
-    types::{code_invariant_error, AggregatorID},
+    resolver::{DelayedFieldReadMode, DelayedFieldResolver},
+    types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -37,7 +37,7 @@ pub struct VMChangeSet {
     module_write_set: HashMap<StateKey, WriteOp>,
     aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
-    aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
+    delayed_field_change_set: HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
@@ -64,7 +64,7 @@ impl VMChangeSet {
             module_write_set: HashMap::new(),
             aggregator_v1_write_set: HashMap::new(),
             aggregator_v1_delta_set: HashMap::new(),
-            aggregator_v2_change_set: HashMap::new(),
+            delayed_field_change_set: HashMap::new(),
             events: vec![],
         }
     }
@@ -74,7 +74,7 @@ impl VMChangeSet {
         module_write_set: HashMap<StateKey, WriteOp>,
         aggregator_v1_write_set: HashMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: HashMap<StateKey, DeltaOp>,
-        aggregator_v2_change_set: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
+        delayed_field_change_set: HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -83,7 +83,7 @@ impl VMChangeSet {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            aggregator_v2_change_set,
+            delayed_field_change_set,
             events,
         };
 
@@ -129,7 +129,7 @@ impl VMChangeSet {
             module_write_set,
             aggregator_v1_write_set: HashMap::new(),
             aggregator_v1_delta_set: HashMap::new(),
-            aggregator_v2_change_set: HashMap::new(),
+            delayed_field_change_set: HashMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -142,7 +142,7 @@ impl VMChangeSet {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set: _,
-            aggregator_v2_change_set: _,
+            delayed_field_change_set: _,
             events,
         } = self;
 
@@ -162,7 +162,7 @@ impl VMChangeSet {
     /// serialized changes.
     /// If deltas are not materialized the conversion fails.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_v1_delta_set.is_empty() || !self.aggregator_v2_change_set.is_empty() {
+        if !self.aggregator_v1_delta_set.is_empty() || !self.delayed_field_change_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
@@ -235,10 +235,10 @@ impl VMChangeSet {
         &self.aggregator_v1_delta_set
     }
 
-    pub fn aggregator_v2_change_set(
+    pub fn delayed_field_change_set(
         &self,
-    ) -> &HashMap<AggregatorID, AggregatorChange<AggregatorID>> {
-        &self.aggregator_v2_change_set
+    ) -> &HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        &self.delayed_field_change_set
     }
 
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
@@ -249,14 +249,14 @@ impl VMChangeSet {
     /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
     pub fn try_materialize_aggregator_v1_delta_set(
         self,
-        resolver: &impl AggregatorResolver,
+        resolver: &impl DelayedFieldResolver,
     ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             module_write_set,
             mut aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            aggregator_v2_change_set,
+            delayed_field_change_set,
             events,
         } = self;
 
@@ -265,7 +265,7 @@ impl VMChangeSet {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Aggregated)?;
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, DelayedFieldReadMode::Aggregated)?;
                 Ok((state_key, write))
             };
 
@@ -280,7 +280,7 @@ impl VMChangeSet {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set: HashMap::new(),
-            aggregator_v2_change_set,
+            delayed_field_change_set,
             events,
         })
     }
@@ -373,9 +373,9 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_aggregator_v2_changes(
-        change_set: &mut HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
-        additional_change_set: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
+    fn squash_additional_delayed_field_changes(
+        change_set: &mut HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+        additional_change_set: HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     ) -> anyhow::Result<(), VMStatus> {
         let merged_changes = additional_change_set
             .into_iter()
@@ -398,7 +398,7 @@ impl VMChangeSet {
                     };
                 (
                     id,
-                    AggregatorChange::merge_two_changes(prev_change, &additional_change),
+                    DelayedChange::merge_two_changes(prev_change, &additional_change),
                 )
             })
             .collect::<Vec<_>>();
@@ -479,7 +479,7 @@ impl VMChangeSet {
             module_write_set: additional_module_write_set,
             aggregator_v1_write_set: additional_aggregator_write_set,
             aggregator_v1_delta_set: additional_aggregator_delta_set,
-            aggregator_v2_change_set: additional_aggregator_v2_change_set,
+            delayed_field_change_set: additional_delayed_field_change_set,
             events: additional_events,
         } = additional_change_set;
 
@@ -489,9 +489,9 @@ impl VMChangeSet {
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;
-        Self::squash_additional_aggregator_v2_changes(
-            &mut self.aggregator_v2_change_set,
-            additional_aggregator_v2_change_set,
+        Self::squash_additional_delayed_field_changes(
+            &mut self.delayed_field_change_set,
+            additional_delayed_field_change_set,
         )?;
         Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
