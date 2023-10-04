@@ -433,20 +433,11 @@ where
         }
     }
 
-    fn materialize_txn_commit(
-        &self,
+    fn map_id_to_values_in_read_write_set(
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
-        shared_counter: &AtomicU32,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        base_view: &S,
-        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) {
-        println!("worker commit hook called");
-        let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
-        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
-
+        latest_view: &LatestView<T, S, X>,
+    ) -> HashMap<T::Key, T::Value> {
         // For each delayed field in resource write set, replace the identifiers with values.
         let mut write_set_keys = HashSet::new();
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
@@ -482,7 +473,7 @@ where
             let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
             let read_set = last_input_output.read_set(txn_idx);
             if let Some(read_set) = read_set {
-                for (key, data_read) in read_set.as_ref().data_reads.iter() {
+                for (key, data_read) in read_set.get_read_values_with_delayed_fields() {
                     if write_set_keys.contains(key) {
                         continue;
                     }
@@ -512,8 +503,15 @@ where
                 }
             }
         }
+        patched_resource_write_set
+    }
 
-        // For each delayed field in the event, replace delayed field identifier with value.
+    // For each delayed field in the event, replace delayed field identifier with value.
+    fn map_id_to_values_events(
+        txn_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        latest_view: &LatestView<T, S, X>,
+    ) -> Vec<T::Event> {
         let events = last_input_output.events(txn_idx);
         let mut patched_events = vec![];
         for (event, layout) in events {
@@ -523,7 +521,7 @@ where
                     .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
                 {
                     Ok((bytes, _)) => {
-                        let mut patched_event = event.clone();
+                        let mut patched_event = event;
                         patched_event.update_event_data(bytes.to_vec());
                         patched_events.push(patched_event);
                     },
@@ -533,7 +531,15 @@ where
                 patched_events.push(event);
             }
         }
+        patched_events
+    }
 
+    fn materialize_aggregator_v1_delta_writes(
+        txn_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        base_view: &S,
+    ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
         let aggregator_v1_delta_keys = last_input_output.aggregator_v1_delta_keys(txn_idx);
         let mut aggregator_v1_delta_writes = Vec::with_capacity(aggregator_v1_delta_keys.len());
@@ -573,6 +579,31 @@ where
             aggregator_v1_delta_writes
                 .push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
+        aggregator_v1_delta_writes
+    }
+
+    fn materialize_txn_commit(
+        &self,
+        txn_idx: TxnIndex,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        scheduler: &Scheduler,
+        shared_counter: &AtomicU32,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        base_view: &S,
+        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
+    ) {
+        let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
+        let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
+        let patched_resource_write_set =
+            Self::map_id_to_values_in_read_write_set(txn_idx, last_input_output, &latest_view);
+        let patched_events =
+            Self::map_id_to_values_events(txn_idx, last_input_output, &latest_view);
+        let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
+            txn_idx,
+            last_input_output,
+            versioned_cache,
+            base_view,
+        );
 
         last_input_output.record_materialized_txn_output(
             txn_idx,
