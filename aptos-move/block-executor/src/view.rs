@@ -127,17 +127,10 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
         match self.versioned_map.delayed_fields().read(id, txn_idx) {
             Ok(value) => {
-                if self
-                    .captured_reads
+                self.captured_reads
                     .borrow_mut()
-                    .capture_delayed_field_read(id, value.clone())
-                    .is_err()
-                {
-                    // Inconsistency in recorded reads.
-                    Err(PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure))
-                } else {
-                    Ok(value)
-                }
+                    .capture_delayed_field_read(id, value.clone())?;
+                Ok(value)
             },
             Err(e) => {
                 self.captured_reads
