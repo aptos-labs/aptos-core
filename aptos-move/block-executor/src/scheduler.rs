@@ -37,7 +37,7 @@ impl ArmedLock {
 
     pub fn try_lock(&self) -> bool {
         self.locked
-            .compare_exchange(3, 0, Ordering::Acquire, Ordering::Relaxed)
+            .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
     }
 
@@ -327,8 +327,6 @@ impl Scheduler {
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
-    /// The current implementation has one dedicated thread to try_commit.
-    /// Should not be called after the last transaction is committed.
     pub fn try_commit(&self) -> Option<TxnIndex> {
         let mut commit_state = self.commit_state.acquire();
         let (commit_idx, commit_wave) = commit_state.dereference_mut();
@@ -337,44 +335,45 @@ impl Scheduler {
             return None;
         }
 
-        if let Some(validation_status) = self.txn_status[*commit_idx as usize].1.try_read() {
-            // Acquired the validation status read lock.
-            if let Some(status) = self.txn_status[*commit_idx as usize]
-                .0
-                .try_upgradable_read()
-            {
-                // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
-                if let ExecutionStatus::Executed(incarnation) = *status {
-                    // Status is executed and we are holding the lock.
+        let validation_status = self.txn_status[*commit_idx as usize].1.read();
 
-                    // Note we update the wave inside commit_state only with max_triggered_wave,
-                    // since max_triggered_wave records the new wave when validation index is
-                    // decreased thus affecting all later txns as well,
-                    // while required_wave only records the new wave for one single txn.
-                    *commit_wave = max(*commit_wave, validation_status.max_triggered_wave);
-                    if let Some(validated_wave) = validation_status.maybe_max_validated_wave {
-                        if validated_wave >= max(*commit_wave, validation_status.required_wave) {
-                            let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
-                            // Upgrade the execution status read lock to write lock.
-                            // Can commit.
-                            *status_write = ExecutionStatus::Committed(incarnation);
+        // Acquired the validation status read lock.
+        if let Some(status) = self.txn_status[*commit_idx as usize]
+            .0
+            .try_upgradable_read()
+        {
+            // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
+            if let ExecutionStatus::Executed(incarnation) = *status {
+                // Status is executed and we are holding the lock.
 
-                            *commit_idx += 1;
-                            if *commit_idx == self.num_txns {
-                                // All txns have been committed, the parallel execution can finish.
-                                self.done_marker.store(true, Ordering::SeqCst);
-                            }
-                            return Some(*commit_idx - 1);
+                // Note we update the wave inside commit_state only with max_triggered_wave,
+                // since max_triggered_wave records the new wave when validation index is
+                // decreased thus affecting all later txns as well,
+                // while required_wave only records the new wave for one single txn.
+                *commit_wave = max(*commit_wave, validation_status.max_triggered_wave);
+                if let Some(validated_wave) = validation_status.maybe_max_validated_wave {
+                    if validated_wave >= max(*commit_wave, validation_status.required_wave) {
+                        let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
+                        // Upgrade the execution status read lock to write lock.
+                        // Can commit.
+                        *status_write = ExecutionStatus::Committed(incarnation);
+
+                        *commit_idx += 1;
+                        if *commit_idx == self.num_txns {
+                            // All txns have been committed, the parallel execution can finish.
+                            self.done_marker.store(true, Ordering::SeqCst);
                         }
+                        return Some(*commit_idx - 1);
                     }
                 }
-
-                // Transaction needs to be at least [re]validated, and possibly also executed.
-                // Once that happens, we will `arm` the queueing_commit.
-                // Concurrency correctness - Both locks are held here.
-                return None;
             }
+
+            // Transaction needs to be at least [re]validated, and possibly also executed.
+            // Once that happens, we will `arm` the queueing_commit.
+            // Concurrency correctness - Both locks are held here.
+            return None;
         }
+
         self.queueing_commits_arm();
 
         None
@@ -616,7 +615,7 @@ impl Scheduler {
     /// It will set the done_marker to be true, resolve all pending dependencies.
     ///
     /// Currently there are 4 scenarios to early halt the BlockSTM execution.
-    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.t
+    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
     /// 2. There is a txn with VM execution status Abort.
     /// 3. There is a txn with VM execution status SkipRest.
     /// 4. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.

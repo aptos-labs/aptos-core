@@ -17,7 +17,6 @@ use crate::{
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
 use aptos_mvhashmap::{
     types::{Incarnation, TxnIndex},
@@ -89,7 +88,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-        maybe_error: &Mutex<Option<Error<E::Error>>>,
+        maybe_error: &mut Option<Error<E::Error>>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
@@ -167,7 +166,6 @@ where
 
         if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
             if scheduler.halt() {
-                let mut maybe_error = maybe_error.lock();
                 *maybe_error = Some(Error::ModulePathReadWrite);
             }
             SchedulerTask::NoTask
@@ -233,17 +231,17 @@ where
         shared_commit_state: &ExplicitSyncWrapper<(
             FeeStatement,
             Vec<FeeStatement>,
-            Mutex<Option<Error<E::Error>>>,
+            Option<Error<E::Error>>,
         )>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            let mut shared_commit_state_guard = shared_commit_state.acquire();
-            let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
-                shared_commit_state_guard.dereference_mut();
-
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
             }
+
+            let mut shared_commit_state_guard = shared_commit_state.acquire();
+            let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
+                shared_commit_state_guard.dereference_mut();
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
@@ -275,7 +273,6 @@ where
 
             if let Some(err) = last_input_output.execution_error(txn_idx) {
                 if scheduler.halt() {
-                    let mut maybe_error = maybe_error.lock();
                     *maybe_error = Some(err);
                     info!(
                         "Block execution was aborted due to {:?}",
@@ -406,7 +403,7 @@ where
         shared_commit_state: &ExplicitSyncWrapper<(
             FeeStatement,
             Vec<FeeStatement>,
-            Mutex<Option<Error<E::Error>>>,
+            Option<Error<E::Error>>,
         )>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
@@ -518,7 +515,7 @@ where
         let shared_commit_state = ExplicitSyncWrapper::new((
             FeeStatement::zero(),
             Vec::<FeeStatement>::with_capacity(num_txns),
-            Mutex::new(None),
+            None,
         ));
 
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
@@ -563,7 +560,7 @@ where
         });
 
         let (_, _, maybe_error) = shared_commit_state.into_inner();
-        match maybe_error.into_inner() {
+        match maybe_error {
             Some(err) => Err(err),
             None => Ok(final_results.into_inner()),
         }
