@@ -30,11 +30,12 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     let mut configs = validators.into_iter().map(|v| v.config).collect::<Vec<_>>();
 
     let mut config = configs.swap_remove(0);
+    let config = config.override_config_mut();
     config.set_data_dir(path.path().to_path_buf());
 
     let mut sr_test = aptos_config::config::SafetyRulesTestConfig::new(account_address.unwrap());
     sr_test.consensus_key(consensus_private_key.unwrap());
     config.consensus.safety_rules.test = Some(sr_test);
 
-    (config, root_key)
+    (config.clone(), root_key)
 }

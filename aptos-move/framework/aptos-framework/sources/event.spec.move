@@ -16,7 +16,7 @@ spec aptos_framework::event {
     }
 
     /// Native function use opaque.
-    spec write_to_module_event_store<T: drop + store>(msg: T) {
+    spec write_module_event_to_store<T: drop + store>(msg: T) {
         pragma opaque;
     }
 

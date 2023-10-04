@@ -4,7 +4,7 @@ use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_block_partitioner::{
-    sharded_block_partitioner::config::PartitionerV1Config, BlockPartitioner,
+    v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
@@ -99,8 +99,7 @@ where
             (
                 Some(parallel_block_executor),
                 Some(
-                    PartitionerV1Config::default()
-                        .num_shards(num_executor_shards)
+                    PartitionerV2Config::default()
                         .max_partitioning_rounds(4)
                         .cross_shard_dep_avoid_threshold(0.9)
                         .partition_last_round(true)

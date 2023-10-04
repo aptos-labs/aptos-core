@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use crate::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
@@ -21,6 +23,7 @@ use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+    secp256k1_ecdsa,
     traits::{signing_message, SigningKey},
     CryptoMaterialError, HashValue,
 };
@@ -341,6 +344,21 @@ impl RawTransaction {
         ))
     }
 
+    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
+    /// into a `SignatureCheckedTransaction`.
+    ///
+    /// For a transaction that has just been signed, its signature is expected to be valid.
+    pub fn sign_secp256k1_ecdsa(
+        self,
+        private_key: &secp256k1_ecdsa::PrivateKey,
+        public_key: secp256k1_ecdsa::PublicKey,
+    ) -> Result<SignatureCheckedTransaction> {
+        let signature = private_key.sign(&self)?;
+        Ok(SignatureCheckedTransaction(
+            SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
+        ))
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn multi_sign_for_testing(
         self,
@@ -631,6 +649,19 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
+            size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_secp256k1_ecdsa(
+        raw_txn: RawTransaction,
+        public_key: secp256k1_ecdsa::PublicKey,
+        signature: secp256k1_ecdsa::Signature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::secp256k1_ecdsa(public_key, signature);
+        SignedTransaction {
+            raw_txn,
+            authenticator,
             size: OnceCell::new(),
         }
     }
@@ -1055,6 +1086,15 @@ impl TransactionOutput {
 
     pub fn write_set(&self) -> &WriteSet {
         &self.write_set
+    }
+
+    // This is a special function to update the total supply in the write set. 'TransactionOutput'
+    // already has materialized write set, but in case of sharding support for total_supply, we
+    // want to update the total supply in the write set by aggregating the total supply deltas from
+    // each shard. However, is costly to materialize the entire write set again, hence we have this
+    // inplace update hack.
+    pub fn update_total_supply(&mut self, value: u128) {
+        self.write_set.update_total_supply(value);
     }
 
     pub fn events(&self) -> &[ContractEvent] {

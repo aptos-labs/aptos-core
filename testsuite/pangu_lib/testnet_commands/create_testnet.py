@@ -28,6 +28,8 @@ class GenesisNodeInformation:
     vfn_config_path: str
     persistent_volume_claim_size: str
     create_vfns: bool
+    cpu: str
+    memory: str
 
 
 @dataclass
@@ -44,6 +46,8 @@ class PanguNodeBlueprint:
     create_vfns: bool
     stake_amount: int
     count: int
+    cpu: str
+    memory: str
 
 
 @dataclass
@@ -346,6 +350,13 @@ def parse_pangu_node_config(
         if loaded_node_configs.blueprints[bp_name].vfn_image == "":
             loaded_node_configs.blueprints[bp_name].vfn_image = util.DEFAULT_IMAGE
 
+        #
+        # Some default sane resource requests
+        if loaded_node_configs.blueprints[bp_name].cpu == "":
+            loaded_node_configs.blueprints[bp_name].cpu = util.CPU_REQUEST
+        if loaded_node_configs.blueprints[bp_name].memory == "":
+            loaded_node_configs.blueprints[bp_name].memory = util.MEMORY_REQUEST
+
     #
     # If the user is using default settings, set the counts acordingly
     if default_node_configs_flag:
@@ -406,9 +417,21 @@ async def generate_genesis(
         validator_storage_class_name = loaded_node_configs.blueprints[
             pangu_node_blueprint
         ].validator_storage_class_name
+        cur_stake_amount: int = stake_amount
+        vfn_image: str = loaded_node_configs.blueprints[pangu_node_blueprint].vfn_image
+        validator_image: str = loaded_node_configs.blueprints[
+            pangu_node_blueprint
+        ].validator_image
+
+        # unpack node resources
         vfn_storage_class_name = loaded_node_configs.blueprints[
             pangu_node_blueprint
         ].vfn_storage_class_name
+        persistent_volume_claim_size: str = loaded_node_configs.blueprints[
+            pangu_node_blueprint
+        ].nodes_persistent_volume_claim_size
+        cpu: str = loaded_node_configs.blueprints[pangu_node_blueprint].cpu
+        memory: str = loaded_node_configs.blueprints[pangu_node_blueprint].memory
 
         for idx in range(1, count + 1):
             #
@@ -417,16 +440,6 @@ async def generate_genesis(
             user_dir: str = f"{args.workspace}/{vfn_validator_node_pair_name}"
             validator_host: str = f"{util.type_specific_name(vfn_validator_node_pair_name, util.NodeType.VALIDATOR)}:{util.VALIDATOR_PORT}"  # -validator
             fullnode_host: str = f"{util.type_specific_name(vfn_validator_node_pair_name, util.NodeType.VFN)}:{util.FULLNODE_HOST_PORT}"  # -fullnode, DNS must equal to the name of the service of the full node
-            cur_stake_amount: int = stake_amount
-            vfn_image: str = loaded_node_configs.blueprints[
-                pangu_node_blueprint
-            ].vfn_image
-            validator_image: str = loaded_node_configs.blueprints[
-                pangu_node_blueprint
-            ].validator_image
-            persistent_volume_claim_size: str = loaded_node_configs.blueprints[
-                pangu_node_blueprint
-            ].nodes_persistent_volume_claim_size
 
             coroutines.append(
                 generate_keys_and_configuration(
@@ -444,6 +457,8 @@ async def generate_genesis(
                         vfn_config_path,
                         persistent_volume_claim_size,
                         create_vfns,
+                        cpu,
+                        memory,
                     ),
                     args,
                     system_context,
@@ -606,6 +621,8 @@ async def generate_keys_and_configuration(
             node_info.validator_image,
             node_info.validator_storage_class_name,
             node_info.persistent_volume_claim_size,
+            node_info.cpu,
+            node_info.memory,
         )
     )
 
@@ -621,6 +638,8 @@ async def generate_keys_and_configuration(
                 node_info.vfn_image,
                 node_info.vfn_storage_class_name,
                 node_info.persistent_volume_claim_size,
+                node_info.cpu,
+                node_info.memory,
             )
         )
 
@@ -774,6 +793,8 @@ async def create_node_stateful_sets(
     image: str,
     storage_clas_name: str = "",
     persistent_volume_claim_size: str = "",
+    cpu: str = "",
+    memory: str = "",
 ):
     """Creates the stateful sets for the nodes
 
@@ -940,6 +961,9 @@ async def create_node_stateful_sets(
             client.V1ContainerPort(container_port=6181),
             client.V1ContainerPort(container_port=9101),
         ],
+        resources=client.V1ResourceRequirements(
+            requests={"cpu": cpu, "memory": memory}
+        ),
     )
 
     spec_pod: client.V1PodSpec = client.V1PodSpec(

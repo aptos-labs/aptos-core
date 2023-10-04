@@ -92,7 +92,6 @@ fn default_url() -> String {
 #[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub enum ExecutionMode {
     MultiStep,
-    SingleStep,
     RootSigner,
 }
 
@@ -117,7 +116,6 @@ impl ReleaseEntry {
     ) -> Result<()> {
         let (is_testnet, is_multi_step) = match execution_mode {
             ExecutionMode::MultiStep => (false, true),
-            ExecutionMode::SingleStep => (false, false),
             ExecutionMode::RootSigner => (true, false),
         };
         match self {
@@ -513,12 +511,10 @@ impl ReleaseConfig {
     }
 
     // Fetch all configs from a remote rest endpoint and assert all the configs are the same as the ones specified locally.
-    pub fn validate_upgrade(&self, endpoint: Url) -> Result<()> {
-        let client = Client::new(endpoint);
-        for proposal in &self.proposals {
-            for entry in proposal.consolidated_side_effects() {
-                entry.validate_upgrade(&client)?;
-            }
+    pub fn validate_upgrade(&self, endpoint: &Url, proposal: &Proposal) -> Result<()> {
+        let client = Client::new(endpoint.clone());
+        for entry in proposal.consolidated_side_effects() {
+            entry.validate_upgrade(&client)?;
         }
         Ok(())
     }
@@ -530,14 +526,6 @@ impl Default for ReleaseConfig {
             name: "TestingConfig".to_string(),
             remote_endpoint: None,
             proposals: vec![
-                Proposal {
-                    execution_mode: ExecutionMode::SingleStep,
-                    metadata: ProposalMetadata::default(),
-                    name: "custom".to_string(),
-                    update_sequence: vec![ReleaseEntry::RawScript(PathBuf::from(
-                        "data/proposals/empty.move",
-                    ))],
-                },
                 Proposal {
                     execution_mode: ExecutionMode::MultiStep,
                     metadata: ProposalMetadata::default(),

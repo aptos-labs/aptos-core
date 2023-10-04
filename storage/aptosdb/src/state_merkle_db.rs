@@ -16,6 +16,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_jellyfish_merkle::{
     node_type::{NodeKey, NodeType},
     JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
@@ -32,7 +33,6 @@ use aptos_types::{
     transaction::Version,
 };
 use arr_macro::arr;
-use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use std::{
     collections::HashMap,
@@ -44,14 +44,6 @@ use std::{
 pub const STATE_MERKLE_DB_FOLDER_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
-
-static TREE_COMMIT_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("tree_commit-{}", index))
-        .build()
-        .unwrap()
-});
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
@@ -77,6 +69,7 @@ impl StateMerkleDb {
         readonly: bool,
         max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
+        let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
@@ -87,7 +80,7 @@ impl StateMerkleDb {
             version_caches.insert(Some(i as u8), VersionedNodeCache::new());
         }
         let lru_cache = LruNodeCache::new(max_nodes_per_lru_cache_shard);
-        if !rocksdb_configs.use_sharded_state_merkle_db {
+        if !sharding {
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
             let db = Arc::new(Self::open_db(
@@ -123,14 +116,14 @@ impl StateMerkleDb {
         batches_for_shards: Vec<SchemaBatch>,
     ) -> Result<()> {
         ensure!(batches_for_shards.len() == NUM_STATE_SHARDS);
-        TREE_COMMIT_POOL.scope(|s| {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
             let mut batches = batches_for_shards.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
                 let state_merkle_batch = batches.next().unwrap();
                 s.spawn(move |_| {
                     self.commit_single_shard(version, shard_id as u8, state_merkle_batch)
-                        .unwrap_or_else(|_| {
-                            panic!("Failed to commit state merkle shard {shard_id}.")
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to commit state merkle shard {shard_id}: {err}")
                         });
                 });
             }
@@ -145,7 +138,7 @@ impl StateMerkleDb {
         batches_for_shards: Vec<SchemaBatch>,
     ) -> Result<()> {
         ensure!(batches_for_shards.len() == NUM_STATE_SHARDS);
-        TREE_COMMIT_POOL.scope(|s| {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
             let mut state_merkle_batch = batches_for_shards.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
                 let batch = state_merkle_batch.next().unwrap();
@@ -168,7 +161,7 @@ impl StateMerkleDb {
         sharding: bool,
     ) -> Result<()> {
         let rocksdb_configs = RocksdbConfigs {
-            use_sharded_state_merkle_db: sharding,
+            enable_storage_sharding: sharding,
             ..Default::default()
         };
         let state_merkle_db = Self::new(
@@ -656,24 +649,48 @@ impl StateMerkleDb {
     ) -> Result<Option<(NodeKey, LeafNode)>> {
         let mut ret = None;
 
-        // TODO(grao): Support sharding here.
-        let mut iter = self
-            .metadata_db()
-            .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
-        iter.seek(&(version, 0)).unwrap();
+        if self.enable_sharding {
+            let mut iter = self
+                .metadata_db()
+                .iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            iter.seek(&(version, 0)).unwrap();
+            // early exit if no node is found for the target version
+            match iter.next().transpose()? {
+                Some((node_key, node)) => {
+                    if node.node_type() == NodeType::Null || node_key.version() != version {
+                        return Ok(None);
+                    }
+                },
+                None => return Ok(None),
+            };
+        }
 
-        while let Some((node_key, node)) = iter.next().transpose()? {
-            if let Node::Leaf(leaf_node) = node {
-                if node_key.version() != version {
-                    break;
-                }
-                match ret {
-                    None => ret = Some((node_key, leaf_node)),
-                    Some(ref other) => {
-                        if leaf_node.account_key() > other.1.account_key() {
-                            ret = Some((node_key, leaf_node));
-                        }
-                    },
+        // traverse all shards in a naive way
+        // if sharding is not enable, we only need to search once.
+        let shards = self
+            .enable_sharding
+            .then(|| (0..NUM_STATE_SHARDS))
+            .unwrap_or(0..1);
+        let start_num_of_nibbles = if self.enable_sharding { 1 } else { 0 };
+        for shard_id in shards.rev() {
+            let shard_db = self.state_merkle_db_shards[shard_id].clone();
+            let mut shard_iter = shard_db.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
+            // DB sharded only contain nodes with num_of_nibbles >= 1
+            shard_iter.seek(&(version, start_num_of_nibbles)).unwrap();
+
+            while let Some((node_key, node)) = shard_iter.next().transpose()? {
+                if let Node::Leaf(leaf_node) = node {
+                    if node_key.version() != version {
+                        break;
+                    }
+                    match ret {
+                        None => ret = Some((node_key, leaf_node)),
+                        Some(ref other) => {
+                            if leaf_node.account_key() > other.1.account_key() {
+                                ret = Some((node_key, leaf_node));
+                            }
+                        },
+                    }
                 }
             }
         }
@@ -785,6 +802,7 @@ impl TreeReader<StateKey> for StateMerkleDb {
     fn get_rightmost_leaf(&self, version: Version) -> Result<Option<(NodeKey, LeafNode)>> {
         // Since everything has the same version during restore, we seek to the first node and get
         // its version.
+
         let mut iter = self
             .metadata_db()
             .iter::<JellyfishMerkleNodeSchema>(Default::default())?;

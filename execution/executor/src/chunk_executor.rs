@@ -142,27 +142,35 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
         chunk_output: ChunkOutput,
         transaction_infos: &[TransactionInfo],
     ) -> Result<ExecutedChunk> {
-        let (mut executed_chunk, to_discard, to_retry) =
-            chunk_output.apply_to_ledger(latest_view, None)?;
+        let (mut executed_chunk, to_discard, to_retry) = chunk_output.apply_to_ledger(
+            latest_view,
+            Some(
+                transaction_infos
+                    .iter()
+                    .map(|txn_info| txn_info.state_checkpoint_hash())
+                    .collect(),
+            ),
+            None,
+        )?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
+        executed_chunk.ensure_transaction_infos_match(transaction_infos)?;
         executed_chunk.ledger_info = executed_chunk
             .maybe_select_chunk_ending_ledger_info(verified_target_li, epoch_change_li)?;
-        executed_chunk.ensure_transaction_infos_match(transaction_infos)?;
 
         Ok(executed_chunk)
     }
 
     fn commit_chunk_impl(&self) -> Result<Arc<ExecutedChunk>> {
         let (base_view, to_commit) = self.commit_queue.lock().next_chunk_to_commit()?;
-        let txns_to_commit = to_commit.transactions_to_commit()?;
+        let txns_to_commit = to_commit.transactions_to_commit();
         let ledger_info = to_commit.ledger_info.as_ref();
         if ledger_info.is_some() || !txns_to_commit.is_empty() {
             fail_point!("executor::commit_chunk", |_| {
                 Err(anyhow::anyhow!("Injected error in commit_chunk"))
             });
             self.db.writer.save_transactions(
-                &txns_to_commit,
+                txns_to_commit,
                 base_view.txn_accumulator().num_leaves(),
                 base_view.state().base_version,
                 ledger_info,
@@ -599,8 +607,16 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         let state_view = self.state_view(latest_view)?;
         let chunk_output = ChunkOutput::by_transaction_output(txns_and_outputs, state_view)?;
-        let (executed_batch, to_discard, to_retry) =
-            chunk_output.apply_to_ledger(latest_view, None)?;
+        let (executed_batch, to_discard, to_retry) = chunk_output.apply_to_ledger(
+            latest_view,
+            Some(
+                txn_infos
+                    .iter()
+                    .map(|txn_info| txn_info.state_checkpoint_hash())
+                    .collect(),
+            ),
+            None,
+        )?;
         ensure_no_discard(to_discard)?;
         ensure_no_retry(to_retry)?;
         executed_batch.ensure_transaction_infos_match(&txn_infos)?;

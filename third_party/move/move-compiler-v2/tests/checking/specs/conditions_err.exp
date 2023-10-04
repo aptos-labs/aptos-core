@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: expected `bool` but found `u64`
+  ┌─ tests/checking/specs/conditions_err.move:6:15
+  │
+6 │     aborts_if x; // Type of condition not bool.
+  │               ^
+
+error: expected `bool` but found `num`
+  ┌─ tests/checking/specs/conditions_err.move:7:13
+  │
+7 │     ensures old(x) + x; // Type of condition not bool.
+  │             ^^^^^^^^^^
+
+error: undeclared `M::result_1`
+  ┌─ tests/checking/specs/conditions_err.move:8:13
+  │
+8 │     ensures result_1 == 0; // Using result which does not exist.
+  │             ^^^^^^^^
+
+error: expected `bool` but found `u64`
+   ┌─ tests/checking/specs/conditions_err.move:14:28
+   │
+14 │     emits _msg to _guid if x; // Type of condition for "if" is not bool.
+   │                            ^

@@ -26,4 +26,4 @@ The following rate limit applies for the Aptos Labs hosted indexer API:
 
 - For a web application that calls this Aptos-provided indexer API directly from the client (for example, wallet or explorer), the rate limit is currently 5000 requests per five minutes by IP address. **Note that this limit can change with or without prior notice.**
 
-If you need a higher rate limit, consider running the Aptos Indexer API yourself. See the guide to self hosting [here](./self-hosted).
+If you need a higher rate limit, consider running the Aptos Indexer API yourself. See the guide to self hosting [here](/indexer/api/self-hosted).

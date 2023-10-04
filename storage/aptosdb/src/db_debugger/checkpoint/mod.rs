@@ -20,8 +20,11 @@ impl Cmd {
     pub fn run(self) -> Result<()> {
         ensure!(!self.output_dir.exists(), "Output dir already exists.");
         fs::create_dir_all(&self.output_dir)?;
-
-        // TODO(grao): Support sharded state merkle db and split_ledger_db here.
-        AptosDB::create_checkpoint(self.db_dir, self.output_dir, false, false)
+        let sharding_config = self.db_dir.sharding_config.clone();
+        AptosDB::create_checkpoint(
+            self.db_dir,
+            self.output_dir,
+            sharding_config.enable_storage_sharding,
+        )
     }
 }

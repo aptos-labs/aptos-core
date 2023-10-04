@@ -48,7 +48,7 @@ pub struct HandlerConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RunConfig {
     /// API server config.
-    server_config: ServerConfig,
+    pub server_config: ServerConfig,
 
     /// Metrics server config.
     metrics_server_config: MetricsServerConfig,
@@ -69,7 +69,6 @@ pub struct RunConfig {
 impl RunConfig {
     pub async fn run(self) -> Result<()> {
         info!("Running with config: {:#?}", self);
-        println!("Faucet is starting, please wait...");
 
         // Set whether we should use useful errors.
         // If it's already set, then we'll carry on
@@ -211,11 +210,6 @@ impl RunConfig {
                 join_set.join_next().await.unwrap().unwrap()
             }));
         }
-
-        println!(
-            "Faucet is running. Faucet endpoint: http://{}:{}",
-            self.server_config.listen_address, self.server_config.listen_port
-        );
 
         // Wait for all the futures. We expect none of them to ever end.
         futures::future::select_all(main_futures)
@@ -825,7 +819,7 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 10);
@@ -883,7 +877,7 @@ mod test {
 
         // Assert that the account exists now with the expected balance.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 10);
@@ -931,7 +925,7 @@ mod test {
 
         // Confirm that the account was given the full 1000 OCTA as requested.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 1000);
@@ -949,7 +943,7 @@ mod test {
 
         // Confirm that the account was only given 100 OCTA (maximum_amount), not 1000.
         let response = aptos_node_api_client
-            .get_account_balance(AccountAddress::from_hex(fund_request.address.unwrap()).unwrap())
+            .get_account_balance(AccountAddress::from_str(&fund_request.address.unwrap()).unwrap())
             .await?;
 
         assert_eq!(response.into_inner().get(), 100);

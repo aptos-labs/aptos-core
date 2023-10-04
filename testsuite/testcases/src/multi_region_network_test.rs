@@ -10,18 +10,18 @@ use std::collections::BTreeMap;
 
 /// The link stats are obtained from https://github.com/doitintl/intercloud-throughput/blob/master/results_202202/results.csv
 /// The four regions were hand-picked from the dataset to simulate a multi-region setup
-/// with high latencies and low bandwidth.
-macro_rules! FOUR_REGION_LINK_STATS_CSV {
-    () => {
-        "data/four_region_link_stats.csv"
-    };
-}
+/// with high latencies.
+/// Note, we restrict bandwidth to 300 Mbps between all regions. The reasoning is that the dataset
+/// is measuring TCP bandwidth only which is primarily affected by RTT, and not the actual bandwidth
+/// across the regions, which would vary according to competing traffic, etc.
+const FOUR_REGION_LINK_STATS: &[u8] = include_bytes!("data/four_region_link_stats.csv");
+/// The two regions were chosen as the most distant regions among the four regions set.
+const TWO_REGION_LINK_STATS: &[u8] = include_bytes!("data/two_region_link_stats.csv");
 
-fn get_link_stats_table() -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
+fn get_link_stats_table(csv: &[u8]) -> BTreeMap<String, BTreeMap<String, (u64, f64)>> {
     let mut stats_table = BTreeMap::new();
 
-    let mut rdr =
-        csv::Reader::from_reader(include_bytes!(FOUR_REGION_LINK_STATS_CSV!()).as_slice());
+    let mut rdr = csv::Reader::from_reader(csv);
     rdr.deserialize()
         .for_each(|result: Result<(String, String, u64, f64), _>| {
             if let Ok((from, to, bitrate, latency)) = result {
@@ -106,7 +106,7 @@ pub struct InterRegionNetEmConfig {
 impl Default for InterRegionNetEmConfig {
     fn default() -> Self {
         Self {
-            delay_jitter_ms: 20,
+            delay_jitter_ms: 0,
             delay_correlation_percentage: 50,
             loss_percentage: 3,
             loss_correlation_percentage: 50,
@@ -161,7 +161,7 @@ impl Default for IntraRegionNetEmConfig {
         Self {
             bandwidth_rate_mbps: 10 * 1000, // 10 Gbps
             delay_latency_ms: 50,
-            delay_jitter_ms: 5,
+            delay_jitter_ms: 0,
             delay_correlation_percentage: 50,
             loss_percentage: 1,
             loss_correlation_percentage: 50,
@@ -205,9 +205,18 @@ pub struct MultiRegionNetworkEmulationConfig {
 impl Default for MultiRegionNetworkEmulationConfig {
     fn default() -> Self {
         Self {
-            link_stats_table: get_link_stats_table(),
+            link_stats_table: get_link_stats_table(FOUR_REGION_LINK_STATS),
             inter_region_config: InterRegionNetEmConfig::default(),
             intra_region_config: Some(IntraRegionNetEmConfig::default()),
+        }
+    }
+}
+
+impl MultiRegionNetworkEmulationConfig {
+    pub fn two_region() -> Self {
+        Self {
+            link_stats_table: get_link_stats_table(TWO_REGION_LINK_STATS),
+            ..Default::default()
         }
     }
 }

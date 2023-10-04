@@ -74,8 +74,8 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64,
         contract_creation_seed: vector<u8>,
     ): address {
-        // TODO: set because of timeout
-        pragma verify = false;
+        pragma verify_duration_estimate = 120;
+        pragma aborts_if_is_partial;
         include PreconditionsInCreateContract;
 
         let amount = coins.value;
@@ -385,24 +385,23 @@ spec aptos_framework::staking_contract {
         aborts_if !exists<Store>(staker_address) && !exists<account::Account>(staker_address);
         aborts_if !exists<Store>(staker_address) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
         ensures exists<Store>(staker_address);
-
-        let store = global<Store>(staker_address);
-        let staking_contracts = store.staking_contracts;
-        aborts_if simple_map::spec_contains_key(staking_contracts, operator);
-
-        // verify create_stake_pool()
-        let seed_0 = bcs::to_bytes(staker_address);
-        let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
-        let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
-        include CreateStakePoolAbortsIf {resource_addr};
-
-        // verify stake::add_stake_with_cap()
-        include StakeAddStakeWithCapAbortsIf{ pool_address: resource_addr };
-
+        // TODO: need to investigate the timeout
+        // let store = global<Store>(staker_address);
+        // let staking_contracts = store.staking_contracts;
+        // aborts_if simple_map::spec_contains_key(staking_contracts, operator);
+        //
+        // // verify create_stake_pool()
+        // let seed_0 = bcs::to_bytes(staker_address);
+        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
+        // include CreateStakePoolAbortsIf {resource_addr};
+        //
+        // // verify stake::add_stake_with_cap()
+        // include StakeAddStakeWithCapAbortsIf{ pool_address: resource_addr };
+        //
         let post post_store = global<Store>(staker_address);
         let post post_staking_contracts = post_store.staking_contracts;
         ensures simple_map::spec_contains_key(post_staking_contracts, operator);
-        ensures amount != 0 ==> simple_map::spec_contains_key(post_staking_contracts, operator);
     }
 
     spec schema StakeAddStakeWithCapAbortsIf {

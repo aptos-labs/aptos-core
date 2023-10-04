@@ -7,10 +7,11 @@ use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     db_options::{gen_state_kv_cfds, state_kv_db_column_families},
     utils::truncation_helper::{get_state_kv_commit_progress, truncate_state_kv_db_shards},
-    COMMIT_POOL, NUM_STATE_SHARDS,
+    NUM_STATE_SHARDS,
 };
 use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
@@ -39,7 +40,8 @@ impl StateKvDb {
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        if !rocksdb_configs.split_ledger_db {
+        let sharding = rocksdb_configs.enable_storage_sharding;
+        if !sharding {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
@@ -98,7 +100,7 @@ impl StateKvDb {
         state_kv_metadata_batch: SchemaBatch,
         sharded_state_kv_batches: [SchemaBatch; NUM_STATE_SHARDS],
     ) -> Result<()> {
-        COMMIT_POOL.scope(|s| {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
             let mut batches = sharded_state_kv_batches.into_iter();
             for shard_id in 0..NUM_STATE_SHARDS {
                 let state_kv_batch = batches
@@ -107,7 +109,7 @@ impl StateKvDb {
                 s.spawn(move |_| {
                     // TODO(grao): Consider propagating the error instead of panic, if necessary.
                     self.commit_single_shard(version, shard_id as u8, state_kv_batch)
-                        .unwrap_or_else(|_| panic!("Failed to commit shard {shard_id}."));
+                        .unwrap_or_else(|err| panic!("Failed to commit shard {shard_id}: {err}."));
                 });
             }
         });

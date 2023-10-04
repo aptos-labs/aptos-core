@@ -7,6 +7,7 @@ use anyhow::Result;
 use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
+    bytes::NumToBytes,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -14,7 +15,6 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use std::collections::BTreeMap;
-
 fn gen_address(index: u8) -> AccountAddress {
     AccountAddress::new([index; AccountAddress::LENGTH])
 }
@@ -55,11 +55,11 @@ fn test_mock_vm_different_senders() {
             [
                 (
                     StateKey::access_path(balance_ap(sender)),
-                    WriteOp::Modification(amount.to_le_bytes().to_vec())
+                    WriteOp::Modification(amount.le_bytes()),
                 ),
                 (
                     StateKey::access_path(seqnum_ap(sender)),
-                    WriteOp::Modification(1u64.to_le_bytes().to_vec())
+                    WriteOp::Modification(1u64.le_bytes()),
                 ),
             ]
             .into_iter()
@@ -90,11 +90,11 @@ fn test_mock_vm_same_sender() {
             [
                 (
                     StateKey::access_path(balance_ap(sender)),
-                    WriteOp::Modification((amount * (i as u64 + 1)).to_le_bytes().to_vec())
+                    WriteOp::Modification((amount * (i as u64 + 1)).le_bytes()),
                 ),
                 (
                     StateKey::access_path(seqnum_ap(sender)),
-                    WriteOp::Modification((i as u64 + 1).to_le_bytes().to_vec())
+                    WriteOp::Modification((i as u64 + 1).le_bytes()),
                 ),
             ]
             .into_iter()
@@ -128,15 +128,15 @@ fn test_mock_vm_payment() {
         [
             (
                 StateKey::access_path(balance_ap(gen_address(0))),
-                WriteOp::Modification(50u64.to_le_bytes().to_vec())
+                WriteOp::Modification(50u64.le_bytes())
             ),
             (
                 StateKey::access_path(seqnum_ap(gen_address(0))),
-                WriteOp::Modification(2u64.to_le_bytes().to_vec())
+                WriteOp::Modification(2u64.le_bytes())
             ),
             (
                 StateKey::access_path(balance_ap(gen_address(1))),
-                WriteOp::Modification(150u64.to_le_bytes().to_vec())
+                WriteOp::Modification(150u64.le_bytes())
             ),
         ]
         .into_iter()

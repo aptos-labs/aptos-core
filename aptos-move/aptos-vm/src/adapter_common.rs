@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{AptosMoveResolver, MoveResolverExt, SessionExt, SessionId};
+use crate::move_vm_ext::{AptosMoveResolver, SessionExt, SessionId};
 use anyhow::Result;
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -23,7 +23,7 @@ pub trait VMAdapter {
     /// this after redesigning cache ownership model.
     fn new_session<'r>(
         &self,
-        remote: &'r impl MoveResolverExt,
+        remote: &'r impl AptosMoveResolver,
         session_id: SessionId,
     ) -> SessionExt<'r, '_>;
 
@@ -50,7 +50,7 @@ pub trait VMAdapter {
     fn execute_single_transaction(
         &self,
         txn: &PreprocessedTransaction,
-        data_cache: &impl MoveResolverExt,
+        data_cache: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus>;
 

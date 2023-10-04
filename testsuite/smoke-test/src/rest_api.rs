@@ -526,4 +526,18 @@ async fn test_bcs() {
         json_events.first().unwrap().version.0,
         bcs_events.first().unwrap().transaction_version
     );
+
+    // Test that more than 25 transactions can be retrieved
+    let json_txns = client
+        .get_transactions(Some(0), Some(30))
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_txns = client
+        .get_transactions_bcs(Some(0), Some(30))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(json_txns.len(), 30);
+    assert_eq!(json_txns.len(), bcs_txns.len());
 }

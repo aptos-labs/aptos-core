@@ -6,6 +6,7 @@ use aptos_crypto::{
     bls12381,
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+    secp256k1_ecdsa,
     traits::{SigningKey, Uniform},
     PrivateKey,
 };
@@ -47,6 +48,13 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &bls_signature)?;
     tracer.trace_value::<MultiEd25519PublicKey>(samples, &public_key.into())?;
     tracer.trace_value::<MultiEd25519Signature>(samples, &signature.into())?;
+
+    let secp256k1_private_key = secp256k1_ecdsa::PrivateKey::generate(&mut rng);
+    let secp256k1_public_key = aptos_crypto::PrivateKey::public_key(&secp256k1_private_key);
+    let secp256k1_signature = secp256k1_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &secp256k1_private_key)?;
+    tracer.trace_value(samples, &secp256k1_public_key)?;
+    tracer.trace_value(samples, &secp256k1_signature)?;
     Ok(())
 }
 
@@ -76,6 +84,7 @@ pub fn get_registry() -> Result<Registry> {
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<aptos_consensus::network_interface::ConsensusMsg>(&samples)?;
+    tracer.trace_type::<aptos_consensus::network_interface::CommitMessage>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;

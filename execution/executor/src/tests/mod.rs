@@ -26,6 +26,7 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
+    bytes::NumToBytes,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
@@ -184,6 +185,7 @@ fn test_executor_status_consensus_only() {
         .execute_block(
             (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
 
@@ -484,11 +486,13 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
+    let (executed, _, _) = chunk_output
+        .apply_to_ledger(&ledger_view, None, None)
+        .unwrap();
 
     db.writer
         .save_transactions(
-            &executed.transactions_to_commit().unwrap(),
+            executed.transactions_to_commit(),
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             None,
@@ -503,9 +507,9 @@ fn test_deleted_key_from_state_store() {
     let executor = TestExecutor::new();
     let db = &executor.db;
     let dummy_state_key1 = StateKey::raw(String::from("test_key1").into_bytes());
-    let dummy_value1 = 10u64.to_le_bytes().to_vec();
+    let dummy_value1 = 10u64.le_bytes();
     let dummy_state_key2 = StateKey::raw(String::from("test_key2").into_bytes());
-    let dummy_value2 = 20u64.to_le_bytes().to_vec();
+    let dummy_value2 = 20u64.le_bytes();
     // Create test transaction, event and transaction output
     let transaction1 = create_test_transaction(0);
     let transaction2 = create_test_transaction(1);
@@ -683,10 +687,10 @@ fn run_transactions_naive(
             maybe_block_gas_limit,
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
+        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None, None).unwrap();
         db.writer
             .save_transactions(
-                &executed.transactions_to_commit().unwrap(),
+                executed.transactions_to_commit(),
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 None,

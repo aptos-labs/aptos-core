@@ -27,4 +27,7 @@ module 0x42::Test {
         Vector<vector<vector<address>>>(Vector<vector<address>>(Vector<address>()));
         Tuple()
     }
+    spec fun $many();
+    spec fun $none();
+    spec fun $one();
 } // end 0x42::Test

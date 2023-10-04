@@ -16,7 +16,7 @@ use move_core_types::{
     gas_algebra::{
         InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumArgs, NumBytes,
     },
-    vm_status::{StatusCode, VMStatus},
+    vm_status::{err_msg, StatusCode, VMStatus},
 };
 use std::fmt::Debug;
 
@@ -282,11 +282,19 @@ pub struct ChangeSetConfigs {
     max_bytes_all_write_ops_per_transaction: u64,
     max_bytes_per_event: u64,
     max_bytes_all_events_per_transaction: u64,
+    max_write_ops_per_transaction: u64,
 }
 
 impl ChangeSetConfigs {
     pub fn unlimited_at_gas_feature_version(gas_feature_version: u64) -> Self {
-        Self::new_impl(gas_feature_version, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
+        Self::new_impl(
+            gas_feature_version,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        )
     }
 
     pub fn new(feature_version: u64, gas_params: &AptosGasParameters) -> Self {
@@ -305,6 +313,7 @@ impl ChangeSetConfigs {
         max_bytes_all_write_ops_per_transaction: u64,
         max_bytes_per_event: u64,
         max_bytes_all_events_per_transaction: u64,
+        max_write_ops_per_transaction: u64,
     ) -> Self {
         Self {
             gas_feature_version,
@@ -312,6 +321,7 @@ impl ChangeSetConfigs {
             max_bytes_all_write_ops_per_transaction,
             max_bytes_per_event,
             max_bytes_all_events_per_transaction,
+            max_write_ops_per_transaction,
         }
     }
 
@@ -327,24 +337,18 @@ impl ChangeSetConfigs {
     fn for_feature_version_3() -> Self {
         const MB: u64 = 1 << 20;
 
-        Self::new_impl(3, MB, u64::MAX, MB, 10 * MB)
+        Self::new_impl(3, MB, u64::MAX, MB, 10 * MB, u64::MAX)
     }
 
     fn from_gas_params(gas_feature_version: u64, gas_params: &AptosGasParameters) -> Self {
+        let params = &gas_params.vm.txn;
         Self::new_impl(
             gas_feature_version,
-            gas_params.vm.txn.max_bytes_per_write_op.into(),
-            gas_params
-                .vm
-                .txn
-                .max_bytes_all_write_ops_per_transaction
-                .into(),
-            gas_params.vm.txn.max_bytes_per_event.into(),
-            gas_params
-                .vm
-                .txn
-                .max_bytes_all_events_per_transaction
-                .into(),
+            params.max_bytes_per_write_op.into(),
+            params.max_bytes_all_write_ops_per_transaction.into(),
+            params.max_bytes_per_event.into(),
+            params.max_bytes_all_events_per_transaction.into(),
+            params.max_write_ops_per_transaction.into(),
         )
     }
 }
@@ -352,6 +356,12 @@ impl ChangeSetConfigs {
 impl CheckChangeSet for ChangeSetConfigs {
     fn check_change_set(&self, change_set: &VMChangeSet) -> Result<(), VMStatus> {
         const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
+
+        if self.max_write_ops_per_transaction != 0
+            && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
+        {
+            return Err(VMStatus::error(ERR, err_msg("Too many write ops.")));
+        }
 
         let mut write_set_size = 0;
         for (key, op) in change_set.write_set_iter() {

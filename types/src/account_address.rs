@@ -28,13 +28,13 @@ pub struct AccountAddressWithChecks(AccountAddress);
 
 impl Display for AccountAddressWithChecks {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.to_hex())
     }
 }
 
 impl Debug for AccountAddressWithChecks {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.0)
+        write!(f, "{:?}", self.0.to_hex())
     }
 }
 
@@ -130,7 +130,7 @@ impl<'de> Deserialize<'de> for AccountAddressWithChecks {
 }
 
 pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
-    AuthenticationKey::ed25519(public_key).derived_address()
+    AuthenticationKey::ed25519(public_key).account_address()
 }
 
 // Note: This is inconsistent with current types because AccountAddress is derived

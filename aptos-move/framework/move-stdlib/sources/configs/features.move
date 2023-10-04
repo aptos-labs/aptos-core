@@ -239,7 +239,17 @@ module std::features {
 
     /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
     /// Lifetime: transient
-    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 27;
+    const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
+
+    /// Whether the aggregator snapshots feature is enabled.
+    /// Lifetime: transient
+    const AGGREGATOR_SNAPSHOTS: u64 = 30;
+
+    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_SNAPSHOTS }
+
+    public fun aggregator_snapshots_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_SNAPSHOTS)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation

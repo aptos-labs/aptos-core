@@ -2164,7 +2164,8 @@ Initialize Store resource if this is the first time the staker has delegated to 
 Cannot create the staking contract if it already exists.
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_PreconditionsInCreateContract">PreconditionsInCreateContract</a>;
 <b>let</b> amount = coins.value;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_Create_Staking_Contract_With_Coins_Abortsif">Create_Staking_Contract_With_Coins_Abortsif</a> { amount };
@@ -2657,18 +2658,9 @@ a staking_contract exists for the staker/operator pair.
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address) && !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(staker_address);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address) && <a href="account.md#0x1_account">account</a>.guid_creation_num + 9 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
     <b>ensures</b> <b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
-    <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
-    <b>let</b> staking_contracts = store.staking_contracts;
-    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(staking_contracts, operator);
-    <b>let</b> seed_0 = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(staker_address);
-    <b>let</b> seed_1 = concat(concat(concat(seed_0, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(operator)), <a href="staking_contract.md#0x1_staking_contract_SALT">SALT</a>), contract_creation_seed);
-    <b>let</b> resource_addr = <a href="account.md#0x1_account_spec_create_resource_address">account::spec_create_resource_address</a>(staker_address, seed_1);
-    <b>include</b> <a href="staking_contract.md#0x1_staking_contract_CreateStakePoolAbortsIf">CreateStakePoolAbortsIf</a> {resource_addr};
-    <b>include</b> <a href="staking_contract.md#0x1_staking_contract_StakeAddStakeWithCapAbortsIf">StakeAddStakeWithCapAbortsIf</a>{ pool_address: resource_addr };
     <b>let</b> <b>post</b> post_store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
     <b>let</b> <b>post</b> post_staking_contracts = post_store.staking_contracts;
     <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_staking_contracts, operator);
-    <b>ensures</b> amount != 0 ==&gt; <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_staking_contracts, operator);
 }
 </code></pre>
 

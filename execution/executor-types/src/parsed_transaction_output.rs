@@ -1,13 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::in_memory_state_calculator::NEW_EPOCH_EVENT_KEY;
 use aptos_types::{
     contract_event::ContractEvent,
+    event::EventKey,
+    on_chain_config,
     transaction::{TransactionOutput, TransactionStatus},
     write_set::WriteSet,
 };
+use once_cell::sync::Lazy;
 use std::ops::Deref;
+
+pub static NEW_EPOCH_EVENT_KEY: Lazy<EventKey> = Lazy::new(on_chain_config::new_epoch_event_key);
 
 pub struct ParsedTransactionOutput {
     output: TransactionOutput,

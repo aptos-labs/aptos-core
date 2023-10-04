@@ -39,7 +39,7 @@ pub(crate) fn get_aggregator_field(aggregator: &StructRef, index: usize) -> Part
     field_ref.read_ref()
 }
 
-/// Returns ID and a limit of aggrgegator based on a reference to `Aggregator` Move struct.
+/// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
     let (handle, key, limit) = get_aggregator_fields(aggregator)?;
     Ok((AggregatorID::new(handle, key), limit))

@@ -5,13 +5,18 @@ use super::{dag_fetcher::TFetchRequester, storage::DAGStorage, NodeId};
 use crate::dag::{
     dag_network::RpcHandler,
     dag_store::Dag,
+    observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
     types::{Node, NodeCertificate, Vote},
 };
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 use thiserror::Error as ThisError;
 
@@ -28,7 +33,7 @@ pub enum NodeBroadcastHandleError {
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
-    signer: ValidatorSigner,
+    signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
@@ -37,7 +42,7 @@ pub(crate) struct NodeBroadcastHandler {
 impl NodeBroadcastHandler {
     pub fn new(
         dag: Arc<RwLock<Dag>>,
-        signer: ValidatorSigner,
+        signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
@@ -140,12 +145,17 @@ fn read_votes_from_storage(
     votes_by_round_peer
 }
 
+#[async_trait]
 impl RpcHandler for NodeBroadcastHandler {
     type Request = Node;
     type Response = Vote;
 
-    fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
         let node = self.validate(node)?;
+        observe_node(node.timestamp(), NodeStage::NodeReceived);
+        debug!(LogSchema::new(LogEvent::ReceiveNode)
+            .remote_peer(*node.author())
+            .round(node.round()));
 
         let votes_by_peer = self
             .votes_by_round_peer
@@ -157,8 +167,11 @@ impl RpcHandler for NodeBroadcastHandler {
                 let vote = Vote::new(node.metadata().clone(), signature);
 
                 self.storage.save_vote(&node.id(), &vote)?;
-                votes_by_peer.insert(*node.metadata().author(), vote.clone());
+                votes_by_peer.insert(*node.author(), vote.clone());
 
+                debug!(LogSchema::new(LogEvent::Vote)
+                    .remote_peer(*node.author())
+                    .round(node.round()));
                 Ok(vote)
             },
             Some(ack) => Ok(ack.clone()),

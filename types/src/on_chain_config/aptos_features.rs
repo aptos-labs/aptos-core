@@ -37,6 +37,10 @@ pub enum FeatureFlag {
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
     SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
+    AGGREGATOR_SNAPSHOTS = 30,
+    SAFER_RESOURCE_GROUPS = 31,
+    SAFER_METADATA = 32,
+    SECP256K1_ECDSA_AUTHENTICATOR = 33,
 }
 
 /// Representation of features on chain as a bitset.
@@ -88,6 +92,10 @@ impl Features {
         // requires emit fee statement
         self.is_emit_fee_statement_enabled()
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
+    }
+
+    pub fn is_aggregator_snapshots_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::AGGREGATOR_SNAPSHOTS)
     }
 }
 

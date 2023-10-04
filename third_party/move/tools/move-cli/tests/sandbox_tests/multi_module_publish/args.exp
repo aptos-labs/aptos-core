@@ -1,12 +1,12 @@
 Command `sandbox publish --bundle --override-ordering A -v`:
 Found 2 modules
-Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("B") } in data cache
+Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Linker Error: Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("B") } in data cache
 Command `sandbox publish --bundle --override-ordering B -v`:
 Found 2 modules
-Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("A") } in data cache
+Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Linker Error: Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("A") } in data cache
 Command `sandbox publish --bundle --override-ordering B --override-ordering A -v`:
 Found 2 modules
-Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("A") } in data cache
+Invalid multi-module publishing: VMError with status LINKER_ERROR at location UNDEFINED and message Linker Error: Cannot find ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000002, name: Identifier("A") } in data cache
 Command `sandbox publish --bundle --override-ordering A --override-ordering B -v`:
 Found 2 modules
 Publishing a new module 0000000000000000000000000000000000000000000000000000000000000002::A (wrote 121 bytes)

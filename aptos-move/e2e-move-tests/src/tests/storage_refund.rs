@@ -3,7 +3,11 @@
 
 use crate::{assert_success, tests::common::test_dir_path, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
-use aptos_types::{on_chain_config::FeatureFlag, write_set::WriteOp};
+use aptos_types::{
+    on_chain_config::FeatureFlag,
+    transaction::{ExecutionStatus, TransactionStatus},
+    write_set::WriteOp,
+};
 use aptos_vm::testing::{testing_only::inject_error_once, InjectedError};
 use move_core_types::account_address::AccountAddress;
 use serde::Serialize;
@@ -50,10 +54,37 @@ fn test_refunds() {
     assert_succ(&mut h, &mod_acc, "store_1_pop_2", vec![], -1);
 
     // Create many slots (with SmartTable)
-    assert_succ(&mut h, &user_acc, "init_collection_of_1000", vec![], 135);
+    assert_succ(&mut h, &user_acc, "init_collection_of_1000", vec![], 1025);
 
     // Release many slots.
-    assert_succ(&mut h, &user_acc, "destroy_collection", vec![], -135);
+    assert_succ(&mut h, &user_acc, "destroy_collection", vec![], -1025);
+
+    // Create many many slots
+    assert_succ(&mut h, &user_acc, "init_collection_of_1000", vec![], 1025);
+    assert_succ(
+        &mut h,
+        &user_acc,
+        "grow_collection",
+        vec![ser(&1000u64), ser(&6000u64)],
+        2977,
+    );
+    assert_succ(
+        &mut h,
+        &user_acc,
+        "grow_collection",
+        vec![ser(&6000u64), ser(&11000u64)],
+        3333,
+    );
+    assert_succ(
+        &mut h,
+        &user_acc,
+        "grow_collection",
+        vec![ser(&11000u64), ser(&16000u64)],
+        3333,
+    );
+
+    // Try to release the entire collection, expect failure because too many items are being released in one single txn.
+    assert_result(&mut h, &user_acc, "destroy_collection", vec![], 0, false);
 }
 
 const LEEWAY: u64 = 2000;
@@ -109,6 +140,11 @@ fn assert_result(
     let txn_out = h.run_raw(txn);
     if expect_success {
         assert_success!(*txn_out.status());
+    } else {
+        assert_ne!(
+            *txn_out.status(),
+            TransactionStatus::Keep(ExecutionStatus::Success)
+        );
     }
 
     let end_balance = h.read_aptos_balance(account.address());
@@ -126,16 +162,17 @@ fn assert_result(
     }
     if expect_success {
         assert_eq!(creates - deletes, expect_num_slots_charged);
+
+        // check the balance
+        let slot_fee = read_slot_fee_from_gas_schedule(h);
+        let expected_end =
+            (start_balance as i64 - slot_fee as i64 * expect_num_slots_charged) as u64;
+        let leeway = LEEWAY * expect_num_slots_charged.unsigned_abs();
+        assert!(expected_end + leeway > end_balance);
+        assert!(expected_end < end_balance + leeway);
     } else {
         assert!(expect_num_slots_charged >= creates);
     }
-
-    // check the balance
-    let slot_fee = read_slot_fee_from_gas_schedule(h);
-    let expected_end = (start_balance as i64 - slot_fee as i64 * expect_num_slots_charged) as u64;
-    let leeway = LEEWAY * expect_num_slots_charged.unsigned_abs();
-    assert!(expected_end + leeway > end_balance);
-    assert!(expected_end < end_balance + leeway);
 
     // check the fee statement
     let fee_statement = txn_out.try_extract_fee_statement().unwrap().unwrap();

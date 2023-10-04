@@ -179,7 +179,7 @@ impl Benches {
             None
         } else {
             let bytes: Vec<u8> = rng.sample_iter::<u8, _>(Standard).take(100).collect();
-            Some(StateValue::new_legacy(bytes))
+            Some(StateValue::new_legacy(bytes.into()))
         }
     }
 

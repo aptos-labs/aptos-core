@@ -21,15 +21,15 @@ fn test_put_get() {
     let block = Block::make_genesis_block();
     let blocks = vec![block];
 
-    assert_eq!(db.get_all_data::<BlockSchema>().unwrap().len(), 0);
-    assert_eq!(db.get_all_data::<QCSchema>().unwrap().len(), 0);
+    assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 0);
+    assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
 
     let qcs = vec![certificate_for_genesis()];
     db.save_blocks_and_quorum_certificates(blocks.clone(), qcs.clone())
         .unwrap();
 
-    assert_eq!(db.get_all_data::<BlockSchema>().unwrap().len(), 1);
-    assert_eq!(db.get_all_data::<QCSchema>().unwrap().len(), 1);
+    assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 1);
+    assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 1);
 
     let tc = vec![0u8, 1, 2];
     db.save_highest_2chain_timeout_certificate(tc.clone())
@@ -58,8 +58,8 @@ fn test_delete_block_and_qc() {
     let tmp_dir = TempPath::new();
     let db = ConsensusDB::new(&tmp_dir);
 
-    assert_eq!(db.get_all_data::<BlockSchema>().unwrap().len(), 0);
-    assert_eq!(db.get_all_data::<QCSchema>().unwrap().len(), 0);
+    assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 0);
+    assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
 
     let blocks = vec![Block::make_genesis_block()];
     let block_id = blocks[0].id();
@@ -68,24 +68,24 @@ fn test_delete_block_and_qc() {
     let qc_id = qcs[0].certified_block().id();
 
     db.save_blocks_and_quorum_certificates(blocks, qcs).unwrap();
-    assert_eq!(db.get_all_data::<BlockSchema>().unwrap().len(), 1);
-    assert_eq!(db.get_all_data::<QCSchema>().unwrap().len(), 1);
+    assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 1);
+    assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 1);
 
     // Start to delete
     db.delete_blocks_and_quorum_certificates(vec![block_id, qc_id])
         .unwrap();
-    assert_eq!(db.get_all_data::<BlockSchema>().unwrap().len(), 0);
-    assert_eq!(db.get_all_data::<QCSchema>().unwrap().len(), 0);
+    assert_eq!(db.get_all::<BlockSchema>().unwrap().len(), 0);
+    assert_eq!(db.get_all::<QCSchema>().unwrap().len(), 0);
 }
 
 fn test_dag_type<S: Schema<Key = K>, K: Eq + Hash>(key: S::Key, value: S::Value, db: &ConsensusDB) {
-    db.save_data::<S>(&key, &value).unwrap();
-    let mut from_db: HashMap<K, S::Value> = db.get_all_data::<S>().unwrap().into_iter().collect();
+    db.put::<S>(&key, &value).unwrap();
+    let mut from_db: HashMap<K, S::Value> = db.get_all::<S>().unwrap().into_iter().collect();
     assert_eq!(from_db.len(), 1);
     let value_from_db = from_db.remove(&key).unwrap();
     assert_eq!(value, value_from_db);
-    db.delete_data::<S>(vec![key]).unwrap();
-    assert_eq!(db.get_all_data::<S>().unwrap().len(), 0);
+    db.delete::<S>(vec![key]).unwrap();
+    assert_eq!(db.get_all::<S>().unwrap().len(), 0);
 }
 
 #[test]
@@ -102,7 +102,7 @@ fn test_dag() {
         vec![],
         Extensions::empty(),
     );
-    test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>(node.digest(), node.clone(), &db);
+    test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>((), node.clone(), &db);
 
     let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());
     test_dag_type::<CertifiedNodeSchema, <CertifiedNodeSchema as Schema>::Key>(
@@ -113,11 +113,4 @@ fn test_dag() {
 
     let vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
     test_dag_type::<DagVoteSchema, <DagVoteSchema as Schema>::Key>(node.id(), vote, &db);
-
-    let anchor_id = node.id();
-    test_dag_type::<OrderedAnchorIdSchema, <OrderedAnchorIdSchema as Schema>::Key>(
-        anchor_id,
-        (),
-        &db,
-    );
 }

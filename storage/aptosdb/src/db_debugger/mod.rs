@@ -11,6 +11,12 @@ pub mod truncate;
 use anyhow::Result;
 use clap::Parser;
 
+#[derive(Parser, Clone)]
+pub struct ShardingConfig {
+    #[clap(long)]
+    enable_storage_sharding: bool,
+}
+
 #[derive(Parser)]
 pub enum Cmd {
     #[clap(subcommand)]

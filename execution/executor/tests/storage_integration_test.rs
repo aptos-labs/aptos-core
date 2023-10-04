@@ -165,9 +165,9 @@ fn test_reconfiguration() {
 
     let t3 = db
         .reader
-        .get_account_transaction(aptos_test_root_address(), 1, true, current_version)
+        .get_transaction_by_version(3, current_version, /*fetch_events=*/ true)
         .unwrap();
-    verify_committed_txn_status(t3.as_ref(), &txn_block[2]).unwrap();
+    verify_committed_txn_status(&t3, &txn_block[2]).unwrap();
 
     let db_state_view = db
         .reader

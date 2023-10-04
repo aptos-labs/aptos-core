@@ -229,7 +229,7 @@ impl std::ops::Deref for AccountAddress {
 
 impl fmt::Display for AccountAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:x}", self)
+        write!(f, "{}", self.to_standard_string())
     }
 }
 
@@ -588,7 +588,7 @@ mod tests {
 
         let address = AccountAddress::from_hex(hex).unwrap();
 
-        assert_eq!(format!("{}", address), hex);
+        assert_eq!(format!("{}", address), format!("0x{}", hex));
         assert_eq!(format!("{:?}", address), hex);
         assert_eq!(format!("{:X}", address), upper_hex);
         assert_eq!(format!("{:x}", address), hex);
