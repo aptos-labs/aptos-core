@@ -3,9 +3,9 @@
 import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { AccountAddress } from "../../core";
 import { Identifier } from "./identifier";
-import { TransactionArgument } from "./transactionArguments";
+import { ScriptTransactionArgument } from "./scriptTransactionArguments";
 import { ModuleId } from "./moduleId";
-import { RustEnumTransactionPayloadVariants } from "../../types";
+import { TransactionPayloadVariants } from "../../types";
 
 /**
  * Representation of the supported Transaction Payload
@@ -24,11 +24,11 @@ export abstract class TransactionPayload extends Serializable {
     // index enum variant
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case RustEnumTransactionPayloadVariants.TransactionPayloadScript:
+      case TransactionPayloadVariants.TransactionPayloadScript:
         return TransactionPayloadScript.load(deserializer);
-      case RustEnumTransactionPayloadVariants.TransactionPayloadEntryFunction:
+      case TransactionPayloadVariants.TransactionPayloadEntryFunction:
         return TransactionPayloadEntryFunction.load(deserializer);
-      case RustEnumTransactionPayloadVariants.TransactionPayloadMultisig:
+      case TransactionPayloadVariants.TransactionPayloadMultisig:
         return TransactionPayloadMultisig.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
@@ -48,7 +48,7 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionPayloadVariants.TransactionPayloadScript);
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.TransactionPayloadScript);
     this.script.serialize(serializer);
   }
 
@@ -70,7 +70,7 @@ export class TransactionPayloadEntryFunction extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionPayloadVariants.TransactionPayloadEntryFunction);
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.TransactionPayloadEntryFunction);
     this.entryFunction.serialize(serializer);
   }
 
@@ -92,7 +92,7 @@ export class TransactionPayloadMultisig extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionPayloadVariants.TransactionPayloadMultisig);
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.TransactionPayloadMultisig);
     this.multiSig.serialize(serializer);
   }
 
@@ -184,7 +184,7 @@ export class Script {
   /**
    * The arugments that the bytecode function requires.
    */
-  public readonly args: Array<TransactionArgument>;
+  public readonly args: Array<ScriptTransactionArgument>;
 
   /**
    * Scripts contain the Move bytecodes payload that can be submitted to Aptos chain for execution.
@@ -205,7 +205,7 @@ export class Script {
    * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
    * ```
    */
-  constructor(bytecode: Uint8Array, type_args: Array<TypeTag>, args: Array<TransactionArgument>) {
+  constructor(bytecode: Uint8Array, type_args: Array<TypeTag>, args: Array<ScriptTransactionArgument>) {
     this.bytecode = bytecode;
     this.type_args = type_args;
     this.args = args;
@@ -214,13 +214,13 @@ export class Script {
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.bytecode);
     serializer.serializeVector<TypeTag>(this.type_args);
-    serializer.serializeVector<TransactionArgument>(this.args);
+    serializer.serializeVector<ScriptTransactionArgument>(this.args);
   }
 
   static deserialize(deserializer: Deserializer): Script {
     const bytecode = deserializer.deserializeBytes();
     const type_args = deserializer.deserializeVector(TypeTag);
-    const args = deserializer.deserializeVector(TransactionArgument);
+    const args = deserializer.deserializeVector(ScriptTransactionArgument);
     return new Script(bytecode, type_args, args);
   }
 }

@@ -1756,8 +1756,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 .dynamic_max_txn_per_s = 6000;
 
             // Experimental storage optimizations
-            config.storage.rocksdb_configs.split_ledger_db = true;
-            config.storage.rocksdb_configs.use_sharded_state_merkle_db = true;
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)
