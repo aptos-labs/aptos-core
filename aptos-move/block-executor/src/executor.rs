@@ -419,7 +419,7 @@ where
 
         loop {
             // Priorotize committing validated transactions
-            if scheduler.should_coordinate_commits() {
+            while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
                     self.maybe_block_gas_limit,
                     scheduler,
