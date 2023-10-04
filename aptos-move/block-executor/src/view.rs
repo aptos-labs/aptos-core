@@ -349,26 +349,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         state_value: StateValue,
         layout: &MoveTypeLayout,
-    ) -> anyhow::Result<StateValue> {
-        state_value.map_bytes(|bytes| {
-            // This call will replace all occurrences of aggregator / snapshot
-            // values with unique identifiers with the same type layout.
-            // The values are stored in aggregators multi-version data structure,
-            // see the actual trait implementation for more details.
-            let patched_value =
-                deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, self).ok_or_else(
-                    || anyhow::anyhow!("Failed to deserialize resource during id replacement"),
-                )?;
-            patched_value
-                .simple_serialize(layout)
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Failed to serialize value {} after id replacement",
-                        patched_value
-                    )
-                })
-                .map(|b| b.into())
-        })
+    ) -> anyhow::Result<(StateValue, HashSet<T::Identifier>)> {
+        let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
+        state_value
+            .map_bytes(|bytes| {
+                // This call will replace all occurrences of aggregator / snapshot
+                // values with unique identifiers with the same type layout.
+                // The values are stored in aggregators multi-version data structure,
+                // see the actual trait implementation for more details.
+                let patched_value =
+                    deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Failed to deserialize resource during id replacement")
+                        })?;
+                patched_value
+                    .simple_serialize(layout)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Failed to serialize value {} after id replacement",
+                            patched_value
+                        )
+                    })
+                    .map(|b| b.into())
+            })
+            .map(|v| (v, mapping.into_inner()))
     }
 
     /// Given a state value, performs deserialization-serialization round-trip
@@ -378,7 +382,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<(Bytes, HashSet<T::Identifier>)> {
-        // TODO: Find a way to replace this with Self::IdentifierV2
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
         let value = Value::simple_deserialize(bytes, layout).ok_or_else(|| {
@@ -387,15 +390,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 bytes
             )
         })?;
-        //TODO: Returns the vector of delayed field ids found in the resource
-        Ok((
-            serialize_and_replace_ids_with_values(&value, layout, self)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Failed to serialize resource during id replacement")
-                })?
-                .into(),
-            HashSet::new(),
-        ))
+        let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
+        let patched_bytes = serialize_and_replace_ids_with_values(&value, layout, &mapping)
+            .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
+            .into();
+        Ok((patched_bytes, mapping.into_inner()))
     }
 
     fn get_resource_state_value_impl(
@@ -423,22 +422,25 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         // TODO(aggregator): gate by the flag.
                         (Some(state_value), Some(layout)) => {
                             let res = self.replace_values_with_identifiers(state_value, layout);
-                            if let Err(err) = &res {
-                                // TODO(aggregator): This means replacement failed
-                                //       and most likely there is a bug. Log the error
-                                //       for now, and add recovery mechanism later.
-                                let log_context = AdapterLogSchema::new(
-                                    self.base_view.id(),
-                                    self.txn_idx as usize,
-                                );
-                                alert!(
-                                    log_context,
-                                    "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
-                                    state_key,
-                                    err
-                                );
+                            match res {
+                                Ok((value, _)) => Some(value),
+                                Err(err) => {
+                                    // TODO(aggregator): This means replacement failed
+                                    //       and most likely there is a bug. Log the error
+                                    //       for now, and add recovery mechanism later.
+                                    let log_context = AdapterLogSchema::new(
+                                        self.base_view.id(),
+                                        self.txn_idx as usize,
+                                    );
+                                    alert!(
+                                        log_context,
+                                        "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
+                                        state_key,
+                                        err
+                                    );
+                                    None
+                                },
                             }
-                            Some(res?)
                         },
                         (from_storage, _) => from_storage,
                     };
@@ -651,11 +653,52 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     }
 }
 
+struct TemporaryValueToIdentifierMapping<
+    'a,
+    T: Transaction,
+    S: TStateView<Key = T::Key>,
+    X: Executable,
+> {
+    latest_view: &'a LatestView<'a, T, S, X>,
+    txn_idx: TxnIndex,
+    // These are the delayed field keys that were touched when utilizing this mapping
+    // to replace ids with values or values with ids
+    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
+    TemporaryValueToIdentifierMapping<'a, T, S, X>
+{
+    pub fn new(latest_view: &'a LatestView<'a, T, S, X>, txn_idx: TxnIndex) -> Self {
+        Self {
+            latest_view,
+            txn_idx,
+            delayed_field_keys: RefCell::new(HashSet::new()),
+        }
+    }
+
+    fn generate_delayed_field_id(&self) -> T::Identifier {
+        match &self.latest_view.latest_view {
+            ViewState::Sync(state) => (state.counter.fetch_add(1, Ordering::SeqCst) as u64).into(),
+            ViewState::Unsync(state) => {
+                let mut counter = state.counter.borrow_mut();
+                let id = (*counter as u64).into();
+                *counter += 1;
+                id
+            },
+        }
+    }
+
+    pub fn into_inner(self) -> HashSet<T::Identifier> {
+        self.delayed_field_keys.borrow().clone()
+    }
+}
+
 // For aggregators V2, values are replaced with identifiers at deserialization time,
 // and are replaced back when the value is serialized. The "lifted" values are cached
 // by the `LatestView` in the aggregators multi-version data structure.
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
-    for LatestView<'a, T, S, X>
+    for TemporaryValueToIdentifierMapping<'a, T, S, X>
 {
     fn value_to_identifier(
         &self,
@@ -664,7 +707,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         value: Value,
     ) -> TransformationResult<Value> {
         let id = self.generate_delayed_field_id();
-        match &self.latest_view {
+        match &self.latest_view.latest_view {
             ViewState::Sync(state) => {
                 let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
                 state.set_delayed_field_value(id, base_value)
@@ -674,6 +717,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 unimplemented!("Value to ID replacement for sequential execution is not supported")
             },
         };
+        self.delayed_field_keys.borrow_mut().insert(id);
         id.try_into_move_value(layout)
             .map_err(|e| TransformationError(format!("{:?}", e)))
     }
@@ -685,7 +729,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     ) -> TransformationResult<Value> {
         let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        match &self.latest_view {
+        self.delayed_field_keys.borrow_mut().insert(id);
+        match &self.latest_view.latest_view {
             ViewState::Sync(state) => Ok(state
                 .read_delayed_field_last_committed_value(
                     id,
