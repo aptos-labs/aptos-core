@@ -688,7 +688,7 @@ impl Scheduler {
 
         if let Ok(prev_val_idx) =
             self.validation_idx
-                .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
+                .fetch_update(Ordering::SeqCst, Ordering::Acquire, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
                         let mut validation_status = self.txn_status[target_idx as usize].1.write();
@@ -801,8 +801,8 @@ impl Scheduler {
             .compare_exchange(
                 curr_validation_idx,
                 next_validation_idx,
-                Ordering::Acquire,
                 Ordering::SeqCst,
+                Ordering::Acquire,
             )
             .is_ok()
         {
