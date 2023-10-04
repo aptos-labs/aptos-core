@@ -4,7 +4,7 @@
 use crate::{metrics::TIMER, DbReader};
 use anyhow::{anyhow, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, sample, sample::SampleRate};
+use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -102,6 +102,7 @@ impl AsyncProofFetcher {
             proofs.insert(state_key_hash, proof);
         }
         self.num_proofs_to_read.store(0, Ordering::SeqCst);
+        //info!("****************** Received {} proofs.", proofs.len());
         proofs
     }
 

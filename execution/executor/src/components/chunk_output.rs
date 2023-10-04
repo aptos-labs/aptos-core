@@ -36,7 +36,7 @@ use aptos_vm::{
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use once_cell::sync::{Lazy, OnceCell};
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{ops::Deref, sync::Arc, thread, time::Duration};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use aptos_executor_service::remote_executor_client::{COORDINATOR_PORT, RemoteExecutorClient};
 use aptos_secure_net::network_controller::NetworkController;
@@ -45,6 +45,7 @@ use aptos_vm::sharded_block_executor::local_executor_shard::LocalExecutorClient;
 
 static REMOTE_SHARDING: OnceCell<bool> = OnceCell::new();
 static REMOTE_ADDRESSES: OnceCell<Vec<SocketAddr>> = OnceCell::new();
+static COORDINATOR_ADDRESS: OnceCell<SocketAddr> = OnceCell::new();
 
 /// Sets the flag when invoked the first time.
 pub fn set_remote_sharding(enable: bool) {
@@ -69,6 +70,17 @@ pub fn get_remote_addresses() -> Vec<SocketAddr> {
     }
 }
 
+pub fn set_coordinator_address(address: SocketAddr) {
+    COORDINATOR_ADDRESS.set(address).ok();
+}
+
+pub fn get_coordinator_address() -> SocketAddr {
+    match COORDINATOR_ADDRESS.get() {
+        Some(value) => *value,
+        None => SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT),
+    }
+}
+
 pub static SHARDED_BLOCK_EXECUTOR: Lazy<
     Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
 > = Lazy::new(|| {
@@ -81,7 +93,7 @@ pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
     Arc<Mutex<ShardedBlockExecutor<CachedStateView, RemoteExecutorClient<CachedStateView>>>>,
 > = Lazy::new(|| {
     info!("*********** REMOTE_SHARDED_BLOCK_EXECUTOR");
-    let coordinator_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT);
+    let coordinator_address = get_coordinator_address();
     let controller = NetworkController::new(
         "remote-executor-coordinator".to_string(),
         coordinator_address,
@@ -153,6 +165,9 @@ impl ChunkOutput {
 
         // TODO(skedia) add logic to emit counters per shard instead of doing it globally.
 
+       // info!("before sleep");
+       // thread::sleep(std::time::Duration::from_millis(1000));
+       // info!("after sleep");
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
@@ -244,7 +259,7 @@ impl ChunkOutput {
                 state_view,
                 maybe_block_gas_limit,
             )?);
-            remote_sharded_block_executor.shutdown();
+            //remote_sharded_block_executor.shutdown();
             res
         } else {
             Ok(V::execute_block_sharded(

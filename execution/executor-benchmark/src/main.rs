@@ -113,6 +113,8 @@ pub struct PipelineOpt {
     #[clap(long, num_args = 1..)]
     pub remote_executor_addresses: Option<Vec<SocketAddr>>,
     #[clap(long)]
+    coordinator_address: Option<SocketAddr>,
+    #[clap(long)]
     use_global_executor: bool,
     #[clap(long, default_value = "4")]
     num_generator_workers: usize,
@@ -443,6 +445,9 @@ fn main() {
     chunk_output::set_remote_sharding(opt.pipeline_opt.remote_sharding);
     if opt.pipeline_opt.remote_executor_addresses.is_some() {
         chunk_output::set_remote_addresses(opt.pipeline_opt.remote_executor_addresses.clone().unwrap());
+    }
+    if opt.pipeline_opt.coordinator_address.is_some() {
+        chunk_output::set_coordinator_address(opt.pipeline_opt.coordinator_address.clone().unwrap());
     }
 
     let config = ProfilerConfig::new_with_defaults();

@@ -67,10 +67,11 @@ impl GRPCNetworkMessageServiceServerWrapper {
         //           we may need to implement a healthcheck service to check if the server is up
         Server::builder()
             .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
-            .add_service(NetworkMessageServiceServer::new(self).max_decoding_message_size(MAX_MESSAGE_SIZE).max_encoding_message_size(MAX_MESSAGE_SIZE))
+            .add_service(NetworkMessageServiceServer::new(self).max_decoding_message_size(MAX_MESSAGE_SIZE))
             .add_service(reflection_service)
             .serve_with_shutdown(server_addr, async {
                 server_shutdown_rx.await.ok();
+                info!("Received signal to shutdown server at {:?}", server_addr);
             })
             .await
             .unwrap();
@@ -121,7 +122,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
         let conn = tonic::transport::Endpoint::new(remote_addr)
             .unwrap()
             .connect_lazy();
-        NetworkMessageServiceClient::new(conn).max_decoding_message_size(MAX_MESSAGE_SIZE).max_encoding_message_size(MAX_MESSAGE_SIZE)
+        NetworkMessageServiceClient::new(conn).max_decoding_message_size(MAX_MESSAGE_SIZE)
     }
 
     pub async fn send_message(

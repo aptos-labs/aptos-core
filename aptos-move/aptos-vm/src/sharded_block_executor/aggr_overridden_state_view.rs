@@ -39,6 +39,7 @@ impl<'a, S: StateView + Sync + Send> TStateView for AggregatorOverriddenStateVie
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         if *state_key == *TOTAL_SUPPLY_STATE_KEY {
+            self.base_view.get_state_value(state_key)?;
             return self.total_supply_base_view_override();
         }
         self.base_view.get_state_value(state_key)

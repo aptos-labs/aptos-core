@@ -141,6 +141,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
 
         let execution_results = self.get_output_from_shards()?;
 
+        self.state_view_service.drop_state_view();
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
 
