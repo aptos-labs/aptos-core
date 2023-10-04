@@ -174,6 +174,7 @@ impl RawData for RawDataServerWrapper {
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
                                 request_metadata.request_email.as_str(),
+                                request_metadata.processor_name.as_str(),
                             ])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
@@ -205,6 +206,7 @@ impl RawData for RawDataServerWrapper {
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
                                 request_metadata.request_email.as_str(),
+                                request_metadata.processor_name.as_str(),
                             ])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
@@ -374,6 +376,7 @@ impl RawData for RawDataServerWrapper {
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
                                 request_metadata.request_email.as_str(),
+                                request_metadata.processor_name.as_str(),
                             ])
                             .inc();
                     }
