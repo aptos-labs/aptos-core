@@ -15,7 +15,7 @@ use futures::{
     stream::FuturesUnordered,
     Stream,
 };
-use quinn::Connection;
+use quinn::{Connection, VarInt};
 use std::{
     fmt::Debug,
     io,
@@ -543,8 +543,18 @@ fn configure_client() -> quinn::ClientConfig {
 fn create_transport_config() -> Arc<quinn::TransportConfig> {
     let mut transport_config = quinn::TransportConfig::default();
 
+    // Set the idle timeout and keep alive
     transport_config.max_idle_timeout(Some(Duration::from_secs(120).try_into().unwrap()));
     transport_config.keep_alive_interval(Some(Duration::from_secs(60)));
+
+    // Optimize the send and receiver buffer sizes according to estimated
+    // RTT and bandwidth. This was taken from the QUINN source code...
+    let expected_rtt: u32 = 255; // 255 ms
+    let max_stream_bandwidth = 300 * 1000 * 1000; // 300 MB
+    let stream_receive_window = (max_stream_bandwidth / 1000) * expected_rtt;
+    let stream_send_window = 8 * stream_receive_window;
+    transport_config.stream_receive_window(VarInt::from_u32(stream_receive_window));
+    transport_config.send_window(stream_send_window as u64);
 
     Arc::new(transport_config)
 }
