@@ -11,8 +11,8 @@ use crate::{
 #[allow(unused_imports)]
 use anyhow::{bail, Error};
 use aptos_aggregator::{
-    resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorID, AggregatorValue},
+    resolver::{DelayedFieldReadMode, TDelayedFieldView},
+    types::{DelayedFieldID, DelayedFieldValue},
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -325,28 +325,28 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
+impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+    type IdentifierV2 = DelayedFieldID;
 
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id, mode)
     }
 
-    fn get_aggregator_v2_value(
+    fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        mode: AggregatorReadMode,
-    ) -> anyhow::Result<AggregatorValue> {
-        self.executor_view.get_aggregator_v2_value(id, mode)
+        mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<DelayedFieldValue> {
+        self.executor_view.get_delayed_field_value(id, mode)
     }
 
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
-        self.executor_view.generate_aggregator_v2_id()
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+        self.executor_view.generate_delayed_field_id()
     }
 }
 

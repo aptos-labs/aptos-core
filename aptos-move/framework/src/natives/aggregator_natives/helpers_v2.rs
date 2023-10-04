@@ -4,7 +4,7 @@
 use super::helpers_v1::set_aggregator_field;
 use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
 use aptos_aggregator::{
-    types::{AggregatorID, SnapshotValue},
+    types::{DelayedFieldID, SnapshotValue},
     utils::{from_utf8_bytes, u128_to_u64},
 };
 use move_binary_format::errors::PartialVMResult;
@@ -15,16 +15,16 @@ use move_vm_types::values::{StructRef, Value};
 const VALUE_FIELD_INDEX: usize = 0;
 const LIMIT_FIELD_INDEX: usize = 1;
 
-pub(crate) fn aggregator_value_field_as_id(value: u128) -> PartialVMResult<AggregatorID> {
-    u128_to_u64(value).map(AggregatorID::new)
+pub(crate) fn aggregator_value_field_as_id(value: u128) -> PartialVMResult<DelayedFieldID> {
+    u128_to_u64(value).map(DelayedFieldID::new)
 }
 
 pub(crate) fn aggregator_snapshot_value_field_as_id(
     value: SnapshotValue,
-) -> PartialVMResult<AggregatorID> {
+) -> PartialVMResult<DelayedFieldID> {
     match value {
         SnapshotValue::Integer(v) => aggregator_value_field_as_id(v),
-        SnapshotValue::String(v) => Ok(from_utf8_bytes(v)?).map(AggregatorID::new),
+        SnapshotValue::String(v) => Ok(from_utf8_bytes(v)?).map(DelayedFieldID::new),
     }
 }
 

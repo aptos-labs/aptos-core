@@ -13,9 +13,9 @@ use crate::natives::{
     AccountAddress,
 };
 use aptos_aggregator::{
-    aggregator_extension::AggregatorData,
     bounded_math::BoundedMath,
-    resolver::AggregatorResolver,
+    delayed_field_extension::AggregatorData,
+    resolver::DelayedFieldResolver,
     types::{AggregatorVersionedID, ReadPosition, SnapshotToStringFormula, SnapshotValue},
     utils::{string_to_bytes, to_utf8_bytes, u128_to_u64},
 };
@@ -181,7 +181,7 @@ impl SnapshotType {
 
 fn get_context_data<'t, 'b>(
     context: &'t mut SafeNativeContext<'_, 'b, '_, '_>,
-) -> (&'b dyn AggregatorResolver, RefMut<'t, AggregatorData>) {
+) -> (&'b dyn DelayedFieldResolver, RefMut<'t, AggregatorData>) {
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     (
         aggregator_context.resolver,
@@ -211,7 +211,7 @@ fn native_create_aggregator(
 
     let value_field_value = if context.aggregator_execution_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
-        let id = resolver.generate_aggregator_v2_id();
+        let id = resolver.generate_delayed_field_id();
         aggregator_data.create_new_aggregator(AggregatorVersionedID::V2(id), max_value);
         id.as_u64() as u128
     } else {

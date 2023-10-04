@@ -9,13 +9,13 @@ use crate::{
 };
 use aptos_aggregator::{
     delta_change_set::serialize,
-    resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorValue, PanicOr, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
+    resolver::{DelayedFieldReadMode, TDelayedFieldView},
+    types::{DelayedFieldValue, PanicOr, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
-        MVAggregatorsError, MVDataError, MVDataOutput, MVModulesError, MVModulesOutput, TxnIndex,
+        MVDataError, MVDataOutput, MVDelayedFieldsError, MVModulesError, MVModulesOutput, TxnIndex,
     },
     unsync_map::UnsyncMap,
     MVHashMap,
@@ -103,29 +103,29 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         }
     }
 
-    fn set_aggregator_v2_value(&self, id: T::Identifier, base_value: AggregatorValue) {
+    fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.versioned_map
-            .aggregators()
+            .delayed_fields()
             .set_base_value(id, base_value)
     }
 
-    fn read_aggregator_v2_last_committed_value(
+    fn read_delayed_field_last_committed_value(
         &self,
         id: T::Identifier,
         txn_idx: TxnIndex,
         read_position: ReadPosition,
-    ) -> Result<AggregatorValue, MVAggregatorsError> {
+    ) -> Result<DelayedFieldValue, MVDelayedFieldsError> {
         self.versioned_map
-            .aggregators()
+            .delayed_fields()
             .read_latest_committed_value(id, txn_idx, read_position)
     }
 
-    fn read_aggregator_v2_aggregated_value(
+    fn read_delayed_field_aggregated_value(
         &self,
         id: T::Identifier,
         txn_idx: TxnIndex,
-    ) -> Result<AggregatorValue, PanicOr<MVAggregatorsError>> {
-        match self.versioned_map.aggregators().read(id, txn_idx) {
+    ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
+        match self.versioned_map.delayed_fields().read(id, txn_idx) {
             Ok(value) => {
                 if self
                     .captured_reads
@@ -134,7 +134,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     .is_err()
                 {
                     // Inconsistency in recorded reads.
-                    Err(PanicOr::Or(MVAggregatorsError::DeltaApplicationFailure))
+                    Err(PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure))
                 } else {
                     Ok(value)
                 }
@@ -387,7 +387,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 bytes
             )
         })?;
-        //TODO: Returns the vector of aggregator ids found in the resource
+        //TODO: Returns the vector of delayed field ids found in the resource
         Ok((
             serialize_and_replace_ids_with_values(&value, layout, self)
                 .ok_or_else(|| {
@@ -583,7 +583,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
     for LatestView<'a, T, S, X>
 {
     type IdentifierV1 = T::Key;
@@ -592,7 +592,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
-        _mode: AggregatorReadMode,
+        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         // TODO: Integrate aggregators V1. That is, we can lift the u128 value
         //       from the state item by passing the right layout here. This can
@@ -601,23 +601,23 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         self.get_resource_state_value(state_key, None)
     }
 
-    fn get_aggregator_v2_value(
+    fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        mode: AggregatorReadMode,
-    ) -> anyhow::Result<aptos_aggregator::types::AggregatorValue> {
+        mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<aptos_aggregator::types::DelayedFieldValue> {
         match &self.latest_view {
             ViewState::Sync(state) => match mode {
-                AggregatorReadMode::Aggregated => state
-                    .read_aggregator_v2_aggregated_value(*id, self.txn_idx)
+                DelayedFieldReadMode::Aggregated => state
+                    .read_delayed_field_aggregated_value(*id, self.txn_idx)
                     .map_err(|e| {
                         anyhow::Error::new(VMStatus::error(
                             StatusCode::from(&e),
                             Some(format!("Error during read: {:?}", e)),
                         ))
                     }),
-                AggregatorReadMode::LastCommitted => state
-                    .read_aggregator_v2_last_committed_value(
+                DelayedFieldReadMode::LastCommitted => state
+                    .read_delayed_field_last_committed_value(
                         *id,
                         self.txn_idx,
                         ReadPosition::BeforeCurrentTxn,
@@ -629,7 +629,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
                         ))
                     }),
             },
-            ViewState::Unsync(state) => state.unsync_map.fetch_aggregator(id).ok_or_else(|| {
+            ViewState::Unsync(state) => state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
                 anyhow::Error::new(VMStatus::error(
                     StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some(format!("Aggregator for id {:?} doesn't exist", id)),
@@ -638,7 +638,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         }
     }
 
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
         match &self.latest_view {
             ViewState::Sync(state) => (state.counter.fetch_add(1, Ordering::SeqCst) as u64).into(),
             ViewState::Unsync(state) => {
@@ -663,11 +663,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         layout: &MoveTypeLayout,
         value: Value,
     ) -> TransformationResult<Value> {
-        let id = self.generate_aggregator_v2_id();
+        let id = self.generate_delayed_field_id();
         match &self.latest_view {
             ViewState::Sync(state) => {
-                let base_value = AggregatorValue::try_from_move_value(layout, value, kind)?;
-                state.set_aggregator_v2_value(id, base_value)
+                let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
+                state.set_delayed_field_value(id, base_value)
             },
             ViewState::Unsync(_state) => {
                 // TODO(aggregator): Support sequential execution.
@@ -687,7 +687,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
         match &self.latest_view {
             ViewState::Sync(state) => Ok(state
-                .read_aggregator_v2_last_committed_value(
+                .read_delayed_field_last_committed_value(
                     id,
                     self.txn_idx,
                     ReadPosition::AfterCurrentTxn,

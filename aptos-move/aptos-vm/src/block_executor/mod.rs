@@ -14,7 +14,7 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange, delta_change_set::DeltaOp, types::AggregatorID,
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::Error,
@@ -44,7 +44,7 @@ use std::{collections::HashMap, sync::Arc};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
-    type Identifier = AggregatorID;
+    type Identifier = DelayedFieldID;
     type Key = StateKey;
     type Tag = StructTag;
     type Value = WriteOp;
@@ -142,13 +142,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v2_change_set(&self) -> HashMap<AggregatorID, AggregatorChange<AggregatorID>> {
+    fn delayed_field_change_set(&self) -> HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get aggregator change set")
             .change_set()
-            .aggregator_v2_change_set()
+            .delayed_field_change_set()
             .clone()
     }
 

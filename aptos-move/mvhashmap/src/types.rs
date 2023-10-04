@@ -90,7 +90,7 @@ pub enum MVModulesOutput<M, X> {
 // TODO: once VersionedAggregators is separated from the MVHashMap, seems that
 // MVDataError and MVModulesError can be unified and simplified.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVAggregatorsError {
+pub enum MVDelayedFieldsError {
     /// No prior entry is found. This can happen if the aggregator was created
     /// by an earlier transaction which aborted, re-executed, and did not re-create
     /// the aggregator (o.w. the ID of the aggregator provided to the reading API
@@ -105,13 +105,13 @@ pub enum MVAggregatorsError {
     DeltaApplicationFailure,
 }
 
-impl MVAggregatorsError {
+impl MVDelayedFieldsError {
     pub fn from_panic_or(
         err: PanicOr<DelayedFieldsSpeculativeError>,
-    ) -> PanicOr<MVAggregatorsError> {
+    ) -> PanicOr<MVDelayedFieldsError> {
         match err {
             PanicOr::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
-            PanicOr::Or(_) => PanicOr::Or(MVAggregatorsError::DeltaApplicationFailure),
+            PanicOr::Or(_) => PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure),
         }
     }
 }

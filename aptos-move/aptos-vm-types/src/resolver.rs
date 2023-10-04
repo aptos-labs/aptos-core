@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{resolver::TAggregatorView, types::AggregatorID};
+use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldID};
 use aptos_state_view::StateViewId;
 use aptos_types::state_store::{
     state_key::StateKey,
@@ -168,7 +168,7 @@ pub trait TExecutorView<K, L, I>:
     TResourceView<Key = K, Layout = L>
     // + TResourceGroupView<Key = K, Tag = T>
     + TModuleView<Key = K>
-    + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
+    + TDelayedFieldView<IdentifierV1 = K, IdentifierV2 = I>
     + StateStorageView
 {
 }
@@ -177,14 +177,14 @@ impl<A, K, L, I> TExecutorView<K, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
         // + TResourceGroupView<Key = K, Tag = T>
         + TModuleView<Key = K>
-        + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
+        + TDelayedFieldView<IdentifierV1 = K, IdentifierV2 = I>
         + StateStorageView
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, MoveTypeLayout, AggregatorID> {}
+pub trait ExecutorView: TExecutorView<StateKey, MoveTypeLayout, DelayedFieldID> {}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, MoveTypeLayout, AggregatorID> {}
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, MoveTypeLayout, DelayedFieldID> {}
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 /// - Result being Err means storage error or some incostistency (e.g. during speculation,

@@ -3,11 +3,11 @@
 
 use crate::task::Transaction;
 use anyhow::bail;
-use aptos_aggregator::types::{AggregatorValue, PanicOr, ReadPosition};
+use aptos_aggregator::types::{DelayedFieldValue, PanicOr, ReadPosition};
 use aptos_mvhashmap::{
-    types::{MVAggregatorsError, MVDataError, MVDataOutput, TxnIndex, Version},
-    versioned_aggregators::VersionedAggregators,
+    types::{MVDataError, MVDataOutput, MVDelayedFieldsError, TxnIndex, Version},
     versioned_data::VersionedData,
+    versioned_delayed_fields::VersionedDelayedFields,
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{state_store::state_value::StateValueMetadataKind, write_set::TransactionWrite};
@@ -162,7 +162,7 @@ pub(crate) struct CapturedReads<T: Transaction> {
     // TODO: implement a general functionality once the fallback is removed.
     pub(crate) module_reads: Vec<T::Key>,
 
-    delayed_field_reads: HashMap<T::Identifier, AggregatorValue>,
+    delayed_field_reads: HashMap<T::Identifier, DelayedFieldValue>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an
     /// observed inconsistency), the transaction output is irrelevant (must be
@@ -271,7 +271,7 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn capture_delayed_field_read(
         &mut self,
         id: T::Identifier,
-        value: AggregatorValue,
+        value: DelayedFieldValue,
     ) -> anyhow::Result<()> {
         let ret = match self.delayed_field_reads.entry(id) {
             Vacant(e) => {
@@ -302,7 +302,7 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
-    pub(crate) fn capture_delayed_field_read_error(&mut self, e: &PanicOr<MVAggregatorsError>) {
+    pub(crate) fn capture_delayed_field_read_error(&mut self, e: &PanicOr<MVDelayedFieldsError>) {
         match e {
             PanicOr::CodeInvariantError(_) => self.incorrect_use = true,
             PanicOr::Or(_) => self.speculative_failure = true,
@@ -402,14 +402,14 @@ impl<T: Transaction> CapturedReads<T> {
     #[allow(dead_code)]
     pub(crate) fn validate_delayed_field_reads(
         &self,
-        delayed_fields: &VersionedAggregators<T::Identifier>,
+        delayed_fields: &VersionedDelayedFields<T::Identifier>,
         idx_to_validate: TxnIndex,
     ) -> bool {
         if self.speculative_failure {
             return false;
         }
 
-        use MVAggregatorsError::*;
+        use MVDelayedFieldsError::*;
         self.delayed_field_reads.iter().all(|(id, read_value)| {
             match delayed_fields.read_latest_committed_value(
                 *id,
@@ -434,7 +434,7 @@ mod test {
         proptest_types::types::{KeyType, MockEvent, ValueType},
         task::Transaction,
     };
-    use aptos_aggregator::types::AggregatorID;
+    use aptos_aggregator::types::DelayedFieldID;
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
@@ -605,7 +605,7 @@ mod test {
 
     impl Transaction for TestTransactionType {
         type Event = MockEvent;
-        type Identifier = AggregatorID;
+        type Identifier = DelayedFieldID;
         type Key = KeyType<u32>;
         type Tag = u32;
         type Value = ValueType;

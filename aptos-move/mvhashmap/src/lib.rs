@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    versioned_aggregators::VersionedAggregators, versioned_data::VersionedData,
+    versioned_data::VersionedData, versioned_delayed_fields::VersionedDelayedFields,
     versioned_group_data::VersionedGroupData, versioned_modules::VersionedModules,
 };
 use aptos_types::{
@@ -16,8 +16,8 @@ use std::{fmt::Debug, hash::Hash};
 pub mod types;
 pub mod unsync_map;
 mod utils;
-pub mod versioned_aggregators;
 pub mod versioned_data;
+pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
 pub mod versioned_modules;
 
@@ -36,7 +36,7 @@ mod unit_tests;
 pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
-    aggregators: VersionedAggregators<I>,
+    delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 }
 
@@ -55,7 +55,7 @@ impl<
         MVHashMap {
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
-            aggregators: VersionedAggregators::new(),
+            delayed_fields: VersionedDelayedFields::new(),
             modules: VersionedModules::new(),
         }
     }
@@ -71,8 +71,8 @@ impl<
         &self.group_data
     }
 
-    pub fn aggregators(&self) -> &VersionedAggregators<I> {
-        &self.aggregators
+    pub fn delayed_fields(&self) -> &VersionedDelayedFields<I> {
+        &self.delayed_fields
     }
 
     pub fn modules(&self) -> &VersionedModules<K, V, X> {
