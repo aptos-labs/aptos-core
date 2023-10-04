@@ -18,7 +18,7 @@ First, you need to initialize the stake pool.
 
 To initialize a staking pool, follow the instructions in [staking pool operations.](../../../nodes/validator-node/operator/staking-pool-operations.md#initialize-cli)
 
-To initialize a delegation pool, follow the instructions in [delegation pool operations.](../../../nodes/validator-node/operatordelegation-pool-operations/#initialize-a-delegation-pool)
+To initialize a delegation pool, follow the instructions in [delegation pool operations.](../../../nodes/validator-node/operator/delegation-pool-operations/#initialize-a-delegation-pool)
 
 
 ## Bootstrapping validator node
