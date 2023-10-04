@@ -2,9 +2,8 @@
 
 import { Deserializer, Serializer } from "../../bcs";
 import { AccountAddress } from "../../core";
-import { RustEnumTransactionVariants } from "../../types";
+import { TransactionVariants } from "../../types";
 import { ChainId } from "./chainId";
-import { TransactionArgument } from "./transactionArguments";
 import { TransactionPayload } from "./transactionPayload";
 
 /**
@@ -104,9 +103,9 @@ export abstract class RawTransactionWithData {
     // undex enum variant
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case RustEnumTransactionVariants.MultiAgentTransaction:
+      case TransactionVariants.MultiAgentTransaction:
         return MultiAgentRawTransaction.load(deserializer);
-      case RustEnumTransactionVariants.FeePayerTransaction:
+      case TransactionVariants.FeePayerTransaction:
         return FeePayerRawTransaction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for RawTransactionWithData: ${index}`);
@@ -135,9 +134,9 @@ export class MultiAgentRawTransaction extends RawTransactionWithData {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionVariants.MultiAgentTransaction);
+    serializer.serializeU32AsUleb128(TransactionVariants.MultiAgentTransaction);
     this.raw_txn.serialize(serializer);
-    serializer.serializeVector<TransactionArgument>(this.secondary_signer_addresses);
+    serializer.serializeVector(this.secondary_signer_addresses);
   }
 
   static load(deserializer: Deserializer): MultiAgentRawTransaction {
@@ -179,9 +178,9 @@ export class FeePayerRawTransaction extends RawTransactionWithData {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionVariants.FeePayerTransaction);
+    serializer.serializeU32AsUleb128(TransactionVariants.FeePayerTransaction);
     this.raw_txn.serialize(serializer);
-    serializer.serializeVector<TransactionArgument>(this.secondary_signer_addresses);
+    serializer.serializeVector(this.secondary_signer_addresses);
     this.fee_payer_address.serialize(serializer);
   }
 

@@ -4,7 +4,7 @@ import { Deserializer, Serializer } from "../../bcs";
 import { AccountAddress } from "../../core";
 import { Ed25519PublicKey, Ed25519Signature } from "../../crypto/ed25519";
 import { MultiEd25519PublicKey, MultiEd25519Signature } from "../../crypto/multi_ed25519";
-import { RustEnumTransactionAuthenticatorVariant } from "../../types";
+import { TransactionAuthenticatorVariant } from "../../types";
 import { AccountAuthenticator } from "./account";
 
 export abstract class TransactionAuthenticator {
@@ -13,13 +13,13 @@ export abstract class TransactionAuthenticator {
   static deserialize(deserializer: Deserializer): TransactionAuthenticator {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorEd25519:
+      case TransactionAuthenticatorVariant.TransactionAuthenticatorEd25519:
         return TransactionAuthenticatorEd25519.load(deserializer);
-      case RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorMultiEd25519:
+      case TransactionAuthenticatorVariant.TransactionAuthenticatorMultiEd25519:
         return TransactionAuthenticatorMultiEd25519.load(deserializer);
-      case RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorMultiAgent:
+      case TransactionAuthenticatorVariant.TransactionAuthenticatorMultiAgent:
         return TransactionAuthenticatorMultiAgent.load(deserializer);
-      case RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorFeePayer:
+      case TransactionAuthenticatorVariant.TransactionAuthenticatorFeePayer:
         return TransactionAuthenticatorFeePayer.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionAuthenticator: ${index}`);
@@ -47,7 +47,7 @@ export class TransactionAuthenticatorEd25519 extends TransactionAuthenticator {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorEd25519);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorEd25519);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -78,7 +78,7 @@ export class TransactionAuthenticatorMultiEd25519 extends TransactionAuthenticat
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorMultiEd25519);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorMultiEd25519);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -117,7 +117,7 @@ export class TransactionAuthenticatorMultiAgent extends TransactionAuthenticator
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorMultiAgent);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorMultiAgent);
     this.sender.serialize(serializer);
     serializer.serializeVector<AccountAddress>(this.secondary_signer_addresses);
     serializer.serializeVector<AccountAuthenticator>(this.secondary_signers);
@@ -163,7 +163,7 @@ export class TransactionAuthenticatorFeePayer extends TransactionAuthenticator {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumTransactionAuthenticatorVariant.TransactionAuthenticatorFeePayer);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorFeePayer);
     this.sender.serialize(serializer);
     serializer.serializeVector<AccountAddress>(this.secondary_signer_addresses);
     serializer.serializeVector<AccountAuthenticator>(this.secondary_signers);

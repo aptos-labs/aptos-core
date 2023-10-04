@@ -8,26 +8,26 @@ export * from "./indexer";
 export type HexInput = string | Uint8Array;
 
 /**
- * Transaction argumtns enum as they are represented in Rust
+ * Script transaction arguments enum as they are represented in Rust
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/transaction_argument.rs#L11}
  */
-export enum RustEnumTransactionArgumentVariants {
-  TransactionArgumentU8 = 0,
-  TransactionArgumentU64 = 1,
-  TransactionArgumentU128 = 2,
-  TransactionArgumentAddress = 3,
-  TransactionArgumentU8Vector = 4,
-  TransactionArgumentBool = 5,
-  TransactionArgumentU16 = 6,
-  TransactionArgumentU32 = 7,
-  TransactionArgumentU256 = 8,
+export enum ScriptTransactionArgumentVariants {
+  ScriptTransactionArgumentU8 = 0,
+  ScriptTransactionArgumentU64 = 1,
+  ScriptTransactionArgumentU128 = 2,
+  ScriptTransactionArgumentAddress = 3,
+  ScriptTransactionArgumentU8Vector = 4,
+  ScriptTransactionArgumentBool = 5,
+  ScriptTransactionArgumentU16 = 6,
+  ScriptTransactionArgumentU32 = 7,
+  ScriptTransactionArgumentU256 = 8,
 }
 
 /**
  * Transaction payload enum as they are represented in Rust
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L478}
  */
-export enum RustEnumTransactionPayloadVariants {
+export enum TransactionPayloadVariants {
   TransactionPayloadScript = 0,
   TransactionPayloadEntryFunction = 2,
   TransactionPayloadMultisig = 3,
@@ -37,7 +37,7 @@ export enum RustEnumTransactionPayloadVariants {
  * Transaction variants enum as they are represented in Rust
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L440}
  */
-export enum RustEnumTransactionVariants {
+export enum TransactionVariants {
   MultiAgentTransaction = 0,
   FeePayerTransaction = 1,
 }
@@ -46,7 +46,7 @@ export enum RustEnumTransactionVariants {
  * Transaction Authenticator enum as they are represented in Rust
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L44}
  */
-export enum RustEnumTransactionAuthenticatorVariant {
+export enum TransactionAuthenticatorVariant {
   TransactionAuthenticatorEd25519 = 0,
   TransactionAuthenticatorMultiEd25519 = 1,
   TransactionAuthenticatorMultiAgent = 2,
@@ -57,7 +57,7 @@ export enum RustEnumTransactionAuthenticatorVariant {
  * Transaction Authenticator enum as they are represented in Rust
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L414}
  */
-export enum RustEnumAccountAuthenticatorVariant {
+export enum AccountAuthenticatorVariant {
   AccountAuthenticatorEd25519 = 0,
   AccountAuthenticatorMultiEd25519 = 1,
 }
