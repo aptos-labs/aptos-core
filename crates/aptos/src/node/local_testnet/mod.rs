@@ -44,7 +44,7 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
 };
-use tokio::task::JoinHandle;
+use tokio::task::JoinSet;
 use tracing::{info, warn};
 use tracing_subscriber::fmt::MakeWriter;
 
@@ -302,11 +302,11 @@ impl CliCommand<()> for RunLocalTestnet {
             .flat_map(|m| m.get_post_healthy_steps())
             .collect();
 
-        let mut tasks: Vec<JoinHandle<()>> = Vec::new();
+        let mut join_set = JoinSet::new();
 
         // Start each of the services.
         for manager in managers.into_iter() {
-            tasks.push(manager.run());
+            join_set.spawn(manager.run());
         }
 
         // Wait for all the services to start up.
@@ -329,21 +329,32 @@ impl CliCommand<()> for RunLocalTestnet {
         // see `ShutdownStep` for more info. In particular, to speak to how "best effort"
         // this really is, to make sure ctrl-c happens more or less instantly, we only
         // register this handler after all the services have started.
-        tasks.push(tokio::spawn(async move {
+        let abort_handle = join_set.spawn(async move {
             tokio::signal::ctrl_c()
                 .await
                 .expect("Failed to register ctrl-c hook");
-        }));
+            Ok(())
+        });
+        let ctrl_c_task_id = abort_handle.id();
 
-        // Wait for all of the tasks. We should never get past this point unless
-        // something goes goes wrong or the user signals for the process to end.
-        let num_tasks = tasks.len();
-        let (_, finished_future_index, _) = futures::future::select_all(tasks).await;
+        // Wait for one of the tasks to end. We should never get past this point unless
+        // something goes goes wrong or the user signals for the process to end. We
+        // unwrap once because we know for certain the set is not empty and that's the
+        // only condition in which this can return `None`.
+        let result = join_set.join_next_with_id().await.unwrap();
+
+        // We want to print a different message depending on which task ended. We can
+        // determine if the task that ended was the ctrl-c task based on the ID of the
+        // task.
+        let finished_task_id = match &result {
+            Ok((id, _)) => *id,
+            Err(err) => err.id(),
+        };
 
         // Because we added the ctrl-c task last, we can figure out if that was the one
         // that ended based on `finished_future_index`. We modify our messaging and the
         // return value based on this.
-        let was_ctrl_c = finished_future_index == num_tasks - 1;
+        let was_ctrl_c = finished_task_id == ctrl_c_task_id;
         if was_ctrl_c {
             eprintln!("\nReceived ctrl-c, running shutdown steps...");
         } else {
