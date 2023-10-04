@@ -63,17 +63,13 @@ impl Default for RocksdbConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfigs {
+    // TODO(grao): Add RocksdbConfig for individual ledger DBs when necessary.
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
-    // Note: Not ready for production use yet.
-    pub use_sharded_state_merkle_db: bool,
-    // Note: Not ready for production use yet.
-    // TODO(grao): Add RocksdbConfig for individual DBs when necessary.
-    pub split_ledger_db: bool,
-    // Note: Not ready for production use yet.
-    pub skip_index_and_usage: bool,
     pub state_kv_db_config: RocksdbConfig,
     pub index_db_config: RocksdbConfig,
+    // Note: Not ready for production use yet.
+    pub enable_storage_sharding: bool,
 }
 
 impl Default for RocksdbConfigs {
@@ -81,14 +77,12 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            use_sharded_state_merkle_db: false,
-            split_ledger_db: false,
-            skip_index_and_usage: false,
             state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
             },
+            enable_storage_sharding: false,
         }
     }
 }
