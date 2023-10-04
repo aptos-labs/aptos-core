@@ -9,7 +9,6 @@ use crate::{
     v2::config::PartitionerV2Config,
     PartitionerConfig,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use move_core_types::account_address::AccountAddress;
 use rand::{rngs::OsRng, Rng};
@@ -78,7 +77,7 @@ fn test_relative_ordering_for_sender() {
     SubBlocksForShard::flatten(sub_blocks)
         .iter()
         .for_each(|txn| {
-            let (sender, seq_number) = get_account_seq_number(txn.transaction().inner());
+            let (sender, seq_number) = get_account_seq_number(txn.transaction().expect_valid());
             if account_to_expected_seq_number.contains_key(&sender) {
                 assert_eq!(
                     account_to_expected_seq_number.get(&sender).unwrap(),
@@ -114,10 +113,7 @@ fn test_no_conflict_across_shards_in_non_last_rounds() {
         let receiver_index = rng.gen_range(0, accounts.len());
         let receiver = accounts.get(receiver_index).unwrap();
         let analyzed_txn = create_signed_p2p_transaction(&mut sender, vec![receiver]).remove(0);
-        txns_by_hash.insert(
-            analyzed_txn.transaction().inner().hash(),
-            analyzed_txn.clone(),
-        );
+        txns_by_hash.insert(analyzed_txn.transaction().hash(), analyzed_txn.clone());
         transactions.push(analyzed_txn);
         accounts.push(sender)
     }
@@ -131,9 +127,7 @@ fn test_no_conflict_across_shards_in_non_last_rounds() {
         for (shard_id, sub_blocks_for_shard) in sub_blocks.iter().enumerate() {
             let sub_block_for_round = sub_blocks_for_shard.get_sub_block(round).unwrap();
             for txn in sub_block_for_round.iter() {
-                let analyzed_txn = txns_by_hash
-                    .get(&txn.txn().transaction().inner().hash())
-                    .unwrap();
+                let analyzed_txn = txns_by_hash.get(&txn.txn().transaction().hash()).unwrap();
                 let storage_locations = analyzed_txn.write_hints().iter();
                 for storage_location in storage_locations {
                     if storage_location_to_shard_map.contains_key(storage_location) {

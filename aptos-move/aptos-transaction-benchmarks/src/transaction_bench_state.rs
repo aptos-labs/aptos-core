@@ -171,7 +171,7 @@ where
                 self.block_partitioner.as_ref().unwrap().partition(
                     txns.iter()
                         .skip(1)
-                        .map(|txn| txn.inner().clone().into())
+                        .map(|txn| txn.expect_valid().clone().into())
                         .collect::<Vec<AnalyzedTransaction>>(),
                     self.sharded_block_executor.as_ref().unwrap().num_shards(),
                 ),

@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
-use aptos_crypto::hash::CryptoHash;
 use aptos_language_e2e_tests::{
     account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
     executor::FakeExecutor,
@@ -160,7 +159,7 @@ pub fn sharded_block_executor_with_conflict<E: ExecutorClient<FakeDataStore>>(
             let receiver = &accounts[(j + i) % num_accounts].lock().unwrap();
             let transfer_amount = 1_000;
             let txn = generate_p2p_txn(sender, receiver, transfer_amount);
-            txn_hash_to_account.insert(txn.transaction().inner().hash(), sender_addr);
+            txn_hash_to_account.insert(txn.transaction().hash(), sender_addr);
             transactions.push(txn)
         }
     }

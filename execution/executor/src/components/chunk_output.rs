@@ -318,10 +318,11 @@ pub fn update_counters_for_processed_chunk<T>(
         };
 
         let kind = match txn.get_transaction() {
-            Transaction::UserTransaction(_) => "user_transaction",
-            Transaction::GenesisTransaction(_) => "genesis",
-            Transaction::BlockMetadata(_) => "block_metadata",
-            Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Some(Transaction::UserTransaction(_)) => "user_transaction",
+            Some(Transaction::GenesisTransaction(_)) => "genesis",
+            Some(Transaction::BlockMetadata(_)) => "block_metadata",
+            Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            None => "unknown",
         };
 
         metrics::APTOS_PROCESSED_TXNS_COUNT
@@ -340,7 +341,7 @@ pub fn update_counters_for_processed_chunk<T>(
                 .inc();
         }
 
-        if let Transaction::UserTransaction(user_txn) = txn.get_transaction() {
+        if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE

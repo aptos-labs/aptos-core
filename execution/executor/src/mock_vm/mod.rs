@@ -88,7 +88,7 @@ impl VMExecutor for MockVM {
         let mut outputs = vec![];
 
         for txn in transactions {
-            let txn = txn.inner();
+            let txn = txn.expect_valid();
             if matches!(txn, Transaction::StateCheckpoint(_)) {
                 outputs.push(TransactionOutput::new(
                     WriteSet::default(),

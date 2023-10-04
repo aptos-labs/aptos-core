@@ -187,7 +187,6 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
 
 mod test_utils {
     use aptos_block_partitioner::BlockPartitioner;
-    use aptos_crypto::hash::CryptoHash;
     use aptos_language_e2e_tests::{
         account::AccountData, common_transactions::peer_to_peer_txn, data_store::FakeDataStore,
         executor::FakeExecutor,
@@ -334,7 +333,7 @@ mod test_utils {
                 let receiver = &accounts[(j + i) % num_accounts].lock().unwrap();
                 let transfer_amount = 1_000;
                 let txn = generate_p2p_txn(sender, receiver, transfer_amount);
-                txn_hash_to_account.insert(txn.transaction().inner().hash(), sender_addr);
+                txn_hash_to_account.insert(txn.transaction().hash(), sender_addr);
                 transactions.push(txn)
             }
         }

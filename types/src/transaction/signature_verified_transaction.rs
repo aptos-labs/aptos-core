@@ -8,7 +8,8 @@ use crate::{
     transaction::{BlockExecutableTransaction, Transaction},
     write_set::WriteOp,
 };
-use move_core_types::language_storage::StructTag;
+use aptos_crypto::{hash::CryptoHash, HashValue};
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -26,10 +27,27 @@ impl SignatureVerifiedTransaction {
         }
     }
 
-    pub fn inner(&self) -> &Transaction {
+    pub fn is_valid(&self) -> bool {
         match self {
-            SignatureVerifiedTransaction::Valid(txn) => txn,
-            SignatureVerifiedTransaction::Invalid(txn) => txn,
+            SignatureVerifiedTransaction::Valid(_) => true,
+            SignatureVerifiedTransaction::Invalid(_) => false,
+        }
+    }
+
+    pub fn sender(&self) -> Option<AccountAddress> {
+        match self {
+            SignatureVerifiedTransaction::Valid(txn) => match txn {
+                Transaction::UserTransaction(txn) => Some(txn.sender()),
+                _ => None,
+            },
+            SignatureVerifiedTransaction::Invalid(_) => None,
+        }
+    }
+
+    pub fn hash(&self) -> HashValue {
+        match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn.hash(),
+            SignatureVerifiedTransaction::Invalid(txn) => txn.hash(),
         }
     }
 
@@ -64,17 +82,21 @@ pub fn into_signature_verified(txn: Transaction) -> SignatureVerifiedTransaction
 }
 
 pub trait TransactionProvider: Debug {
-    fn get_transaction(&self) -> &Transaction;
+    fn get_transaction(&self) -> Option<&Transaction>;
 }
 
 impl TransactionProvider for SignatureVerifiedTransaction {
-    fn get_transaction(&self) -> &Transaction {
-        self.inner()
+    fn get_transaction(&self) -> Option<&Transaction> {
+        if self.is_valid() {
+            Some(self.expect_valid())
+        } else {
+            None
+        }
     }
 }
 
 impl TransactionProvider for Transaction {
-    fn get_transaction(&self) -> &Transaction {
-        self
+    fn get_transaction(&self) -> Option<&Transaction> {
+        Some(self)
     }
 }

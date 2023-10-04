@@ -12,7 +12,7 @@ use crate::{
         Transaction, TransactionPayload,
     },
 };
-use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_crypto::HashValue;
 pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
@@ -73,7 +73,7 @@ impl AnalyzedTransaction {
             .iter()
             .chain(write_hints.iter())
             .any(|hint| !matches!(hint, StorageLocation::Specific(_)));
-        let hash = transaction.inner().hash();
+        let hash = transaction.hash();
         AnalyzedTransaction {
             transaction,
             read_hints,
@@ -104,10 +104,7 @@ impl AnalyzedTransaction {
     }
 
     pub fn sender(&self) -> Option<AccountAddress> {
-        match &self.transaction.inner() {
-            Transaction::UserTransaction(signed_txn) => Some(signed_txn.sender()),
-            _ => None,
-        }
+        self.transaction.sender()
     }
 
     pub fn expect_p_txn(self) -> (SignatureVerifiedTransaction, Vec<StateKey>, Vec<StateKey>) {
@@ -306,6 +303,13 @@ impl AnalyzedTransactionProvider for Transaction {
 
 impl AnalyzedTransactionProvider for SignatureVerifiedTransaction {
     fn get_read_write_hints(&self) -> (Vec<StorageLocation>, Vec<StorageLocation>) {
-        self.inner().get_read_write_hints()
+        match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn.get_read_write_hints(),
+            SignatureVerifiedTransaction::Invalid(_) => {
+                // Invalid transactions are not execute by the VM, so we don't need to provide
+                // read/write hints for them.
+                empty_rw_set()
+            },
+        }
     }
 }

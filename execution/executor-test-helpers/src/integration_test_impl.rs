@@ -277,7 +277,10 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transactions(3, 12, current_version, false)
         .unwrap();
-    let expected_txns: Vec<Transaction> = block1[2..].iter().map(|t| t.inner().clone()).collect();
+    let expected_txns: Vec<Transaction> = block1[2..]
+        .iter()
+        .map(|t| t.expect_valid().clone())
+        .collect();
     verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
     // With sharding enabled, we won't have indices for event, skip the checks.
@@ -453,7 +456,7 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transactions(14, 15 + diff, current_version, false)
         .unwrap();
-    let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.inner().clone()).collect();
+    let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.expect_valid().clone()).collect();
     verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
     // With sharding enabled, we won't have indices for event, skip the checks.
@@ -597,7 +600,7 @@ pub fn verify_committed_txn_status(
     let txn = &txn_with_proof.transaction;
 
     ensure!(
-        expected_txn.inner() == txn,
+        expected_txn.expect_valid() == txn,
         "The two transactions do not match. Expected txn: {:?}, returned txn: {:?}",
         expected_txn,
         txn,
