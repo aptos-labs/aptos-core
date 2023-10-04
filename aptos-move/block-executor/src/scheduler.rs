@@ -339,7 +339,8 @@ impl Scheduler {
             return None;
         }
 
-        if let Some(validation_status) = self.txn_status[*commit_idx as usize].1.try_read() {
+        let validation_status = self.txn_status[*commit_idx as usize].1.read();
+        {
             // Acquired the validation status read lock.
             if let Some(status) = self.txn_status[*commit_idx as usize]
                 .0
@@ -370,6 +371,8 @@ impl Scheduler {
                         }
                     }
                 }
+            } else {
+                self.coordinating_commits_arm();
             }
         }
         None
