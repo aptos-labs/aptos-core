@@ -367,17 +367,16 @@ impl Scheduler {
                             return Some(*commit_idx - 1);
                         }
                     }
-                }
 
-                // Transaction needs to be at least [re]validated, and possibly also executed.
-                // Once that happens, we will `arm` the queueing_commit.
-                // Concurrency correctness - Both locks are held here.
-                return None;
+                    // Transaction needs to be at least [re]validated, and possibly also executed.
+                    // Once that happens, we will `arm` the queueing_commit.
+                    // Concurrency correctness - Both locks are held here.
+                    return None;
+                }
             }
         }
-
-        // On of the attempts to lock failed (either try_read() or try_upgradable_read())
         self.queueing_commits_arm();
+
         None
     }
 
