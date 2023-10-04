@@ -592,11 +592,13 @@ fn single_test_suite(
         "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
         "gather_metrics" => gather_metrics(),
         // Network benchmark tests
+        "net_bench_no_chaos_500" => net_bench_no_chaos(MEGABYTE, 500),
         "net_bench_no_chaos_100" => net_bench_no_chaos(MEGABYTE, 100),
         "net_bench_no_chaos_50" => net_bench_no_chaos(MEGABYTE, 50),
         "net_bench_no_chaos_20" => net_bench_no_chaos(MEGABYTE, 20),
         "net_bench_no_chaos_10" => net_bench_no_chaos(MEGABYTE, 10),
         "net_bench_no_chaos_1" => net_bench_no_chaos(MEGABYTE, 1),
+        "net_bench_two_region_chaos_500" => net_bench_two_region_chaos(MEGABYTE, 500),
         "net_bench_two_region_chaos_100" => net_bench_two_region_chaos(MEGABYTE, 100),
         "net_bench_two_region_chaos_50" => net_bench_two_region_chaos(MEGABYTE, 50),
         "net_bench_two_region_chaos_20" => net_bench_two_region_chaos(MEGABYTE, 20),
