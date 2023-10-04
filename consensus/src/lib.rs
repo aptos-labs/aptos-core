@@ -13,6 +13,9 @@
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
 
+#[macro_use(defer)]
+extern crate scopeguard;
+
 extern crate core;
 
 mod block_storage;

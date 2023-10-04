@@ -6,40 +6,38 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { get } from "../client";
-import { paginateWithCursor } from "../utils/paginate_with_cursor";
+import { getAptosFullNode, paginateWithCursor } from "../client";
 import { AccountAddress, Hex } from "../core";
-import { AptosApiType } from "../utils/const";
 import { queryIndexer } from "./general";
 import {
   AccountData,
+  GetAccountCoinsCountResponse,
+  GetAccountCoinsDataResponse,
+  GetAccountCollectionsWithOwnedTokenResponse,
+  GetAccountOwnedObjectsResponse,
+  GetAccountOwnedTokensFromCollectionResponse,
+  GetAccountOwnedTokensQueryResponse,
+  GetAccountTokensCountQueryResponse,
+  GetAccountTransactionsCountResponse,
+  HexInput,
+  IndexerPaginationArgs,
   LedgerVersion,
   MoveModuleBytecode,
   MoveResource,
   MoveResourceType,
-  PaginationArgs,
-  TransactionResponse,
-  HexInput,
-  GetAccountTokensCountQueryResponse,
-  TokenStandard,
   OrderBy,
-  GetAccountOwnedTokensQueryResponse,
-  IndexerPaginationArgs,
-  GetAccountOwnedTokensFromCollectionResponse,
-  GetAccountCollectionsWithOwnedTokenResponse,
-  GetAccountTransactionsCountResponse,
-  GetAccountCoinsDataResponse,
-  GetAccountCoinsCountResponse,
-  GetAccountOwnedObjectsResponse,
+  PaginationArgs,
+  TokenStandard,
+  TransactionResponse,
 } from "../types";
 import {
+  GetAccountCoinsCountQuery,
+  GetAccountCoinsDataQuery,
+  GetAccountCollectionsWithOwnedTokensQuery,
   GetAccountOwnedObjectsQuery,
-  GetAccountTokensCountQuery,
   GetAccountOwnedTokensFromCollectionQuery,
   GetAccountOwnedTokensQuery,
-  GetAccountCollectionsWithOwnedTokensQuery,
-  GetAccountCoinsDataQuery,
-  GetAccountCoinsCountQuery,
+  GetAccountTokensCountQuery,
   GetAccountTransactionsCountQuery,
 } from "../types/generated/operations";
 import {
@@ -55,14 +53,11 @@ import {
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
-  const { data } = await get<{}, AccountData>(
-    {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
-      originMethod: "getInfo",
-    },
+  const { data } = await getAptosFullNode<{}, AccountData>({
     aptosConfig,
-  );
+    originMethod: "getInfo",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}`,
+  });
   return data;
 }
 
@@ -72,15 +67,12 @@ export async function getModules(args: {
   options?: PaginationArgs & LedgerVersion;
 }): Promise<MoveModuleBytecode[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, MoveModuleBytecode[]>(
-    {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
-      params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
-      originMethod: "getModules",
-    },
+  const data = await paginateWithCursor<{}, MoveModuleBytecode[]>({
     aptosConfig,
-  );
+    originMethod: "getModules",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/modules`,
+    params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 1000 },
+  });
   return data;
 }
 
@@ -99,15 +91,12 @@ export async function getModule(args: {
   options?: LedgerVersion;
 }): Promise<MoveModuleBytecode> {
   const { aptosConfig, accountAddress, moduleName, options } = args;
-  const { data } = await get<{}, MoveModuleBytecode>(
-    {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
-      originMethod: "getModule",
-      params: { ledger_version: options?.ledgerVersion },
-    },
+  const { data } = await getAptosFullNode<{}, MoveModuleBytecode>({
     aptosConfig,
-  );
+    originMethod: "getModule",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/module/${moduleName}`,
+    params: { ledger_version: options?.ledgerVersion },
+  });
   return data;
 }
 
@@ -117,15 +106,12 @@ export async function getTransactions(args: {
   options?: PaginationArgs;
 }): Promise<TransactionResponse[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, TransactionResponse[]>(
-    {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
-      originMethod: "getTransactions",
-      params: { start: options?.start, limit: options?.limit },
-    },
+  const data = await paginateWithCursor<{}, TransactionResponse[]>({
     aptosConfig,
-  );
+    originMethod: "getTransactions",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/transactions`,
+    params: { start: options?.start, limit: options?.limit },
+  });
   return data;
 }
 
@@ -135,15 +121,12 @@ export async function getResources(args: {
   options?: PaginationArgs & LedgerVersion;
 }): Promise<MoveResource[]> {
   const { aptosConfig, accountAddress, options } = args;
-  const data = await paginateWithCursor<{}, MoveResource[]>(
-    {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
-      params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
-      originMethod: "getResources",
-    },
+  const data = await paginateWithCursor<{}, MoveResource[]>({
     aptosConfig,
-  );
+    originMethod: "getResources",
+    path: `accounts/${AccountAddress.fromHexInput({ input: accountAddress }).toString()}/resources`,
+    params: { ledger_version: options?.ledgerVersion, start: options?.start, limit: options?.limit ?? 999 },
+  });
   return data;
 }
 
@@ -154,17 +137,14 @@ export async function getResource(args: {
   options?: LedgerVersion;
 }): Promise<MoveResource> {
   const { aptosConfig, accountAddress, resourceType, options } = args;
-  const { data } = await get<{}, MoveResource>(
-    {
-      url: aptosConfig.getRequestUrl(AptosApiType.FULLNODE),
-      endpoint: `accounts/${AccountAddress.fromHexInput({
-        input: accountAddress,
-      }).toString()}/resource/${resourceType}`,
-      originMethod: "getResource",
-      params: { ledger_version: options?.ledgerVersion },
-    },
+  const { data } = await getAptosFullNode<{}, MoveResource>({
     aptosConfig,
-  );
+    originMethod: "getResource",
+    path: `accounts/${AccountAddress.fromHexInput({
+      input: accountAddress,
+    }).toString()}/resource/${resourceType}`,
+    params: { ledger_version: options?.ledgerVersion },
+  });
   return data;
 }
 

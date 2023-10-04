@@ -8,20 +8,33 @@ import { PublicKey, Signature } from "./asymmetric_crypto";
 import { HexInput } from "../types";
 import { Hex } from "../core/hex";
 
+/**
+ * Represents the public key of a K-of-N Ed25519 multisig transaction.
+ */
 export class MultiEd25519PublicKey extends PublicKey {
-  // Maximum number of public keys supported
+  /**
+   * Maximum number of public keys supported
+   */
   static readonly MAX_KEYS = 32;
 
-  // Minimum number of public keys required
+  /**
+   * Minimum number of public keys needed
+   */
   static readonly MIN_KEYS = 2;
 
-  // Minimum number of threshold supported
+  /**
+   * Minimum threshold for the number of valid signatures required
+   */
   static readonly MIN_THRESHOLD = 1;
 
-  // List of Ed25519 public keys for this MultiEd25519PublicKey
+  /**
+   * List of Ed25519 public keys for this MultiEd25519PublicKey
+   */
   public readonly publicKeys: Ed25519PublicKey[];
 
-  // The minimum number of valid signatures required, for the number of public keys specified
+  /**
+   * The minimum number of valid signatures required, for the number of public keys specified
+   */
   public readonly threshold: number;
 
   /**
@@ -76,17 +89,12 @@ export class MultiEd25519PublicKey extends PublicKey {
     return Hex.fromHexInput({ hexInput: this.toUint8Array() }).toString();
   }
 
-  verifySignature(args: { data: HexInput; signature: MultiEd25519Signature }): boolean {
+  verifySignature(args: { message: HexInput; signature: MultiEd25519Signature }): boolean {
     throw new Error("TODO - Method not implemented.");
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): MultiEd25519PublicKey {
@@ -103,17 +111,30 @@ export class MultiEd25519PublicKey extends PublicKey {
   }
 }
 
+/**
+ * Represents the signature of a K-of-N Ed25519 multisig transaction.
+ */
 export class MultiEd25519Signature extends Signature {
-  // Maximum number of signatures supported
+  /**
+   * Maximum number of Ed25519 signatures supported
+   */
   static MAX_SIGNATURES_SUPPORTED = 32;
 
-  // Bitmap length
+  /**
+   * Number of bytes in the bitmap representing who signed the transaction (32-bits)
+   */
   static BITMAP_LEN: number = 4;
 
-  // List of Ed25519Signatures for this MultiEd25519Signature
+  /**
+   * The list of underlying Ed25519 signatures
+   */
   public readonly signatures: Ed25519Signature[];
 
-  // The bitmap masks that public key that has signed the message
+  /**
+   * 32-bit Bitmap representing who signed the transaction
+   *
+   * This is represented where each public key can be masked to determine whether the message was signed by that key.
+   */
   public readonly bitmap: Uint8Array;
 
   /**
@@ -138,10 +159,6 @@ export class MultiEd25519Signature extends Signature {
       throw new Error(
         `The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`,
       );
-    }
-
-    if (signatures.length > MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
-      throw new Error(`The number of signatures cannot be greater than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED}`);
     }
 
     this.signatures = signatures;
@@ -192,11 +209,11 @@ export class MultiEd25519Signature extends Signature {
 
     bits.forEach((bit: number) => {
       if (bit >= MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED) {
-        throw new Error(`Cannot have a signature larger than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED - 1}`);
+        throw new Error(`Cannot have a signature larger than ${MultiEd25519Signature.MAX_SIGNATURES_SUPPORTED - 1}.`);
       }
 
       if (dupCheckSet.has(bit)) {
-        throw new Error("Duplicate bits detected");
+        throw new Error("Duplicate bits detected.");
       }
 
       dupCheckSet.add(bit);
@@ -205,6 +222,7 @@ export class MultiEd25519Signature extends Signature {
 
       let byte = bitmap[byteOffset];
 
+      // eslint-disable-next-line no-bitwise
       byte |= firstBitInByte >> bit % 8;
 
       bitmap[byteOffset] = byte;
@@ -217,11 +235,6 @@ export class MultiEd25519Signature extends Signature {
     serializer.serializeBytes(this.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Signature {
-    throw new Error("Method not implemented.");
-  }
-
   static deserialize(deserializer: Deserializer): MultiEd25519Signature {
     const bytes = deserializer.deserializeBytes();
     const bitmap = bytes.subarray(bytes.length - 4);
@@ -230,7 +243,7 @@ export class MultiEd25519Signature extends Signature {
 
     for (let i = 0; i < bytes.length - bitmap.length; i += Ed25519Signature.LENGTH) {
       const begin = i;
-      signatures.push(new Ed25519Signature({ data: bytes.subarray(begin, begin + Ed25519Signature.LENGTH) }));
+      signatures.push(new Ed25519Signature({ hexInput: bytes.subarray(begin, begin + Ed25519Signature.LENGTH) }));
     }
     return new MultiEd25519Signature({ signatures, bitmap });
   }

@@ -457,6 +457,7 @@ clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
 codespan-reporting = "0.11.1"
+concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
@@ -485,7 +486,7 @@ dirs = "5.0.1"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
-enum_dispatch = "0.3.8"
+enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 erased-serde = "0.3.13"
 event-listener = "2.5.3"
@@ -588,6 +589,7 @@ ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
+scopeguard = "1.2.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }

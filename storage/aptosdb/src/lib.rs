@@ -224,9 +224,9 @@ fn update_rocksdb_properties(
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
 
-    let split_ledger = state_kv_db.enabled_sharding();
+    let enable_storage_sharding = state_kv_db.enabled_sharding();
 
-    if split_ledger {
+    if enable_storage_sharding {
         for cf in ledger_metadata_db_column_families() {
             set_property(cf, ledger_db.metadata_db())?;
         }
@@ -429,7 +429,7 @@ impl AptosDB {
             buffered_state_target_items,
             readonly,
             empty_buffered_state_for_restore,
-            rocksdb_configs.skip_index_and_usage,
+            rocksdb_configs.enable_storage_sharding,
         );
 
         if !readonly && enable_indexer {
@@ -584,8 +584,7 @@ impl AptosDB {
         max_node_cache: usize,
     ) -> Self {
         let db_config = RocksdbConfigs {
-            use_sharded_state_merkle_db: true,
-            split_ledger_db: true,
+            enable_storage_sharding: true,
             ..Default::default()
         };
         Self::open(
@@ -766,26 +765,17 @@ impl AptosDB {
     pub fn create_checkpoint(
         db_path: impl AsRef<Path>,
         cp_path: impl AsRef<Path>,
-        use_split_ledger_db: bool,
-        use_sharded_state_merkle_db: bool,
+        sharding: bool,
     ) -> Result<()> {
         let start = Instant::now();
 
-        info!(
-            use_split_ledger_db = use_split_ledger_db,
-            use_sharded_state_merkle_db = use_sharded_state_merkle_db,
-            "Creating checkpoint for AptosDB."
-        );
+        info!(sharding = sharding, "Creating checkpoint for AptosDB.");
 
-        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), use_split_ledger_db)?;
-        if use_split_ledger_db {
+        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
+        if sharding {
             StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         }
-        StateMerkleDb::create_checkpoint(
-            db_path.as_ref(),
-            cp_path.as_ref(),
-            use_sharded_state_merkle_db,
-        )?;
+        StateMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
 
         info!(
             db_path = db_path.as_ref(),
@@ -2119,7 +2109,7 @@ impl DbWriter for AptosDB {
                 first_version,
                 latest_in_memory_state.current.usage(),
                 None,
-                /*skip_index_and_usage=*/ false,
+                self.skip_index_and_usage,
             )?;
 
             {

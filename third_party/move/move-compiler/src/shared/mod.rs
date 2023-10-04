@@ -379,6 +379,19 @@ impl Flags {
         }
     }
 
+    pub fn all_functions() -> Self {
+        Self {
+            test: true,
+            verify: true,
+            shadow: false,
+            flavor: "".to_string(),
+            bytecode_version: None,
+            keep_testing_functions: false,
+            skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
+        }
+    }
+
     pub fn verification() -> Self {
         Self {
             test: false,

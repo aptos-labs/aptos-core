@@ -9,6 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
+    explicit_sync_wrapper::ExplicitSyncWrapper,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
@@ -33,49 +34,12 @@ use num_cpus;
 use rayon::ThreadPool;
 use std::{
     collections::HashMap,
-    marker::PhantomData,
-    sync::{
-        atomic::AtomicU32,
-        mpsc,
-        mpsc::{Receiver, Sender},
-        Arc,
-    },
+    marker::{PhantomData, Sync},
+    sync::{atomic::AtomicU32, Arc},
 };
 
-struct CommitGuard<'a> {
-    post_commit_txs: &'a Vec<Sender<u32>>,
-    worker_idx: usize,
-    txn_idx: u32,
-}
-
-impl<'a> CommitGuard<'a> {
-    fn new(post_commit_txs: &'a Vec<Sender<u32>>, worker_idx: usize, txn_idx: u32) -> Self {
-        Self {
-            post_commit_txs,
-            worker_idx,
-            txn_idx,
-        }
-    }
-}
-
-impl<'a> Drop for CommitGuard<'a> {
-    fn drop(&mut self) {
-        // Send the committed txn to the Worker thread.
-        self.post_commit_txs[self.worker_idx]
-            .send(self.txn_idx)
-            .expect("Worker must be available");
-    }
-}
-
-#[derive(Debug)]
-enum CommitRole {
-    Coordinator(Vec<Sender<TxnIndex>>),
-    Worker(Receiver<TxnIndex>),
-}
-
 pub struct BlockExecutor<T, E, S, L, X> {
-    // number of active concurrent tasks, corresponding
-    // to the maximum number of rayon
+    // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     concurrency_level: usize,
     executor_thread_pool: Arc<ThreadPool>,
@@ -124,6 +88,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
+        maybe_error: &mut Option<Error<E::Error>>,
     ) -> SchedulerTask {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
@@ -199,16 +164,14 @@ where
             }
         }
 
-        if last_input_output
-            .record(idx_to_execute, sync_view.take_reads(), result)
-            .is_err()
-        {
-            // When there is module publishing r/w intersection, can early halt BlockSTM to
-            // fallback to sequential execution.
-            scheduler.halt();
-            return SchedulerTask::NoTask;
+        if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
+            if scheduler.halt() {
+                *maybe_error = Some(Error::ModulePathReadWrite);
+            }
+            SchedulerTask::NoTask
+        } else {
+            scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
         }
-        scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
     }
 
     fn validate(
@@ -250,27 +213,35 @@ where
             scheduler.finish_abort(idx_to_validate, incarnation)
         } else {
             scheduler.finish_validation(idx_to_validate, validation_wave);
+
+            if valid {
+                scheduler.queueing_commits_arm();
+            }
+
             SchedulerTask::NoTask
         }
     }
 
-    fn coordinator_commit_hook(
+    fn prepare_and_queue_commit_ready_txns(
         &self,
         maybe_block_gas_limit: Option<u64>,
         scheduler: &Scheduler,
-        post_commit_txs: &Vec<Sender<u32>>,
-        worker_idx: &mut usize,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        accumulated_fee_statement: &mut FeeStatement,
-        txn_fee_statements: &mut Vec<FeeStatement>,
+        shared_commit_state: &ExplicitSyncWrapper<(
+            FeeStatement,
+            Vec<FeeStatement>,
+            Option<Error<E::Error>>,
+        )>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
-            // Create a CommitGuard to ensure Coordinator sends the committed txn index to Worker.
-            let _commit_guard: CommitGuard =
-                CommitGuard::new(post_commit_txs, *worker_idx, txn_idx);
-            // Iterate round robin over workers to do commit_hook.
-            *worker_idx = (*worker_idx + 1) % post_commit_txs.len();
+            defer! {
+                scheduler.add_to_commit_queue(txn_idx);
+            }
+
+            let mut shared_commit_state_guard = shared_commit_state.acquire();
+            let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
+                shared_commit_state_guard.dereference_mut();
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
@@ -300,58 +271,60 @@ where
                 }
             }
 
+            if let Some(err) = last_input_output.execution_error(txn_idx) {
+                if scheduler.halt() {
+                    *maybe_error = Some(err);
+                    info!(
+                        "Block execution was aborted due to {:?}",
+                        maybe_error.as_ref().unwrap()
+                    );
+                } // else it's already halted
+                break;
+            }
+
             // Committed the last transaction, BlockSTM finishes execution.
             if txn_idx + 1 == scheduler.num_txns()
-                || last_input_output.block_truncated_at_idx(txn_idx)
+                || last_input_output.block_skips_rest_at_idx(txn_idx)
             {
                 if txn_idx + 1 == scheduler.num_txns() {
                     assert!(
                         !matches!(scheduler_task, SchedulerTask::ExecutionTask(_, _, _)),
                         "All transactions can be committed, can't have execution task"
                     );
-
-                    // The caller should finish the worker loop.
-                    *scheduler_task = SchedulerTask::Done;
                 }
 
                 // Either all txn committed, or a committed txn caused an early halt.
-                scheduler.halt();
+                if scheduler.halt() {
+                    counters::update_parallel_block_gas_counters(
+                        accumulated_fee_statement,
+                        (txn_idx + 1) as usize,
+                    );
+                    counters::update_parallel_txn_gas_counters(txn_fee_statements);
 
-                counters::update_parallel_block_gas_counters(
-                    accumulated_fee_statement,
-                    (txn_idx + 1) as usize,
-                );
-                counters::update_parallel_txn_gas_counters(txn_fee_statements);
-
-                let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
-                    + accumulated_fee_statement.io_gas_used();
-                info!(
-                    "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
-		     accumulated_non_storage_gas = {}, limit = {:?}",
-                    txn_idx + 1,
-                    scheduler.num_txns(),
-                    accumulated_non_storage_gas,
-                    maybe_block_gas_limit,
-                );
+                    let accumulated_non_storage_gas = accumulated_fee_statement
+                        .execution_gas_used()
+                        + accumulated_fee_statement.io_gas_used();
+                    info!(
+                        "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
+		         accumulated_non_storage_gas = {}, limit = {:?}",
+                        txn_idx + 1,
+                        scheduler.num_txns(),
+                        accumulated_non_storage_gas,
+                        maybe_block_gas_limit,
+                    );
+                }
                 break;
             }
-
-            // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
-            // will be properly handled by the threads. For instance, it is possible that the committing
-            // thread holds an execution task of ExecutionTaskType::Wakeup(DependencyCondvar) for some
-            // other thread pending on the dependency conditional variable from the last iteration. If
-            // the committing thread early halts BlockSTM and resets its scheduler_task to be Done, the
-            // pending thread will be pending on read forever. In other words, we rely on the committing
-            // thread to wake up the pending execution thread, if the committing thread holds the Wakeup task.
         }
     }
 
-    fn worker_commit_hook(
+    fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
+        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
         let delta_keys = last_input_output.delta_keys(txn_idx);
         let _events = last_input_output.events(txn_idx);
@@ -391,7 +364,9 @@ where
             // Must contain committed value as we set the base value above.
             delta_writes.push((k, WriteOp::Modification(serialize(&committed_delta).into())));
         }
+
         last_input_output.record_delta_writes(txn_idx, delta_writes);
+
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
@@ -405,9 +380,17 @@ where
                 },
             }
         }
+
+        let mut final_results = final_results.acquire();
+        match last_input_output.take_output(txn_idx) {
+            ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                final_results[txn_idx as usize] = t;
+            },
+            ExecutionStatus::Abort(_) => (),
+        };
     }
 
-    fn work_task_with_scope(
+    fn worker_loop(
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
@@ -417,47 +400,47 @@ where
         // TODO: should not need to pass base view.
         base_view: &S,
         shared_counter: &AtomicU32,
-        role: CommitRole,
+        shared_commit_state: &ExplicitSyncWrapper<(
+            FeeStatement,
+            Vec<FeeStatement>,
+            Option<Error<E::Error>>,
+        )>,
+        final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
         drop(init_timer);
 
-        let committing = matches!(role, CommitRole::Coordinator(_));
-
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
-        let mut worker_idx = 0;
 
-        let mut accumulated_fee_statement = FeeStatement::zero();
-        let mut txn_fee_statements = Vec::with_capacity(block.len());
-        loop {
-            // Only one thread does try_commit to avoid contention.
-            match &role {
-                CommitRole::Coordinator(post_commit_txs) => {
-                    self.coordinator_commit_hook(
-                        self.maybe_block_gas_limit,
-                        scheduler,
-                        post_commit_txs,
-                        &mut worker_idx,
-                        &mut scheduler_task,
-                        last_input_output,
-                        &mut accumulated_fee_statement,
-                        &mut txn_fee_statements,
-                    );
-                },
-                CommitRole::Worker(rx) => {
-                    while let Ok(txn_idx) = rx.try_recv() {
-                        self.worker_commit_hook(
-                            txn_idx,
-                            versioned_cache,
-                            last_input_output,
-                            base_view,
-                        );
-                    }
-                },
+        let drain_commit_queue = || {
+            while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
+                self.materialize_txn_commit(
+                    txn_idx,
+                    versioned_cache,
+                    last_input_output,
+                    base_view,
+                    final_results,
+                );
             }
+        };
+
+        loop {
+            // Priorotize committing validated transactions
+            while scheduler.should_coordinate_commits() {
+                self.prepare_and_queue_commit_ready_txns(
+                    self.maybe_block_gas_limit,
+                    scheduler,
+                    &mut scheduler_task,
+                    last_input_output,
+                    shared_commit_state,
+                );
+                scheduler.queueing_commits_mark_done();
+            }
+
+            drain_commit_queue();
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => Self::validate(
@@ -472,40 +455,35 @@ where
                     txn_idx,
                     incarnation,
                     ExecutionTaskType::Execution,
-                ) => Self::execute(
-                    txn_idx,
-                    incarnation,
-                    block,
-                    last_input_output,
-                    versioned_cache,
-                    scheduler,
-                    &executor,
-                    base_view,
-                    ParallelState::new(versioned_cache, scheduler, shared_counter),
-                ),
+                ) => {
+                    let mut shared_commit_state_guard = shared_commit_state.acquire();
+                    let (_, _, maybe_error) = shared_commit_state_guard.dereference_mut();
+                    Self::execute(
+                        txn_idx,
+                        incarnation,
+                        block,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                        &executor,
+                        base_view,
+                        ParallelState::new(versioned_cache, scheduler, shared_counter),
+                        maybe_error,
+                    )
+                },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
-                    *lock.lock() = DependencyStatus::Resolved;
+                    let mut lock = lock.lock();
+                    *lock = DependencyStatus::Resolved;
                     // Wake up the process waiting for dependency.
                     cvar.notify_one();
 
-                    SchedulerTask::NoTask
+                    scheduler.next_task()
                 },
-                SchedulerTask::NoTask => scheduler.next_task(committing),
+                SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
-                    // Make sure to drain any remaining commit tasks assigned by the coordinator.
-                    if let CommitRole::Worker(rx) = &role {
-                        // Until the sender drops the tx, an index for commit_hook might be sent.
-                        while let Ok(txn_idx) = rx.recv() {
-                            self.worker_commit_hook(
-                                txn_idx,
-                                versioned_cache,
-                                last_input_output,
-                                base_view,
-                            );
-                        }
-                    }
+                    drain_commit_queue();
                     break;
                 },
             }
@@ -532,30 +510,32 @@ where
             return Ok(vec![]);
         }
 
-        let num_txns = signature_verified_block.len() as u32;
+        let num_txns = signature_verified_block.len();
+
+        let shared_commit_state = ExplicitSyncWrapper::new((
+            FeeStatement::zero(),
+            Vec::<FeeStatement>::with_capacity(num_txns),
+            None,
+        ));
+
+        let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
+
+        {
+            final_results
+                .acquire()
+                .resize_with(num_txns, E::Output::skip_output);
+        }
+
+        let num_txns = num_txns as u32;
+
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
-
-        let mut roles: Vec<CommitRole> = vec![];
-        let mut senders: Vec<Sender<u32>> = Vec::with_capacity(self.concurrency_level - 1);
-        for _ in 0..(self.concurrency_level - 1) {
-            let (tx, rx) = mpsc::channel();
-            roles.push(CommitRole::Worker(rx));
-            senders.push(tx);
-        }
-        // Add the coordinator role. Coordinator is responsible for committing
-        // indices and assigning post-commit work per index to other workers.
-        // Note: It is important that the Coordinator is the first thread that
-        // picks up a role will be a coordinator. Hence, if multiple parallel
-        // executors are running concurrently, they will all have active coordinator.
-        roles.push(CommitRole::Coordinator(senders));
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
-                let role = roles.pop().expect("Role must be set for all threads");
                 s.spawn(|_| {
-                    self.work_task_with_scope(
+                    self.worker_loop(
                         &executor_initial_arguments,
                         signature_verified_block,
                         &last_input_output,
@@ -563,37 +543,13 @@ where
                         &scheduler,
                         base_view,
                         &shared_counter,
-                        role,
+                        &shared_commit_state,
+                        &final_results,
                     );
                 });
             }
         });
         drop(timer);
-
-        let num_txns = num_txns as usize;
-        // TODO: for large block sizes and many cores, extract outputs in parallel.
-        let mut final_results = Vec::with_capacity(num_txns);
-
-        let maybe_err = if last_input_output.module_publishing_may_race() {
-            counters::MODULE_PUBLISHING_FALLBACK_COUNT.inc();
-            Some(Error::ModulePathReadWrite)
-        } else {
-            let mut ret = None;
-            for idx in 0..num_txns {
-                match last_input_output.take_output(idx as TxnIndex) {
-                    ExecutionStatus::Success(t) => final_results.push(t),
-                    ExecutionStatus::SkipRest(t) => {
-                        final_results.push(t);
-                        break;
-                    },
-                    ExecutionStatus::Abort(err) => {
-                        ret = Some(err);
-                        break;
-                    },
-                };
-            }
-            ret
-        };
 
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
@@ -603,12 +559,10 @@ where
             drop(versioned_cache);
         });
 
-        match maybe_err {
+        let (_, _, maybe_error) = shared_commit_state.into_inner();
+        match maybe_error {
             Some(err) => Err(err),
-            None => {
-                final_results.resize_with(num_txns, E::Output::skip_output);
-                Ok(final_results)
-            },
+            None => Ok(final_results.into_inner()),
         }
     }
 
@@ -624,9 +578,7 @@ where
         drop(init_timer);
 
         let data_map = UnsyncMap::new();
-
         let mut ret = Vec::with_capacity(num_txns);
-
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {

@@ -5,7 +5,7 @@ use crate::dag::{
     tests::helpers::new_certified_node,
     types::{
         CertifiedNode, DAGNetworkMessage, DagSnapshotBitmask, Extensions, Node, NodeCertificate,
-        NodeMetadata, RemoteFetchRequest, TDAGMessage,
+        NodeMetadata, RemoteFetchRequest,
     },
 };
 use aptos_consensus_types::common::Payload;
@@ -19,6 +19,7 @@ use std::vec;
 #[test]
 fn test_node_verify() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let sender = signers[0].author();
 
     let invalid_node = Node::new_for_test(
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
@@ -28,7 +29,7 @@ fn test_node_verify() {
     );
     assert_eq!(
         invalid_node
-            .verify(&validator_verifier)
+            .verify(sender, &validator_verifier)
             .unwrap_err()
             .to_string(),
         "invalid digest"
@@ -36,12 +37,18 @@ fn test_node_verify() {
 
     // Well-formed round 1 node
     let first_round_node = new_node(1, 10, signers[0].author(), vec![]);
-    assert_ok!(first_round_node.verify(&validator_verifier));
+    assert_ok!(first_round_node.verify(sender, &validator_verifier));
+    // Mismatch sender
+    first_round_node
+        .verify(signers[1].author(), &validator_verifier)
+        .unwrap_err();
 
     // Round 2 node without parents
     let node = new_node(2, 20, signers[0].author(), vec![]);
     assert_eq!(
-        node.verify(&validator_verifier).unwrap_err().to_string(),
+        node.verify(sender, &validator_verifier)
+            .unwrap_err()
+            .to_string(),
         "not enough parents to satisfy voting power",
     );
 
@@ -52,7 +59,9 @@ fn test_node_verify() {
     );
     let node = new_node(3, 20, signers[0].author(), vec![parent_cert]);
     assert_eq!(
-        node.verify(&validator_verifier).unwrap_err().to_string(),
+        node.verify(sender, &validator_verifier)
+            .unwrap_err()
+            .to_string(),
         "invalid parent round"
     );
 }
@@ -83,7 +92,7 @@ fn test_certified_node_verify() {
             .verify(&validator_verifier)
             .unwrap_err()
             .to_string(),
-        "unable to verify: Invalid bitvec from the multi-signature"
+        "Invalid bitvec from the multi-signature"
     );
 }
 
@@ -112,12 +121,23 @@ fn test_remote_fetch_request() {
         vec![parents[0].clone()],
         DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
     );
+    assert!(request
+        .verify(&validator_verifier)
+        .unwrap_err()
+        .to_string()
+        .contains("Bitmask length doesn't match"));
+
+    let request = RemoteFetchRequest::new(
+        1,
+        vec![parents[0].clone()],
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]; 2]),
+    );
     assert_ok!(request.verify(&validator_verifier));
 
     let request = RemoteFetchRequest::new(
         1,
         parents,
-        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]]),
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]; 2]),
     );
     assert_ok!(request.verify(&validator_verifier));
 }
