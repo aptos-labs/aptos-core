@@ -48,7 +48,7 @@ impl<T> ExplicitSyncWrapper<T> {
         unsafe { &*self.value.get() }
     }
 
-    pub fn dereference_mut(&self) -> &mut T {
+    pub fn dereference_mut<'a>(&self) -> &'a mut T {
         unsafe { &mut *self.value.get() }
     }
 }
@@ -65,6 +65,7 @@ impl<T> Guard<'_, T> {
 
 impl<T> Deref for Guard<'_, T> {
     type Target = T;
+
     fn deref(&self) -> &T {
         self.lock.dereference()
     }
