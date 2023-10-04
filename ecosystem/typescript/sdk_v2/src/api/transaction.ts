@@ -99,7 +99,7 @@ export class Transaction {
    * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
    * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
    * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-   * const transasction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
+   * const transaction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
    * ```
    */
   async waitForTransaction(args: {
