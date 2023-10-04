@@ -24,8 +24,7 @@ pub type Wave = u32;
 pub struct ArmedLock {
     // Last bit:   1 -> unlocked; 0 -> locked
     // Second bit: 1 -> there's work; 0 -> no work
-    // locked: AtomicU64,
-    locked: Mutex<usize>,
+    locked: AtomicU64,
 }
 
 impl ArmedLock {
