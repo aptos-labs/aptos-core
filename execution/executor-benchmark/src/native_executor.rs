@@ -348,7 +348,7 @@ impl TransactionBlockExecutor for NativeExecutor {
         let transaction_outputs = NATIVE_EXECUTOR_POOL.install(|| {
             transactions
                 .par_iter()
-                .map(|txn| match &txn.inner() {
+                .map(|txn| match &txn.expect_valid() {
                     Transaction::StateCheckpoint(_) => Self::handle_state_checkpoint(),
                     Transaction::UserTransaction(user_txn) => match user_txn.payload() {
                         aptos_types::transaction::TransactionPayload::EntryFunction(f) => {

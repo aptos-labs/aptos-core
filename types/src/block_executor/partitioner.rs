@@ -511,7 +511,7 @@ impl PartitionedTransactions {
     }
 
     pub fn add_checkpoint_txn(&mut self, last_txn: SignatureVerifiedTransaction) {
-        assert!(matches!(last_txn.inner(), Transaction::StateCheckpoint(_)));
+        assert!(matches!(last_txn.expect_valid(), Transaction::StateCheckpoint(_)));
         let txn_with_deps =
             TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
         if !self.global_txns.is_empty() {
