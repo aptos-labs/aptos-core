@@ -237,8 +237,9 @@ where
         )>,
     ) {
         while let Some(txn_idx) = scheduler.try_commit() {
+            let mut shared_commit_state_guard = shared_commit_state.acquire();
             let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
-                shared_commit_state.get_mut();
+                shared_commit_state_guard.deref_mut();
 
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
@@ -383,7 +384,7 @@ where
             }
         }
 
-        let final_results = final_results.get_mut();
+        let mut final_results = final_results.acquire();
         match last_input_output.take_output(txn_idx) {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 final_results[txn_idx as usize] = t;
@@ -456,7 +457,8 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    let (_, _, maybe_error) = shared_commit_state.get();
+                    let mut shared_commit_state_guard = shared_commit_state.acquire();
+                    let (_, _, maybe_error) = shared_commit_state_guard.deref_mut();
                     Self::execute(
                         txn_idx,
                         incarnation,
@@ -529,7 +531,7 @@ where
 
         {
             final_results
-                .get_mut()
+                .acquire()
                 .resize_with(num_txns, E::Output::skip_output);
         }
 

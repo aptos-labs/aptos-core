@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::cell::UnsafeCell;
+use std::{
+    cell::UnsafeCell,
+    ops::{Deref, DerefMut},
+    sync::atomic,
+};
 
 // Parallel algorithms often guarantee a sequential use of certain
 // data structures, or parts of the data-structures (like elements of
@@ -16,6 +20,10 @@ pub struct ExplicitSyncWrapper<T> {
     value: UnsafeCell<T>,
 }
 
+pub struct Guard<'a, T> {
+    lock: &'a ExplicitSyncWrapper<T>,
+}
+
 impl<T> ExplicitSyncWrapper<T> {
     pub const fn new(value: T) -> Self {
         Self {
@@ -23,16 +31,54 @@ impl<T> ExplicitSyncWrapper<T> {
         }
     }
 
-    pub fn get_mut<'a>(&self) -> &'a mut T {
-        unsafe { &mut *self.value.get() }
+    pub fn acquire(&self) -> Guard<T> {
+        atomic::fence(atomic::Ordering::Acquire);
+        Guard { lock: self }
     }
 
-    pub fn get<'a>(&self) -> &'a T {
-        unsafe { &mut *self.value.get() }
+    pub(crate) fn unlock(&self) {
+        atomic::fence(atomic::Ordering::Release);
     }
 
     pub fn into_inner(self) -> T {
         self.value.into_inner()
+    }
+
+    pub fn deref(&self) -> &T {
+        unsafe { &*self.value.get() }
+    }
+
+    pub fn deref_mut(&self) -> &mut T {
+        unsafe { &mut *self.value.get() }
+    }
+}
+
+impl<T> Guard<'_, T> {
+    pub fn deref(&self) -> &T {
+        self.lock.deref()
+    }
+
+    pub fn deref_mut(&mut self) -> &mut T {
+        self.lock.deref_mut()
+    }
+}
+
+impl<T> Deref for Guard<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        self.lock.deref()
+    }
+}
+
+impl<T> DerefMut for Guard<'_, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        self.lock.deref_mut()
+    }
+}
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        self.lock.unlock();
     }
 }
 
