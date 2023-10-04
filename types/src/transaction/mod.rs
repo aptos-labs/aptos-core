@@ -1119,7 +1119,8 @@ impl TransactionOutput {
             write_set,
             events,
             gas_used,
-            status, ..
+            status,
+            ..
         } = self;
         (write_set, events, gas_used, status)
     }

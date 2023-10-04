@@ -15,7 +15,9 @@ use crate::{
 use anyhow::Error;
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -73,7 +75,6 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
@@ -452,7 +453,11 @@ impl FakeExecutor {
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let preprocess_txn = BlockAptosVM::verify_transactions(txn_block);
         let txn_provider = Arc::new(DefaultTxnProvider::new(preprocess_txn));
-        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>, _>(
+        BlockAptosVM::execute_block::<
+            _,
+            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
+            _,
+        >(
             self.executor_thread_pool.clone(),
             txn_provider,
             &self.data_store,

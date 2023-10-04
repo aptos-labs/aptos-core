@@ -1,16 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaUpdate;
 use crate::change_set::VMChangeSet;
-use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_aggregator::{delta_change_set::DeltaUpdate, resolver::AggregatorResolver};
 use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{WriteOp, TOTAL_SUPPLY_STATE_KEY},
 };
-use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
 use move_core_types::vm_status::VMStatus;
 
 /// Output produced by the VM after executing a transaction.
@@ -109,7 +107,8 @@ impl VMOutput {
         );
         let (vm_change_set, gas_used, status) = materialized_output.unpack();
         let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
-        Ok(TransactionOutput::new(write_set, events, gas_used, status).with_total_supply_delta(total_supply_delta))
+        Ok(TransactionOutput::new(write_set, events, gas_used, status)
+            .with_total_supply_delta(total_supply_delta))
     }
 
     /// Similar to `try_into_transaction_output` but deltas are materialized
@@ -137,15 +136,17 @@ impl VMOutput {
         let (write_set, events) = vm_change_set
             .into_storage_change_set_unchecked()
             .into_inner();
-        TransactionOutput::new(write_set, events, gas_used, status).with_total_supply_delta(total_supply_delta)
+        TransactionOutput::new(write_set, events, gas_used, status)
+            .with_total_supply_delta(total_supply_delta)
     }
 
     fn total_supply_delta(&self) -> Option<(bool, u128)> {
-        self.change_set.aggregator_v1_delta_set().get(&TOTAL_SUPPLY_STATE_KEY).map(|op|{
-            match op.get_update() {
+        self.change_set
+            .aggregator_v1_delta_set()
+            .get(&TOTAL_SUPPLY_STATE_KEY)
+            .map(|op| match op.get_update() {
                 DeltaUpdate::Plus(x) => (false, x),
                 DeltaUpdate::Minus(x) => (true, x),
-            }
-        })
+            })
     }
 }

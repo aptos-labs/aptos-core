@@ -13,6 +13,7 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
+    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::delta_change_set::serialize;
@@ -31,13 +32,17 @@ use aptos_types::{
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use num_cpus;
 use rayon::ThreadPool;
-use std::{collections::HashMap, hint, marker::PhantomData, sync::{
-    atomic::AtomicU32,
-    mpsc,
-    mpsc::{Receiver, Sender},
-    Arc,
-}};
-use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
+use std::{
+    collections::HashMap,
+    hint,
+    marker::PhantomData,
+    sync::{
+        atomic::AtomicU32,
+        mpsc,
+        mpsc::{Receiver, Sender},
+        Arc,
+    },
+};
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -549,17 +554,23 @@ where
                                 .with_label_values(&[counters::Mode::PARALLEL])
                                 .inc();
                             info!(
-                            "[BlockSTM]: Parallel execution early halted due to \
+                                "[BlockSTM]: Parallel execution early halted due to \
                              accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}",
-                            accumulated_non_storage_gas, per_block_gas_limit,
-                        );
+                                accumulated_non_storage_gas, per_block_gas_limit,
+                            );
 
                             // Set the execution output status to be SkipRest, to skip the rest of the txns.
                             last_input_output.update_to_skip_rest(txn_idx);
                         }
                     }
                 }
-                self.worker_commit_hook(txn_idx, versioned_cache, last_input_output, base_view, txn_provider);
+                self.worker_commit_hook(
+                    txn_idx,
+                    versioned_cache,
+                    last_input_output,
+                    base_view,
+                    txn_provider,
+                );
 
                 // Committed the last transaction, BlockSTM finishes execution.
                 if scheduler.next_txn(txn_idx) == txn_provider.end_txn_idx()
@@ -574,7 +585,8 @@ where
                     );
                     counters::update_parallel_txn_gas_counters(&txn_fee_statements);
 
-                    let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
+                    let accumulated_non_storage_gas = accumulated_fee_statement
+                        .execution_gas_used()
                         + accumulated_fee_statement.io_gas_used();
                     info!(
                         "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. accumulated_non_storage_gas = {}, limit = {:?}",
@@ -618,19 +630,21 @@ where
                     versioned_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(txn_idx, incarnation, ExecutionTaskType::Execution) => {
-                    Self::execute(
-                        txn_idx,
-                        incarnation,
-                        txn_provider,
-                        last_input_output,
-                        versioned_cache,
-                        scheduler,
-                        &executor,
-                        base_view,
-                        ParallelState::new(versioned_cache, scheduler, shared_counter),
-                    )
-                },
+                SchedulerTask::ExecutionTask(
+                    txn_idx,
+                    incarnation,
+                    ExecutionTaskType::Execution,
+                ) => Self::execute(
+                    txn_idx,
+                    incarnation,
+                    txn_provider,
+                    last_input_output,
+                    versioned_cache,
+                    scheduler,
+                    &executor,
+                    base_view,
+                    ParallelState::new(versioned_cache, scheduler, shared_counter),
+                ),
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
@@ -640,9 +654,7 @@ where
 
                     SchedulerTask::NoTask
                 },
-                SchedulerTask::NoTask => {
-                    scheduler.next_task(false)
-                },
+                SchedulerTask::NoTask => scheduler.next_task(false),
                 SchedulerTask::Done => {
                     break;
                 },
@@ -669,7 +681,9 @@ where
 
         let versioned_cache = MVHashMap::new();
         for (global_txn_idx, key) in txn_provider.remote_dependencies() {
-            versioned_cache.data().force_mark_estimate(key, global_txn_idx);
+            versioned_cache
+                .data()
+                .force_mark_estimate(key, global_txn_idx);
             //sharding todo: what about `versioned_cache.modules()`?
         }
 
@@ -692,14 +706,30 @@ where
                 // Implementing this dedicated committing thread mode as a workaround,
                 // while a better solution is pending here: https://github.com/aptos-labs/aptos-core/pull/10081.
                 s.spawn(|_| {
-                    txn_provider.as_ref().run_sharding_msg_loop(&versioned_cache, &scheduler);
+                    txn_provider
+                        .as_ref()
+                        .run_sharding_msg_loop(&versioned_cache, &scheduler);
                 });
                 s.spawn(|_| {
-                    self.work_task_with_scope_commit_only(txn_provider.as_ref(), &last_input_output, &versioned_cache, &scheduler, base_view);
+                    self.work_task_with_scope_commit_only(
+                        txn_provider.as_ref(),
+                        &last_input_output,
+                        &versioned_cache,
+                        &scheduler,
+                        base_view,
+                    );
                 });
                 for _ in 2..self.concurrency_level {
-                    s.spawn(|_|{
-                        self.work_task_with_scope_v3_scheduler_tasks_only(&executor_initial_arguments, txn_provider.as_ref(), &last_input_output, &versioned_cache, &scheduler, base_view, &shared_counter);
+                    s.spawn(|_| {
+                        self.work_task_with_scope_v3_scheduler_tasks_only(
+                            &executor_initial_arguments,
+                            txn_provider.as_ref(),
+                            &last_input_output,
+                            &versioned_cache,
+                            &scheduler,
+                            base_view,
+                            &shared_counter,
+                        );
                     });
                 }
             } else {
@@ -897,11 +927,7 @@ where
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
-            self.execute_transactions_parallel(
-                executor_arguments,
-                txn_provider.clone(),
-                base_view,
-            )
+            self.execute_transactions_parallel(executor_arguments, txn_provider.clone(), base_view)
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,

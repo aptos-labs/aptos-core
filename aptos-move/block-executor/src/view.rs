@@ -6,6 +6,7 @@ use crate::{
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler},
     task::Transaction,
+    txn_provider::TxnIndexProvider,
 };
 use aptos_aggregator::{
     delta_change_set::serialize,
@@ -33,7 +34,6 @@ use move_core_types::{
     vm_status::{StatusCode, VMStatus},
 };
 use std::{cell::RefCell, fmt::Debug, sync::atomic::AtomicU32};
-use crate::txn_provider::TxnIndexProvider;
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -232,13 +232,21 @@ pub(crate) enum ViewState<'a, T: Transaction, X: Executable, TP: TxnIndexProvide
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> {
+pub(crate) struct LatestView<
+    'a,
+    T: Transaction,
+    S: TStateView<Key = T::Key>,
+    X: Executable,
+    TP: TxnIndexProvider,
+> {
     base_view: &'a S,
     latest_view: ViewState<'a, T, X, TP>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> LatestView<'a, T, S, X, TP> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider>
+    LatestView<'a, T, S, X, TP>
+{
     pub(crate) fn new(
         base_view: &'a S,
         latest_view: ViewState<'a, T, X, TP>,
@@ -336,8 +344,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnInde
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TResourceView
-    for LatestView<'a, T, S, X, TP>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider>
+    TResourceView for LatestView<'a, T, S, X, TP>
 {
     type Key = T::Key;
     type Layout = MoveTypeLayout;
@@ -383,8 +391,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnInde
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TModuleView
-    for LatestView<'a, T, S, X, TP>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider>
+    TModuleView for LatestView<'a, T, S, X, TP>
 {
     type Key = T::Key;
 
@@ -419,8 +427,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnInde
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> StateStorageView
-    for LatestView<'a, T, S, X, TP>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider>
+    StateStorageView for LatestView<'a, T, S, X, TP>
 {
     fn id(&self) -> StateViewId {
         self.base_view.id()
@@ -431,8 +439,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnInde
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TAggregatorView
-    for LatestView<'a, T, S, X, TP>
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider>
+    TAggregatorView for LatestView<'a, T, S, X, TP>
 {
     type IdentifierV1 = T::Key;
     type IdentifierV2 = T::Identifier;

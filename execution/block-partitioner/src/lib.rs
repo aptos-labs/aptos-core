@@ -24,7 +24,6 @@ pub trait PartitionerConfig: Debug {
     fn build(&self) -> Box<dyn BlockPartitioner>;
 }
 
-
 #[cfg(test)]
 mod tests;
 

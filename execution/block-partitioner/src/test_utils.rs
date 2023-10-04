@@ -11,6 +11,8 @@ use aptos_crypto::hash::TestOnlyHash;
 use aptos_crypto::HashValue;
 use aptos_crypto::{ed25519::ed25519_keys::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
 #[cfg(test)]
+use aptos_types::block_executor::partitioner::PartitionedTransactionsV2;
+#[cfg(test)]
 use aptos_types::block_executor::partitioner::RoundId;
 #[cfg(test)]
 use aptos_types::block_executor::partitioner::ShardId;
@@ -42,8 +44,6 @@ use std::collections::HashMap;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-#[cfg(test)]
-use aptos_types::block_executor::partitioner::PartitionedTransactionsV2;
 
 #[derive(Debug)]
 pub struct TestAccount {

@@ -3,11 +3,11 @@
 
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
+    block_executor::partitioner::{PartitionedTransactions, PartitionedTransactionsV3},
+    transaction::TransactionOutput,
 };
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
-use aptos_types::block_executor::partitioner::PartitionedTransactionsV3;
 
 pub struct ShardedExecutionOutput {
     pub sharded_output: Vec<Vec<Vec<TransactionOutput>>>,

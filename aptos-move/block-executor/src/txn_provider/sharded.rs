@@ -1,20 +1,22 @@
 // Copyright © Aptos Foundation
 
-use std::fmt::Debug;
-use aptos_mvhashmap::types::TxnIndex;
-use std::collections::{BTreeSet, HashMap, HashSet};
-use std::marker::PhantomData;
-use std::sync::Arc;
-use dashmap::DashSet;
+use crate::{
+    errors::Error,
+    scheduler::Scheduler,
+    task::{ExecutionStatus, Transaction, TransactionOutput},
+    txn_last_input_output::TxnLastInputOutput,
+    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
+};
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_mvhashmap::MVHashMap;
-use aptos_types::executable::Executable;
-use aptos_types::write_set::WriteOp;
-use crate::errors::Error;
-use crate::scheduler::Scheduler;
-use crate::task::{ExecutionStatus, Transaction, TransactionOutput};
-use crate::txn_last_input_output::TxnLastInputOutput;
-use crate::txn_provider::{BlockSTMPlugin, TxnIndexProvider};
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
+use aptos_types::{executable::Executable, write_set::WriteOp};
+use dashmap::DashSet;
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    fmt::Debug,
+    marker::PhantomData,
+    sync::Arc,
+};
 
 pub enum CrossShardMessage<T: Transaction, TE: Debug> {
     Commit(CrossShardTxnResult<T, TE>),
@@ -56,10 +58,10 @@ pub struct ShardedTxnProvider<T: Transaction, TO: TransactionOutput, TE: Debug> 
 }
 
 impl<T, TO, TE> ShardedTxnProvider<T, TO, TE>
-    where
-        T: Transaction,
-        TO: TransactionOutput<Txn = T>,
-        TE: Debug + Send + Clone,
+where
+    T: Transaction,
+    TO: TransactionOutput<Txn = T>,
+    TE: Debug + Send + Clone,
 {
     pub fn new(
         block_id: [u8; 32],
@@ -106,9 +108,16 @@ impl<T, TO, TE> ShardedTxnProvider<T, TO, TE>
         global_txn_idx: TxnIndex,
         txn_output: ConcreteTxnOutput<T>,
     ) {
-        let ConcreteTxnOutput { resource_write_set, module_write_set, aggregator_v1_write_set, aggregator_v1_delta_set } = txn_output;
+        let ConcreteTxnOutput {
+            resource_write_set,
+            module_write_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+        } = txn_output;
         // First, apply writes.
-        for (k, v) in resource_write_set.into_iter().chain(aggregator_v1_write_set.into_iter())
+        for (k, v) in resource_write_set
+            .into_iter()
+            .chain(aggregator_v1_write_set.into_iter())
         {
             versioned_cache.data().write(k, global_txn_idx, 0, v);
         }
@@ -125,10 +134,10 @@ impl<T, TO, TE> ShardedTxnProvider<T, TO, TE>
 }
 
 impl<TX, TO, TE> TxnIndexProvider for ShardedTxnProvider<TX, TO, TE>
-    where
-        TX: Transaction,
-        TO: TransactionOutput<Txn = TX>,
-        TE: Debug + Send + Clone,
+where
+    TX: Transaction,
+    TO: TransactionOutput<Txn = TX>,
+    TE: Debug + Send + Clone,
 {
     fn end_txn_idx(&self) -> TxnIndex {
         TxnIndex::MAX
@@ -139,7 +148,10 @@ impl<TX, TO, TE> TxnIndexProvider for ShardedTxnProvider<TX, TO, TE>
     }
 
     fn first_txn(&self) -> TxnIndex {
-        self.global_idxs.first().copied().unwrap_or(self.end_txn_idx())
+        self.global_idxs
+            .first()
+            .copied()
+            .unwrap_or(self.end_txn_idx())
     }
 
     fn next_txn(&self, idx: TxnIndex) -> TxnIndex {
@@ -147,7 +159,10 @@ impl<TX, TO, TE> TxnIndexProvider for ShardedTxnProvider<TX, TO, TE>
             self.end_txn_idx()
         } else {
             let local_rank = self.local_idxs_by_global.get(&idx).copied().unwrap();
-            self.global_idxs.get(local_rank + 1).copied().unwrap_or(self.end_txn_idx())
+            self.global_idxs
+                .get(local_rank + 1)
+                .copied()
+                .unwrap_or(self.end_txn_idx())
         }
     }
 
@@ -158,7 +173,11 @@ impl<TX, TO, TE> TxnIndexProvider for ShardedTxnProvider<TX, TO, TE>
     fn txns_and_deps(&self) -> Vec<TxnIndex> {
         let x = self.global_idxs.iter();
         let y = self.remote_dependencies.keys();
-        x.chain(y).copied().collect::<BTreeSet<_>>().into_iter().collect()
+        x.chain(y)
+            .copied()
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
     }
 
     fn local_index(&self, idx: TxnIndex) -> usize {
@@ -182,18 +201,16 @@ impl<TX, TO, TE> TxnIndexProvider for ShardedTxnProvider<TX, TO, TE>
     }
 }
 
-
 impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
-    where
-        TX: Transaction,
-        TO: TransactionOutput<Txn = TX>,
-        TE: Debug + Send + Clone,
+where
+    TX: Transaction,
+    TO: TransactionOutput<Txn = TX>,
+    TE: Debug + Send + Clone,
 {
     fn remote_dependencies(&self) -> Vec<(TxnIndex, TX::Key)> {
-        self.remote_dependencies.iter()
-            .flat_map(|(txn_idx, keys)|{
-                keys.iter().map(|key|(*txn_idx, key.clone()))
-            })
+        self.remote_dependencies
+            .iter()
+            .flat_map(|(txn_idx, keys)| keys.iter().map(|key| (*txn_idx, key.clone())))
             .collect()
     }
 
@@ -205,19 +222,23 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
     fn run_sharding_msg_loop<X: Executable + 'static>(
         &self,
         mv: &MVHashMap<TX::Key, TX::Tag, TX::Value, X>,
-        scheduler: &Scheduler<Self>
+        scheduler: &Scheduler<Self>,
     ) {
-        while let CrossShardMessage::Commit(CrossShardTxnResult { global_txn_idx, result }) = self.cross_shard_client.recv() {
+        while let CrossShardMessage::Commit(CrossShardTxnResult {
+            global_txn_idx,
+            result,
+        }) = self.cross_shard_client.recv()
+        {
             match result {
                 ExecutionStatus::Success(output) => {
                     self.apply_updates_to_mv(mv, global_txn_idx, output);
-                }
+                },
                 ExecutionStatus::SkipRest(output) => {
                     self.apply_updates_to_mv(mv, global_txn_idx, output);
-                }
+                },
                 ExecutionStatus::Abort(_) => {
                     //sharding todo: what to do here?
-                }
+                },
             }
             self.remote_committed_txns.insert(global_txn_idx);
             scheduler.fast_resume_dependents(global_txn_idx);
@@ -225,28 +246,34 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
     }
 
     fn shutdown_receiver(&self) {
-        self.cross_shard_client.send(self.shard_idx, CrossShardMessage::Shutdown);
+        self.cross_shard_client
+            .send(self.shard_idx, CrossShardMessage::Shutdown);
     }
 
-    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<TX, TO, TE>, _delta_writes: &[(TX::Key, WriteOp)]) {
+    fn on_local_commit(
+        &self,
+        txn_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<TX, TO, TE>,
+        _delta_writes: &[(TX::Key, WriteOp)],
+    ) {
         let txn_output = last_input_output.txn_output(txn_idx).unwrap();
         let concrete_status = match txn_output.output_status() {
-            ExecutionStatus::Success(obj) => {
-                ExecutionStatus::Success(ConcreteTxnOutput::new(obj))
-            }
+            ExecutionStatus::Success(obj) => ExecutionStatus::Success(ConcreteTxnOutput::new(obj)),
             ExecutionStatus::SkipRest(obj) => {
                 ExecutionStatus::SkipRest(ConcreteTxnOutput::new(obj))
-            }
-            ExecutionStatus::Abort(obj) => {
-                ExecutionStatus::Abort(obj.clone())
-            }
+            },
+            ExecutionStatus::Abort(obj) => ExecutionStatus::Abort(obj.clone()),
         };
 
         let txn_local_index = self.local_index(txn_idx);
         for &shard_id in &self.follower_shard_sets[txn_local_index] {
             self.cross_shard_client.send(
                 shard_id,
-                CrossShardMessage::Commit(CrossShardTxnResult { global_txn_idx: txn_idx, result: concrete_status.clone() }));
+                CrossShardMessage::Commit(CrossShardTxnResult {
+                    global_txn_idx: txn_idx,
+                    result: concrete_status.clone(),
+                }),
+            );
         }
     }
 

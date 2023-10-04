@@ -19,7 +19,9 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::Gas;
@@ -80,7 +82,6 @@ use std::{
         Arc,
     },
 };
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1536,12 +1537,13 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.len();
-        let pre_processed_txns = RAYON_EXEC_POOL.install(||{BlockAptosVM::verify_transactions(transactions)});
+        let pre_processed_txns =
+            RAYON_EXEC_POOL.install(|| BlockAptosVM::verify_transactions(transactions));
 
         let ret = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            _
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
             Arc::new(DefaultTxnProvider::new(pre_processed_txns)),

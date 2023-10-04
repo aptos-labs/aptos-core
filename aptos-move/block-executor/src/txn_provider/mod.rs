@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
+use crate::{
+    scheduler::Scheduler,
+    task::{Transaction, TransactionOutput},
+    txn_last_input_output::TxnLastInputOutput,
+};
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
+use aptos_types::{executable::Executable, write_set::WriteOp};
 use std::fmt::Debug;
-use aptos_mvhashmap::MVHashMap;
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::executable::Executable;
-use aptos_types::write_set::WriteOp;
-use crate::scheduler::Scheduler;
-use crate::task::{Transaction, TransactionOutput};
-use crate::txn_last_input_output::{TxnLastInputOutput};
 
 /// The transaction index operations that are implemented differently between unsharded execution and sharded execution.
 pub trait TxnIndexProvider {
@@ -46,10 +46,10 @@ pub trait TxnIndexProvider {
 
 /// Some other places where unsharded execution and sharded execution work differently.
 pub trait BlockSTMPlugin<T: Transaction, TO, TE>
-    where
-        T: Transaction,
-        TO: TransactionOutput<Txn = T>,
-        TE: Debug + Send + Clone,
+where
+    T: Transaction,
+    TO: TransactionOutput<Txn = T>,
+    TE: Debug + Send + Clone,
 {
     /// Get all the remote dependency set of all local txns.
     fn remote_dependencies(&self) -> Vec<(TxnIndex, T::Key)>;
@@ -58,13 +58,22 @@ pub trait BlockSTMPlugin<T: Transaction, TO, TE>
     fn txn(&self, idx: TxnIndex) -> &T;
 
     /// Run a loop to receive remote txn output and unblock local txns.
-    fn run_sharding_msg_loop<X: Executable + 'static>(&self, mv_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>, scheduler: &Scheduler<Self>);
+    fn run_sharding_msg_loop<X: Executable + 'static>(
+        &self,
+        mv_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        scheduler: &Scheduler<Self>,
+    );
 
     /// Stop the loop above.
     fn shutdown_receiver(&self);
 
     /// Some extra processing once a local txn is committed.
-    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<T, TO, TE>, delta_writes: &[(T::Key, WriteOp)]);
+    fn on_local_commit(
+        &self,
+        txn_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T, TO, TE>,
+        delta_writes: &[(T::Key, WriteOp)],
+    );
 
     /// Return whether a dedicated committing thread should be used in BlockSTM.
     fn use_dedicated_committing_thread(&self) -> bool;

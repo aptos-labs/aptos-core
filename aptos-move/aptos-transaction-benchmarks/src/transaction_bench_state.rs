@@ -2,7 +2,9 @@
 
 use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    txn_commit_hook::NoOpTransactionCommitHook, txn_provider::default::DefaultTxnProvider,
+};
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -32,7 +34,6 @@ use aptos_vm::{
 };
 use proptest::{collection::vec, prelude::Strategy, strategy::ValueTree, test_runner::TestRunner};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
-use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 
 pub struct TransactionBenchState<S> {
     num_transactions: usize,
@@ -211,7 +212,7 @@ where
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            _
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
             txn_provider,
@@ -263,7 +264,7 @@ where
         let output = BlockAptosVM::execute_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-            _
+            _,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
             txn_provider,

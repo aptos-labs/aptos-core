@@ -240,8 +240,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     /// A variant of `mark_estimate()` that does not require the entry exist.
     pub fn force_mark_estimate(&self, key: K, txn_idx: TxnIndex) {
         let mut v = self.values.entry(key).or_default();
-        v.versioned_map
-            .insert(ShiftedTxnIndex::new(txn_idx), CachePadded::new(Entry::new_predicted_dep()));
+        v.versioned_map.insert(
+            ShiftedTxnIndex::new(txn_idx),
+            CachePadded::new(Entry::new_predicted_dep()),
+        );
     }
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic

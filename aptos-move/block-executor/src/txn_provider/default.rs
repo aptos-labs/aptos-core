@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
-use std::fmt::Debug;
-use aptos_mvhashmap::MVHashMap;
-use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::executable::Executable;
-use aptos_types::write_set::WriteOp;
+use crate::{
+    scheduler::Scheduler,
+    task::{Transaction, TransactionOutput},
+    txn_last_input_output::TxnLastInputOutput,
+    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
+};
+use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
+use aptos_types::{executable::Executable, write_set::WriteOp};
 use move_core_types::account_address::AccountAddress;
-use crate::scheduler::Scheduler;
-use crate::task::{Transaction, TransactionOutput};
-use crate::txn_last_input_output::TxnLastInputOutput;
-use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
+use std::fmt::Debug;
 
 /// Some logic of vanilla BlockSTM.
 pub struct DefaultTxnProvider<T> {
@@ -20,7 +20,7 @@ impl<T> DefaultTxnProvider<T> {
     pub fn new(txns: Vec<T>) -> Self {
         Self {
             block_id: AccountAddress::random().into_bytes(),
-            txns
+            txns,
         }
     }
 }
@@ -35,11 +35,19 @@ impl<T> TxnIndexProvider for DefaultTxnProvider<T> {
     }
 
     fn first_txn(&self) -> TxnIndex {
-        if self.num_txns() == 0 { self.end_txn_idx() } else { 0 }
+        if self.num_txns() == 0 {
+            self.end_txn_idx()
+        } else {
+            0
+        }
     }
 
     fn next_txn(&self, idx: TxnIndex) -> TxnIndex {
-        if idx == self.end_txn_idx() { idx } else { idx + 1 }
+        if idx == self.end_txn_idx() {
+            idx
+        } else {
+            idx + 1
+        }
     }
 
     fn txns(&self) -> Vec<TxnIndex> {
@@ -72,16 +80,20 @@ impl<T> TxnIndexProvider for DefaultTxnProvider<T> {
 }
 
 impl<T, TO, TE> BlockSTMPlugin<T, TO, TE> for DefaultTxnProvider<T>
-    where
-        T: Transaction,
-        TO: TransactionOutput<Txn = T>,
-        TE: Debug + Send + Clone,
+where
+    T: Transaction,
+    TO: TransactionOutput<Txn = T>,
+    TE: Debug + Send + Clone,
 {
     fn remote_dependencies(&self) -> Vec<(TxnIndex, T::Key)> {
         vec![]
     }
 
-    fn run_sharding_msg_loop<X: Executable + 'static>(&self, _mv_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>, _scheduler: &Scheduler<Self>) {
+    fn run_sharding_msg_loop<X: Executable + 'static>(
+        &self,
+        _mv_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
+        _scheduler: &Scheduler<Self>,
+    ) {
         // Nothing to do.
     }
 
@@ -93,7 +105,12 @@ impl<T, TO, TE> BlockSTMPlugin<T, TO, TE> for DefaultTxnProvider<T>
         &self.txns[idx as usize]
     }
 
-    fn on_local_commit(&self, _txn_idx: TxnIndex, _last_input_output: &TxnLastInputOutput<T, TO, TE>, _delta_writes: &[(T::Key, WriteOp)]) {
+    fn on_local_commit(
+        &self,
+        _txn_idx: TxnIndex,
+        _last_input_output: &TxnLastInputOutput<T, TO, TE>,
+        _delta_writes: &[(T::Key, WriteOp)],
+    ) {
         // Nothing to do.
     }
 

@@ -1,23 +1,35 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sharded_block_executor::{coordinator_client::CoordinatorClient, counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS, cross_shard_client::CrossShardClient, executor_client::{ExecutorClient, ShardedExecutionOutput}, global_executor::GlobalExecutor, messages::CrossShardMsg, sharded_aggregator_service, sharded_executor_service::ShardedExecutorService, ExecutorShardCommand, ExecuteV3PartitionCommand};
+use crate::{
+    adapter_common::PreprocessedTransaction,
+    sharded_block_executor::{
+        coordinator_client::CoordinatorClient,
+        counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS,
+        cross_shard_client::CrossShardClient,
+        executor_client::{ExecutorClient, ShardedExecutionOutput},
+        global_executor::GlobalExecutor,
+        messages::CrossShardMsg,
+        sharded_aggregator_service,
+        sharded_aggregator_service::get_state_value,
+        sharded_executor_service::ShardedExecutorService,
+        ExecuteV3PartitionCommand, ExecutorShardCommand,
+    },
+};
+use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardMessage};
 use aptos_logger::trace;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
-        PartitionedTransactions, RoundId, ShardId, GLOBAL_ROUND_ID, MAX_ALLOWED_PARTITIONING_ROUNDS,
+        PartitionedTransactions, PartitionedTransactionsV3, RoundId, ShardId, GLOBAL_ROUND_ID,
+        MAX_ALLOWED_PARTITIONING_ROUNDS,
     },
     transaction::TransactionOutput,
+    write_set::TOTAL_SUPPLY_STATE_KEY,
 };
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
-use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardMessage};
-use aptos_types::block_executor::partitioner::PartitionedTransactionsV3;
-use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
-use crate::adapter_common::PreprocessedTransaction;
-use crate::sharded_block_executor::sharded_aggregator_service::get_state_value;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -102,22 +114,24 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             .zip(cross_shard_msg_rxs)
             .zip(v3_clients)
             .enumerate()
-            .map(|(shard_id, (((command_rx, result_tx), cross_shard_rxs), v3_client))| {
-                let cross_shard_client = LocalCrossShardClient::new(
-                    global_cross_shard_tx.clone(),
-                    cross_shard_msg_txs.clone(),
-                    cross_shard_rxs,
-                );
-                Self::new(
-                    shard_id as ShardId,
-                    num_shards,
-                    num_threads,
-                    command_rx,
-                    result_tx,
-                    cross_shard_client,
-                    v3_client,
-                )
-            })
+            .map(
+                |(shard_id, (((command_rx, result_tx), cross_shard_rxs), v3_client))| {
+                    let cross_shard_client = LocalCrossShardClient::new(
+                        global_cross_shard_tx.clone(),
+                        cross_shard_msg_txs.clone(),
+                        cross_shard_rxs,
+                    );
+                    Self::new(
+                        shard_id as ShardId,
+                        num_shards,
+                        num_threads,
+                        command_rx,
+                        result_tx,
+                        cross_shard_client,
+                        v3_client,
+                    )
+                },
+            )
             .collect();
         LocalExecutorClient::new(command_txs, result_rxs, executor_shards, global_executor)
     }
@@ -213,10 +227,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         state_view: Arc<S>,
         transactions: PartitionedTransactionsV3,
         concurrency_level_per_shard: usize,
-        maybe_block_gas_limit: Option<u64>
+        maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let num_txns = transactions.num_txns();
-        let PartitionedTransactionsV3 { partitions, global_idx_sets_by_shard, .. } = transactions;
+        let PartitionedTransactionsV3 {
+            partitions,
+            global_idx_sets_by_shard,
+            ..
+        } = transactions;
 
         for (shard_idx, partition) in partitions.into_iter().enumerate() {
             let cmd = ExecutorShardCommand::ExecuteV3Partition(ExecuteV3PartitionCommand {
@@ -231,29 +249,41 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         // Collect results.
         let mut output_holders: Vec<Option<TransactionOutput>> = vec![None; num_txns];
         for (shard_idx, rx) in self.result_rxs.iter().enumerate() {
-            let maybe_txn_output_lists: Result<Vec<Vec<TransactionOutput>>, VMStatus> = rx.recv().unwrap();
+            let maybe_txn_output_lists: Result<Vec<Vec<TransactionOutput>>, VMStatus> =
+                rx.recv().unwrap();
             match maybe_txn_output_lists {
                 Ok(txn_output_lists) => {
-                    for txn_output_list in txn_output_lists { // This loop should only have 1 iteration.
+                    for txn_output_list in txn_output_lists {
+                        // This loop should only have 1 iteration.
                         for (local_idx, txn_output) in txn_output_list.into_iter().enumerate() {
-                            output_holders[global_idx_sets_by_shard[shard_idx][local_idx] as usize] = Some(txn_output);
+                            output_holders
+                                [global_idx_sets_by_shard[shard_idx][local_idx] as usize] =
+                                Some(txn_output);
                         }
                     }
-                }
+                },
                 Err(_vm_status) => {
                     // sharding v3 todo: handle shard error when aggregating.
                     todo!()
-                }
+                },
             }
         }
 
-        let mut outputs: Vec<TransactionOutput> = output_holders.into_iter().map(|output_holder| output_holder.unwrap()).collect();
+        let mut outputs: Vec<TransactionOutput> = output_holders
+            .into_iter()
+            .map(|output_holder| output_holder.unwrap())
+            .collect();
 
         // Update total supply.
-        let mut total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
+        let mut total_supply_base_val: u128 =
+            get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
         for output in outputs.iter_mut() {
             if let Some((minus, amount)) = output.total_supply_delta {
-                total_supply_base_val = if minus { total_supply_base_val - amount } else { total_supply_base_val + amount };
+                total_supply_base_val = if minus {
+                    total_supply_base_val - amount
+                } else {
+                    total_supply_base_val + amount
+                };
                 output.update_total_supply(total_supply_base_val);
             }
         }
@@ -388,7 +418,12 @@ impl LocalCrossShardClientV3 {
             txs.push(tx);
             rxs.push(rx);
         }
-        rxs.into_iter().map(|rx| LocalCrossShardClientV3 { txs: txs.clone(), rx }).collect()
+        rxs.into_iter()
+            .map(|rx| LocalCrossShardClientV3 {
+                txs: txs.clone(),
+                rx,
+            })
+            .collect()
     }
 }
 

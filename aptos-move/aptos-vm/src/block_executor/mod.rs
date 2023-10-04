@@ -7,9 +7,7 @@ pub(crate) mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::vm_wrapper::AptosExecutorTask,
-    counters::{
-        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-    },
+    counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
     AptosVM,
 };
 use aptos_aggregator::{aggregator_extension::AggregatorID, delta_change_set::DeltaOp};
@@ -21,6 +19,7 @@ use aptos_block_executor::{
         TransactionOutput as BlockExecutorTransactionOutput,
     },
     txn_commit_hook::TransactionCommitHook,
+    txn_provider::{BlockSTMPlugin, TxnIndexProvider},
 };
 use aptos_infallible::Mutex;
 use aptos_state_view::{StateView, StateViewId};
@@ -38,7 +37,6 @@ use move_core_types::{language_storage::StructTag, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
 use std::{collections::HashMap, sync::Arc};
-use aptos_block_executor::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -193,7 +191,11 @@ impl BlockAptosVM {
     pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook<Output = AptosTransactionOutput>,
-        TP: TxnIndexProvider + BlockSTMPlugin<PreprocessedTransaction, AptosTransactionOutput, VMStatus> + Send + Sync + 'static
+        TP: TxnIndexProvider
+            + BlockSTMPlugin<PreprocessedTransaction, AptosTransactionOutput, VMStatus>
+            + Send
+            + Sync
+            + 'static,
     >(
         executor_thread_pool: Arc<ThreadPool>,
         txn_provider: Arc<TP>,

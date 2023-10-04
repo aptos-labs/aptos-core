@@ -12,12 +12,11 @@ use crate::sharded_block_executor::{
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::{PartitionedTransactions, SubBlocksForShard},
+    block_executor::partitioner::{PartitionV3, PartitionedTransactions, SubBlocksForShard},
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
-use aptos_types::block_executor::partitioner::PartitionV3;
 
 pub mod aggr_overridden_state_view;
 pub mod coordinator_client;

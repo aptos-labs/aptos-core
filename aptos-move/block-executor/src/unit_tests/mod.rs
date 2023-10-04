@@ -13,6 +13,7 @@ use crate::{
     },
     scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, TxnIndexProvider},
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
@@ -26,8 +27,6 @@ use rand::{prelude::*, random};
 use std::{
     cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
 };
-use crate::txn_provider::default::DefaultTxnProvider;
-use crate::txn_provider::TxnIndexProvider;
 
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, V, E>(transactions: Vec<MockTransaction<K, V, E>>)
@@ -54,7 +53,7 @@ where
         DeltaDataView<K, V>,
         NoOpTransactionCommitHook<MockOutput<K, V, E>, usize>,
         ExecutableTestType,
-        _
+        _,
     >::new(num_cpus::get(), executor_thread_pool, None, None)
     .execute_transactions_parallel((), txn_provider, &data_view);
 
@@ -913,9 +912,7 @@ pub struct DefaultIndexProvider {
 
 impl DefaultIndexProvider {
     pub fn new(num_txns: TxnIndex) -> Self {
-        Self {
-            num_txns
-        }
+        Self { num_txns }
     }
 }
 

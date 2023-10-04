@@ -12,6 +12,7 @@ use crate::{
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
 use criterion::{BatchSize, Bencher as CBencher};
@@ -24,7 +25,6 @@ use proptest::{
     test_runner::TestRunner,
 };
 use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
-use crate::txn_provider::default::DefaultTxnProvider;
 
 pub struct Bencher<K, V, E> {
     transaction_size: usize,
@@ -133,7 +133,7 @@ where
             EmptyDataView<KeyType<K>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType, E>, usize>,
             ExecutableTestType,
-            _
+            _,
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), txn_provider, &data_view);
 

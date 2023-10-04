@@ -2,13 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::GET_NEXT_TASK_SECONDS;
+use crate::{counters::GET_NEXT_TASK_SECONDS, txn_provider::TxnIndexProvider};
 use aptos_infallible::Mutex;
 use aptos_mvhashmap::types::{Incarnation, TxnIndex};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::{max, min},
+    collections::HashMap,
     hint,
     ops::DerefMut,
     sync::{
@@ -16,8 +17,6 @@ use std::{
         Arc, Condvar,
     },
 };
-use std::collections::HashMap;
-use crate::txn_provider::TxnIndexProvider;
 
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
@@ -245,27 +244,34 @@ pub struct Scheduler<P: ?Sized> {
 impl<TP: TxnIndexProvider> Scheduler<TP> {
     pub fn new(txn_provider: Arc<TP>) -> Self {
         // Empty block should early return and not create a scheduler.
-        assert!(txn_provider.num_txns() > 0, "No scheduler needed for 0 transactions");
+        assert!(
+            txn_provider.num_txns() > 0,
+            "No scheduler needed for 0 transactions"
+        );
 
         Self {
             txn_provider: txn_provider.clone(),
-            txn_dependency: txn_provider.txns_and_deps().into_iter()
+            txn_dependency: txn_provider
+                .txns_and_deps()
+                .into_iter()
                 .map(|idx| (idx, CachePadded::new(Mutex::new(Vec::new()))))
                 .collect(),
-            txn_status: txn_provider.txns().into_iter()
+            txn_status: txn_provider
+                .txns()
+                .into_iter()
                 .map(|idx| {
                     (
                         idx,
                         CachePadded::new((
                             RwLock::new(ExecutionStatus::Ready(0, ExecutionTaskType::Execution)),
                             RwLock::new(ValidationStatus::new()),
-                        ))
+                        )),
                     )
                 })
                 .collect(),
             commit_state: CachePadded::new(Mutex::new((txn_provider.first_txn(), 0))),
             execution_idx: AtomicU32::new(txn_provider.first_txn()),
-            validation_idx: AtomicU64::new(txn_provider.first_txn() as u64),// wave is 0!
+            validation_idx: AtomicU64::new(txn_provider.first_txn() as u64), // wave is 0!
             done_marker: CachePadded::new(AtomicBool::new(false)),
         }
     }
@@ -355,7 +361,8 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
-            let prefer_validate = idx_to_validate < min(idx_to_execute, self.txn_provider.end_txn_idx())
+            let prefer_validate = idx_to_validate
+                < min(idx_to_execute, self.txn_provider.end_txn_idx())
                 && !self.never_executed(idx_to_validate);
 
             if !prefer_validate && idx_to_execute >= self.txn_provider.end_txn_idx() {
@@ -505,7 +512,9 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
                 // The transaction execution required revalidating all higher txns (not
                 // only itself), currently happens when incarnation writes to a new path
                 // (w.r.t. the write-set of its previous completed incarnation).
-                if let Some(wave) = self.decrease_validation_idx(self.txn_provider.next_txn(txn_idx)) {
+                if let Some(wave) =
+                    self.decrease_validation_idx(self.txn_provider.next_txn(txn_idx))
+                {
                     cur_wave = wave;
                 };
             }
@@ -543,11 +552,11 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
                     let (dep_status_lock, cvar) = &*dep_condvar.clone();
                     *dep_status_lock.lock() = DependencyStatus::Resolved;
                     cvar.notify_one();
-                    *status = ExecutionStatus::Executing(*incarnation);// sharding todo: is this really needed?
+                    *status = ExecutionStatus::Executing(*incarnation); // sharding todo: is this really needed?
                 },
                 _ => {
                     unreachable!()
-                }
+                },
             }
         }
     }
@@ -662,7 +671,8 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
                 .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
-                        let mut validation_status = self.txn_status.get(&target_idx).unwrap().1.write();
+                        let mut validation_status =
+                            self.txn_status.get(&target_idx).unwrap().1.write();
                         // Update the minimum wave all the suffix txn needs to pass.
                         // We set it to max for safety (to avoid overwriting with lower values
                         // by a slower thread), but currently this isn't strictly required
@@ -802,7 +812,12 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
     fn try_execute_next_version(&self) -> Option<(TxnIndex, Incarnation, ExecutionTaskType)> {
-        let idx_to_execute = self.execution_idx.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v|Some(self.txn_provider.next_txn(v))).unwrap();
+        let idx_to_execute = self
+            .execution_idx
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| {
+                Some(self.txn_provider.next_txn(v))
+            })
+            .unwrap();
 
         if idx_to_execute == self.txn_provider.end_txn_idx() {
             return None;

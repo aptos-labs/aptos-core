@@ -9,7 +9,8 @@ use aptos_logger::trace;
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
 use aptos_types::{
-    block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
+    block_executor::partitioner::{PartitionedTransactions, PartitionedTransactionsV3},
+    transaction::TransactionOutput,
     vm_status::VMStatus,
 };
 use aptos_vm::sharded_block_executor::executor_client::{ExecutorClient, ShardedExecutionOutput};
@@ -19,7 +20,6 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
-use aptos_types::block_executor::partitioner::PartitionedTransactionsV3;
 
 #[allow(dead_code)]
 pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
@@ -135,7 +135,13 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
 
-    fn execute_block_v3(&self, _state_view: Arc<S>, _transactions: PartitionedTransactionsV3, _concurrency_level_per_shard: usize, _maybe_block_gas_limit: Option<u64>) -> Result<Vec<TransactionOutput>, VMStatus> {
+    fn execute_block_v3(
+        &self,
+        _state_view: Arc<S>,
+        _transactions: PartitionedTransactionsV3,
+        _concurrency_level_per_shard: usize,
+        _maybe_block_gas_limit: Option<u64>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
         todo!()
     }
 }

@@ -5,6 +5,7 @@ use crate::{
     captured_reads::CapturedReads,
     errors::Error,
     task::{ExecutionStatus, Transaction, TransactionOutput},
+    txn_provider::TxnIndexProvider,
 };
 use anyhow::anyhow;
 use aptos_mvhashmap::types::TxnIndex;
@@ -21,7 +22,6 @@ use std::{
         Arc,
     },
 };
-use crate::txn_provider::TxnIndexProvider;
 
 type TxnInput<T> = CapturedReads<T>;
 
@@ -61,10 +61,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 {
     pub fn new<P: TxnIndexProvider>(txn_provider: Arc<P>) -> Self {
         Self {
-            inputs: txn_provider.txns().into_iter()
+            inputs: txn_provider
+                .txns()
+                .into_iter()
                 .map(|idx| (idx, CachePadded::new(ArcSwapOption::empty())))
                 .collect(),
-            outputs: txn_provider.txns().into_iter()
+            outputs: txn_provider
+                .txns()
+                .into_iter()
                 .map(|idx| (idx, CachePadded::new(ArcSwapOption::empty())))
                 .collect(),
             module_writes: DashSet::new(),
@@ -133,8 +137,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             }
         }
 
-        self.inputs.get(&txn_idx).unwrap().store(Some(Arc::new(input)));
-        self.outputs.get(&txn_idx).unwrap().store(Some(Arc::new(TxnOutput::from_output_status(output))));
+        self.inputs
+            .get(&txn_idx)
+            .unwrap()
+            .store(Some(Arc::new(input)));
+        self.outputs
+            .get(&txn_idx)
+            .unwrap()
+            .store(Some(Arc::new(TxnOutput::from_output_status(output))));
 
         Ok(())
     }
@@ -149,7 +159,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
-        match &self.outputs.get(&txn_idx).unwrap()
+        match &self
+            .outputs
+            .get(&txn_idx)
+            .unwrap()
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
@@ -164,7 +177,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     /// Does a transaction at txn_idx have SkipRest or Abort status.
     pub(crate) fn block_truncated_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
-            &self.outputs.get(&txn_idx).unwrap()
+            &self
+                .outputs
+                .get(&txn_idx)
+                .unwrap()
                 .load_full()
                 .expect("[BlockSTM]: Execution output must be recorded after execution")
                 .output_status,
@@ -174,9 +190,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
-            self.outputs.get(&txn_idx).unwrap().store(Some(Arc::new(TxnOutput {
-                output_status: ExecutionStatus::SkipRest(output),
-            })));
+            self.outputs
+                .get(&txn_idx)
+                .unwrap()
+                .store(Some(Arc::new(TxnOutput {
+                    output_status: ExecutionStatus::SkipRest(output),
+                })));
         } else {
             unreachable!();
         }
@@ -192,7 +211,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
-        self.outputs.get(&txn_idx).unwrap()
+        self.outputs
+            .get(&txn_idx)
+            .unwrap()
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
@@ -208,15 +229,17 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
-        self.outputs.get(&txn_idx).unwrap().load().as_ref().map_or(
-            vec![],
-            |txn_output| match &txn_output.output_status {
+        self.outputs
+            .get(&txn_idx)
+            .unwrap()
+            .load()
+            .as_ref()
+            .map_or(vec![], |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     t.aggregator_v1_delta_set().into_keys().collect()
                 },
                 ExecutionStatus::Abort(_) => vec![],
-            },
-        )
+            })
     }
 
     pub(crate) fn events(&self, txn_idx: TxnIndex) -> Box<dyn Iterator<Item = T::Event>> {
@@ -239,7 +262,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         delta_writes: Vec<(T::Key, WriteOp)>,
     ) {
-        match &self.outputs.get(&txn_idx).unwrap()
+        match &self
+            .outputs
+            .get(&txn_idx)
+            .unwrap()
             .load_full()
             .expect("Output must exist")
             .output_status
@@ -254,7 +280,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
     pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, Error<E>> {
-        let owning_ptr = self.outputs.get(&txn_idx).unwrap()
+        let owning_ptr = self
+            .outputs
+            .get(&txn_idx)
+            .unwrap()
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");
 

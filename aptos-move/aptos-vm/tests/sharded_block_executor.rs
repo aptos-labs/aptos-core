@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_block_partitioner::v3::V3NaivePartitionerConfig;
 /// It has to be integration tests because otherwise it forms an indirect dependency circle between
 /// aptos-vm and aptos-language-e2e-tests, which causes static variables to have two instances in
 /// the same process while testing, resulting in the counters failing to register with "AlreadyReg"
@@ -19,7 +20,6 @@ use aptos_vm::sharded_block_executor::{
     local_executor_shard::LocalExecutorService, ShardedBlockExecutor,
 };
 use rand::{rngs::OsRng, Rng};
-use aptos_block_partitioner::v3::V3NaivePartitionerConfig;
 
 #[test]
 fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
@@ -222,30 +222,20 @@ fn test_partitioner_v3_naive_sharded_block_executor_with_random_transfers_parall
     let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
     let sharded_block_executor = ShardedBlockExecutor::new(client);
     let partitioner = V3NaivePartitionerConfig::default().build();
-    test_utils::sharded_block_executor_with_random_transfers(
-        partitioner,
-        sharded_block_executor,
-        4,
-    )
+    test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 4)
 }
 
 #[ignore] //sharding v3 todo: implement sequential execution for v3, then re-enable this.
 #[test]
-fn test_partitioner_v3_naive_sharded_block_executor_with_random_transfers_sequential()
-{
+fn test_partitioner_v3_naive_sharded_block_executor_with_random_transfers_sequential() {
     let mut rng = OsRng;
     let max_num_shards = 32;
     let num_shards = rng.gen_range(1, max_num_shards);
     let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(1));
     let sharded_block_executor = ShardedBlockExecutor::new(client);
     let partitioner = V3NaivePartitionerConfig::default().build();
-    test_utils::sharded_block_executor_with_random_transfers(
-        partitioner,
-        sharded_block_executor,
-        1,
-    )
+    test_utils::sharded_block_executor_with_random_transfers(partitioner, sharded_block_executor, 1)
 }
-
 
 mod test_utils {
     use aptos_block_partitioner::BlockPartitioner;

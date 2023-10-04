@@ -13,6 +13,7 @@ use crate::{
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
 use claims::assert_ok;
@@ -26,7 +27,6 @@ use proptest::{
 };
 use rand::Rng;
 use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
-use crate::txn_provider::default::DefaultTxnProvider;
 
 fn run_transactions<K, V, E>(
     key_universe: &[K],
@@ -211,7 +211,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             DeltaDataView<KeyType<[u8; 32]>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
             ExecutableTestType,
-            _
+            _,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
@@ -265,7 +265,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             DeltaDataView<KeyType<[u8; 32]>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
             ExecutableTestType,
-            _
+            _,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
@@ -424,7 +424,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         DeltaDataView<KeyType<[u8; 32]>, ValueType>,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
         ExecutableTestType,
-        _
+        _,
     >::new(
         num_cpus::get(),
         executor_thread_pool,
@@ -470,7 +470,7 @@ fn publishing_fixed_params_with_block_gas_limit(
             DeltaDataView<KeyType<[u8; 32]>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
             ExecutableTestType,
-            _
+            _,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),

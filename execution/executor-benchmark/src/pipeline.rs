@@ -5,7 +5,7 @@ use crate::{
     block_partitioning::BlockPartitioningStage, ledger_update_stage::LedgerUpdateStage,
     GasMesurement, TransactionCommitter, TransactionExecutor,
 };
-use aptos_block_partitioner::v2::config::PartitionerV2Config;
+use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
@@ -24,7 +24,6 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use aptos_block_partitioner::PartitionerConfig;
 
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
