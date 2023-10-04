@@ -7,6 +7,7 @@ mod indexer_api;
 mod logging;
 mod node;
 mod postgres;
+mod processors;
 mod ready_server;
 mod traits;
 mod utils;
@@ -18,6 +19,7 @@ use self::{
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
     postgres::PostgresArgs,
+    processors::ProcessorArgs,
     ready_server::ReadyServerArgs,
     traits::{PostHealthyStep, ServiceManager},
 };
@@ -28,7 +30,8 @@ use crate::{
     },
     config::GlobalConfig,
     node::local_testnet::{
-        faucet::FaucetManager, node::NodeManager, ready_server::ReadyServerManager,
+        faucet::FaucetManager, node::NodeManager, processors::ProcessorManager,
+        ready_server::ReadyServerManager,
     },
 };
 use anyhow::Context;
@@ -76,6 +79,9 @@ pub struct RunLocalTestnet {
 
     #[clap(flatten)]
     postgres_args: PostgresArgs,
+
+    #[clap(flatten)]
+    processor_args: ProcessorArgs,
 
     #[clap(flatten)]
     indexer_api_args: IndexerApiArgs,
@@ -203,7 +209,27 @@ impl CliCommand<()> for RunLocalTestnet {
         if self.indexer_api_args.with_indexer_api {
             let postgres_manager = postgres::PostgresManager::new(&self, test_dir.clone())
                 .context("Failed to build postgres service manager")?;
+            let postgres_health_checkers = postgres_manager.get_healthchecks();
             managers.push(Box::new(postgres_manager));
+
+            let processor_preqrequisite_healthcheckers =
+                [node_health_checkers, postgres_health_checkers]
+                    .into_iter()
+                    .flatten()
+                    .collect();
+            let processor_managers = ProcessorManager::many_new(
+                &self,
+                processor_preqrequisite_healthcheckers,
+                node_manager.get_data_service_url(),
+                self.postgres_args.get_connection_string(None),
+            )
+            .context("Failed to build processor service managers")?;
+
+            let mut processor_managers = processor_managers
+                .into_iter()
+                .map(|m| Box::new(m) as Box<dyn ServiceManager>)
+                .collect();
+            managers.append(&mut processor_managers);
         }
 
         // We put the node manager into managers at the end just so we have access to
