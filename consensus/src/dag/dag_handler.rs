@@ -4,14 +4,12 @@ use super::{
     dag_driver::DagDriver,
     dag_fetcher::{FetchRequestHandler, FetchWaiter},
     dag_state_sync::{StateSyncStatus, StateSyncTrigger},
-    types::TDAGMessage,
     CertifiedNode, Node,
 };
 use crate::{
     dag::{dag_network::RpcHandler, rb_handler::NodeBroadcastHandler, types::DAGMessage},
     network::{IncomingDAGRequest, TConsensusMsg},
 };
-use anyhow::ensure;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_logger::{debug, warn};
@@ -95,35 +93,6 @@ impl NetworkHandler {
         }
     }
 
-    fn verify_incoming_rpc(
-        &self,
-        dag_message: &DAGMessage,
-        sender: Author,
-    ) -> Result<(), anyhow::Error> {
-        match dag_message {
-            DAGMessage::NodeMsg(node) => {
-                ensure!(
-                    *node.author() == sender,
-                    "Message author mismatch network sender"
-                );
-                node.verify(&self.epoch_state.verifier)
-            },
-            DAGMessage::CertifiedNodeMsg(certified_node) => {
-                ensure!(
-                    *certified_node.author() == sender,
-                    "Message author mismatch network sender"
-                );
-                certified_node.verify(&self.epoch_state.verifier)
-            },
-            DAGMessage::FetchRequest(request) => request.verify(&self.epoch_state.verifier),
-            _ => Err(anyhow::anyhow!(
-                "unexpected rpc message {} from {}",
-                dag_message.name(),
-                sender
-            )),
-        }
-    }
-
     async fn process_rpc(
         &mut self,
         rpc_request: IncomingDAGRequest,
@@ -137,8 +106,7 @@ impl NetworkHandler {
         );
 
         let response: anyhow::Result<DAGMessage> = {
-            let verification_result = self.verify_incoming_rpc(&dag_message, rpc_request.sender);
-            match verification_result {
+            match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
                 Ok(_) => match dag_message {
                     DAGMessage::NodeMsg(node) => {
                         self.node_receiver.process(node).await.map(|r| r.into())
