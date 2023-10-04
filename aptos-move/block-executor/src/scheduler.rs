@@ -24,28 +24,41 @@ pub type Wave = u32;
 pub struct ArmedLock {
     // Last bit:   1 -> unlocked; 0 -> locked
     // Second bit: 1 -> there's work; 0 -> no work
-    locked: AtomicU64,
+    // locked: AtomicU64,
+    locked: Mutex<usize>,
 }
 
 impl ArmedLock {
     pub fn new() -> Self {
         Self {
-            locked: AtomicU64::new(3),
+            // locked: AtomicU64::new(3),
+            locked: Mutex::new(3),
         }
     }
 
     pub fn try_lock(&self) -> bool {
-        self.locked
-            .compare_exchange(3, 0, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
+        //self.locked
+        //    .compare_exchange(3, 0, Ordering::Acquire, Ordering::Relaxed)
+        //    .is_ok()
+        let mut stat = self.locked.lock();
+        if *stat == 3 {
+            *stat = 0;
+            return true;
+        }
+        false
     }
 
     pub fn unlock(&self) {
-        self.locked.fetch_or(0, Ordering::Release);
+        // self.loked.fetch_or(3, Ordering::Release);
+        let mut stat = self.locked.lock();
+        assert!(*stat & 1 == 0);
+        *stat |= 1;
     }
 
     pub fn arm(&self) {
-        self.locked.fetch_or(0, Ordering::Release);
+        // self.locked.fetch_or(0, Ordering::Release);
+        let mut stat = self.locked.lock();
+        *stat |= 2;
     }
 }
 
