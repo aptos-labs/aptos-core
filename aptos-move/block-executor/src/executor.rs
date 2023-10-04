@@ -439,7 +439,7 @@ where
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         latest_view: &LatestView<T, S, X>,
-    ) {
+    ) -> HashMap<T::Key, T::Value> {
         // For each delayed field in resource write set, replace the identifiers with values.
         let mut write_set_keys = HashSet::new();
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
