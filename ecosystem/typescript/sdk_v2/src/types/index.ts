@@ -136,6 +136,14 @@ export type MoveModuleBytecode = {
  * TRANSACTION TYPES
  */
 
+export enum TransactionType {
+  Pending = "pending_transaction",
+  User = "user_transaction",
+  Genesis = "genesis_transaction",
+  BlockMetadata = "block_metadata_transaction",
+  StateCheckpoint = "state_checkpoint_transaction",
+}
+
 export type TransactionResponse =
   | PendingTransactionResponse
   | UserTransactionResponse
@@ -144,7 +152,7 @@ export type TransactionResponse =
   | StateCheckpointTransactionResponse;
 
 export type PendingTransactionResponse = {
-  type: string;
+  type: TransactionType.Pending;
   hash: string;
   sender: string;
   sequence_number: string;
@@ -155,12 +163,8 @@ export type PendingTransactionResponse = {
   signature?: TransactionSignature;
 };
 
-export function isPendingTransaction(txn: TransactionResponse): txn is PendingTransactionResponse {
-  return txn.type === "pending_transaction";
-}
-
 export type UserTransactionResponse = {
-  type: string;
+  type: TransactionType.User;
   version: string;
   hash: string;
   state_change_hash: string;
@@ -195,7 +199,7 @@ export type UserTransactionResponse = {
 };
 
 export type GenesisTransactionResponse = {
-  type: string;
+  type: TransactionType.Genesis;
   version: string;
   hash: string;
   state_change_hash: string;
@@ -223,7 +227,7 @@ export type GenesisTransactionResponse = {
 };
 
 export type BlockMetadataTransactionResponse = {
-  type: string;
+  type: TransactionType.BlockMetadata;
   version: string;
   hash: string;
   state_change_hash: string;
@@ -263,7 +267,7 @@ export type BlockMetadataTransactionResponse = {
 };
 
 export type StateCheckpointTransactionResponse = {
-  type: string;
+  type: TransactionType.StateCheckpoint;
   version: string;
   hash: string;
   state_change_hash: string;

@@ -7,7 +7,7 @@
 
 import { AptosConfig } from "../api/aptos_config";
 import { AptosApiError, getAptosFullNode, paginateWithCursor } from "../client";
-import { AnyNumber, GasEstimation, PaginationArgs, TransactionResponse, isPendingTransaction } from "../types";
+import { AnyNumber, GasEstimation, PaginationArgs, TransactionResponse, TransactionType } from "../types";
 import { DEFAULT_TXN_TIMEOUT_SEC } from "../utils/const";
 import { sleep } from "../utils/helpers";
 
@@ -64,8 +64,8 @@ export async function getTransactionByHash(args: {
 export async function isTransactionPending(args: { aptosConfig: AptosConfig; txnHash: string }): Promise<boolean> {
   const { aptosConfig, txnHash } = args;
   try {
-    const response = await getTransactionByHash({ aptosConfig, txnHash });
-    return isPendingTransaction(response);
+    const transaction = await getTransactionByHash({ aptosConfig, txnHash });
+    return transaction.type === TransactionType.Pending;
   } catch (e: any) {
     if (e?.status === 404) {
       return true;
@@ -91,16 +91,16 @@ export async function isTransactionPending(args: { aptosConfig: AptosConfig; txn
  * In case 2, the function will throw an ApiError, likely with an HTTP status
  * code indicating some problem with the request (e.g. 400).
  *
- * In case 3, if `checkSuccess` is false (the default), this function returns
- * the transaction response just like in case 1, in which the `success` field
- * will be false. If `checkSuccess` is true, it will instead throw a
- * FailedTransactionError.
+ * In case 3, if `checkSuccess` is true (the default), it will throw a
+ * FailedTransactionError is the transaction's `success` field is false. If `checkSuccess` 
+ * is false, this function returns the transaction response just like in case 1 even is the 
+ * `success` field is false.
  *
  * In case 4, this function throws a WaitForTransactionError.
  *
  * @param txnHash The hash of a transaction previously submitted to the blockchain.
  * @param extraArgs.timeoutSecs Timeout in seconds. Defaults to 20 seconds.
- * @param extraArgs.checkSuccess See above. Defaults to false.
+ * @param extraArgs.checkSuccess See above. Defaults to true.
  * @returns See above.
  *
  * @example
@@ -108,7 +108,7 @@ export async function isTransactionPending(args: { aptosConfig: AptosConfig; txn
  * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
  * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
  * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
- * const transaction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
+ * const transaction = await this.aptosClient.waitForTransaction(pendingTransaction.hash);
  * ```
  */
 export async function waitForTransaction(args: {
@@ -118,7 +118,7 @@ export async function waitForTransaction(args: {
 }): Promise<TransactionResponse> {
   const { aptosConfig, txnHash, extraArgs } = args;
   const timeoutSecs = extraArgs?.timeoutSecs ?? DEFAULT_TXN_TIMEOUT_SEC;
-  const checkSuccess = extraArgs?.checkSuccess ?? false;
+  const checkSuccess = extraArgs?.checkSuccess ?? true;
 
   let isPending = true;
   let count = 0;
@@ -132,7 +132,7 @@ export async function waitForTransaction(args: {
       // eslint-disable-next-line no-await-in-loop
       lastTxn = await getTransactionByHash({ aptosConfig, txnHash });
 
-      isPending = isPendingTransaction(lastTxn);
+      isPending = lastTxn.type === TransactionType.Pending;
 
       if (!isPending) {
         break;
@@ -152,10 +152,10 @@ export async function waitForTransaction(args: {
 
   // There is a chance that lastTxn is still undefined. Let's throw some error here
   if (lastTxn === undefined) {
-    throw new Error(`Waiting for transaction ${txnHash} failed`);
+    throw new WaitForTransactionError(`Waiting for transaction ${txnHash} failed`, lastTxn);
   }
 
-  if (isPendingTransaction(lastTxn)) {
+  if (lastTxn.type === TransactionType.Pending) {
     throw new WaitForTransactionError(
       `Waiting for transaction ${txnHash} timed out after ${timeoutSecs} seconds`,
       lastTxn,
