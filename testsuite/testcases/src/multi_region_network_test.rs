@@ -108,7 +108,7 @@ impl Default for InterRegionNetEmConfig {
         Self {
             delay_jitter_ms: 0,
             delay_correlation_percentage: 50,
-            loss_percentage: 3,
+            loss_percentage: 0,
             loss_correlation_percentage: 50,
         }
     }
