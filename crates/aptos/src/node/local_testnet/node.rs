@@ -102,6 +102,10 @@ impl NodeManager {
     pub fn get_node_api_url(&self) -> Url {
         socket_addr_to_url(&self.config.api.address, "http").unwrap()
     }
+
+    pub fn get_data_service_url(&self) -> Url {
+        socket_addr_to_url(&self.config.indexer_grpc.address, "http").unwrap()
+    }
 }
 
 #[async_trait]
