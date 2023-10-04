@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { sha256 } from "@noble/hashes/sha256";
+import { secp256k1 } from "@noble/curves/secp256k1";
 import { Deserializer, Serializer } from "../bcs";
 import { Hex } from "../core";
 import { HexInput } from "../types";
 import { PrivateKey, PublicKey, Signature } from "./asymmetric_crypto";
-import { secp256k1 } from "@noble/curves/secp256k1";
 
 /**
  * Represents the Secp256k1 ecdsa public key
@@ -161,11 +161,11 @@ export class Secp256k1PrivateKey extends PrivateKey {
 
   /**
    * Derive the Secp256k1PublicKey from this private key.
-   * 
+   *
    * @returns Secp256k1PublicKey
    */
   publicKey(): Secp256k1PublicKey {
-    const bytes = secp256k1.getPublicKey(this.key.toUint8Array());
+    const bytes = secp256k1.getPublicKey(this.key.toUint8Array(), false);
     return new Secp256k1PublicKey({ hexInput: bytes });
   }
 }
