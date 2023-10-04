@@ -23,23 +23,28 @@ proposals:
           enabled:
             - safer_resource_groups
             - safer_metadata
+            - signature_checker_v2_script_fix
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: step_3_enable_signature_checker_v2_fix
+      - Execution:
+          V3:
+            block_gas_limit: ~
+            transaction_shuffler_type: no_shuffling
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: step_3_enable_block_gas_limit
     metadata:
-      title: "Enable a fix signature checker v2"
-      description: "Fixing a counting bug"
+      title: "Enable Block Gas Limit"
+      description: "Enable Block Gas Limit"
     execution_mode: MultiStep
     update_sequence:
-      - FeatureFlag:
-          enabled:
-            - signature_checker_v2_script_fix
-  - name: step_4_enable_block_gas_limit_and_transaction_shuffling
+      - Execution:
+          V3:
+            block_gas_limit: 35000
+  - name: step_4_enable_transaction_shuffling
     metadata:
-      title: "Enable Block Gas Limit and Transaction Shuffling"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency.
-                    AIP-27: Sender Aware Transaction Shuffling"
+      title: "Enable Transaction Shuffling"
+      description: "AIP-27: Sender Aware Transaction Shuffling"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132
                        https://github.com/aptos-foundation/AIPs/issues/109"
     execution_mode: MultiStep
@@ -48,8 +53,6 @@ proposals:
           V3:
             transaction_shuffler_type:
               sender_aware_v2: 32
-            block_gas_limit: 35000
-            transaction_deduper_type: txn_hash_and_authenticator_v1
   - name: step_5_enable_bulletproofs
     metadata:
       title: "Enable Bulletproofs Module"
