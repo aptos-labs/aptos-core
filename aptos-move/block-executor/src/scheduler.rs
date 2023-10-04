@@ -331,7 +331,7 @@ impl Scheduler {
     /// Should not be called after the last transaction is committed.
     pub fn try_commit(&self) -> Option<TxnIndex> {
         let mut commit_state = self.commit_state.acquire();
-        let (commit_idx, commit_wave) = commit_state.deref_mut();
+        let (commit_idx, commit_wave) = commit_state.dereference_mut();
 
         if *commit_idx == self.num_txns {
             return None;
@@ -367,12 +367,12 @@ impl Scheduler {
                             return Some(*commit_idx - 1);
                         }
                     }
-
-                    // Transaction needs to be at least [re]validated, and possibly also executed.
-                    // Once that happens, we will `arm` the queueing_commit.
-                    // Concurrency correctness - Both locks are held here.
-                    return None;
                 }
+
+                // Transaction needs to be at least [re]validated, and possibly also executed.
+                // Once that happens, we will `arm` the queueing_commit.
+                // Concurrency correctness - Both locks are held here.
+                return None;
             }
         }
         self.queueing_commits_arm();
@@ -383,7 +383,7 @@ impl Scheduler {
     #[cfg(test)]
     /// Return the TxnIndex and Wave of current commit index
     pub fn commit_state(&self) -> (TxnIndex, u32) {
-        let commit_state = self.commit_state.deref();
+        let commit_state = self.commit_state.dereference();
         (commit_state.0, commit_state.1)
     }
 

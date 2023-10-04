@@ -44,35 +44,35 @@ impl<T> ExplicitSyncWrapper<T> {
         self.value.into_inner()
     }
 
-    pub fn deref(&self) -> &T {
+    pub fn dereference(&self) -> &T {
         unsafe { &*self.value.get() }
     }
 
-    pub fn deref_mut(&self) -> &mut T {
+    pub fn dereference_mut(&self) -> &mut T {
         unsafe { &mut *self.value.get() }
     }
 }
 
 impl<T> Guard<'_, T> {
-    pub fn deref(&self) -> &T {
-        self.lock.deref()
+    pub fn dereference(&self) -> &T {
+        self.lock.dereference()
     }
 
-    pub fn deref_mut(&mut self) -> &mut T {
-        self.lock.deref_mut()
+    pub fn dereference_mut(&mut self) -> &mut T {
+        self.lock.dereference_mut()
     }
 }
 
 impl<T> Deref for Guard<'_, T> {
     type Target = T;
     fn deref(&self) -> &T {
-        self.lock.deref()
+        self.lock.dereference()
     }
 }
 
 impl<T> DerefMut for Guard<'_, T> {
     fn deref_mut(&mut self) -> &mut T {
-        self.lock.deref_mut()
+        self.lock.dereference_mut()
     }
 }
 

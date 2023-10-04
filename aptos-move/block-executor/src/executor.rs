@@ -239,7 +239,7 @@ where
         while let Some(txn_idx) = scheduler.try_commit() {
             let mut shared_commit_state_guard = shared_commit_state.acquire();
             let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
-                shared_commit_state_guard.deref_mut();
+                shared_commit_state_guard.dereference_mut();
 
             defer! {
                 scheduler.add_to_commit_queue(txn_idx);
@@ -460,7 +460,7 @@ where
                     ExecutionTaskType::Execution,
                 ) => {
                     let mut shared_commit_state_guard = shared_commit_state.acquire();
-                    let (_, _, maybe_error) = shared_commit_state_guard.deref_mut();
+                    let (_, _, maybe_error) = shared_commit_state_guard.dereference_mut();
                     Self::execute(
                         txn_idx,
                         incarnation,
