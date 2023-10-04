@@ -18,23 +18,23 @@ export abstract class ScriptTransactionArgument extends Serializable {
     // index enum variant
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU8:
+      case ScriptTransactionArgumentVariants.U8:
         return ScriptTransactionArgumentU8.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU64:
+      case ScriptTransactionArgumentVariants.U64:
         return ScriptTransactionArgumentU64.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU128:
+      case ScriptTransactionArgumentVariants.U128:
         return ScriptTransactionArgumentU128.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentAddress:
+      case ScriptTransactionArgumentVariants.Address:
         return ScriptTransactionArgumentAddress.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU8Vector:
+      case ScriptTransactionArgumentVariants.U8Vector:
         return ScriptTransactionArgumentU8Vector.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentBool:
+      case ScriptTransactionArgumentVariants.Bool:
         return ScriptTransactionArgumentBool.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU16:
+      case ScriptTransactionArgumentVariants.U16:
         return ScriptTransactionArgumentU16.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU32:
+      case ScriptTransactionArgumentVariants.U32:
         return ScriptTransactionArgumentU32.load(deserializer);
-      case ScriptTransactionArgumentVariants.ScriptTransactionArgumentU256:
+      case ScriptTransactionArgumentVariants.U256:
         return ScriptTransactionArgumentU256.load(deserializer);
       default:
         throw new Error(`Unknown variant index for ScriptTransactionArgument: ${index}`);
@@ -51,7 +51,7 @@ export class ScriptTransactionArgumentU8 extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU8);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U8);
     serializer.serializeU8(this.value);
   }
 
@@ -70,7 +70,7 @@ export class ScriptTransactionArgumentU16 extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU16);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U16);
     serializer.serializeU16(this.value);
   }
 
@@ -89,7 +89,7 @@ export class ScriptTransactionArgumentU32 extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU32);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U32);
     serializer.serializeU32(this.value);
   }
 
@@ -108,7 +108,7 @@ export class ScriptTransactionArgumentU64 extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU64);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U64);
     serializer.serializeU64(this.value);
   }
 
@@ -127,7 +127,7 @@ export class ScriptTransactionArgumentU128 extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU128);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U128);
     serializer.serializeU128(this.value);
   }
 
@@ -146,7 +146,7 @@ export class ScriptTransactionArgumentU256 extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU256);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U256);
     serializer.serializeU256(this.value);
   }
 
@@ -165,7 +165,7 @@ export class ScriptTransactionArgumentAddress extends ScriptTransactionArgument 
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentAddress);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.Address);
     this.value.serialize(serializer);
   }
 
@@ -184,7 +184,7 @@ export class ScriptTransactionArgumentU8Vector extends ScriptTransactionArgument
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentU8Vector);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U8Vector);
     serializer.serializeBytes(this.value);
   }
 
@@ -203,7 +203,7 @@ export class ScriptTransactionArgumentBool extends ScriptTransactionArgument {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.ScriptTransactionArgumentBool);
+    serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.Bool);
     serializer.serializeBool(this.value);
   }
 

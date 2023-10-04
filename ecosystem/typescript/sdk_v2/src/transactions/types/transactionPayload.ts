@@ -6,6 +6,7 @@ import { Identifier } from "./identifier";
 import { ScriptTransactionArgument } from "./scriptTransactionArguments";
 import { ModuleId } from "./moduleId";
 import { TransactionPayloadVariants } from "../../types";
+import { TypeTag } from "./typeTag";
 
 /**
  * Representation of the supported Transaction Payload
@@ -24,11 +25,11 @@ export abstract class TransactionPayload extends Serializable {
     // index enum variant
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case TransactionPayloadVariants.TransactionPayloadScript:
+      case TransactionPayloadVariants.Script:
         return TransactionPayloadScript.load(deserializer);
-      case TransactionPayloadVariants.TransactionPayloadEntryFunction:
+      case TransactionPayloadVariants.EntryFunction:
         return TransactionPayloadEntryFunction.load(deserializer);
-      case TransactionPayloadVariants.TransactionPayloadMultisig:
+      case TransactionPayloadVariants.Multisig:
         return TransactionPayloadMultisig.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
@@ -48,7 +49,7 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionPayloadVariants.TransactionPayloadScript);
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.Script);
     this.script.serialize(serializer);
   }
 
@@ -70,7 +71,7 @@ export class TransactionPayloadEntryFunction extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionPayloadVariants.TransactionPayloadEntryFunction);
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.EntryFunction);
     this.entryFunction.serialize(serializer);
   }
 
@@ -92,7 +93,7 @@ export class TransactionPayloadMultisig extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionPayloadVariants.TransactionPayloadMultisig);
+    serializer.serializeU32AsUleb128(TransactionPayloadVariants.Multisig);
     this.multiSig.serialize(serializer);
   }
 
