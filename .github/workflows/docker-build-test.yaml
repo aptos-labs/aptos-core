@@ -133,22 +133,6 @@ jobs:
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
-  rust-images-indexer:
-    needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:build-indexer-images')
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      PROFILE: release
-      FEATURES: indexer
-      BUILD_ADDL_TESTING_IMAGES: true
-      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
-
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
@@ -262,7 +246,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
