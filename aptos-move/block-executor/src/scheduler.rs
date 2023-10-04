@@ -30,22 +30,22 @@ pub struct ArmedLock {
 impl ArmedLock {
     pub fn new() -> Self {
         Self {
-            locked: AtomicU64::new(3),
+            locked: AtomicU64::new(1),
         }
     }
 
     pub fn try_lock(&self) -> bool {
         self.locked
-            .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
+            .compare_exchange(3, 0, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
     }
 
     pub fn unlock(&self) {
-        self.locked.fetch_or(3, Ordering::Release);
+        self.locked.fetch_or(1, Ordering::SeqCst);
     }
 
     pub fn arm(&self) {
-        self.locked.fetch_or(0, Ordering::Relaxed);
+        self.locked.fetch_or(2, Ordering::SeqCst);
     }
 }
 

@@ -402,7 +402,7 @@ where
         let mut scheduler_task = SchedulerTask::NoTask;
 
         loop {
-            while scheduler.should_coordinate_commits() {
+            if scheduler.should_coordinate_commits() {
                 self.coordinator_commit_hook(
                     self.maybe_block_gas_limit,
                     scheduler,
