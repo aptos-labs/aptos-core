@@ -28,6 +28,8 @@ spec:
       # AptosNet from HAproxy
     - protocol: TCP
       port: 6180
+    - protocol: UDP
+      port: 6180
     - protocol: TCP
       port: 9101
   {{- if $.Values.service.validator.enableRestApi }}
@@ -68,10 +70,14 @@ spec:
     ports:
     - protocol: TCP
       port: 6181
+    - protocol: UDP
+      port: 6181
   egress:
   # AptosNet to other validators
   - ports:
     - protocol: TCP
+      port: 6180
+    - protocol: UDP
       port: 6180
   # DNS
   - to:

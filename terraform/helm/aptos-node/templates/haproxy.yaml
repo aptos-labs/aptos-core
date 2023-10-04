@@ -36,6 +36,10 @@ spec:
   ports:
   - name: validator
     port: 6180
+    protocol: TCP
+  - name: validator-udp
+    port: 6180
+    protocol: UDP
   {{- if $.Values.service.validator.enableMetricsPort }}
   - name: metrics
     port: 9101
@@ -79,6 +83,11 @@ spec:
   ports:
   - name: aptosnet
     port: 6182
+    protocol: TCP
+    targetPort: {{ add 6182 $index }}
+  - name: aptosnet-udp
+    port: 6182
+    protocol: UDP
     targetPort: {{ add 6182 $index }}
   {{- if $.Values.service.fullnode.enableMetricsPort }}
   - name: metrics

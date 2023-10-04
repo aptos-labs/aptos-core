@@ -22,6 +22,10 @@ spec:
   ports:
   - name: aptosnet
     port: 6182
+    protocol: TCP
+  - name: aptosnet-udp
+    port: 6182
+    protocol: UDP
   - name: metrics
     port: 9101
   - name: api
@@ -116,8 +120,8 @@ spec:
         - name: fn
           mountPath: /opt/aptos/data
         ports:
-        - containerPort: 6181
-        - containerPort: 6182
+        - containerPort: 6181  # VFN
+        - containerPort: 6182  # Public
         - containerPort: 8080
           name: api
         - containerPort: 9101

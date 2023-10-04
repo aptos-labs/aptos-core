@@ -19,8 +19,16 @@ spec:
   ports:
   - name: validator
     port: 6180
+    protocol: TCP
+  - name: validator-udp
+    port: 6180
+    protocol: UDP
   - name: fullnode
     port: 6181
+    protocol: TCP
+  - name: fullnode-udp
+    port: 6181
+    protocol: UDP
   - name: metrics
     port: 9101
   {{- if $.Values.service.validator.enableRestApi }}
@@ -116,7 +124,7 @@ spec:
         - name: aptos-data
           mountPath: /opt/aptos/data
         ports:
-        - containerPort: 6180
+        - containerPort: 6180  # Validator
         - containerPort: 6181  # VFN
         - containerPort: 6182  # Public
         - containerPort: 8080
