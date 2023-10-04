@@ -1,4 +1,4 @@
-import { AptosResponse } from "./types";
+import { AptosResponse, MimeType } from "./types";
 import { aptosRequest } from "./core";
 import { AnyNumber, ClientConfig } from "../types";
 import { AptosConfig } from "../api/aptos_config";
@@ -22,9 +22,13 @@ export type GetRequestOptions = {
    */
   path: string;
   /**
-   * The content type of the request
+   * The content type of the request body
    */
-  contentType?: string;
+  contentType?: MimeType;
+  /**
+   * The accepted content type of the response of the API
+   */
+  acceptType?: MimeType;
   /**
    * The query parameters for the request
    */
@@ -35,7 +39,7 @@ export type GetRequestOptions = {
   overrides?: ClientConfig;
 };
 
-export type GetAptosFullNodeRequestOptions = Omit<GetRequestOptions, "type">;
+export type GetAptosRequestOptions = Omit<GetRequestOptions, "type">;
 
 /**
  * Main function to do a Get request
@@ -45,7 +49,7 @@ export type GetAptosFullNodeRequestOptions = Omit<GetRequestOptions, "type">;
  * @returns
  */
 export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosResponse<Req, Res>> {
-  const { aptosConfig, overrides, params, contentType, path, originMethod, type } = options;
+  const { aptosConfig, overrides, params, contentType, acceptType, path, originMethod, type } = options;
   const url = aptosConfig.getRequestUrl(type);
 
   const response: AptosResponse<Req, Res> = await aptosRequest<Req, Res>(
@@ -54,7 +58,8 @@ export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosRe
       method: "GET",
       originMethod,
       path,
-      contentType,
+      contentType: contentType?.valueOf(),
+      acceptType: acceptType?.valueOf(),
       params,
       overrides: {
         ...aptosConfig,
@@ -67,14 +72,14 @@ export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosRe
 }
 
 export async function getAptosFullNode<Req, Res>(
-  options: GetAptosFullNodeRequestOptions,
+  options: GetAptosRequestOptions,
 ): Promise<AptosResponse<Req, Res>> {
   return get<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
 }
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(
-  options: GetAptosFullNodeRequestOptions,
+  options: GetAptosRequestOptions,
 ): Promise<Res> {
   const out = [];
   let cursor: string | undefined;

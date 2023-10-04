@@ -78,8 +78,7 @@ where
 fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    split_ledger_db: bool,
-    use_sharded_state_merkle_db: bool,
+    enable_storage_sharding: bool,
 ) {
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
@@ -87,13 +86,8 @@ fn create_checkpoint(
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
-    AptosDB::create_checkpoint(
-        source_dir,
-        checkpoint_dir,
-        split_ledger_db,
-        use_sharded_state_merkle_db,
-    )
-    .expect("db checkpoint creation fails.");
+    AptosDB::create_checkpoint(source_dir, checkpoint_dir, enable_storage_sharding)
+        .expect("db checkpoint creation fails.");
 }
 
 /// Runs the benchmark with given parameters.
@@ -112,9 +106,7 @@ pub fn run_benchmark<V>(
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
     pruner_config: PrunerConfig,
-    split_ledger_db: bool,
-    use_sharded_state_merkle_db: bool,
-    skip_index_and_usage: bool,
+    enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -122,16 +114,13 @@ pub fn run_benchmark<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        split_ledger_db,
-        use_sharded_state_merkle_db,
+        enable_storage_sharding,
     );
 
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
-    config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
-    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
+    config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
     let transaction_generator_creator = transaction_mix.clone().map(|transaction_mix| {
@@ -394,9 +383,7 @@ pub fn add_accounts<V>(
     checkpoint_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    split_ledger_db: bool,
-    use_sharded_state_merkle_db: bool,
-    skip_index_and_usage: bool,
+    enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -405,8 +392,7 @@ pub fn add_accounts<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        split_ledger_db,
-        use_sharded_state_merkle_db,
+        enable_storage_sharding,
     );
     add_accounts_impl::<V>(
         num_new_accounts,
@@ -416,9 +402,7 @@ pub fn add_accounts<V>(
         checkpoint_dir,
         pruner_config,
         verify_sequence_numbers,
-        split_ledger_db,
-        use_sharded_state_merkle_db,
-        skip_index_and_usage,
+        enable_storage_sharding,
         pipeline_config,
     );
 }
@@ -431,9 +415,7 @@ fn add_accounts_impl<V>(
     output_dir: impl AsRef<Path>,
     pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
-    split_ledger_db: bool,
-    use_sharded_state_merkle_db: bool,
-    skip_index_and_usage: bool,
+    enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
 ) where
     V: TransactionBlockExecutor + 'static,
@@ -441,9 +423,7 @@ fn add_accounts_impl<V>(
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
     config.storage.dir = output_dir.as_ref().to_path_buf();
     config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.split_ledger_db = split_ledger_db;
-    config.storage.rocksdb_configs.use_sharded_state_merkle_db = use_sharded_state_merkle_db;
-    config.storage.rocksdb_configs.skip_index_and_usage = skip_index_and_usage;
+    config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (db, executor) = init_db_and_executor::<V>(&config);
 
     let start_version = db.reader.get_latest_version().unwrap();
@@ -480,7 +460,7 @@ fn add_accounts_impl<V>(
     let now_version = db.reader.get_latest_version().unwrap();
     let delta_v = now_version - start_version;
     info!(
-        "Overall TPS: account creation: {} txn/s",
+        "Overall TPS: create_db: account creation: {} txn/s",
         delta_v as f32 / elapsed,
     );
 
@@ -586,8 +566,6 @@ mod tests {
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             verify_sequence_numbers,
             false,
-            false,
-            false,
             PipelineConfig::default(),
         );
 
@@ -607,8 +585,6 @@ mod tests {
             checkpoint_dir,
             verify_sequence_numbers,
             NO_OP_STORAGE_PRUNER_CONFIG,
-            false,
-            false,
             false,
             PipelineConfig::default(),
         );

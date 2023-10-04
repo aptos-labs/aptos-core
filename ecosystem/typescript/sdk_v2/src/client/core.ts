@@ -1,5 +1,5 @@
 import aptosClient from "@aptos-labs/aptos-client";
-import { AptosApiError, AptosResponse } from "./types";
+import { AptosApiError, AptosResponse, MimeType } from "./types";
 import { VERSION } from "../version";
 import { ClientConfig, AptosRequest } from "../types";
 import { AptosConfig } from "../api/aptos_config";
@@ -33,7 +33,7 @@ async function request<Req, Res>(
   const headers: Record<string, string | string[] | undefined> = {
     ...overrides?.HEADERS,
     "x-aptos-client": `aptos-ts-sdk/${VERSION}`,
-    "content-type": contentType ?? "application/json",
+    "content-type": contentType ?? MimeType.JSON.valueOf(),
   };
 
   if (overrides?.TOKEN) {

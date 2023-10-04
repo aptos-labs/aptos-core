@@ -263,6 +263,7 @@ dependencies = [
  "hex",
  "itertools",
  "jemallocator",
+ "maplit",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-cli",
@@ -292,6 +293,7 @@ dependencies = [
  "tokio",
  "toml 0.7.4",
  "tonic 0.10.0",
+ "tracing",
  "tracing-subscriber",
  "walkdir",
 ]
@@ -587,6 +589,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
+ "concurrent-queue 2.3.0",
  "criterion",
  "crossbeam",
  "dashmap",
@@ -601,6 +604,7 @@ dependencies = [
  "proptest-derive",
  "rand 0.7.3",
  "rayon",
+ "scopeguard",
  "serde",
  "test-case",
 ]
@@ -784,9 +788,11 @@ dependencies = [
  "proptest",
  "rand 0.7.3",
  "rayon",
+ "scopeguard",
  "serde",
  "serde_bytes",
  "serde_json",
+ "strum_macros",
  "tempfile",
  "thiserror",
  "tokio",
@@ -1293,6 +1299,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2995,6 +3002,7 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule-updator",
  "aptos-genesis",
+ "aptos-keygen",
  "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
@@ -3188,6 +3196,7 @@ dependencies = [
  "byteorder",
  "once_cell",
  "proptest",
+ "rand 0.7.3",
  "rocksdb",
 ]
 
@@ -3264,12 +3273,16 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-protos",
  "aptos-retrier",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
  "serde",
  "thiserror",
+ "tokio",
+ "tonic 0.10.0",
+ "tonic-reflection",
 ]
 
 [[package]]
@@ -3623,6 +3636,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-temppath",
  "aptos-types",
+ "assert_approx_eq",
  "bcs 0.1.4",
  "csv",
  "futures",
@@ -4258,7 +4272,7 @@ version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e14485364214912d3b19cc3435dde4df66065127f05fa0d75c712f36f12c2f28"
 dependencies = [
- "concurrent-queue",
+ "concurrent-queue 1.2.4",
  "event-listener",
  "futures-core",
 ]
@@ -4270,7 +4284,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "871f9bb5e0a22eeb7e8cf16641feb87c9dc67032ccf8ff49e772eb9941d3a965"
 dependencies = [
  "async-task",
- "concurrent-queue",
+ "concurrent-queue 1.2.4",
  "fastrand 1.8.0",
  "futures-lite",
  "once_cell",
@@ -4300,7 +4314,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ab006897723d9352f63e2b13047177c3982d8d79709d713ce7747a8f19fd1b0"
 dependencies = [
  "autocfg",
- "concurrent-queue",
+ "concurrent-queue 1.2.4",
  "futures-lite",
  "libc",
  "log",
@@ -5327,6 +5341,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "concurrent-queue"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f057a694a54f12365049b0958a1685bb52d567f5593b355fbf685838e873d400"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "console"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6262,14 +6285,14 @@ dependencies = [
 
 [[package]]
 name = "enum_dispatch"
-version = "0.3.8"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eb359f1476bf611266ac1f5355bc14aeca37b299d0ebccc038ee7058891c9cb"
+checksum = "8f33313078bb8d4d05a2733a94ac4c2d8a0df9a2b84424ebf4f33bfc224a890e"
 dependencies = [
  "once_cell",
  "proc-macro2 1.0.64",
  "quote 1.0.29",
- "syn 1.0.105",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -9069,6 +9092,7 @@ dependencies = [
  "move-docgen",
  "move-errmapgen",
  "move-ir-types",
+ "move-model",
  "move-package",
  "move-prover",
  "move-resource-viewer",
@@ -12240,9 +12264,9 @@ checksum = "1d51f5df5af43ab3f1360b429fa5e0152ac5ce8c0bd6485cae490332e96846a8"
 
 [[package]]
 name = "scopeguard"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
+checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "sct"

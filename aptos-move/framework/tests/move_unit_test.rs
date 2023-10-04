@@ -23,6 +23,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..Default::default()
             },
+            full_model_generation: true, // Run extended checks also on test code
             ..Default::default()
         },
         // TODO(Gas): double check if this is correct
@@ -41,6 +42,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
 pub fn aptos_test_natives() -> NativeFunctionTable {
     // By side effect, configure for unit tests
     natives::configure_for_unit_test();
+    extended_checks::configure_extended_checks_for_unit_test();
     // move_stdlib has the testing feature enabled to include debug native functions
     natives::aptos_natives(
         LATEST_GAS_FEATURE_VERSION,

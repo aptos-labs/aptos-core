@@ -6,6 +6,10 @@ use crate::dag::{
     anchor_election::AnchorElection,
     dag_state_sync::DAG_WINDOW,
     dag_store::{Dag, NodeStatus},
+    observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
     storage::DAGStorage,
     types::NodeMetadata,
     CertifiedNode,
@@ -193,10 +197,17 @@ impl OrderRule {
                 node_status.as_node().clone()
             })
             .collect();
+
+        observe_node(anchor.timestamp(), NodeStage::AnchorOrdered);
+        for node in ordered_nodes.iter().skip(1) {
+            observe_node(node.timestamp(), NodeStage::NodeOrdered);
+        }
         ordered_nodes.reverse();
+
         debug!(
-            "Ordered anchor {}, reached round {} with {} nodes",
-            anchor.id(),
+            LogSchema::new(LogEvent::OrderedAnchor),
+            id = anchor.id(),
+            "Reached round {} with {} nodes",
             lowest_round_to_reach,
             ordered_nodes.len()
         );

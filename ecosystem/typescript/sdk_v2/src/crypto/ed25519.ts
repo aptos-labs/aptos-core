@@ -72,14 +72,9 @@ export class Ed25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): PublicKey {
+  static deserialize(deserializer: Deserializer): Ed25519PublicKey {
     const bytes = deserializer.deserializeBytes();
     return new Ed25519PublicKey({ hexInput: bytes });
-  }
-
-  // eslint-disable-next-line class-methods-use-this,@typescript-eslint/no-unused-vars
-  deserialize(deserializer: Deserializer): PublicKey {
-    throw new Error("Not implemented");
   }
 }
 
@@ -150,11 +145,6 @@ export class Ed25519PrivateKey extends PrivateKey {
     serializer.serializeBytes(this.toUint8Array());
   }
 
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Ed25519PrivateKey {
-    throw new Error("Method not implemented.");
-  }
-
   static deserialize(deserializer: Deserializer): Ed25519PrivateKey {
     const bytes = deserializer.deserializeBytes();
     return new Ed25519PrivateKey({ hexInput: bytes });
@@ -170,7 +160,13 @@ export class Ed25519PrivateKey extends PrivateKey {
     return new Ed25519PrivateKey({ hexInput: keyPair.secretKey.slice(0, Ed25519PrivateKey.LENGTH) });
   }
 
-  publicKey(): PublicKey {
+
+  /**
+   * Derive the Ed25519PublicKey for this private key.
+   * 
+   * @returns Ed25519PublicKey
+   */
+  publicKey(): Ed25519PublicKey {
     const bytes = this.signingKeyPair.publicKey;
     return new Ed25519PublicKey({ hexInput: bytes });
   }
@@ -221,11 +217,6 @@ export class Ed25519Signature extends Signature {
 
   serialize(serializer: Serializer): void {
     serializer.serializeBytes(this.data.toUint8Array());
-  }
-
-  // TODO: Update this in interface to be static, then remove this method
-  deserialize(deserializer: Deserializer): Ed25519Signature {
-    throw new Error("Method not implemented.");
   }
 
   static deserialize(deserializer: Deserializer): Ed25519Signature {

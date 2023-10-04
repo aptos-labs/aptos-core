@@ -1,98 +1,98 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use aptos_gas_algebra::DynamicExpression;
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap,
 };
 
-/// expand out the AST and collect only additive terms
+/// Expands a gas expression into a list of terms that add up to the original expression.
+/// A term is an expression that does not contain the add operation.
 ///
-/// ### Arguments
+/// Note that the result is NOT guaranteed to be simplified or in canonical form.
 ///
-/// * `expr` - Root node of the AST
-///
-/// ### Example
-///
-/// * term -> num
-/// * term -> var
-/// * term -> term * term
-/// * case 1: num -> Vec(num)
-/// * case 2: var -> Vec(var)
-/// * case 3: e1 * e2 -> t1 * t2
-/// * case 4: e1 * e2 -> t1 + t2
+/// Here are some examples:
+/// - `1 => [1]`
+/// - `x => [x]`
+/// - `(1 + 2)*x => [1*x, 2*x]`
+/// - `5*(x + y) => [5*x, 5*y]`
+/// - `(a + b)*(c + d) => [a*c, a*d, b*c, b*d]`
+/// - `(1 + 2)*3*5 + 4 => [1*3*5, 2*3*5, 4]`
 pub fn expand_terms(expr: DynamicExpression) -> Vec<DynamicExpression> {
-    let mut result: Vec<DynamicExpression> = Vec::new();
+    use DynamicExpression::{Add, GasParam, GasValue, Mul};
+
     match expr {
-        DynamicExpression::GasValue { value } => {
-            result.push(DynamicExpression::GasValue { value });
-            result
+        GasValue { value } => {
+            vec![GasValue { value }]
         },
-        DynamicExpression::GasParam { name } => {
-            result.push(DynamicExpression::GasParam { name });
-            result
+        GasParam { name } => {
+            vec![GasParam { name }]
         },
-        DynamicExpression::Mul { left, right } => {
-            let t1 = expand_terms(*left);
-            let t2 = expand_terms(*right);
-            let mut subresult: Vec<DynamicExpression> = Vec::new();
-            for a_i in t1 {
-                for b_j in &t2 {
-                    match &a_i {
-                        DynamicExpression::GasValue { .. } => {
-                            subresult.push(DynamicExpression::Mul {
-                                left: Box::new(a_i.clone()),
-                                right: Box::new(b_j.clone()),
-                            });
-                        },
-                        _ => {
-                            subresult.push(DynamicExpression::Mul {
-                                left: Box::new(b_j.clone()),
-                                right: Box::new(a_i.clone()),
-                            });
-                        },
+        Mul { left, right } => {
+            let left_terms = expand_terms(*left);
+            let right_terms = expand_terms(*right);
+
+            let mut result = vec![];
+            for left_term in &left_terms {
+                for right_term in &right_terms {
+                    match right_term {
+                        // Attempt to place coefficients on the left side, but this is primarily
+                        // for aesthetic reasons and does not provide a guarantee.
+                        GasValue { .. } => result.push(Mul {
+                            left: Box::new(right_term.clone()),
+                            right: Box::new(left_term.clone()),
+                        }),
+                        _ => result.push(Mul {
+                            left: Box::new(left_term.clone()),
+                            right: Box::new(right_term.clone()),
+                        }),
                     }
                 }
             }
-            result.extend(subresult.clone());
             result
         },
-        DynamicExpression::Add { left, right } => {
-            let t1 = expand_terms(*left);
-            let t2 = expand_terms(*right);
-            result.extend(t1.clone());
-            result.extend(t2.clone());
+        Add { left, right } => {
+            let mut result = expand_terms(*left);
+            result.extend(expand_terms(*right));
             result
         },
     }
 }
 
-/// Simplify like-terms
+/// Takes a list of simple terms and combines the like-terms.
 ///
-/// ### Arguments
+/// A simple term is a gas parameter multiplied by some coefficient. It can have a few forms:
+/// - `coefficient * param`
+/// - `param * coefficient`
+/// - `param` (implicit coefficient of 1)
 ///
-/// * `terms` - Vector of terms group by "+"
+/// Zero terms (`x*0`, `0*x`, `0`) are ignored, while all other non-simple terms will result in an error.
 ///
-/// ### Example
-///
-/// (A + A) * (5 + 5) => 5A + 5A + 5A + 5A => 20A
+/// Examples
+/// - `x => { x: 1 }`
+/// - `x*3 + 2*x => { x: 5 }`
+/// - `0 + x + 2*y => { x: 1, y: 2 }`
 pub fn aggregate_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String, u64>> {
+    use DynamicExpression::{GasParam, GasValue, Mul};
+
     let mut map: BTreeMap<String, u64> = BTreeMap::new();
     for term in terms {
         match term {
-            DynamicExpression::GasValue { value } => {
-                // seeing a concrete quantity means that the user
-                // isn't providing expressions in the GasExpression.
-                // this makes calibration impossible and we should error
+            GasValue { value } => {
+                // Seeing a concrete quantity here means that the VM or native functions do not have
+                // some of its costs encoded abstractly using GasEpression.
+                //
+                // This makes calibration impossible and we should error.
                 if value != 0 {
-                    return Err(anyhow!(
-                        "Concrete quantity provided. Should be GasExpression."
-                    ));
+                    bail!(
+                        "Expected simple term got non-zero concrete value {}.",
+                        value
+                    );
                 }
             },
-            DynamicExpression::GasParam { name } => match map.entry(name) {
+            GasParam { name } => match map.entry(name) {
                 Occupied(mut entry) => {
                     *entry.get_mut() += 1;
                 },
@@ -100,25 +100,23 @@ pub fn aggregate_terms(terms: Vec<DynamicExpression>) -> Result<BTreeMap<String,
                     entry.insert(1);
                 },
             },
-            DynamicExpression::Mul { left, right } => {
-                let mut key: String = String::new();
-                let mut val: u64 = 0;
-
-                if let DynamicExpression::GasParam { name } = *right {
-                    key = name;
-                }
-
-                if let DynamicExpression::GasValue { value } = *left {
-                    val = value;
-                }
-
-                if let Vacant(e) = map.entry(key.clone()) {
-                    e.insert(val);
-                } else {
-                    map.entry(key).and_modify(|v| *v += val);
-                }
+            Mul { left, right } => match (*left, *right) {
+                (GasParam { name }, GasValue { value })
+                | (GasValue { value }, GasParam { name }) => {
+                    if value != 0 {
+                        match map.entry(name) {
+                            Vacant(entry) => {
+                                entry.insert(value);
+                            },
+                            Occupied(entry) => {
+                                *entry.into_mut() += value;
+                            },
+                        }
+                    }
+                },
+                (left, right) => bail!("Expected simple term got {:?} * {:?}.", left, right),
             },
-            _ => {},
+            term => bail!("Expected simple term got {:?}.", term),
         }
     }
     Ok(map)

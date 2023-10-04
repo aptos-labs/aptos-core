@@ -869,7 +869,7 @@ fn realistic_env_sweep_wrap(
 fn realistic_env_load_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TPS(&[10, 100, 1000, 3000, 5000]),
+        workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
             (9, 1.5, 3., 4.),
             (95, 1.5, 3., 4.),
@@ -893,7 +893,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
 fn realistic_env_workload_sweep_test() -> ForgeConfig {
     realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
-        workloads: Workloads::TRANSACTIONS(&[
+        workloads: Workloads::TRANSACTIONS(vec![
             TransactionWorkload {
                 transaction_type: TransactionTypeArg::CoinTransfer,
                 num_modules: 1,
@@ -964,7 +964,7 @@ fn load_vs_perf_benchmark() -> ForgeConfig {
         .with_initial_fullnode_count(10)
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TPS(&[
+            workloads: Workloads::TPS(vec![
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
             ]),
             criteria: Vec::new(),
@@ -993,7 +993,7 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
         }))
         .add_network_test(LoadVsPerfBenchmark {
             test: Box::new(PerformanceBenchmark),
-            workloads: Workloads::TRANSACTIONS(&[
+            workloads: Workloads::TRANSACTIONS(vec![
                 TransactionWorkload {
                     transaction_type: TransactionTypeArg::NoOp,
                     num_modules: 1,
@@ -1756,8 +1756,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 .dynamic_max_txn_per_s = 6000;
 
             // Experimental storage optimizations
-            config.storage.rocksdb_configs.split_ledger_db = true;
-            config.storage.rocksdb_configs.use_sharded_state_merkle_db = true;
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
         }))
         .with_success_criteria(
             SuccessCriteria::new(8000)
