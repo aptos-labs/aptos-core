@@ -30,7 +30,7 @@ export class Transaction {
   }
 
   /**
-   * @param txnVersion - Transaction version is an uint64 number.
+   * @param txnVersion - Transaction version is a uint64 number.
    * @returns On-chain transaction. Only on-chain transactions have versions, so this
    * function cannot be used to query pending transactions.
    */
