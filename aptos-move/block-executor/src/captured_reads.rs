@@ -158,7 +158,7 @@ struct GroupRead<T: Transaction> {
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
 pub(crate) struct CapturedReads<T: Transaction> {
-    pub(crate) data_reads: HashMap<T::Key, DataRead<T::Value>>,
+    data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
     // Currently, we record paths for triggering module R/W fallback.
     // TODO: implement a general functionality once the fallback is removed.
@@ -186,6 +186,15 @@ enum UpdateResult {
 }
 
 impl<T: Transaction> CapturedReads<T> {
+    // Return an iterator over the captured reads.
+    pub(crate) fn get_read_values_with_delayed_fields(
+        &self,
+    ) -> impl Iterator<Item = (&T::Key, &DataRead<T::Value>)> {
+        self.data_reads
+            .iter()
+            .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
+    }
+
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
     // consistency and ensures that the most comprehensive read is recorded.
     fn update_entry<K, V: TransactionWrite>(
