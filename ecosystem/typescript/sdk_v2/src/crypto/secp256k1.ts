@@ -127,8 +127,6 @@ export class Secp256k1PrivateKey extends PrivateKey {
 
   /**
    * Sign the given message with the private key.
-   * The `lowS` option is default to `true`
-   * lowS: true prohibits signatures which have (sig.s >= CURVE.n/2n).
    *
    * @param args.message in HexInput format
    * @returns Signature
