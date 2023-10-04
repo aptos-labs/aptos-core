@@ -108,7 +108,7 @@ export async function isTransactionPending(args: { aptosConfig: AptosConfig; txn
  * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
  * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
  * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
- * const transasction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
+ * const transaction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
  * ```
  */
 export async function waitForTransaction(args: {
