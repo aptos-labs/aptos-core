@@ -4,7 +4,7 @@
 use crate::{
     captured_reads::CapturedReads,
     errors::Error,
-    task::{CategorizeError, ErrorCategory, ExecutionStatus, Transaction, TransactionOutput},
+    task::{CategorizeError, ErrorCategory, ExecutionStatus, TransactionOutput},
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -232,7 +232,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
             })
     }
 
-    pub(crate) fn aggregator_v2_keys(
+    pub(crate) fn delayed_field_keys(
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = T::Identifier>> {
@@ -241,7 +241,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
             .as_ref()
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    Some(t.aggregator_v2_change_set().into_keys())
+                    Some(t.delayed_field_change_set().into_keys())
                 },
                 ExecutionStatus::Abort(_) => None,
             })

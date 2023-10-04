@@ -9,11 +9,11 @@ use crate::{
     },
 };
 use aptos_aggregator::{
-    aggregator_change_set::{AggregatorApplyChange, AggregatorChange},
     bounded_math::SignedU128,
+    delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaOp,
     delta_math::DeltaHistory,
-    types::{AggregatorID, SnapshotToStringFormula},
+    types::{DelayedFieldID, SnapshotToStringFormula},
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -437,11 +437,11 @@ fn test_failed_conversion_to_change_set() {
 
 #[test]
 fn test_aggregator_v2_snapshots_and_derived() {
-    use AggregatorApplyChange::*;
-    use AggregatorChange::*;
+    use DelayedApplyChange::*;
+    use DelayedChange::*;
 
     let agg_changes_1 = vec![(
-        AggregatorID::new(1),
+        DelayedFieldID::new(1),
         Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(3), 100, DeltaHistory {
                 max_achieved_positive_delta: 3,
@@ -455,7 +455,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
 
     let agg_changes_2 = vec![
         (
-            AggregatorID::new(1),
+            DelayedFieldID::new(1),
             Apply(AggregatorDelta {
                 delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
                     max_achieved_positive_delta: 5,
@@ -466,9 +466,9 @@ fn test_aggregator_v2_snapshots_and_derived() {
             }),
         ),
         (
-            AggregatorID::new(2),
+            DelayedFieldID::new(2),
             Apply(SnapshotDelta {
-                base_aggregator: AggregatorID::new(1),
+                base_aggregator: DelayedFieldID::new(1),
                 delta: DeltaOp::new(SignedU128::Positive(2), 100, DeltaHistory {
                     max_achieved_positive_delta: 6,
                     min_achieved_negative_delta: 0,
@@ -478,9 +478,9 @@ fn test_aggregator_v2_snapshots_and_derived() {
             }),
         ),
         (
-            AggregatorID::new(3),
+            DelayedFieldID::new(3),
             Apply(SnapshotDerived {
-                base_snapshot: AggregatorID::new(2),
+                base_snapshot: DelayedFieldID::new(2),
                 formula: SnapshotToStringFormula::Concat {
                     prefix: "p".as_bytes().to_vec(),
                     suffix: "s".as_bytes().to_vec(),
@@ -492,10 +492,10 @@ fn test_aggregator_v2_snapshots_and_derived() {
 
     assert_ok!(change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker));
 
-    let output_map = change_set_1.aggregator_v2_change_set();
+    let output_map = change_set_1.delayed_field_change_set();
     assert_eq!(output_map.len(), 3);
     assert_some_eq!(
-        output_map.get(&AggregatorID::new(1)),
+        output_map.get(&DelayedFieldID::new(1)),
         &Apply(AggregatorDelta {
             delta: DeltaOp::new(SignedU128::Positive(8), 100, DeltaHistory {
                 max_achieved_positive_delta: 8,
@@ -506,9 +506,9 @@ fn test_aggregator_v2_snapshots_and_derived() {
         })
     );
     assert_some_eq!(
-        output_map.get(&AggregatorID::new(2)),
+        output_map.get(&DelayedFieldID::new(2)),
         &Apply(SnapshotDelta {
-            base_aggregator: AggregatorID::new(1),
+            base_aggregator: DelayedFieldID::new(1),
             delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
                 max_achieved_positive_delta: 9,
                 min_achieved_negative_delta: 0,
@@ -518,9 +518,9 @@ fn test_aggregator_v2_snapshots_and_derived() {
         })
     );
     assert_some_eq!(
-        output_map.get(&AggregatorID::new(3)),
+        output_map.get(&DelayedFieldID::new(3)),
         &Apply(SnapshotDerived {
-            base_snapshot: AggregatorID::new(2),
+            base_snapshot: DelayedFieldID::new(2),
             formula: SnapshotToStringFormula::Concat {
                 prefix: "p".as_bytes().to_vec(),
                 suffix: "s".as_bytes().to_vec()

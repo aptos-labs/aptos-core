@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator::AggregatorID,
+    aggregator::DelayedFieldID,
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
     transaction::{BlockExecutableTransaction, Transaction},
@@ -61,7 +61,7 @@ impl SignatureVerifiedTransaction {
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Event = ContractEvent;
-    type Identifier = AggregatorID;
+    type Identifier = DelayedFieldID;
     type Key = StateKey;
     type Tag = StructTag;
     type Value = WriteOp;

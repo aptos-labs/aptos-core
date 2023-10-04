@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::change_set::VMChangeSet;
-use aptos_aggregator::resolver::AggregatorResolver;
+use aptos_aggregator::resolver::DelayedFieldResolver;
 use aptos_types::{
     contract_event::ContractEvent, //contract_event::ContractEvent,
     fee_statement::FeeStatement,
@@ -77,14 +77,14 @@ impl VMOutput {
     /// has an empty delta set.
     pub fn try_materialize(
         self,
-        resolver: &impl AggregatorResolver,
+        resolver: &impl DelayedFieldResolver,
     ) -> anyhow::Result<Self, VMStatus> {
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
         if self.status().is_discarded()
             || (self.change_set().aggregator_v1_delta_set().is_empty()
-                && self.change_set().aggregator_v2_change_set().is_empty())
+                && self.change_set().delayed_field_change_set().is_empty())
         {
             return Ok(self);
         }
@@ -104,7 +104,7 @@ impl VMOutput {
     /// Same as `try_materialize` but also constructs `TransactionOutput`.
     pub fn try_into_transaction_output(
         self,
-        resolver: &impl AggregatorResolver,
+        resolver: &impl DelayedFieldResolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(resolver)?;
         debug_assert!(
