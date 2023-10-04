@@ -10,6 +10,9 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardMessage};
+use aptos_types::vm_status::VMStatus;
+use aptos_vm::adapter_common::PreprocessedTransaction;
 
 pub struct RemoteCrossShardClient {
     // The senders of cross-shard messages to other shards per round.
@@ -63,5 +66,16 @@ impl CrossShardClient for RemoteCrossShardClient {
         let message = rx.recv().unwrap();
         let msg: CrossShardMsg = bcs::from_bytes(&message.to_bytes()).unwrap();
         msg
+    }
+}
+
+pub struct RemoteCrossShardClientV3 {}
+
+impl CrossShardClientForV3<PreprocessedTransaction, VMStatus> for RemoteCrossShardClientV3 {
+    fn send(&self, _shard_idx: usize, _output: CrossShardMessage<PreprocessedTransaction, VMStatus>) {
+        todo!()
+    }
+    fn recv(&self) -> CrossShardMessage<PreprocessedTransaction, VMStatus> {
+        todo!()
     }
 }

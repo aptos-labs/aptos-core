@@ -135,7 +135,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
 
-    fn execute_block_v3(&self, state_view: Arc<S>, transactions: PartitionedTransactionsV3, concurrency_level_per_shard: usize, maybe_block_gas_limit: Option<u64>) -> Result<Vec<TransactionOutput>, VMStatus> {
+    fn execute_block_v3(&self, _state_view: Arc<S>, _transactions: PartitionedTransactionsV3, _concurrency_level_per_shard: usize, _maybe_block_gas_limit: Option<u64>) -> Result<Vec<TransactionOutput>, VMStatus> {
         todo!()
     }
 }

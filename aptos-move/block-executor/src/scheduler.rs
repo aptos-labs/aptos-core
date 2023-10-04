@@ -517,7 +517,7 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
         SchedulerTask::NoTask
     }
 
-    /// Resume any transaction blocked by a given txn `blocker` by notifying their condvars.
+    /// Resume any transaction blocked by a given txn `blocker` by notifying their condition variables.
     /// Clear the blocking status (`self.txn_dependency`).
     /// Return the minimum txn index that is resumed, if any.
     ///
@@ -735,12 +735,10 @@ impl<TP: TxnIndexProvider> Scheduler<TP> {
                 },
                 _ => None,
             }
+        } else if self.txn_provider.txn_output_has_arrived(txn_idx) {
+            Some(0)
         } else {
-            if self.txn_provider.txn_output_has_arrived(txn_idx) {
-                Some(0)
-            } else {
-                None
-            }
+            None
         }
     }
 

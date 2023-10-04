@@ -1,9 +1,5 @@
 // Copyright © Aptos Foundation
-
-use std::collections::HashMap;
 use std::fmt::Debug;
-use std::slice::Iter;
-use std::sync::Arc;
 use aptos_mvhashmap::MVHashMap;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::executable::Executable;
@@ -11,7 +7,7 @@ use aptos_types::write_set::WriteOp;
 use move_core_types::account_address::AccountAddress;
 use crate::scheduler::Scheduler;
 use crate::task::{Transaction, TransactionOutput};
-use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
+use crate::txn_last_input_output::TxnLastInputOutput;
 use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
 
 /// Some logic of vanilla BlockSTM.
@@ -97,7 +93,7 @@ impl<T, TO, TE> BlockSTMPlugin<T, TO, TE> for DefaultTxnProvider<T>
         &self.txns[idx as usize]
     }
 
-    fn on_local_commit(&self, _txn_idx: TxnIndex, _last_input_output: &TxnLastInputOutput<T, TO, TE>, _delta_writes: &Vec<(T::Key, WriteOp)>) {
+    fn on_local_commit(&self, _txn_idx: TxnIndex, _last_input_output: &TxnLastInputOutput<T, TO, TE>, _delta_writes: &[(T::Key, WriteOp)]) {
         // Nothing to do.
     }
 

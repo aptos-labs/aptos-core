@@ -26,10 +26,8 @@ use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, ShardedTxnProvider};
 use aptos_types::block_executor::partitioner::PartitionV3;
 use crate::adapter_common::{preprocess_transaction, PreprocessedTransaction};
-use crate::aptos_vm::RAYON_EXEC_POOL;
 use crate::sharded_block_executor::ExecuteV3PartitionCommand;
 use rayon::iter::ParallelIterator;
-use crate::block_executor::AptosTransactionOutput;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,

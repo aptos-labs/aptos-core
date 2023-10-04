@@ -26,6 +26,8 @@ use rand::{prelude::*, random};
 use std::{
     cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
 };
+use crate::txn_provider::default::DefaultTxnProvider;
+use crate::txn_provider::TxnIndexProvider;
 
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, V, E>(transactions: Vec<MockTransaction<K, V, E>>)
@@ -45,14 +47,16 @@ where
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     let output = BlockExecutor::<
         MockTransaction<K, V, E>,
         MockTask<K, V, E>,
         DeltaDataView<K, V>,
         NoOpTransactionCommitHook<MockOutput<K, V, E>, usize>,
         ExecutableTestType,
+        _
     >::new(num_cpus::get(), executor_thread_pool, None, None)
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel((), txn_provider, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
     baseline.assert_output(&output);
@@ -334,7 +338,7 @@ fn early_skips() {
 
 #[test]
 fn scheduler_tasks() {
-    let s = Scheduler::new(5);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(5)));
 
     for i in 0..5 {
         // No validation tasks.
@@ -425,7 +429,7 @@ fn scheduler_tasks() {
 
 #[test]
 fn scheduler_first_wave() {
-    let s = Scheduler::new(6);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(6)));
 
     for i in 0..5 {
         // Nothing to validate.
@@ -480,7 +484,7 @@ fn scheduler_first_wave() {
 
 #[test]
 fn scheduler_dependency() {
-    let s = Scheduler::new(10);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(10)));
 
     for i in 0..5 {
         // Nothing to validate.
@@ -526,8 +530,8 @@ fn scheduler_dependency() {
 
 // Will return a scheduler in a state where all transactions are scheduled for
 // for execution, validation index = num_txns, and wave = 0.
-fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler {
-    let s = Scheduler::new(num_txns);
+fn incarnation_one_scheduler(num_txns: TxnIndex) -> Scheduler<DefaultIndexProvider> {
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(num_txns)));
 
     for i in 0..num_txns {
         // Get the first executions out of the way.
@@ -641,7 +645,7 @@ fn scheduler_incarnation() {
 
 #[test]
 fn scheduler_basic() {
-    let s = Scheduler::new(3);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(3)));
 
     for i in 0..3 {
         // Nothing to validate.
@@ -691,7 +695,7 @@ fn scheduler_basic() {
 
 #[test]
 fn scheduler_drain_idx() {
-    let s = Scheduler::new(3);
+    let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(3)));
 
     for i in 0..3 {
         // Nothing to validate.
@@ -834,7 +838,7 @@ fn no_conflict_task_count() {
 
     let num_txns: TxnIndex = 1000;
     for num_concurrent_tasks in [1, 5, 10, 20] {
-        let s = Scheduler::new(num_txns);
+        let s = Scheduler::new(Arc::new(DefaultIndexProvider::new(num_txns)));
 
         let mut tasks = BTreeMap::new();
 
@@ -900,5 +904,63 @@ fn no_conflict_task_count() {
             assert_eq!(s.commit_state(), (i + 1, 0));
         }
         assert!(matches!(s.next_task(false), SchedulerTask::Done));
+    }
+}
+
+pub struct DefaultIndexProvider {
+    num_txns: TxnIndex,
+}
+
+impl DefaultIndexProvider {
+    pub fn new(num_txns: TxnIndex) -> Self {
+        Self {
+            num_txns
+        }
+    }
+}
+
+impl TxnIndexProvider for DefaultIndexProvider {
+    fn end_txn_idx(&self) -> TxnIndex {
+        self.num_txns
+    }
+
+    fn num_txns(&self) -> usize {
+        self.num_txns as usize
+    }
+
+    fn first_txn(&self) -> TxnIndex {
+        0
+    }
+
+    fn next_txn(&self, idx: TxnIndex) -> TxnIndex {
+        idx + 1
+    }
+
+    fn txns(&self) -> Vec<TxnIndex> {
+        (0..self.num_txns).collect()
+    }
+
+    fn txns_and_deps(&self) -> Vec<TxnIndex> {
+        self.txns()
+    }
+
+    fn local_index(&self, idx: TxnIndex) -> usize {
+        idx as usize
+    }
+
+    fn is_local(&self, _idx: TxnIndex) -> bool {
+        true
+    }
+
+    fn txn_output_has_arrived(&self, _txn_idx: TxnIndex) -> bool {
+        unreachable!()
+    }
+
+    fn block_idx(&self) -> &[u8] {
+        &[0; 32]
+    }
+
+    fn shard_idx(&self) -> usize {
+        0
     }
 }

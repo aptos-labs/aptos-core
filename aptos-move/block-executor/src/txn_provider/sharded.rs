@@ -3,23 +3,17 @@
 use std::fmt::Debug;
 use aptos_mvhashmap::types::TxnIndex;
 use std::collections::{BTreeSet, HashMap, HashSet};
-use std::hash::Hash;
 use std::marker::PhantomData;
-use std::slice::Iter;
-use std::sync::{Arc, mpsc, Mutex};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
 use dashmap::DashSet;
-use serde::Serialize;
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_logger::info;
 use aptos_mvhashmap::MVHashMap;
-use aptos_types::block_executor::partitioner::PartitionV3;
 use aptos_types::executable::Executable;
 use aptos_types::write_set::WriteOp;
 use crate::errors::Error;
 use crate::scheduler::Scheduler;
 use crate::task::{ExecutionStatus, Transaction, TransactionOutput};
-use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
+use crate::txn_last_input_output::TxnLastInputOutput;
 use crate::txn_provider::{BlockSTMPlugin, TxnIndexProvider};
 
 pub enum CrossShardMessage<T: Transaction, TE: Debug> {
@@ -213,25 +207,20 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
         mv: &MVHashMap<TX::Key, TX::Tag, TX::Value, X>,
         scheduler: &Scheduler<Self>
     ) {
-        loop {
-            match self.cross_shard_client.recv() {
-                CrossShardMessage::Commit(CrossShardTxnResult { global_txn_idx, result }) => {
-                    match result {
-                        ExecutionStatus::Success(output) => {
-                            self.apply_updates_to_mv(mv, global_txn_idx, output);
-                        }
-                        ExecutionStatus::SkipRest(output) => {
-                            self.apply_updates_to_mv(mv, global_txn_idx, output);
-                        }
-                        ExecutionStatus::Abort(_) => {
-                            //sharding todo: what to do here?
-                        }
-                    }
-                    self.remote_committed_txns.insert(global_txn_idx);
-                    scheduler.fast_resume_dependents(global_txn_idx);
-                },
-                CrossShardMessage::Shutdown => break,
+        while let CrossShardMessage::Commit(CrossShardTxnResult { global_txn_idx, result }) = self.cross_shard_client.recv() {
+            match result {
+                ExecutionStatus::Success(output) => {
+                    self.apply_updates_to_mv(mv, global_txn_idx, output);
+                }
+                ExecutionStatus::SkipRest(output) => {
+                    self.apply_updates_to_mv(mv, global_txn_idx, output);
+                }
+                ExecutionStatus::Abort(_) => {
+                    //sharding todo: what to do here?
+                }
             }
+            self.remote_committed_txns.insert(global_txn_idx);
+            scheduler.fast_resume_dependents(global_txn_idx);
         }
     }
 
@@ -239,7 +228,7 @@ impl<TX, TO, TE> BlockSTMPlugin<TX, TO, TE> for ShardedTxnProvider<TX, TO, TE>
         self.cross_shard_client.send(self.shard_idx, CrossShardMessage::Shutdown);
     }
 
-    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<TX, TO, TE>, _delta_writes: &Vec<(TX::Key, WriteOp)>) {
+    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<TX, TO, TE>, _delta_writes: &[(TX::Key, WriteOp)]) {
         let txn_output = last_input_output.txn_output(txn_idx).unwrap();
         let concrete_status = match txn_output.output_status() {
             ExecutionStatus::Success(obj) => {

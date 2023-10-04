@@ -39,7 +39,7 @@ pub struct PipelineConfig {
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
-    #[derivative(Default(value = "Box::new(PartitionerV2Config::default())"))]
+    #[derivative(Default(value = "Box::<PartitionerV2Config>::default()"))]
     pub partitioner_config: Box<dyn PartitionerConfig>,
 }
 

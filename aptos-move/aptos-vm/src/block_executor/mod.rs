@@ -9,7 +9,6 @@ use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
     counters::{
         BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
-        BLOCK_EXECUTOR_SIGNATURE_VERIFICATION_SECONDS,
     },
     AptosVM,
 };

@@ -9,6 +9,7 @@ use aptos_secure_net::network_controller::NetworkController;
 use aptos_types::block_executor::partitioner::ShardId;
 use aptos_vm::sharded_block_executor::sharded_executor_service::ShardedExecutorService;
 use std::{net::SocketAddr, sync::Arc};
+use crate::remote_cross_shard_client::RemoteCrossShardClientV3;
 
 /// A service that provides support for remote execution. Essentially, it reads a request from
 /// the remote executor client and executes the block locally and returns the result.
@@ -37,13 +38,14 @@ impl ExecutorService {
             &mut controller,
             remote_shard_addresses,
         ));
-
+        let v3_client = Arc::new(RemoteCrossShardClientV3 {});
         let executor_service = Arc::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
             num_threads,
             coordinator_client,
             cross_shard_client,
+            v3_client,
         ));
 
         Self {

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::{DeltaOp, DeltaUpdate};
+use aptos_aggregator::delta_change_set::DeltaUpdate;
 use crate::change_set::VMChangeSet;
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_types::{

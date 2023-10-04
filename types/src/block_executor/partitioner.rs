@@ -457,10 +457,32 @@ pub enum PartitionedTransactions {
     V3(PartitionedTransactionsV3),
 }
 
+impl PartitionedTransactions {
+    pub fn as_v2_ref(&self) -> &PartitionedTransactionsV2 {
+        match self {
+            V2(obj) => obj,
+            V3(_) => panic!("Called `as_v2_ref` on a V3 result."),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartitionedTransactionsV2 {
     pub sharded_txns: Vec<SubBlocksForShard<AnalyzedTransaction>>,
     pub global_txns: Vec<TransactionWithDependencies<AnalyzedTransaction>>,
+}
+
+impl PartitionedTransactionsV2 {
+    pub fn sharded_txns(&self) -> &[SubBlocksForShard<AnalyzedTransaction>] {
+        &self.sharded_txns
+    }
+
+    pub fn num_sharded_txns(&self) -> usize {
+        self.sharded_txns
+            .iter()
+            .map(|sub_blocks| sub_blocks.num_txns())
+            .sum::<usize>()
+    }
 }
 
 /// The input of a shard in sharded execution V3.

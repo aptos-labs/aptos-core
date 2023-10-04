@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
 use std::collections::HashMap;
-use aptos_crypto::hash::CryptoHash;
-use aptos_types::block_executor::partitioner::{PartitionedTransactions, PartitionedTransactionsV3, PartitionV3, ShardId};
+use aptos_types::block_executor::partitioner::{PartitionedTransactions, PartitionedTransactionsV3, PartitionV3};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use crate::{BlockPartitioner, PartitionerConfig};
@@ -26,7 +25,7 @@ impl BlockPartitioner for V3NaivePartitioner {
                     if owner_shard_idx == cur_shard_idx {
                         continue;
                     }
-                    partitions[owner_shard_idx as usize].insert_follower_shard(*owner_txn_idx, cur_shard_idx);
+                    partitions[owner_shard_idx].insert_follower_shard(*owner_txn_idx, cur_shard_idx);
                     partitions[cur_shard_idx].insert_remote_dependency(*owner_txn_idx, loc.state_key().clone());
                 }
             }

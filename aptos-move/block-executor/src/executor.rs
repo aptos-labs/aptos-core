@@ -38,7 +38,6 @@ use std::{collections::HashMap, hint, marker::PhantomData, sync::{
     Arc,
 }};
 use crate::txn_provider::{TxnIndexProvider, BlockSTMPlugin};
-use crate::txn_provider::sharded::ConcreteTxnOutput;
 
 struct CommitGuard<'a> {
     post_commit_txs: &'a Vec<Sender<u32>>,
@@ -642,8 +641,7 @@ where
                     SchedulerTask::NoTask
                 },
                 SchedulerTask::NoTask => {
-                    let new_task = scheduler.next_task(false);
-                    new_task
+                    scheduler.next_task(false)
                 },
                 SchedulerTask::Done => {
                     break;
@@ -738,7 +736,6 @@ where
         });
         drop(timer);
 
-        let num_txns = num_txns as usize;
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let mut final_results = Vec::with_capacity(num_txns);
 

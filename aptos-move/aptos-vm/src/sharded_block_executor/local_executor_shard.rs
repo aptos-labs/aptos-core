@@ -13,13 +13,10 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
-use std::collections::{HashMap, HashSet};
-use std::sync::mpsc::channel;
-use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardTxnResult, CrossShardMessage};
+use aptos_block_executor::txn_provider::sharded::{CrossShardClientForV3, CrossShardMessage};
 use aptos_types::block_executor::partitioner::PartitionedTransactionsV3;
 use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
 use crate::adapter_common::PreprocessedTransaction;
-use crate::block_executor::AptosTransactionOutput;
 use crate::sharded_block_executor::sharded_aggregator_service::get_state_value;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes

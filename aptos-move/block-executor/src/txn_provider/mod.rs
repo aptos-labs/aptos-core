@@ -1,26 +1,12 @@
 // Copyright © Aptos Foundation
-
-use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::Debug;
-use std::hash::Hash;
-use std::slice::Iter;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, mpsc, Mutex};
-use std::sync::mpsc::{Receiver, Sender};
-use dashmap::DashSet;
-use rayon::Scope;
-use serde::Serialize;
-use aptos_logger::info;
 use aptos_mvhashmap::MVHashMap;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::block_executor::partitioner::ShardId;
 use aptos_types::executable::Executable;
-use aptos_types::state_store::state_key::StateKey;
 use aptos_types::write_set::WriteOp;
-use crate::errors::Error;
 use crate::scheduler::Scheduler;
-use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
-use crate::txn_last_input_output::{TxnLastInputOutput, TxnOutput};
+use crate::task::{Transaction, TransactionOutput};
+use crate::txn_last_input_output::{TxnLastInputOutput};
 
 /// The transaction index operations that are implemented differently between unsharded execution and sharded execution.
 pub trait TxnIndexProvider {
@@ -78,7 +64,7 @@ pub trait BlockSTMPlugin<T: Transaction, TO, TE>
     fn shutdown_receiver(&self);
 
     /// Some extra processing once a local txn is committed.
-    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<T, TO, TE>, delta_writes: &Vec<(T::Key, WriteOp)>);
+    fn on_local_commit(&self, txn_idx: TxnIndex, last_input_output: &TxnLastInputOutput<T, TO, TE>, delta_writes: &[(T::Key, WriteOp)]);
 
     /// Return whether a dedicated committing thread should be used in BlockSTM.
     fn use_dedicated_committing_thread(&self) -> bool;

@@ -17,10 +17,7 @@ use aptos_types::{
 };
 use move_core_types::vm_status::VMStatus;
 use std::{marker::PhantomData, sync::Arc};
-use std::collections::{HashMap, HashSet};
-use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::block_executor::partitioner::PartitionV3;
-use aptos_types::state_store::state_key::StateKey;
 
 pub mod aggr_overridden_state_view;
 pub mod coordinator_client;

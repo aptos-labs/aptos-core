@@ -26,6 +26,7 @@ use proptest::{
 };
 use rand::Rng;
 use std::{cmp::max, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use crate::txn_provider::default::DefaultTxnProvider;
 
 fn run_transactions<K, V, E>(
     key_universe: &[K],
@@ -65,6 +66,7 @@ fn run_transactions<K, V, E>(
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     for _ in 0..num_repeat {
         let output = BlockExecutor::<
             MockTransaction<KeyType<K>, ValueType, E>,
@@ -72,13 +74,14 @@ fn run_transactions<K, V, E>(
             EmptyDataView<KeyType<K>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType, E>, usize>,
             ExecutableTestType,
+            _,
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
             None,
         )
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), txn_provider.clone(), &data_view);
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -200,6 +203,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
     for _ in 0..20 {
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
@@ -207,13 +211,14 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
             DeltaDataView<KeyType<[u8; 32]>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
             ExecutableTestType,
+            _
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
             None,
         )
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), txn_provider.clone(), &data_view);
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit).assert_output(&output);
     }
@@ -251,6 +256,8 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
+
     for _ in 0..20 {
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
@@ -258,13 +265,14 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
             DeltaDataView<KeyType<[u8; 32]>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
             ExecutableTestType,
+            _
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             maybe_block_gas_limit,
             None,
         )
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), txn_provider.clone(), &data_view);
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit).assert_output(&output);
     }
@@ -407,6 +415,8 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
+
     // Confirm still no intersection
     let output = BlockExecutor::<
         MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
@@ -414,13 +424,14 @@ fn publishing_fixed_params_with_block_gas_limit(
         DeltaDataView<KeyType<[u8; 32]>, ValueType>,
         NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
         ExecutableTestType,
+        _
     >::new(
         num_cpus::get(),
         executor_thread_pool,
         maybe_block_gas_limit,
         None,
     )
-    .execute_transactions_parallel((), &transactions, &data_view);
+    .execute_transactions_parallel((), txn_provider, &data_view);
     assert_ok!(output);
 
     // Adjust the reads of txn indices[2] to contain module read to key 42.
@@ -450,6 +461,8 @@ fn publishing_fixed_params_with_block_gas_limit(
             .unwrap(),
     );
 
+    let txn_provider = Arc::new(DefaultTxnProvider::new(transactions.clone()));
+
     for _ in 0..200 {
         let output = BlockExecutor::<
             MockTransaction<KeyType<[u8; 32]>, ValueType, MockEvent>,
@@ -457,13 +470,14 @@ fn publishing_fixed_params_with_block_gas_limit(
             DeltaDataView<KeyType<[u8; 32]>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, ValueType, MockEvent>, usize>,
             ExecutableTestType,
+            _
         >::new(
             num_cpus::get(),
             executor_thread_pool.clone(),
             Some(max(w_index, r_index) as u64 * MAX_GAS_PER_TXN + 1),
             None,
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
-        .execute_transactions_parallel((), &transactions, &data_view);
+        .execute_transactions_parallel((), txn_provider.clone(), &data_view);
 
         assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
     }

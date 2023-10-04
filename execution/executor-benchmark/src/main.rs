@@ -161,7 +161,7 @@ impl PipelineOpt {
                 pre_partitioner_config: self.pre_partitioner_config(),
             }),
             Some("v3-naive") => Box::new(V3NaivePartitionerConfig {}),
-            None => Box::new(PartitionerV2Config::default()),
+            None => Box::<PartitionerV2Config>::default(),
             _ => panic!(
                 "Unknown partitioner version: {:?}",
                 self.partitioner_version
