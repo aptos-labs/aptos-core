@@ -125,10 +125,10 @@ export class EntryFunction {
    * ```
    * public entry fun transfer<CoinType>(from: &signer, to: address, amount: u64)
    * ```
-   * @param args Arugments to the move function.
+   * @param args arguments to the move function.
    *
    * @example
-   * A coin transfer function has three arugments "from", "to" and "amount".
+   * A coin transfer function has three arguments "from", "to" and "amount".
    * ```
    * public entry fun transfer<CoinType>(from: &signer, to: address, amount: u64)
    * ```
@@ -182,7 +182,7 @@ export class Script {
   public readonly type_args: Array<TypeTag>;
 
   /**
-   * The arugments that the bytecode function requires.
+   * The arguments that the bytecode function requires.
    */
   public readonly args: Array<ScriptTransactionArgument>;
 
@@ -197,10 +197,10 @@ export class Script {
    * ```
    * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
    * ```
-   * @param args The arugments that the bytecode function requires.
+   * @param args The arguments that the bytecode function requires.
    *
    * @example
-   * A coin transfer function has three arugments "from", "to" and "amount".
+   * A coin transfer function has three arguments "from", "to" and "amount".
    * ```
    * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
    * ```
