@@ -78,6 +78,11 @@ import { NODE_URL, FAUCET_URL } from "./common";
   ); // <:!:section_5
   await provider.aptosClient.waitForTransaction(txnHash2, { checkSuccess: true });
 
+  const inSync = await ensureIndexerAndNetworkInSync(provider);
+  if (!inSync) {
+    return;
+  }
+
   // Print the collection data.
   // :!:>section_6
   const collectionData = (await provider.getCollectionData(alice.address(), collectionName)).current_collections_v2[0];
@@ -117,19 +122,6 @@ import { NODE_URL, FAUCET_URL } from "./common";
   bobAmount = (await getTokenInfo(provider, bob.address(), collectionAddress)).amount;
   console.log(`Alice's token balance: ${aliceAmount}`);
   console.log(`Bob's token balance: ${bobAmount}`); // <:!:section_12
-
-  console.log("\n=== Checking if indexer devnet chainId same as fullnode chainId  ===");
-  const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
-  const fullNodeChainId = await provider.getChainId();
-
-  console.log(
-    `\nFullnode chain id is: ${fullNodeChainId}, indexer chain id is: ${indexerLedgerInfo.ledger_infos[0].chain_id}`,
-  );
-
-  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
-    console.log(`\nFullnode chain id and indexer chain id are not synced, skipping rest of tests`);
-    return;
-  }
 
   console.log("\n=== Getting Alices's NFTs ===");
   console.log(
@@ -172,3 +164,14 @@ async function getTokenInfo(
     };
   }
 } // <:!:getTokenInfo
+
+async function ensureIndexerAndNetworkInSync(provider: Provider): Promise<boolean> {
+  const indexerLedgerInfo = await provider.getIndexerLedgerInfo();
+  const fullNodeChainId = await provider.getChainId();
+  if (indexerLedgerInfo.ledger_infos[0].chain_id !== fullNodeChainId) {
+    console.log(`\nERROR: Provider's fullnode chain id and indexer chain id are not synced, skipping rest of tests`);
+    return false;
+  } else {
+    return true;
+  }
+}
