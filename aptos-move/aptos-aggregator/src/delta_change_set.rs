@@ -136,8 +136,8 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 mod test {
     use super::*;
     use crate::{
-        resolver::{AggregatorReadMode, TAggregatorView},
-        types::AggregatorValue,
+        resolver::{DelayedFieldReadMode, TDelayedFieldView},
+        types::DelayedFieldValue,
         FakeAggregatorView,
     };
     use aptos_types::{
@@ -399,7 +399,7 @@ mod test {
             state_view.try_convert_aggregator_v1_delta_into_write_op(
                 &KEY,
                 &delta_op,
-                AggregatorReadMode::Aggregated
+                DelayedFieldReadMode::Aggregated
             ),
             Err(VMStatus::Error {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -411,14 +411,14 @@ mod test {
 
     struct BadStorage;
 
-    impl TAggregatorView for BadStorage {
+    impl TDelayedFieldView for BadStorage {
         type IdentifierV1 = StateKey;
         type IdentifierV2 = ();
 
         fn get_aggregator_v1_state_value(
             &self,
             _id: &Self::IdentifierV1,
-            _mode: AggregatorReadMode,
+            _mode: DelayedFieldReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -426,18 +426,18 @@ mod test {
             )))
         }
 
-        fn get_aggregator_v2_value(
+        fn get_delayed_field_value(
             &self,
             _id: &Self::IdentifierV2,
-            _mode: AggregatorReadMode,
-        ) -> anyhow::Result<AggregatorValue> {
+            _mode: DelayedFieldReadMode,
+        ) -> anyhow::Result<DelayedFieldValue> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
 
-        fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+        fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
             unimplemented!("Irrelevant for the test")
         }
     }
@@ -450,7 +450,7 @@ mod test {
             state_view.try_convert_aggregator_v1_delta_into_write_op(
                 &KEY,
                 &delta_op,
-                AggregatorReadMode::Aggregated
+                DelayedFieldReadMode::Aggregated
             ),
             Err(VMStatus::Error {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -472,14 +472,14 @@ mod test {
         let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(
             &KEY,
             &add_op,
-            AggregatorReadMode::Aggregated,
+            DelayedFieldReadMode::Aggregated,
         );
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
         let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(
             &KEY,
             &sub_op,
-            AggregatorReadMode::Aggregated,
+            DelayedFieldReadMode::Aggregated,
         );
         assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
@@ -497,7 +497,7 @@ mod test {
             state_view.try_convert_aggregator_v1_delta_into_write_op(
                 &KEY,
                 &add_op,
-                AggregatorReadMode::Aggregated
+                DelayedFieldReadMode::Aggregated
             ),
             Err(VMStatus::ExecutionFailure {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -508,7 +508,7 @@ mod test {
             state_view.try_convert_aggregator_v1_delta_into_write_op(
                 &KEY,
                 &sub_op,
-                AggregatorReadMode::Aggregated
+                DelayedFieldReadMode::Aggregated
             ),
             Err(VMStatus::ExecutionFailure {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,

@@ -1,14 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{resolver::TAggregatorView, types::AggregatorID};
+use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldID};
 use aptos_state_view::{StateView, StateViewId};
-use aptos_types::{
-    state_store::{
-        state_key::StateKey,
-        state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
-    },
+use aptos_types::state_store::{
+    state_key::StateKey,
+    state_storage_usage::StateStorageUsage,
+    state_value::{StateValue, StateValueMetadataKind},
 };
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
@@ -187,7 +185,7 @@ pub trait StateStorageView {
 pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
-    + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
+    + TDelayedFieldView<IdentifierV1 = K, IdentifierV2 = I>
     + StateStorageView
 {
 }
@@ -195,14 +193,14 @@ pub trait TExecutorView<K, T, L, I>:
 impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
-        + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
+        + TDelayedFieldView<IdentifierV1 = K, IdentifierV2 = I>
         + StateStorageView
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
+pub trait ExecutorView: TExecutorView<StateKey, MoveTypeLayout, DelayedFieldID> {}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, MoveTypeLayout, DelayedFieldID> {}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
