@@ -31,7 +31,7 @@ impl Default for NetbenchConfig {
             enable_direct_send_testing: false,
             direct_send_data_size: 100 * 1024, // 100 KB
             direct_send_per_second: 1_000,
-            direct_send_ramp_up_ms: Some(30_000), // 30 seconds
+            direct_send_ramp_up_ms: Some(20_000), // 20 seconds
 
             enable_rpc_testing: false,
             rpc_data_size: 100 * 1024,
