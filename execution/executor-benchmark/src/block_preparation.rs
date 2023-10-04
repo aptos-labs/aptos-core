@@ -6,10 +6,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
-    transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        Transaction,
-    },
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
 };
 use once_cell::sync::Lazy;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -59,7 +56,7 @@ impl BlockPreparationStage {
             SIG_VERIFY_POOL.install(|| {
                 txns.into_par_iter()
                     .with_min_len(25)
-                    .map(into_signature_verified)
+                    .map(|t| t.into())
                     .collect::<Vec<_>>()
             });
         let block: ExecutableBlock = match &self.maybe_partitioner {

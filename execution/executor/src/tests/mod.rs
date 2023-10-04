@@ -33,10 +33,9 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
-        Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
+        TransactionOutput, TransactionPayload, TransactionStatus, Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -354,15 +353,13 @@ fn create_transaction_chunks(
     // separate DB. Then we call get_transactions to retrieve them.
     let TestExecutor { executor, .. } = TestExecutor::new();
 
-    let mut txns = vec![];
+    let mut txns: Vec<SignatureVerifiedTransaction> = vec![];
     for i in 1..(chunk_ranges.last().unwrap().end - 1) {
         let txn = encode_mint_transaction(gen_address(i), 100);
-        txns.push(into_signature_verified(txn));
+        txns.push(txn.into());
     }
     if BLOCK_GAS_LIMIT.is_none() {
-        txns.push(into_signature_verified(Transaction::StateCheckpoint(
-            HashValue::random(),
-        )));
+        txns.push(Transaction::StateCheckpoint(HashValue::random()).into());
     }
     let id = gen_block_id(1);
 
@@ -602,7 +599,7 @@ fn test_reconfig_suffix_empty_blocks() {
     let block_d = TestBlock::new(1, 1, gen_block_id(4), BLOCK_GAS_LIMIT);
     block_b
         .txns
-        .push(into_signature_verified(encode_reconfiguration_transaction()));
+        .push(encode_reconfiguration_transaction().into());
     let parent_block_id = executor.committed_block_id();
     executor
         .execute_block(
@@ -729,7 +726,7 @@ proptest! {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id, BLOCK_GAS_LIMIT);
             let num_txns = block.txns.len() as LeafCount;
-            block.txns[reconfig_txn_index as usize] = into_signature_verified(encode_reconfiguration_transaction());
+            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction().into();
 
             let parent_block_id = executor.committed_block_id();
             let output = executor.execute_block(
@@ -824,11 +821,11 @@ proptest! {
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
             if BLOCK_GAS_LIMIT.is_some() {
-                txns.push(into_signature_verified(Transaction::StateCheckpoint(block_a.id)));
+                txns.push(Transaction::StateCheckpoint(block_a.id).into());
             }
             txns.extend(block_b.txns.iter().cloned());
             if BLOCK_GAS_LIMIT.is_some() {
-                txns.push(into_signature_verified(Transaction::StateCheckpoint(block_b.id)));
+                txns.push(Transaction::StateCheckpoint(block_b.id).into());
             }
             txns
         }, BLOCK_GAS_LIMIT);

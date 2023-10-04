@@ -14,9 +14,8 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        SignedTransaction, Transaction, TransactionInfo, TransactionOutput, TransactionPayload,
-        Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };
@@ -57,10 +56,8 @@ impl AptosDebugger {
         version: Version,
         txns: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>> {
-        let sig_verified_txns: Vec<SignatureVerifiedTransaction> = txns
-            .into_iter()
-            .map(into_signature_verified)
-            .collect::<Vec<_>>();
+        let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
+            txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
         AptosVM::execute_block(&sig_verified_txns, &state_view, None)
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))

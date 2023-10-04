@@ -4,10 +4,7 @@
 use anyhow::Result;
 use aptos_language_e2e_tests::{account::AccountData, data_store::FakeDataStore};
 use aptos_types::{
-    transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        Transaction,
-    },
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
     write_set::WriteSet,
 };
 use aptos_vm::{AptosVM, VMExecutor};
@@ -35,7 +32,7 @@ fn main() -> Result<()> {
 
     let txns: Vec<SignatureVerifiedTransaction> = (0..NUM_TXNS)
         .map(|seq_num| {
-            into_signature_verified(Transaction::UserTransaction(
+            Transaction::UserTransaction(
                 alice
                     .account()
                     .transaction()
@@ -46,7 +43,8 @@ fn main() -> Result<()> {
                     ))
                     .sequence_number(seq_num)
                     .sign(),
-            ))
+            )
+            .into()
         })
         .collect();
 

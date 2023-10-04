@@ -67,18 +67,20 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Value = WriteOp;
 }
 
-pub fn into_signature_verified_block(txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
-    txns.into_iter().map(into_signature_verified).collect()
+impl From<Transaction> for SignatureVerifiedTransaction {
+    fn from(txn: Transaction) -> Self {
+        match txn {
+            Transaction::UserTransaction(txn) => match txn.verify_signature() {
+                Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
+                Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
+            },
+            _ => SignatureVerifiedTransaction::Valid(txn),
+        }
+    }
 }
 
-pub fn into_signature_verified(txn: Transaction) -> SignatureVerifiedTransaction {
-    match txn {
-        Transaction::UserTransaction(txn) => match txn.verify_signature() {
-            Ok(_) => SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)),
-            Err(_) => SignatureVerifiedTransaction::Invalid(Transaction::UserTransaction(txn)),
-        },
-        _ => SignatureVerifiedTransaction::Valid(txn),
-    }
+pub fn into_signature_verified_block(txns: Vec<Transaction>) -> Vec<SignatureVerifiedTransaction> {
+    txns.into_iter().map(|t| t.into()).collect()
 }
 
 pub trait TransactionProvider: Debug {

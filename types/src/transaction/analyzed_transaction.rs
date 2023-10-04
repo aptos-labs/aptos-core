@@ -8,8 +8,8 @@ use crate::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig, TransactionFeeBurnCap},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        Transaction, TransactionPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+        TransactionPayload,
     },
 };
 use aptos_crypto::HashValue;
@@ -155,7 +155,7 @@ impl From<AnalyzedTransaction> for SignatureVerifiedTransaction {
 
 impl From<Transaction> for AnalyzedTransaction {
     fn from(txn: Transaction) -> Self {
-        AnalyzedTransaction::new(into_signature_verified(txn))
+        AnalyzedTransaction::new(txn.into())
     }
 }
 

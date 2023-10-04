@@ -12,10 +12,7 @@ use aptos_executor_types::{
 use aptos_logger::{debug, error};
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
-    transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        Transaction,
-    },
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
 };
 use fail::fail_point;
 use once_cell::sync::Lazy;
@@ -103,7 +100,7 @@ impl ExecutionPipeline {
                             txns_to_execute
                                 .into_par_iter()
                                 .with_min_len(25)
-                                .map(into_signature_verified)
+                                .map(|t| t.into())
                                 .collect::<Vec<_>>()
                         });
                     sig_verified_txns

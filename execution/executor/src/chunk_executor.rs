@@ -32,9 +32,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
-        signature_verified_transaction::{into_signature_verified, SignatureVerifiedTransaction},
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -226,7 +226,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             transactions
                 .into_par_iter()
                 .with_min_len(25)
-                .map(into_signature_verified)
+                .map(|t| t.into())
                 .collect::<Vec<_>>()
         });
 
@@ -563,7 +563,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .iter()
             .take((end_version - begin_version) as usize)
             .cloned()
-            .map(into_signature_verified)
+            .map(|t| t.into())
             .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
