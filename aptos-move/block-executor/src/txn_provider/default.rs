@@ -113,8 +113,4 @@ where
     ) {
         // Nothing to do.
     }
-
-    fn use_dedicated_committing_thread(&self) -> bool {
-        false
-    }
 }

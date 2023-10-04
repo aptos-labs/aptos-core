@@ -74,9 +74,6 @@ where
         last_input_output: &TxnLastInputOutput<T, TO, TE>,
         delta_writes: &[(T::Key, WriteOp)],
     );
-
-    /// Return whether a dedicated committing thread should be used in BlockSTM.
-    fn use_dedicated_committing_thread(&self) -> bool;
 }
 
 pub mod default;

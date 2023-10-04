@@ -496,154 +496,6 @@ where
         }
     }
 
-    // fn work_task_with_scope_commit_only(
-    //     &self,
-    //     txn_provider: &TP,
-    //     last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-    //     versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
-    //     scheduler: &Scheduler<TP>,
-    //     base_view: &S,
-    // ) {
-    //     let mut accumulated_fee_statement = FeeStatement::zero();
-    //     let mut txn_fee_statements = Vec::with_capacity(txn_provider.num_txns());
-    //     let mut shutdown = false;
-    //     hint::spin_loop();
-    //
-    //     while !shutdown {
-    //         while let Some(txn_idx) = scheduler.try_commit() {
-    //             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
-    //                 // For committed txns with Success status, calculate the accumulated gas costs.
-    //                 accumulated_fee_statement.add_fee_statement(&fee_statement);
-    //                 txn_fee_statements.push(fee_statement);
-    //
-    //                 if let Some(&per_block_gas_limit) = self.maybe_block_gas_limit.as_ref() {
-    //                     // When the accumulated execution and io gas of the committed txns exceeds
-    //                     // PER_BLOCK_GAS_LIMIT, early halt BlockSTM. Storage gas does not count towards
-    //                     // the per block gas limit, as we measure execution related cost here.
-    //                     let accumulated_non_storage_gas = accumulated_fee_statement
-    //                         .execution_gas_used()
-    //                         + accumulated_fee_statement.io_gas_used();
-    //                     if accumulated_non_storage_gas >= per_block_gas_limit {
-    //                         counters::EXCEED_PER_BLOCK_GAS_LIMIT_COUNT
-    //                             .with_label_values(&[counters::Mode::PARALLEL])
-    //                             .inc();
-    //                         info!(
-    //                             "[BlockSTM]: Parallel execution early halted due to \
-    //                          accumulated_non_storage_gas {} >= PER_BLOCK_GAS_LIMIT {}",
-    //                             accumulated_non_storage_gas, per_block_gas_limit,
-    //                         );
-    //
-    //                         // Set the execution output status to be SkipRest, to skip the rest of the txns.
-    //                         last_input_output.update_to_skip_rest(txn_idx);
-    //                     }
-    //                 }
-    //             }
-    //             self.worker_commit_hook(
-    //                 txn_idx,
-    //                 versioned_cache,
-    //                 last_input_output,
-    //                 base_view,
-    //                 txn_provider,
-    //             );
-    //
-    //             // Committed the last transaction, BlockSTM finishes execution.
-    //             if scheduler.next_txn(txn_idx) == txn_provider.end_txn_idx()
-    //                 || last_input_output.block_truncated_at_idx(txn_idx)
-    //             {
-    //                 // Either all txn committed, or a committed txn caused an early halt.
-    //                 scheduler.halt();
-    //
-    //                 counters::update_parallel_block_gas_counters(
-    //                     &accumulated_fee_statement,
-    //                     txn_provider.local_index(txn_idx) + 1,
-    //                 );
-    //                 counters::update_parallel_txn_gas_counters(&txn_fee_statements);
-    //
-    //                 let accumulated_non_storage_gas = accumulated_fee_statement
-    //                     .execution_gas_used()
-    //                     + accumulated_fee_statement.io_gas_used();
-    //                 info!(
-    //                     "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. accumulated_non_storage_gas = {}, limit = {:?}",
-    //                     txn_provider.local_index(txn_idx) + 1,
-    //                     txn_provider.num_txns(),
-    //                     accumulated_non_storage_gas,
-    //                     self.maybe_block_gas_limit,
-    //                 );
-    //                 shutdown = true;
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     txn_provider.shutdown_receiver();
-    // }
-
-    // fn work_task_with_scope_v3_scheduler_tasks_only(
-    //     &self,
-    //     executor_arguments: &E::Argument,
-    //     txn_provider: &TP,
-    //     last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-    //     versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X>,
-    //     scheduler: &Scheduler<TP>,
-    //     // TODO: should not need to pass base view.
-    //     base_view: &S,
-    //     shared_counter: &AtomicU32,
-    //     shared_commit_state: &ExplicitSyncWrapper<(
-    //         FeeStatement,
-    //         Vec<FeeStatement>,
-    //         Option<Error<E::Error>>,
-    //     )>,
-    //     final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    // ) {
-    //     // Make executor for each task. TODO: fast concurrent executor.
-    //     let init_timer = VM_INIT_SECONDS.start_timer();
-    //     let executor = E::init(*executor_arguments);
-    //     drop(init_timer);
-    //
-    //     let _timer = WORK_WITH_TASK_SECONDS.start_timer();
-    //     let mut scheduler_task = SchedulerTask::NoTask;
-    //
-    //     loop {
-    //         scheduler_task = match scheduler_task {
-    //             SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => Self::validate(
-    //                 txn_idx,
-    //                 incarnation,
-    //                 wave,
-    //                 last_input_output,
-    //                 versioned_cache,
-    //                 scheduler,
-    //             ),
-    //             SchedulerTask::ExecutionTask(
-    //                 txn_idx,
-    //                 incarnation,
-    //                 ExecutionTaskType::Execution,
-    //             ) => Self::execute(
-    //                 txn_idx,
-    //                 incarnation,
-    //                 txn_provider,
-    //                 last_input_output,
-    //                 versioned_cache,
-    //                 scheduler,
-    //                 &executor,
-    //                 base_view,
-    //                 ParallelState::new(versioned_cache, scheduler, shared_counter),
-    //             ),
-    //             SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
-    //                 let (lock, cvar) = &*condvar;
-    //                 // Mark dependency resolved.
-    //                 *lock.lock() = DependencyStatus::Resolved;
-    //                 // Wake up the process waiting for dependency.
-    //                 cvar.notify_one();
-    //
-    //                 SchedulerTask::NoTask
-    //             },
-    //             SchedulerTask::NoTask => scheduler.next_task(false),
-    //             SchedulerTask::Done => {
-    //                 break;
-    //             },
-    //         }
-    //     }
-    // }
-
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
@@ -655,11 +507,7 @@ where
         // will only have a coordinator role but no workers for rolling commit.
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
-        if txn_provider.use_dedicated_committing_thread() {
-            assert!(self.concurrency_level >= 3, "Need at least 3 threads: 1 for message handling, 1 for committing, 1+ for scheduler tasks.");
-        } else {
-            assert!(self.concurrency_level > 1, "Must use sequential execution");
-        }
+        assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
         for (global_txn_idx, key) in txn_provider.remote_dependencies() {
@@ -694,49 +542,31 @@ where
         }
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let num_active_workers = AtomicUsize::new(self.concurrency_level - 1);
+        let num_active_workers = AtomicUsize::new(self.concurrency_level);
 
         self.executor_thread_pool.scope(|s| {
-            if txn_provider.use_dedicated_committing_thread() {
+            s.spawn(|_| {
+                txn_provider
+                    .as_ref()
+                    .run_sharding_msg_loop(&versioned_cache, &scheduler);
+            });
+            for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
-                    txn_provider
-                        .as_ref()
-                        .run_sharding_msg_loop(&versioned_cache, &scheduler);
+                    self.worker_loop(
+                        &executor_initial_arguments,
+                        txn_provider.as_ref(),
+                        &last_input_output,
+                        &versioned_cache,
+                        &scheduler,
+                        base_view,
+                        &shared_counter,
+                        &shared_commit_state,
+                        &final_results,
+                    );
+                    if num_active_workers.fetch_sub(1, Ordering::SeqCst) == 1 {
+                        txn_provider.shutdown_receiver();
+                    }
                 });
-                for _ in 1..self.concurrency_level {
-                    s.spawn(|_| {
-                        self.worker_loop(
-                            &executor_initial_arguments,
-                            txn_provider.as_ref(),
-                            &last_input_output,
-                            &versioned_cache,
-                            &scheduler,
-                            base_view,
-                            &shared_counter,
-                            &shared_commit_state,
-                            &final_results,
-                        );
-                        if num_active_workers.fetch_sub(1, Ordering::SeqCst) == 1 {
-                            txn_provider.shutdown_receiver();
-                        }
-                    });
-                }
-            } else {
-                for _ in 0..self.concurrency_level {
-                    s.spawn(|_| {
-                        self.worker_loop(
-                            &executor_initial_arguments,
-                            txn_provider.as_ref(),
-                            &last_input_output,
-                            &versioned_cache,
-                            &scheduler,
-                            base_view,
-                            &shared_counter,
-                            &shared_commit_state,
-                            &final_results,
-                        );
-                    });
-                }
             }
         });
         drop(timer);

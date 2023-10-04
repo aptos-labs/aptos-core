@@ -276,10 +276,6 @@ where
             );
         }
     }
-
-    fn use_dedicated_committing_thread(&self) -> bool {
-        true
-    }
 }
 
 #[derive(Clone)]
