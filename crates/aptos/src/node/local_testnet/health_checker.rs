@@ -10,8 +10,8 @@ use serde::Serialize;
 use std::time::Duration;
 use tokio::time::Instant;
 
-const MAX_WAIT_S: u64 = 35;
-const WAIT_INTERVAL_MS: u64 = 150;
+const MAX_WAIT_S: u64 = 60;
+const WAIT_INTERVAL_MS: u64 = 200;
 
 /// This provides a single place to define a variety of different healthchecks.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
