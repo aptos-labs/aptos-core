@@ -159,12 +159,6 @@ impl From<Transaction> for AnalyzedTransaction {
     }
 }
 
-impl From<AnalyzedTransaction> for Transaction {
-    fn from(val: AnalyzedTransaction) -> Self {
-        val.transaction.into_inner()
-    }
-}
-
 pub fn account_resource_location(address: AccountAddress) -> StorageLocation {
     StorageLocation::Specific(StateKey::access_path(AccessPath::new(
         address,
