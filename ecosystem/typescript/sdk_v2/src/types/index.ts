@@ -790,6 +790,8 @@ export type AuthenticationKeyScheme = SigningScheme | DeriveScheme;
 
 /**
  * A list of signing schemes that are supported by Aptos.
+ *
+ * https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L375-L378
  */
 export enum SigningScheme {
   /**

@@ -66,7 +66,7 @@ export class Account {
       // Secp256k1
       this.signingScheme = SigningScheme.Secp256k1Ecdsa;
     } else {
-      throw new Error("Unsupported public key type");
+      throw new Error("Can not create new Account, unsupported public key type");
     }
 
     this.privateKey = privateKey;
@@ -76,19 +76,22 @@ export class Account {
   /**
    * Derives an account with random private key and address
    *
-   * @param args.scheme AuthenticationKeyScheme - type of Authentication Key schemes
+   * @param args.scheme SigningScheme - type of SigningScheme to use.
+   * Currently only Ed25519, MultiEd25519, and Secp256k1 are supported
+   *
    * @returns Account
    */
   static generate(args: { scheme: SigningScheme }): Account {
+    const { scheme } = args;
     let privateKey: PrivateKey;
 
-    if (args.scheme === SigningScheme.Ed25519) {
+    if (scheme === SigningScheme.Ed25519) {
       privateKey = Ed25519PrivateKey.generate();
-    } else if (args.scheme === SigningScheme.Secp256k1Ecdsa) {
+    } else if (scheme === SigningScheme.Secp256k1Ecdsa) {
       privateKey = Secp256k1PrivateKey.generate();
     } else {
       // TODO: Add support for MultiEd25519
-      throw new Error("Unsupported signing scheme");
+      throw new Error(`Can not generate new Private Key, unsupported signing scheme ${scheme}`);
     }
 
     const address = new AccountAddress({ data: Account.authKey({ publicKey: privateKey.publicKey() }).toUint8Array() });
