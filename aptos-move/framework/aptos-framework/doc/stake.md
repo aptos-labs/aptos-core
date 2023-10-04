@@ -1024,6 +1024,7 @@ at the end of the epoch.
 ## Resource `ValidatorSetChangeDisabled`
 
 A flag indicating that validator set changes should be rejected, if present under the system account.
+Will be set when DKG starts and unset when DKG terminates.
 
 
 <pre><code><b>struct</b> <a href="stake.md#0x1_stake_ValidatorSetChangeDisabled">ValidatorSetChangeDisabled</a> <b>has</b> drop, key
@@ -1327,10 +1328,10 @@ Validator Config not published.
 
 <a name="0x1_stake_EVALIDATOR_SET_CHANGES_DISABLED"></a>
 
-TBD
+User-level validator set change temporarily disabled.
 
 
-<pre><code><b>const</b> <a href="stake.md#0x1_stake_EVALIDATOR_SET_CHANGES_DISABLED">EVALIDATOR_SET_CHANGES_DISABLED</a>: u64 = 19;
+<pre><code><b>const</b> <a href="stake.md#0x1_stake_EVALIDATOR_SET_CHANGES_DISABLED">EVALIDATOR_SET_CHANGES_DISABLED</a>: u64 = 20;
 </code></pre>
 
 
@@ -1964,6 +1965,9 @@ Beyond genesis, no one can create AptosCoin mint/burn capabilities.
 ## Function `remove_validators`
 
 Allow on chain governance to remove validators from the validator set.
+
+This is a system-level validator set change, therefore not affected by user-level locking.
+Caller should ensure a fast reconfiguration is triggered after this.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_remove_validators">remove_validators</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, validators: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;)
@@ -3839,6 +3843,59 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
+
+<a name="0x1_stake_spec_get_reward_rate_1"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_1">spec_get_reward_rate_1</a>(config: StakingConfig): num {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
+       <b>let</b> epoch_rewards_rate = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+       <b>if</b> (epoch_rewards_rate.value == 0) {
+           0
+       } <b>else</b> {
+           <b>let</b> denominator_0 = aptos_std::fixed_point64::spec_divide_u128(<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate);
+           <b>let</b> denominator = <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
+               <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
+           } <b>else</b> {
+               denominator_0
+           };
+           <b>let</b> nominator = aptos_std::fixed_point64::spec_multiply_u128(denominator, epoch_rewards_rate);
+           nominator
+       }
+   } <b>else</b> {
+           config.rewards_rate
+   }
+}
+</code></pre>
+
+
+
+
+<a name="0x1_stake_spec_get_reward_rate_2"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_2">spec_get_reward_rate_2</a>(config: StakingConfig): num {
+   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
+       <b>let</b> epoch_rewards_rate = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
+       <b>if</b> (epoch_rewards_rate.value == 0) {
+           1
+       } <b>else</b> {
+           <b>let</b> denominator_0 = aptos_std::fixed_point64::spec_divide_u128(<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate);
+           <b>let</b> denominator = <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
+               <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
+           } <b>else</b> {
+               denominator_0
+           };
+           denominator
+       }
+   } <b>else</b> {
+           config.rewards_rate_denominator
+   }
+}
+</code></pre>
+
+
+
 <a name="@Specification_1_initialize_validator_fees"></a>
 
 ### Function `initialize_validator_fees`
@@ -4684,76 +4741,6 @@ Returns validator's next epoch voting power, including pending_active, active, a
    !<a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validator_set.pending_active, pool_address)
        && (<a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validator_set.active_validators, pool_address)
        || <a href="stake.md#0x1_stake_spec_contains">spec_contains</a>(validator_set.pending_inactive, pool_address))
-}
-</code></pre>
-
-
-
-
-<a name="0x1_stake_ResourceRequirement"></a>
-
-
-<pre><code><b>schema</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a> {
-    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;StakingConfig&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;StakingRewardsConfig&gt;(@aptos_framework) || !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>();
-    <b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
-    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>&gt;(@aptos_framework);
-}
-</code></pre>
-
-
-
-
-<a name="0x1_stake_spec_get_reward_rate_1"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_1">spec_get_reward_rate_1</a>(config: StakingConfig): num {
-   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
-       <b>let</b> epoch_rewards_rate = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
-       <b>if</b> (epoch_rewards_rate.value == 0) {
-           0
-       } <b>else</b> {
-           <b>let</b> denominator_0 = aptos_std::fixed_point64::spec_divide_u128(<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate);
-           <b>let</b> denominator = <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
-               <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
-           } <b>else</b> {
-               denominator_0
-           };
-           <b>let</b> nominator = aptos_std::fixed_point64::spec_multiply_u128(denominator, epoch_rewards_rate);
-           nominator
-       }
-   } <b>else</b> {
-           config.rewards_rate
-   }
-}
-</code></pre>
-
-
-
-
-<a name="0x1_stake_spec_get_reward_rate_2"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_get_reward_rate_2">spec_get_reward_rate_2</a>(config: StakingConfig): num {
-   <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>()) {
-       <b>let</b> epoch_rewards_rate = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework).rewards_rate;
-       <b>if</b> (epoch_rewards_rate.value == 0) {
-           1
-       } <b>else</b> {
-           <b>let</b> denominator_0 = aptos_std::fixed_point64::spec_divide_u128(<a href="staking_config.md#0x1_staking_config_MAX_REWARDS_RATE">staking_config::MAX_REWARDS_RATE</a>, epoch_rewards_rate);
-           <b>let</b> denominator = <b>if</b> (denominator_0 &gt; <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>) {
-               <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>
-           } <b>else</b> {
-               denominator_0
-           };
-           denominator
-       }
-   } <b>else</b> {
-           config.rewards_rate_denominator
-   }
 }
 </code></pre>
 

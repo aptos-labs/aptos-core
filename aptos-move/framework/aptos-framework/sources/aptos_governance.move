@@ -539,7 +539,7 @@ module aptos_framework::aptos_governance {
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration::reconfigure();
+        reconfiguration::start_slow_reconfigure();
     }
 
     /// Update feature flags and also trigger reconfiguration.

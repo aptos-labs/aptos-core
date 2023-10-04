@@ -771,7 +771,7 @@ encoded in a single BCS byte array.
         validator.consensus_pubkey,
         validator.proof_of_possession,
     );
-    <a href="stake.md#0x1_stake_update_network_and_fullnode_addresses">stake::update_network_and_fullnode_addresses</a>(
+    <a href="stake.md#0x1_stake_force_update_network_and_fullnode_addresses">stake::force_update_network_and_fullnode_addresses</a>(
         operator,
         pool_address,
         validator.network_addresses,

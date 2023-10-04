@@ -11,12 +11,12 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::consensus_config;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
-    friend aptos_framework::consensus_config;
     friend aptos_framework::execution_config;
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
@@ -53,6 +53,10 @@ module aptos_framework::reconfiguration {
     const EINVALID_BLOCK_TIME: u64 = 4;
     /// An invalid block time was encountered.
     const EINVALID_GUID_FOR_EVENT: u64 = 5;
+    /// Another reconfiguration is in progress.
+    const EANOTHER_RECONFIGURATION_IN_PROGRESS: u64 = 6;
+    /// There is no reconfiguration in progress.
+    const ENO_RECONFIGURATION_IN_PROGRESS: u64 = 6;
 
     /// Only called during genesis.
     /// Publishes `Configuration` resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
@@ -135,6 +139,8 @@ module aptos_framework::reconfiguration {
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
         storage_gas::on_reconfig();
+        consensus_config::on_new_epoch();
+        // TODO: complete the list.
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
@@ -149,6 +155,35 @@ module aptos_framework::reconfiguration {
                 epoch: config_ref.epoch,
             },
         );
+    }
+
+    /// This, if present under the system account, indicates that a slow reconfiguration is in progress.
+    struct InProgressSlowReconfigureStatus has drop, key {
+        deadline: u64,
+    }
+
+    public(friend) fun slow_reconfigure_in_progress(): bool {
+        exists<InProgressSlowReconfigureStatus>(@aptos_framework)
+    }
+
+    public(friend) fun current_slow_reconfigure_deadline(): u64 acquires InProgressSlowReconfigureStatus {
+        borrow_global<InProgressSlowReconfigureStatus>(@aptos_framework).deadline
+    }
+
+    public(friend) fun start_slow_reconfigure() {
+        assert!(!slow_reconfigure_in_progress(), error::invalid_state(EANOTHER_RECONFIGURATION_IN_PROGRESS));
+        //TODO: start DKG.
+    }
+
+    public(friend) fun update_slow_reconfigure(params: vector<u8>) {
+        assert!(slow_reconfigure_in_progress(), error::invalid_state(ENO_RECONFIGURATION_IN_PROGRESS));
+        std::debug::print(&params) //TODO: consume `params`
+    }
+
+    public(friend) fun terminate_slow_reconfigure() acquires Configuration, InProgressSlowReconfigureStatus {
+        assert!(slow_reconfigure_in_progress(), error::invalid_state(ENO_RECONFIGURATION_IN_PROGRESS));
+        move_from<InProgressSlowReconfigureStatus>(@aptos_framework);
+        reconfigure()
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

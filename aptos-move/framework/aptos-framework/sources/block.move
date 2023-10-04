@@ -156,6 +156,74 @@ module aptos_framework::block {
         };
     }
 
+
+    /// Set the metadata for the current block.
+    /// The runtime always runs this before executing the transactions in a block.
+    fun block_prologue_v2(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        slow_reconfigure_params: vector<u8>,
+    ) acquires BlockResource {
+        // Operational constraint: can only be invoked by the VM.
+        system_addresses::assert_vm(&vm);
+
+        // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
+        assert!(
+            proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
+            error::permission_denied(EINVALID_PROPOSER),
+        );
+
+        let proposer_index = option::none();
+        if (proposer != @vm_reserved) {
+            proposer_index = option::some(stake::get_validator_index(proposer));
+        };
+
+        let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
+        block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
+
+        let new_block_event = NewBlockEvent {
+            hash,
+            epoch,
+            round,
+            height: block_metadata_ref.height,
+            previous_block_votes_bitvec,
+            proposer,
+            failed_proposer_indices,
+            time_microseconds: timestamp,
+        };
+        emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
+
+        if (features::collect_and_distribute_gas_fees()) {
+            // Assign the fees collected from the previous block to the previous block proposer.
+            // If for any reason the fees cannot be assigned, this function burns the collected coins.
+            transaction_fee::process_collected_fees();
+            // Set the proposer of this block as the receiver of the fees, so that the fees for this
+            // block are assigned to the right account.
+            transaction_fee::register_proposer_for_fee_collection(proposer);
+        };
+
+        // Performance scores have to be updated before the epoch transition as the transaction that triggers the
+        // transition is the last block in the previous epoch.
+        stake::update_performance_statistics(proposer_index, failed_proposer_indices);
+        state_storage::on_new_block(reconfiguration::current_epoch());
+
+        if (reconfiguration::slow_reconfigure_in_progress()) {
+            if (timestamp >= reconfiguration::current_slow_reconfigure_deadline()) {
+                reconfiguration::terminate_slow_reconfigure();
+            } else {
+                reconfiguration::update_slow_reconfigure(slow_reconfigure_params);
+            }
+        } else if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
+            reconfiguration::start_slow_reconfigure();
+        };
+    }
+
     #[view]
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockResource {
