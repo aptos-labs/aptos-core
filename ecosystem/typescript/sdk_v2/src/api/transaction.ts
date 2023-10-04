@@ -104,7 +104,7 @@ export class Transaction {
    */
   async waitForTransaction(args: {
     txnHash: string;
-    extraArgs: { timeoutSecs?: number; checkSuccess?: boolean };
+    extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean };
   }): Promise<TransactionResponse> {
     const transaction = await waitForTransaction({ aptosConfig: this.config, ...args });
     return transaction;
