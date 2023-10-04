@@ -5,7 +5,6 @@ import {
   TypeTagAddress,
   TypeTagBool,
   TypeTagParser,
-  TypeTagParserError,
   TypeTagSigner,
   TypeTagStruct,
   TypeTagU128,
@@ -52,6 +51,11 @@ describe("StructTag", () => {
       expect(nestedTypeTag.value.name.identifier).toEqual(expectedTypeTag.name);
       expect(nestedTypeTag.value.type_args.length).toEqual(0);
     }
+  });
+
+  test("correctly validates String type tag", () => {
+    const structTag = new TypeTagStruct(StructTag.fromString("0x1::string::String"));
+    expect(new TypeTagParser("0x1::string::String").parseTypeTag().bcsToBytes()).toEqual(structTag.bcsToBytes());
   });
 });
 
@@ -142,7 +146,7 @@ describe("TypeTagParser", () => {
       }
     });
 
-    test("TypeTagParser successfully parses a strcut with a nested Object type", () => {
+    test("TypeTagParser successfully parses a struct with a nested Object type", () => {
       const typeTag = "0x1::some_module::SomeResource<0x1::object::Object<T>>";
       const parser = new TypeTagParser(typeTag);
       const result = parser.parseTypeTag() as TypeTagStruct;

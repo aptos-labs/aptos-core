@@ -163,25 +163,41 @@ export class TypeTagStruct extends TypeTag {
     return new TypeTagStruct(value);
   }
 
+  /**
+   * This function checks if the TypeTagStruct is a Move String TypeTag.
+   * In Move, a string is represented as the String struct from string.move, deployed at `0x1`,
+   * meaning it has the following properties:
+   * - address: 0x1
+   * - module_name: "string"
+   * - name: "String"
+   *
+   * @returns true if the StructTag is a String type tag, false otherwise
+   */
   isStringTypeTag(): boolean {
-    if (
+    return (
       this.value.module_name.identifier === "string" &&
       this.value.name.identifier === "String" &&
       this.value.address.toString() === AccountAddress.ONE.toString()
-    ) {
-      return true;
-    }
-    return false;
+    );
   }
 }
 
-export class StructTag {
-  constructor(
-    public readonly address: AccountAddress,
-    public readonly module_name: Identifier,
-    public readonly name: Identifier,
-    public readonly type_args: Array<TypeTag>,
-  ) {}
+export class StructTag extends Serializable {
+  public readonly address: AccountAddress;
+
+  public readonly module_name: Identifier;
+
+  public readonly name: Identifier;
+
+  public readonly type_args: Array<TypeTag>;
+
+  constructor(address: AccountAddress, module_name: Identifier, name: Identifier, type_args: Array<TypeTag>) {
+    super();
+    this.address = address;
+    this.module_name = module_name;
+    this.name = name;
+    this.type_args = type_args;
+  }
 
   /**
    * Converts a string literal to a StructTag
@@ -219,28 +235,18 @@ export class StructTag {
 }
 
 export const stringStructTag = new StructTag(
-  AccountAddress.fromHexInput({ input: "0x1" }),
+  AccountAddress.ONE,
   new Identifier("string"),
   new Identifier("String"),
   [],
 );
 
 export function optionStructTag(typeArg: TypeTag): StructTag {
-  return new StructTag(
-    AccountAddress.fromHexInput({ input: "0x1" }),
-    new Identifier("option"),
-    new Identifier("Option"),
-    [typeArg],
-  );
+  return new StructTag(AccountAddress.ONE, new Identifier("option"), new Identifier("Option"), [typeArg]);
 }
 
 export function objectStructTag(typeArg: TypeTag): StructTag {
-  return new StructTag(
-    AccountAddress.fromHexInput({ input: "0x1" }),
-    new Identifier("object"),
-    new Identifier("Object"),
-    [typeArg],
-  );
+  return new StructTag(AccountAddress.ONE, new Identifier("object"), new Identifier("Object"), [typeArg]);
 }
 
 function bail(message: string) {
