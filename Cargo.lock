@@ -263,6 +263,7 @@ dependencies = [
  "hex",
  "itertools",
  "jemallocator",
+ "maplit",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-cli",
@@ -292,6 +293,7 @@ dependencies = [
  "tokio",
  "toml 0.7.4",
  "tonic 0.10.0",
+ "tracing",
  "tracing-subscriber",
  "walkdir",
 ]
@@ -1296,6 +1298,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2998,6 +3001,7 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule-updator",
  "aptos-genesis",
+ "aptos-keygen",
  "aptos-rest-client",
  "aptos-temppath",
  "aptos-types",
@@ -3268,12 +3272,16 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-protos",
  "aptos-retrier",
  "bcs 0.1.4",
  "crossbeam-channel",
  "once_cell",
  "serde",
  "thiserror",
+ "tokio",
+ "tonic 0.10.0",
+ "tonic-reflection",
 ]
 
 [[package]]

@@ -72,7 +72,7 @@ export class Ed25519PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): PublicKey {
+  static deserialize(deserializer: Deserializer): Ed25519PublicKey {
     const bytes = deserializer.deserializeBytes();
     return new Ed25519PublicKey({ hexInput: bytes });
   }

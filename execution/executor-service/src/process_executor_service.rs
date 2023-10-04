@@ -7,7 +7,7 @@ use std::net::SocketAddr;
 
 /// An implementation of the remote executor service that runs in a standalone process.
 pub struct ProcessExecutorService {
-    _executor_service: ExecutorService,
+    executor_service: ExecutorService,
 }
 
 impl ProcessExecutorService {
@@ -32,8 +32,10 @@ impl ProcessExecutorService {
             remote_shard_addresses,
         );
         executor_service.start();
-        Self {
-            _executor_service: executor_service,
-        }
+        Self { executor_service }
+    }
+
+    pub fn shutdown(&mut self) {
+        self.executor_service.shutdown()
     }
 }

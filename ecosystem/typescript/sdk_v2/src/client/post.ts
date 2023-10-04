@@ -43,7 +43,7 @@ export type PostRequestOptions = {
   overrides?: ClientConfig;
 };
 
-export type PostAptosFullNodeRequestOptions = Omit<PostRequestOptions, "type">;
+export type PostAptosRequestOptions = Omit<PostRequestOptions, "type">;
 
 /**
  * Main function to do a Post request
@@ -76,7 +76,19 @@ export async function post<Req, Res>(options: PostRequestOptions): Promise<Aptos
 }
 
 export async function postAptosFullNode<Req, Res>(
-  options: PostAptosFullNodeRequestOptions,
+  options: PostAptosRequestOptions,
 ): Promise<AptosResponse<Req, Res>> {
   return post<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
+}
+
+export async function postAptosIndexer<Req, Res>(
+  options: PostAptosRequestOptions,
+): Promise<AptosResponse<Req, Res>> {
+  return post<Req, Res>({ ...options, type: AptosApiType.INDEXER });
+}
+
+export async function postAptosFaucet<Req, Res>(
+  options: PostAptosRequestOptions,
+): Promise<AptosResponse<Req, Res>> {
+  return post<Req, Res>({ ...options, type: AptosApiType.FAUCET });
 }
