@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext};
-use aptos_aggregator::{aggregator_extension::extension_error, types::AggregatorVersionedID};
+use aptos_aggregator::{delayed_field_extension::extension_error, types::AggregatorVersionedID};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{

@@ -9,7 +9,7 @@ use crate::{
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange, delta_change_set::DeltaOp, types::AggregatorID,
+    delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
@@ -24,14 +24,14 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
-        TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockExecutableTransaction,
+        TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
+use move_core_types::{value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{collections::HashMap, sync::Arc};
@@ -128,13 +128,13 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v2_change_set(&self) -> HashMap<AggregatorID, AggregatorChange<AggregatorID>> {
+    fn delayed_field_change_set(&self) -> HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get aggregator change set")
             .change_set()
-            .aggregator_v2_change_set()
+            .delayed_field_change_set()
             .clone()
     }
 
@@ -169,12 +169,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     fn incorporate_materialized_txn_output(
         &self,
-        aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutorTransaction>::Key, WriteOp)>,
+        aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
         patched_resource_write_set: HashMap<
-            <Self::Txn as BlockExecutorTransaction>::Key,
-            <Self::Txn as BlockExecutorTransaction>::Value,
+            <Self::Txn as BlockExecutableTransaction>::Key,
+            <Self::Txn as BlockExecutableTransaction>::Value,
         >,
-        patched_events: Vec<<Self::Txn as BlockExecutorTransaction>::Event>,
+        patched_events: Vec<<Self::Txn as BlockExecutableTransaction>::Event>,
     ) {
         assert!(
             self.committed_output

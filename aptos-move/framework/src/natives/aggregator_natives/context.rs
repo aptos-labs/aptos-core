@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_change_set::{AggregatorApplyChange, AggregatorChange},
-    aggregator_extension::{AggregatorData, AggregatorSnapshotState, AggregatorState},
+    delayed_change::{DelayedApplyChange, DelayedChange},
+    delayed_field_extension::{AggregatorData, AggregatorSnapshotState, AggregatorState},
     delta_change_set::DeltaOp,
     delta_math::DeltaHistory,
-    resolver::AggregatorResolver,
-    types::{AggregatorID, AggregatorValue, AggregatorVersionedID, SnapshotValue},
+    resolver::DelayedFieldResolver,
+    types::{AggregatorVersionedID, DelayedFieldID, DelayedFieldValue, SnapshotValue},
 };
 use aptos_types::state_store::state_key::StateKey;
 use better_any::{Tid, TidAble};
@@ -29,7 +29,7 @@ pub enum AggregatorChangeV1 {
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: HashMap<StateKey, AggregatorChangeV1>,
-    pub aggregator_v2_changes: HashMap<AggregatorID, AggregatorChange<AggregatorID>>,
+    pub delayed_field_changes: HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -38,14 +38,14 @@ pub struct AggregatorChangeSet {
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
-    pub(crate) resolver: &'a dyn AggregatorResolver,
+    pub(crate) resolver: &'a dyn DelayedFieldResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn AggregatorResolver) -> Self {
+    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn DelayedFieldResolver) -> Self {
         Self {
             txn_hash,
             resolver,
@@ -68,7 +68,7 @@ impl<'a> NativeAggregatorContext<'a> {
             aggregator_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
-        let mut aggregator_v2_changes = HashMap::new();
+        let mut delayed_field_changes = HashMap::new();
 
         // First process all snapshots (they need access to aggregators)
         for (id, snapshot) in snapshots {
@@ -76,10 +76,10 @@ impl<'a> NativeAggregatorContext<'a> {
             let change = match state {
                 AggregatorSnapshotState::Create {
                     value: SnapshotValue::Integer(value),
-                } => Some(AggregatorChange::Create(AggregatorValue::Snapshot(value))),
+                } => Some(DelayedChange::Create(DelayedFieldValue::Snapshot(value))),
                 AggregatorSnapshotState::Create {
                     value: SnapshotValue::String(value),
-                } => Some(AggregatorChange::Create(AggregatorValue::Derived(value))),
+                } => Some(DelayedChange::Create(DelayedFieldValue::Derived(value))),
                 AggregatorSnapshotState::Delta {
                     base_aggregator,
                     delta,
@@ -91,27 +91,23 @@ impl<'a> NativeAggregatorContext<'a> {
                             AggregatorState::Delta { history, .. } => DeltaOp::new(delta, v.max_value, history),
                         }
                     );
-                    Some(AggregatorChange::Apply(
-                        AggregatorApplyChange::SnapshotDelta {
-                            base_aggregator,
-                            delta: delta_op,
-                        },
-                    ))
+                    Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
+                        base_aggregator,
+                        delta: delta_op,
+                    }))
                 },
                 AggregatorSnapshotState::Derived {
                     base_snapshot,
                     formula,
-                } => Some(AggregatorChange::Apply(
-                    AggregatorApplyChange::SnapshotDerived {
-                        base_snapshot,
-                        formula,
-                    },
-                )),
+                } => Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
+                    base_snapshot,
+                    formula,
+                })),
                 // Not a write
                 AggregatorSnapshotState::Reference { .. } => None,
             };
             if let Some(change) = change {
-                aggregator_v2_changes.insert(id, change);
+                delayed_field_changes.insert(id, change);
             }
         }
 
@@ -132,23 +128,21 @@ impl<'a> NativeAggregatorContext<'a> {
                 AggregatorVersionedID::V2(id) => {
                     let change = match state {
                         AggregatorState::Create { value } => {
-                            Some(AggregatorChange::Create(AggregatorValue::Aggregator(value)))
+                            Some(DelayedChange::Create(DelayedFieldValue::Aggregator(value)))
                         },
                         AggregatorState::Delta { delta, history, .. } => {
                             if delta.is_zero() && history.is_empty() {
                                 // not a write
                                 None
                             } else {
-                                Some(AggregatorChange::Apply(
-                                    AggregatorApplyChange::AggregatorDelta {
-                                        delta: DeltaOp::new(delta, max_value, history),
-                                    },
-                                ))
+                                Some(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
+                                    delta: DeltaOp::new(delta, max_value, history),
+                                }))
                             }
                         },
                     };
                     if let Some(change) = change {
-                        aggregator_v2_changes.insert(id, change);
+                        delayed_field_changes.insert(id, change);
                     }
                 },
             }
@@ -161,7 +155,7 @@ impl<'a> NativeAggregatorContext<'a> {
 
         AggregatorChangeSet {
             aggregator_v1_changes,
-            aggregator_v2_changes,
+            delayed_field_changes,
         }
     }
 }
@@ -180,8 +174,8 @@ mod test {
         state_view.set_from_state_key(aggregator_v1_state_key_for_test(500), 150);
         state_view.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
         state_view.set_from_state_key(aggregator_v1_state_key_for_test(700), 200);
-        state_view.set_from_aggregator_id(AggregatorID::new(900), 300);
-        state_view.set_from_aggregator_id(AggregatorID::new(1000), 400);
+        state_view.set_from_aggregator_id(DelayedFieldID::new(900), 300);
+        state_view.set_from_aggregator_id(DelayedFieldID::new(1000), 400);
         state_view
     }
 
@@ -297,8 +291,8 @@ mod test {
 
     fn get_test_resolver_v2() -> FakeAggregatorView {
         let mut state_view = FakeAggregatorView::default();
-        state_view.set_from_aggregator_id(AggregatorID::new(900), 300);
-        state_view.set_from_aggregator_id(AggregatorID::new(1000), 400);
+        state_view.set_from_aggregator_id(DelayedFieldID::new(900), 300);
+        state_view.set_from_aggregator_id(DelayedFieldID::new(1000), 400);
         state_view
     }
 
@@ -336,12 +330,12 @@ mod test {
 
         // failed because of wrong max_value
         assert!(aggregator_data
-            .snapshot(AggregatorID::new(900), 800, context.resolver)
+            .snapshot(DelayedFieldID::new(900), 800, context.resolver)
             .is_err());
 
         assert_ok_eq!(
-            aggregator_data.snapshot(AggregatorID::new(900), 900, context.resolver),
-            AggregatorID::new(1)
+            aggregator_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
+            DelayedFieldID::new(1)
         );
 
         assert_ok_eq!(
@@ -353,8 +347,8 @@ mod test {
         );
 
         assert_ok_eq!(
-            aggregator_data.snapshot(AggregatorID::new(900), 900, context.resolver),
-            AggregatorID::new(2)
+            aggregator_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
+            DelayedFieldID::new(2)
         );
 
         assert_ok_eq!(
@@ -383,18 +377,18 @@ mod test {
         );
 
         assert_ok_eq!(
-            aggregator_data.snapshot(AggregatorID::new(2000), 2000, context.resolver),
-            AggregatorID::new(3)
+            aggregator_data.snapshot(DelayedFieldID::new(2000), 2000, context.resolver),
+            DelayedFieldID::new(3)
         );
 
         assert_eq!(
             aggregator_data.string_concat(
-                AggregatorID::new(2200),
+                DelayedFieldID::new(2200),
                 "prefix".as_bytes().to_vec(),
                 "suffix".as_bytes().to_vec(),
                 context.resolver,
             ),
-            AggregatorID::new(4)
+            DelayedFieldID::new(4)
         );
 
         assert_ok_eq!(
@@ -419,13 +413,13 @@ mod test {
         let context = NativeAggregatorContext::new([0; 32], &resolver);
         test_set_up_v2(&context);
         let AggregatorChangeSet {
-            aggregator_v2_changes,
+            delayed_field_changes,
             ..
         } = context.into_change_set();
-        assert!(!aggregator_v2_changes.contains_key(&AggregatorID::new(1000)));
+        assert!(!delayed_field_changes.contains_key(&DelayedFieldID::new(1000)));
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::new(900)),
-            &AggregatorChange::Apply(AggregatorApplyChange::AggregatorDelta {
+            delayed_field_changes.get(&DelayedFieldID::new(900)),
+            &DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
                 delta: DeltaOp::new(SignedU128::Positive(600), 900, DeltaHistory {
                     max_achieved_positive_delta: 600,
                     min_achieved_negative_delta: 0,
@@ -438,9 +432,9 @@ mod test {
         // So their validation validates full transaction, and it is not
         // needed to check aggregators too (i.e. when we do read_snapshot)
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::new(1)),
-            &AggregatorChange::Apply(AggregatorApplyChange::SnapshotDelta {
-                base_aggregator: AggregatorID::new(900),
+            delayed_field_changes.get(&DelayedFieldID::new(1)),
+            &DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
+                base_aggregator: DelayedFieldID::new(900),
                 delta: DeltaOp::new(SignedU128::Positive(200), 900, DeltaHistory {
                     max_achieved_positive_delta: 600,
                     min_achieved_negative_delta: 0,
@@ -450,8 +444,8 @@ mod test {
             }),
         );
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::new(2)),
-            &AggregatorChange::Apply(AggregatorApplyChange::AggregatorDelta {
+            delayed_field_changes.get(&DelayedFieldID::new(2)),
+            &DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
                 delta: DeltaOp::new(SignedU128::Positive(500), 900, DeltaHistory {
                     max_achieved_positive_delta: 600,
                     min_achieved_negative_delta: 0,
@@ -462,17 +456,17 @@ mod test {
         );
 
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::new(2000)),
-            &AggregatorChange::Create(AggregatorValue::Aggregator(500)),
+            delayed_field_changes.get(&DelayedFieldID::new(2000)),
+            &DelayedChange::Create(DelayedFieldValue::Aggregator(500)),
         );
 
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::new(3)),
-            &AggregatorChange::Create(AggregatorValue::Snapshot(500)),
+            delayed_field_changes.get(&DelayedFieldID::new(3)),
+            &DelayedChange::Create(DelayedFieldValue::Snapshot(500)),
         );
         assert_some_eq!(
-            aggregator_v2_changes.get(&AggregatorID::new(4)),
-            &AggregatorChange::Create(AggregatorValue::Derived(
+            delayed_field_changes.get(&DelayedFieldID::new(4)),
+            &DelayedChange::Create(DelayedFieldValue::Derived(
                 "prefix500suffix".as_bytes().to_vec()
             )),
         );
