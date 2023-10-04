@@ -54,7 +54,7 @@ export class Transaction {
    *
    * To create a transaction hash:
    *
-   * 1. Create hash message bytes: "Aptos::Transaction" bytes + BCS bytes of Transaction.
+   * 1. Create a hash message from the bytes: "Aptos::Transaction" bytes + the BCS-serialized Transaction bytes.
    * 2. Apply hash algorithm SHA3-256 to the hash message bytes.
    * 3. Hex-encode the hash bytes with 0x prefix.
    *
