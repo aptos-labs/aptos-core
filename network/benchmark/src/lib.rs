@@ -295,7 +295,8 @@ pub async fn run_netbench_service(
     }
 }
 
-const BLAB_SECS: u64 = 2;
+// Once every Xs log a message for something that may be happening
+const BLAB_SECS: u64 = 1;
 
 pub async fn direct_sender(
     node_config: NodeConfig,
