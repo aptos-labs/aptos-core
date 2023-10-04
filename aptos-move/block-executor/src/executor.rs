@@ -432,14 +432,6 @@ where
                 }
                 break;
             }
-
-            // Remark: When early halting the BlockSTM, we have to make sure the current / new tasks
-            // will be properly handled by the threads. For instance, it is possible that the committing
-            // thread holds an execution task of ExecutionTaskType::Wakeup(DependencyCondvar) for some
-            // other thread pending on the dependency conditional variable from the last iteration. If
-            // the committing thread early halts BlockSTM and resets its scheduler_task to be Done, the
-            // pending thread will be pending on read forever. In other words, we rely on the committing
-            // thread to wake up the pending execution thread, if the committing thread holds the Wakeup task.
         }
     }
 
