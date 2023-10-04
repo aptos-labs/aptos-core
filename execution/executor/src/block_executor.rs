@@ -246,13 +246,16 @@ where
                             "Injected error in vm_execute_block"
                         )))
                     });
+                    //info!("execute_transaction_block start...................");
                     V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
                 };
+               // info!("execute_transaction_block done...................");
 
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                     .with_label_values(&["state_checkpoint"])
                     .start_timer();
 
+               // info!("chunk_output.into_state_checkpoint_output start...................");
                 THREAD_MANAGER.get_exe_cpu_pool().install(|| {
                     chunk_output.into_state_checkpoint_output(
                         parent_output.state(),
@@ -261,6 +264,7 @@ where
                 })?
             };
 
+        //info!("Done executing block; adding blk to tree...................");
         let _ = self.block_tree.add_block(
             parent_block_id,
             block_id,

@@ -55,6 +55,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         *state_view_lock = Some(state_view);
     }
 
+    pub fn drop_state_view(&self) {
+        let mut state_view_lock = self.state_view.write().unwrap();
+        *state_view_lock = None;
+    }
+
     pub fn start(&self) {
         while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();

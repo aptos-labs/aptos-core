@@ -24,6 +24,7 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+use aptos_executor::components::chunk_output;
 
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
@@ -108,7 +109,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
+            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config, chunk_output::get_remote_sharding());
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 
