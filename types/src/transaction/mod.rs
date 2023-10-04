@@ -1201,6 +1201,16 @@ impl TransactionOutput {
     }
 }
 
+pub trait TransactionOutputProvider {
+    fn get_transaction_output(&self) -> &TransactionOutput;
+}
+
+impl TransactionOutputProvider for TransactionOutput {
+    fn get_transaction_output(&self) -> &TransactionOutput {
+        self
+    }
+}
+
 /// `TransactionInfo` is the object we store in the transaction accumulator. It consists of the
 /// transaction as well as the execution result of this transaction.
 #[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
