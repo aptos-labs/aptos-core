@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_aggregator::delta_change_set::{DeltaOp, DeltaUpdate};
 use crate::change_set::VMChangeSet;
 use aptos_aggregator::resolver::AggregatorResolver;
 use aptos_types::{
@@ -9,6 +10,7 @@ use aptos_types::{
     transaction::{TransactionOutput, TransactionStatus},
     write_set::WriteOp,
 };
+use aptos_types::write_set::TOTAL_SUPPLY_STATE_KEY;
 use move_core_types::vm_status::VMStatus;
 
 /// Output produced by the VM after executing a transaction.
@@ -95,6 +97,8 @@ impl VMOutput {
         self,
         resolver: &impl AggregatorResolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
+        let total_supply_delta = self.total_supply_delta();
+
         let materialized_output = self.try_materialize(resolver)?;
         debug_assert!(
             materialized_output
@@ -105,7 +109,7 @@ impl VMOutput {
         );
         let (vm_change_set, gas_used, status) = materialized_output.unpack();
         let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
-        Ok(TransactionOutput::new(write_set, events, gas_used, status))
+        Ok(TransactionOutput::new(write_set, events, gas_used, status).with_total_supply_delta(total_supply_delta))
     }
 
     /// Similar to `try_into_transaction_output` but deltas are materialized
@@ -114,6 +118,7 @@ impl VMOutput {
         mut self,
         materialized_deltas: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
+        let total_supply_delta = self.total_supply_delta();
         assert_eq!(
             materialized_deltas.len(),
             self.change_set().aggregator_v1_delta_set().len(),
@@ -132,6 +137,15 @@ impl VMOutput {
         let (write_set, events) = vm_change_set
             .into_storage_change_set_unchecked()
             .into_inner();
-        TransactionOutput::new(write_set, events, gas_used, status)
+        TransactionOutput::new(write_set, events, gas_used, status).with_total_supply_delta(total_supply_delta)
+    }
+
+    fn total_supply_delta(&self) -> Option<(bool, u128)> {
+        self.change_set.aggregator_v1_delta_set().get(&TOTAL_SUPPLY_STATE_KEY).map(|op|{
+            match op.get_update() {
+                DeltaUpdate::Plus(x) => (false, x),
+                DeltaUpdate::Minus(x) => (true, x),
+            }
+        })
     }
 }

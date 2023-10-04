@@ -31,7 +31,7 @@ fn test_partitioner_v2_uniform_sharded_block_executor_no_conflict() {
             .partition_last_round(merge_discard)
             .pre_partitioner_config(Box::new(UniformPartitionerConfig {}))
             .build();
-        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor);
+        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 2);
     }
 }
 
@@ -113,7 +113,7 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_no_conflict() 
             .partition_last_round(merge_discard)
             .pre_partitioner_config(Box::<ConnectedComponentPartitionerConfig>::default())
             .build();
-        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor);
+        test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 2);
     }
 }
 
@@ -186,17 +186,15 @@ fn test_partitioner_v2_connected_component_sharded_block_executor_with_random_tr
     }
 }
 
-#[ignore] //sharding v3 todo: implement total supply for v3, then re-enable this.
 #[test]
 fn test_partitioner_v3_naive_sharded_block_executor_no_conflict() {
     let num_shards = 8;
     let client = LocalExecutorService::setup_local_executor_shards(num_shards, Some(4));
     let sharded_block_executor = ShardedBlockExecutor::new(client);
     let partitioner = V3NaivePartitionerConfig::default().build();
-    test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor);
+    test_utils::test_sharded_block_executor_no_conflict(partitioner, sharded_block_executor, 4);
 }
 
-#[ignore] //sharding v3 todo: implement total supply for v3, then re-enable this.
 #[test]
 // Sharded execution with cross shard conflict doesn't work for now because we don't have
 // cross round dependency tracking yet.
@@ -218,7 +216,6 @@ fn test_partitioner_v3_naive_sharded_block_executor_with_conflict_sequential() {
     test_utils::sharded_block_executor_with_conflict(partitioner, sharded_block_executor, 1)
 }
 
-#[ignore] //sharding v3 todo: implement total supply for v3, then re-enable this.
 #[test]
 fn test_partitioner_v3_naive_sharded_block_executor_with_random_transfers_parallel() {
     let num_shards = 3;
@@ -344,6 +341,7 @@ mod test_utils {
     pub fn test_sharded_block_executor_no_conflict<E: ExecutorClient<FakeDataStore>>(
         partitioner: Box<dyn BlockPartitioner>,
         sharded_block_executor: ShardedBlockExecutor<FakeDataStore, E>,
+        concurrency_level_per_shard: usize,
     ) {
         let num_txns = 400;
         let num_shards = 8;
@@ -357,7 +355,7 @@ mod test_utils {
             .execute_block(
                 Arc::new(executor.data_store().clone()),
                 partitioned_txns.clone(),
-                2,
+                concurrency_level_per_shard,
                 None,
             )
             .unwrap();

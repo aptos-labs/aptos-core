@@ -663,7 +663,11 @@ where
         // will only have a coordinator role but no workers for rolling commit.
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
-        assert!(self.concurrency_level > 1, "Must use sequential execution");
+        if txn_provider.use_dedicated_committing_thread() {
+            assert!(self.concurrency_level >= 3, "Need at least 3 threads: 1 for message handling, 1 for committing, 1+ for scheduler tasks.");
+        } else {
+            assert!(self.concurrency_level > 1, "Must use sequential execution");
+        }
 
         let versioned_cache = MVHashMap::new();
         for (global_txn_idx, key) in txn_provider.remote_dependencies() {

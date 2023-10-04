@@ -232,35 +232,36 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         }
 
         // Collect results.
-        let mut output_vec: Vec<Option<TransactionOutput>> = vec![None; num_txns];
+        let mut output_holders: Vec<Option<TransactionOutput>> = vec![None; num_txns];
         for (shard_idx, rx) in self.result_rxs.iter().enumerate() {
             let maybe_txn_output_lists: Result<Vec<Vec<TransactionOutput>>, VMStatus> = rx.recv().unwrap();
             match maybe_txn_output_lists {
                 Ok(txn_output_lists) => {
                     for txn_output_list in txn_output_lists { // This loop should only have 1 iteration.
                         for (local_idx, txn_output) in txn_output_list.into_iter().enumerate() {
-                            output_vec[global_idx_sets_by_shard[shard_idx][local_idx] as usize] = Some(txn_output);
+                            output_holders[global_idx_sets_by_shard[shard_idx][local_idx] as usize] = Some(txn_output);
                         }
                     }
                 }
-                Err(vm_status) => {
+                Err(_vm_status) => {
+                    // sharding v3 todo: handle shard error when aggregating.
                     todo!()
                 }
             }
         }
 
-        //sharding v3 todo: Update total supply
-        // let total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
-        //
-        // for output_ref in output_vec.iter_mut() {
-        //     let output = output_ref.as_mut().unwrap();
-        //     if let Some(delta) = output.write_set().get_total_supply() {
-        //         output.update_total_supply()
-        //     }
-        // }
+        let mut outputs: Vec<TransactionOutput> = output_holders.into_iter().map(|output_holder| output_holder.unwrap()).collect();
 
-        let ret = output_vec.into_iter().map(|output| output.unwrap()).collect();
-        Ok(ret)
+        // Update total supply.
+        let mut total_supply_base_val: u128 = get_state_value(&TOTAL_SUPPLY_STATE_KEY, state_view.as_ref()).unwrap();
+        for output in outputs.iter_mut() {
+            if let Some((minus, amount)) = output.total_supply_delta {
+                total_supply_base_val = if minus { total_supply_base_val - amount } else { total_supply_base_val + amount };
+                output.update_total_supply(total_supply_base_val);
+            }
+        }
+
+        Ok(outputs)
     }
 }
 

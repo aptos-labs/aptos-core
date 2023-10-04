@@ -1055,6 +1055,10 @@ pub struct TransactionOutput {
     /// The list of writes this transaction intends to do.
     write_set: WriteSet,
 
+    /// A copy of the original total supply delta.
+    /// In sharded execution, the materialized total supply in field `write_set` is usually incorrect.
+    /// This field helps calculate the correct value during result aggregation.
+    pub total_supply_delta: Option<(bool, u128)>,
     /// The list of events emitted during this transaction.
     events: Vec<ContractEvent>,
 
@@ -1074,6 +1078,7 @@ impl TransactionOutput {
     ) -> Self {
         TransactionOutput {
             write_set,
+            total_supply_delta: None,
             events,
             gas_used,
             status,
@@ -1114,7 +1119,7 @@ impl TransactionOutput {
             write_set,
             events,
             gas_used,
-            status,
+            status, ..
         } = self;
         (write_set, events, gas_used, status)
     }
@@ -1188,6 +1193,11 @@ impl TransactionOutput {
             }
         }
         Ok(None)
+    }
+
+    pub fn with_total_supply_delta(mut self, delta: Option<(bool, u128)>) -> Self {
+        self.total_supply_delta = delta;
+        self
     }
 }
 
