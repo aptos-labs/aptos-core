@@ -307,7 +307,7 @@ fn get_num_ramp_up_ticks(
 ) -> u64 {
     #[allow(clippy::if_same_then_else)]
     if start_micros + ramp_up_micros > now_micros {
-        2 // send every 3 ticks
+        3 // send every 4 ticks
     } else if start_micros + ramp_up_micros * 2 > now_micros {
         1 // send every 2 ticks
     } else if start_micros + ramp_up_micros * 3 > now_micros && counter % 2 == 0 {
