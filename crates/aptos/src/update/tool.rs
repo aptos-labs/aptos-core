@@ -47,7 +47,7 @@ impl UpdateTool {
             },
             InstallationMethod::Homebrew => {
                 return Err(anyhow!(
-                    "Detected this CLI comes from homebrew, use `brew upgrade aptos` instead"
+                    "Detected this CLI comes from homebrew, use `brew install aptos` instead"
                 )
                 .into());
             },
