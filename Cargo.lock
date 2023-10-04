@@ -3635,6 +3635,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-temppath",
  "aptos-types",
+ "assert_approx_eq",
  "bcs 0.1.4",
  "csv",
  "futures",
