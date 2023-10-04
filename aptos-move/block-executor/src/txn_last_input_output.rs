@@ -221,7 +221,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
             })
     }
 
-    pub(crate) fn aggregator_v2_keys(
+    pub(crate) fn delayed_field_keys(
         &self,
         txn_idx: TxnIndex,
     ) -> Option<impl Iterator<Item = T::Identifier>> {
@@ -230,7 +230,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
             .as_ref()
             .and_then(|txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    Some(t.aggregator_v2_change_set().into_keys())
+                    Some(t.delayed_field_change_set().into_keys())
                 },
                 ExecutionStatus::Abort(_) => None,
             })

@@ -4,9 +4,9 @@
 use crate::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
     delta_math::DeltaHistory,
-    resolver::{AggregatorReadMode, AggregatorResolver},
+    resolver::{DelayedFieldReadMode, DelayedFieldResolver},
     types::{
-        code_invariant_error, expect_ok, AggregatorID, AggregatorValue, AggregatorVersionedID,
+        code_invariant_error, expect_ok, AggregatorVersionedID, DelayedFieldID, DelayedFieldValue,
         DelayedFieldsSpeculativeError, PanicError, PanicOr, ReadPosition, SnapshotToStringFormula,
         SnapshotValue,
     },
@@ -89,12 +89,12 @@ pub enum AggregatorSnapshotState {
     },
     // Created in this transaction, via snapshot(&aggregator)
     Delta {
-        base_aggregator: AggregatorID,
+        base_aggregator: DelayedFieldID,
         delta: SignedU128,
     },
     // Created in this transaction, via string_concat(prefix, &snapshot, suffix)
     Derived {
-        base_snapshot: AggregatorID,
+        base_snapshot: DelayedFieldID,
         formula: SnapshotToStringFormula,
     },
     // Accessed in this transaction, based on the ID
@@ -108,7 +108,7 @@ pub enum AggregatorSnapshotState {
 pub struct AggregatorSnapshot {
     // The identifier used to identify the aggregator.
     #[allow(dead_code)]
-    id: AggregatorID,
+    id: DelayedFieldID,
 
     state: AggregatorSnapshotState,
 }
@@ -131,14 +131,14 @@ pub struct Aggregator {
     pub state: AggregatorState,
 }
 
-fn get_aggregator_v2_value_from_storage(
-    id: &AggregatorID,
-    resolver: &dyn AggregatorResolver,
-    mode: AggregatorReadMode,
-) -> Result<AggregatorValue, PanicOr<DelayedFieldsSpeculativeError>> {
+fn get_delayed_field_value_from_storage(
+    id: &DelayedFieldID,
+    resolver: &dyn DelayedFieldResolver,
+    mode: DelayedFieldReadMode,
+) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
     // TODO transform unexpected errors into PanicError
     resolver
-        .get_aggregator_v2_value(id, mode)
+        .get_delayed_field_value(id, mode)
         .map_err(|_err| PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(*id)))
 }
 
@@ -156,7 +156,7 @@ impl Aggregator {
     pub fn try_add(
         &mut self,
         input: u128,
-        resolver: &dyn AggregatorResolver,
+        resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<bool> {
         if input > self.max_value {
             // We do not have to record the overflow.
@@ -213,7 +213,7 @@ impl Aggregator {
     pub fn try_sub(
         &mut self,
         input: u128,
-        resolver: &dyn AggregatorResolver,
+        resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<bool> {
         if input > self.max_value {
             // We do not have to record the underflow.
@@ -266,8 +266,8 @@ impl Aggregator {
 
     fn get_aggregator_value_from_storage(
         id: &AggregatorVersionedID,
-        resolver: &dyn AggregatorResolver,
-        mode: AggregatorReadMode,
+        resolver: &dyn DelayedFieldResolver,
+        mode: DelayedFieldReadMode,
     ) -> PartialVMResult<u128> {
         match id {
             AggregatorVersionedID::V1(state_key) => resolver
@@ -282,7 +282,7 @@ impl Aggregator {
                     ))
                 }),
             AggregatorVersionedID::V2(id) => {
-                let value = get_aggregator_v2_value_from_storage(id, resolver, mode)?;
+                let value = get_delayed_field_value_from_storage(id, resolver, mode)?;
                 Ok(value.into_aggregator_value()?)
             },
         }
@@ -299,7 +299,7 @@ impl Aggregator {
     /// aggregator is in Delta state, delta should be 0, and history should be empty.
     pub fn read_last_committed_aggregator_value(
         &mut self,
-        resolver: &dyn AggregatorResolver,
+        resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<()> {
         if let AggregatorState::Delta {
             speculative_start_value,
@@ -318,7 +318,7 @@ impl Aggregator {
                 let value_from_storage = Self::get_aggregator_value_from_storage(
                     &self.id,
                     resolver,
-                    AggregatorReadMode::LastCommitted,
+                    DelayedFieldReadMode::LastCommitted,
                 )?;
 
                 *speculative_start_value =
@@ -338,7 +338,7 @@ impl Aggregator {
     /// after this call.
     pub fn read_aggregated_aggregator_value(
         &mut self,
-        resolver: &dyn AggregatorResolver,
+        resolver: &dyn DelayedFieldResolver,
         read_position: ReadPosition,
     ) -> PartialVMResult<u128> {
         match &mut self.state {
@@ -386,7 +386,7 @@ impl Aggregator {
                 let value_from_storage = Self::get_aggregator_value_from_storage(
                     &self.id,
                     resolver,
-                    AggregatorReadMode::Aggregated,
+                    DelayedFieldReadMode::Aggregated,
                 )?;
 
                 // Validate history.
@@ -424,7 +424,7 @@ pub struct AggregatorData {
     // All aggregator instances that exist in the current transaction.
     aggregators: BTreeMap<AggregatorVersionedID, Aggregator>,
     // All aggregator snapshot instances that exist in the current transaction.
-    aggregator_snapshots: BTreeMap<AggregatorID, AggregatorSnapshot>,
+    aggregator_snapshots: BTreeMap<DelayedFieldID, AggregatorSnapshot>,
 }
 
 impl AggregatorData {
@@ -496,10 +496,10 @@ impl AggregatorData {
 
     pub fn snapshot(
         &mut self,
-        aggregator_id: AggregatorID,
+        aggregator_id: DelayedFieldID,
         aggregator_max_value: u128,
-        resolver: &dyn AggregatorResolver,
-    ) -> PartialVMResult<AggregatorID> {
+        resolver: &dyn DelayedFieldResolver,
+    ) -> PartialVMResult<DelayedFieldID> {
         let aggregator = self.get_aggregator(
             AggregatorVersionedID::V2(aggregator_id),
             aggregator_max_value,
@@ -516,7 +516,7 @@ impl AggregatorData {
             },
         };
 
-        let snapshot_id = resolver.generate_aggregator_v2_id();
+        let snapshot_id = resolver.generate_delayed_field_id();
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
                 id: snapshot_id,
@@ -528,10 +528,10 @@ impl AggregatorData {
     pub fn create_new_snapshot(
         &mut self,
         value: SnapshotValue,
-        resolver: &dyn AggregatorResolver,
-    ) -> AggregatorID {
+        resolver: &dyn DelayedFieldResolver,
+    ) -> DelayedFieldID {
         let snapshot_state = AggregatorSnapshotState::Create { value };
-        let snapshot_id = resolver.generate_aggregator_v2_id();
+        let snapshot_id = resolver.generate_delayed_field_id();
 
         self.aggregator_snapshots
             .insert(snapshot_id, AggregatorSnapshot {
@@ -543,17 +543,17 @@ impl AggregatorData {
 
     pub fn read_snapshot(
         &mut self,
-        snapshot_id: AggregatorID,
-        resolver: &dyn AggregatorResolver,
+        snapshot_id: DelayedFieldID,
+        resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<SnapshotValue> {
         // Since we need the value - if it is not present, we need to do the "aggregated read" to get it.
         // need to clone here, so we can call self.read_snapshot below.
         let snapshot_state = match self.aggregator_snapshots.entry(snapshot_id) {
             Entry::Vacant(entry) => {
-                let value_from_storage = get_aggregator_v2_value_from_storage(
+                let value_from_storage = get_delayed_field_value_from_storage(
                     &snapshot_id,
                     resolver,
-                    AggregatorReadMode::Aggregated,
+                    DelayedFieldReadMode::Aggregated,
                 )?;
                 entry
                     .insert(AggregatorSnapshot {
@@ -610,12 +610,12 @@ impl AggregatorData {
 
     pub fn string_concat(
         &mut self,
-        id: AggregatorID,
+        id: DelayedFieldID,
         prefix: Vec<u8>,
         suffix: Vec<u8>,
-        resolver: &dyn AggregatorResolver,
-    ) -> AggregatorID {
-        let new_id = resolver.generate_aggregator_v2_id();
+        resolver: &dyn DelayedFieldResolver,
+    ) -> DelayedFieldID {
+        let new_id = resolver.generate_delayed_field_id();
 
         let snapshot_state = AggregatorSnapshotState::Derived {
             base_snapshot: id,
@@ -637,7 +637,7 @@ impl AggregatorData {
         BTreeSet<AggregatorVersionedID>,
         BTreeSet<StateKey>,
         BTreeMap<AggregatorVersionedID, Aggregator>,
-        BTreeMap<AggregatorID, AggregatorSnapshot>,
+        BTreeMap<DelayedFieldID, AggregatorSnapshot>,
     ) {
         (
             self.new_aggregators,

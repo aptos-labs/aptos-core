@@ -6,8 +6,8 @@
 use anyhow::Error;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
-    resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorID, AggregatorValue},
+    resolver::{DelayedFieldReadMode, TDelayedFieldView},
+    types::{DelayedFieldID, DelayedFieldValue},
 };
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
@@ -54,27 +54,27 @@ impl AptosBlankStorage {
 }
 
 #[cfg(feature = "testing")]
-impl TAggregatorView for AptosBlankStorage {
+impl TDelayedFieldView for AptosBlankStorage {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+    type IdentifierV2 = DelayedFieldID;
 
     fn get_aggregator_v1_state_value(
         &self,
         _id: &Self::IdentifierV1,
-        _mode: AggregatorReadMode,
+        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }
 
-    fn get_aggregator_v2_value(
+    fn get_delayed_field_value(
         &self,
         _id: &Self::IdentifierV2,
-        _mode: AggregatorReadMode,
-    ) -> anyhow::Result<AggregatorValue> {
+        _mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<DelayedFieldValue> {
         unimplemented!()
     }
 
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
         (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
     }
 }

@@ -7,9 +7,9 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::{
-    aggregator_change_set::{AggregatorChange, ApplyBase},
-    resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorID, AggregatorValue},
+    delayed_change::{ApplyBase, DelayedChange},
+    resolver::{DelayedFieldReadMode, TDelayedFieldView},
+    types::{DelayedFieldID, DelayedFieldValue},
 };
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
@@ -119,14 +119,14 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
+impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+    type IdentifierV2 = DelayedFieldID;
 
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
@@ -140,33 +140,33 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn get_aggregator_v2_value(
+    fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        mode: AggregatorReadMode,
-    ) -> anyhow::Result<AggregatorValue> {
-        use AggregatorChange::*;
+        mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<DelayedFieldValue> {
+        use DelayedChange::*;
 
-        match self.change_set.aggregator_v2_change_set().get(id) {
+        match self.change_set.delayed_field_change_set().get(id) {
             Some(Create(value)) => Ok(value.clone()),
             Some(Apply(apply)) => {
                 let base_value = match apply.get_apply_base_id(id) {
                     ApplyBase::Previous(base_id) => {
-                        self.base.get_aggregator_v2_value(&base_id, mode)?
+                        self.base.get_delayed_field_value(&base_id, mode)?
                     },
                     // For Current, call on self to include current change!
-                    ApplyBase::Current(base_id) => self.get_aggregator_v2_value(&base_id, mode)?,
+                    ApplyBase::Current(base_id) => self.get_delayed_field_value(&base_id, mode)?,
                 };
                 Ok(apply
                     .apply_to_base(base_value)
                     .map_err(PartialVMError::from)?)
             },
-            None => self.base.get_aggregator_v2_value(id, mode),
+            None => self.base.get_delayed_field_value(id, mode),
         }
     }
 
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
-        self.base.generate_aggregator_v2_id()
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+        self.base.generate_delayed_field_id()
     }
 }
 
@@ -243,7 +243,7 @@ mod test {
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        view.get_aggregator_v1_value(&key(s), AggregatorReadMode::Aggregated)
+        view.get_aggregator_v1_value(&key(s), DelayedFieldReadMode::Aggregated)
             .unwrap()
             .unwrap()
     }

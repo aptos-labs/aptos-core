@@ -3,7 +3,7 @@
 
 use crate::{
     delta_change_set::{serialize, DeltaOp},
-    types::{AggregatorID, AggregatorValue},
+    types::{DelayedFieldID, DelayedFieldValue},
 };
 use aptos_types::{
     state_store::{
@@ -17,7 +17,7 @@ use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// Defines different ways `AggregatorResolver` can be used to read its value
 /// from the state.
-pub enum AggregatorReadMode {
+pub enum DelayedFieldReadMode {
     /// The returned value is guaranteed to be correct.
     Aggregated,
     /// The returned value is based on last committed value, ignoring
@@ -28,7 +28,7 @@ pub enum AggregatorReadMode {
 /// Allows to query aggregator values from the state storage.
 /// Because there are two types of aggregators in the system, V1 and V2, we use
 /// different code paths for each.
-pub trait TAggregatorView {
+pub trait TDelayedFieldView {
     // We differentiate between two possible ways to identify an aggregator in
     // storage for now (V1 or V2) so that the APIs are completely separate and
     // we can delete all V1 code when necessary.
@@ -44,13 +44,13 @@ pub trait TAggregatorView {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>>;
 
     fn get_aggregator_v1_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<u128>> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id, mode)?;
         match maybe_state_value {
@@ -68,19 +68,19 @@ pub trait TAggregatorView {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
         let maybe_state_value =
-            self.get_aggregator_v1_state_value(id, AggregatorReadMode::Aggregated)?;
+            self.get_aggregator_v1_state_value(id, DelayedFieldReadMode::Aggregated)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn get_aggregator_v2_value(
+    fn get_delayed_field_value(
         &self,
         _id: &Self::IdentifierV2,
-        _mode: AggregatorReadMode,
-    ) -> anyhow::Result<AggregatorValue>;
+        _mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<DelayedFieldValue>;
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2;
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2;
 
     /// Consumes a single delta of aggregator V1, and tries to materialize it
     /// with a given identifier (state key). If materialization succeeds, a
@@ -89,7 +89,7 @@ pub trait TAggregatorView {
         &self,
         id: &Self::IdentifierV1,
         delta_op: &DeltaOp,
-        mode: AggregatorReadMode,
+        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         let base = self
             .get_aggregator_v1_value(id, mode)
@@ -113,12 +113,12 @@ pub trait TAggregatorView {
     }
 }
 
-pub trait AggregatorResolver:
-    TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>
+pub trait DelayedFieldResolver:
+    TDelayedFieldView<IdentifierV1 = StateKey, IdentifierV2 = DelayedFieldID>
 {
 }
 
-impl<T> AggregatorResolver for T where
-    T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>
+impl<T> DelayedFieldResolver for T where
+    T: TDelayedFieldView<IdentifierV1 = StateKey, IdentifierV2 = DelayedFieldID>
 {
 }

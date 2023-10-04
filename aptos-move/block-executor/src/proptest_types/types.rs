@@ -4,9 +4,9 @@
 
 use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
+    delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    types::AggregatorID,
+    types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -311,7 +311,7 @@ impl<
     > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
-    type Identifier = AggregatorID;
+    type Identifier = DelayedFieldID;
     type Key = K;
     type Tag = u32;
     type Value = V;
@@ -566,7 +566,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<K, MoveTypeLayout, AggregatorID>,
+        view: &impl TExecutorView<K, MoveTypeLayout, DelayedFieldID>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -664,11 +664,11 @@ where
         self.deltas.iter().cloned().collect()
     }
 
-    fn aggregator_v2_change_set(
+    fn delayed_field_change_set(
         &self,
     ) -> HashMap<
         <Self::Txn as Transaction>::Identifier,
-        AggregatorChange<<Self::Txn as Transaction>::Identifier>,
+        DelayedChange<<Self::Txn as Transaction>::Identifier>,
     > {
         // TODO: add aggregators V2 to the proptest?
         HashMap::new()

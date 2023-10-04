@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_change_set::AggregatorChange,
+    delayed_change::DelayedChange,
     delta_change_set::DeltaOp,
     types::{TryFromMoveValue, TryIntoMoveValue},
 };
@@ -53,7 +53,7 @@ pub trait Transaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    /// AggregatorV2 identifier type.
+    /// Delayed field identifier type.
     type Identifier: PartialOrd
         + Ord
         + Send
@@ -165,12 +165,12 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Get the aggregator V1 deltas of a transaction from its output.
     fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
-    /// Get the aggregator V2 changes of a transaction from its output.
-    fn aggregator_v2_change_set(
+    /// Get the delayed field changes of a transaction from its output.
+    fn delayed_field_change_set(
         &self,
     ) -> HashMap<
         <Self::Txn as Transaction>::Identifier,
-        AggregatorChange<<Self::Txn as Transaction>::Identifier>,
+        DelayedChange<<Self::Txn as Transaction>::Identifier>,
     >;
 
     /// Get the events of a transaction from its output.

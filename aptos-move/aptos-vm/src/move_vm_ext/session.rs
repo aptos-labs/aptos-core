@@ -341,7 +341,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut module_write_set = HashMap::new();
         let mut aggregator_v1_write_set = HashMap::new();
         let mut aggregator_v1_delta_set = HashMap::new();
-        let mut aggregator_v2_change_set = HashMap::new();
+        let mut delayed_field_change_set = HashMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -394,8 +394,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (id, change) in aggregator_change_set.aggregator_v2_changes {
-            aggregator_v2_change_set.insert(id, change);
+        for (id, change) in aggregator_change_set.delayed_field_changes {
+            delayed_field_change_set.insert(id, change);
         }
 
         VMChangeSet::new(
@@ -403,7 +403,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            aggregator_v2_change_set,
+            delayed_field_change_set,
             events,
             configs,
         )

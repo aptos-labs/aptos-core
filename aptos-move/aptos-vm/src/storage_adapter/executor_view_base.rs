@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    resolver::{AggregatorReadMode, TAggregatorView},
-    types::{AggregatorID, AggregatorValue},
+    resolver::{DelayedFieldReadMode, TDelayedFieldView},
+    types::{DelayedFieldID, DelayedFieldValue},
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::{
@@ -42,28 +42,28 @@ impl<S: StateView> AsExecutorView<S> for S {
     }
 }
 
-impl<'s, S: StateView> TAggregatorView for ExecutorViewBase<'s, S> {
+impl<'s, S: StateView> TDelayedFieldView for ExecutorViewBase<'s, S> {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+    type IdentifierV2 = DelayedFieldID;
 
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
         // Reading from StateView can be in precise mode only.
-        _mode: AggregatorReadMode,
+        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.base.get_state_value(state_key)
     }
 
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
         (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
     }
 
-    fn get_aggregator_v2_value(
+    fn get_delayed_field_value(
         &self,
         _id: &Self::IdentifierV2,
-        _mode: AggregatorReadMode,
-    ) -> anyhow::Result<AggregatorValue> {
+        _mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<DelayedFieldValue> {
         unimplemented!()
     }
 }

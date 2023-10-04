@@ -157,7 +157,7 @@ pub enum DeltaHistoryMergeOffsetFailureReason {
 pub enum DelayedFieldsSpeculativeError {
     /// DelayedField with given ID couldn't be found
     /// (due to speculative nature), but must exist.
-    NotFound(AggregatorID),
+    NotFound(DelayedFieldID),
     /// Applying new start_value doesn't satisfy history bounds.
     DeltaApplication {
         base_value: u128,
@@ -184,12 +184,12 @@ pub enum DelayedFieldsSpeculativeError {
 
 impl NonPanic for DelayedFieldsSpeculativeError {}
 
-// TODO To be renamed to DelayedFieldID
-/// Ephemeral identifier type used by aggregators V2.
+/// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
+/// during execution.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AggregatorID(u64);
+pub struct DelayedFieldID(u64);
 
-impl AggregatorID {
+impl DelayedFieldID {
     pub fn new(value: u64) -> Self {
         Self(value)
     }
@@ -200,13 +200,13 @@ impl AggregatorID {
 }
 
 // Used for ID generation from u32/u64 counters.
-impl From<u64> for AggregatorID {
+impl From<u64> for DelayedFieldID {
     fn from(value: u64) -> Self {
         Self::new(value)
     }
 }
 
-impl TryIntoMoveValue for AggregatorID {
+impl TryIntoMoveValue for DelayedFieldID {
     type Error = PanicError;
 
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
@@ -224,7 +224,7 @@ impl TryIntoMoveValue for AggregatorID {
     }
 }
 
-impl TryFromMoveValue for AggregatorID {
+impl TryFromMoveValue for DelayedFieldID {
     type Error = PanicError;
     type Hint = ();
 
@@ -263,7 +263,7 @@ pub enum AggregatorVersionedID {
     V1(StateKey),
     // Aggregator V2 is embedded into resources, and uses ephemeral identifiers
     // which are unique per block.
-    V2(AggregatorID),
+    V2(DelayedFieldID),
 }
 
 impl AggregatorVersionedID {
@@ -273,7 +273,7 @@ impl AggregatorVersionedID {
     }
 
     pub fn v2(value: u64) -> Self {
-        Self::V2(AggregatorID::new(value))
+        Self::V2(DelayedFieldID::new(value))
     }
 }
 
@@ -288,23 +288,23 @@ impl TryFrom<AggregatorVersionedID> for StateKey {
     }
 }
 
-// TODO To be renamed to DelayedFieldValue
+/// Value of a DelayedField (i.e. aggregator or snapshot)
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AggregatorValue {
+pub enum DelayedFieldValue {
     Aggregator(u128),
     Snapshot(u128),
     // TODO probably change to Derived(Arc<Vec<u8>>) to make copying predictably costly
     Derived(Vec<u8>),
 }
 
-impl AggregatorValue {
+impl DelayedFieldValue {
     pub fn into_aggregator_value(self) -> Result<u128, PanicError> {
         match self {
-            AggregatorValue::Aggregator(value) => Ok(value),
-            AggregatorValue::Snapshot(_) => Err(code_invariant_error(
+            DelayedFieldValue::Aggregator(value) => Ok(value),
+            DelayedFieldValue::Snapshot(_) => Err(code_invariant_error(
                 "Tried calling into_aggregator_value on Snapshot value",
             )),
-            AggregatorValue::Derived(_) => Err(code_invariant_error(
+            DelayedFieldValue::Derived(_) => Err(code_invariant_error(
                 "Tried calling into_aggregator_value on String SnapshotValue",
             )),
         }
@@ -312,11 +312,11 @@ impl AggregatorValue {
 
     pub fn into_snapshot_value(self) -> Result<u128, PanicError> {
         match self {
-            AggregatorValue::Snapshot(value) => Ok(value),
-            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
+            DelayedFieldValue::Snapshot(value) => Ok(value),
+            DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling into_snapshot_value on Aggregator value",
             )),
-            AggregatorValue::Derived(_) => Err(code_invariant_error(
+            DelayedFieldValue::Derived(_) => Err(code_invariant_error(
                 "Tried calling into_snapshot_value on String SnapshotValue",
             )),
         }
@@ -324,22 +324,22 @@ impl AggregatorValue {
 
     pub fn into_derived_value(self) -> Result<Vec<u8>, PanicError> {
         match self {
-            AggregatorValue::Derived(value) => Ok(value),
-            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
+            DelayedFieldValue::Derived(value) => Ok(value),
+            DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling into_derived_value on Aggregator value",
             )),
-            AggregatorValue::Snapshot(_) => Err(code_invariant_error(
+            DelayedFieldValue::Snapshot(_) => Err(code_invariant_error(
                 "Tried calling into_derived_value on Snapshot value",
             )),
         }
     }
 }
 
-impl TryIntoMoveValue for AggregatorValue {
+impl TryIntoMoveValue for DelayedFieldValue {
     type Error = PartialVMError;
 
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
-        use AggregatorValue::*;
+        use DelayedFieldValue::*;
         use MoveTypeLayout::*;
 
         Ok(match (self, layout) {
@@ -358,7 +358,7 @@ impl TryIntoMoveValue for AggregatorValue {
     }
 }
 
-impl TryFromMoveValue for AggregatorValue {
+impl TryFromMoveValue for DelayedFieldValue {
     type Error = PartialVMError;
     // Need to distinguish between aggregators and snapshots of integer types.
     // TODO: We only need that because of the current enum-based implementations.
@@ -369,7 +369,7 @@ impl TryFromMoveValue for AggregatorValue {
         value: Value,
         hint: &Self::Hint,
     ) -> Result<Self, Self::Error> {
-        use AggregatorValue::*;
+        use DelayedFieldValue::*;
         use IdentifierMappingKind as K;
         use MoveTypeLayout as L;
 
@@ -412,16 +412,16 @@ impl SnapshotValue {
     }
 }
 
-impl TryFrom<AggregatorValue> for SnapshotValue {
+impl TryFrom<DelayedFieldValue> for SnapshotValue {
     type Error = PanicError;
 
-    fn try_from(value: AggregatorValue) -> Result<SnapshotValue, PanicError> {
+    fn try_from(value: DelayedFieldValue) -> Result<SnapshotValue, PanicError> {
         match value {
-            AggregatorValue::Aggregator(_) => Err(code_invariant_error(
+            DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling SnapshotValue::try_from on AggregatorValue(Aggregator)",
             )),
-            AggregatorValue::Snapshot(v) => Ok(SnapshotValue::Integer(v)),
-            AggregatorValue::Derived(v) => Ok(SnapshotValue::String(v)),
+            DelayedFieldValue::Snapshot(v) => Ok(SnapshotValue::Integer(v)),
+            DelayedFieldValue::Derived(v) => Ok(SnapshotValue::String(v)),
         }
     }
 }
