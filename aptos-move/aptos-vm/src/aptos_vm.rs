@@ -1716,7 +1716,7 @@ impl VMAdapter for AptosVM {
             return Ok((vm_status, output, None));
         }
 
-        Ok(match txn.inner() {
+        Ok(match txn.expect_valid() {
             BlockMetadataTransaction(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
                 let (vm_status, output) =

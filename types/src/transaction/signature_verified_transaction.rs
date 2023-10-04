@@ -32,6 +32,13 @@ impl SignatureVerifiedTransaction {
             SignatureVerifiedTransaction::Invalid(txn) => txn,
         }
     }
+
+    pub fn expect_valid(&self) -> &Transaction {
+        match self {
+            SignatureVerifiedTransaction::Valid(txn) => txn,
+            SignatureVerifiedTransaction::Invalid(_) => panic!("Expected valid transaction"),
+        }
+    }
 }
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {
