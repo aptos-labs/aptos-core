@@ -784,10 +784,14 @@ export type TableItemRequest = {
 /**
  * A list of Authentication Key schemes that are supported by Aptos.
  *
- * Keys that start with `Derive` are solely used for deriving account addresses from
- * other data. They are not used for signing transactions.
+ * They are combinations of signing schemes and derive schemes.
  */
-export enum AuthenticationKeyScheme {
+export type AuthenticationKeyScheme = SigningScheme | DeriveScheme;
+
+/**
+ * A list of signing schemes that are supported by Aptos.
+ */
+export enum SigningScheme {
   /**
    * For Ed25519PublicKey
    */
@@ -796,6 +800,16 @@ export enum AuthenticationKeyScheme {
    * For MultiEd25519PublicKey
    */
   MultiEd25519 = 1,
+  /**
+   * For Secp256k1 ecdsa
+   */
+  Secp256k1Ecdsa = 2,
+}
+
+/**
+ * Scheme used for deriving account addresses from other data
+ */
+export enum DeriveScheme {
   /**
    * Derives an address using an AUID, used for objects
    */
