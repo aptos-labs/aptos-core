@@ -29,6 +29,7 @@
 
 const Features = {
   Default: "default",
+  Indexer: "indexer",
 };
 
 const IMAGES_TO_RELEASE_ONLY_INTERNAL = ["validator-testing"];
@@ -39,6 +40,7 @@ const IMAGES_TO_RELEASE = {
     ],
     release: [
       Features.Default,
+      Features.Indexer,
     ],
   },
   "validator-testing": {
@@ -47,6 +49,7 @@ const IMAGES_TO_RELEASE = {
     ],
     release: [
       Features.Default,
+      Features.Indexer,
     ],
   },
   faucet: {
