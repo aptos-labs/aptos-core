@@ -220,14 +220,31 @@ async fn handler_task(
             },
             Event::NewPeer(wat) => {
                 if config.enable_direct_send_testing {
-                    Handle::current().spawn(direct_sender(
-                        node_config.clone(),
-                        network_client.clone(),
-                        time_service.clone(),
-                        network_id,
-                        wat.remote_peer_id,
-                        shared.clone(),
-                    ));
+                    Handle::current().spawn({
+                        if config.enable_direct_send_ramp_up {
+                            direct_sender(
+                                Some(config.direct_send_ramp_up_duration_seconds),
+                                config.direct_send_ramp_up_per_second,
+                                config.direct_send_data_size,
+                                network_client.clone(),
+                                time_service.clone(),
+                                network_id,
+                                wat.remote_peer_id,
+                                shared.clone(),
+                            )
+                            .await;
+                        }
+                        direct_sender(
+                            None,
+                            config.direct_send_per_second,
+                            config.direct_send_data_size,
+                            network_client.clone(),
+                            time_service.clone(),
+                            network_id,
+                            wat.remote_peer_id,
+                            shared.clone(),
+                        )
+                    });
                 }
                 if config.enable_rpc_testing {
                     Handle::current().spawn(rpc_sender(
@@ -299,18 +316,15 @@ pub async fn run_netbench_service(
 const BLAB_MICROS: u64 = 100_000;
 
 pub async fn direct_sender(
-    node_config: NodeConfig,
+    duration_seconds: Option<u64>,
+    per_second: u64,
+    data_size: usize,
     network_client: NetworkClient<NetbenchMessage>,
     time_service: TimeService,
     network_id: NetworkId,
     peer_id: PeerId,
     shared: Arc<RwLock<NetbenchSharedState>>,
 ) {
-    let config = node_config.netbench.unwrap();
-    let interval = Duration::from_nanos(1_000_000_000 / config.direct_send_per_second);
-    let ticker = time_service.interval(interval);
-    futures::pin_mut!(ticker);
-    let data_size = config.direct_send_data_size;
     let mut rng = OsRng;
     let mut blob = Vec::<u8>::with_capacity(data_size);
 
@@ -320,8 +334,17 @@ pub async fn direct_sender(
     }
 
     let mut counter: u64 = rng.gen();
+    let interval = Duration::from_nanos(1_000_000_000 / per_second);
+    let ticker = time_service.interval(interval);
+    futures::pin_mut!(ticker);
 
-    loop {
+    let end = if let Some(duration_seconds) = duration_seconds {
+        (time_service.now_unix_time().as_micros() as u64) + (duration_seconds * 1_000_000)
+    } else {
+        u64::MAX
+    };
+
+    while end > time_service.now_unix_time().as_micros() as u64 {
         ticker.next().await;
 
         counter += 1;
