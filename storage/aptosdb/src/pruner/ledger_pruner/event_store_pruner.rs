@@ -19,6 +19,10 @@ pub struct EventStorePruner {
 }
 
 impl DBSubPruner for EventStorePruner {
+    fn name(&self) -> &str {
+        "EventStorePruner"
+    }
+
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
         self.event_store

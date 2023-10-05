@@ -796,7 +796,7 @@ impl StateStore {
                     .flat_map(|sharded_states| sharded_states.iter().flatten())
                     .map(|(key, _)| key)
                     .collect::<HashSet<_>>();
-                THREAD_MANAGER.get_io_pool().scope(|s| {
+                THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
                     for key in key_set {
                         let cache = &state_cache_with_version[key.get_shard_id() as usize];
                         s.spawn(move |_| {
@@ -1108,7 +1108,7 @@ impl StateStore {
         base_version: Version,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
-        THREAD_MANAGER.get_io_pool().scope(|s| {
+        THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
             sharded_state_cache.par_iter().for_each(|shard| {
                 shard.iter_mut().for_each(|mut entry| {
                     match entry.value() {
