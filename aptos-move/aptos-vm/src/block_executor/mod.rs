@@ -179,6 +179,49 @@ impl BlockAptosVM {
         maybe_block_gas_limit: Option<u64>,
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Self::run_block(
+            executor_thread_pool,
+            signature_verified_block,
+            state_view,
+            concurrency_level,
+            maybe_block_gas_limit,
+            transaction_commit_listener,
+            true,
+        )
+    }
+
+    // TODO: unify simulation & execution for multi-sig transactions to remove this.
+    pub fn simulate_block<
+        S: StateView + Sync,
+        L: TransactionCommitHook<Output = AptosTransactionOutput>,
+    >(
+        executor_thread_pool: Arc<ThreadPool>,
+        signature_verified_block: &[SignatureVerifiedTransaction],
+        state_view: &S,
+        concurrency_level: usize,
+        maybe_block_gas_limit: Option<u64>,
+        transaction_commit_listener: Option<L>,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        Self::run_block(
+            executor_thread_pool,
+            signature_verified_block,
+            state_view,
+            concurrency_level,
+            maybe_block_gas_limit,
+            transaction_commit_listener,
+            false,
+        )
+    }
+
+    fn run_block<S: StateView + Sync, L: TransactionCommitHook<Output = AptosTransactionOutput>>(
+        executor_thread_pool: Arc<ThreadPool>,
+        signature_verified_block: &[SignatureVerifiedTransaction],
+        state_view: &S,
+        concurrency_level: usize,
+        maybe_block_gas_limit: Option<u64>,
+        transaction_commit_listener: Option<L>,
+        is_simulation: bool,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
@@ -201,7 +244,11 @@ impl BlockAptosVM {
             transaction_commit_listener,
         );
 
-        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
+        let ret = executor.execute_block(
+            (state_view, is_simulation),
+            signature_verified_block,
+            state_view,
+        );
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs

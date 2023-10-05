@@ -18,19 +18,21 @@ pub(crate) struct AptosExecutorTask<'a, S> {
 }
 
 impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
-    type Argument = &'a S;
+    type Argument = (&'a S, bool);
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(argument: &'a S) -> Self {
-        // AptosVM has to be initialized using configs from storage.
-        let vm = AptosVM::new_from_state_view(&argument);
+    fn init(argument: (&'a S, bool)) -> Self {
+        let (base_view, is_simulation) = argument;
 
-        Self {
-            vm,
-            base_view: argument,
+        // AptosVM has to be initialized using configs from storage.
+        let mut vm = AptosVM::new_from_state_view(base_view);
+        if is_simulation {
+            vm = vm.for_simulation();
         }
+
+        Self { vm, base_view }
     }
 
     // This function is called by the BlockExecutor for each transaction is intends

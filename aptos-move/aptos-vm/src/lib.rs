@@ -147,9 +147,9 @@ pub trait VMValidator {
 pub trait VMSimulator {
     /// Executes a SignedTransaction without performing signature verification.
     fn simulate_signed_transaction(
-        transaction: &SignedTransaction,
-        state_view: &impl StateView,
-    ) -> (VMStatus, TransactionOutput);
+        transaction: SignedTransaction,
+        state_view: &(impl StateView + Sync),
+    ) -> TransactionOutput;
 }
 
 /// This trait describes the VM's execution interface.

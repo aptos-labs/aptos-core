@@ -777,15 +777,11 @@ impl SignedTransaction {
         Ok(SignatureCheckedTransaction(self))
     }
 
+    /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
+    /// the signature is valid.
     pub fn verify_signature(&self) -> Result<()> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(())
-    }
-
-    /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
-    /// the signature is valid.
-    pub fn signature_is_valid(&self) -> bool {
-        self.authenticator.verify(&self.raw_txn).is_ok()
     }
 
     pub fn contains_duplicate_signers(&self) -> bool {
