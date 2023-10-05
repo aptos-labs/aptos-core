@@ -326,9 +326,6 @@ pub async fn direct_sender(
     shared: Arc<RwLock<NetbenchSharedState>>,
 ) {
     let config = node_config.netbench.unwrap();
-    let interval = Duration::from_nanos(1_000_000_000 / config.direct_send_per_second);
-    let ticker = time_service.interval(interval);
-    futures::pin_mut!(ticker);
     let data_size = config.direct_send_data_size;
     let mut rng = OsRng;
     let mut blob = Vec::<u8>::with_capacity(data_size);
@@ -339,6 +336,10 @@ pub async fn direct_sender(
     }
 
     let mut counter: u64 = rng.gen();
+
+    let interval = Duration::from_nanos(1_000_000_000 / config.direct_send_per_second);
+    let ticker = time_service.interval(interval);
+    futures::pin_mut!(ticker);
 
     let start = time_service.now_unix_time().as_micros() as u64;
     loop {
