@@ -5,11 +5,13 @@ import * as bip39 from "@scure/bip39";
 import { bytesToHex } from "@noble/hashes/utils";
 import { AccountAddress } from "./account_address";
 import { Hex } from "./hex";
-import { HexInput } from "../types";
+import { HexInput, SigningScheme } from "../types";
 import { PrivateKey, PublicKey, Signature } from "../crypto/asymmetric_crypto";
 import { derivePath } from "../utils/hd-key";
 import { AuthenticationKey } from "../crypto/authentication_key";
-import { Ed25519PrivateKey } from "../crypto/ed25519";
+import { Ed25519PrivateKey, Ed25519PublicKey } from "../crypto/ed25519";
+import { Secp256k1PrivateKey, Secp256k1PublicKey } from "../crypto/secp256k1";
+import { MultiEd25519PublicKey } from "../crypto/multi_ed25519";
 
 /**
  * Class for creating and managing account on Aptos network
@@ -34,6 +36,11 @@ export class Account {
   readonly accountAddress: AccountAddress;
 
   /**
+   * Signing scheme used to sign transactions
+   */
+  readonly signingScheme: SigningScheme;
+
+  /**
    * constructor for Account
    *
    * Need to update this to use the new crypto library if new schemes are added.
@@ -49,6 +56,19 @@ export class Account {
 
     // Derive the public key from the private key
     this.publicKey = privateKey.publicKey();
+
+    // Derive the signing scheme from the public key
+    if (this.publicKey instanceof Ed25519PublicKey) {
+      this.signingScheme = SigningScheme.Ed25519;
+    } else if (this.publicKey instanceof MultiEd25519PublicKey) {
+      this.signingScheme = SigningScheme.MultiEd25519;
+    } else if (this.publicKey instanceof Secp256k1PublicKey) {
+      // Secp256k1
+      this.signingScheme = SigningScheme.Secp256k1Ecdsa;
+    } else {
+      throw new Error("Can not create new Account, unsupported public key type");
+    }
+
     this.privateKey = privateKey;
     this.accountAddress = address;
   }
@@ -56,10 +76,24 @@ export class Account {
   /**
    * Derives an account with random private key and address
    *
+   * @param args.scheme SigningScheme - type of SigningScheme to use.
+   * Currently only Ed25519, MultiEd25519, and Secp256k1 are supported
+   *
    * @returns Account
    */
-  static generate(): Account {
-    const privateKey = Ed25519PrivateKey.generate();
+  static generate(args: { scheme: SigningScheme }): Account {
+    const { scheme } = args;
+    let privateKey: PrivateKey;
+
+    if (scheme === SigningScheme.Ed25519) {
+      privateKey = Ed25519PrivateKey.generate();
+    } else if (scheme === SigningScheme.Secp256k1Ecdsa) {
+      privateKey = Secp256k1PrivateKey.generate();
+    } else {
+      // TODO: Add support for MultiEd25519
+      throw new Error(`Can not generate new Private Key, unsupported signing scheme ${scheme}`);
+    }
+
     const address = new AccountAddress({ data: Account.authKey({ publicKey: privateKey.publicKey() }).toUint8Array() });
     return new Account({ privateKey, address });
   }
