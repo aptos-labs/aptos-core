@@ -77,7 +77,7 @@ export class Account {
    * Derives an account with random private key and address
    *
    * @param args.scheme SigningScheme - type of SigningScheme to use.
-   * Currently only Ed25519, MultiEd25519, and Secp256k1 are supported
+   * Currently only Ed25519, and Secp256k1 are supported
    *
    * @returns Account
    */

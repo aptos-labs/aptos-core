@@ -845,9 +845,10 @@ export type TableItemRequest = {
 export type AuthenticationKeyScheme = SigningScheme | DeriveScheme;
 
 /**
- * A list of signing schemes that are supported by Aptos.
+ * A list of signing schemes that are supported by Aptos. It serves as a domain separator
+ * when hashing a public key to derive its corresponding authentication key.
  *
- * https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L375-L378
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L375-L378}
  */
 export enum SigningScheme {
   /**
@@ -866,6 +867,8 @@ export enum SigningScheme {
 
 /**
  * Scheme used for deriving account addresses from other data
+ *
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L375-L378}
  */
 export enum DeriveScheme {
   /**
