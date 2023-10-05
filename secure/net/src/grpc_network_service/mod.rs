@@ -20,7 +20,7 @@ use tonic::{
     Request, Response, Status,
 };
 
-const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 40;
+const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 80;
 
 pub struct GRPCNetworkMessageServiceServerWrapper {
     inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,

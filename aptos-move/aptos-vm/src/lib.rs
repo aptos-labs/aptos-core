@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
+//#![forbid(unsafe_code)]
 
 //! # The VM runtime
 //!
