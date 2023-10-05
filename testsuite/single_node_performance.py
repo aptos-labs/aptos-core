@@ -160,6 +160,11 @@ else:
 
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
 
+DATA_DIR = os.environ.get("DATA_DIR")
+if not(DATA_DIR):
+    print("Please set env_var DATA_DIR")
+    exit()
+
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
 
@@ -336,7 +341,7 @@ def print_table(
 errors = []
 warnings = []
 
-with tempfile.TemporaryDirectory() as tmpdirname:
+with tempfile.TemporaryDirectory(dir=DATA_DIR) as tmpdirname:
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"cargo run {BUILD_FLAG} -- --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
