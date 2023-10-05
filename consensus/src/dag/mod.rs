@@ -15,6 +15,7 @@ mod dag_store;
 mod observability;
 mod order_rule;
 mod rb_handler;
+mod round_state;
 mod storage;
 #[cfg(test)]
 mod tests;
