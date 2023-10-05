@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loaded_data::instance_uid::{GlobalCache, InstanceUID};
+use crate::loaded_data::instance_uid::{InstanceUID, InstanceUniverse};
 use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
@@ -17,8 +17,8 @@ use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
-pub static GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE: Lazy<GlobalCache<StructIdentifier>> =
-    Lazy::new(|| GlobalCache::new());
+pub static STRUCT_IDENTIFIER_IDS_UNIVERSE: Lazy<InstanceUniverse<StructIdentifier>> =
+    Lazy::new(|| InstanceUniverse::new());
 
 pub type StructIdentifierUID = InstanceUID<'static, StructIdentifier>;
 

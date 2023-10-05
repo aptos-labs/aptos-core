@@ -218,8 +218,8 @@ pub(crate) fn is_valid_txn_arg(typ: &Type, allowed_structs: &ConstructorMap) -> 
         Struct { name, .. } | StructInstantiation { name, .. } => {
             let full_name = format!(
                 "{}::{}",
-                name.uncompressed().module.short_str_lossless(),
-                name.uncompressed().name
+                name.inner_ref().module.short_str_lossless(),
+                name.inner_ref().name
             );
             allowed_structs.contains_key(&full_name)
         },
@@ -346,8 +346,8 @@ pub(crate) fn recursively_construct_arg(
             // performed in `is_valid_txn_arg`
             let full_name = format!(
                 "{}::{}",
-                name.uncompressed().module.short_str_lossless(),
-                name.uncompressed().name
+                name.inner_ref().module.short_str_lossless(),
+                name.inner_ref().name
             );
             let constructor = allowed_structs
                 .get(&full_name)

@@ -26,7 +26,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
-    StructIdentifier, StructIdentifierUID, StructType, Type, GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE,
+    StructIdentifier, StructIdentifierUID, StructType, Type, STRUCT_IDENTIFIER_IDS_UNIVERSE,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -115,7 +115,7 @@ impl ModuleCache {
             field_names,
             abilities,
             type_parameters,
-            name: GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE.compress(StructIdentifier {
+            name: STRUCT_IDENTIFIER_IDS_UNIVERSE.get(StructIdentifier {
                 name,
                 module: module.self_id(),
             }),
@@ -289,12 +289,10 @@ impl Module {
                         .with_message("Ability definition of module mismatch".to_string()));
                     }
                 }
-                struct_names.push(
-                    GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE.compress(StructIdentifier {
-                        module: module_id,
-                        name: struct_name.to_owned(),
-                    }),
-                )
+                struct_names.push(STRUCT_IDENTIFIER_IDS_UNIVERSE.get(StructIdentifier {
+                    module: module_id,
+                    name: struct_name.to_owned(),
+                }))
             }
 
             // Build signature table

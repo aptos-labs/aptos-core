@@ -27,7 +27,7 @@ use move_core_types::{
 };
 use move_vm_types::loaded_data::runtime_types::{
     DepthFormula, StructIdentifier, StructIdentifierUID, StructType, Type,
-    GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE,
+    STRUCT_IDENTIFIER_IDS_UNIVERSE,
 };
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
@@ -1176,7 +1176,7 @@ impl Loader {
     ) -> PartialVMResult<Arc<StructType>> {
         self.module_cache
             .read()
-            .resolve_struct_by_name(&name.uncompressed().name, &name.uncompressed().module)
+            .resolve_struct_by_name(&name.inner_ref().name, &name.inner_ref().module)
     }
 }
 
@@ -1561,12 +1561,10 @@ impl Script {
                         .finish(Location::Script),
                 );
             }
-            struct_names.push(
-                GLOBAL_STRUCT_IDENTIFIER_IDS_CACHE.compress(StructIdentifier {
-                    module: module_id,
-                    name: struct_name.to_owned(),
-                }),
-            );
+            struct_names.push(STRUCT_IDENTIFIER_IDS_UNIVERSE.get(StructIdentifier {
+                module: module_id,
+                name: struct_name.to_owned(),
+            }));
         }
 
         let mut function_refs = vec![];
@@ -1807,9 +1805,9 @@ impl Loader {
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let struct_tag = StructTag {
-            address: *name.uncompressed().module.address(),
-            module: name.uncompressed().module.name().to_owned(),
-            name: name.uncompressed().name.clone(),
+            address: *name.inner_ref().module.address(),
+            module: name.inner_ref().module.name().to_owned(),
+            name: name.inner_ref().name.clone(),
             type_params: ty_arg_tags,
         };
 
