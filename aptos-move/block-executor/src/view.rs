@@ -387,18 +387,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
     for LatestView<'a, T, S, X>
 {
-    type Key = T::Key;
+    type GroupKey = T::Key;
+    type ResourceTag = T::Tag;
     type Layout = MoveTypeLayout;
-    type Tag = T::Tag;
 
-    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         unimplemented!("TResourceGroupView not yet implemented");
     }
 
     fn get_resource_from_group(
         &self,
-        _state_key: &Self::Key,
-        _resource_tag: &Self::Tag,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
         _maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
         unimplemented!("TResourceGroupView not yet implemented");
@@ -406,16 +406,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
 
     fn resource_size_in_group(
         &self,
-        _state_key: &Self::Key,
-        _resource_tag: &Self::Tag,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
     ) -> anyhow::Result<u64> {
         unimplemented!("TResourceGroupView not yet implemented");
     }
 
     fn resource_exists_in_group(
         &self,
-        _state_key: &Self::Key,
-        _resource_tag: &Self::Tag,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
     ) -> anyhow::Result<bool> {
         unimplemented!("TResourceGroupView not yet implemented");
     }

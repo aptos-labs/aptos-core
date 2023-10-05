@@ -59,8 +59,8 @@ pub trait ExecutorTask: Sync {
             MoveTypeLayout,
             <Self::Txn as Transaction>::Identifier,
         > + TResourceGroupView<
-            Key = <Self::Txn as Transaction>::Key,
-            Tag = <Self::Txn as Transaction>::Tag,
+            GroupKey = <Self::Txn as Transaction>::Key,
+            ResourceTag = <Self::Txn as Transaction>::Tag,
             Layout = MoveTypeLayout,
         >),
         txn: &Self::Txn,

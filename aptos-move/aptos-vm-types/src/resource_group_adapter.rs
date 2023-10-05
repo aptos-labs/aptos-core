@@ -133,50 +133,52 @@ impl<'r> ResourceGroupAdapter<'r> {
 }
 
 impl TResourceGroupView for ResourceGroupAdapter<'_> {
-    type Key = StateKey;
-    type Tag = StructTag;
+    type GroupKey = StateKey;
+    type ResourceTag = StructTag;
     type Layout = MoveTypeLayout;
 
-    fn resource_group_size(&self, state_key: &StateKey) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         if self.group_size_kind == GroupSizeKind::None {
             return Ok(0);
         }
 
         if let Some(group_view) = self.maybe_resource_group_view {
-            return group_view.resource_group_size(state_key);
+            return group_view.resource_group_size(group_key);
         }
 
-        self.ensure_cached(state_key)?;
+        self.ensure_cached(group_key)?;
         Ok(self
             .group_cache
             .borrow()
-            .get(state_key)
+            .get(group_key)
             .expect("Must be cached")
             .1)
     }
 
     fn get_resource_from_group(
         &self,
-        state_key: &StateKey,
-        resource_tag: &StructTag,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<Option<Bytes>> {
         if let Some(group_view) = self.maybe_resource_group_view {
-            return group_view.get_resource_from_group(state_key, resource_tag, maybe_layout);
+            return group_view.get_resource_from_group(group_key, resource_tag, maybe_layout);
         }
 
-        self.ensure_cached(state_key)?;
+        self.ensure_cached(group_key)?;
         Ok(self
             .group_cache
             .borrow()
-            .get(state_key)
+            .get(group_key)
             .expect("Must be cached")
             .0 // btreemap
             .get(resource_tag)
             .cloned())
     }
 
-    fn release_group_cache(&self) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
+    fn release_group_cache(
+        &self,
+    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
         self.release_group_cache()
     }
 }

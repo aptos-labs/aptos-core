@@ -59,8 +59,8 @@ pub trait TResourceView {
 /// via TResourceView's corresponding interfaces w. key (get_resource_state_value_metadata &
 /// resource_exists). This simplifies interfaces for now, TODO: revisit later.
 pub trait TResourceGroupView {
-    type Key;
-    type Tag;
+    type GroupKey;
+    type ResourceTag;
     type Layout;
 
     /// The size of the resource group, based on the sizes of the latest entries at observed
@@ -76,12 +76,12 @@ pub trait TResourceGroupView {
     /// the parallel execution setting, as a wrong value will be (later) caught by validation.
     /// Thus, R/W conflicts are avoided, as long as the estimates are correct (e.g. updating
     /// struct members of a fixed size).
-    fn resource_group_size(&self, state_key: &Self::Key) -> anyhow::Result<u64>;
+    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64>;
 
     fn get_resource_from_group(
         &self,
-        state_key: &Self::Key,
-        resource_tag: &Self::Tag,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>>;
 
@@ -92,10 +92,10 @@ pub trait TResourceGroupView {
     /// determined by the following method.
     fn resource_size_in_group(
         &self,
-        state_key: &Self::Key,
-        resource_tag: &Self::Tag,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
     ) -> anyhow::Result<u64> {
-        self.get_resource_from_group(state_key, resource_tag, None)
+        self.get_resource_from_group(group_key, resource_tag, None)
             .map(|maybe_bytes| {
                 maybe_bytes.map_or_else(
                     || 0,
@@ -119,10 +119,10 @@ pub trait TResourceGroupView {
     /// which in the context of parallel execution does not cause a full R/W conflict.
     fn resource_exists_in_group(
         &self,
-        state_key: &Self::Key,
-        resource_tag: &Self::Tag,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
     ) -> anyhow::Result<bool> {
-        self.get_resource_from_group(state_key, resource_tag, None)
+        self.get_resource_from_group(group_key, resource_tag, None)
             .map(|maybe_bytes| maybe_bytes.is_some())
     }
 
@@ -132,7 +132,9 @@ pub trait TResourceGroupView {
     ///
     /// The trait allows releasing the cache in such cases. Otherwise (default behavior),
     /// if naive cache is not implemeneted (e.g. in block executor), None is returned.
-    fn release_group_cache(&self) -> Option<HashMap<Self::Key, BTreeMap<Self::Tag, Bytes>>> {
+    fn release_group_cache(
+        &self,
+    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
         None
     }
 }
@@ -209,28 +211,28 @@ pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, Aggre
 impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
 
 pub trait ResourceGroupView:
-    TResourceGroupView<Key = StateKey, Tag = StructTag, Layout = MoveTypeLayout>
+    TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
 {
 }
 
 impl<T> ResourceGroupView for T where
-    T: TResourceGroupView<Key = StateKey, Tag = StructTag, Layout = MoveTypeLayout>
+    T: TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
 {
 }
 
 impl TResourceGroupView for () {
-    type Key = StateKey;
-    type Tag = StructTag;
+    type GroupKey = StateKey;
+    type ResourceTag = StructTag;
     type Layout = MoveTypeLayout;
 
-    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         unimplemented!("Trait implementated for () for type resolution");
     }
 
     fn get_resource_from_group(
         &self,
-        _state_key: &Self::Key,
-        _resource_tag: &Self::Tag,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
         _maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
         unimplemented!("Trait implementated for () for type resolution");

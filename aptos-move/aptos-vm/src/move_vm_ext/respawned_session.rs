@@ -175,31 +175,31 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
 }
 
 impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
-    type Key = StateKey;
+    type GroupKey = StateKey;
+    type ResourceTag = StructTag;
     type Layout = MoveTypeLayout;
-    type Tag = StructTag;
 
-    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
         Ok(0)
     }
 
     fn get_resource_from_group(
         &self,
-        state_key: &Self::Key,
-        resource_tag: &Self::Tag,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
         self.change_set
             .resource_group_write_set()
-            .get(state_key)
+            .get(group_key)
             .and_then(|g| g.inner_ops.get(resource_tag))
             .map(|op| op.extract_raw_bytes())
             .ok_or(anyhow::Error::msg("Must be ignored immediately after"))
             .or_else(|_| {
                 // Not found in change-set, fall back to the base executor view.
                 self.base_resource_group_view.get_resource_from_group(
-                    state_key,
+                    group_key,
                     resource_tag,
                     maybe_layout,
                 )
