@@ -1112,7 +1112,6 @@ impl AptosVM {
             txn,
             &txn_data,
             log_context,
-            false,
         ));
 
         if self.vm_impl.get_gas_feature_version() >= 1 {
@@ -1535,7 +1534,6 @@ impl AptosVM {
         transaction: &SignedTransaction,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        is_simulation: bool,
     ) -> Result<(), VMStatus> {
         if transaction.contains_duplicate_signers() {
             return Err(VMStatus::error(
@@ -1549,7 +1547,6 @@ impl AptosVM {
             transaction.payload(),
             txn_data,
             log_context,
-            is_simulation,
         )
     }
 
@@ -1560,8 +1557,6 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        // Whether the prologue is run as part of tx simulation.
-        is_simulation: bool,
     ) -> Result<(), VMStatus> {
         match payload {
             TransactionPayload::Script(_) => {
@@ -1585,7 +1580,7 @@ impl AptosVM {
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.
-                if !is_simulation {
+                if !self.is_simulation {
                     self.vm_impl.run_multisig_prologue(
                         session,
                         txn_data,
@@ -1646,7 +1641,6 @@ impl AptosVM {
             txn,
             &txn_data,
             log_context,
-            true,
         ));
 
         let storage_gas_params =
@@ -1980,7 +1974,6 @@ impl VMValidator for AptosVM {
             &txn,
             &txn_data,
             &log_context,
-            false,
         );
 
         // Increment the counter for transactions verified.
