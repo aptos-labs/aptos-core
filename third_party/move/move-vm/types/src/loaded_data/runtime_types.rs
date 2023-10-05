@@ -372,11 +372,11 @@ impl Type {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
-                AbilitySet::VECTOR,
-                vec![false],
-                vec![ty.abilities()?],
-            ),
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    ty.abilities()?
+                ])
+            },
             Type::Struct { ability, .. } => Ok(*ability),
             Type::StructInstantiation {
                 ty_args,
