@@ -11,7 +11,7 @@ use crate::{
     errors::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     view::{LatestView, ParallelState, SequentialState, ViewState},
@@ -27,6 +27,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     executable::Executable,
     fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -493,7 +494,7 @@ where
     pub(crate) fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
@@ -569,7 +570,7 @@ where
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: &Vec<T>,
+        signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
@@ -677,19 +678,19 @@ where
     pub fn execute_block(
         &self,
         executor_arguments: E::Argument,
-        signature_verified_block: Vec<T>,
+        signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
         let mut ret = if self.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
-                &signature_verified_block,
+                signature_verified_block,
                 base_view,
             )
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                signature_verified_block,
                 base_view,
             )
         };
@@ -703,14 +704,10 @@ where
 
             ret = self.execute_transactions_sequential(
                 executor_arguments,
-                &signature_verified_block,
+                signature_verified_block,
                 base_view,
             )
         }
-        self.executor_thread_pool.spawn(move || {
-            // Explicit async drops.
-            drop(signature_verified_block);
-        });
         ret
     }
 }

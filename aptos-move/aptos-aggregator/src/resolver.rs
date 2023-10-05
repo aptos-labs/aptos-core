@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaOp},
     module::AGGREGATOR_MODULE,
 };
 use aptos_types::{
+    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadataKind},
@@ -132,9 +132,10 @@ impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>> A
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils {
     use super::*;
-    use crate::{aggregator_extension::AggregatorHandle, delta_change_set::serialize};
-    use aptos_types::state_store::{
-        state_key::StateKey, state_value::StateValue, table::TableHandle,
+    use crate::delta_change_set::serialize;
+    use aptos_types::{
+        aggregator::AggregatorHandle,
+        state_store::{state_key::StateKey, state_value::StateValue, table::TableHandle},
     };
     use move_core_types::account_address::AccountAddress;
     use std::collections::HashMap;

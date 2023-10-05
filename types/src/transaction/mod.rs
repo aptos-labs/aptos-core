@@ -44,9 +44,13 @@ mod change_set;
 mod module;
 mod multisig;
 mod script;
+pub mod signature_verified_transaction;
 mod transaction_argument;
 
-use crate::fee_statement::FeeStatement;
+use crate::{
+    contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
+    write_set::TransactionWrite,
+};
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
@@ -56,6 +60,7 @@ pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
+use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -574,7 +579,7 @@ impl Deref for SignatureCheckedTransaction {
     }
 }
 
-impl fmt::Debug for SignedTransaction {
+impl Debug for SignedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -734,6 +739,11 @@ impl SignedTransaction {
     pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(SignatureCheckedTransaction(self))
+    }
+
+    pub fn verify_signature(&self) -> Result<()> {
+        self.authenticator.verify(&self.raw_txn)?;
+        Ok(())
     }
 
     /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
@@ -1793,4 +1803,28 @@ impl TryFrom<Transaction> for SignedTransaction {
             _ => Err(format_err!("Not a user transaction.")),
         }
     }
+}
+
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
+/// transaction will write to a key value storage as their side effect.
+pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
+    /// specifying a tag, and output requires merging all resources together (Note: this may change
+    /// in the future if write-set format changes to be per-resource, could be more performant).
+    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
+    type Tag: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + DeserializeOwned
+        + Serialize;
+    /// AggregatorV2 identifier type.
+    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
+    type Value: Send + Sync + Clone + TransactionWrite;
+    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
