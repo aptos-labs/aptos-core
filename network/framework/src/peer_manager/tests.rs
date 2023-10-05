@@ -50,18 +50,19 @@ pub fn build_test_transport(
 
     memory_transport
         .and_then(move |socket, addr, origin| async move {
-            Ok(Connection {
+            let connection_metadata = ConnectionMetadata::new(
+                PeerId::random(),
+                ConnectionId::default(),
+                addr,
+                origin,
+                MessagingProtocolVersion::V1,
+                ProtocolIdSet::mock(),
+                PeerRole::Unknown,
+            );
+            Ok(Connection::new_with_single_socket(
                 socket,
-                metadata: ConnectionMetadata::new(
-                    PeerId::random(),
-                    ConnectionId::default(),
-                    addr,
-                    origin,
-                    MessagingProtocolVersion::V1,
-                    ProtocolIdSet::mock(),
-                    PeerRole::Unknown,
-                ),
-            })
+                connection_metadata,
+            ))
         })
         .boxed()
 }
@@ -234,18 +235,16 @@ fn create_connection<TSocket: transport::TSocket>(
     origin: ConnectionOrigin,
     connection_id: ConnectionId,
 ) -> Connection<TSocket> {
-    Connection {
-        socket,
-        metadata: ConnectionMetadata::new(
-            peer_id,
-            connection_id,
-            addr,
-            origin,
-            MessagingProtocolVersion::V1,
-            ProtocolIdSet::mock(),
-            PeerRole::Unknown,
-        ),
-    }
+    let connection_metadata = ConnectionMetadata::new(
+        peer_id,
+        connection_id,
+        addr,
+        origin,
+        MessagingProtocolVersion::V1,
+        ProtocolIdSet::mock(),
+        PeerRole::Unknown,
+    );
+    Connection::new_with_single_socket(socket, connection_metadata)
 }
 
 #[test]

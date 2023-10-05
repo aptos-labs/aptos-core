@@ -86,7 +86,7 @@ pub fn fuzz(data: &[u8]) {
         ProtocolIdSet::all_known(),
         PeerRole::Unknown,
     );
-    let connection = Connection { socket, metadata };
+    let connection = Connection::new_with_single_socket(socket, metadata);
 
     let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(8);
     let channel_size = 8;

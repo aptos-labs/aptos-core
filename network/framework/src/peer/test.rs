@@ -58,18 +58,16 @@ fn build_test_peer(
 ) {
     let (a, b) = MemorySocket::new_pair();
     let peer_id = PeerId::random();
-    let connection = Connection {
-        metadata: ConnectionMetadata::new(
-            peer_id,
-            ConnectionId::default(),
-            NetworkAddress::from_str("/ip4/127.0.0.1/tcp/8081").unwrap(),
-            origin,
-            MessagingProtocolVersion::V1,
-            ProtocolIdSet::empty(),
-            PeerRole::Unknown,
-        ),
-        socket: a,
-    };
+    let connection_metadata = ConnectionMetadata::new(
+        peer_id,
+        ConnectionId::default(),
+        NetworkAddress::from_str("/ip4/127.0.0.1/tcp/8081").unwrap(),
+        origin,
+        MessagingProtocolVersion::V1,
+        ProtocolIdSet::empty(),
+        PeerRole::Unknown,
+    );
+    let connection = Connection::new_with_single_socket(a, connection_metadata);
 
     let (connection_notifs_tx, connection_notifs_rx) = aptos_channels::new_test(1);
     let (peer_reqs_tx, peer_reqs_rx) =
@@ -123,7 +121,7 @@ fn build_test_connected_peers(
         build_test_peer(executor, time_service, ConnectionOrigin::Outbound);
 
     // Make sure both peers are connected
-    peer_b.connection = Some(connection_a);
+    peer_b.connection = Some(vec![connection_a]);
     (
         (
             peer_a,

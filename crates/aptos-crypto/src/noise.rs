@@ -138,7 +138,7 @@ const _: [(); 32] = [(); HashValue::LENGTH];
 //
 
 /// A NoiseError enum represents the different types of error that noise can return to users of the crate
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum NoiseError {
     /// the received message is too short to contain the expected data
     #[error("noise: the received message is too short to contain the expected data")]

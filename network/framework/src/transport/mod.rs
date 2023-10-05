@@ -180,12 +180,38 @@ impl fmt::Display for ConnectionMetadata {
     }
 }
 
-/// The `Connection` struct consists of connection metadata and the actual socket for
-/// communication.
+/// The `Connection` struct consists of connection metadata and the actual
+/// sockets for communication.
 #[derive(Debug)]
 pub struct Connection<TSocket> {
-    pub socket: TSocket,
+    pub sockets: Vec<TSocket>,
     pub metadata: ConnectionMetadata,
+}
+
+impl<TSocket> Connection<TSocket> {
+    /// Returns a new connection with a single socket
+    pub fn new_with_single_socket(
+        socket: TSocket,
+        metadata: ConnectionMetadata,
+    ) -> Connection<TSocket> {
+        Connection {
+            sockets: vec![socket],
+            metadata,
+        }
+    }
+
+    /// Returns a new connection with multiple sockets
+    pub fn new_with_multiple_sockets(
+        sockets: Vec<TSocket>,
+        metadata: ConnectionMetadata,
+    ) -> Connection<TSocket> {
+        Connection { sockets, metadata }
+    }
+
+    /// Returns a reference to the first socket in the connection
+    pub fn get_first_socket(&mut self) -> &mut TSocket {
+        &mut self.sockets[0]
+    }
 }
 
 /// Convenience function for adding a timeout to a Future that returns an `io::Result`.
@@ -319,18 +345,19 @@ async fn upgrade_inbound<T: TSocket>(
         })?;
 
     // return successful connection
-    Ok(Connection {
+    let connection_metadata = ConnectionMetadata::new(
+        remote_peer_id,
+        CONNECTION_ID_GENERATOR.next(),
+        addr,
+        origin,
+        messaging_protocol,
+        application_protocols,
+        peer_role,
+    );
+    Ok(Connection::new_with_single_socket(
         socket,
-        metadata: ConnectionMetadata::new(
-            remote_peer_id,
-            CONNECTION_ID_GENERATOR.next(),
-            addr,
-            origin,
-            messaging_protocol,
-            application_protocols,
-            peer_role,
-        ),
-    })
+        connection_metadata,
+    ))
 }
 
 /// Upgrade an outbound connection. This means we run a Noise IK handshake for
@@ -394,18 +421,19 @@ pub async fn upgrade_outbound<T: TSocket>(
         })?;
 
     // return successful connection
-    Ok(Connection {
+    let connection_metadata = ConnectionMetadata::new(
+        remote_peer_id,
+        CONNECTION_ID_GENERATOR.next(),
+        addr,
+        origin,
+        messaging_protocol,
+        application_protocols,
+        peer_role,
+    );
+    Ok(Connection::new_with_single_socket(
         socket,
-        metadata: ConnectionMetadata::new(
-            remote_peer_id,
-            CONNECTION_ID_GENERATOR.next(),
-            addr,
-            origin,
-            messaging_protocol,
-            application_protocols,
-            peer_role,
-        ),
-    })
+        connection_metadata,
+    ))
 }
 
 /// The common AptosNet Transport.

@@ -273,9 +273,10 @@ fn test_transport_success<TTransport>(
         );
 
         // test the socket works
-        let msg = write_read_msg(&mut conn.socket, b"foobar").await;
+        let socket = conn.get_first_socket();
+        let msg = write_read_msg(socket, b"foobar").await;
         assert_eq!(&msg, b"barbaz".as_ref());
-        conn.socket.close().await.unwrap();
+        socket.close().await.unwrap();
     };
 
     // dial the listener, check the connection metadata, and verify that the
@@ -299,9 +300,10 @@ fn test_transport_success<TTransport>(
         assert_eq!(conn.metadata.application_protocols, supported_protocols);
 
         // test the socket works
-        let msg = write_read_msg(&mut conn.socket, b"barbaz").await;
+        let socket = conn.get_first_socket();
+        let msg = write_read_msg(socket, b"barbaz").await;
         assert_eq!(&msg, b"foobar".as_ref());
-        conn.socket.close().await.unwrap();
+        socket.close().await.unwrap();
     };
 
     rt.block_on(future::join(listener_task, dialer_task));
@@ -425,9 +427,10 @@ fn test_transport_maybe_mutual<TTransport>(
         );
 
         // test the socket works
-        let msg = write_read_msg(&mut conn.socket, b"foobar").await;
+        let socket = conn.get_first_socket();
+        let msg = write_read_msg(socket, b"foobar").await;
         assert_eq!(&msg, b"barbaz".as_ref());
-        conn.socket.close().await.unwrap();
+        socket.close().await.unwrap();
 
         // Clear the trusted peers and see that we can still connect to the remote but with it
         // being untrusted
@@ -454,9 +457,10 @@ fn test_transport_maybe_mutual<TTransport>(
         assert_eq!(conn.metadata.role, PeerRole::Unknown);
 
         // test the socket works
-        let msg = write_read_msg(&mut conn.socket, b"foobar").await;
+        let socket = conn.get_first_socket();
+        let msg = write_read_msg(socket, b"foobar").await;
         assert_eq!(&msg, b"barbaz".as_ref());
-        conn.socket.close().await.unwrap();
+        socket.close().await.unwrap();
     };
 
     // dial the listener, check the connection metadata, and verify that the
@@ -480,9 +484,10 @@ fn test_transport_maybe_mutual<TTransport>(
         assert_eq!(conn.metadata.application_protocols, supported_protocols);
 
         // test the socket works
-        let msg = write_read_msg(&mut conn.socket, b"barbaz").await;
+        let socket = conn.get_first_socket();
+        let msg = write_read_msg(socket, b"barbaz").await;
         assert_eq!(&msg, b"foobar".as_ref());
-        conn.socket.close().await.unwrap();
+        socket.close().await.unwrap();
 
         // Dial again as an "untrusted" dialer
 
@@ -504,9 +509,10 @@ fn test_transport_maybe_mutual<TTransport>(
         assert_eq!(conn.metadata.application_protocols, supported_protocols);
 
         // test the socket works
-        let msg = write_read_msg(&mut conn.socket, b"barbaz").await;
+        let socket = conn.get_first_socket();
+        let msg = write_read_msg(socket, b"barbaz").await;
         assert_eq!(&msg, b"foobar".as_ref());
-        conn.socket.close().await.unwrap();
+        socket.close().await.unwrap();
     };
 
     rt.block_on(future::join(listener_task, dialer_task));

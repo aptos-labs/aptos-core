@@ -16,10 +16,7 @@ use crate::{
     counters::{self},
     logging::*,
     peer::{Peer, PeerNotification, PeerRequest},
-    transport::{
-        Connection, ConnectionId, ConnectionMetadata, TSocket as TransportTSocket,
-        TRANSPORT_TIMEOUT,
-    },
+    transport::{Connection, ConnectionId, ConnectionMetadata, TSocket as TransportTSocket},
     ProtocolId,
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -27,11 +24,11 @@ use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::{ConnectionOrigin, Transport};
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_time_service::TimeService;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{
     channel::oneshot,
-    io::{AsyncRead, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite},
     sink::SinkExt,
     stream::StreamExt,
 };
@@ -569,16 +566,19 @@ where
         }
     }
 
-    fn disconnect(&mut self, connection: Connection<TSocket>) {
+    fn disconnect(&mut self, _connection: Connection<TSocket>) {
+
+        // Close connection, and drop it.
+        // TODO: fix me!
+        /*
         let network_context = self.network_context;
         let time_service = self.time_service.clone();
 
-        // Close connection, and drop it
         let drop_fut = async move {
             let mut connection = connection;
             let peer_id = connection.metadata.remote_peer_id;
             if let Err(e) = time_service
-                .timeout(TRANSPORT_TIMEOUT, connection.socket.close())
+                .timeout(TRANSPORT_TIMEOUT, connection.close_sockets())
                 .await
             {
                 warn!(
@@ -593,6 +593,7 @@ where
             };
         };
         self.executor.spawn(drop_fut);
+         */
     }
 
     fn add_peer(&mut self, connection: Connection<TSocket>) -> Result<(), Error> {

@@ -118,8 +118,8 @@ pub struct Peer<TSocket> {
     time_service: TimeService,
     /// Connection specific information.
     connection_metadata: ConnectionMetadata,
-    /// Underlying connection.
-    connection: Option<TSocket>,
+    /// Underlying connection (with multiple sockets) to the remote peer
+    connection: Option<Vec<TSocket>>,
     /// Channel to notify PeerManager that we've disconnected.
     connection_notifs_tx: aptos_channels::Sender<TransportNotification<TSocket>>,
     /// Channel to receive requests from PeerManager to send messages and rpcs.
@@ -161,7 +161,7 @@ where
     ) -> Self {
         let Connection {
             metadata: connection_metadata,
-            socket,
+            sockets,
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
         let max_fragments = max_message_size / max_frame_size;
@@ -170,7 +170,7 @@ where
             executor,
             time_service: time_service.clone(),
             connection_metadata,
-            connection: Some(socket),
+            connection: Some(sockets),
             connection_notifs_tx,
             peer_reqs_rx,
             peer_notifs_tx,
@@ -209,8 +209,10 @@ where
         );
 
         // Split the connection into a ReadHalf and a WriteHalf.
-        let (read_socket, write_socket) =
-            tokio::io::split(self.connection.take().unwrap().compat());
+        // TODO: fix this!
+        let mut connection = self.connection.take().unwrap();
+        let socket = connection.remove(0);
+        let (read_socket, write_socket) = tokio::io::split(socket.compat());
 
         let mut reader =
             MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
