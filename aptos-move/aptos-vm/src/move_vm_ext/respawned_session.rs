@@ -18,7 +18,10 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
-    resolver::{ExecutorView, StateStorageView, TModuleView, TResourceGroupView, TResourceView},
+    resolver::{
+        ExecutorView, ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView,
+        TResourceView,
+    },
     storage::ChangeSetConfigs,
 };
 use bytes::Bytes;
@@ -52,12 +55,15 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
-        let executor_view =
-            ExecutorViewWithChangeSet::new(base.as_executor_view(), previous_session_change_set);
+        let executor_view = ExecutorViewWithChangeSet::new(
+            base.as_executor_view(),
+            base.as_resource_group_view(),
+            previous_session_change_set,
+        );
 
         Ok(RespawnedSessionBuilder {
             executor_view,
-            resolver_builder: |executor_view| vm.as_move_resolver(executor_view, false),
+            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
             session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
             storage_refund,
         }
@@ -107,13 +113,22 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
 pub struct ExecutorViewWithChangeSet<'r> {
-    base: &'r dyn ExecutorView,
+    base_executor_view: &'r dyn ExecutorView,
+    base_resource_group_view: &'r dyn ResourceGroupView,
     change_set: VMChangeSet,
 }
 
 impl<'r> ExecutorViewWithChangeSet<'r> {
-    pub(crate) fn new(base: &'r dyn ExecutorView, change_set: VMChangeSet) -> Self {
-        Self { base, change_set }
+    pub(crate) fn new(
+        base_executor_view: &'r dyn ExecutorView,
+        base_resource_group_view: &'r dyn ResourceGroupView,
+        change_set: VMChangeSet,
+    ) -> Self {
+        Self {
+            base_executor_view,
+            base_resource_group_view,
+            change_set,
+        }
     }
 }
 
@@ -128,12 +143,14 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
-                .base
+                .base_executor_view
                 .try_convert_aggregator_v1_delta_into_write_op(id, delta_op, mode)?
                 .as_state_value()),
             None => match self.change_set.aggregator_v1_write_set().get(id) {
                 Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base.get_aggregator_v1_state_value(id, mode),
+                None => self
+                    .base_executor_view
+                    .get_aggregator_v1_state_value(id, mode),
             },
         }
     }
@@ -150,7 +167,9 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base.get_resource_state_value(state_key, maybe_layout),
+            None => self
+                .base_executor_view
+                .get_resource_state_value(state_key, maybe_layout),
         }
     }
 }
@@ -179,8 +198,11 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .ok_or(anyhow::Error::msg("Must be ignored immediately after"))
             .or_else(|_| {
                 // Not found in change-set, fall back to the base executor view.
-                self.base
-                    .get_resource_from_group(state_key, resource_tag, maybe_layout)
+                self.base_resource_group_view.get_resource_from_group(
+                    state_key,
+                    resource_tag,
+                    maybe_layout,
+                )
             })
     }
 }
@@ -191,14 +213,14 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.module_write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base.get_module_state_value(state_key),
+            None => self.base_executor_view.get_module_state_value(state_key),
         }
     }
 }
 
 impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
     fn id(&self) -> StateViewId {
-        self.base.id()
+        self.base_executor_view.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
@@ -331,20 +353,26 @@ mod test {
             HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         let resource_group_write_set = HashMap::from([
-            (key("resource_group_both"), GroupWrite {
-                metadata_op: WriteOp::Deletion, // should be irrelevant for the test
-                inner_ops: HashMap::from([
-                    (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
-                    (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
-                ]),
-            }),
-            (key("resource_group_write_set"), GroupWrite {
-                metadata_op: WriteOp::Deletion, // should be irrelevant for the test
-                inner_ops: HashMap::from([(
-                    mock_tag_1(),
-                    WriteOp::Modification(serialize(&5000).into()),
-                )]),
-            }),
+            (
+                key("resource_group_both"),
+                GroupWrite {
+                    metadata_op: WriteOp::Deletion, // should be irrelevant for the test
+                    inner_ops: HashMap::from([
+                        (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
+                        (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
+                    ]),
+                },
+            ),
+            (
+                key("resource_group_write_set"),
+                GroupWrite {
+                    metadata_op: WriteOp::Deletion, // should be irrelevant for the test
+                    inner_ops: HashMap::from([(
+                        mock_tag_1(),
+                        WriteOp::Modification(serialize(&5000).into()),
+                    )]),
+                },
+            ),
         ]);
 
         let change_set = VMChangeSet::new(

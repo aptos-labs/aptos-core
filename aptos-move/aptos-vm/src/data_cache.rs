@@ -5,8 +5,9 @@
 
 use crate::{
     aptos_vm_impl::gas_config,
-    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver, AsExecutorView},
-    storage_adapter::ExecutorViewBase,
+    move_vm_ext::{
+        get_max_binary_format_version, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+    },
 };
 #[allow(unused_imports)]
 use anyhow::Error;
@@ -24,8 +25,11 @@ use aptos_types::{
     },
 };
 use aptos_vm_types::{
-    resolver::{ExecutorView, StateStorageView, StateValueMetadataResolver, TResourceGroupView},
-    resource_group_adapter::{GroupSizeKind, ResourceGroupAdapter, UnifiedResourceView},
+    resolver::{
+        ExecutorView, ResourceGroupView, StateStorageView, StateValueMetadataResolver,
+        TResourceGroupView, TResourceView,
+    },
+    resource_group_adapter::ResourceGroupAdapter,
 };
 use bytes::Bytes;
 use move_binary_format::{errors::*, CompiledModule};
@@ -37,11 +41,9 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use paste::paste;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
-    ops::Deref,
 };
 
 pub(crate) fn get_resource_group_from_metadata(
@@ -56,24 +58,13 @@ pub(crate) fn get_resource_group_from_metadata(
         .find_map(|attr| attr.get_resource_group_member())
 }
 
-// Allows to keep a single `StorageAdapter` for both borrowed or owned views.
-// For example, views are typically borrowed during block execution, but are
-// owned in tests or in indexer.
-// We also do not use `std::borrow::CoW` because otherwise `E` (which is the
-// executor view) has to implement `Clone`.
-enum ExecutorViewKind<'e, E: 'e> {
-    Borrowed(&'e E),
-    Owned(E),
-}
+struct ConfigAdapter<'a, K, L>(&'a dyn TResourceView<Key = K, Layout = L>);
 
-impl<E> Deref for ExecutorViewKind<'_, E> {
-    type Target = E;
-
-    fn deref(&self) -> &Self::Target {
-        match *self {
-            ExecutorViewKind::Borrowed(e) => e,
-            ExecutorViewKind::Owned(ref e) => e,
-        }
+impl<'a> ConfigStorage for ConfigAdapter<'a, StateKey, MoveTypeLayout> {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
+        self.0
+            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .ok()?
     }
 }
 
@@ -83,28 +74,10 @@ impl<E> Deref for ExecutorViewKind<'_, E> {
 /// (that tie to specialized handling in block executor), or via 'standard' interfaces
 /// for (non-group) resources and subsequent handling in the StorageAdapter itself.
 pub struct StorageAdapter<'e, E> {
-    // Underlying storage backend, borrowed or owned.
-    executor_view: ExecutorViewKind<'e, E>,
+    executor_view: &'e E,
     max_binary_format_version: u32,
-    // Determines the way to compute the size of the group (based on gas version).
-    group_size_kind: GroupSizeKind,
-    // When block executor is true, and group_size_kind is AsBlob, we need to have an
-    // alternative way to provide resource group resolution for backwards compatibility.
-    // In all other cases, maybe_naive_group_view must be None.
-    maybe_naive_group_view: Option<ResourceGroupAdapter<'e>>,
+    resource_group_view: ResourceGroupAdapter<'e>,
     accessed_groups: RefCell<HashSet<StateKey>>,
-}
-
-macro_rules! apply_to_group_view {
-    ($self:ident, $f:ident ( $($p:ident),* )) => {{
-	paste!(
-        if let Some(group_view_override) = &$self.maybe_naive_group_view {
-            group_view_override.$f($($p, )*)
-        } else {
-            $self.executor_view.$f($($p, )*)
-        }
-	    )
-    }};
 }
 
 impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
@@ -112,51 +85,36 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         executor_view: &'e E,
         gas_feature_version: u64,
         features: &Features,
-        _block_executor: bool,
+        maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
         let max_binary_version = get_max_binary_format_version(features, gas_feature_version);
-        let group_size_kind = GroupSizeKind::from_gas_feature_version(gas_feature_version);
-        // TODO: when resource groups are supported in block executor, do not create Adapter
-        // when _block_executor = true & group_size_kind == GroupSizeKind::AsSum
-        let maybe_naive_group_view = Some(ResourceGroupAdapter::from_resource_view(
+        let resource_group_adapter = ResourceGroupAdapter::new(
+            maybe_resource_group_view,
             executor_view,
-            GroupSizeKind::AsBlob,
-        ));
-        let executor_view = ExecutorViewKind::Borrowed(executor_view);
+            gas_feature_version,
+        );
 
-        Self::new(
-            executor_view,
-            max_binary_version,
-            group_size_kind,
-            maybe_naive_group_view,
-        )
+        Self::new(executor_view, max_binary_version, resource_group_adapter)
     }
 
     // TODO(gelash, georgemitenkov): delete after simulation uses block executor.
-    pub(crate) fn from_borrowed(executor_view: &'e E, block_executor: bool) -> Self {
-        let config_view = UnifiedResourceView::ResourceView(executor_view);
+    pub(crate) fn from_borrowed(executor_view: &'e E) -> Self {
+        let config_view = ConfigAdapter(executor_view);
         let (_, gas_feature_version) = gas_config(&config_view);
         let features = Features::fetch_config(&config_view).unwrap_or_default();
 
-        Self::from_borrowed_with_config(
-            executor_view,
-            gas_feature_version,
-            &features,
-            block_executor,
-        )
+        Self::from_borrowed_with_config(executor_view, gas_feature_version, &features, None)
     }
 
     fn new(
-        executor_view: ExecutorViewKind<'e, E>,
+        executor_view: &'e E,
         max_binary_format_version: u32,
-        group_size_kind: GroupSizeKind,
-        maybe_naive_group_view: Option<ResourceGroupAdapter<'e>>,
+        resource_group_view: ResourceGroupAdapter<'e>,
     ) -> Self {
         Self {
             executor_view,
             max_binary_format_version,
-            group_size_kind,
-            maybe_naive_group_view,
+            resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
         }
     }
@@ -175,20 +133,20 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             ));
 
             let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
-            let need_size = self.group_size_kind != GroupSizeKind::None && first_access;
             let common_error = |e| -> VMError {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("{}", e))
                     .finish(Location::Undefined)
             };
 
-            let key_ref = &key;
-            let buf =
-                apply_to_group_view!(self, get_resource_from_group(key_ref, struct_tag, None))
-                    .map_err(common_error)?;
-
-            let group_size = if need_size {
-                apply_to_group_view!(self, resource_group_size(key_ref)).map_err(common_error)?
+            let buf = self
+                .resource_group_view
+                .get_resource_from_group(&key, struct_tag, None)
+                .map_err(common_error)?;
+            let group_size = if first_access {
+                self.resource_group_view
+                    .resource_group_size(&key)
+                    .map_err(common_error)?
             } else {
                 0
             };
@@ -217,7 +175,7 @@ impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {
     fn release_resource_group_cache(
         &self,
     ) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
-        apply_to_group_view!(self, release_naive_group_cache())
+        self.resource_group_view.release_group_cache()
     }
 }
 
@@ -293,22 +251,18 @@ impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
 
 /// Converts `StateView` into `AptosMoveResolver`.
 pub trait AsMoveResolver<S> {
-    fn as_move_resolver(&self) -> StorageAdapter<ExecutorViewBase<S>>;
+    fn as_move_resolver(&self) -> StorageAdapter<S>;
 }
 
 impl<S: StateView> AsMoveResolver<S> for S {
-    fn as_move_resolver(&self) -> StorageAdapter<ExecutorViewBase<S>> {
-        let config_view: UnifiedResourceView<'_, StateKey, MoveTypeLayout> =
-            UnifiedResourceView::StateView(self);
+    fn as_move_resolver(&self) -> StorageAdapter<S> {
+        let config_view = ConfigAdapter(self);
         let (_, gas_feature_version) = gas_config(&config_view);
         let features = Features::fetch_config(&config_view).unwrap_or_default();
-
         let max_binary_version = get_max_binary_format_version(&features, gas_feature_version);
-        let group_size_kind = GroupSizeKind::from_gas_feature_version(gas_feature_version);
+        let resource_group_adapter = ResourceGroupAdapter::new(None, self, gas_feature_version);
 
-        let executor_view =
-            ExecutorViewKind::Owned(ExecutorViewBase::new(self, group_size_kind.clone()));
-        StorageAdapter::new(executor_view, max_binary_version, group_size_kind, None)
+        StorageAdapter::new(self, max_binary_version, resource_group_adapter)
     }
 }
 
@@ -351,6 +305,13 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
 // Allows to extract the view from `StorageAdapter`.
 impl<'e, E: ExecutorView> AsExecutorView for StorageAdapter<'e, E> {
     fn as_executor_view(&self) -> &dyn ExecutorView {
-        self.executor_view.deref()
+        self.executor_view
+    }
+}
+
+// Allows to extract the view from `StorageAdapter`.
+impl<'e, E> AsResourceGroupView for StorageAdapter<'e, E> {
+    fn as_resource_group_view(&self) -> &dyn ResourceGroupView {
+        &self.resource_group_view
     }
 }

@@ -1,20 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{TResourceGroupView, TResourceView};
+use crate::resolver::{ResourceGroupView, TResourceGroupView, TResourceView};
 use anyhow::Error;
-use aptos_state_view::TStateView;
-use aptos_types::{
-    access_path::AccessPath, on_chain_config::ConfigStorage, state_store::state_key::StateKey,
-};
+use aptos_types::state_store::state_key::StateKey;
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
     fmt::Debug,
-    hash::Hash,
 };
 
 /// Corresponding to different gas features, methods for counting the 'size' of a
@@ -44,59 +39,38 @@ impl GroupSizeKind {
     }
 }
 
-pub enum UnifiedResourceView<'a, K, L> {
-    StateView(&'a dyn TStateView<Key = K>),
-    ResourceView(&'a dyn TResourceView<Key = K, Layout = L>),
-}
-
-impl<'a, K, L> UnifiedResourceView<'a, K, L> {
-    fn get_bytes(&self, state_key: &K) -> anyhow::Result<Option<Bytes>> {
-        match self {
-            UnifiedResourceView::StateView(s) => s.get_state_value_bytes(state_key),
-            UnifiedResourceView::ResourceView(r) => r.get_resource_bytes(state_key, None),
-        }
-    }
-}
-
-impl<'a, L> ConfigStorage for UnifiedResourceView<'a, StateKey, L> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
-        self.get_bytes(&StateKey::access_path(access_path)).ok()?
-    }
-}
-
-pub struct TResourceGroupAdapter<'r, K, T, L>
-where
-    K: Clone + Eq + Hash,
-    T: Debug + DeserializeOwned + Ord + Serialize,
-{
-    resource_resolver: UnifiedResourceView<'r, K, L>,
+/// Handles the resolution of ResourceGroupView interfaces. If the gas feature version is
+/// sufficiently new (corresponding to GroupSizeKind::AsSum), maybe_resource_group_view will
+/// be used first, if set (this way, block executor provides the new resolution behavior).
+///
+/// If gas feature corresponding to AsSum is not enabled, maybe_resource_group_view is set
+/// to None (even if provided, because block executor does not support older gas charging).
+/// When maybe_resource_group_view is None, group view resolution happens based on the
+/// resource view interfaces, with an underlying cache. This is for efficiency, but also
+/// to be released to the session for older feature versions (needed to prepare VM output).
+///
+/// Currently, maybe_resource_group_view is always set to None, and cache always released.
+/// There are TODOs in the code for enabling the new behavior.
+pub struct ResourceGroupAdapter<'r> {
+    maybe_resource_group_view: Option<&'r dyn ResourceGroupView>,
+    resource_view: &'r dyn TResourceView<Key = StateKey, Layout = MoveTypeLayout>,
     group_size_kind: GroupSizeKind,
-    // Caches group size alongside the BTreeMap corresponding to the group for key K.
-    group_cache: RefCell<HashMap<K, (BTreeMap<T, Bytes>, u64)>>,
+    group_cache: RefCell<HashMap<StateKey, (BTreeMap<StructTag, Bytes>, u64)>>,
 }
 
-impl<'r, K, T, L> TResourceGroupAdapter<'r, K, T, L>
-where
-    K: Clone + Eq + Hash,
-    T: Debug + DeserializeOwned + Ord + Serialize,
-{
-    pub fn from_resource_view(
-        resource_view: &'r dyn TResourceView<Key = K, Layout = L>,
-        group_size_kind: GroupSizeKind,
+impl<'r> ResourceGroupAdapter<'r> {
+    pub fn new(
+        _maybe_resource_group_view: Option<&'r dyn ResourceGroupView>,
+        resource_view: &'r dyn TResourceView<Key = StateKey, Layout = MoveTypeLayout>,
+        gas_feature_version: u64,
     ) -> Self {
-        Self {
-            resource_resolver: UnifiedResourceView::ResourceView(resource_view),
-            group_size_kind,
-            group_cache: RefCell::new(HashMap::new()),
-        }
-    }
+        let group_size_kind = GroupSizeKind::from_gas_feature_version(gas_feature_version);
 
-    pub fn from_state_view(
-        state_view: &'r dyn TStateView<Key = K>,
-        group_size_kind: GroupSizeKind,
-    ) -> Self {
         Self {
-            resource_resolver: UnifiedResourceView::StateView(state_view),
+            // TODO: when ResourceGroupView is implemented by block executor, provide
+            // (group_size_kind == GroupSizeKind::AsSum).then(|| maybe_resource_group_view)
+            maybe_resource_group_view: None,
+            resource_view,
             group_size_kind,
             group_cache: RefCell::new(HashMap::new()),
         }
@@ -106,31 +80,36 @@ where
         self.group_size_kind.clone()
     }
 
-    fn release_group_cache(&self) -> HashMap<K, BTreeMap<T, Bytes>> {
-        self.group_cache
-            .borrow_mut()
-            .drain()
-            .map(|(k, v)| (k, v.0))
-            .collect()
+    fn release_group_cache(&self) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
+        // TODO: once block executor can handle the new VMChangeSet, return None when
+        // group_size_kind is GroupSizeKind::AsSum, which will also switch output of session
+        // to a newer format and correspondingly, to the new (AsSum) gas charging for it.
+        // Note: should still flush the cache, even if returning None.
+        Some(
+            self.group_cache
+                .borrow_mut()
+                .drain()
+                .map(|(k, v)| (k, v.0))
+                .collect(),
+        )
     }
 
     // Ensures that the resource group at state_key is cached in self.group_cache. Ok(true)
     // means the resource was already cached, while Ok(false) means it just got cached.
-    fn ensure_cached(&self, state_key: &K) -> anyhow::Result<bool> {
+    fn ensure_cached(&self, state_key: &StateKey) -> anyhow::Result<bool> {
         if self.group_cache.borrow().contains_key(state_key) {
             return Ok(true);
         }
 
-        let group_data_from_resolver = self.resource_resolver.get_bytes(state_key)?;
-        let (group_data, blob_len): (BTreeMap<T, Bytes>, u64) = group_data_from_resolver
-            .map_or_else(
-                || Ok::<_, Error>((BTreeMap::new(), 0)),
-                |group_data_blob| {
-                    let group_data = bcs::from_bytes(&group_data_blob)
-                        .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?;
-                    Ok((group_data, group_data_blob.len() as u64))
-                },
-            )?;
+        let group_data = self.resource_view.get_resource_bytes(state_key, None)?;
+        let (group_data, blob_len): (BTreeMap<StructTag, Bytes>, u64) = group_data.map_or_else(
+            || Ok::<_, Error>((BTreeMap::new(), 0)),
+            |group_data_blob| {
+                let group_data = bcs::from_bytes(&group_data_blob)
+                    .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?;
+                Ok((group_data, group_data_blob.len() as u64))
+            },
+        )?;
 
         let group_size = match self.group_size_kind {
             GroupSizeKind::None => 0,
@@ -153,18 +132,20 @@ where
     }
 }
 
-pub type ResourceGroupAdapter<'a> = TResourceGroupAdapter<'a, StateKey, StructTag, MoveTypeLayout>;
+impl TResourceGroupView for ResourceGroupAdapter<'_> {
+    type Key = StateKey;
+    type Tag = StructTag;
+    type Layout = MoveTypeLayout;
 
-impl<K, T, L> TResourceGroupView for TResourceGroupAdapter<'_, K, T, L>
-where
-    K: Clone + Eq + Hash,
-    T: Debug + DeserializeOwned + Ord + Serialize,
-{
-    type Key = K;
-    type Layout = L;
-    type Tag = T;
+    fn resource_group_size(&self, state_key: &StateKey) -> anyhow::Result<u64> {
+        if self.group_size_kind == GroupSizeKind::None {
+            return Ok(0);
+        }
 
-    fn resource_group_size(&self, state_key: &Self::Key) -> anyhow::Result<u64> {
+        if let Some(group_view) = self.maybe_resource_group_view {
+            return group_view.resource_group_size(state_key);
+        }
+
         self.ensure_cached(state_key)?;
         Ok(self
             .group_cache
@@ -176,10 +157,14 @@ where
 
     fn get_resource_from_group(
         &self,
-        state_key: &Self::Key,
-        resource_tag: &Self::Tag,
-        _maybe_layout: Option<&Self::Layout>,
+        state_key: &StateKey,
+        resource_tag: &StructTag,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<Option<Bytes>> {
+        if let Some(group_view) = self.maybe_resource_group_view {
+            return group_view.get_resource_from_group(state_key, resource_tag, maybe_layout);
+        }
+
         self.ensure_cached(state_key)?;
         Ok(self
             .group_cache
@@ -191,8 +176,8 @@ where
             .cloned())
     }
 
-    fn release_naive_group_cache(&self) -> Option<HashMap<K, BTreeMap<T, Bytes>>> {
-        Some(self.release_group_cache())
+    fn release_group_cache(&self) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
+        self.release_group_cache()
     }
 }
 

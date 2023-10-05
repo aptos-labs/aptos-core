@@ -11,7 +11,6 @@ use crate::{
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
-    storage_adapter::AsExecutorView,
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     verifier, VMExecutor, VMValidator,
@@ -51,7 +50,7 @@ use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculat
 use aptos_vm_types::{
     change_set::VMChangeSet,
     output::VMOutput,
-    resolver::ExecutorView,
+    resolver::{ExecutorView, ResourceGroupView},
     storage::{ChangeSetConfigs, StorageGasParameters},
 };
 use fail::fail_point;
@@ -123,14 +122,6 @@ macro_rules! unwrap_or_discard {
 impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         Self(AptosVMImpl::new(resolver))
-    }
-
-    // TODO(gelash, georgemitenkov): delete after simulation uses block executor.
-    fn new_from_executor_view(executor_view: &impl ExecutorView) -> Self {
-        Self(AptosVMImpl::new(&StorageAdapter::from_borrowed(
-            executor_view,
-            false,
-        )))
     }
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
@@ -265,19 +256,27 @@ impl AptosVM {
         .1
     }
 
-    /// If VM is used in the block executor context, we should use the dedicated interfaces
-    /// for resource group provided by the executor_view. Otherwise, the groups will be
-    /// resolved by the storage adapter based on resource APIs.
     pub fn as_move_resolver<'r, R: ExecutorView>(
         &self,
         executor_view: &'r R,
-        block_executor: bool,
     ) -> StorageAdapter<'r, R> {
         StorageAdapter::from_borrowed_with_config(
             executor_view,
             self.0.get_gas_feature_version(),
             self.0.get_features(),
-            block_executor,
+            None,
+        )
+    }
+
+    pub fn as_move_resolver_with_group_view<'r, R: ExecutorView + ResourceGroupView>(
+        &self,
+        executor_view: &'r R,
+    ) -> StorageAdapter<'r, R> {
+        StorageAdapter::from_borrowed_with_config(
+            executor_view,
+            self.0.get_gas_feature_version(),
+            self.0.get_features(),
+            Some(executor_view),
         )
     }
 
@@ -1281,6 +1280,7 @@ impl AptosVM {
     fn read_change_set(
         &self,
         executor_view: &dyn ExecutorView,
+        resource_group_view: &dyn ResourceGroupView,
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
@@ -1302,7 +1302,7 @@ impl AptosVM {
         }
         for (state_key, group_write) in change_set.resource_group_write_set().iter() {
             for tag in group_write.inner_ops.keys() {
-                executor_view
+                resource_group_view
                     .get_resource_from_group(state_key, tag, None)
                     .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
             }
@@ -1350,7 +1350,11 @@ impl AptosVM {
         )?;
 
         Self::validate_waypoint_change_set(&change_set, log_context)?;
-        self.read_change_set(resolver.as_executor_view(), &change_set)?;
+        self.read_change_set(
+            resolver.as_executor_view(),
+            resolver.as_resource_group_view(),
+            &change_set,
+        )?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -1414,11 +1418,11 @@ impl AptosVM {
         txn: &SignedTransaction,
         executor_view: &impl ExecutorView,
     ) -> (VMStatus, TransactionOutput) {
-        let vm = AptosVM::new_from_executor_view(executor_view);
+        let vm = AptosVM::new(&StorageAdapter::from_borrowed(executor_view));
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(executor_view.id(), 0);
 
-        let resolver = simulation_vm.0.as_move_resolver(executor_view, false);
+        let resolver = simulation_vm.0.as_move_resolver(executor_view);
         let (vm_status, vm_output) =
             simulation_vm.simulate_signed_transaction(&resolver, txn, &log_context);
         (
@@ -1447,8 +1451,7 @@ impl AptosVM {
                 gas_budget,
             )));
 
-        let executor_view = state_view.as_executor_view();
-        let resolver = vm.as_move_resolver(&executor_view, false);
+        let resolver = vm.as_move_resolver(&state_view);
         let mut session = vm.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
@@ -1637,8 +1640,7 @@ impl VMValidator for AptosVM {
             },
         };
 
-        let executor_view = state_view.as_executor_view();
-        let resolver = self.as_move_resolver(&executor_view, false);
+        let resolver = self.as_move_resolver(&state_view);
         let mut session = self.0.new_session(&resolver, SessionId::prologue(&txn));
         let validation_result = self.validate_signature_checked_transaction(
             &mut session,

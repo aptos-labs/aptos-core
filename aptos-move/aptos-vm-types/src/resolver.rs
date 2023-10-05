@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::resolver::TAggregatorView;
-use aptos_state_view::StateViewId;
+use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     aggregator::AggregatorID,
     state_store::{
@@ -132,7 +132,7 @@ pub trait TResourceGroupView {
     ///
     /// The trait allows releasing the cache in such cases. Otherwise (default behavior),
     /// if naive cache is not implemeneted (e.g. in block executor), None is returned.
-    fn release_naive_group_cache(&self) -> Option<HashMap<Self::Key, BTreeMap<Self::Tag, Bytes>>> {
+    fn release_group_cache(&self) -> Option<HashMap<Self::Key, BTreeMap<Self::Tag, Bytes>>> {
         None
     }
 }
@@ -190,7 +190,6 @@ pub trait StateStorageView {
 ///   conversion from state to executor view is needed, an adapter can be used.
 pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
-    + TResourceGroupView<Key = K, Tag = T, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
     + StateStorageView
@@ -199,7 +198,6 @@ pub trait TExecutorView<K, T, L, I>:
 
 impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
-        + TResourceGroupView<Key = K, Tag = T, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
         + StateStorageView
@@ -209,6 +207,76 @@ impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
 pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
 
 impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
+
+pub trait ResourceGroupView:
+    TResourceGroupView<Key = StateKey, Tag = StructTag, Layout = MoveTypeLayout>
+{
+}
+
+impl<T> ResourceGroupView for T where
+    T: TResourceGroupView<Key = StateKey, Tag = StructTag, Layout = MoveTypeLayout>
+{
+}
+
+impl TResourceGroupView for () {
+    type Key = StateKey;
+    type Tag = StructTag;
+    type Layout = MoveTypeLayout;
+
+    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
+        unimplemented!("Trait implementated for () for type resolution");
+    }
+
+    fn get_resource_from_group(
+        &self,
+        _state_key: &Self::Key,
+        _resource_tag: &Self::Tag,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<Bytes>> {
+        unimplemented!("Trait implementated for () for type resolution");
+    }
+}
+
+/// Direct implementations for StateView
+impl<S> TResourceView for S
+where
+    S: StateView,
+{
+    type Key = StateKey;
+    type Layout = MoveTypeLayout;
+
+    fn get_resource_state_value(
+        &self,
+        state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
+impl<S> TModuleView for S
+where
+    S: StateView,
+{
+    type Key = StateKey;
+
+    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
+impl<S> StateStorageView for S
+where
+    S: StateView,
+{
+    fn id(&self) -> StateViewId {
+        self.id()
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.get_usage()
+    }
+}
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 /// - Result being Err means storage error or some incostistency (e.g. during speculation,

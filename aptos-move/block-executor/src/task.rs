@@ -8,7 +8,7 @@ use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
-use aptos_vm_types::resolver::TExecutorView;
+use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::value::MoveTypeLayout;
 use std::{collections::HashMap, fmt::Debug};
 
@@ -53,12 +53,16 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<
+        view: &(impl TExecutorView<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
             <Self::Txn as Transaction>::Identifier,
-        >,
+        > + TResourceGroupView<
+            Key = <Self::Txn as Transaction>::Key,
+            Tag = <Self::Txn as Transaction>::Tag,
+            Layout = MoveTypeLayout,
+        >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
