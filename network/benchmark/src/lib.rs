@@ -356,6 +356,8 @@ pub async fn direct_sender(
                 ticker.next().await;
             }
         }
+        let await_end = time_service.now_unix_time().as_micros() as u64;
+        direct_micros("await", await_end - start);
 
         counter += 1;
         {
