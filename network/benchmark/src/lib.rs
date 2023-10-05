@@ -10,7 +10,9 @@ use aptos_logger::{
     prelude::{sample, SampleRate},
     warn,
 };
-use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
+use aptos_metrics_core::{
+    register_avg_counter, register_int_counter_vec, Histogram, IntCounter, IntCounterVec,
+};
 use aptos_network::{
     application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
     protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
@@ -358,7 +360,7 @@ pub async fn direct_sender(
             }
         }
         let await_end = time_service.now_unix_time().as_micros() as u64;
-        direct_micros("await", await_end - await_start);
+        APTOS_NETWORK_BENCHMARK_INTERVALS.observe((await_end - await_start) as f64);
 
         counter += 1;
         {
@@ -612,6 +614,13 @@ pub static APTOS_NETWORK_BENCHMARK_RPC_MESSAGES: Lazy<IntCounterVec> = Lazy::new
         &["state"]
     )
     .unwrap()
+});
+
+pub static APTOS_NETWORK_BENCHMARK_INTERVALS: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_network_benchmark_intervals",
+        "The intervals between direct sends",
+    )
 });
 
 fn rpc_messages(state_label: &'static str) {
