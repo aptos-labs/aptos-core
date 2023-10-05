@@ -5,7 +5,7 @@ use crate::{
     remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest,
     RemoteExecutionResult,
 };
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -19,6 +19,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use std::time::Instant;
 
 pub static COORDINATOR_PORT: u16 = 52200;
 
@@ -132,10 +133,15 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 maybe_block_gas_limit,
             });
 
+            info!("&&&&&&&&&&&& Cmd TX ");
+            let bcs_ser = Instant::now();
+            let msg = Message::new(bcs::to_bytes(&execution_request).unwrap());
+            info!("&&&&&&&&&&&& Bcs ser time is {} ", bcs_ser.elapsed().as_secs_f64());
+
             senders[shard_id]
                 .lock()
                 .unwrap()
-                .send(Message::new(bcs::to_bytes(&execution_request).unwrap()))
+                .send(msg)
                 .unwrap();
         }
 

@@ -165,9 +165,10 @@ where
 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 info!(
-                    "Overall execution TPS: {} txn/s (over {} txns)",
+                    "Overall execution TPS: {} txn/s (over {} txns, in {} s)",
                     executed as f64 / elapsed,
-                    executed
+                    executed,
+                    elapsed
                 );
                 info!(
                     "Overall execution GPS: {} gas/s (over {} txns)",

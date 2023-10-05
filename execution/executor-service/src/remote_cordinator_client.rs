@@ -15,6 +15,11 @@ use aptos_vm::sharded_block_executor::{
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
+use std::time::Instant;
+use aptos_logger::info;
+
+static mut init_prefetch_time: f64 = 0.0;
+static mut cmd_rx_bcs_deser_time: f64 = 0.0;
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -37,6 +42,10 @@ impl RemoteCoordinatorClient {
         let state_view_client =
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
 
+        unsafe {
+            cmd_rx_bcs_deser_time = 0.0;
+            init_prefetch_time = 0.0;
+        }
         Self {
             state_view_client: Arc::new(state_view_client),
             command_rx,
@@ -78,12 +87,21 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command(&self) -> ExecutorShardCommand<RemoteStateViewClient> {
         match self.command_rx.recv() {
             Ok(message) => {
+                let bcs_deser = Instant::now();
                 let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
+                unsafe {
+                    cmd_rx_bcs_deser_time += bcs_deser.elapsed().as_secs_f64();
+                }
                 match request {
                     RemoteExecutionRequest::ExecuteBlock(command) => {
+                        info!("&&&&&&&&&&&& Cmd rx ");
+                        let start_time = Instant::now();
                         let state_keys = Self::extract_state_keys(&command);
                         self.state_view_client.init_for_block(state_keys);
                         let (sub_blocks, concurrency, gas_limit) = command.into();
+                        unsafe {
+                            init_prefetch_time += start_time.elapsed().as_secs_f64();
+                        }
                         ExecutorShardCommand::ExecuteSubBlocks(
                             self.state_view_client.clone(),
                             sub_blocks,
@@ -93,7 +111,16 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                     },
                 }
             },
-            Err(_) => ExecutorShardCommand::Stop,
+            Err(_) => {
+                unsafe {
+                    info!("&&&&&&&&&&&& Total cmd rx bcs deser time is {} ", cmd_rx_bcs_deser_time);
+                    info!("&&&&&&&&&&&& Total init prefetch time is {} ", init_prefetch_time);
+                    init_prefetch_time = 0.0;
+                    cmd_rx_bcs_deser_time = 0.0;
+                }
+                self.state_view_client.print_info();
+                ExecutorShardCommand::Stop
+            },
         }
     }
 

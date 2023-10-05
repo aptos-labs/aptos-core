@@ -27,6 +27,12 @@ use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
+use std::time::Instant;
+
+static mut cmd_rx_and_prefetch_time: f64 = 0.0;
+static mut result_tx_time: f64 = 0.0;
+static mut exe_block_time: f64 = 0.0;
+static mut isFirst: bool = true;
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -212,6 +218,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.num_shards
         );
         loop {
+            let mut start_time = Instant::now();
             let command = self.coordinator_client.receive_execute_command();
             match command {
                 ExecutorShardCommand::ExecuteSubBlocks(
@@ -225,6 +232,15 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         self.shard_id,
                         transactions.num_txns()
                     );
+                    unsafe {
+                        if isFirst {
+                            isFirst = false;
+                        } else {
+                            cmd_rx_and_prefetch_time += start_time.elapsed().as_secs_f64();
+                        }
+                    }
+
+                    let mut execute_block_start = Instant::now();
                     let ret = self.execute_block(
                         transactions,
                         state_view.as_ref(),
@@ -232,12 +248,27 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         maybe_block_gas_limit,
                     );
                     drop(state_view);
+                    unsafe {
+                        exe_block_time += execute_block_start.elapsed().as_secs_f64();
+                    }
+
+                    let mut result_tx_start = Instant::now();
                     self.coordinator_client.send_execution_result(ret);
+                    unsafe {
+                        result_tx_time += result_tx_start.elapsed().as_secs_f64();
+                    }
                 },
                 ExecutorShardCommand::Stop => {
                     break;
                 },
             }
+        }
+        unsafe {
+            info!("&&&&&&&&&&&&& Total cmd rx + init prefetch time is {}; exe block time is {}; result tx time is {} ",
+                cmd_rx_and_prefetch_time, exe_block_time, result_tx_time);
+            cmd_rx_and_prefetch_time = 0.0;
+            result_tx_time = 0.0;
+            exe_block_time = 0.0;
         }
         trace!("Shard {} is shutting down", self.shard_id);
     }
