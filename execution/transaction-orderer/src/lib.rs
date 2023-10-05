@@ -7,6 +7,7 @@ use std::rc::Rc;
 use aptos_block_partitioner::PartitionerConfig;
 use aptos_block_partitioner::v3::build_partitioning_result;
 use aptos_crypto::hash::CryptoHash;
+use aptos_logger::prelude::*;
 use aptos_types::block_executor::partitioner::{PartitionedTransactions, PartitionedTransactionsV3, PartitionV3};
 use aptos_types::transaction::analyzed_transaction::AnalyzedTransaction;
 use crate::batch_orderer::SequentialDynamicAriaOrderer;
@@ -38,7 +39,7 @@ impl aptos_block_partitioner::BlockPartitioner for V3ReorderingPartitioner {
         let block_size = transactions.len();
         let min_ordered_transaction_before_execution = std::env::var("V3B__MIN_ORDERED_BEFORE_EXECUTION").ok().map(|v|v.parse::<usize>().unwrap_or(100)).unwrap_or(100);
         let max_window_size = std::env::var("V3B__MAX_WINDOW_SIZE").ok().map(|v|v.parse::<usize>().unwrap_or(1000)).unwrap_or(1000);
-        println!("V3B configs: max_window_size={}, min_ordered_transaction_before_execution={}", max_window_size, min_ordered_transaction_before_execution);
+        info!("V3ReorderingPartitioner started with configs: max_window_size={}, min_ordered_transaction_before_execution={}", max_window_size, min_ordered_transaction_before_execution);
 
         let block_orderer = BatchedBlockOrdererWithWindow::new(
             SequentialDynamicAriaOrderer::with_window(),

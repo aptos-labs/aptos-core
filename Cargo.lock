@@ -3530,6 +3530,7 @@ dependencies = [
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-graphs",
+ "aptos-logger",
  "aptos-transaction-orderer",
  "aptos-types",
  "clap 4.3.21",

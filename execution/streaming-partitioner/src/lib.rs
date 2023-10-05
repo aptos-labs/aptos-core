@@ -3,6 +3,7 @@
 pub mod transaction_graph_partitioner;
 
 use aptos_graphs::partitioning::PartitionId;
+use aptos_logger::prelude::*;
 use aptos_transaction_orderer::common::PTransaction;
 use aptos_types::batched_stream::{Batched, BatchedStream};
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -54,13 +55,14 @@ pub struct V3FennelBasedPartitioner {}
 
 impl BlockPartitioner for V3FennelBasedPartitioner {
     fn partition(&self, transactions: Vec<AnalyzedTransaction>, num_shards: usize) -> PartitionedTransactions {
+        info!("V3FennelBasedPartitioner started.");
         let block_size = transactions.len();
         let mut fennel = FennelGraphPartitioner::new(num_shards);
         fennel.balance_constraint_mode = BalanceConstraintMode::Batched;
         fennel.alpha_computation_mode = AlphaComputationMode::Batched;
         let params = transaction_graph_partitioner::Params {
             node_weight_function: |_: &CompressedPTransaction<AnalyzedTransaction>| 1 as NodeWeight,
-            edge_weight_function: |idx1: SerializationIdx, idx2: SerializationIdx| ((1. / (1. + idx1 as f64 - idx2 as f64)) * 1000000.) as EdgeWeight,
+            edge_weight_function: |idx1: SerializationIdx, idx2: SerializationIdx| ((1. / (1. + idx1 as f64 - idx2 as f64)) * 1000000.) as EdgeWeight,//sharding v3 todo: tweak edge_weight_function
             shuffle_batches: true,
         };
         let mut partitioner = TransactionGraphPartitioner::new(fennel, params);
