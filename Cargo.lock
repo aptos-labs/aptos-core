@@ -9210,6 +9210,7 @@ dependencies = [
  "arbitrary",
  "bcs 0.1.4",
  "bytes",
+ "dashmap",
  "ethnum",
  "hex",
  "num 0.4.0",
@@ -9880,7 +9881,6 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
- "dashmap",
  "derivative",
  "move-binary-format",
  "move-core-types",

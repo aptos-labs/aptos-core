@@ -5,5 +5,4 @@
 //!
 //! This module contains the loaded definition of code data used in runtime.
 
-pub mod intern_table;
 pub mod runtime_types;

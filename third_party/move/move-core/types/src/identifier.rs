@@ -27,12 +27,20 @@
 //! * specify keys for lookups in storage
 //! * do cross-module lookups while executing transactions
 
+use crate::intern_table::{InstanceUID, InstanceUniverse};
 use anyhow::{bail, Result};
+use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use ref_cast::RefCast;
-use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, fmt, ops::Deref, str::FromStr};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{
+    borrow::Borrow,
+    fmt,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    str::FromStr,
+};
 
 /// Return true if this character can appear in a Move identifier.
 ///
@@ -85,20 +93,44 @@ pub(crate) static ALLOWED_IDENTIFIERS: &str =
 pub(crate) static ALLOWED_NO_SELF_IDENTIFIERS: &str =
     r"(?:[a-zA-Z][a-zA-Z0-9_]*)|(?:_[a-zA-Z0-9_]+)";
 
+pub static IDENTIFIER_UNIVERSE: Lazy<InstanceUniverse<String>> = Lazy::new(InstanceUniverse::new);
+
+pub type IdentifierID = InstanceUID<'static, String>;
+
 /// An owned identifier.
 ///
 /// For more details, see the module level documentation.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
-pub struct Identifier(Box<str>);
-// An identifier cannot be mutated so use Box<str> instead of String -- it is 1 word smaller.
+pub struct Identifier(IdentifierID);
+
+impl Serialize for Identifier {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.inner_ref().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Identifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename = "Identifier")]
+        struct RawIdentifier(String);
+
+        let raw = RawIdentifier::deserialize(deserializer)?;
+
+        Ok(Identifier::new(raw.0).unwrap())
+    }
+}
 
 impl Identifier {
     /// Creates a new `Identifier` instance.
-    pub fn new(s: impl Into<Box<str>>) -> Result<Self> {
+    pub fn new(s: impl Into<String>) -> Result<Self> {
         let s = s.into();
         if Self::is_valid(&s) {
-            Ok(Self(s))
+            Ok(Self(IDENTIFIER_UNIVERSE.get(s.to_string())))
         } else {
             bail!("Invalid identifier '{}'", s);
         }
@@ -112,7 +144,7 @@ impl Identifier {
     /// Returns if this identifier is `<SELF>`.
     /// TODO: remove once we fully separate CompiledScript & CompiledModule.
     pub fn is_self(&self) -> bool {
-        &*self.0 == "<SELF>"
+        self.0.inner_ref().as_str() == "<SELF>"
     }
 
     /// Converts a vector of bytes to an `Identifier`.
@@ -131,7 +163,7 @@ impl Identifier {
     /// This is not implemented as a `From` trait to discourage automatic conversions -- these
     /// conversions should not typically happen.
     pub fn into_string(self) -> String {
-        self.0.into()
+        self.0.inner_ref().as_ref().clone()
     }
 
     /// Converts this `Identifier` into a UTF-8-encoded byte sequence.
@@ -166,22 +198,28 @@ impl Deref for Identifier {
     fn deref(&self) -> &IdentStr {
         // Identifier and IdentStr maintain the same invariants, so it is safe to
         // convert.
-        IdentStr::ref_cast(&self.0)
+        IdentStr::ref_cast(&self.0.inner_ref())
     }
 }
 
 impl fmt::Display for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", &self.0)
+        write!(f, "{}", &self.0.inner_ref())
     }
 }
 
 /// A borrowed identifier.
 ///
 /// For more details, see the module level documentation.
-#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd, RefCast)]
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd, RefCast)]
 #[repr(transparent)]
 pub struct IdentStr(str);
+
+impl Hash for IdentStr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_owned().hash(state);
+    }
+}
 
 impl IdentStr {
     pub fn new(s: &str) -> Result<&IdentStr> {
@@ -231,7 +269,7 @@ impl ToOwned for IdentStr {
     type Owned = Identifier;
 
     fn to_owned(&self) -> Identifier {
-        Identifier(self.0.into())
+        Identifier::new(&self.0).unwrap()
     }
 }
 

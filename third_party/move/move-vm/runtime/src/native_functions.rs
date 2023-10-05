@@ -42,7 +42,7 @@ pub fn make_table(
     make_table_from_iter(addr, elems.iter().cloned())
 }
 
-pub fn make_table_from_iter<S: Into<Box<str>>>(
+pub fn make_table_from_iter<S: Into<String>>(
     addr: AccountAddress,
     elems: impl IntoIterator<Item = (S, S, NativeFunction)>,
 ) -> NativeFunctionTable {

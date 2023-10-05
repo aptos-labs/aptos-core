@@ -9,7 +9,9 @@ pub mod account_address;
 pub mod effects;
 pub mod errmap;
 pub mod gas_algebra;
+
 pub mod identifier;
+pub mod intern_table;
 pub mod language_storage;
 pub mod metadata;
 pub mod move_resource;
