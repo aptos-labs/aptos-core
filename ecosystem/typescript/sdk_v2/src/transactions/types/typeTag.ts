@@ -8,6 +8,7 @@ import { AccountAddress } from "../../core";
 import { Deserializer, Serializable, Serializer } from "../../bcs";
 import { Identifier } from "./identifier";
 import { TypeTagParser } from "./typeTagParser";
+import { TypeTagVariants } from "../../types";
 
 export abstract class TypeTag extends Serializable {
   abstract serialize(serializer: Serializer): void;
@@ -15,27 +16,27 @@ export abstract class TypeTag extends Serializable {
   static deserialize(deserializer: Deserializer): TypeTag {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case 0:
+      case TypeTagVariants.Bool:
         return TypeTagBool.load(deserializer);
-      case 1:
+      case TypeTagVariants.U8:
         return TypeTagU8.load(deserializer);
-      case 2:
+      case TypeTagVariants.U64:
         return TypeTagU64.load(deserializer);
-      case 3:
+      case TypeTagVariants.U128:
         return TypeTagU128.load(deserializer);
-      case 4:
+      case TypeTagVariants.Address:
         return TypeTagAddress.load(deserializer);
-      case 5:
+      case TypeTagVariants.Signer:
         return TypeTagSigner.load(deserializer);
-      case 6:
+      case TypeTagVariants.Vector:
         return TypeTagVector.load(deserializer);
-      case 7:
+      case TypeTagVariants.Struct:
         return TypeTagStruct.load(deserializer);
-      case 8:
+      case TypeTagVariants.U16:
         return TypeTagU16.load(deserializer);
-      case 9:
+      case TypeTagVariants.U32:
         return TypeTagU32.load(deserializer);
-      case 10:
+      case TypeTagVariants.U256:
         return TypeTagU256.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TypeTag: ${index}`);
@@ -45,7 +46,7 @@ export abstract class TypeTag extends Serializable {
 
 export class TypeTagBool extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(0);
+    serializer.serializeU32AsUleb128(TypeTagVariants.Bool);
   }
 
   static load(_deserializer: Deserializer): TypeTagBool {
@@ -55,7 +56,7 @@ export class TypeTagBool extends TypeTag {
 
 export class TypeTagU8 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(TypeTagVariants.U8);
   }
 
   static load(_deserializer: Deserializer): TypeTagU8 {
@@ -65,7 +66,7 @@ export class TypeTagU8 extends TypeTag {
 
 export class TypeTagU16 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(8);
+    serializer.serializeU32AsUleb128(TypeTagVariants.U16);
   }
 
   static load(_deserializer: Deserializer): TypeTagU16 {
@@ -75,7 +76,7 @@ export class TypeTagU16 extends TypeTag {
 
 export class TypeTagU32 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(9);
+    serializer.serializeU32AsUleb128(TypeTagVariants.U32);
   }
 
   static load(_deserializer: Deserializer): TypeTagU32 {
@@ -85,7 +86,7 @@ export class TypeTagU32 extends TypeTag {
 
 export class TypeTagU64 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(2);
+    serializer.serializeU32AsUleb128(TypeTagVariants.U64);
   }
 
   static load(_deserializer: Deserializer): TypeTagU64 {
@@ -95,7 +96,7 @@ export class TypeTagU64 extends TypeTag {
 
 export class TypeTagU128 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(3);
+    serializer.serializeU32AsUleb128(TypeTagVariants.U128);
   }
 
   static load(_deserializer: Deserializer): TypeTagU128 {
@@ -105,7 +106,7 @@ export class TypeTagU128 extends TypeTag {
 
 export class TypeTagU256 extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(10);
+    serializer.serializeU32AsUleb128(TypeTagVariants.U256);
   }
 
   static load(_deserializer: Deserializer): TypeTagU256 {
@@ -115,7 +116,7 @@ export class TypeTagU256 extends TypeTag {
 
 export class TypeTagAddress extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(4);
+    serializer.serializeU32AsUleb128(TypeTagVariants.Address);
   }
 
   static load(_deserializer: Deserializer): TypeTagAddress {
@@ -125,7 +126,7 @@ export class TypeTagAddress extends TypeTag {
 
 export class TypeTagSigner extends TypeTag {
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(5);
+    serializer.serializeU32AsUleb128(TypeTagVariants.Signer);
   }
 
   static load(_deserializer: Deserializer): TypeTagSigner {
@@ -139,7 +140,7 @@ export class TypeTagVector extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(6);
+    serializer.serializeU32AsUleb128(TypeTagVariants.Vector);
     this.value.serialize(serializer);
   }
 
@@ -155,7 +156,7 @@ export class TypeTagStruct extends TypeTag {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(7);
+    serializer.serializeU32AsUleb128(TypeTagVariants.Struct);
     this.value.serialize(serializer);
   }
 
