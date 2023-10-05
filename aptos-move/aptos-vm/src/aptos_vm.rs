@@ -131,14 +131,6 @@ impl AptosVM {
         Self(AptosVMImpl::new(&state_view.as_move_resolver()))
     }
 
-    pub fn new_for_validation(state_view: &impl StateView) -> Self {
-        info!(
-            AdapterLogSchema::new(state_view.id(), 0),
-            "Adapter created for Validation"
-        );
-        Self::new_from_state_view(state_view)
-    }
-
     /// Sets execution concurrency level when invoked the first time.
     pub fn set_concurrency_level_once(mut concurrency_level: usize) {
         concurrency_level = min(concurrency_level, num_cpus::get());
