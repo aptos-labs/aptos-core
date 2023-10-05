@@ -17,23 +17,26 @@ use move_core_types::{
     language_storage::StructTag,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::{
-    collections::{
-        hash_map::Entry::{Occupied, Vacant},
-        HashMap,
-    },
-    hash::Hash,
-};
+use std::{collections::HashMap, hash::Hash};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// Describes an update to a resource group granularly, with WriteOps to affected
 /// member resources of the group, as well as a separate WriteOp for metadata and size.
 pub struct GroupWrite {
-    /// Op that contains the correct metadata, and the size of the group after the
-    /// updates encoded in the bytes (no bytes for deletion). The bytes will be
-    /// replaced with correct serialized group update to obtain storage WriteOp.
+    /// Op of the correct kind (creation / modification / deletion) and metadata, and
+    /// the size of the group after the updates encoded in the bytes (no bytes for
+    /// deletion). Relevant during block execution, where the information read to
+    /// derive metadata_op will be validated during parallel execution to make sure
+    /// it is correct, and the bytes will be replaced after the transaction is committed
+    /// with correct serialized group update to obtain storage WriteOp.
     pub metadata_op: WriteOp,
     /// Updates to individual group members. WriteOps are 'legacy', i.e. no metadata.
+    /// If the metadata_op is a deletion, all (correct) inner_ops should be deletions,
+    /// and if metadata_op is a creation, then there may not be a creation inner op.
+    /// Not vice versa, e.g. for deleted inner ops, other untouched resources may still
+    /// exist in the group. Note: During parallel block execution, due to speculative
+    /// reads, this invariant may be violated (and lead to speculation error if observed)
+    /// but guaranteed to fail validation and lead to correct re-execution in that case.
     pub inner_ops: HashMap<StructTag, WriteOp>,
 }
 
@@ -291,6 +294,7 @@ impl VMChangeSet {
         additional_aggregator_write_set: HashMap<StateKey, WriteOp>,
         additional_aggregator_delta_set: HashMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
+        use std::collections::hash_map::Entry::{Occupied, Vacant};
         use WriteOp::*;
 
         // First, squash deltas.
@@ -375,6 +379,8 @@ impl VMChangeSet {
         write_set: &mut HashMap<K, WriteOp>,
         additional_write_set: HashMap<K, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
+        use std::collections::hash_map::Entry::{Occupied, Vacant};
+
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
@@ -392,6 +398,8 @@ impl VMChangeSet {
         write_set: &mut HashMap<StateKey, GroupWrite>,
         additional_write_set: HashMap<StateKey, GroupWrite>,
     ) -> anyhow::Result<(), VMStatus> {
+        use std::collections::hash_map::Entry::{Occupied, Vacant};
+
         for (key, additional_update) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut group_entry) => {
@@ -409,7 +417,10 @@ impl VMChangeSet {
                     .map_err(|e| {
                         VMStatus::error(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg(format!("Error while squashing two write ops: {}.", e)),
+                            err_msg(format!(
+                                "Error while squashing two group write metadata ops: {}.",
+                                e
+                            )),
                         )
                     })?;
                     if noop {
@@ -473,7 +484,9 @@ impl VMChangeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::utils::{raw_metadata, write_op_with_metadata};
+    use crate::tests::utils::{
+        mock_tag_0, mock_tag_1, mock_tag_2, raw_metadata, write_op_with_metadata,
+    };
     use claims::{assert_err, assert_ok, assert_some_eq};
     use test_case::test_case;
 
@@ -514,15 +527,15 @@ mod tests {
     #[test_case(1, 2)] // modify, delete
     #[test_case(2, 0)] // delete, create
     fn test_squash_groups_mergeable_metadata(base_type_idx: u8, additional_type_idx: u8) {
-        let key_0 = StateKey::raw(vec![1]);
+        let key = StateKey::raw(vec![0]);
 
         let mut base_update = HashMap::new();
         let mut additional_update = HashMap::new();
-        base_update.insert(key_0.clone(), GroupWrite {
+        base_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(base_type_idx, 100),
             inner_ops: HashMap::new(),
         });
-        additional_update.insert(key_0.clone(), GroupWrite {
+        additional_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(additional_type_idx, 200),
             inner_ops: HashMap::new(),
         });
@@ -534,7 +547,7 @@ mod tests {
 
         assert_eq!(base_update.len(), 1);
         assert_some_eq!(
-            base_update.get(&key_0).unwrap().metadata_op.metadata(),
+            base_update.get(&key).unwrap().metadata_op.metadata(),
             // take the original metadata
             &raw_metadata(100)
         );
@@ -545,15 +558,15 @@ mod tests {
     #[test_case(2, 1)] // delete, modify
     #[test_case(2, 2)] // delete, delete
     fn test_squash_groups_error(base_type_idx: u8, additional_type_idx: u8) {
-        let key_0 = StateKey::raw(vec![1]);
+        let key = StateKey::raw(vec![0]);
 
         let mut base_update = HashMap::new();
         let mut additional_update = HashMap::new();
-        base_update.insert(key_0.clone(), GroupWrite {
+        base_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(base_type_idx, 100),
             inner_ops: HashMap::new(),
         });
-        additional_update.insert(key_0.clone(), GroupWrite {
+        additional_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(additional_type_idx, 200),
             inner_ops: HashMap::new(),
         });
@@ -566,15 +579,15 @@ mod tests {
 
     #[test]
     fn test_squash_groups_noop() {
-        let key_0 = StateKey::raw(vec![1]);
+        let key = StateKey::raw(vec![0]);
 
         let mut base_update = HashMap::new();
         let mut additional_update = HashMap::new();
-        base_update.insert(key_0.clone(), GroupWrite {
+        base_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(0, 100), // create
             inner_ops: HashMap::new(),
         });
-        additional_update.insert(key_0.clone(), GroupWrite {
+        additional_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(2, 200), // delete
             inner_ops: HashMap::new(),
         });
@@ -584,5 +597,81 @@ mod tests {
             additional_update
         ));
         assert!(base_update.is_empty(), "Must become a no-op");
+    }
+
+    #[test]
+    fn test_inner_ops() {
+        let key_1 = StateKey::raw(vec![1]);
+        let key_2 = StateKey::raw(vec![2]);
+
+        let mut base_update = HashMap::new();
+        let mut additional_update = HashMap::new();
+        base_update.insert(key_1.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(1, 100),
+            inner_ops: HashMap::from([
+                (mock_tag_0(), WriteOp::Creation(vec![100].into())),
+                (mock_tag_2(), WriteOp::Modification(vec![2].into())),
+            ]),
+        });
+        additional_update.insert(key_1.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(1, 200),
+            inner_ops: HashMap::from([
+                (mock_tag_0(), WriteOp::Modification(vec![0].into())),
+                (mock_tag_1(), WriteOp::Modification(vec![1].into())),
+            ]),
+        });
+
+        base_update.insert(key_2.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(1, 100),
+            inner_ops: HashMap::from([
+                (mock_tag_0(), WriteOp::Deletion),
+                (mock_tag_1(), WriteOp::Modification(vec![2].into())),
+                (mock_tag_2(), WriteOp::Creation(vec![2].into())),
+            ]),
+        });
+        additional_update.insert(key_2.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(1, 200),
+            inner_ops: HashMap::from([
+                (mock_tag_0(), WriteOp::Creation(vec![0].into())),
+                (mock_tag_1(), WriteOp::Deletion),
+                (mock_tag_2(), WriteOp::Deletion),
+            ]),
+        });
+
+        assert_ok!(VMChangeSet::squash_group_writes(
+            &mut base_update,
+            additional_update
+        ));
+        assert_eq!(base_update.len(), 2);
+        let inner_ops_1 = &base_update.get(&key_1).unwrap().inner_ops;
+        assert_eq!(inner_ops_1.len(), 3);
+        assert_some_eq!(
+            inner_ops_1.get(&mock_tag_0()),
+            &WriteOp::Creation(vec![0].into())
+        );
+        assert_some_eq!(
+            inner_ops_1.get(&mock_tag_1()),
+            &WriteOp::Modification(vec![1].into())
+        );
+        assert_some_eq!(
+            inner_ops_1.get(&mock_tag_2()),
+            &WriteOp::Modification(vec![2].into())
+        );
+        let inner_ops_2 = &base_update.get(&key_2).unwrap().inner_ops;
+        assert_eq!(inner_ops_2.len(), 2);
+        assert_some_eq!(
+            inner_ops_2.get(&mock_tag_0()),
+            &WriteOp::Modification(vec![0].into())
+        );
+        assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &WriteOp::Deletion);
+
+        let additional_update = HashMap::from([(key_2.clone(), GroupWrite {
+            metadata_op: write_op_with_metadata(1, 200),
+            inner_ops: HashMap::from([(mock_tag_1(), WriteOp::Deletion)]),
+        })]);
+        assert_err!(VMChangeSet::squash_group_writes(
+            &mut base_update,
+            additional_update
+        ));
     }
 }

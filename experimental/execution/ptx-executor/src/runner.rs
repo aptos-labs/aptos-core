@@ -20,7 +20,7 @@ use aptos_types::{
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
-use aptos_vm::{adapter_common::VMAdapter, storage_adapter::AsExecutorView, AptosVM};
+use aptos_vm::{adapter_common::VMAdapter, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -261,12 +261,11 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         OverlayedStateView::new_with_overlay(self.base_view, dependencies);
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
 
-                    let executor_view = state_view.as_executor_view();
                     let vm_output = {
                         let _vm = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_vm"]);
                         vm.execute_single_transaction(
                             &transaction,
-                            &vm.as_move_resolver(&executor_view),
+                            &vm.as_move_resolver(&state_view),
                             &log_context,
                         )
                     };

@@ -176,8 +176,8 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
 
 impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     type GroupKey = StateKey;
-    type ResourceTag = StructTag;
     type Layout = MoveTypeLayout;
+    type ResourceTag = StructTag;
 
     fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
@@ -190,20 +190,20 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        self.change_set
+        if let Some(write_op) = self
+            .change_set
             .resource_group_write_set()
             .get(group_key)
             .and_then(|g| g.inner_ops.get(resource_tag))
-            .map(|op| op.extract_raw_bytes())
-            .ok_or(anyhow::Error::msg("Must be ignored immediately after"))
-            .or_else(|_| {
-                // Not found in change-set, fall back to the base executor view.
-                self.base_resource_group_view.get_resource_from_group(
-                    group_key,
-                    resource_tag,
-                    maybe_layout,
-                )
-            })
+        {
+            Ok(write_op.extract_raw_bytes())
+        } else {
+            self.base_resource_group_view.get_resource_from_group(
+                group_key,
+                resource_tag,
+                maybe_layout,
+            )
+        }
     }
 }
 
@@ -231,7 +231,10 @@ impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storage_adapter::AsExecutorView;
+    use crate::{
+        data_cache::AsMoveResolver,
+        move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
+    };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
@@ -353,26 +356,20 @@ mod test {
             HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
         let resource_group_write_set = HashMap::from([
-            (
-                key("resource_group_both"),
-                GroupWrite {
-                    metadata_op: WriteOp::Deletion, // should be irrelevant for the test
-                    inner_ops: HashMap::from([
-                        (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
-                        (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
-                    ]),
-                },
-            ),
-            (
-                key("resource_group_write_set"),
-                GroupWrite {
-                    metadata_op: WriteOp::Deletion, // should be irrelevant for the test
-                    inner_ops: HashMap::from([(
-                        mock_tag_1(),
-                        WriteOp::Modification(serialize(&5000).into()),
-                    )]),
-                },
-            ),
+            (key("resource_group_both"), GroupWrite {
+                metadata_op: WriteOp::Deletion, // should be irrelevant for the test
+                inner_ops: HashMap::from([
+                    (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
+                    (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
+                ]),
+            }),
+            (key("resource_group_write_set"), GroupWrite {
+                metadata_op: WriteOp::Deletion, // should be irrelevant for the test
+                inner_ops: HashMap::from([(
+                    mock_tag_1(),
+                    WriteOp::Modification(serialize(&5000).into()),
+                )]),
+            }),
         ]);
 
         let change_set = VMChangeSet::new(
@@ -386,8 +383,12 @@ mod test {
         )
         .unwrap();
 
-        let executor_view = state_view.as_executor_view();
-        let view = ExecutorViewWithChangeSet::new(&executor_view, change_set);
+        let resolver = state_view.as_move_resolver();
+        let view = ExecutorViewWithChangeSet::new(
+            resolver.as_executor_view(),
+            resolver.as_resource_group_view(),
+            change_set,
+        );
 
         assert_eq!(read_module(&view, "module_base"), 10);
         assert_eq!(read_module(&view, "module_both"), 100);

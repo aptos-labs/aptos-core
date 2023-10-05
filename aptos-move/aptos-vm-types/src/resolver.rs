@@ -95,16 +95,12 @@ pub trait TResourceGroupView {
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
     ) -> anyhow::Result<u64> {
-        self.get_resource_from_group(group_key, resource_tag, None)
-            .map(|maybe_bytes| {
-                maybe_bytes.map_or_else(
-                    || 0,
-                    |bytes: Bytes| {
-                        debug_assert!(!bytes.is_empty(), "Must be None instead of empty Bytes");
-                        bytes.len() as u64
-                    },
-                )
-            })
+        Ok(self
+            .get_resource_from_group(group_key, resource_tag, None)?
+            .map_or(0, |bytes| {
+                debug_assert!(!bytes.is_empty(), "Must be None instead of empty Bytes");
+                bytes.len() as u64
+            }))
     }
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
@@ -187,9 +183,11 @@ pub trait StateStorageView {
 ///     1. Specialize on access type,
 ///     2. Separate execution and storage abstractions.
 ///
-///  **WARNING:** There is no default implementation of `ExecutorView` for
-///  `StateView` in order to ensure that a correct type is always used. If
-///   conversion from state to executor view is needed, an adapter can be used.
+/// StateView currently has a basic implementation of the ExecutorView trait,
+/// which is used across tests and basic applications in the system.
+/// TODO: audit and reconsider the default implementation (e.g. should not
+/// resolve AggregatorV2 via the state-view based default implementation, as it
+/// doesn't provide a value exchange functionality).
 pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
@@ -220,26 +218,7 @@ impl<T> ResourceGroupView for T where
 {
 }
 
-impl TResourceGroupView for () {
-    type GroupKey = StateKey;
-    type ResourceTag = StructTag;
-    type Layout = MoveTypeLayout;
-
-    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
-        unimplemented!("Trait implementated for () for type resolution");
-    }
-
-    fn get_resource_from_group(
-        &self,
-        _group_key: &Self::GroupKey,
-        _resource_tag: &Self::ResourceTag,
-        _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
-        unimplemented!("Trait implementated for () for type resolution");
-    }
-}
-
-/// Direct implementations for StateView
+/// Direct implementations for StateView.
 impl<S> TResourceView for S
 where
     S: StateView,

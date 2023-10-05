@@ -388,8 +388,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     for LatestView<'a, T, S, X>
 {
     type GroupKey = T::Key;
-    type ResourceTag = T::Tag;
     type Layout = MoveTypeLayout;
+    type ResourceTag = T::Tag;
 
     fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         unimplemented!("TResourceGroupView not yet implemented");
