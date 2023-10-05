@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
+use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -17,6 +17,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
+    transaction::BlockExecutableTransaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::resolver::TExecutorView;
@@ -37,6 +38,7 @@ use std::{
         Arc,
     },
 };
+
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -299,7 +301,7 @@ impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
         V: Clone + Send + Sync + TransactionWrite + 'static,
         E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
-    > Transaction for MockTransaction<K, V, E>
+    > BlockExecutableTransaction for MockTransaction<K, V, E>
 {
     type Event = E;
     type Identifier = ();

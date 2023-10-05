@@ -137,7 +137,7 @@ pub fn calculate_genesis<V: VMExecutor>(
     };
 
     let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
-        vec![genesis_txn.clone()].into(),
+        vec![genesis_txn.clone().into()].into(),
         base_state_view,
         None,
     )?

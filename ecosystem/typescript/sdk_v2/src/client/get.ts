@@ -71,9 +71,7 @@ export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosRe
   return response;
 }
 
-export async function getAptosFullNode<Req, Res>(
-  options: GetAptosRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
+export async function getAptosFullNode<Req, Res>(options: GetAptosRequestOptions): Promise<AptosResponse<Req, Res>> {
   return get<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
 }
 

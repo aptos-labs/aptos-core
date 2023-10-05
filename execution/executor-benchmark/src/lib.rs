@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod account_generator;
-pub mod block_partitioning;
+pub mod block_preparation;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
