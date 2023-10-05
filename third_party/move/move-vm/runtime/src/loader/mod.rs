@@ -1739,15 +1739,15 @@ impl StructInfoCache {
 
 #[derive(Clone)]
 pub(crate) struct TypeCache {
-    structs: BTreeMap<StructIdentifierUID, HashMap<Vec<Type>, StructInfoCache>>,
-    depth_formula: BTreeMap<StructIdentifierUID, DepthFormula>,
+    structs: HashMap<StructIdentifierUID, HashMap<Vec<Type>, StructInfoCache>>,
+    depth_formula: HashMap<StructIdentifierUID, DepthFormula>,
 }
 
 impl TypeCache {
     fn new() -> Self {
         Self {
-            structs: BTreeMap::new(),
-            depth_formula: BTreeMap::new(),
+            structs: HashMap::new(),
+            depth_formula: HashMap::new(),
         }
     }
 }
