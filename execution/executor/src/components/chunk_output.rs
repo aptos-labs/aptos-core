@@ -20,7 +20,10 @@ use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
+        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
+    },
 };
 use aptos_vm::{
     sharded_block_executor::{
@@ -73,20 +76,17 @@ impl ChunkOutput {
     }
 
     fn by_transaction_execution_unsharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let transaction_outputs =
-            Self::execute_block::<V>(transactions.clone(), &state_view, maybe_block_gas_limit)?;
-
-        // to print txn output for debugging, uncomment:
-        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
+            Self::execute_block::<V>(&transactions, &state_view, maybe_block_gas_limit)?;
 
         update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
 
         Ok(Self {
-            transactions,
+            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
@@ -113,7 +113,7 @@ impl ChunkOutput {
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
-                .map(|t| t.into_txn())
+                .map(|t| t.into_txn().into_inner())
                 .collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
@@ -199,7 +199,7 @@ impl ChunkOutput {
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
@@ -216,7 +216,7 @@ impl ChunkOutput {
     /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
     #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
@@ -244,11 +244,13 @@ impl ChunkOutput {
     }
 }
 
-pub fn update_counters_for_processed_chunk(
-    transactions: &[Transaction],
+pub fn update_counters_for_processed_chunk<T>(
+    transactions: &[T],
     transaction_outputs: &[TransactionOutput],
     process_type: &str,
-) {
+) where
+    T: TransactionProvider,
+{
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
@@ -315,11 +317,12 @@ pub fn update_counters_for_processed_chunk(
             TransactionStatus::Retry => ("retry", "", "".to_string()),
         };
 
-        let kind = match txn {
-            Transaction::UserTransaction(_) => "user_transaction",
-            Transaction::GenesisTransaction(_) => "genesis",
-            Transaction::BlockMetadata(_) => "block_metadata",
-            Transaction::StateCheckpoint(_) => "state_checkpoint",
+        let kind = match txn.get_transaction() {
+            Some(Transaction::UserTransaction(_)) => "user_transaction",
+            Some(Transaction::GenesisTransaction(_)) => "genesis",
+            Some(Transaction::BlockMetadata(_)) => "block_metadata",
+            Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            None => "unknown",
         };
 
         metrics::APTOS_PROCESSED_TXNS_COUNT
@@ -338,7 +341,7 @@ pub fn update_counters_for_processed_chunk(
                 .inc();
         }
 
-        if let Transaction::UserTransaction(user_txn) = txn {
+        if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE

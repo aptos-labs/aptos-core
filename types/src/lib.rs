@@ -52,6 +52,7 @@ pub use utility_coin::*;
 
 pub mod account_view;
 pub mod aggregate_signature;
+pub mod aggregator;
 pub mod block_executor;
 pub mod bytes;
 pub mod state_store;

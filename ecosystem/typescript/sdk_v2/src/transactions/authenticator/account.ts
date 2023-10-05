@@ -3,7 +3,7 @@
 import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { Ed25519PublicKey, Ed25519Signature } from "../../crypto/ed25519";
 import { MultiEd25519PublicKey, MultiEd25519Signature } from "../../crypto/multi_ed25519";
-import { RustEnumAccountAuthenticatorVariant } from "../../types";
+import { AccountAuthenticatorVariant } from "../../types";
 
 export abstract class AccountAuthenticator extends Serializable {
   abstract serialize(serializer: Serializer): void;
@@ -11,9 +11,9 @@ export abstract class AccountAuthenticator extends Serializable {
   static deserialize(deserializer: Deserializer): AccountAuthenticator {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case RustEnumAccountAuthenticatorVariant.AccountAuthenticatorEd25519:
+      case AccountAuthenticatorVariant.AccountAuthenticatorEd25519:
         return AccountAuthenticatorEd25519.load(deserializer);
-      case RustEnumAccountAuthenticatorVariant.AccountAuthenticatorMultiEd25519:
+      case AccountAuthenticatorVariant.AccountAuthenticatorMultiEd25519:
         return AccountAuthenticatorMultiEd25519.load(deserializer);
       default:
         throw new Error(`Unknown variant index for AccountAuthenticator: ${index}`);
@@ -40,7 +40,7 @@ export class AccountAuthenticatorEd25519 extends AccountAuthenticator {
    *
    */
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumAccountAuthenticatorVariant.AccountAuthenticatorEd25519);
+    serializer.serializeU32AsUleb128(AccountAuthenticatorVariant.AccountAuthenticatorEd25519);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -71,7 +71,7 @@ export class AccountAuthenticatorMultiEd25519 extends AccountAuthenticator {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(RustEnumAccountAuthenticatorVariant.AccountAuthenticatorMultiEd25519);
+    serializer.serializeU32AsUleb128(AccountAuthenticatorVariant.AccountAuthenticatorMultiEd25519);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }

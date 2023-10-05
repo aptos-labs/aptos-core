@@ -5,15 +5,12 @@
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    contract_event::ReadWriteEvent,
-    executable::ModulePath,
-    fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp},
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use aptos_vm_types::resolver::TExecutorView;
 use move_core_types::value::MoveTypeLayout;
-use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use std::{collections::HashMap, fmt::Debug};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -26,30 +23,6 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
-}
-
-/// Trait that defines a transaction type that can be executed by the block executor. A transaction
-/// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
-    /// specifying a tag, and output requires merging all resources together (Note: this may change
-    /// in the future if write-set format changes to be per-resource, could be more performant).
-    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
-    type Tag: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + DeserializeOwned
-        + Serialize;
-    /// AggregatorV2 identifier type.
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
-    type Value: Send + Sync + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }
 
 /// Inference result of a transaction.
