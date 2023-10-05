@@ -3,30 +3,27 @@
 
 #![forbid(unsafe_code)]
 
-use crate::ParsedTransactionOutput;
+use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
-use aptos_types::{
-    state_store::ShardedStateUpdates,
-    transaction::{Transaction, TransactionStatus},
-};
+use aptos_types::{state_store::ShardedStateUpdates, transaction::TransactionStatus};
 use itertools::zip_eq;
 
 #[derive(Default)]
 pub struct TransactionsByStatus {
     statuses: Vec<TransactionStatus>,
-    to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-    to_discard: Vec<Transaction>,
-    to_retry: Vec<Transaction>,
+    to_keep: TransactionsWithParsedOutput,
+    to_discard: TransactionsWithParsedOutput,
+    to_retry: TransactionsWithParsedOutput,
 }
 
 impl TransactionsByStatus {
     pub fn new(
         status: Vec<TransactionStatus>,
-        to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-        to_discard: Vec<Transaction>,
-        to_retry: Vec<Transaction>,
+        to_keep: TransactionsWithParsedOutput,
+        to_discard: TransactionsWithParsedOutput,
+        to_retry: TransactionsWithParsedOutput,
     ) -> Self {
         Self {
             statuses: status,
@@ -48,9 +45,9 @@ impl TransactionsByStatus {
         self,
     ) -> (
         Vec<TransactionStatus>,
-        Vec<(Transaction, ParsedTransactionOutput)>,
-        Vec<Transaction>,
-        Vec<Transaction>,
+        TransactionsWithParsedOutput,
+        TransactionsWithParsedOutput,
+        TransactionsWithParsedOutput,
     ) {
         (self.statuses, self.to_keep, self.to_discard, self.to_retry)
     }

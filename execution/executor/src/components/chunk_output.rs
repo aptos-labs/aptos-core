@@ -22,7 +22,8 @@ use aptos_types::{
     epoch_state::EpochState,
     transaction::{
         signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
-        ExecutionStatus, Transaction, TransactionOutput, TransactionStatus,
+        ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
+        TransactionStatus,
     },
 };
 use aptos_vm::{
@@ -82,8 +83,6 @@ impl ChunkOutput {
     ) -> Result<Self> {
         let transaction_outputs =
             Self::execute_block::<V>(&transactions, &state_view, maybe_block_gas_limit)?;
-
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
 
         Ok(Self {
             transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
@@ -244,12 +243,13 @@ impl ChunkOutput {
     }
 }
 
-pub fn update_counters_for_processed_chunk<T>(
+pub fn update_counters_for_processed_chunk<T, O>(
     transactions: &[T],
-    transaction_outputs: &[TransactionOutput],
+    transaction_outputs: &[O],
     process_type: &str,
 ) where
     T: TransactionProvider,
+    O: TransactionOutputProvider,
 {
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
@@ -262,7 +262,7 @@ pub fn update_counters_for_processed_chunk<T>(
     }
 
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
-        let (state, reason, error_code) = match output.status() {
+        let (state, reason, error_code) = match output.get_transaction_output().status() {
             TransactionStatus::Keep(execution_status) => match execution_status {
                 ExecutionStatus::Success => ("keep_success", "", "".to_string()),
                 ExecutionStatus::OutOfGas => ("keep_rejected", "OutOfGas", "error".to_string()),
@@ -395,7 +395,7 @@ pub fn update_counters_for_processed_chunk<T>(
             }
         }
 
-        for event in output.events() {
+        for event in output.get_transaction_output().events() {
             let (is_core, creation_number) = match event {
                 ContractEvent::V1(v1) => (
                     v1.key().get_creator_address() == CORE_CODE_ADDRESS,
