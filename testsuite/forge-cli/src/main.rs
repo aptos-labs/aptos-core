@@ -1368,12 +1368,15 @@ fn netbench_config_100_megabytes_per_sec(netbench_config: &mut NetbenchConfig) {
     netbench_config.direct_send_per_second = 1000;
 }
 
-fn netbench_config_5_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
+fn netbench_config_12_megabytes_per_sec_small_messages(netbench_config: &mut NetbenchConfig) {
     netbench_config.enabled = true;
     netbench_config.max_network_channel_size = 1000;
     netbench_config.enable_direct_send_testing = true;
     netbench_config.direct_send_data_size = 100000;
-    netbench_config.direct_send_per_second = 50;
+    netbench_config.direct_send_per_second = 120;
+    netbench_config.enable_direct_send_ramp_up = true;
+    netbench_config.direct_send_ramp_up_duration_seconds = 90;
+    netbench_config.direct_send_ramp_up_per_second = 30;
 }
 
 /// Currently sending 16 MB/s outbound gets 12 MB/s inbound.
@@ -1418,7 +1421,9 @@ fn net_bench_two_region_env() -> ForgeConfig {
 }
 
 fn net_bench_two_region_env_small_messages() -> ForgeConfig {
-    net_bench_two_region_inner(Arc::new(netbench_config_5_megabytes_per_sec_small_messages))
+    net_bench_two_region_inner(Arc::new(
+        netbench_config_12_megabytes_per_sec_small_messages,
+    ))
 }
 
 fn three_region_simulation_with_different_node_speed() -> ForgeConfig {
