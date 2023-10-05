@@ -343,6 +343,7 @@ pub async fn direct_sender(
 
     let start = time_service.now_unix_time().as_micros() as u64;
     loop {
+        let await_start = time_service.now_unix_time().as_micros() as u64;
         ticker.next().await;
 
         if let Some(ramp_up_ms) = config.direct_send_ramp_up_ms {
@@ -357,7 +358,7 @@ pub async fn direct_sender(
             }
         }
         let await_end = time_service.now_unix_time().as_micros() as u64;
-        direct_micros("await", await_end - start);
+        direct_micros("await", await_end - await_start);
 
         counter += 1;
         {
