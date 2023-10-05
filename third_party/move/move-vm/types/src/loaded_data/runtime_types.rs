@@ -18,7 +18,7 @@ use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 pub const TYPE_DEPTH_MAX: usize = 256;
 
 pub static STRUCT_IDENTIFIER_IDS_UNIVERSE: Lazy<InstanceUniverse<StructIdentifier>> =
-    Lazy::new(|| InstanceUniverse::new());
+    Lazy::new(InstanceUniverse::new);
 
 pub type StructIdentifierUID = InstanceUID<'static, StructIdentifier>;
 

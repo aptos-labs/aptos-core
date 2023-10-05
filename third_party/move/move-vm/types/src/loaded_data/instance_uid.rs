@@ -64,6 +64,12 @@ impl<'a, T: Eq + Hash> Drop for InstanceUniverseTableEntry<'a, T> {
 
 pub type InstanceUID<'a, T> = Arc<InstanceUniverseTableEntry<'a, T>>;
 
+impl<'a, T: Eq + Hash> Default for InstanceUniverse<'a, T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, T: Eq + Hash> InstanceUniverse<'a, T> {
     pub fn new() -> Self {
         Self {
