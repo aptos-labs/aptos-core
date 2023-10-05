@@ -4,10 +4,13 @@
 use crate::{
     captured_reads::CapturedReads,
     errors::Error,
-    task::{ExecutionStatus, Transaction, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
 };
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{fee_statement::FeeStatement, write_set::WriteOp};
+use aptos_types::{
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;

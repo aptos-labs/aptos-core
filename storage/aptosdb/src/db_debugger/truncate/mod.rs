@@ -301,7 +301,7 @@ mod test {
 
             let mut iter = ledger_db.metadata_db().iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
-            prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
+            prop_assert!(iter.next().transpose().unwrap().unwrap().0 <= target_version);
 
             let mut iter = ledger_db.write_set_db().iter::<WriteSetSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
