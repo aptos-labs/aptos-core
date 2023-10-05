@@ -119,6 +119,9 @@ members = [
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",
+    "execution/graphs",
+    "execution/streaming-partitioner",
+    "execution/transaction-orderer",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "mempool",
@@ -322,6 +325,7 @@ aptos-gas-schedule-updator = { path = "aptos-move/aptos-gas-schedule-updator" }
 aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
+aptos-graphs = { path = "execution/graphs" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
@@ -395,6 +399,7 @@ aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
 aptos-storage-service-types = { path = "state-sync/storage-service/types" }
 aptos-storage-service-server = { path = "state-sync/storage-service/server" }
+aptos-streaming-partitioner = { path = "execution/streaming-partitioner" }
 aptos-telemetry = { path = "crates/aptos-telemetry" }
 aptos-telemetry-service = { path = "crates/aptos-telemetry-service" }
 aptos-temppath = { path = "crates/aptos-temppath" }
@@ -404,6 +409,7 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
+aptos-transaction-orderer = { path = "execution/transaction-orderer" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
@@ -538,7 +544,9 @@ mime = "0.3.16"
 mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
+namable_closures = "0.2.4"
 native-tls = "0.2.10"
+nonmax = "0.5.3"
 ntest = "0.9.0"
 num_cpus = "1.13.1"
 num-derive = "0.3.3"

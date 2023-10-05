@@ -31,6 +31,8 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_streaming_partitioner::V3FennelBasedPartitionerConfig;
+use aptos_transaction_orderer::V3ReorderingPartitionerConfig;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -165,6 +167,8 @@ impl PipelineOpt {
                 pre_partitioner_config: self.pre_partitioner_config(),
             }),
             Some("v3-naive") => Box::new(V3NaivePartitionerConfig {}),
+            Some("v3-orderer") => Box::new(V3ReorderingPartitionerConfig {}),
+            Some("v3-fennel") => Box::new(V3FennelBasedPartitionerConfig {}),
             None => Box::<PartitionerV2Config>::default(),
             _ => panic!(
                 "Unknown partitioner version: {:?}",
