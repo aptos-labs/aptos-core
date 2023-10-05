@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{adapter_common::VMAdapter, aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
+use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
