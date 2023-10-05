@@ -6,8 +6,11 @@ import { Deserializer } from "../deserializer";
 import { Serializable, Serializer } from "../serializer";
 
 export class Bool extends Serializable {
-  constructor(public value: boolean) {
+  public value: boolean;
+
+  constructor(value: boolean) {
     super();
+    this.value = value;
   }
 
   serialize(serializer: Serializer): void {
@@ -23,8 +26,11 @@ export class Bool extends Serializable {
   }
 }
 export class U8 extends Serializable {
-  constructor(public value: number) {
+  public value: number;
+
+  constructor(value: number) {
     super();
+    this.value = value;
   }
 
   serialize(serializer: Serializer): void {
@@ -36,8 +42,11 @@ export class U8 extends Serializable {
   }
 }
 export class U16 extends Serializable {
-  constructor(public value: number) {
+  public value: number;
+
+  constructor(value: number) {
     super();
+    this.value = value;
   }
 
   serialize(serializer: Serializer): void {
@@ -49,8 +58,11 @@ export class U16 extends Serializable {
   }
 }
 export class U32 extends Serializable {
-  constructor(public value: number) {
+  public value: number;
+
+  constructor(value: number) {
     super();
+    this.value = value;
   }
 
   serialize(serializer: Serializer): void {
@@ -78,7 +90,7 @@ export class U64 extends Serializable {
   }
 }
 export class U128 extends Serializable {
-  value: bigint;
+  public value: bigint;
 
   constructor(value: AnyNumber) {
     super();
@@ -94,7 +106,7 @@ export class U128 extends Serializable {
   }
 }
 export class U256 extends Serializable {
-  value: bigint;
+  public value: bigint;
 
   constructor(value: AnyNumber) {
     super();

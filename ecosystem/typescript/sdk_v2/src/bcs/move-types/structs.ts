@@ -4,9 +4,6 @@ import { Bool, U128, U16, U256, U32, U64, U8 } from "./primitives";
 import { AnyNumber, HexInput } from "../../types";
 import { AccountAddress } from "../../core";
 
-export type NonGenericInputs = boolean | number | string | bigint;
-export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString;
-
 /**
  * This class is the Aptos Typescript SDK representation of a Move `vector<T>`,
  * where `T` represents either a primitive type (`bool`, `u8`, `u64`, ...)
@@ -51,8 +48,11 @@ export type NonGenerics = Bool | U8 | U16 | U32 | U64 | U128 | U256 | MoveString
  * @returns a `Vector<T>` with the values `values`
  */
 export class Vector<T extends Serializable> extends Serializable {
-  constructor(public values: Array<T>) {
+  public values: Array<T>;
+
+  constructor(values: Array<T>) {
     super();
+    this.values = values;
   }
 
   /**
@@ -182,8 +182,11 @@ export class Vector<T extends Serializable> extends Serializable {
 }
 
 export class MoveString extends Serializable {
-  constructor(public value: string) {
+  public value: string;
+
+  constructor(value: string) {
     super();
+    this.value = value;
   }
 
   serialize(serializer: Serializer): void {
@@ -376,7 +379,7 @@ export class MoveOption<T extends Serializable> extends Serializable {
 }
 
 export class MoveObject extends Serializable {
-  value: AccountAddress;
+  public value: AccountAddress;
 
   constructor(value: HexInput) {
     super();
