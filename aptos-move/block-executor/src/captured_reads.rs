@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::Transaction;
 use anyhow::bail;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     versioned_data::VersionedData,
     versioned_group_data::VersionedGroupData,
 };
-use aptos_types::{state_store::state_value::StateValueMetadataKind, write_set::TransactionWrite};
+use aptos_types::{
+    state_store::state_value::StateValueMetadataKind,
+    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+};
 use derivative::Derivative;
 use std::{
     collections::{
@@ -356,13 +358,11 @@ impl<T: Transaction> CapturedReads<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        proptest_types::types::{KeyType, MockEvent, ValueType},
-        task::Transaction,
-    };
+    use crate::proptest_types::types::{KeyType, MockEvent, ValueType};
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
+        transaction::BlockExecutableTransaction,
     };
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
     use test_case::test_case;
@@ -523,7 +523,7 @@ mod test {
     #[derive(Clone, Debug)]
     struct TestTransactionType {}
 
-    impl Transaction for TestTransactionType {
+    impl BlockExecutableTransaction for TestTransactionType {
         type Event = MockEvent;
         type Identifier = ();
         type Key = KeyType<u32>;

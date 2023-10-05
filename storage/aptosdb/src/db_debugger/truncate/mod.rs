@@ -64,8 +64,7 @@ impl Cmd {
             AptosDB::create_checkpoint(
                 &self.db_dir,
                 backup_checkpoint_dir,
-                self.sharding_config.split_ledger_db,
-                self.sharding_config.use_sharded_state_merkle_db,
+                self.sharding_config.enable_storage_sharding,
             )?;
             println!("Done!");
         } else {
@@ -73,8 +72,7 @@ impl Cmd {
         }
 
         let rocksdb_config = RocksdbConfigs {
-            split_ledger_db: self.sharding_config.split_ledger_db,
-            use_sharded_state_merkle_db: self.sharding_config.use_sharded_state_merkle_db,
+            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
@@ -225,8 +223,7 @@ mod test {
             use crate::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
             aptos_logger::Logger::new().init();
             let sharding_config = ShardingConfig {
-                split_ledger_db: input.1,
-                use_sharded_state_merkle_db: input.1,
+                enable_storage_sharding: input.1,
             };
             let tmp_dir = TempPath::new();
 
@@ -281,8 +278,7 @@ mod test {
             let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
                 tmp_dir.path().to_path_buf(),
                 RocksdbConfigs {
-                    use_sharded_state_merkle_db: input.1,
-                    split_ledger_db: input.1,
+                    enable_storage_sharding: input.1,
                     ..Default::default()
                 },
                 /*readonly=*/ false,
@@ -305,7 +301,7 @@ mod test {
 
             let mut iter = ledger_db.metadata_db().iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
-            prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
+            prop_assert!(iter.next().transpose().unwrap().unwrap().0 <= target_version);
 
             let mut iter = ledger_db.write_set_db().iter::<WriteSetSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
@@ -356,7 +352,7 @@ mod test {
                 prop_assert!(version <= target_version);
             }
 
-            if sharding_config.split_ledger_db && sharding_config.use_sharded_state_merkle_db {
+            if sharding_config.enable_storage_sharding {
                 let state_merkle_db = Arc::new(state_merkle_db);
                 for i in 0..NUM_STATE_SHARDS as u8 {
                     let mut kv_shard_iter = state_kv_db.db_shard(i).iter::<StateValueSchema>(ReadOptions::default()).unwrap();

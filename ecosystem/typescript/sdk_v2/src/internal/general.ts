@@ -6,9 +6,8 @@
  */
 
 import { AptosConfig } from "../api/aptos_config";
-import { getAptosFullNode, post, postAptosFullNode } from "../client";
+import { getAptosFullNode, postAptosFullNode, postAptosIndexer } from "../client";
 import { Block, GraphqlQuery, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
-import { AptosApiType } from "../utils/const";
 
 export async function getLedgerInfo(args: { aptosConfig: AptosConfig }): Promise<LedgerInfo> {
   const { aptosConfig } = args;
@@ -89,9 +88,8 @@ export async function queryIndexer<T>(args: {
   originMethod?: string;
 }): Promise<T> {
   const { aptosConfig, query, originMethod } = args;
-  const { data } = await post<GraphqlQuery, T>({
+  const { data } = await postAptosIndexer<GraphqlQuery, T>({
     aptosConfig,
-    type: AptosApiType.INDEXER,
     originMethod: originMethod ?? "queryIndexer",
     path: "",
     body: query,

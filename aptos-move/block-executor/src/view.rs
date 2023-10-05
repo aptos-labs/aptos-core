@@ -5,7 +5,6 @@ use crate::{
     captured_reads::{CapturedReads, DataRead, ReadKind},
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler},
-    task::Transaction,
 };
 use aptos_aggregator::{
     delta_change_set::serialize,
@@ -24,6 +23,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};

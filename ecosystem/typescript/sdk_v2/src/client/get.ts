@@ -39,7 +39,7 @@ export type GetRequestOptions = {
   overrides?: ClientConfig;
 };
 
-export type GetAptosFullNodeRequestOptions = Omit<GetRequestOptions, "type">;
+export type GetAptosRequestOptions = Omit<GetRequestOptions, "type">;
 
 /**
  * Main function to do a Get request
@@ -71,15 +71,13 @@ export async function get<Req, Res>(options: GetRequestOptions): Promise<AptosRe
   return response;
 }
 
-export async function getAptosFullNode<Req, Res>(
-  options: GetAptosFullNodeRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
+export async function getAptosFullNode<Req, Res>(options: GetAptosRequestOptions): Promise<AptosResponse<Req, Res>> {
   return get<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
 }
 
 /// This function is a helper for paginating using a function wrapping an API
 export async function paginateWithCursor<Req extends Record<string, any>, Res extends any[]>(
-  options: GetAptosFullNodeRequestOptions,
+  options: GetAptosRequestOptions,
 ): Promise<Res> {
   const out = [];
   let cursor: string | undefined;

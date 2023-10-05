@@ -23,6 +23,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..Default::default()
             },
+            full_model_generation: true, // Run extended checks also on test code
             ..Default::default()
         },
         // TODO(Gas): double check if this is correct
