@@ -901,9 +901,11 @@ impl StateStore {
                 (usage.items() as i64 + items_delta) as usize,
                 (usage.bytes() as i64 + bytes_delta) as usize,
             );
-            if i == num_versions - 1 {
+            if !skip_usage || i == num_versions - 1 {
                 let version = first_version + i as u64;
-                info!("Write usage at version {version}, {usage:?}.");
+                if i == num_versions - 1 {
+                    info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
+                }
                 batch
                     .put::<VersionDataSchema>(&version, &usage.into())
                     .unwrap();
