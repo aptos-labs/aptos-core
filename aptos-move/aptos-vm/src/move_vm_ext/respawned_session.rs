@@ -64,7 +64,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         Ok(RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
-            session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
+            session_builder: |resolver| Some(vm.vm_impl.new_session(resolver, session_id)),
             storage_refund,
         }
         .build())
