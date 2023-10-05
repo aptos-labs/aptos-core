@@ -533,6 +533,9 @@ describe("Tests for the Serializable class", () => {
   });
 
   it("serializes a rotation capability offer struct correctly", () => {
+    // if you don't want to store your values in your Serializable class as Move/BCS classes,
+    // you can always keep them as primitive values and instantiate & serialize them
+    // in the  `serialize` function of your Serializable class
     class RotationCapabilityOfferProofChallengeV2 extends Serializable {
       public readonly moduleAddress: AccountAddress = AccountAddress.ONE;
       public readonly moduleName: string = "account";
@@ -550,11 +553,11 @@ describe("Tests for the Serializable class", () => {
 
       serialize(serializer: Serializer): void {
         serializer.serialize(this.moduleAddress);
-        serializer.serializeStr(this.moduleName);
-        serializer.serializeStr(this.structName);
-        serializer.serializeStr(this.functionName);
-        serializer.serializeU8(this.chainId);
-        serializer.serializeU64(this.sequenceNumber);
+        serializer.serialize(new MoveString(this.moduleName)); // equivalent to => serializer.serializeStr(this.moduleName);
+        serializer.serialize(new MoveString(this.structName)); // => serializer.serializeStr(this.structName);
+        serializer.serialize(new MoveString(this.functionName)); // => serializer.serializeStr(this.functionName);
+        serializer.serialize(new U8(this.chainId)); // => serializer.serializeU8(this.chainId);
+        serializer.serialize(new U64(this.sequenceNumber)); // => serializer.serializeU64(this.sequenceNumber);
         serializer.serialize(this.sourceAddress);
         serializer.serialize(this.recipientAddress);
       }
