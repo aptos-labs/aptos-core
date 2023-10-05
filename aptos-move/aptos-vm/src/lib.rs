@@ -143,6 +143,15 @@ pub trait VMValidator {
     ) -> VMValidatorResult;
 }
 
+/// This trait describes the VM's simulation interfaces.
+pub trait VMSimulator {
+    /// Executes a SignedTransaction without performing signature verification.
+    fn simulate_signed_transaction(
+        transaction: &SignedTransaction,
+        state_view: &impl StateView,
+    ) -> (VMStatus, TransactionOutput);
+}
+
 /// This trait describes the VM's execution interface.
 pub trait VMExecutor: Send + Sync {
     // NOTE: At the moment there are no persistent caches that live past the end of a block (that's

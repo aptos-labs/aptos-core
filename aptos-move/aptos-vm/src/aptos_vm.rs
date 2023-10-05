@@ -12,7 +12,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    verifier, VMExecutor, VMValidator,
+    verifier, VMExecutor, VMSimulator, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -136,6 +136,11 @@ impl AptosVM {
 
     pub fn new_from_state_view(state_view: &impl StateView) -> Self {
         Self::new(&state_view.as_move_resolver())
+    }
+
+    fn for_simulation(mut self) -> Self {
+        self.is_simulation = true;
+        self
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -1474,25 +1479,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    /// Executes a SignedTransaction without performing signature verification.
-    pub fn simulate_signed_transaction(
-        txn: &SignedTransaction,
-        executor_view: &impl ExecutorView,
-    ) -> (VMStatus, TransactionOutput) {
-        let vm = AptosVM::new(&StorageAdapter::from_borrowed(executor_view));
-        let log_context = AdapterLogSchema::new(executor_view.id(), 0);
-
-        let resolver = vm.as_move_resolver(executor_view);
-        let (vm_status, vm_output) =
-            vm.simulate_single_signed_transaction(&resolver, txn, &log_context);
-        (
-            vm_status,
-            vm_output
-                .try_into_transaction_output(&resolver)
-                .expect("Simulation cannot fail"),
-        )
-    }
-
     pub fn execute_view_function(
         state_view: &impl StateView,
         module_id: ModuleId,
@@ -1623,7 +1609,7 @@ impl AptosVM {
         }
     }
 
-    fn simulate_single_signed_transaction(
+    fn simulate_user_signed_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,
@@ -1639,10 +1625,10 @@ impl AptosVM {
             return discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
         }
 
-        self.simulate_signed_transaction_impl(resolver, txn, log_context, &mut gas_meter)
+        self.simulate_user_signed_transaction_impl(resolver, txn, log_context, &mut gas_meter)
     }
 
-    fn simulate_signed_transaction_impl(
+    fn simulate_user_signed_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
         txn: &SignedTransaction,
@@ -2015,5 +2001,26 @@ impl VMValidator for AptosVM {
             .inc();
 
         result
+    }
+}
+
+impl VMSimulator for AptosVM {
+    fn simulate_signed_transaction(
+        transaction: &SignedTransaction,
+        state_view: &impl StateView,
+    ) -> (VMStatus, TransactionOutput) {
+        // TODO: redirect to block-executor.
+        let resolver = state_view.as_move_resolver();
+        let vm = AptosVM::new(&resolver).for_simulation();
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
+        let (vm_status, vm_output) =
+            vm.simulate_user_signed_transaction(&resolver, transaction, &log_context);
+        (
+            vm_status,
+            vm_output
+                .try_into_transaction_output(&resolver)
+                .expect("Simulation cannot fail"),
+        )
     }
 }
