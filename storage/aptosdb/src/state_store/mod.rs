@@ -901,7 +901,7 @@ impl StateStore {
                 (usage.items() as i64 + items_delta) as usize,
                 (usage.bytes() as i64 + bytes_delta) as usize,
             );
-            if !skip_usage || i == num_versions - 1 {
+            if i == num_versions - 1 {
                 let version = first_version + i as u64;
                 info!("Write usage at version {version}, {usage:?}.");
                 batch
