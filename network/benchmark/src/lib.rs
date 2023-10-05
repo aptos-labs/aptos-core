@@ -301,17 +301,17 @@ const BLAB_MICROS: u64 = 100_000;
 /// Determine how many extra ticks to wait for during ramp up
 fn get_num_ramp_up_ticks(
     ramp_up_micros: u64,
-    counter: u64,
+    _counter: u64,
     start_micros: u64,
     now_micros: u64,
 ) -> u64 {
     #[allow(clippy::if_same_then_else)]
     if start_micros + ramp_up_micros > now_micros {
-        2 // send every 3 ticks
-    } else if start_micros + ramp_up_micros * 2 > now_micros {
-        1 // send every 2 ticks
-    } else if start_micros + ramp_up_micros * 3 > now_micros && counter % 2 == 0 {
-        1 // send every 1.5 ticks
+        3 // send every 4 ticks
+          // } else if start_micros + ramp_up_micros * 2 > now_micros {
+          //     1 // send every 2 ticks
+          // } else if start_micros + ramp_up_micros * 3 > now_micros && counter % 2 == 0 {
+          //     1 // send every 1.5 ticks
     } else {
         0 // ramp up complete
     }
