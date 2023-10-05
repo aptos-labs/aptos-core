@@ -19,6 +19,7 @@ pub enum NodeStage {
 pub enum RoundStage {
     NodeBroadcasted,
     CertifiedNodeBroadcasted,
+    StrongLinkReceived,
     Finished,
 }
 
