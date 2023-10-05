@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+use std::iter::{Chain, Map};
+use std::slice::Iter;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::analyzed_transaction::{AnalyzedTransaction, StorageLocation},
@@ -24,12 +26,12 @@ pub trait PTransaction {
 impl PTransaction for AnalyzedTransaction {
     type Key = StateKey;
     type ReadSetIter<'a> =
-        std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
+        Map<Chain<Iter<'a, StorageLocation>, Iter<'a, StorageLocation>>, fn(&StorageLocation) -> &StateKey>;
     type WriteSetIter<'a> =
-        std::iter::Map<std::slice::Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
+        Map<Iter<'a, StorageLocation>, fn(&StorageLocation) -> &StateKey>;
 
     fn read_set(&self) -> Self::ReadSetIter<'_> {
-        self.read_hints().iter().map(StorageLocation::state_key) //sharding v3 todo: chain writes
+        self.read_hints().iter().chain(self.write_hints().iter()).map(StorageLocation::state_key)
     }
 
     fn write_set(&self) -> Self::WriteSetIter<'_> {
