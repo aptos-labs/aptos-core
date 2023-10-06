@@ -29,6 +29,7 @@ export class Bool extends Serializable {
     return new Bool(deserializer.deserializeBool());
   }
 }
+
 export class U8 extends Serializable {
   public readonly value: Uint8;
 
@@ -82,6 +83,7 @@ export class U32 extends Serializable {
     return new U32(deserializer.deserializeU32());
   }
 }
+
 export class U64 extends Serializable {
   public readonly value: bigint;
 
