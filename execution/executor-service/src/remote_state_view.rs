@@ -133,23 +133,48 @@ impl RemoteStateViewClient {
     pub fn init_for_block(&self, state_keys: Vec<StateKey>) {
         *self.state_view.write().unwrap() = RemoteStateView::new();
         info!("&&&&&&&&&&&&& Prefetching {} state keys", state_keys.len());
-        self.pre_fetch_state_values(state_keys);
+        //self.thread_pool.spawn(move || {
+            self.pre_fetch_state_values(state_keys, false);
+        //});
     }
 
-    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>) {
-        state_keys.clone().into_iter().for_each(|state_key| {
-            self.state_view.read().unwrap().insert_state_key(state_key);
-        });
-        state_keys
-            .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
-            .map(|state_keys_chunk| state_keys_chunk.to_vec())
-            .for_each(|state_keys| {
-                let sender = self.kv_tx.clone();
-                let shard_id = self.shard_id;
-                self.thread_pool.spawn(move || {
-                    Self::send_state_value_request(shard_id, sender, state_keys);
-                });
+    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_fetch: bool) {
+        let state_view_clone = self.state_view.clone();
+        let thread_pool_clone = self.thread_pool.clone();
+        let kv_tx_clone = self.kv_tx.clone();
+        let shard_id = self.shard_id;
+
+        if sync_fetch {
+            state_keys.clone().into_iter().for_each(|state_key| {
+                state_view_clone.read().unwrap().insert_state_key(state_key);
             });
+            state_keys
+                .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
+                .map(|state_keys_chunk| state_keys_chunk.to_vec())
+                .for_each(|state_keys| {
+                    let sender = kv_tx_clone.clone();
+                    //let shard_id = self.shard_id;
+                    thread_pool_clone.clone().spawn(move || {
+                        Self::send_state_value_request(shard_id, sender, state_keys);
+                    });
+                });
+        } else {
+            self.thread_pool.spawn(move || {
+                state_keys.clone().into_iter().for_each(|state_key| {
+                    state_view_clone.read().unwrap().insert_state_key(state_key);
+                });
+                state_keys
+                    .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
+                    .map(|state_keys_chunk| state_keys_chunk.to_vec())
+                    .for_each(|state_keys| {
+                        let sender = kv_tx_clone.clone();
+                        //let shard_id = self.shard_id;
+                        thread_pool_clone.clone().spawn(move || {
+                            Self::send_state_value_request(shard_id, sender, state_keys);
+                        });
+                    });
+            });
+        }
     }
 
     fn send_state_value_request(
@@ -197,7 +222,7 @@ impl TStateView for RemoteStateViewClient {
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
         let _timer = APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS.start_timer();
         APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT.inc();
-        self.pre_fetch_state_values(vec![state_key.clone()]);
+        self.pre_fetch_state_values(vec![state_key.clone()], true);
         state_view_reader.get_state_value(state_key)
     }
 
