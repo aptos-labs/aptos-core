@@ -9,18 +9,36 @@ export type HexInput = string | Uint8Array;
 
 /**
  * Script transaction arguments enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/language_storage.rs#L27}
+ */
+export enum TypeTagVariants {
+  Bool = 0,
+  U8 = 1,
+  U64 = 2,
+  U128 = 3,
+  Address = 4,
+  Signer = 5,
+  Vector = 6,
+  Struct = 7,
+  U16 = 8,
+  U32 = 9,
+  U256 = 10,
+}
+
+/**
+ * Script transaction arguments enum as they are represented in Rust
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/transaction_argument.rs#L11}
  */
 export enum ScriptTransactionArgumentVariants {
-  ScriptTransactionArgumentU8 = 0,
-  ScriptTransactionArgumentU64 = 1,
-  ScriptTransactionArgumentU128 = 2,
-  ScriptTransactionArgumentAddress = 3,
-  ScriptTransactionArgumentU8Vector = 4,
-  ScriptTransactionArgumentBool = 5,
-  ScriptTransactionArgumentU16 = 6,
-  ScriptTransactionArgumentU32 = 7,
-  ScriptTransactionArgumentU256 = 8,
+  U8 = 0,
+  U64 = 1,
+  U128 = 2,
+  Address = 3,
+  U8Vector = 4,
+  Bool = 5,
+  U16 = 6,
+  U32 = 7,
+  U256 = 8,
 }
 
 /**
@@ -28,9 +46,9 @@ export enum ScriptTransactionArgumentVariants {
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L478}
  */
 export enum TransactionPayloadVariants {
-  TransactionPayloadScript = 0,
-  TransactionPayloadEntryFunction = 2,
-  TransactionPayloadMultisig = 3,
+  Script = 0,
+  EntryFunction = 2,
+  Multisig = 3,
 }
 
 /**
@@ -47,10 +65,10 @@ export enum TransactionVariants {
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L44}
  */
 export enum TransactionAuthenticatorVariant {
-  TransactionAuthenticatorEd25519 = 0,
-  TransactionAuthenticatorMultiEd25519 = 1,
-  TransactionAuthenticatorMultiAgent = 2,
-  TransactionAuthenticatorFeePayer = 4,
+  Ed25519 = 0,
+  MultiEd25519 = 1,
+  MultiAgent = 2,
+  FeePayer = 4,
 }
 
 /**
@@ -58,8 +76,8 @@ export enum TransactionAuthenticatorVariant {
  * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L414}
  */
 export enum AccountAuthenticatorVariant {
-  AccountAuthenticatorEd25519 = 0,
-  AccountAuthenticatorMultiEd25519 = 1,
+  Ed25519 = 0,
+  MultiEd25519 = 1,
 }
 
 /**
