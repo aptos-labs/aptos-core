@@ -429,6 +429,8 @@ We make sure there is an account connected, set the transaction in progress stat
 ...
 ```
 
-Try it! Check a task’s checkbox, approve the transaction and see the task marked as completed.
+4. You might be getting an error for missing components. To resolve, update the import, ```import { Layout, Row, Col, Button, Spin } from "antd";``` to ```import { Layout, Row, Col, Button, Spin, List, Checkbox, Input } from "antd";```.
+
+Now, Try it! Check a task’s checkbox, approve the transaction and see the task marked as completed.
 
 You have now learned how to build a dapp on Aptos from end to end. Congratulations! Tell your friends. :-)
