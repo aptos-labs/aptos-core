@@ -21,6 +21,7 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
 };
 use dashmap::DashMap;
+use crate::metrics::{APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT, APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS, APTOS_REMOTE_EXECUTOR_PREFETCH_WAIT_TIME_SECONDS, APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_COUNT, APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_DESER_TIME_SECONDS, APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_PROCESSING_TIME_SECONDS};
 
 pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
 
@@ -65,12 +66,12 @@ impl RemoteStateView {
     }
 }
 
-static mut get_remote_val_time: f64 = 0.0;
-static mut get_remote_val_count: usize = 0;
-static mut get_prefetched_val_time_approx: f64 = 0.0;
-static mut kv_response_process_time : f64 = 0.0;
-static mut kv_response_process_count : usize = 0;
-static mut kv_response_deser_time : f64 = 0.0;
+//static mut get_remote_val_time: f64 = 0.0;
+//static mut get_remote_val_count: usize = 0;
+//static mut get_prefetched_val_time_approx: f64 = 0.0;
+//static mut kv_response_process_time : f64 = 0.0;
+//static mut kv_response_process_count : usize = 0;
+//static mut kv_response_deser_time : f64 = 0.0;
 
 pub struct RemoteStateViewClient {
     shard_id: ShardId,
@@ -106,14 +107,14 @@ impl RemoteStateViewClient {
             thread_pool.clone(),
         );
 
-        unsafe {
+        /*unsafe {
             get_remote_val_time = 0.0;
             get_remote_val_count = 0;
             get_prefetched_val_time_approx = 0.0;
             kv_response_process_time = 0.0;
             kv_response_process_count = 0;
             kv_response_deser_time = 0.0;
-        }
+        }*/
 
         let join_handle = thread::Builder::new()
             .name(format!("remote-kv-receiver-{}", shard_id))
@@ -162,7 +163,13 @@ impl RemoteStateViewClient {
     }
 
     pub fn print_info(&self) {
-        unsafe {
+        info!("&&&&&&&&&&&& Total approx get prefetched val time is {} s", APTOS_REMOTE_EXECUTOR_PREFETCH_WAIT_TIME_SECONDS.get_sample_sum());
+        info!("&&&&&&&&&&&& Total kv response process time is {} for {} calls", APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_PROCESSING_TIME_SECONDS.get_sample_sum(),
+            APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_COUNT.get());
+        info!("&&&&&&&&&&&& Total kv response deser time is {}", APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_DESER_TIME_SECONDS.get_sample_sum());
+        info!("&&&&&&&&&&&& Total non prefetch get remote val time is {} for {} calls", APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS.get_sample_sum(),
+            APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT.get());
+        /*unsafe {
             info!("&&&&&&&&&&&& Total get remote val time is {} for {} calls", get_remote_val_time, get_remote_val_count);
             info!("&&&&&&&&&&&& Total approx get prefetched val time is {}", get_prefetched_val_time_approx);
             info!("&&&&&&&&&&&& Total kv response process time is {} for {} calls", kv_response_process_time, kv_response_process_count);
@@ -173,7 +180,7 @@ impl RemoteStateViewClient {
             kv_response_process_time = 0.0;
             kv_response_process_count = 0;
             kv_response_deser_time = 0.0;
-        }
+        }*/
     }
 }
 
@@ -184,22 +191,14 @@ impl TStateView for RemoteStateViewClient {
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
-            let start_time = Instant::now();
-            let val = state_view_reader.get_state_value(state_key);
-            unsafe {
-                get_prefetched_val_time_approx += start_time.elapsed().as_secs_f64();
-            }
-            return val
+            let _timer = APTOS_REMOTE_EXECUTOR_PREFETCH_WAIT_TIME_SECONDS.start_timer();
+            return state_view_reader.get_state_value(state_key);
         }
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
-        let start_time = Instant::now();
+        let _timer = APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS.start_timer();
+        APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT.inc();
         self.pre_fetch_state_values(vec![state_key.clone()]);
-        let val = state_view_reader.get_state_value(state_key);
-        unsafe {
-            get_remote_val_time += start_time.elapsed().as_secs_f64();
-            get_remote_val_count += 1;
-        }
-        val
+        state_view_reader.get_state_value(state_key)
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
@@ -245,11 +244,14 @@ impl RemoteStateValueReceiver {
         message: Message,
         state_view: Arc<RwLock<RemoteStateView>>,
     ) {
-        let start_time = Instant::now();
+        let _timer = APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_PROCESSING_TIME_SECONDS.start_timer();
+        let bcs_deser_timer = APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_DESER_TIME_SECONDS.start_timer();
         let response: RemoteKVResponse = bcs::from_bytes(&message.data).unwrap();
-        unsafe {
+        bcs_deser_timer.stop_and_record();
+        APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_COUNT.inc();
+        /*unsafe {
             kv_response_deser_time += start_time.elapsed().as_secs_f64();
-        }
+        }*/
         let state_view_lock = state_view.read().unwrap();
         trace!(
             "Received state values for shard {} with size {}",
@@ -262,9 +264,9 @@ impl RemoteStateValueReceiver {
             .for_each(|(state_key, state_value)| {
                 state_view_lock.set_state_value(&state_key, state_value);
             });
-        unsafe {
+        /*unsafe {
             kv_response_process_time += start_time.elapsed().as_secs_f64();
             kv_response_process_count += 1;
-        }
+        }*/
     }
 }

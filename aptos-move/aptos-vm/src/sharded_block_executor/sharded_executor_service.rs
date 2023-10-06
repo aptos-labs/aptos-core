@@ -28,11 +28,33 @@ use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
 use std::sync::Arc;
 use std::time::Instant;
+use once_cell::sync::Lazy;
+use aptos_metrics_core::{exponential_buckets, Histogram, register_histogram};
 
-static mut cmd_rx_and_prefetch_time: f64 = 0.0;
-static mut result_tx_time: f64 = 0.0;
-static mut exe_block_time: f64 = 0.0;
-static mut isFirst: bool = true;
+//static mut cmd_rx_and_prefetch_time: f64 = 0.0;
+//static mut result_tx_time: f64 = 0.0;
+//static mut exe_block_time: f64 = 0.0;
+//static mut isFirst: bool = true;
+
+pub static APTOS_REMOTE_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_remote_executor_execute_block_seconds",
+        // metric description
+        "The time spent in seconds on executing a block on a shard, including time spent in fetching remote state values and cross-shard communications",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    ).unwrap()
+});
+
+pub static APTOS_REMOTE_EXECUTOR_RESULT_TX_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "aptos_remote_executor_result_tx_seconds",
+        // metric description
+        "The time spent in seconds on sending the execution result of a block on a shard to the coordinator",
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    ).unwrap()
+});
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -218,7 +240,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.num_shards
         );
         loop {
-            let mut start_time = Instant::now();
+           // let mut start_time = Instant::now();
             let command = self.coordinator_client.receive_execute_command();
             match command {
                 ExecutorShardCommand::ExecuteSubBlocks(
@@ -232,15 +254,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         self.shard_id,
                         transactions.num_txns()
                     );
-                    unsafe {
+                    /*unsafe {
                         if isFirst {
                             isFirst = false;
                         } else {
                             cmd_rx_and_prefetch_time += start_time.elapsed().as_secs_f64();
                         }
-                    }
+                    }*/
 
-                    let mut execute_block_start = Instant::now();
+                   // let mut execute_block_start = Instant::now();
+                    let execute_block_timer = APTOS_REMOTE_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
                     let ret = self.execute_block(
                         transactions,
                         state_view.as_ref(),
@@ -248,28 +271,29 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         maybe_block_gas_limit,
                     );
                     drop(state_view);
-                    unsafe {
+                    execute_block_timer.stop_and_record();
+                   /* unsafe {
                         exe_block_time += execute_block_start.elapsed().as_secs_f64();
-                    }
+                    }*/
 
-                    let mut result_tx_start = Instant::now();
+                    //let mut result_tx_start = Instant::now();
+                    let _timer = APTOS_REMOTE_EXECUTOR_RESULT_TX_SECONDS.start_timer();
                     self.coordinator_client.send_execution_result(ret);
-                    unsafe {
-                        result_tx_time += result_tx_start.elapsed().as_secs_f64();
-                    }
                 },
                 ExecutorShardCommand::Stop => {
                     break;
                 },
             }
         }
-        unsafe {
+        /*unsafe {
             info!("&&&&&&&&&&&&& Total cmd rx + init prefetch time is {}; exe block time is {}; result tx time is {} ",
                 cmd_rx_and_prefetch_time, exe_block_time, result_tx_time);
             cmd_rx_and_prefetch_time = 0.0;
             result_tx_time = 0.0;
             exe_block_time = 0.0;
-        }
+        }*/
+        info!("&&&&&&&&&&&& execute block time is {} s", APTOS_REMOTE_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum());
+        info!("&&&&&&&&&&&& result tx time is {} s", APTOS_REMOTE_EXECUTOR_RESULT_TX_SECONDS.get_sample_sum());
         trace!("Shard {} is shutting down", self.shard_id);
     }
 }

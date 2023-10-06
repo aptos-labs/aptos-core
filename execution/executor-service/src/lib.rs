@@ -22,6 +22,7 @@ mod test_utils;
 mod tests;
 #[cfg(test)]
 mod thread_executor_service;
+mod metrics;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteExecutionResult {
