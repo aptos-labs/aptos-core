@@ -118,7 +118,7 @@ async fn test_certified_node_handler() {
     let (tx, _) = unbounded();
     let order_rule = OrderRule::new(
         epoch_state.clone(),
-        LedgerInfo::mock_genesis(None),
+        1,
         dag.clone(),
         Box::new(RoundRobinAnchorElection::new(validators)),
         Arc::new(TestNotifier { tx }),

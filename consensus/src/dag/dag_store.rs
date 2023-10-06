@@ -41,56 +41,40 @@ pub struct Dag {
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
     storage: Arc<dyn DAGStorage>,
-    initial_round: Round,
+    start_round: Round,
     epoch_state: Arc<EpochState>,
+    /// The window we maintain between highest committed round and initial round
+    window_size: u64,
 }
 
 impl Dag {
     pub fn new(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
-        initial_round: Round,
-        _dag_window_size_config: usize,
+        start_round: Round,
+        window_size: u64,
     ) -> Self {
-        let epoch = epoch_state.epoch;
-        let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
-        let num_validators = author_to_index.len();
-        let all_nodes = storage.get_certified_nodes().unwrap_or_default();
-        let mut expired = vec![];
-        let mut nodes_by_round = BTreeMap::new();
+        let mut all_nodes = storage.get_certified_nodes().unwrap_or_default();
+        all_nodes.sort_unstable_by_key(|(_, node)| node.round());
+        let mut to_prune = vec![];
+        // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
+        let mut dag = Self::new_empty(epoch_state, storage.clone(), start_round, window_size);
         for (digest, certified_node) in all_nodes {
-            if certified_node.metadata().epoch() == epoch && certified_node.round() >= initial_round
-            {
-                let arc_node = Arc::new(certified_node);
-                let index = *author_to_index
-                    .get(arc_node.metadata().author())
-                    .expect("Author from certified node should exist");
-                let round = arc_node.metadata().round();
-                debug!("Recovered node {} from storage", arc_node.id());
-                nodes_by_round
-                    .entry(round)
-                    .or_insert_with(|| vec![None; num_validators])[index] =
-                    Some(NodeStatus::Unordered(arc_node));
-            } else {
-                expired.push(digest);
+            if dag.add_node(certified_node).is_err() {
+                to_prune.push(digest);
             }
         }
-        if let Err(e) = storage.delete_certified_nodes(expired) {
+        if let Err(e) = storage.delete_certified_nodes(to_prune) {
             error!("Error deleting expired nodes: {:?}", e);
         }
-        Self {
-            nodes_by_round,
-            author_to_index,
-            storage,
-            initial_round,
-            epoch_state,
-        }
+        dag
     }
 
     pub fn new_empty(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
-        initial_round: Round,
+        start_round: Round,
+        window_size: u64,
     ) -> Self {
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let nodes_by_round = BTreeMap::new();
@@ -98,8 +82,9 @@ impl Dag {
             nodes_by_round,
             author_to_index,
             storage,
-            initial_round,
+            start_round,
             epoch_state,
+            window_size,
         }
     }
 
@@ -108,7 +93,7 @@ impl Dag {
             .nodes_by_round
             .first_key_value()
             .map(|(round, _)| round)
-            .unwrap_or(&self.initial_round)
+            .unwrap_or(&self.start_round)
     }
 
     pub fn highest_round(&self) -> Round {
@@ -116,7 +101,7 @@ impl Dag {
             .nodes_by_round
             .last_key_value()
             .map(|(round, _)| round)
-            .unwrap_or(&self.initial_round)
+            .unwrap_or(&self.start_round)
     }
 
     /// The highest strong links round is either the highest round or the highest round - 1
@@ -128,6 +113,12 @@ impl Dag {
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+        ensure!(
+            node.epoch() == self.epoch_state.epoch,
+            "different epoch {}, current {}",
+            node.epoch(),
+            self.epoch_state.epoch
+        );
         let node = Arc::new(node);
         let author = node.metadata().author();
         let index = *self
@@ -135,8 +126,18 @@ impl Dag {
             .get(author)
             .ok_or_else(|| anyhow!("unknown author"))?;
         let round = node.metadata().round();
-        ensure!(round >= self.lowest_round(), "round too low");
-        ensure!(round <= self.highest_round() + 1, "round too high");
+        ensure!(
+            round >= self.lowest_round(),
+            "round too low {}, lowest in dag {}",
+            round,
+            self.lowest_round()
+        );
+        ensure!(
+            round <= self.highest_round() + 1,
+            "round too high {}, highest in dag {}",
+            round,
+            self.highest_round()
+        );
         if round > self.lowest_round() {
             for parent in node.parents() {
                 ensure!(self.exists(parent.metadata()), "parent not exist");
@@ -339,19 +340,23 @@ impl Dag {
     }
 
     pub(super) fn prune(&mut self) {
-        let all_nodes = self.storage.get_certified_nodes().unwrap_or_default();
-        let mut expired = vec![];
-        for (digest, certified_node) in all_nodes {
-            if certified_node.metadata().epoch() != self.epoch_state.epoch
-                || certified_node.metadata().round() < self.initial_round
-            {
-                expired.push(digest);
-                self.nodes_by_round
-                    .remove(&certified_node.metadata().round());
-            }
-        }
-        if let Err(e) = self.storage.delete_certified_nodes(expired) {
+        let to_keep = self.nodes_by_round.split_off(&self.start_round);
+        let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);
+        let digests = to_prune
+            .iter()
+            .flat_map(|(_, round_ref)| round_ref.iter().flatten())
+            .map(|node_status| *node_status.as_node().metadata().digest())
+            .collect();
+        if let Err(e) = self.storage.delete_certified_nodes(digests) {
             error!("Error deleting expired nodes: {:?}", e);
+        }
+    }
+
+    pub fn commit_callback(&mut self, commit_round: Round) {
+        let new_round = commit_round.saturating_sub(self.window_size);
+        if new_round > self.start_round {
+            self.start_round = new_round;
+            self.prune();
         }
     }
 
