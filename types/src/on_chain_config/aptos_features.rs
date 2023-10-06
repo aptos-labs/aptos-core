@@ -41,6 +41,7 @@ pub enum FeatureFlag {
     SAFER_RESOURCE_GROUPS = 31,
     SAFER_METADATA = 32,
     SECP256K1_ECDSA_AUTHENTICATOR = 33,
+    SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
 }
 
 /// Representation of features on chain as a bitset.

@@ -1103,6 +1103,27 @@ impl AptosVM {
             session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
+        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
+            ..
+        } = &txn.authenticator_ref()
+        {
+            if self
+                .0
+                .get_features()
+                .is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+            {
+                if let Err(err) = session.execute_function_bypass_visibility(
+                    &ACCOUNT_MODULE,
+                    CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
+                    vec![],
+                    serialize_values(&vec![MoveValue::Address(txn.sender())]),
+                    gas_meter,
+                ) {
+                    return discard_error_vm_status(err.into());
+                };
+            }
+        }
+
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
 
