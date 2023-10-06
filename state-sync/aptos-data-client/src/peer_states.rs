@@ -24,7 +24,7 @@ use std::{
 // Useful constants
 const LOGS_FREQUENCY_SECS: u64 = 120; // 2 minutes
 const METRICS_FREQUENCY_SECS: u64 = 15; // 15 seconds
-const NUM_PEER_BUCKETS_FOR_METRICS: u8 = 5; // To avoid metric explosion, we bucket peers into groups
+const NUM_PEER_BUCKETS_FOR_METRICS: u8 = 4; // To avoid metric explosion, we bucket peers into groups
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
