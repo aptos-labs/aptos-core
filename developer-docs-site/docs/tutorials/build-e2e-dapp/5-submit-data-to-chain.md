@@ -141,6 +141,8 @@ return (
 );
 ```
 
+8. Don't forget to update ```import { Layout, Row, Col, Button } from "antd";``` to import Spin: ```import { Layout, Row, Col, Button, Spin} from "antd";```
+
 Now you can head over to our app, and add a new list!
 
 Since you haven’t made the user interface able to handle cases where an account has created a list, you will do so next [handling tasks](./6-handle-tasks.md) in chapter 6.
