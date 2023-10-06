@@ -20,14 +20,11 @@ export async function fundAccount(args: {
 }): Promise<string[]> {
   const { aptosConfig, accountAddress, amount } = args;
   const timeoutSecs = args.timeoutSecs ?? DEFAULT_TXN_TIMEOUT_SEC;
-
-  // address: HexInput, amount: number, timeoutSecs = DEFAULT_TXN_TIMEOUT_SEC)
-  const address = AccountAddress.fromHexInput({ input: accountAddress }).toString();
   const { data } = await postAptosFaucet<any, Array<string>>({
     aptosConfig,
     path: "mint",
     params: {
-      accountAddress: address,
+      accountAddress: AccountAddress.fromHexInput({ input: accountAddress }).toString(),
       amount,
     },
     originMethod: "fundAccount",
