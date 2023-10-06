@@ -151,11 +151,15 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
     let name_string = name.to_string();
-    let (impl_generics, ty_generics, where_clause) = &ast.generics.split_for_impl();
 
+    let impl_params = ast.generics.params.iter();
+    let (_, params, where_clause) = ast.generics.split_for_impl();
+
+    // Note: Ideally, we should generate a lifetime with a unique name so that it does not collide with
+    //       the lifetime parameters of the type itself.
     let gen = quote! {
-        impl<'de, #impl_generics> ::serde::Deserialize<'de> for #name #ty_generics
-        #where_clause
+        impl<'de, #(#impl_params),*> ::serde::Deserialize<'de> for #name #params
+            #where_clause
         {
             fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
@@ -174,7 +178,7 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
                     struct Value<'a>(&'a [u8]);
 
                     let value = Value::deserialize(deserializer)?;
-                    #name #ty_generics::try_from(value.0).map_err(|s| {
+                    #name::try_from(value.0).map_err(|s| {
                         <D::Error as ::serde::de::Error>::custom(format!("{} with {}", s, #name_string))
                     })
                 }
@@ -189,11 +193,14 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
 pub fn serialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
-    let (impl_generics, ty_generics, where_clause) = &ast.generics.split_for_impl();
     let name_string = name.to_string();
 
+    let (impl_params, params, where_clause) = ast.generics.split_for_impl();
+
     let gen = quote! {
-        impl #impl_generics ::serde::Serialize for #name #ty_generics #where_clause {
+        impl #impl_params ::serde::Serialize for #name #params
+            #where_clause
+        {
             fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
             where
                 S: ::serde::Serializer,
