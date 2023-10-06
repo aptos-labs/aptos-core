@@ -118,9 +118,7 @@ export class Serializer {
    * BCS layout for "boolean": One byte. "0x01" for true and "0x00" for false.
    */
   serializeBool(value: boolean) {
-    if (typeof value !== "boolean") {
-      throw new Error("Value needs to be a boolean");
-    }
+    ensureBoolean(value);
     const byteValue = value ? 1 : 0;
     this.appendToBuffer(new Uint8Array([byteValue]));
   }
@@ -307,6 +305,12 @@ export class Serializer {
     values.forEach((item) => {
       item.serialize(this);
     });
+  }
+}
+
+export function ensureBoolean(value: unknown): asserts value is boolean {
+  if (typeof value !== "boolean") {
+    throw new Error("Invalid boolean value.");
   }
 }
 

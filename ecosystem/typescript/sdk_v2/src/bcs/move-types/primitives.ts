@@ -11,13 +11,14 @@ import {
 } from "../consts";
 import { AnyNumber, Uint16, Uint32, Uint8 } from "../../types";
 import { Deserializer } from "../deserializer";
-import { Serializable, Serializer, validateNumberInRange } from "../serializer";
+import { Serializable, Serializer, ensureBoolean, validateNumberInRange } from "../serializer";
 
 export class Bool extends Serializable {
   public readonly value: boolean;
 
   constructor(value: boolean) {
     super();
+    ensureBoolean(value);
     this.value = value;
   }
 
