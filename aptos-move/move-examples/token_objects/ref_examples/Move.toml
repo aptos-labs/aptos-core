@@ -1,0 +1,11 @@
+[package]
+name = 'ref_examples'
+version = '1.0.0'
+
+[addresses]
+ref_examples = "_"
+admin = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
