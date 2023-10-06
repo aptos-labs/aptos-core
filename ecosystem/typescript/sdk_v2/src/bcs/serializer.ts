@@ -310,8 +310,15 @@ export class Serializer {
   }
 }
 
+export function validateNumberInRange<T extends AnyNumber>(value: T, minValue: T, maxValue: T, message?: string) {
+  const valueBigInt = BigInt(value.toString());
+  if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
+    throw new Error(message || "Value is out of range");
+  }
+}
+
 /**
- * A decorator that ensures the input argument for a function is within a range.
+ * A decorator to ensure the input argument for a function is within a range.
  * @param minValue The input argument must be >= minValue
  * @param maxValue The input argument must be <= maxValue
  * @param message Error message
@@ -320,13 +327,11 @@ function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T, message
   return (target: unknown, propertyKey: string, descriptor: PropertyDescriptor) => {
     const childFunction = descriptor.value;
     // eslint-disable-next-line no-param-reassign
-    descriptor.value = function deco(value: AnyNumber): Serializer {
-      const valueBigInt = BigInt(value.toString());
-      if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
-        throw new Error(message || "Value is out of range");
-      }
+    descriptor.value = function deco(value: AnyNumber) {
+      validateNumberInRange(value, minValue, maxValue, message);
       return childFunction.apply(this, [value]);
     };
+
     return descriptor;
   };
 }

@@ -1,12 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { AnyNumber } from "../../types";
+import {
+  MAX_U128_BIG_INT,
+  MAX_U16_NUMBER,
+  MAX_U32_NUMBER,
+  MAX_U64_BIG_INT,
+  MAX_U8_NUMBER,
+  MAX_U256_BIG_INT,
+} from "../consts";
+import { AnyNumber, Uint16, Uint32, Uint8 } from "../../types";
 import { Deserializer } from "../deserializer";
-import { Serializable, Serializer } from "../serializer";
+import { Serializable, Serializer, validateNumberInRange } from "../serializer";
 
 export class Bool extends Serializable {
-  public value: boolean;
+  public readonly value: boolean;
 
   constructor(value: boolean) {
     super();
@@ -17,19 +25,16 @@ export class Bool extends Serializable {
     serializer.serializeBool(this.value);
   }
 
-  deserialize(deserializer: Deserializer) {
-    this.value = deserializer.deserializeBool();
-  }
-
   static deserialize(deserializer: Deserializer): Bool {
     return new Bool(deserializer.deserializeBool());
   }
 }
 export class U8 extends Serializable {
-  public value: number;
+  public readonly value: Uint8;
 
-  constructor(value: number) {
+  constructor(value: Uint8) {
     super();
+    validateNumberInRange(value, 0, MAX_U8_NUMBER);
     this.value = value;
   }
 
@@ -41,11 +46,13 @@ export class U8 extends Serializable {
     return new U8(deserializer.deserializeU8());
   }
 }
-export class U16 extends Serializable {
-  public value: number;
 
-  constructor(value: number) {
+export class U16 extends Serializable {
+  public readonly value: Uint16;
+
+  constructor(value: Uint16) {
     super();
+    validateNumberInRange(value, 0, MAX_U16_NUMBER);
     this.value = value;
   }
 
@@ -57,11 +64,13 @@ export class U16 extends Serializable {
     return new U16(deserializer.deserializeU16());
   }
 }
-export class U32 extends Serializable {
-  public value: number;
 
-  constructor(value: number) {
+export class U32 extends Serializable {
+  public readonly value: Uint32;
+
+  constructor(value: Uint32) {
     super();
+    validateNumberInRange(value, 0, MAX_U32_NUMBER);
     this.value = value;
   }
 
@@ -74,10 +83,11 @@ export class U32 extends Serializable {
   }
 }
 export class U64 extends Serializable {
-  value: bigint;
+  public readonly value: bigint;
 
   constructor(value: AnyNumber) {
     super();
+    validateNumberInRange(value, BigInt(0), MAX_U64_BIG_INT);
     this.value = BigInt(value);
   }
 
@@ -89,11 +99,13 @@ export class U64 extends Serializable {
     return new U64(deserializer.deserializeU64());
   }
 }
+
 export class U128 extends Serializable {
-  public value: bigint;
+  public readonly value: bigint;
 
   constructor(value: AnyNumber) {
     super();
+    validateNumberInRange(value, BigInt(0), MAX_U128_BIG_INT);
     this.value = BigInt(value);
   }
 
@@ -105,11 +117,13 @@ export class U128 extends Serializable {
     return new U128(deserializer.deserializeU128());
   }
 }
+
 export class U256 extends Serializable {
-  public value: bigint;
+  public readonly value: bigint;
 
   constructor(value: AnyNumber) {
     super();
+    validateNumberInRange(value, BigInt(0), MAX_U256_BIG_INT);
     this.value = BigInt(value);
   }
 
