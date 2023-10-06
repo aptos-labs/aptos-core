@@ -118,9 +118,7 @@ export class Serializer {
    * BCS layout for "boolean": One byte. "0x01" for true and "0x00" for false.
    */
   serializeBool(value: boolean) {
-    if (typeof value !== "boolean") {
-      throw new Error("Value needs to be a boolean");
-    }
+    ensureBoolean(value);
     const byteValue = value ? 1 : 0;
     this.appendToBuffer(new Uint8Array([byteValue]));
   }
@@ -310,23 +308,36 @@ export class Serializer {
   }
 }
 
+export function ensureBoolean(value: unknown): asserts value is boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`${value} is not a boolean value`);
+  }
+}
+
+export const outOfRangeErrorMessage = (value: AnyNumber, min: AnyNumber, max: AnyNumber) =>
+  `${value} is out of range: [${min}, ${max}]`;
+
+export function validateNumberInRange<T extends AnyNumber>(value: T, minValue: T, maxValue: T) {
+  const valueBigInt = BigInt(value.toString());
+  if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
+    throw new Error(outOfRangeErrorMessage(value, minValue, maxValue));
+  }
+}
+
 /**
- * A decorator that ensures the input argument for a function is within a range.
+ * A decorator to ensure the input argument for a function is within a range.
  * @param minValue The input argument must be >= minValue
  * @param maxValue The input argument must be <= maxValue
- * @param message Error message
  */
-function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T, message?: string) {
+function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T) {
   return (target: unknown, propertyKey: string, descriptor: PropertyDescriptor) => {
     const childFunction = descriptor.value;
     // eslint-disable-next-line no-param-reassign
-    descriptor.value = function deco(value: AnyNumber): Serializer {
-      const valueBigInt = BigInt(value.toString());
-      if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
-        throw new Error(message || "Value is out of range");
-      }
+    descriptor.value = function deco(value: AnyNumber) {
+      validateNumberInRange(value, minValue, maxValue);
       return childFunction.apply(this, [value]);
     };
+
     return descriptor;
   };
 }

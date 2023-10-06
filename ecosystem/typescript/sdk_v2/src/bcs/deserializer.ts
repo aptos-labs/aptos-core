@@ -6,11 +6,12 @@ import { MAX_U32_NUMBER } from "./consts";
 import { Uint128, Uint16, Uint256, Uint32, Uint64, Uint8 } from "../types";
 
 /**
- * This interface exists solely for the `deserialize` function in the `Deserializer` class.
- * It is not exported because exporting it results in more typing errors than it prevents
- * due to Typescript's lack of support for static methods in abstract classes and interfaces.
+ * This interface exists to define Deserializable<T> inputs for functions that
+ * deserialize a byte buffer into a type T.
+ * It is not intended to be implemented or extended, because Typescript has no support
+ * for static methods in interfaces.
  */
-interface Deserializable<T> {
+export interface Deserializable<T> {
   deserialize(deserializer: Deserializer): T;
 }
 
