@@ -18,7 +18,7 @@ use crate::{
     AptosDB, StateStore,
 };
 use anyhow::{ensure, Result};
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_schemadb::{ReadOptions, DB};
 use aptos_types::transaction::Version;
@@ -33,6 +33,7 @@ use std::{fs, path::PathBuf, sync::Arc};
         .args(&["backup_checkpoint_dir", "opt_out_backup_checkpoint"]),
 ))]
 pub struct Cmd {
+    // TODO(grao): Support db_path_overrides here.
     #[clap(long, value_parser)]
     db_dir: PathBuf,
 
@@ -77,7 +78,7 @@ impl Cmd {
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &self.db_dir,
+            &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             /*readonly=*/ false,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
@@ -313,7 +314,7 @@ mod test {
             drop(db);
 
             let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-                tmp_dir.path().to_path_buf(),
+                &StorageDirPaths::from_path(tmp_dir.path()),
                 RocksdbConfigs {
                     enable_storage_sharding: input.1,
                     ..Default::default()
