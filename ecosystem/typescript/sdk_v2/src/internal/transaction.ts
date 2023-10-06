@@ -7,7 +7,7 @@
 
 import { AptosConfig } from "../api/aptos_config";
 import { AptosApiError, getAptosFullNode, paginateWithCursor } from "../client";
-import { AnyNumber, GasEstimation, PaginationArgs, TransactionResponse, TransactionResponseType } from "../types";
+import { AnyNumber, GasEstimation, HexInput, PaginationArgs, TransactionResponse, TransactionResponseType } from "../types";
 import { DEFAULT_TXN_TIMEOUT_SEC } from "../utils/const";
 import { sleep } from "../utils/helpers";
 
@@ -50,7 +50,7 @@ export async function getTransactionByVersion(args: {
 
 export async function getTransactionByHash(args: {
   aptosConfig: AptosConfig;
-  txnHash: string;
+  txnHash: HexInput;
 }): Promise<TransactionResponse> {
   const { aptosConfig, txnHash } = args;
   const { data } = await getAptosFullNode<{}, TransactionResponse>({
@@ -61,7 +61,7 @@ export async function getTransactionByHash(args: {
   return data;
 }
 
-export async function isTransactionPending(args: { aptosConfig: AptosConfig; txnHash: string }): Promise<boolean> {
+export async function isTransactionPending(args: { aptosConfig: AptosConfig; txnHash: HexInput }): Promise<boolean> {
   const { aptosConfig, txnHash } = args;
   try {
     const transaction = await getTransactionByHash({ aptosConfig, txnHash });
@@ -76,7 +76,7 @@ export async function isTransactionPending(args: { aptosConfig: AptosConfig; txn
 
 export async function waitForTransaction(args: {
   aptosConfig: AptosConfig;
-  txnHash: string;
+  txnHash: HexInput;
   extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean };
 }): Promise<TransactionResponse> {
   const { aptosConfig, txnHash, extraArgs } = args;

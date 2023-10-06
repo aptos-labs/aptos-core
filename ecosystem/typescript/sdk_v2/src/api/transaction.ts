@@ -6,7 +6,7 @@ import {
   isTransactionPending,
   waitForTransaction,
 } from "../internal/transaction";
-import { AnyNumber, GasEstimation, PaginationArgs, TransactionResponse } from "../types";
+import { AnyNumber, GasEstimation, HexInput, PaginationArgs, TransactionResponse } from "../types";
 import { AptosConfig } from "./aptos_config";
 
 export class Transaction {
@@ -50,7 +50,6 @@ export class Transaction {
 
   /**
    * Defines if specified transaction is currently in pending state
-   * @param txnHash A hash of transaction
    *
    * To create a transaction hash:
    *
@@ -58,52 +57,38 @@ export class Transaction {
    * 2. Apply hash algorithm SHA3-256 to the hash message bytes.
    * 3. Hex-encode the hash bytes with 0x prefix.
    *
+   * @param txnHash A hash of transaction
    * @returns `true` if transaction is in pending state and `false` otherwise
    */
-  async isPendingTransaction(args: { txnHash: string }): Promise<boolean> {
+  async isPendingTransaction(args: { txnHash: HexInput }): Promise<boolean> {
     const isPending = await isTransactionPending({ aptosConfig: this.config, ...args });
     return isPending;
   }
 
   /**
-   * Wait for a transaction to move past pending state.
-   *
-   * There are 4 possible outcomes:
-   * 1. Transaction is processed and successfully committed to the blockchain.
-   * 2. Transaction is rejected for some reason, and is therefore not committed
-   *    to the blockchain.
+   * Waits for a transaction to move past the pending state.
+   * 
+   * There are 4 cases.
+   * 1. Transaction is successfully processed and committed to the chain.
+   *    - The function will resolve with the transaction response from the API.
+   * 2. Transaction is rejected for some reason, and is therefore not committed to the blockchain.
+   *    - The function will throw an AptosApiError with an HTTP status code indicating some problem with the request.
    * 3. Transaction is committed but execution failed, meaning no changes were
    *    written to the blockchain state.
-   * 4. Transaction is not processed within the specified timeout.
-   *
-   * In case 1, this function resolves with the transaction response returned
-   * by the API.
-   *
-   * In case 2, the function will throw an ApiError, likely with an HTTP status
-   * code indicating some problem with the request (e.g. 400).
-   *
-   * In case 3, if `checkSuccess` is false (the default), this function returns
-   * the transaction response just like in case 1, in which the `success` field
-   * will be false. If `checkSuccess` is true, it will instead throw a
-   * FailedTransactionError.
-   *
-   * In case 4, this function throws a WaitForTransactionError.
-   *
+   *    - If `checkSuccess` is true, the function will throw a FailedTransactionError
+   *      If `checkSuccess` is false, the function will resolve with the transaction response where the `success` field is false.
+   * 4. Transaction does not move past the pending state within `extraArgs.timeoutSecs` seconds.
+   *    - The function will throw a WaitForTransactionError
+   * 
+   * 
    * @param txnHash The hash of a transaction previously submitted to the blockchain.
    * @param extraArgs.timeoutSecs Timeout in seconds. Defaults to 20 seconds.
-   * @param extraArgs.checkSuccess See above. Defaults to false.
-   * @returns See above.
-   *
-   * @example
-   * ```
-   * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
-   * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
-   * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
-   * const transaction = await this.aptosClient.waitForTransactionWithResult(pendingTransaction.hash);
-   * ```
+   * @param extraArgs.checkSuccess A boolean which controls whether the function will error if the transaction failed. 
+   *   Defaults to true.  See case 3 above.
+   * @returns The transaction on-chain.  See above for more details.
    */
   async waitForTransaction(args: {
-    txnHash: string;
+    txnHash: HexInput;
     extraArgs?: { timeoutSecs?: number; checkSuccess?: boolean };
   }): Promise<TransactionResponse> {
     const transaction = await waitForTransaction({ aptosConfig: this.config, ...args });
