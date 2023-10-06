@@ -7,7 +7,7 @@
 
 import { AptosConfig } from "../api/aptos_config";
 import { AptosApiError, getAptosFullNode, paginateWithCursor } from "../client";
-import { AnyNumber, GasEstimation, PaginationArgs, TransactionResponse, TransactionType } from "../types";
+import { AnyNumber, GasEstimation, PaginationArgs, TransactionResponse, TransactionResponseType } from "../types";
 import { DEFAULT_TXN_TIMEOUT_SEC } from "../utils/const";
 import { sleep } from "../utils/helpers";
 
@@ -65,7 +65,7 @@ export async function isTransactionPending(args: { aptosConfig: AptosConfig; txn
   const { aptosConfig, txnHash } = args;
   try {
     const transaction = await getTransactionByHash({ aptosConfig, txnHash });
-    return transaction.type === TransactionType.Pending;
+    return transaction.type === TransactionResponseType.Pending;
   } catch (e: any) {
     if (e?.status === 404) {
       return true;
@@ -74,43 +74,6 @@ export async function isTransactionPending(args: { aptosConfig: AptosConfig; txn
   }
 }
 
-/**
- * Wait for a transaction to move past pending state.
- *
- * There are 4 possible outcomes:
- * 1. Transaction is processed and successfully committed to the blockchain.
- * 2. Transaction is rejected for some reason, and is therefore not committed
- *    to the blockchain.
- * 3. Transaction is committed but execution failed, meaning no changes were
- *    written to the blockchain state.
- * 4. Transaction is not processed within the specified timeout.
- *
- * In case 1, this function resolves with the transaction response returned
- * by the API.
- *
- * In case 2, the function will throw an ApiError, likely with an HTTP status
- * code indicating some problem with the request (e.g. 400).
- *
- * In case 3, if `checkSuccess` is true (the default), it will throw a
- * FailedTransactionError is the transaction's `success` field is false. If `checkSuccess` 
- * is false, this function returns the transaction response just like in case 1 even is the 
- * `success` field is false.
- *
- * In case 4, this function throws a WaitForTransactionError.
- *
- * @param txnHash The hash of a transaction previously submitted to the blockchain.
- * @param extraArgs.timeoutSecs Timeout in seconds. Defaults to 20 seconds.
- * @param extraArgs.checkSuccess See above. Defaults to true.
- * @returns See above.
- *
- * @example
- * ```
- * const rawTransaction = await this.generateRawTransaction(sender.address(), payload, extraArgs);
- * const bcsTxn = AptosClient.generateBCSTransaction(sender, rawTransaction);
- * const pendingTransaction = await this.submitSignedBCSTransaction(bcsTxn);
- * const transaction = await this.aptosClient.waitForTransaction(pendingTransaction.hash);
- * ```
- */
 export async function waitForTransaction(args: {
   aptosConfig: AptosConfig;
   txnHash: string;
@@ -123,6 +86,7 @@ export async function waitForTransaction(args: {
   let isPending = true;
   let count = 0;
   let lastTxn: TransactionResponse | undefined;
+  let lastError: AptosApiError | undefined;
 
   while (isPending) {
     if (count >= timeoutSecs) {
@@ -132,16 +96,20 @@ export async function waitForTransaction(args: {
       // eslint-disable-next-line no-await-in-loop
       lastTxn = await getTransactionByHash({ aptosConfig, txnHash });
 
-      isPending = lastTxn.type === TransactionType.Pending;
+      isPending = lastTxn.type === TransactionResponseType.Pending;
 
       if (!isPending) {
         break;
       }
     } catch (e) {
-      // In short, this means we will retry if it was an ApiError and the code was 404 or 5xx.
+      // In short, this means we will retry if it was an AptosApiError and the code was 404 or 5xx.
       const isAptosApiError = e instanceof AptosApiError;
-      const isRequestError = isAptosApiError && e.status !== 404 && e.status >= 400 && e.status < 500;
-      if (!isAptosApiError || isRequestError) {
+      if (!isAptosApiError) {
+        throw e // This would be unexpected
+      }
+      lastError = e;
+      const isRequestError = e.status !== 404 && e.status >= 400 && e.status < 500;
+      if (isRequestError) {
         throw e;
       }
     }
@@ -150,14 +118,21 @@ export async function waitForTransaction(args: {
     count += 1;
   }
 
-  // There is a chance that lastTxn is still undefined. Let's throw some error here
+  // There is a chance that lastTxn is still undefined. Let's throw the last error otherwise a WaitForTransactionError
   if (lastTxn === undefined) {
-    throw new WaitForTransactionError(`Waiting for transaction ${txnHash} failed`, lastTxn);
+    if (lastError) {
+      throw lastError;
+    } else {
+      throw new WaitForTransactionError(
+        `Fetching transaction ${txnHash} failed and timed out after ${timeoutSecs} seconds`,
+        lastTxn,
+      );
+    }
   }
 
-  if (lastTxn.type === TransactionType.Pending) {
+  if (lastTxn.type === TransactionResponseType.Pending) {
     throw new WaitForTransactionError(
-      `Waiting for transaction ${txnHash} timed out after ${timeoutSecs} seconds`,
+      `Transaction ${txnHash} timed out in pending state after ${timeoutSecs} seconds`,
       lastTxn,
     );
   }
@@ -175,7 +150,7 @@ export async function waitForTransaction(args: {
 
 /**
  * This error is used by `waitForTransaction` when waiting for a
- * transaction times out or when transaction is undefined 
+ * transaction times out or when transaction is undefined
  */
 export class WaitForTransactionError extends Error {
   public readonly lastSubmittedTransaction: TransactionResponse | undefined;

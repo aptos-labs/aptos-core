@@ -191,7 +191,7 @@ export type MoveModuleBytecode = {
  * TRANSACTION TYPES
  */
 
-export enum TransactionType {
+export enum TransactionResponseType {
   Pending = "pending_transaction",
   User = "user_transaction",
   Genesis = "genesis_transaction",
@@ -207,7 +207,7 @@ export type TransactionResponse =
   | StateCheckpointTransactionResponse;
 
 export type PendingTransactionResponse = {
-  type: TransactionType.Pending;
+  type: TransactionResponseType.Pending;
   hash: string;
   sender: string;
   sequence_number: string;
@@ -219,7 +219,7 @@ export type PendingTransactionResponse = {
 };
 
 export type UserTransactionResponse = {
-  type: TransactionType.User;
+  type: TransactionResponseType.User;
   version: string;
   hash: string;
   state_change_hash: string;
@@ -254,7 +254,7 @@ export type UserTransactionResponse = {
 };
 
 export type GenesisTransactionResponse = {
-  type: TransactionType.Genesis;
+  type: TransactionResponseType.Genesis;
   version: string;
   hash: string;
   state_change_hash: string;
@@ -282,7 +282,7 @@ export type GenesisTransactionResponse = {
 };
 
 export type BlockMetadataTransactionResponse = {
-  type: TransactionType.BlockMetadata;
+  type: TransactionResponseType.BlockMetadata;
   version: string;
   hash: string;
   state_change_hash: string;
@@ -322,7 +322,7 @@ export type BlockMetadataTransactionResponse = {
 };
 
 export type StateCheckpointTransactionResponse = {
-  type: TransactionType.StateCheckpoint;
+  type: TransactionResponseType.StateCheckpoint;
   version: string;
   hash: string;
   state_change_hash: string;
