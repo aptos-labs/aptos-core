@@ -17,37 +17,37 @@ import { AccountAddress } from "../../core";
  *
  * @example
  * // in Move: `vector<u8> [1, 2, 3, 4];`
- * const vecOfU8s = new Vector<U8>([new U8(1), new U8(2), new U8(3), new U8(4)]);
+ * const vecOfU8s = new MoveVector<U8>([new U8(1), new U8(2), new U8(3), new U8(4)]);
  * // in Move: `std::bcs::to_bytes(vector<u8> [1, 2, 3, 4]);`
  * const bcsBytes = vecOfU8s.toUint8Array();
  *
  * // vector<vector<u8>> [ vector<u8> [1], vector<u8> [1, 2, 3, 4], vector<u8> [5, 6, 7, 8] ];
- * const vecOfVecs = new Vector<Vector<U8>>([
- *   new Vector<U8>([new U8(1)]),
- *   Vector.U8([1, 2, 3, 4]),
- *   Vector.U8([5, 6, 7, 8]),
+ * const vecOfVecs = new MoveVector<MoveVector<U8>>([
+ *   new MoveVector<U8>([new U8(1)]),
+ *   MoveVector.U8([1, 2, 3, 4]),
+ *   MoveVector.U8([5, 6, 7, 8]),
  * ]);
  *
  * // vector<Option<u8>> [ std::option::some<u8>(1), std::option::some<u8>(2) ];
- * const vecOfOptionU8s = new Vector<MoveOption<U8>>([
+ * const vecOfOptionU8s = new MoveVector<MoveOption<U8>>([
  *    MoveOption.U8(1),
  *    MoveOption.U8(2),
  * ]);
  *
  * // vector<String> [ std::string::utf8(b"hello"), std::string::utf8(b"world") ];
- * const vecOfStrings = new Vector([new MoveString("hello"), new MoveString("world")]);
- * const vecOfStrings2 = Vector.String(["hello", "world"]);
+ * const vecOfStrings = new MoveVector([new MoveString("hello"), new MoveString("world")]);
+ * const vecOfStrings2 = MoveVector.String(["hello", "world"]);
  *
  * // where MySerializableStruct is a class you've made that implements Serializable
- * const vecOfSerializableValues = new Vector<MySerializableStruct>([
+ * const vecOfSerializableValues = new MoveVector<MySerializableStruct>([
  *   new MySerializableStruct("hello", "world"),
  *   new MySerializableStruct("foo", "bar"),
  * ]);
  * @params
  * values: an Array<T> of values where T is a class that implements Serializable
- * @returns a `Vector<T>` with the values `values`
+ * @returns a `MoveVector<T>` with the values `values`
  */
-export class Vector<T extends Serializable> extends Serializable {
+export class MoveVector<T extends Serializable> extends Serializable {
   public values: Array<T>;
 
   constructor(values: Array<T>) {
@@ -56,99 +56,99 @@ export class Vector<T extends Serializable> extends Serializable {
   }
 
   /**
-   * Factory method to generate a Vector of U8s from an array of numbers.
+   * Factory method to generate a MoveVector of U8s from an array of numbers.
    *
    * @example
-   * const v = Vector.U8([1, 2, 3, 4]);
+   * const v = MoveVector.U8([1, 2, 3, 4]);
    * @params values: an array of `numbers` to convert to U8s
-   * @returns a `Vector<U8>`
+   * @returns a `MoveVector<U8>`
    */
-  static U8(values: Array<number>): Vector<U8> {
-    return new Vector<U8>(values.map((v) => new U8(v)));
+  static U8(values: Array<number>): MoveVector<U8> {
+    return new MoveVector<U8>(values.map((v) => new U8(v)));
   }
 
   /**
-   * Factory method to generate a Vector of U16s from an array of numbers.
+   * Factory method to generate a MoveVector of U16s from an array of numbers.
    *
    * @example
-   * const v = Vector.U16([1, 2, 3, 4]);
+   * const v = MoveVector.U16([1, 2, 3, 4]);
    * @params values: an array of `numbers` to convert to U16s
-   * @returns a `Vector<U16>`
+   * @returns a `MoveVector<U16>`
    */
-  static U16(values: Array<number>): Vector<U16> {
-    return new Vector<U16>(values.map((v) => new U16(v)));
+  static U16(values: Array<number>): MoveVector<U16> {
+    return new MoveVector<U16>(values.map((v) => new U16(v)));
   }
 
   /**
-   * Factory method to generate a Vector of U32s from an array of numbers.
+   * Factory method to generate a MoveVector of U32s from an array of numbers.
    *
    * @example
-   * const v = Vector.U32([1, 2, 3, 4]);
+   * const v = MoveVector.U32([1, 2, 3, 4]);
    * @params values: an array of `numbers` to convert to U32s
-   * @returns a `Vector<U32>`
+   * @returns a `MoveVector<U32>`
    */
-  static U32(values: Array<number>): Vector<U32> {
-    return new Vector<U32>(values.map((v) => new U32(v)));
+  static U32(values: Array<number>): MoveVector<U32> {
+    return new MoveVector<U32>(values.map((v) => new U32(v)));
   }
 
   /**
-   * Factory method to generate a Vector of U64s from an array of numbers or bigints.
+   * Factory method to generate a MoveVector of U64s from an array of numbers or bigints.
    *
    * @example
-   * const v = Vector.U64([1, 2, 3, 4]);
+   * const v = MoveVector.U64([1, 2, 3, 4]);
    * @params values: an array of numbers of type `number | bigint` to convert to U64s
-   * @returns a `Vector<U64>`
+   * @returns a `MoveVector<U64>`
    */
-  static U64(values: Array<AnyNumber>): Vector<U64> {
-    return new Vector<U64>(values.map((v) => new U64(v)));
+  static U64(values: Array<AnyNumber>): MoveVector<U64> {
+    return new MoveVector<U64>(values.map((v) => new U64(v)));
   }
 
   /**
-   * Factory method to generate a Vector of U128s from an array of numbers or bigints.
+   * Factory method to generate a MoveVector of U128s from an array of numbers or bigints.
    *
    * @example
-   * const v = Vector.U128([1, 2, 3, 4]);
+   * const v = MoveVector.U128([1, 2, 3, 4]);
    * @params values: an array of numbers of type `number | bigint` to convert to U128s
-   * @returns a `Vector<U128>`
+   * @returns a `MoveVector<U128>`
    */
-  static U128(values: Array<AnyNumber>): Vector<U128> {
-    return new Vector<U128>(values.map((v) => new U128(v)));
+  static U128(values: Array<AnyNumber>): MoveVector<U128> {
+    return new MoveVector<U128>(values.map((v) => new U128(v)));
   }
 
   /**
-   * Factory method to generate a Vector of U256s from an array of numbers or bigints.
+   * Factory method to generate a MoveVector of U256s from an array of numbers or bigints.
    *
    * @example
-   * const v = Vector.U256([1, 2, 3, 4]);
+   * const v = MoveVector.U256([1, 2, 3, 4]);
    * @params values: an array of numbers of type `number | bigint` to convert to U256s
-   * @returns a `Vector<U256>`
+   * @returns a `MoveVector<U256>`
    */
-  static U256(values: Array<AnyNumber>): Vector<U256> {
-    return new Vector<U256>(values.map((v) => new U256(v)));
+  static U256(values: Array<AnyNumber>): MoveVector<U256> {
+    return new MoveVector<U256>(values.map((v) => new U256(v)));
   }
 
   /**
-   * Factory method to generate a Vector of Bools from an array of booleans.
+   * Factory method to generate a MoveVector of Bools from an array of booleans.
    *
    * @example
-   * const v = Vector.Bool([true, false, true, false]);
+   * const v = MoveVector.Bool([true, false, true, false]);
    * @params values: an array of `numbers` to convert to Bools
-   * @returns a `Vector<Bool>`
+   * @returns a `MoveVector<Bool>`
    */
-  static Bool(values: Array<boolean>): Vector<Bool> {
-    return new Vector<Bool>(values.map((v) => new Bool(v)));
+  static Bool(values: Array<boolean>): MoveVector<Bool> {
+    return new MoveVector<Bool>(values.map((v) => new Bool(v)));
   }
 
   /**
-   * Factory method to generate a Vector of MoveStrings from an array of strings.
+   * Factory method to generate a MoveVector of MoveStrings from an array of strings.
    *
    * @example
-   * const v = Vector.String(["hello", "world"]);
+   * const v = MoveVector.String(["hello", "world"]);
    * @params values: an array of `numbers` to convert to MoveStrings
-   * @returns a `Vector<MoveString>`
+   * @returns a `MoveVector<MoveString>`
    */
-  static String(values: Array<string>): Vector<MoveString> {
-    return new Vector<MoveString>(values.map((v) => new MoveString(v)));
+  static String(values: Array<string>): MoveVector<MoveString> {
+    return new MoveVector<MoveString>(values.map((v) => new MoveString(v)));
   }
 
   serialize(serializer: Serializer): void {
@@ -156,7 +156,7 @@ export class Vector<T extends Serializable> extends Serializable {
   }
 
   /**
-   * Deserialize a Vector of type T, specifically where T is a Serializable and Deserializable type.
+   * Deserialize a MoveVector of type T, specifically where T is a Serializable and Deserializable type.
    *
    * NOTE: This only works with a depth of one. Generics will not work.
    *
@@ -165,19 +165,19 @@ export class Vector<T extends Serializable> extends Serializable {
    * If you want to use types that merely implement Deserializable,
    * please use the deserializeVector function in the Deserializer class.
    * @example
-   * const vec = Vector.deserialize(deserializer, U64);
+   * const vec = MoveVector.deserialize(deserializer, U64);
    * @params deserializer: the Deserializer instance to use, with bytes loaded into it already.
    * cls: the class to typecast the input values to, must be a Serializable and Deserializable type.
-   * @returns a Vector of the corresponding class T
+   * @returns a MoveVector of the corresponding class T
    * *
    */
-  static deserialize<T extends Serializable>(deserializer: Deserializer, cls: Deserializable<T>): Vector<T> {
+  static deserialize<T extends Serializable>(deserializer: Deserializer, cls: Deserializable<T>): MoveVector<T> {
     const length = deserializer.deserializeUleb128AsU32();
     const values = new Array<T>();
     for (let i = 0; i < length; i += 1) {
       values.push(cls.deserialize(deserializer));
     }
-    return new Vector(values);
+    return new MoveVector(values);
   }
 }
 
@@ -199,16 +199,16 @@ export class MoveString extends Serializable {
 }
 
 export class MoveOption<T extends Serializable> extends Serializable {
-  private vec: Vector<T>;
+  private vec: MoveVector<T>;
 
   public readonly value?: T;
 
   constructor(value?: T | null) {
     super();
     if (typeof value !== "undefined" && value !== null) {
-      this.vec = new Vector([value]);
+      this.vec = new MoveVector([value]);
     } else {
-      this.vec = new Vector([]);
+      this.vec = new MoveVector([]);
     }
 
     [this.value] = this.vec.values;
@@ -371,7 +371,7 @@ export class MoveOption<T extends Serializable> extends Serializable {
   }
 
   static deserialize<U extends Serializable>(deserializer: Deserializer, cls: Deserializable<U>): MoveOption<U> {
-    const vector = Vector.deserialize(deserializer, cls);
+    const vector = MoveVector.deserialize(deserializer, cls);
     return new MoveOption(vector.values[0]);
   }
 }
@@ -379,13 +379,22 @@ export class MoveOption<T extends Serializable> extends Serializable {
 export class MoveObject extends Serializable {
   public value: AccountAddress;
 
-  constructor(value: HexInput) {
+  constructor(value: HexInput | AccountAddress) {
     super();
 
-    this.value = AccountAddress.fromHexInput({ input: value });
+    if (value instanceof AccountAddress) {
+      this.value = value;
+    } else {
+      this.value = AccountAddress.fromHexInput({ input: value });
+    }
   }
 
   serialize(serializer: Serializer): void {
     serializer.serialize(this.value);
+  }
+
+  static deserialize(deserializer: Deserializer): MoveObject {
+    const address = deserializer.deserialize(AccountAddress);
+    return new MoveObject(address);
   }
 }
