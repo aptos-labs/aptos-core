@@ -450,12 +450,12 @@ mod test {
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata())),
+            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(None));
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
         let not_exists = DataRead::Exists(false);
 
@@ -573,9 +573,9 @@ mod test {
         }};
     }
 
-    fn raw_metadata() -> StateValueMetadataKind {
-        Some(StateValueMetadata::new(5, &CurrentTimeMicroseconds {
-            microseconds: 7,
+    fn raw_metadata(v: u64) -> StateValueMetadataKind {
+        Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
+            microseconds: v,
         }))
     }
 
@@ -592,12 +592,12 @@ mod test {
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata())),
+            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(None));
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
         let not_exists = DataRead::Exists(false);
 
@@ -685,9 +685,9 @@ mod test {
     fn with_metadata_reads_by_kind() -> Vec<DataRead<ValueType>> {
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata())),
+            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
         vec![exists, metadata, versioned_with_metadata]
     }
@@ -833,7 +833,7 @@ mod test {
             Arc::new(ValueType::with_len_and_metadata(1, None)),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let deletion_metadata = DataRead::Metadata(None);
         let exists = DataRead::Exists(true);
 
