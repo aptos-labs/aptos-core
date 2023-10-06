@@ -251,6 +251,16 @@ module std::features {
         is_enabled(AGGREGATOR_SNAPSHOTS)
     }
 
+    /// Whether the automatic creation of accounts is enabled for sponsored transactions.
+    /// Lifetime: transient
+    const SPONSORED_AUTOMATIC_ACCOUNT_CREATION: u64 = 34;
+
+    public fun get_sponsored_automatic_account_creation(): u64 { SPONSORED_AUTOMATIC_ACCOUNT_CREATION }
+
+    public fun sponsored_automatic_account_creation_enabled(): bool acquires Features {
+        is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+    }
+
     /// Whether the fix to reduce the maximum identifer length is enabled.
     /// Lifetime: transient
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
