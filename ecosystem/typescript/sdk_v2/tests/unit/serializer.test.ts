@@ -10,7 +10,7 @@ import {
   MAX_U8_NUMBER,
   MAX_U256_BIG_INT,
 } from "../../src/bcs/consts";
-import { Serializable, Serializer, outOfRangeErrorMessage } from "../../src/bcs/serializer";
+import { Serializable, Serializer, ensureBoolean, outOfRangeErrorMessage } from "../../src/bcs/serializer";
 import { AccountAddress } from "../../src/core";
 
 describe("BCS Serializer", () => {
@@ -72,7 +72,7 @@ describe("BCS Serializer", () => {
     expect(() => {
       // @ts-ignore
       serializer.serializeBool(12);
-    }).toThrow("Value needs to be a boolean");
+    }).toThrow(`${12} is not a boolean value`);
   });
 
   it("serializes a uint8", () => {
