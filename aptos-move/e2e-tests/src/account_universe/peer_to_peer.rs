@@ -11,7 +11,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use move_core_types::{
-    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::AbortLocation,
 };
@@ -89,7 +89,7 @@ impl AUTransactionGen for P2PTransferGen {
                 status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         CORE_CODE_ADDRESS,
-                        ident_str!("coin").to_owned(),
+                        Identifier::from("coin"),
                     )),
                     code: 65542,
                     info: None,
@@ -105,7 +105,7 @@ impl AUTransactionGen for P2PTransferGen {
                 status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         CORE_CODE_ADDRESS,
-                        ident_str!("coin").to_owned(),
+                        Identifier::from("coin"),
                     )),
                     code: 65542,
                     info: None,

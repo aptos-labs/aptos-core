@@ -11,7 +11,7 @@ use anyhow::{bail, Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
+    identifier::Identifier,
     language_storage::{StructTag, TypeTag, CORE_CODE_ADDRESS},
     move_resource::MoveStructType,
 };
@@ -24,8 +24,8 @@ use std::convert::TryFrom;
 pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
         address: CORE_CODE_ADDRESS,
-        module: ident_str!("transaction_fee").to_owned(),
-        name: ident_str!("FeeStatement").to_owned(),
+        module: Identifier::new("transaction_fee").unwrap(),
+        name: Identifier::new("FeeStatement").unwrap(),
         type_params: vec![],
     }))
 });

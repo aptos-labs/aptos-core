@@ -162,8 +162,8 @@ impl Function {
         self.return_types.len()
     }
 
-    pub(crate) fn name(&self) -> &str {
-        self.name.as_str()
+    pub(crate) fn name(&self) -> &Identifier {
+        &self.name
     }
 
     pub(crate) fn code(&self) -> &[Bytecode] {

@@ -37,8 +37,7 @@ use aptos_types::{
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     value::{MoveStructLayout, MoveTypeLayout},
@@ -52,8 +51,8 @@ use std::{
     sync::Arc,
 };
 
-const OBJECT_MODULE: &IdentStr = ident_str!("object");
-const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
+const OBJECT_MODULE: &'static str = "object";
+const OBJECT_STRUCT: &'static str = "Object";
 
 /// The Move converter for converting Move types to JSON
 ///
@@ -591,7 +590,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                 let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_entry_function(function.name.0.as_ident_str())
+                    .find_entry_function(&function.name.0)
                     .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
                 ensure!(
                     func.generic_type_params.len() == type_arguments.len(),
@@ -654,9 +653,8 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
                             let module = function.module.clone();
                             let code =
                                 self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
-                            let func = code
-                                .find_entry_function(function.name.0.as_ident_str())
-                                .ok_or_else(|| {
+                            let func =
+                                code.find_entry_function(&function.name.0).ok_or_else(|| {
                                     format_err!("could not find entry function by {}", function)
                                 })?;
                             ensure!(
@@ -763,8 +761,8 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
             TypeTag::Struct(boxed_struct) => {
                 // The current framework can't handle generics, so we handle this here
                 if boxed_struct.address == AccountAddress::ONE
-                    && boxed_struct.module.as_ident_str() == OBJECT_MODULE
-                    && boxed_struct.name.as_ident_str() == OBJECT_STRUCT
+                    && boxed_struct.module.as_str() == OBJECT_MODULE
+                    && boxed_struct.name.as_str() == OBJECT_STRUCT
                 {
                     // Objects are just laid out as an address
                     MoveTypeLayout::Address
@@ -892,7 +890,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         let module = function.module.clone();
         let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
         let func = code
-            .find_function(function.name.0.as_ident_str())
+            .find_function(&function.name.0)
             .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
         ensure!(
             func.generic_type_params.len() == type_arguments.len(),

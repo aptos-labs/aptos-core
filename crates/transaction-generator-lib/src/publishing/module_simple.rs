@@ -6,8 +6,7 @@ use aptos_framework::natives::code::{MoveOption, PackageMetadata};
 use aptos_sdk::{
     bcs,
     move_types::{
-        account_address::AccountAddress, ident_str, identifier::Identifier,
-        language_storage::ModuleId,
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     },
     types::transaction::{EntryFunction, TransactionPayload},
 };
@@ -75,9 +74,7 @@ pub fn scramble(module: &mut CompiledModule, fn_count: usize, rng: &mut StdRng) 
             let mut func_def = fd.clone();
             let mut name = func_name.clone();
             name.push_str(suffix.to_string().as_str());
-            module
-                .identifiers
-                .push(Identifier::new(name.as_str()).expect("Identifier name must be valid"));
+            module.identifiers.push(Identifier::from(name.as_str()));
             func_handle.name = IdentifierIndex((module.identifiers.len() - 1) as u16);
             module.function_handles.push(func_handle);
             func_def.function = FunctionHandleIndex((module.function_handles.len() - 1) as u16);
@@ -245,22 +242,18 @@ impl EntryPoints {
     ) -> TransactionPayload {
         match self {
             // 0 args
-            EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
+            EntryPoints::Nop => get_payload_void(module_id, Identifier::from("nop")),
             EntryPoints::Nop2Signers => {
-                get_payload_void(module_id, ident_str!("nop_2_signers").to_owned())
+                get_payload_void(module_id, Identifier::from("nop_2_signers"))
             },
             EntryPoints::Nop5Signers => {
-                get_payload_void(module_id, ident_str!("nop_5_signers").to_owned())
+                get_payload_void(module_id, Identifier::from("nop_5_signers"))
             },
-            EntryPoints::Step => get_payload_void(module_id, ident_str!("step").to_owned()),
-            EntryPoints::GetCounter => {
-                get_payload_void(module_id, ident_str!("get_counter").to_owned())
-            },
-            EntryPoints::ResetData => {
-                get_payload_void(module_id, ident_str!("reset_data").to_owned())
-            },
-            EntryPoints::Double => get_payload_void(module_id, ident_str!("double").to_owned()),
-            EntryPoints::Half => get_payload_void(module_id, ident_str!("half").to_owned()),
+            EntryPoints::Step => get_payload_void(module_id, Identifier::from("step")),
+            EntryPoints::GetCounter => get_payload_void(module_id, Identifier::from("get_counter")),
+            EntryPoints::ResetData => get_payload_void(module_id, Identifier::from("reset_data")),
+            EntryPoints::Double => get_payload_void(module_id, Identifier::from("double")),
+            EntryPoints::Half => get_payload_void(module_id, Identifier::from("half")),
             // 1 arg
             EntryPoints::Loopy { loop_count } => loopy(
                 module_id,
@@ -295,18 +288,16 @@ impl EntryPoints {
                 bytes_make_or_change(rng, module_id, data_len)
             },
             EntryPoints::EmitEvents { count } => {
-                get_payload(module_id, ident_str!("emit_events").to_owned(), vec![
+                get_payload(module_id, Identifier::from("emit_events"), vec![
                     bcs::to_bytes(count).unwrap(),
                 ])
             },
-            EntryPoints::MakeOrChangeTable { offset, count } => get_payload(
-                module_id,
-                ident_str!("make_or_change_table").to_owned(),
-                vec![
+            EntryPoints::MakeOrChangeTable { offset, count } => {
+                get_payload(module_id, Identifier::from("make_or_change_table"), vec![
                     bcs::to_bytes(offset).unwrap(),
                     bcs::to_bytes(count).unwrap(),
-                ],
-            ),
+                ])
+            },
             EntryPoints::MakeOrChangeTableRandom {
                 max_offset,
                 max_count,
@@ -316,56 +307,52 @@ impl EntryPoints {
                 offset %= max_offset;
                 let mut count: u64 = rng.gen();
                 count %= max_count;
-                get_payload(
-                    module_id,
-                    ident_str!("make_or_change_table").to_owned(),
-                    vec![
-                        bcs::to_bytes(&offset).unwrap(),
-                        bcs::to_bytes(&count).unwrap(),
-                    ],
-                )
+                get_payload(module_id, Identifier::from("make_or_change_table"), vec![
+                    bcs::to_bytes(&offset).unwrap(),
+                    bcs::to_bytes(&count).unwrap(),
+                ])
             },
             EntryPoints::StepDst => step_dst(module_id, other.expect("Must provide other")),
             EntryPoints::TokenV1InitializeCollection => get_payload_void(
                 module_id,
-                ident_str!("token_v1_initialize_collection").to_owned(),
+                Identifier::from("token_v1_initialize_collection"),
             ),
             EntryPoints::TokenV1MintAndStoreNFTParallel => get_payload(
                 module_id,
-                ident_str!("token_v1_mint_and_store_nft_parallel").to_owned(),
+                Identifier::from("token_v1_mint_and_store_nft_parallel"),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
             EntryPoints::TokenV1MintAndStoreNFTSequential => get_payload(
                 module_id,
-                ident_str!("token_v1_mint_and_store_nft_sequential").to_owned(),
+                Identifier::from("token_v1_mint_and_store_nft_sequential"),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
 
             EntryPoints::TokenV1MintAndTransferNFTParallel => get_payload(
                 module_id,
-                ident_str!("token_v1_mint_and_transfer_nft_parallel").to_owned(),
+                Identifier::from("token_v1_mint_and_transfer_nft_parallel"),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
             EntryPoints::TokenV1MintAndTransferNFTSequential => get_payload(
                 module_id,
-                ident_str!("token_v1_mint_and_transfer_nft_sequential").to_owned(),
+                Identifier::from("token_v1_mint_and_transfer_nft_sequential"),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
             EntryPoints::TokenV1MintAndStoreFT => get_payload(
                 module_id,
-                ident_str!("token_v1_mint_and_store_ft").to_owned(),
+                Identifier::from("token_v1_mint_and_store_ft"),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
             EntryPoints::TokenV1MintAndTransferFT => get_payload(
                 module_id,
-                ident_str!("token_v1_mint_and_transfer_ft").to_owned(),
+                Identifier::from("token_v1_mint_and_transfer_ft"),
                 vec![bcs::to_bytes(other.expect("Must provide other")).unwrap()],
             ),
             EntryPoints::TokenV2AmbassadorMint => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
-                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    Identifier::from("mint_ambassador_token_by_user"),
                     vec![
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
                         bcs::to_bytes(&rand_string(rng, 20)).unwrap(),  // name
@@ -469,54 +456,54 @@ pub fn rand_gen_function(rng: &mut StdRng, module_id: ModuleId) -> TransactionPa
 //
 
 fn loopy(module_id: ModuleId, count: u64) -> TransactionPayload {
-    get_payload(module_id, ident_str!("loopy").to_owned(), vec![
-        bcs::to_bytes(&count).unwrap(),
-    ])
+    get_payload(module_id, Identifier::from("loopy"), vec![bcs::to_bytes(
+        &count,
+    )
+    .unwrap()])
 }
 
 fn get_from_random_const(module_id: ModuleId, idx: u64) -> TransactionPayload {
-    get_payload(
-        module_id,
-        ident_str!("get_from_random_const").to_owned(),
-        vec![bcs::to_bytes(&idx).unwrap()],
-    )
+    get_payload(module_id, Identifier::from("get_from_random_const"), vec![
+        bcs::to_bytes(&idx).unwrap(),
+    ])
 }
 
 fn set_id(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     let id: u64 = rng.gen();
-    get_payload(module_id, ident_str!("set_id").to_owned(), vec![
-        bcs::to_bytes(&id).unwrap(),
-    ])
+    get_payload(module_id, Identifier::from("set_id"), vec![bcs::to_bytes(
+        &id,
+    )
+    .unwrap()])
 }
 
 fn set_name(rng: &mut StdRng, module_id: ModuleId) -> TransactionPayload {
     let len = rng.gen_range(0usize, 1000usize);
     let name: String = rand_string(rng, len);
-    get_payload(module_id, ident_str!("set_name").to_owned(), vec![
+    get_payload(module_id, Identifier::from("set_name"), vec![
         bcs::to_bytes(&name).unwrap(),
     ])
 }
 
 fn maximize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("maximize").to_owned(), vec![
+    get_payload(module_id, Identifier::from("maximize"), vec![
         bcs::to_bytes(other).unwrap(),
     ])
 }
 
 fn minimize(module_id: ModuleId, other: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("minimize").to_owned(), vec![
+    get_payload(module_id, Identifier::from("minimize"), vec![
         bcs::to_bytes(other).unwrap(),
     ])
 }
 
 fn step_dst(module_id: ModuleId, dst: &AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("step_destination").to_owned(), vec![
+    get_payload(module_id, Identifier::from("step_destination"), vec![
         bcs::to_bytes(dst).unwrap(),
     ])
 }
 
 fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayload {
-    get_payload(module_id, ident_str!("mint_new_token").to_owned(), vec![
+    get_payload(module_id, Identifier::from("mint_new_token"), vec![
         bcs::to_bytes(&other).unwrap(),
     ])
 }
@@ -538,7 +525,7 @@ fn make_or_change(
     let name: String = rand_string(rng, str_len);
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
-    get_payload(module_id, ident_str!("make_or_change").to_owned(), vec![
+    get_payload(module_id, Identifier::from("make_or_change"), vec![
         bcs::to_bytes(&id).unwrap(),
         bcs::to_bytes(&name).unwrap(),
         bcs::to_bytes(&bytes).unwrap(),
@@ -552,11 +539,9 @@ fn bytes_make_or_change(
 ) -> TransactionPayload {
     let mut bytes = Vec::<u8>::with_capacity(data_len);
     rng.fill_bytes(&mut bytes);
-    get_payload(
-        module_id,
-        ident_str!("bytes_make_or_change").to_owned(),
-        vec![bcs::to_bytes(&bytes).unwrap()],
-    )
+    get_payload(module_id, Identifier::from("bytes_make_or_change"), vec![
+        bcs::to_bytes(&bytes).unwrap(),
+    ])
 }
 
 fn get_payload_void(module_id: ModuleId, func: Identifier) -> TransactionPayload {

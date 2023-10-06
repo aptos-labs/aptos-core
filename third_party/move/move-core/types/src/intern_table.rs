@@ -80,22 +80,36 @@ impl<'a, T: Eq + Hash> InstanceUniverse<'a, T> {
         let instance_arc = Arc::new(instance);
 
         loop {
-            match self.instance_to_entry.entry(instance_arc.clone()) {
-                Occupied(entry) => {
-                    if let Some(compressed) = Weak::upgrade(entry.get()) {
-                        return compressed;
-                    }
-                },
-                Vacant(entry) => {
-                    let inner = InstanceUniverseTableEntry {
-                        ptr: instance_arc.clone(),
-                        map: &self.instance_to_entry,
-                    };
-                    let ret = Arc::new(inner);
-                    entry.insert(Arc::downgrade(&ret));
-                    return ret;
-                },
+            if let Some(weak) = self.instance_to_entry.get(&instance_arc) {
+                if let Some(compressed) = weak.upgrade() {
+                    return compressed;
+                }
+            } else {
+                let inner = InstanceUniverseTableEntry {
+                    ptr: instance_arc.clone(),
+                    map: &self.instance_to_entry,
+                };
+                let ret = Arc::new(inner);
+                self.instance_to_entry
+                    .insert(instance_arc, Arc::downgrade(&ret));
+                return ret;
             }
+            // match self.instance_to_entry.entry(instance_arc.clone()) {
+            //     Occupied(entry) => {
+            //         if let Some(compressed) = Weak::upgrade(entry.get()) {
+            //             return compressed;
+            //         }
+            //     },
+            //     Vacant(entry) => {
+            //         let inner = InstanceUniverseTableEntry {
+            //             ptr: instance_arc.clone(),
+            //             map: &self.instance_to_entry,
+            //         };
+            //         let ret = Arc::new(inner);
+            //         entry.insert(Arc::downgrade(&ret));
+            //         return ret;
+            //     },
+            // }
         }
     }
 }

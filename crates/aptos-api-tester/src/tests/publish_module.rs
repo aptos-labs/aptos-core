@@ -28,7 +28,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
 };
-use move_core_types::{ident_str, language_storage::ModuleId};
+use move_core_types::language_storage::ModuleId;
 use std::{collections::BTreeMap, path::PathBuf};
 
 static MODULE_NAME: &str = "message";
@@ -306,8 +306,8 @@ async fn set_message(client: &Client, account: &mut LocalAccount) -> Result<(), 
 
     // create payload
     let payload = TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(account.address(), ident_str!(MODULE_NAME).to_owned()),
-        ident_str!("set_message").to_owned(),
+        ModuleId::new(account.address(), Identifier::new(MODULE_NAME).to_owned()),
+        Identifier::new("set_message").to_owned(),
         vec![],
         vec![message],
     ));

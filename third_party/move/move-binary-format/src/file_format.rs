@@ -37,15 +37,11 @@ use crate::{
     IndexKind, SignatureTokenKind,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    metadata::Metadata,
-    vm_status::StatusCode,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    metadata::Metadata, vm_status::StatusCode,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
-use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
 use std::ops::BitOr;
 use variant_count::VariantCount;
@@ -188,8 +184,8 @@ pub type SignaturePool = Vec<Signature>;
 
 // TODO: "<SELF>" only passes the validator for identifiers because it is special cased. Whenever
 // "<SELF>" is removed, so should the special case in identifier.rs.
-pub fn self_module_name() -> &'static IdentStr {
-    IdentStr::ref_cast("<SELF>")
+pub fn self_module_name() -> &'static str {
+    "<SELF>"
 }
 
 /// Index 0 into the LocalsSignaturePool, which is guaranteed to be an empty list.
@@ -2074,7 +2070,7 @@ pub fn empty_module() -> CompiledModule {
             name: IdentifierIndex(0),
         }],
         self_module_handle_idx: ModuleHandleIndex(0),
-        identifiers: vec![self_module_name().to_owned()],
+        identifiers: vec![self_module_name().into()],
         address_identifiers: vec![AccountAddress::ZERO],
         constant_pool: vec![],
         metadata: vec![],

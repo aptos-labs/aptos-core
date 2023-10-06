@@ -499,7 +499,7 @@ impl AptosVMImpl {
         session
             .execute_function_bypass_visibility(
                 &MULTISIG_ACCOUNT_MODULE,
-                VALIDATE_MULTISIG_TRANSACTION,
+                &VALIDATE_MULTISIG_TRANSACTION,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
@@ -577,7 +577,7 @@ impl AptosVMImpl {
         session
             .execute_function_bypass_visibility(
                 &TRANSACTION_FEE_MODULE,
-                EMIT_FEE_STATEMENT,
+                &EMIT_FEE_STATEMENT,
                 vec![],
                 vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
                 &mut UnmeteredGasMeter,

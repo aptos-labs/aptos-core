@@ -56,10 +56,7 @@ use move_binary_format::{
 use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
 use move_command_line_common::{address::NumericalAddress, files::FileHash};
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage,
-    value::MoveValue,
+    account_address::AccountAddress, identifier::Identifier, language_storage, value::MoveValue,
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use num::ToPrimitive;
@@ -1441,7 +1438,7 @@ impl GlobalEnv {
     pub fn find_function_by_language_storage_id_name(
         &self,
         id: &language_storage::ModuleId,
-        name: &IdentStr,
+        name: &Identifier,
     ) -> Option<FunctionEnv<'_>> {
         self.find_module_by_language_storage_id(id)
             .and_then(|menv| menv.find_function(menv.symbol_pool().make(name.as_str())))

@@ -57,7 +57,7 @@ pub(crate) fn validate_resource_groups(
 
             let scope = if let Some(inner_group) = groups.get(&value_module_id) {
                 inner_group
-                    .get(value.name.as_ident_str().as_str())
+                    .get(value.name.as_str())
                     .ok_or_else(|| metadata_validation_error("Invalid resource_group attribute"))?
             } else {
                 return Err(metadata_validation_error("No such resource_group"));

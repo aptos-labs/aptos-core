@@ -166,7 +166,7 @@ name:
 pub fn execute_script_function(
     &mut self,
     module: &ModuleId,
-    function_name: &IdentStr,
+    function_name: &Identifier,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
     senders: Vec<AccountAddress>,
@@ -198,7 +198,7 @@ constructing a genesis state), or wrap and expose it with restrictions.
 pub fn execute_function(
     &mut self,
     module: &ModuleId,
-    function_name: &IdentStr,
+    function_name: &Identifier,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
     gas_status: &mut impl GasMeter,

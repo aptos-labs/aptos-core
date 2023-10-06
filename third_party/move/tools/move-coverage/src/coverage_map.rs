@@ -6,10 +6,7 @@
 
 use anyhow::{format_err, Result};
 use move_binary_format::file_format::{CodeOffset, CompiledModule};
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -177,7 +174,7 @@ impl ModuleCoverageMap {
         }
     }
 
-    pub fn get_function_coverage(&self, func_name: &IdentStr) -> Option<&FunctionCoverage> {
+    pub fn get_function_coverage(&self, func_name: &Identifier) -> Option<&FunctionCoverage> {
         self.function_maps.get(func_name)
     }
 }

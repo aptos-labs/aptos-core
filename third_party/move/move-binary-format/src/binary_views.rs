@@ -18,9 +18,7 @@ use crate::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
 
@@ -63,7 +61,7 @@ impl<'a> BinaryIndexedView<'a> {
         }
     }
 
-    pub fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    pub fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         match self {
             BinaryIndexedView::Module(module) => module.identifier_at(idx),
             BinaryIndexedView::Script(script) => script.identifier_at(idx),

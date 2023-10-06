@@ -12,10 +12,7 @@ use crate::{
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{Account, Response};
-use aptos_sdk::move_types::{
-    ident_str,
-    language_storage::{StructTag, TypeTag},
-};
+use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -152,8 +149,8 @@ pub fn native_coin() -> Currency {
 pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(Box::new(StructTag {
         address: AccountAddress::ONE,
-        module: ident_str!(APTOS_COIN_MODULE).into(),
-        name: ident_str!(APTOS_COIN_RESOURCE).into(),
+        module: Identifier::new(APTOS_COIN_MODULE).into(),
+        name: Identifier::new(APTOS_COIN_RESOURCE).into(),
         type_params: vec![],
     }))
 }

@@ -11,7 +11,6 @@ use aptos_types::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
 };
 use std::{
@@ -41,7 +40,7 @@ impl<'a> Display for Render<'a, ModuleId> {
     }
 }
 
-impl<'a> Display for Render<'a, (&'a ModuleId, &'a IdentStr, &'a [TypeTag])> {
+impl<'a> Display for Render<'a, (&'a ModuleId, &'a str, &'a [TypeTag])> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}::{}", Render(self.0 .0), self.0 .1)?;
         if !self.0 .2.is_empty() {
@@ -71,7 +70,7 @@ impl Display for FrameName {
             } => write!(
                 f,
                 "{}",
-                Render(&(module_id, fn_name.as_ident_str(), ty_args.as_slice())),
+                Render(&(module_id, fn_name.as_str(), ty_args.as_slice())),
             ),
         }
     }

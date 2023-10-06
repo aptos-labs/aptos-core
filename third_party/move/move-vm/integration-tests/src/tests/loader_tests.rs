@@ -11,9 +11,7 @@ use move_binary_format::{
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
 use move_vm_runtime::{config::VMConfig, move_vm::MoveVM};
 use move_vm_test_utils::InMemoryStorage;
@@ -146,7 +144,7 @@ impl Adapter {
         }
     }
 
-    fn call_function(&self, module: &ModuleId, name: &IdentStr) {
+    fn call_function(&self, module: &ModuleId, name: &Identifier) {
         let mut session = self.vm.new_session(&self.store);
         session
             .execute_function_bypass_visibility(

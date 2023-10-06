@@ -30,7 +30,7 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
 
     let struct_value = Struct::pack(vec![
         Value::address(struct_tag.address),
-        Value::vector_u8(struct_tag.module.as_bytes().to_vec()),
+        Value::vector_u8(struct_tag.module.as_str().as_bytes().to_vec()),
         Value::vector_u8(name.as_bytes().to_vec()),
     ]);
     Ok(smallvec![Value::struct_(struct_value)])

@@ -8,7 +8,7 @@ use aptos_types::{
     transaction::{EntryFunction, MultisigTransactionPayload},
 };
 use move_core_types::{
-    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     value::{serialize_values, MoveValue},
 };
@@ -70,8 +70,11 @@ async fn test_multisig_transaction_to_update_owners() {
     // Add owners 3 and 4.
     let add_owners_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
         EntryFunction::new(
-            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
-            ident_str!("add_owners").to_owned(),
+            ModuleId::new(
+                CORE_CODE_ADDRESS,
+                Identifier::new("multisig_account").unwrap(),
+            ),
+            Identifier::new("add_owners").unwrap(),
             vec![],
             serialize_values(&vec![MoveValue::vector_address(vec![
                 owner_account_3.address(),
@@ -106,8 +109,11 @@ async fn test_multisig_transaction_to_update_owners() {
 
     let remove_owners_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
         EntryFunction::new(
-            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
-            ident_str!("remove_owners").to_owned(),
+            ModuleId::new(
+                CORE_CODE_ADDRESS,
+                Identifier::new("multisig_account").unwrap(),
+            ),
+            Identifier::new("remove_owners").unwrap(),
             vec![],
             serialize_values(&vec![MoveValue::vector_address(vec![
                 owner_account_4.address()
@@ -155,8 +161,11 @@ async fn test_multisig_transaction_update_signature_threshold() {
     // Change the signature threshold from 2-of-2 to 1-of-2
     let signature_threshold_payload = bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
         EntryFunction::new(
-            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("multisig_account").to_owned()),
-            ident_str!("update_signatures_required").to_owned(),
+            ModuleId::new(
+                CORE_CODE_ADDRESS,
+                Identifier::new("multisig_account").unwrap(),
+            ),
+            Identifier::new("update_signatures_required").unwrap(),
             vec![],
             serialize_values(&vec![MoveValue::U64(1)]),
         ),
@@ -471,8 +480,8 @@ async fn assert_signature_threshold(
 fn construct_multisig_txn_transfer_payload(recipient: AccountAddress, amount: u64) -> Vec<u8> {
     bcs::to_bytes(&MultisigTransactionPayload::EntryFunction(
         EntryFunction::new(
-            ModuleId::new(CORE_CODE_ADDRESS, ident_str!("aptos_account").to_owned()),
-            ident_str!("transfer").to_owned(),
+            ModuleId::new(CORE_CODE_ADDRESS, Identifier::new("aptos_account").unwrap()),
+            Identifier::new("transfer").unwrap(),
             vec![],
             serialize_values(&vec![MoveValue::Address(recipient), MoveValue::U64(amount)]),
         ),

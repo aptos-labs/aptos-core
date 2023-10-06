@@ -7,14 +7,14 @@ use crate::{
 };
 use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
+use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
 pub fn determine_is_view(
     module_metadata: Option<&RuntimeModuleMetadataV1>,
-    fun_name: &IdentStr,
+    fun_name: &Identifier,
 ) -> bool {
     if let Some(data) = module_metadata {
         data.fun_attributes
@@ -31,7 +31,7 @@ pub fn determine_is_view(
 pub(crate) fn validate_view_function(
     session: &mut SessionExt,
     args: Vec<Vec<u8>>,
-    fun_name: &IdentStr,
+    fun_name: &Identifier,
     fun_inst: &LoadedFunctionInstantiation,
     module_metadata: Option<&RuntimeModuleMetadataV1>,
     struct_constructors_feature: bool,

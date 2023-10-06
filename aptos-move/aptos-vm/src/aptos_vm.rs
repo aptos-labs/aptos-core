@@ -63,7 +63,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     transaction_argument::convert_txn_args,
@@ -587,7 +586,7 @@ impl AptosVM {
         let payload_bytes: Vec<Vec<u8>> = session
             .execute_function_bypass_visibility(
                 &MULTISIG_ACCOUNT_MODULE,
-                GET_NEXT_TRANSACTION_PAYLOAD,
+                &GET_NEXT_TRANSACTION_PAYLOAD,
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Address(txn_payload.multisig_address),
@@ -725,7 +724,7 @@ impl AptosVM {
         respawned_session.execute(|session| {
             session.execute_function_bypass_visibility(
                 &MULTISIG_ACCOUNT_MODULE,
-                SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
+                &SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP,
                 vec![],
                 cleanup_args,
                 &mut UnmeteredGasMeter,
@@ -762,7 +761,7 @@ impl AptosVM {
         respawned_session.execute(|session| {
             session.execute_function_bypass_visibility(
                 &MULTISIG_ACCOUNT_MODULE,
-                FAILED_TRANSACTION_EXECUTION_CLEANUP,
+                &FAILED_TRANSACTION_EXECUTION_CLEANUP,
                 vec![],
                 cleanup_args,
                 &mut UnmeteredGasMeter,
@@ -804,14 +803,14 @@ impl AptosVM {
         senders: &[AccountAddress],
         new_published_modules_loaded: &mut bool,
     ) -> VMResult<()> {
-        let init_func_name = ident_str!("init_module");
+        let init_func_name = Identifier::new("init_module").unwrap();
         for module in modules {
             if exists.contains(&module.self_id()) {
                 // Call initializer only on first publish.
                 continue;
             }
             *new_published_modules_loaded = true;
-            let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
+            let init_function = session.load_function(&module.self_id(), &init_func_name, &[]);
             // it is ok to not have init_module function
             // init_module function should be (1) private and (2) has no return value
             // Note that for historic reasons, verification here is treated
@@ -825,7 +824,7 @@ impl AptosVM {
                         .collect();
                     session.execute_function_bypass_visibility(
                         &module.self_id(),
-                        init_func_name,
+                        &init_func_name,
                         vec![],
                         args,
                         gas_meter,
@@ -1370,7 +1369,7 @@ impl AptosVM {
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
-                BLOCK_PROLOGUE,
+                &BLOCK_PROLOGUE,
                 vec![],
                 args,
                 &mut gas_meter,
@@ -1441,7 +1440,7 @@ impl AptosVM {
         let arguments = verifier::view_function::validate_view_function(
             &mut session,
             arguments,
-            func_name.as_ident_str(),
+            &func_name,
             &func_inst,
             metadata.as_ref().map(Arc::as_ref),
             vm.0.get_features()
@@ -1451,7 +1450,7 @@ impl AptosVM {
         Ok(session
             .execute_function_bypass_visibility(
                 &module_id,
-                func_name.as_ident_str(),
+                &func_name,
                 type_args,
                 arguments,
                 &mut gas_meter,

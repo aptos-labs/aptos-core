@@ -15,7 +15,7 @@ use move_command_line_common::env::get_bytecode_version_from_env;
 use move_core_types::{
     account_address::AccountAddress,
     errmap::ErrorMapping,
-    identifier::IdentStr,
+    identifier::Identifier,
     language_storage::TypeTag,
     transaction_argument::{convert_txn_args, TransactionArgument},
     value::MoveValue,
@@ -99,7 +99,7 @@ move run` must be applied to a module inside `storage/`",
                 .map_err(|e| anyhow!("Error deserializing module: {:?}", e))?;
             session.execute_entry_function(
                 &module.self_id(),
-                IdentStr::new(script_name)?,
+                &Identifier::new(script_name)?,
                 vm_type_args.clone(),
                 vm_args,
                 &mut gas_status,

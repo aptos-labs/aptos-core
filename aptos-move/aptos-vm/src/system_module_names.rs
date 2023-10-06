@@ -5,7 +5,7 @@
 //! Names of modules, functions, and types used by Aptos System.
 
 use aptos_types::account_config;
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use once_cell::sync::Lazy;
 
 // Data to resolve basic account and transaction flow functions and structs
@@ -13,36 +13,43 @@ use once_cell::sync::Lazy;
 pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
-        ident_str!("block").to_owned(),
+        Identifier::new("block").unwrap(),
     )
 });
 
 // TZ: TODO: remove these except for the block-related names
 // Names for special functions and structs
-pub const SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("script_prologue");
-pub const MULTI_AGENT_SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("multi_agent_script_prologue");
-pub const MODULE_PROLOGUE_NAME: &IdentStr = ident_str!("module_prologue");
-pub const USER_EPILOGUE_NAME: &IdentStr = ident_str!("epilogue");
-pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
+pub const SCRIPT_PROLOGUE_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("script_prologue").unwrap());
+pub const MULTI_AGENT_SCRIPT_PROLOGUE_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("multi_agent_script_prologue").unwrap());
+pub const MODULE_PROLOGUE_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("module_prologue").unwrap());
+pub const USER_EPILOGUE_NAME: Lazy<Identifier> = Lazy::new(|| Identifier::new("epilogue").unwrap());
+pub const BLOCK_PROLOGUE: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("block_prologue").unwrap());
 
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
-        ident_str!("multisig_account").to_owned(),
+        Identifier::new("multisig_account").unwrap(),
     )
 });
-pub const VALIDATE_MULTISIG_TRANSACTION: &IdentStr = ident_str!("validate_multisig_transaction");
-pub const GET_NEXT_TRANSACTION_PAYLOAD: &IdentStr = ident_str!("get_next_transaction_payload");
-pub const SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP: &IdentStr =
-    ident_str!("successful_transaction_execution_cleanup");
-pub const FAILED_TRANSACTION_EXECUTION_CLEANUP: &IdentStr =
-    ident_str!("failed_transaction_execution_cleanup");
+pub const VALIDATE_MULTISIG_TRANSACTION: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("validate_multisig_transaction").unwrap());
+pub const GET_NEXT_TRANSACTION_PAYLOAD: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("get_next_transaction_payload").unwrap());
+pub const SUCCESSFUL_TRANSACTION_EXECUTION_CLEANUP: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("successful_transaction_execution_cleanup").unwrap());
+pub const FAILED_TRANSACTION_EXECUTION_CLEANUP: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("failed_transaction_execution_cleanup").unwrap());
 
 pub static TRANSACTION_FEE_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
-        ident_str!("transaction_fee").to_owned(),
+        Identifier::new("transaction_fee").unwrap(),
     )
 });
 
-pub const EMIT_FEE_STATEMENT: &IdentStr = ident_str!("emit_fee_statement");
+pub const EMIT_FEE_STATEMENT: Lazy<Identifier> =
+    Lazy::new(|| Identifier::new("emit_fee_statement").unwrap());

@@ -9,8 +9,6 @@ use crate::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
-    identifier::IdentStr,
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -61,8 +59,8 @@ pub struct CoinInfoResource {
 }
 
 impl MoveStructType for CoinInfoResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("CoinInfo");
+    const MODULE_NAME: &'static str = "coin";
+    const STRUCT_NAME: &'static str = "CoinInfo";
 
     fn type_params() -> Vec<TypeTag> {
         vec![APTOS_COIN_TYPE.clone()]

@@ -21,7 +21,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     value::MoveValue,
@@ -55,7 +55,7 @@ pub fn view_resource_in_move_storage(
     storage: &impl MoveResolver,
     address: AccountAddress,
     module: &ModuleId,
-    resource: &IdentStr,
+    resource: &Identifier,
     type_args: Vec<TypeTag>,
 ) -> Result<String> {
     let tag = StructTag {
@@ -283,7 +283,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     fn call_function(
         &mut self,
         module: &ModuleId,
-        function: &IdentStr,
+        function: &Identifier,
         type_args: Vec<TypeTag>,
         signers: Vec<ParsedAddress>,
         txn_args: Vec<MoveValue>,
@@ -329,7 +329,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         &mut self,
         address: AccountAddress,
         module: &ModuleId,
-        resource: &IdentStr,
+        resource: &Identifier,
         type_args: Vec<TypeTag>,
     ) -> Result<String> {
         view_resource_in_move_storage(&self.storage, address, module, resource, type_args)

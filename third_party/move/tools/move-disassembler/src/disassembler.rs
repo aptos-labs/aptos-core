@@ -20,7 +20,7 @@ use move_bytecode_source_map::{
     source_map::{FunctionSourceMap, SourceName},
 };
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule, NamedCompiledScript};
-use move_core_types::{ident_str, identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use move_coverage::coverage_map::{ExecCoverageMap, FunctionCoverage};
 use move_ir_types::location::Loc;
 use std::collections::HashMap;
@@ -242,7 +242,7 @@ impl<'a> Disassembler<'a> {
     // Code Coverage Helpers
     //***************************************************************************
 
-    fn get_function_coverage(&self, function_name: &IdentStr) -> Option<&FunctionCoverage> {
+    fn get_function_coverage(&self, function_name: &Identifier) -> Option<&FunctionCoverage> {
         self.source_mapper
             .source_map
             .module_name_opt
@@ -257,11 +257,11 @@ impl<'a> Disassembler<'a> {
             })
     }
 
-    fn is_function_called(&self, function_name: &IdentStr) -> bool {
+    fn is_function_called(&self, function_name: &Identifier) -> bool {
         self.get_function_coverage(function_name).is_some()
     }
 
-    fn format_function_coverage(&self, name: &IdentStr, function_body: String) -> String {
+    fn format_function_coverage(&self, name: &Identifier, function_body: String) -> String {
         if self.coverage_map.is_none() {
             return function_body;
         }
@@ -929,7 +929,7 @@ impl<'a> Disassembler<'a> {
     fn disassemble_bytecode(
         &self,
         function_source_map: &FunctionSourceMap,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         parameters: SignatureIndex,
         code: &CodeUnit,
     ) -> Result<Vec<String>> {
@@ -1066,7 +1066,7 @@ impl<'a> Disassembler<'a> {
         &self,
         function_source_map: &FunctionSourceMap,
         function: Option<(&FunctionDefinition, &FunctionHandle)>,
-        name: &IdentStr,
+        name: &Identifier,
         type_parameters: &[AbilitySet],
         parameters: SignatureIndex,
         code: Option<&CodeUnit>,
@@ -1173,7 +1173,7 @@ impl<'a> Disassembler<'a> {
             .source_map
             .get_struct_source_map(struct_def_idx)?;
 
-        let field_info: Option<Vec<(&IdentStr, &TypeSignature)>> =
+        let field_info: Option<Vec<(&Identifier, &TypeSignature)>> =
             match &struct_definition.field_information {
                 StructFieldInformation::Native => None,
                 StructFieldInformation::Declared(fields) => Some(
@@ -1275,7 +1275,7 @@ impl<'a> Disassembler<'a> {
                         .source_map
                         .get_function_source_map(FunctionDefinitionIndex(0_u16))?,
                     None,
-                    ident_str!("main"),
+                    &Identifier::new("main").unwrap(),
                     &script.type_parameters,
                     script.parameters,
                     Some(&script.code),

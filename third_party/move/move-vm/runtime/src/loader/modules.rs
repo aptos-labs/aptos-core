@@ -20,11 +20,7 @@ use move_binary_format::{
         StructFieldInformation, TableIndex,
     },
 };
-use move_core_types::{
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_types::loaded_data::runtime_types::{StructIdentifier, StructType, Type};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -128,7 +124,7 @@ impl ModuleCache {
     // Return and error if the type has not been loaded
     pub(crate) fn resolve_struct_by_name(
         &self,
-        struct_name: &IdentStr,
+        struct_name: &Identifier,
         module_id: &ModuleId,
     ) -> PartialVMResult<Arc<StructType>> {
         self.modules
@@ -149,7 +145,7 @@ impl ModuleCache {
     // Return and error if the function has not been loaded
     pub(crate) fn resolve_function_by_name(
         &self,
-        func_name: &IdentStr,
+        func_name: &Identifier,
         module_id: &ModuleId,
     ) -> PartialVMResult<Arc<Function>> {
         match self.modules.get(module_id).and_then(|module| {

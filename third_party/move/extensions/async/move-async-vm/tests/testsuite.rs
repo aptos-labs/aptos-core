@@ -20,8 +20,7 @@ use move_compiler::{
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
-    ident_str,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
@@ -109,8 +108,8 @@ impl Harness {
             };
 
             // Put a start message for this actor into the mailbox.
-            let entry_point_id = ident_str!("start");
-            let hash = actor_metadata::message_hash(&actor, entry_point_id);
+            let entry_point_id = Identifier::new("start").unwrap();
+            let hash = actor_metadata::message_hash(&actor, &entry_point_id);
             mailbox.push_back((addr, hash, vec![]));
         }
 
@@ -145,7 +144,7 @@ impl Harness {
     fn publish_module(
         &self,
         session: &mut AsyncSession,
-        id: &IdentStr,
+        id: &Identifier,
         gas: &mut GasStatus,
         done: &mut BTreeSet<Identifier>,
     ) -> anyhow::Result<()> {

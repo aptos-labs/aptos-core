@@ -4,7 +4,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
@@ -22,8 +21,8 @@ proptest! {
 fn test_type_tag_deserialize_case_insensitive() {
     let org_struct_tag = StructTag {
         address: AccountAddress::ONE,
-        module: Identifier::from(ident_str!("TestModule")),
-        name: Identifier::from(ident_str!("TestStruct")),
+        module: Identifier::from(Identifier::new("TestModule")),
+        name: Identifier::from(Identifier::new("TestStruct")),
         type_params: vec![
             TypeTag::U8,
             TypeTag::U16,

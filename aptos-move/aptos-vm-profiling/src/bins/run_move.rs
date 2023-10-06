@@ -8,7 +8,7 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use move_binary_format::CompiledModule;
-use move_core_types::{account_address::AccountAddress, ident_str, identifier::Identifier};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_compiler::Compiler;
 use move_vm_runtime::{
     move_vm::MoveVM, native_extensions::NativeContextExtensions, native_functions::NativeFunction,
@@ -182,7 +182,7 @@ fn main() -> Result<()> {
         let args: Vec<Vec<u8>> = vec![];
         let res = sess.execute_function_bypass_visibility(
             &module.self_id(),
-            ident_str!("run"),
+            Identifier::new("run"),
             vec![],
             args,
             &mut UnmeteredGasMeter,

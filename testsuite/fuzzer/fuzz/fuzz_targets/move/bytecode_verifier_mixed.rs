@@ -13,7 +13,7 @@ use move_binary_format::file_format::{
     StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, TypeSignature,
     Visibility,
 };
-use move_core_types::{account_address::AccountAddress, ident_str};
+use move_core_types::account_address::AccountAddress;
 mod utils;
 
 #[derive(Arbitrary, Debug)]
@@ -56,11 +56,11 @@ fuzz_target!(|mix: Mixed| {
 
     module.identifiers.extend(
         vec![
-            ident_str!("zf_hello_world").into(),
-            ident_str!("awldFnU18mlDKQfh6qNfBGx8X").into(),
-            ident_str!("aQPwJNHyAHpvJ").into(),
-            ident_str!("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
-            ident_str!("arYpsFa2fvrpPJ").into(),
+            Identifier::new("zf_hello_world").into(),
+            Identifier::new("awldFnU18mlDKQfh6qNfBGx8X").into(),
+            Identifier::new("aQPwJNHyAHpvJ").into(),
+            Identifier::new("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
+            Identifier::new("arYpsFa2fvrpPJ").into(),
         ]
         .into_iter(),
     );

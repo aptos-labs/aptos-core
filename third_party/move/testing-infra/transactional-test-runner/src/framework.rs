@@ -37,7 +37,7 @@ use move_compiler::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
 use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
@@ -154,7 +154,7 @@ pub trait MoveTestAdapter<'a>: Sized {
     fn call_function(
         &mut self,
         module: &ModuleId,
-        function: &IdentStr,
+        function: &Identifier,
         type_args: Vec<TypeTag>,
         signers: Vec<ParsedAddress>,
         args: Vec<<<Self as MoveTestAdapter<'a>>::ExtraValueArgs as ParsableValue>::ConcreteValue>,
@@ -165,7 +165,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         &mut self,
         address: AccountAddress,
         module: &ModuleId,
-        resource: &IdentStr,
+        resource: &Identifier,
         type_args: Vec<TypeTag>,
     ) -> Result<String>;
 
@@ -440,13 +440,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
                 let args = self.compiled_state().resolve_args(args)?;
                 let (output, return_values) = self.call_function(
-                    &module_id,
-                    name.as_ident_str(),
-                    type_args,
-                    signers,
-                    args,
-                    gas_budget,
-                    extra_args,
+                    &module_id, &name, type_args, signers, args, gas_budget, extra_args,
                 )?;
                 let rendered_return_value = display_return_values(return_values);
                 Ok(merge_output(output, rendered_return_value))
@@ -466,7 +460,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 Ok(Some(self.view_data(
                     address,
                     &module_id,
-                    name.as_ident_str(),
+                    name.as_str(),
                     type_arguments,
                 )?))
             },

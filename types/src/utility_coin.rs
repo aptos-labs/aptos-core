@@ -3,7 +3,7 @@
 
 use crate::account_address::AccountAddress;
 use move_core_types::{
-    ident_str,
+    identifier::Identifier,
     language_storage::{StructTag, TypeTag},
 };
 use once_cell::sync::Lazy;
@@ -11,8 +11,8 @@ use once_cell::sync::Lazy;
 pub static APTOS_COIN_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
         address: AccountAddress::ONE,
-        module: ident_str!("aptos_coin").to_owned(),
-        name: ident_str!("AptosCoin").to_owned(),
+        module: Identifier::new("aptos_coin").unwrap(),
+        name: Identifier::new("AptosCoin").unwrap(),
         type_params: vec![],
     }))
 });

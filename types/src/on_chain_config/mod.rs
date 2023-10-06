@@ -10,8 +10,7 @@ use crate::{
 use anyhow::{format_err, Result};
 use bytes::Bytes;
 use move_core_types::{
-    ident_str,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::StructTag,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -247,8 +246,8 @@ impl Default for ConfigurationResource {
 }
 
 impl MoveStructType for ConfigurationResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("reconfiguration");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
+    const MODULE_NAME: &'static str = "reconfiguration";
+    const STRUCT_NAME: &'static str = "Configuration";
 }
 
 impl MoveResource for ConfigurationResource {}

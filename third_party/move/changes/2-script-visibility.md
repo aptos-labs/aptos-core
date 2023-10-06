@@ -42,7 +42,7 @@ A new entry point `execute_script_function` is added to the VM to allow the invo
 fn execute_script_function(
     &self,
     module: &ModuleId,
-    function_name: &IdentStr,
+    function_name: &Identifier,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
     senders: Vec<AccountAddress>,
@@ -54,7 +54,7 @@ fn execute_script_function(
 
 The entry point is designed to be similar to the existing `execute_script` entry point, with only one change:
 
-* argument `script: Vec<u8>` (i.e., a serialized script in raw bytes) is replaced by a pair of `module: &ModuleId` and `function_name: &IdentStr` that uniquely identifies a `public(script)` function in a published module (assuming the function exists).
+* argument `script: Vec<u8>` (i.e., a serialized script in raw bytes) is replaced by a pair of `module: &ModuleId` and `function_name: &Identifier` that uniquely identifies a `public(script)` function in a published module (assuming the function exists).
 
 The VM will reject the execution with proper status codes in the following situations:
 

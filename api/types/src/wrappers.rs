@@ -13,7 +13,7 @@
 use crate::{Address, VerifyInput, U64};
 use anyhow::{bail, Context};
 use aptos_types::{event::EventKey, state_store::state_key::StateKey};
-use move_core_types::identifier::{IdentStr, Identifier};
+use move_core_types::identifier::Identifier;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
@@ -58,23 +58,17 @@ impl From<&Identifier> for IdentifierWrapper {
     }
 }
 
-impl From<&IdentStr> for IdentifierWrapper {
-    fn from(ident_str: &IdentStr) -> Self {
-        Self(Identifier::from(ident_str))
-    }
-}
-
-impl AsRef<IdentStr> for IdentifierWrapper {
-    fn as_ref(&self) -> &IdentStr {
-        self.0.as_ref()
+impl AsRef<Identifier> for IdentifierWrapper {
+    fn as_ref(&self) -> &Identifier {
+        &self.0
     }
 }
 
 impl Deref for IdentifierWrapper {
-    type Target = IdentStr;
+    type Target = Identifier;
 
-    fn deref(&self) -> &IdentStr {
-        self.0.deref()
+    fn deref(&self) -> &Identifier {
+        &self.0
     }
 }
 

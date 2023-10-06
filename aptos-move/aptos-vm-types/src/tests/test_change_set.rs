@@ -16,7 +16,6 @@ use aptos_types::{
 use claims::{assert_matches, assert_ok};
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
 };
@@ -287,11 +286,11 @@ fn test_unsuccessful_squash_delta_create() {
 fn test_roundtrip_to_storage_change_set() {
     let test_struct_tag = StructTag {
         address: AccountAddress::ONE,
-        module: ident_str!("foo").into(),
-        name: ident_str!("Foo").into(),
+        module: Identifier::new("foo").into(),
+        name: Identifier::new("Foo").into(),
         type_params: vec![],
     };
-    let test_module_id = ModuleId::new(AccountAddress::ONE, ident_str!("bar").into());
+    let test_module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("bar").into());
 
     let resource_key = StateKey::access_path(
         AccessPath::resource_access_path(AccountAddress::ONE, test_struct_tag).unwrap(),

@@ -29,18 +29,13 @@
 
 use crate::intern_table::{InstanceUID, InstanceUniverse};
 use anyhow::{bail, Result};
+#[cfg(any(test, feature = "fuzzing"))]
+use arbitrary::Unstructured;
 use once_cell::sync::Lazy;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
-use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{
-    borrow::Borrow,
-    fmt,
-    hash::{Hash, Hasher},
-    ops::Deref,
-    str::FromStr,
-};
+use std::{fmt, hash::Hash, str::FromStr};
 
 /// Return true if this character can appear in a Move identifier.
 ///
@@ -69,7 +64,7 @@ const fn all_bytes_valid(b: &[u8], start_offset: usize) -> bool {
 ///
 /// For now this is deliberately restrictive -- we would like to evolve this in the future.
 // TODO: "<SELF>" is coded as an exception. It should be removed once CompiledScript goes away.
-// Note: needs to be pub as it's used in the `ident_str!` macro.
+// Note: needs to be pub as it's used in the `Identifier::new` macro.
 pub const fn is_valid(s: &str) -> bool {
     // Rust const fn's don't currently support slicing or indexing &str's, so we
     // have to operate on the underlying byte slice. This is not a problem as
@@ -101,7 +96,7 @@ pub type IdentifierID = InstanceUID<'static, String>;
 ///
 /// For more details, see the module level documentation.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
+// #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub struct Identifier(IdentifierID);
 
 impl Serialize for Identifier {
@@ -154,8 +149,8 @@ impl Identifier {
     }
 
     /// Creates a borrowed version of `self`.
-    pub fn as_ident_str(&self) -> &IdentStr {
-        self
+    pub fn as_str(&self) -> &str {
+        self.0.inner_ref().as_str()
     }
 
     /// Converts this `Identifier` into a `String`.
@@ -170,6 +165,10 @@ impl Identifier {
     pub fn into_bytes(self) -> Vec<u8> {
         self.into_string().into_bytes()
     }
+
+    pub fn len(&self) -> usize {
+        self.0.inner_ref().len()
+    }
 }
 
 impl FromStr for Identifier {
@@ -180,102 +179,15 @@ impl FromStr for Identifier {
     }
 }
 
-impl From<&IdentStr> for Identifier {
-    fn from(ident_str: &IdentStr) -> Self {
-        ident_str.to_owned()
-    }
-}
-
-impl AsRef<IdentStr> for Identifier {
-    fn as_ref(&self) -> &IdentStr {
-        self
-    }
-}
-
-impl Deref for Identifier {
-    type Target = IdentStr;
-
-    fn deref(&self) -> &IdentStr {
-        // Identifier and IdentStr maintain the same invariants, so it is safe to
-        // convert.
-        IdentStr::ref_cast(&self.0.inner_ref())
+impl<'a> From<&'a str> for Identifier {
+    fn from(value: &'a str) -> Self {
+        Identifier::new(value.to_string()).unwrap()
     }
 }
 
 impl fmt::Display for Identifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", &self.0.inner_ref())
-    }
-}
-
-/// A borrowed identifier.
-///
-/// For more details, see the module level documentation.
-#[derive(Debug, Eq, Ord, PartialEq, PartialOrd, RefCast)]
-#[repr(transparent)]
-pub struct IdentStr(str);
-
-impl Hash for IdentStr {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.to_owned().hash(state);
-    }
-}
-
-impl IdentStr {
-    pub fn new(s: &str) -> Result<&IdentStr> {
-        if Self::is_valid(s) {
-            Ok(IdentStr::ref_cast(s))
-        } else {
-            bail!("Invalid identifier '{}'", s);
-        }
-    }
-
-    /// Returns true if this string is a valid identifier.
-    pub fn is_valid(s: impl AsRef<str>) -> bool {
-        is_valid(s.as_ref())
-    }
-
-    /// Returns the length of `self` in bytes.
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    /// Returns `true` if `self` has a length of zero bytes.
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    /// Converts `self` to a `&str`.
-    ///
-    /// This is not implemented as a `From` trait to discourage automatic conversions -- these
-    /// conversions should not typically happen.
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    /// Converts `self` to a byte slice.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-}
-
-impl Borrow<IdentStr> for Identifier {
-    fn borrow(&self) -> &IdentStr {
-        self
-    }
-}
-
-impl ToOwned for IdentStr {
-    type Owned = Identifier;
-
-    fn to_owned(&self) -> Identifier {
-        Identifier::new(&self.0).unwrap()
-    }
-}
-
-impl fmt::Display for IdentStr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", &self.0)
     }
 }
 
@@ -294,63 +206,9 @@ impl Arbitrary for Identifier {
     }
 }
 
-// const assert that IdentStr impls RefCast<From = str>
-// This assertion is what guarantees the unsafe transmute is safe.
-const _: fn() = || {
-    fn assert_impl_all<T: ?Sized + ::ref_cast::RefCast<From = str>>() {}
-    assert_impl_all::<IdentStr>();
-};
-
-/// `ident_str!` is a compile-time validated macro that constructs a
-/// `&'static IdentStr` from a const `&'static str`.
-///
-/// ### Example
-///
-/// Creating a valid static or const [`IdentStr`]:
-///
-/// ```rust
-/// use move_core_types::{ident_str, identifier::IdentStr};
-/// const VALID_IDENT: &'static IdentStr = ident_str!("MyCoolIdentifier");
-///
-/// const THING_NAME: &'static str = "thing_name";
-/// const THING_IDENT: &'static IdentStr = ident_str!(THING_NAME);
-/// ```
-///
-/// In contrast, creating an invalid [`IdentStr`] will fail at compile time:
-///
-/// ```rust,compile_fail
-/// use move_core_types::{ident_str, identifier::IdentStr};
-/// const INVALID_IDENT: &'static IdentStr = ident_str!("123Foo"); // Fails to compile!
-/// ```
-// TODO(philiphayes): this should really be an associated const fn like `IdentStr::new`;
-// unfortunately, both unsafe-reborrow and unsafe-transmute don't currently work
-// inside const fn's. Only unsafe-transmute works inside static const-blocks
-// (but not const-fn's).
-#[macro_export]
-macro_rules! ident_str {
-    ($ident:expr) => {{
-        // Only static strings allowed.
-        let s: &'static str = $ident;
-
-        // Only valid identifier strings are allowed.
-        // Note: Work-around hack to print an error message in a const block.
-        let is_valid = $crate::identifier::is_valid(s);
-        ["String is not a valid Move identifier"][!is_valid as usize];
-
-        // SAFETY: the following transmute is safe because
-        // (1) it's equivalent to the unsafe-reborrow inside IdentStr::ref_cast()
-        //     (which we can't use b/c it's not const).
-        // (2) we've just asserted that IdentStr impls RefCast<From = str>, which
-        //     already guarantees the transmute is safe (RefCast checks that
-        //     IdentStr(str) is #[repr(transparent)]).
-        // (3) both in and out lifetimes are 'static, so we're not widening the lifetime.
-        // (4) we've just asserted that the IdentStr passes the is_valid check.
-        //
-        // Note: this lint is unjustified and no longer checked. See issue:
-        // https://github.com/rust-lang/rust-clippy/issues/6372
-        #[allow(clippy::transmute_ptr_to_ptr)]
-        unsafe {
-            ::std::mem::transmute::<&'static str, &'static $crate::identifier::IdentStr>(s)
-        }
-    }};
+#[cfg(any(test, feature = "fuzzing"))]
+impl<'a> arbitrary::Arbitrary<'a> for Identifier {
+    fn arbitrary(u: &mut Unstructured<'a>) -> arbitrary::Result<Self> {
+        todo!();
+    }
 }

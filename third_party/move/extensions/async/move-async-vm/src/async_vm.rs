@@ -59,7 +59,7 @@ impl AsyncVM {
             .flat_map(|a| {
                 a.messages.iter().map(move |m| {
                     (
-                        actor_metadata::message_hash(&a.module_id, m.as_ident_str()),
+                        actor_metadata::message_hash(&a.module_id, m.as_str()),
                         (a.module_id.clone(), m.clone()),
                     )
                 })

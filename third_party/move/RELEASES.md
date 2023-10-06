@@ -347,7 +347,7 @@ which is a much better description of its contents.
 ([#8161](https://github.com/diem/diem/pull/8161)).
 * Removed a number of dependencies on Diem crates,
 continuing our effort to make Move usable apart from Diem.
-* Added an `ident_str!` macro to create const `IdentStr` values
+* Added an `Identifier::new` macro to create const `IdentStr` values
 ([#8300](https://github.com/diem/diem/pull/8300)).
 * Refactored the `MoveResource` trait to add a separate `MoveStructType` trait
 ([#8346](https://github.com/diem/diem/pull/8346)).

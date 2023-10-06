@@ -47,7 +47,7 @@ pub(crate) fn get_resource_group_from_metadata(
     let metadata = aptos_framework::get_metadata(metadata)?;
     metadata
         .struct_attributes
-        .get(struct_tag.name.as_ident_str().as_str())?
+        .get(struct_tag.name.as_str())?
         .iter()
         .find_map(|attr| attr.get_resource_group_member())
 }

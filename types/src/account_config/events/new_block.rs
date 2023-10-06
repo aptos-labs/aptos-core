@@ -9,11 +9,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use move_core_types::{
-    ident_str,
-    identifier::IdentStr,
-    move_resource::{MoveResource, MoveStructType},
-};
+use move_core_types::move_resource::{MoveResource, MoveStructType};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
@@ -96,8 +92,8 @@ impl NewBlockEvent {
 }
 
 impl MoveStructType for NewBlockEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("block");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("NewBlockEvent");
+    const MODULE_NAME: &'static str = "block";
+    const STRUCT_NAME: &'static str = "NewBlockEvent";
 }
 
 pub fn new_block_event_key() -> EventKey {
@@ -136,8 +132,8 @@ impl BlockResource {
 }
 
 impl MoveStructType for BlockResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("block");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("BlockResource");
+    const MODULE_NAME: &'static str = "block";
+    const STRUCT_NAME: &'static str = "BlockResource";
 }
 
 impl MoveResource for BlockResource {}

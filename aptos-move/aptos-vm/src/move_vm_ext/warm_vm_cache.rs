@@ -12,7 +12,7 @@ use aptos_types::on_chain_config::OnChainConfig;
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
-    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::StatusCode,
 };
@@ -90,7 +90,7 @@ impl WarmVmCache {
         // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
         let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
+            &ModuleId::new(CORE_CODE_ADDRESS, Identifier::from("account")),
             &resolver,
         );
     }

@@ -22,7 +22,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
 use move_core_types::{
-    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     move_resource::MoveStructType,
 };
@@ -160,7 +160,7 @@ impl NativeExecutor {
                 return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         AccountAddress::ONE,
-                        ident_str!("account").into(),
+                        Identifier::from("account"),
                     )),
                     code: 7,
                     info: None,
@@ -187,7 +187,7 @@ impl NativeExecutor {
                 return Ok(Err(TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                     location: AbortLocation::Module(ModuleId::new(
                         AccountAddress::ONE,
-                        ident_str!("account").into(),
+                        Identifier::from("account"),
                     )),
                     code: 8,
                     info: None,

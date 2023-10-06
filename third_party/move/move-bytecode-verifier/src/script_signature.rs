@@ -23,7 +23,7 @@ use move_binary_format::{
     file_format_common::{VERSION_1, VERSION_5},
     IndexKind,
 };
-use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
+use move_core_types::{identifier::Identifier, vm_status::StatusCode};
 
 pub type FnCheckScriptSignature = fn(
     &BinaryIndexedView,
@@ -76,7 +76,7 @@ pub fn verify_module(
 /// when it serves as an entry point for script execution
 pub fn verify_module_function_signature_by_name(
     module: &CompiledModule,
-    name: &IdentStr,
+    name: &Identifier,
     check_signature: FnCheckScriptSignature,
 ) -> VMResult<()> {
     let fdef_opt = module.function_defs().iter().enumerate().find(|(_, fdef)| {

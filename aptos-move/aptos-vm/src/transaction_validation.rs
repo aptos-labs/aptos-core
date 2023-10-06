@@ -3,7 +3,7 @@
 
 use aptos_types::account_config::constants::CORE_CODE_ADDRESS;
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::Identifier, language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     vm_status::AbortLocation,
 };
 use once_cell::sync::Lazy;
@@ -44,7 +44,7 @@ impl TransactionValidation {
             || location
                 == &AbortLocation::Module(ModuleId::new(
                     CORE_CODE_ADDRESS,
-                    ident_str!("transaction_validation").to_owned(),
+                    Identifier::from("transaction_validation"),
                 ))
     }
 }

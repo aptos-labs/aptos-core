@@ -448,7 +448,7 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
     let self_ident_idx = match script
         .identifiers
         .iter()
-        .position(|ident| ident.as_ident_str() == self_module_name())
+        .position(|ident| ident.as_str() == self_module_name())
     {
         Some(idx) => IdentifierIndex::new(idx as u16),
         None => {

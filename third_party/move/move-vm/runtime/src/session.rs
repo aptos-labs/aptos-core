@@ -16,7 +16,7 @@ use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
     gas_algebra::NumBytes,
-    identifier::IdentStr,
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
 };
@@ -73,7 +73,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn execute_entry_function(
         &mut self,
         module: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
@@ -95,7 +95,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn execute_function_bypass_visibility(
         &mut self,
         module: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
@@ -339,7 +339,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn load_function_with_type_arg_inference(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         expected_return_type: &Type,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
         let (func, instantiation) = self
@@ -359,7 +359,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn load_function(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         type_arguments: &[TypeTag],
     ) -> VMResult<LoadedFunctionInstantiation> {
         let (_, _, instantiation) = self.move_vm.runtime.loader().load_function(

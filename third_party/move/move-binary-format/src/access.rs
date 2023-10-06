@@ -6,9 +6,7 @@
 
 use crate::{file_format::*, internals::ModuleIndex};
 use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
 };
 
 /// Represents accessors for a compiled module.
@@ -31,7 +29,7 @@ pub trait ModuleAccess: Sync {
     }
 
     /// Returns the name of the module.
-    fn name(&self) -> &IdentStr {
+    fn name(&self) -> &Identifier {
         self.identifier_at(self.self_handle().name)
     }
 
@@ -82,7 +80,7 @@ pub trait ModuleAccess: Sync {
         &self.as_module().signatures[idx.into_index()]
     }
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         &self.as_module().identifiers[idx.into_index()]
     }
 
@@ -196,7 +194,7 @@ pub trait ModuleAccess: Sync {
         self.struct_defs().iter().find(|d| d.struct_handle == idx)
     }
 
-    fn find_struct_def_by_name(&self, name: &IdentStr) -> Option<&StructDefinition> {
+    fn find_struct_def_by_name(&self, name: &Identifier) -> Option<&StructDefinition> {
         self.struct_defs().iter().find(|def| {
             let handle = self.struct_handle_at(def.struct_handle);
             name == self.identifier_at(handle.name)
@@ -227,7 +225,7 @@ pub trait ScriptAccess: Sync {
         &self.as_script().signatures[idx.into_index()]
     }
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         &self.as_script().identifiers[idx.into_index()]
     }
 

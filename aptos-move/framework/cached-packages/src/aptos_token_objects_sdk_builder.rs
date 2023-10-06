@@ -19,7 +19,7 @@ use aptos_types::{
     transaction::{EntryFunction, TransactionPayload},
 };
 use move_core_types::{
-    ident_str,
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
 
@@ -197,9 +197,9 @@ pub fn aptos_token_create_collection(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 4,
             ]),
-            ident_str!("aptos_token").to_owned(),
+            Identifier::from("aptos_token"),
         ),
-        ident_str!("create_collection").to_owned(),
+        Identifier::from("create_collection"),
         vec![],
         vec![
             bcs::to_bytes(&description).unwrap(),
@@ -237,9 +237,9 @@ pub fn aptos_token_mint(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 4,
             ]),
-            ident_str!("aptos_token").to_owned(),
+            Identifier::from("aptos_token"),
         ),
-        ident_str!("mint").to_owned(),
+        Identifier::from("mint"),
         vec![],
         vec![
             bcs::to_bytes(&collection).unwrap(),
@@ -270,9 +270,9 @@ pub fn aptos_token_mint_soul_bound(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 4,
             ]),
-            ident_str!("aptos_token").to_owned(),
+            Identifier::from("aptos_token"),
         ),
-        ident_str!("mint_soul_bound").to_owned(),
+        Identifier::from("mint_soul_bound"),
         vec![],
         vec![
             bcs::to_bytes(&collection).unwrap(),

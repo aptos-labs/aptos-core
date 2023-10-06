@@ -13,7 +13,7 @@
 //!   iterators to aid understanding of the file format and to make it easy to generate views.
 
 use crate::{access::ModuleAccess, file_format::*, SignatureTokenKind};
-use move_core_types::{identifier::IdentStr, language_storage::ModuleId};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter::DoubleEndedIterator,
@@ -24,8 +24,8 @@ use std::{
 /// `T` here is any sort of `ModuleAccess`. See the documentation in access.rs for more.
 pub struct ModuleView<'a, T> {
     module: &'a T,
-    name_to_function_definition_view: BTreeMap<&'a IdentStr, FunctionDefinitionView<'a, T>>,
-    name_to_struct_definition_view: BTreeMap<&'a IdentStr, StructDefinitionView<'a, T>>,
+    name_to_function_definition_view: BTreeMap<&'a Identifier, FunctionDefinitionView<'a, T>>,
+    name_to_struct_definition_view: BTreeMap<&'a Identifier, StructDefinitionView<'a, T>>,
 }
 
 impl<'a, T: ModuleAccess> ModuleView<'a, T> {
@@ -147,12 +147,12 @@ impl<'a, T: ModuleAccess> ModuleView<'a, T> {
 
     pub fn function_definition(
         &self,
-        name: &'a IdentStr,
+        name: &'a Identifier,
     ) -> Option<&FunctionDefinitionView<'a, T>> {
         self.name_to_function_definition_view.get(name)
     }
 
-    pub fn struct_definition(&self, name: &'a IdentStr) -> Option<&StructDefinitionView<'a, T>> {
+    pub fn struct_definition(&self, name: &'a Identifier) -> Option<&StructDefinitionView<'a, T>> {
         self.name_to_struct_definition_view.get(name)
     }
 
@@ -227,7 +227,7 @@ impl<'a, T: ModuleAccess> StructHandleView<'a, T> {
         self.module.module_handle_at(self.struct_handle.module)
     }
 
-    pub fn name(&self) -> &'a IdentStr {
+    pub fn name(&self) -> &'a Identifier {
         self.module.identifier_at(self.struct_handle.name)
     }
 
@@ -272,7 +272,7 @@ impl<'a, T: ModuleAccess> FunctionHandleView<'a, T> {
         self.module.module_handle_at(self.function_handle.module)
     }
 
-    pub fn name(&self) -> &'a IdentStr {
+    pub fn name(&self) -> &'a Identifier {
         self.module.identifier_at(self.function_handle.name)
     }
 
@@ -374,7 +374,7 @@ impl<'a, T: ModuleAccess> StructDefinitionView<'a, T> {
         }
     }
 
-    pub fn name(&self) -> &'a IdentStr {
+    pub fn name(&self) -> &'a Identifier {
         self.struct_handle_view.name()
     }
 }
@@ -389,7 +389,7 @@ impl<'a, T: ModuleAccess> FieldDefinitionView<'a, T> {
         Self { module, field_def }
     }
 
-    pub fn name(&self) -> &'a IdentStr {
+    pub fn name(&self) -> &'a Identifier {
         self.module.identifier_at(self.field_def.name)
     }
 
@@ -492,7 +492,7 @@ impl<'a, T: ModuleAccess> FunctionDefinitionView<'a, T> {
         self.code().map(|_| LocalsSignatureView::new(self.clone()))
     }
 
-    pub fn name(&self) -> &'a IdentStr {
+    pub fn name(&self) -> &'a Identifier {
         self.function_handle_view.name()
     }
 

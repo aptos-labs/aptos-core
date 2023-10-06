@@ -31,7 +31,6 @@ use aptos_types::{
 use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
 use move_core_types::{
-    ident_str,
     language_storage::{StructTag, TypeTag},
     resolver::MoveResolver,
 };
@@ -235,7 +234,7 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
                     };
                     let table_handle = match &struct_value.value[0] {
                         (name, AnnotatedMoveValue::Address(handle)) => {
-                            assert_eq!(name.as_ref(), ident_str!("handle"));
+                            assert_eq!(name.as_str(), "handle");
                             TableHandle(*handle)
                         },
                         _ => bail!("Table struct malformed. {:?}", struct_value),
@@ -276,8 +275,8 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
 
     fn is_table(struct_tag: &StructTag) -> bool {
         struct_tag.address == AccountAddress::ONE
-            && struct_tag.module.as_ident_str() == ident_str!("table")
-            && struct_tag.name.as_ident_str() == ident_str!("Table")
+            && struct_tag.module.as_str() == "table"
+            && struct_tag.name.as_str() == "Table"
     }
 
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {

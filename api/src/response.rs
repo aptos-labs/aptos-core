@@ -31,10 +31,7 @@
 
 use super::{accept_type::AcceptType, bcs_payload::Bcs};
 use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue, LedgerInfo};
-use move_core_types::{
-    identifier::{IdentStr, Identifier},
-    language_storage::StructTag,
-};
+use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
 use serde_json::Value;
 use std::fmt::Display;
@@ -647,7 +644,7 @@ pub fn resource_not_found<E: NotFoundError>(
 
 pub fn module_not_found<E: NotFoundError>(
     address: Address,
-    module_name: &IdentStr,
+    module_name: &Identifier,
     ledger_version: u64,
     ledger_info: &LedgerInfo,
 ) -> E {

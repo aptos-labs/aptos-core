@@ -101,7 +101,7 @@ impl ExecutionGasEvent {
             } => Node::new(
                 format!(
                     "{}",
-                    Render(&(module_id, fn_name.as_ident_str(), ty_args.as_slice()))
+                    Render(&(module_id, fn_name.as_str(), ty_args.as_slice()))
                 ),
                 *cost,
             ),
@@ -123,7 +123,7 @@ impl CallFrame {
             } => {
                 format!(
                     "{}",
-                    Render(&(module_id, name.as_ident_str(), ty_args.as_slice()))
+                    Render(&(module_id, name.as_str(), ty_args.as_slice()))
                 )
             },
         };

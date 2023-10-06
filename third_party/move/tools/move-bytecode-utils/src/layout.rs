@@ -12,7 +12,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
@@ -515,7 +515,7 @@ impl StructLayoutBuilder {
 
     fn build_from_name(
         declaring_module: &ModuleId,
-        name: &IdentStr,
+        name: &Identifier,
         type_arguments: Vec<MoveTypeLayout>,
         resolver: &impl GetModule,
         layout_type: LayoutType,

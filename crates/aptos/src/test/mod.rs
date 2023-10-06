@@ -60,7 +60,6 @@ use aptos_rest_client::{
 use aptos_sdk::move_types::{account_address::AccountAddress, language_storage::ModuleId};
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::ValidatorSet;
-use move_core_types::ident_str;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -313,8 +312,8 @@ impl CliTestFramework {
         RunFunction {
             entry_function_args: EntryFunctionArguments {
                 function_id: Some(MemberId {
-                    module_id: ModuleId::new(AccountAddress::ONE, ident_str!("coin").into()),
-                    member_id: ident_str!("transfer").into(),
+                    module_id: ModuleId::new(AccountAddress::ONE, Identifier::new("coin").into()),
+                    member_id: Identifier::new("transfer").into(),
                 }),
                 arg_vec: ArgWithTypeVec {
                     args: vec![
@@ -325,8 +324,8 @@ impl CliTestFramework {
                 type_arg_vec: TypeArgVec {
                     type_args: vec![MoveType::Struct(MoveStructTag::new(
                         AccountAddress::ONE.into(),
-                        ident_str!("aptos_coin").into(),
-                        ident_str!("AptosCoin").into(),
+                        Identifier::new("aptos_coin").into(),
+                        Identifier::new("AptosCoin").into(),
                         vec![],
                     ))],
                 },

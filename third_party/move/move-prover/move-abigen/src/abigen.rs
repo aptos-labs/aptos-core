@@ -11,7 +11,7 @@ use move_bytecode_verifier::script_signature;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_core_types::{
     abi::{ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI},
-    identifier::IdentStr,
+    identifier::Identifier,
     language_storage::{StructTag, TypeTag},
 };
 use move_model::{
@@ -130,13 +130,13 @@ impl<'env> Abigen<'env> {
                 .get_functions()
                 .filter(|func| {
                     let func_name = module_env.symbol_pool().string(func.get_name());
-                    let func_ident = IdentStr::new(&func_name).unwrap();
+                    let func_ident = Identifier::new(func_name.as_str()).unwrap();
                     // only pick up script functions that also have a script-callable signature.
                     // and check all arguments have a valid type tag
                     func.is_entry()
                         && script_signature::verify_module_function_signature_by_name(
                             module,
-                            func_ident,
+                            &func_ident,
                             script_signature::no_additional_script_signature_checks,
                         )
                         .is_ok()

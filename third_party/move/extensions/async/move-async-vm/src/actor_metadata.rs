@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_core_types::{
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag},
 };
 use sha3::{Digest, Sha3_256};
@@ -20,7 +20,7 @@ pub struct ActorMetadata {
 }
 
 /// Compute a hash for a message.
-pub fn message_hash(module_id: &ModuleId, handler_id: &IdentStr) -> u64 {
+pub fn message_hash(module_id: &ModuleId, handler_id: &Identifier) -> u64 {
     let hash_str = format!(
         "0x{}::{}::{}",
         module_id.address().to_hex(),

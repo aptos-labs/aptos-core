@@ -357,7 +357,7 @@ impl Context {
                                 &resolver.get_module_metadata(&struct_tag.module_id()),
                             )?;
                             md.struct_attributes
-                                .get(struct_tag.name.as_ident_str().as_str())?
+                                .get(struct_tag.name.as_str())?
                                 .iter()
                                 .find(|attr| attr.is_resource_group())?;
                             Some(())

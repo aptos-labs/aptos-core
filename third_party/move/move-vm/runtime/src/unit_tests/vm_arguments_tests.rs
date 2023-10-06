@@ -16,7 +16,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     metadata::Metadata,
@@ -319,7 +318,7 @@ fn call_script_function_with_args_ty_args_signers(
     let mut session = move_vm.new_session(&remote_view);
     session.execute_function_bypass_visibility(
         &id,
-        function_name.as_ident_str(),
+        &function_name,
         ty_args,
         combine_signers_and_args(signers, non_signer_args),
         &mut UnmeteredGasMeter,
@@ -803,7 +802,7 @@ fn check_script_function() {
 fn call_missing_item() {
     let module = empty_module();
     let id = &module.self_id();
-    let function_name = ident_str!("foo");
+    let function_name = Identifier::new("foo");
     // missing module
     let move_vm = MoveVM::new(vec![]).unwrap();
     let mut remote_view = RemoteStore::new();

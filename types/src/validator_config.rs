@@ -4,18 +4,14 @@
 
 use crate::network_address::NetworkAddress;
 use aptos_crypto::bls12381;
-use move_core_types::{
-    ident_str,
-    identifier::IdentStr,
-    move_resource::{MoveResource, MoveStructType},
-};
+use move_core_types::move_resource::{MoveResource, MoveStructType};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
 impl MoveStructType for ValidatorConfig {
-    const MODULE_NAME: &'static IdentStr = ident_str!("stake");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorConfig");
+    const MODULE_NAME: &'static str = "stake";
+    const STRUCT_NAME: &'static str = "ValidatorConfig";
 }
 
 impl MoveResource for ValidatorConfig {}
@@ -26,8 +22,8 @@ pub struct ValidatorOperatorConfigResource {
 }
 
 impl MoveStructType for ValidatorOperatorConfigResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("validator_operator_config");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("ValidatorOperatorConfig");
+    const MODULE_NAME: &'static str = "validator_operator_config";
+    const STRUCT_NAME: &'static str = "ValidatorOperatorConfig";
 }
 
 impl MoveResource for ValidatorOperatorConfigResource {}

@@ -17,7 +17,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::Identifier, vm_status::StatusCode,
+    account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
 };
 
 #[test]
@@ -52,11 +52,11 @@ fn unbalanced_stack_crash() {
         .push(Signature(vec![Address, Bool, Address]));
 
     module.identifiers.extend(vec![
-        ident_str!("zf_hello_world").into(),
-        ident_str!("awldFnU18mlDKQfh6qNfBGx8X").into(),
-        ident_str!("aQPwJNHyAHpvJ").into(),
-        ident_str!("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
-        ident_str!("arYpsFa2fvrpPJ").into(),
+        Identifier::new("zf_hello_world").into(),
+        Identifier::new("awldFnU18mlDKQfh6qNfBGx8X").into(),
+        Identifier::new("aQPwJNHyAHpvJ").into(),
+        Identifier::new("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
+        Identifier::new("arYpsFa2fvrpPJ").into(),
     ]);
     module.address_identifiers.push(AccountAddress::random());
 

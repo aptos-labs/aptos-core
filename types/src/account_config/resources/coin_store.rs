@@ -3,8 +3,6 @@
 
 use crate::{event::EventHandle, utility_coin::APTOS_COIN_TYPE};
 use move_core_types::{
-    ident_str,
-    identifier::IdentStr,
     language_storage::TypeTag,
     move_resource::{MoveResource, MoveStructType},
 };
@@ -55,8 +53,8 @@ impl CoinStoreResource {
 }
 
 impl MoveStructType for CoinStoreResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("CoinStore");
+    const MODULE_NAME: &'static str = "coin";
+    const STRUCT_NAME: &'static str = "CoinStore";
 
     fn type_params() -> Vec<TypeTag> {
         vec![APTOS_COIN_TYPE.clone()]

@@ -6,8 +6,7 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use move_binary_format::file_format::CompiledModule;
 use move_core_types::{
-    account_address::AccountAddress, gas_algebra::GasQuantity, identifier::IdentStr,
-    language_storage::TypeTag,
+    account_address::AccountAddress, gas_algebra::GasQuantity, language_storage::TypeTag,
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{
@@ -50,8 +49,7 @@ fuzz_target!(|fuzz_data: FuzzData| {
         return;
     }
 
-    let ident =
-        IdentStr::new(fuzz_data.ident.as_str()).unwrap_or_else(|_| IdentStr::new("f").unwrap());
+    let ident = Identifier::new(fuzz_data.ident);.unwrap_or_else(|_| Identifier::new("f").unwrap());
     let _ = session.execute_entry_function(
         &fuzz_data.cm.self_id(),
         ident,

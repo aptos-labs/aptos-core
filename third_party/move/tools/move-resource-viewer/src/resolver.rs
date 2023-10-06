@@ -19,7 +19,7 @@ use move_binary_format::{
 use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
 };
@@ -62,7 +62,11 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
         }
     }
 
-    fn get_module(&self, address: &AccountAddress, name: &IdentStr) -> Result<Rc<CompiledModule>> {
+    fn get_module(
+        &self,
+        address: &AccountAddress,
+        name: &Identifier,
+    ) -> Result<Rc<CompiledModule>> {
         let module_id = ModuleId::new(*address, name.to_owned());
         self.get_module_by_id_or_err(&module_id)
     }
@@ -75,7 +79,7 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
     pub fn resolve_function_arguments(
         &self,
         module: &ModuleId,
-        function: &IdentStr,
+        function: &Identifier,
     ) -> Result<Vec<FatType>> {
         let m = self.get_module_by_id_or_err(module)?;
         for def in m.function_defs.iter() {
@@ -111,7 +115,7 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
 
     pub fn resolve_struct(&self, struct_tag: &StructTag) -> Result<FatStructType> {
         let module = self.get_module(&struct_tag.address, &struct_tag.module)?;
-        let struct_def = find_struct_def_in_module(module.clone(), struct_tag.name.as_ident_str())?;
+        let struct_def = find_struct_def_in_module(module.clone(), &struct_tag.name)?;
         let ty_args = struct_tag
             .type_params
             .iter()
@@ -124,8 +128,8 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
     }
 
     pub fn get_field_names(&self, ty: &FatStructType) -> Result<Vec<Identifier>> {
-        let module = self.get_module(&ty.address, ty.module.as_ident_str())?;
-        let struct_def_idx = find_struct_def_in_module(module.clone(), ty.name.as_ident_str())?;
+        let module = self.get_module(&ty.address, &ty.module)?;
+        let struct_def_idx = find_struct_def_in_module(module.clone(), &ty.name)?;
         let struct_def = module.struct_def_at(struct_def_idx);
 
         match &struct_def.field_information {
@@ -232,7 +236,7 @@ impl<'a, T: MoveResolver + ?Sized> Resolver<'a, T> {
 
 fn find_struct_def_in_module(
     module: Rc<CompiledModule>,
-    name: &IdentStr,
+    name: &Identifier,
 ) -> Result<StructDefinitionIndex> {
     for (i, defs) in module.struct_defs().iter().enumerate() {
         let st_handle = module.struct_handle_at(defs.struct_handle);

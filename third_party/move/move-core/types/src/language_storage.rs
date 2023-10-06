@@ -4,7 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     parser::{parse_struct_tag, parse_type_tag},
     safe_serialize,
 };
@@ -228,7 +228,7 @@ impl ModuleId {
         ModuleId { address, name }
     }
 
-    pub fn name(&self) -> &IdentStr {
+    pub fn name(&self) -> &Identifier {
         &self.name
     }
 

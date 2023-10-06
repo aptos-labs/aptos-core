@@ -3,11 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{account_address::AccountAddress, event::EventHandle};
-use move_core_types::{
-    ident_str,
-    identifier::IdentStr,
-    move_resource::{MoveResource, MoveStructType},
-};
+use move_core_types::move_resource::{MoveResource, MoveStructType};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -77,8 +73,8 @@ impl AccountResource {
 }
 
 impl MoveStructType for AccountResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("account");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("Account");
+    const MODULE_NAME: &'static str = "account";
+    const STRUCT_NAME: &'static str = "Account";
 }
 
 impl MoveResource for AccountResource {}

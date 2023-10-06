@@ -7,7 +7,7 @@ use move_binary_format::CompiledModule;
 use move_compiler::{compiled_unit::AnnotatedCompiledUnit, Compiler};
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
 };
 use move_vm_runtime::move_vm::MoveVM;
@@ -82,7 +82,8 @@ fn execute<M: Measurement + 'static>(
 
     // module and function to call
     let module_id = ModuleId::new(sender, Identifier::new("Bench").unwrap());
-    let fun_name = IdentStr::new(fun).unwrap_or_else(|_| panic!("Invalid identifier name {}", fun));
+    let fun_name =
+        Identifier::new(fun).unwrap_or_else(|_| panic!("Invalid identifier name {}", fun));
 
     // benchmark
     c.bench_function(fun, |b| {

@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::identifier::{IdentStr, Identifier, ALLOWED_IDENTIFIERS, ALLOWED_NO_SELF_IDENTIFIERS};
+use crate::identifier::{Identifier, ALLOWED_IDENTIFIERS, ALLOWED_NO_SELF_IDENTIFIERS};
 use bcs::test_helpers::assert_canonical_encode_decode;
 use once_cell::sync::Lazy;
 use proptest::prelude::*;
@@ -79,16 +79,6 @@ proptest! {
         let s = identifier.clone().into_string();
         let id2 = Identifier::new(s).expect("identifier should parse correctly");
         prop_assert_eq!(identifier, id2);
-    }
-
-    #[test]
-    fn identifier_ident_str_equivalence(identifier in any::<Identifier>()) {
-        let s = identifier.clone().into_string();
-        let ident_str = IdentStr::new(&s).expect("identifier should parse correctly");
-        prop_assert_eq!(ident_str, identifier.as_ident_str());
-        prop_assert_eq!(ident_str, identifier.as_ref());
-        prop_assert_eq!(ident_str, identifier.borrow());
-        prop_assert_eq!(ident_str.to_owned(), identifier);
     }
 
     #[test]

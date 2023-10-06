@@ -7,7 +7,7 @@ pub use move_core_types::abi::{
     ArgumentABI, ScriptFunctionABI as EntryFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use move_core_types::{
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
 };
 use serde::{Deserialize, Serialize};
@@ -133,7 +133,7 @@ impl EntryFunction {
         &self.module
     }
 
-    pub fn function(&self) -> &IdentStr {
+    pub fn function(&self) -> &Identifier {
         &self.function
     }
 

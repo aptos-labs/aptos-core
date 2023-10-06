@@ -13,12 +13,8 @@ use move_binary_format::{
     file_format_common::read_uleb128_as_u64,
 };
 use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    identifier::{IdentStr, Identifier},
-    language_storage::ModuleId,
-    value::MoveValue,
-    vm_status::StatusCode,
+    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    value::MoveValue, vm_status::StatusCode,
 };
 use move_vm_runtime::session::LoadedFunctionInstantiation;
 use move_vm_types::{
@@ -33,14 +29,14 @@ use std::{
 
 pub(crate) struct FunctionId {
     module_id: ModuleId,
-    func_name: &'static IdentStr,
+    func_name: Identifier,
 }
 
 type ConstructorMap = Lazy<BTreeMap<String, FunctionId>>;
 static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     [("0x1::string::String", FunctionId {
-        module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
-        func_name: ident_str!("utf8"),
+        module_id: ModuleId::new(AccountAddress::ONE, Identifier::from("string")),
+        func_name: Identifier::from("utf8"),
     })]
     .into_iter()
     .map(|(s, validator)| (s.to_string(), validator))
@@ -50,30 +46,24 @@ static OLD_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
 static NEW_ALLOWED_STRUCTS: ConstructorMap = Lazy::new(|| {
     [
         ("0x1::string::String", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("string"))),
-            func_name: ident_str!("utf8"),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from("string")),
+            func_name: Identifier::from("utf8"),
         }),
         ("0x1::object::Object", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("object"))),
-            func_name: ident_str!("address_to_object"),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from("object")),
+            func_name: Identifier::from("address_to_object"),
         }),
         ("0x1::option::Option", FunctionId {
-            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))),
-            func_name: ident_str!("from_vec"),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from("option")),
+            func_name: Identifier::from("from_vec"),
         }),
         ("0x1::fixed_point32::FixedPoint32", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("fixed_point32")),
-            ),
-            func_name: ident_str!("create_from_raw_value"),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from("fixed_point32")),
+            func_name: Identifier::from("create_from_raw_value"),
         }),
         ("0x1::fixed_point64::FixedPoint64", FunctionId {
-            module_id: ModuleId::new(
-                AccountAddress::ONE,
-                Identifier::from(ident_str!("fixed_point64")),
-            ),
-            func_name: ident_str!("create_from_raw_value"),
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::from("fixed_point64")),
+            func_name: Identifier::from("create_from_raw_value"),
         }),
     ]
     .into_iter()
@@ -392,7 +382,7 @@ fn validate_and_construct(
 
     let (function, instantiation) = session.load_function_with_type_arg_inference(
         &constructor.module_id,
-        constructor.func_name,
+        &constructor.func_name,
         expected_type,
     )?;
     let mut args = vec![];

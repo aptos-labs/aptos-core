@@ -1,11 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{
-    ident_str,
-    identifier::IdentStr,
-    move_resource::{MoveResource, MoveStructType},
-};
+use move_core_types::move_resource::{MoveResource, MoveStructType};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -16,8 +12,8 @@ use serde::{Deserialize, Serialize};
 pub struct ObjectGroupResource {}
 
 impl MoveStructType for ObjectGroupResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("object");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("ObjectGroup");
+    const MODULE_NAME: &'static str = "object";
+    const STRUCT_NAME: &'static str = "ObjectGroup";
 }
 
 impl MoveResource for ObjectGroupResource {}

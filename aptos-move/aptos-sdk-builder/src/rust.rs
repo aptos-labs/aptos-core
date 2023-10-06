@@ -260,7 +260,7 @@ impl EntryFunctionCall {
                 ("move_core_types::language_storage", vec![
                     "ModuleId", "TypeTag",
                 ]),
-                ("move_core_types", vec!["ident_str"]),
+                ("move_core_types::identifier", vec!["Identifier"]),
                 ("aptos_types::transaction", vec![
                     "TransactionPayload",
                     "EntryFunction",
@@ -771,7 +771,7 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
 
     fn quote_identifier(&self, ident: &str) -> String {
         if self.local_types {
-            format!("ident_str!(\"{}\").to_owned()", ident)
+            format!("Identifier::from(\"{}\")", ident)
         } else {
             format!("Identifier(\"{}\".to_string())", ident)
         }

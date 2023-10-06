@@ -22,7 +22,7 @@ use move_binary_format::{
         StructFieldInformation, StructHandle, StructHandleIndex,
     },
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::borrow::Borrow;
 
 pub trait Bytecode {
@@ -34,17 +34,17 @@ pub trait Bytecode {
 
     fn signature_at(&self, idx: SignatureIndex) -> &Signature;
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr;
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier;
 
     fn address_identifier_at(&self, idx: AddressIdentifierIndex) -> &AccountAddress;
 
-    fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction>;
+    fn find_entry_function(&self, name: &Identifier) -> Option<MoveFunction>;
 
-    fn find_function(&self, name: &IdentStr) -> Option<MoveFunction>;
+    fn find_function(&self, name: &Identifier) -> Option<MoveFunction>;
 
     fn metadata(&self) -> Option<RuntimeModuleMetadataV1>;
 
-    fn function_is_view(&self, name: &IdentStr) -> bool;
+    fn function_is_view(&self, name: &Identifier) -> bool;
 
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
@@ -177,7 +177,7 @@ impl Bytecode for CompiledModule {
         ModuleAccess::signature_at(self, idx)
     }
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         ModuleAccess::identifier_at(self, idx)
     }
 
@@ -185,7 +185,7 @@ impl Bytecode for CompiledModule {
         ModuleAccess::address_identifier_at(self, idx)
     }
 
-    fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+    fn find_entry_function(&self, name: &Identifier) -> Option<MoveFunction> {
         self.function_defs
             .iter()
             .filter(|def| def.is_entry)
@@ -196,7 +196,7 @@ impl Bytecode for CompiledModule {
             .map(|def| self.new_move_function(def))
     }
 
-    fn find_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+    fn find_function(&self, name: &Identifier) -> Option<MoveFunction> {
         self.function_defs
             .iter()
             .find(|def| {
@@ -210,7 +210,7 @@ impl Bytecode for CompiledModule {
         get_metadata_from_compiled_module(self)
     }
 
-    fn function_is_view(&self, name: &IdentStr) -> bool {
+    fn function_is_view(&self, name: &Identifier) -> bool {
         determine_is_view(self.metadata().as_ref(), name)
     }
 }
@@ -232,7 +232,7 @@ impl Bytecode for CompiledScript {
         ScriptAccess::signature_at(self, idx)
     }
 
-    fn identifier_at(&self, idx: IdentifierIndex) -> &IdentStr {
+    fn identifier_at(&self, idx: IdentifierIndex) -> &Identifier {
         ScriptAccess::identifier_at(self, idx)
     }
 
@@ -240,7 +240,7 @@ impl Bytecode for CompiledScript {
         ScriptAccess::address_identifier_at(self, idx)
     }
 
-    fn find_entry_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+    fn find_entry_function(&self, name: &Identifier) -> Option<MoveFunction> {
         if name.as_str() == "main" {
             Some(MoveFunction::from(self))
         } else {
@@ -248,7 +248,7 @@ impl Bytecode for CompiledScript {
         }
     }
 
-    fn find_function(&self, name: &IdentStr) -> Option<MoveFunction> {
+    fn find_function(&self, name: &Identifier) -> Option<MoveFunction> {
         if name.as_str() == "main" {
             Some(MoveFunction::from(self))
         } else {
@@ -260,7 +260,7 @@ impl Bytecode for CompiledScript {
         get_metadata_from_compiled_script(self)
     }
 
-    fn function_is_view(&self, _name: &IdentStr) -> bool {
+    fn function_is_view(&self, _name: &Identifier) -> bool {
         false
     }
 }

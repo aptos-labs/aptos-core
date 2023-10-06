@@ -20,7 +20,7 @@ use move_binary_format::{
 };
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
@@ -379,7 +379,7 @@ impl Loader {
     fn load_function_without_type_args(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         data_store: &TransactionDataCache,
     ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store)?;
@@ -484,7 +484,7 @@ impl Loader {
     pub(crate) fn load_function_with_type_arg_inference(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         expected_return_type: &Type,
         data_store: &TransactionDataCache,
     ) -> VMResult<(LoadedFunction, LoadedFunctionInstantiation)> {
@@ -546,7 +546,7 @@ impl Loader {
     pub(crate) fn load_function(
         &self,
         module_id: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         ty_args: &[TypeTag],
         data_store: &TransactionDataCache,
     ) -> VMResult<(Arc<Module>, Arc<Function>, LoadedFunctionInstantiation)> {
@@ -1808,8 +1808,9 @@ impl Loader {
             type_params: ty_arg_tags,
         };
 
-        let size =
-            (struct_tag.address.len() + struct_tag.module.len() + struct_tag.name.len()) as u64;
+        let size = (struct_tag.address.len()
+            + struct_tag.module.as_str().len()
+            + struct_tag.name.as_str().len()) as u64;
         gas_context.charge(size * gas_context.cost_per_byte)?;
         self.type_cache
             .write()

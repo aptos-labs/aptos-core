@@ -4,7 +4,6 @@
 
 use crate::{
     account_address::AccountAddress,
-    ident_str,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     value::{MoveStruct, MoveValue},
@@ -15,12 +14,12 @@ use serde_json::json;
 fn struct_deserialization() {
     let struct_type = StructTag {
         address: AccountAddress::ZERO,
-        name: ident_str!("MyStruct").to_owned(),
-        module: ident_str!("MyModule").to_owned(),
+        name: Identifier::new("MyStruct").unwrap(),
+        module: Identifier::new("MyModule").unwrap(),
         type_params: vec![],
     };
     let values = vec![MoveValue::U64(7), MoveValue::Bool(true)];
-    let fields = vec![ident_str!("f").to_owned(), ident_str!("g").to_owned()];
+    let fields = vec![Identifier::new("f").unwrap(), Identifier::new("g").unwrap()];
     let field_values: Vec<(Identifier, MoveValue)> =
         fields.into_iter().zip(values.clone()).collect();
 
@@ -86,14 +85,14 @@ fn struct_one_field_equiv_value() {
 fn nested_typed_struct_deserialization() {
     let struct_type = StructTag {
         address: AccountAddress::ZERO,
-        name: ident_str!("MyStruct").to_owned(),
-        module: ident_str!("MyModule").to_owned(),
+        name: Identifier::new("MyStruct").to_owned(),
+        module: Identifier::new("MyModule").to_owned(),
         type_params: vec![],
     };
     let nested_struct_type = StructTag {
         address: AccountAddress::ZERO,
-        name: ident_str!("NestedStruct").to_owned(),
-        module: ident_str!("NestedModule").to_owned(),
+        name: Identifier::new("NestedStruct").to_owned(),
+        module: Identifier::new("NestedModule").to_owned(),
         type_params: vec![TypeTag::U8],
     };
 
@@ -103,11 +102,11 @@ fn nested_typed_struct_deserialization() {
     assert_eq!(serde_json::to_value(&runtime_value).unwrap(), json!([[7]]));
 
     let nested_fielded_struct = MoveValue::Struct(MoveStruct::with_fields(vec![(
-        ident_str!("f").to_owned(),
+        Identifier::new("f").to_owned(),
         MoveValue::U64(7),
     )]));
     let fielded_value = MoveStruct::with_fields(vec![(
-        ident_str!("inner").to_owned(),
+        Identifier::new("inner").to_owned(),
         nested_fielded_struct,
     )]);
     assert_eq!(
@@ -117,11 +116,11 @@ fn nested_typed_struct_deserialization() {
 
     let nested_typed_struct =
         MoveValue::Struct(MoveStruct::with_types(nested_struct_type, vec![(
-            ident_str!("f").to_owned(),
+            Identifier::new("f").to_owned(),
             MoveValue::U64(7),
         )]));
     let typed_value = MoveStruct::with_types(struct_type, vec![(
-        ident_str!("inner").to_owned(),
+        Identifier::new("inner").to_owned(),
         nested_typed_struct,
     )]);
     assert_eq!(

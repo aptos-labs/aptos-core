@@ -183,7 +183,7 @@ impl Interpreter {
                     gas_meter
                         .charge_call(
                             module_id,
-                            func.name(),
+                            func.name().as_str(),
                             self.operand_stack
                                 .last_n(func.arg_count())
                                 .map_err(|e| set_err_info!(current_frame, e))?,
@@ -239,7 +239,7 @@ impl Interpreter {
                     gas_meter
                         .charge_call_generic(
                             module_id,
-                            func.name(),
+                            func.name().as_str(),
                             ty_args.iter().map(|ty| TypeWithLoader { ty, loader }),
                             self.operand_stack
                                 .last_n(func.arg_count())

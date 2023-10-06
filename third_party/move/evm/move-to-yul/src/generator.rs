@@ -14,9 +14,7 @@ use crate::{
 };
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use itertools::Itertools;
-use move_core_types::{
-    identifier::IdentStr, language_storage::ModuleId, metadata::Metadata, value::MoveValue,
-};
+use move_core_types::{language_storage::ModuleId, metadata::Metadata, value::MoveValue};
 use move_model::{
     emit, emitln,
     model::{
@@ -111,7 +109,7 @@ impl Generator {
         options: &Options,
         env: &GlobalEnv,
         module_id: &ModuleId,
-        fun_name: &IdentStr,
+        fun_name: &Identifier,
         args: &[MoveValue],
     ) -> Result<String, String> {
         let fun = env

@@ -21,7 +21,7 @@ use move_binary_format::{
 use move_bytecode_verifier::script_signature;
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
@@ -381,7 +381,7 @@ impl VMRuntime {
     pub(crate) fn execute_function(
         &self,
         module: &ModuleId,
-        function_name: &IdentStr,
+        function_name: &Identifier,
         ty_args: Vec<TypeTag>,
         serialized_args: Vec<impl Borrow<[u8]>>,
         data_store: &mut TransactionDataCache,
@@ -447,7 +447,7 @@ impl VMRuntime {
 
         script_signature::verify_module_function_signature_by_name(
             module.module(),
-            IdentStr::new(function.as_ref().name()).expect(""),
+            function.as_ref().name(),
             additional_signature_checks,
         )?;
 

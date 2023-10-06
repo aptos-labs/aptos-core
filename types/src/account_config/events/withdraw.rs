@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_core_types::move_resource::MoveStructType;
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a SentPaymentEvent.
@@ -23,6 +23,6 @@ impl WithdrawEvent {
 }
 
 impl MoveStructType for WithdrawEvent {
-    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("WithdrawEvent");
+    const MODULE_NAME: &'static str = "coin";
+    const STRUCT_NAME: &'static str = "WithdrawEvent";
 }

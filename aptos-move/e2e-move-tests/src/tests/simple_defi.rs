@@ -10,7 +10,7 @@ use aptos_types::{
     account_config::CoinStoreResource,
     transaction::{EntryFunction, TransactionPayload},
 };
-use move_core_types::{ident_str, language_storage::ModuleId, parser::parse_struct_tag};
+use move_core_types::{language_storage::ModuleId, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -133,9 +133,9 @@ fn run_exchange_function(
                 AccountAddress::from_hex_literal("0xcafe").unwrap(),
                 vec![].as_slice(),
             ),
-            ident_str!("simple_defi").to_owned(),
+            Identifier::new("simple_defi").to_owned(),
         ),
-        ident_str!(function).to_owned(),
+        Identifier::new(function).to_owned(),
         vec![],
         vec![bcs::to_bytes::<u64>(&amount).unwrap()],
     ));

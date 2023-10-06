@@ -16,10 +16,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_bytecode_source_map::source_map::SourceMap;
-use move_core_types::{
-    account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
-};
+use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::{
     ast::{
         BlockLabel_, ConstantName, Field_, FunctionName, ModuleIdent, ModuleName,
@@ -58,14 +55,10 @@ fn get_or_add_item<K: Eq + Hash>(m: &mut HashMap<K, TableIndex>, k: K) -> Result
     get_or_add_item_macro!(m, &k, k)
 }
 
-pub fn ident_str(s: &str) -> Result<&IdentStr> {
-    IdentStr::new(s)
-}
-
 #[derive(Clone, Debug)]
 pub struct CompiledDependencyView<'a> {
-    structs: HashMap<(&'a IdentStr, &'a IdentStr), TableIndex>,
-    functions: HashMap<&'a IdentStr, TableIndex>,
+    structs: HashMap<(&'a Identifier, &'a Identifier), TableIndex>,
+    functions: HashMap<&'a Identifier, TableIndex>,
 
     module_pool: &'a [ModuleHandle],
     struct_pool: &'a [StructHandle],
@@ -144,15 +137,15 @@ impl<'a> CompiledDependencyView<'a> {
     fn struct_handle(&self, module: &ModuleName, name: &StructName) -> Option<&'a StructHandle> {
         self.structs
             .get(&(
-                ident_str(module.0.as_str()).ok()?,
-                ident_str(name.0.as_str()).ok()?,
+                &Identifier::new(module.0.as_str()).ok()?,
+                &Identifier::new(name.0.as_str()).ok()?,
             ))
             .and_then(|idx| self.struct_pool.get(*idx as usize))
     }
 
     fn function_signature(&self, name: &FunctionName) -> Option<FunctionSignature> {
         self.functions
-            .get(ident_str(name.0.as_str()).ok()?)
+            .get(&Identifier::new(name.0.as_str()).ok()?)
             .and_then(|idx| {
                 let fh = self.function_pool.get(*idx as usize)?;
                 Some(FunctionSignature {
@@ -491,9 +484,9 @@ impl<'a> Context<'a> {
 
     /// Get the identifier pool index, adds it if missing.
     pub fn identifier_index(&mut self, s: impl AsRef<str>) -> Result<IdentifierIndex> {
-        let ident = ident_str(s.as_ref())?;
+        let ident = Identifier::new(s.as_ref())?;
         let m = &mut self.identifiers;
-        let idx: Result<TableIndex> = get_or_add_item_macro!(m, ident, ident.to_owned());
+        let idx: Result<TableIndex> = get_or_add_item_macro!(m, &ident, ident);
         Ok(IdentifierIndex(idx?))
     }
 

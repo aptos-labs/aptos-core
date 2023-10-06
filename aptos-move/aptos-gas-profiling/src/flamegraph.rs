@@ -130,7 +130,7 @@ impl ExecutionAndIOCosts {
                             format!(
                                 "{};{}",
                                 self.path(),
-                                Render(&(module, fn_name.as_ident_str(), ty_args.as_slice())),
+                                Render(&(module, fn_name.as_str(), ty_args.as_slice())),
                             ),
                             *cost,
                         ),

@@ -341,11 +341,10 @@ pub fn summarize_path_cov(module: &CompiledModule, trace_map: &TraceMap) -> Modu
         let mut path_stack: Vec<BTreeSet<(CodeOffset, CodeOffset)>> = Vec::new();
         let mut path_store: Vec<(Identifier, BTreeSet<(CodeOffset, CodeOffset)>)> = Vec::new();
         for (index, record) in trace.iter().enumerate().filter(|(_, e)| {
-            e.module_addr == *module_name.address()
-                && e.module_name.as_ident_str() == module_name.name()
+            e.module_addr == *module_name.address() && &e.module_name == module_name.name()
         }) {
             let (info, is_call) = if let Some(last) = call_stack.last() {
-                if last.fn_name.as_ident_str() != record.func_name.as_ident_str() {
+                if last.fn_name != record.func_name {
                     // calls into a new function
                     (func_info.get(&record.func_name).unwrap(), true)
                 } else if last.fn_entry == record.func_pc {

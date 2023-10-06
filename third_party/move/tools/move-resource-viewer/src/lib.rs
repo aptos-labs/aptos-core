@@ -15,7 +15,7 @@ use move_binary_format::{
 use move_bytecode_utils::layout::TypeLayoutBuilder;
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::{IdentStr, Identifier},
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::MoveResolver,
     u256,
@@ -118,7 +118,7 @@ impl<'a, T: MoveResolver + ?Sized> MoveValueAnnotator<'a, T> {
     pub fn view_function_arguments(
         &self,
         module: &ModuleId,
-        function: &IdentStr,
+        function: &Identifier,
         ty_args: &[TypeTag],
         args: &[Vec<u8>],
     ) -> Result<Vec<AnnotatedMoveValue>> {

@@ -16,7 +16,7 @@ use move_compiler::unit_test::{ExpectedFailure, ModuleTestPlan, TestCase, TestPl
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
-    identifier::IdentStr,
+    identifier::Identifier,
     value::serialize_values,
     vm_status::StatusCode,
 };
@@ -269,7 +269,7 @@ impl SharedTestingConfig {
         let now = Instant::now();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
             &test_plan.module_id,
-            IdentStr::new(function_name).unwrap(),
+            &Identifier::new(function_name).unwrap(),
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
@@ -510,7 +510,7 @@ impl SharedTestingConfig {
                 &gen_options,
                 &model,
                 &test_plan.module_id,
-                IdentStr::new(function_name).unwrap(),
+                Identifier::new(function_name).unwrap(),
                 &test_info.arguments,
             ) {
                 Ok(yul_code) => yul_code,
