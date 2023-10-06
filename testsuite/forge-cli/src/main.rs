@@ -1403,7 +1403,7 @@ fn net_bench_two_region_inner(
     netbench_config_fn: Arc<dyn Fn(&mut NetbenchConfig) + Send + Sync>,
 ) -> ForgeConfig {
     ForgeConfig::default()
-        .add_network_test(wrap_with_two_region_env(Delay::new(180)))
+        .add_network_test(wrap_with_two_region_env(Delay::new(300)))
         .with_initial_validator_count(NonZeroUsize::new(2).unwrap())
         .with_validator_override_node_config_fn(Arc::new(move |config, _| {
             // Use a target that is not too much higher than the achievable throughput, to avoid
