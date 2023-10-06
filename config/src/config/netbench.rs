@@ -14,7 +14,7 @@ pub struct NetbenchConfig {
     pub direct_send_data_size: usize,     // The amount of data to send in each request
     pub direct_send_per_second: u64,      // Requests to send per second
     pub enable_direct_send_ramp_up: bool, // Whether or not to ramp up before sending full speed
-    pub direct_send_ramp_up_duration_seconds: u64, // The number of seconds to ramp up to full speed
+    pub direct_send_ramp_up_duration_seconds: u64, // The number of seconds to ramp up
     pub direct_send_ramp_up_per_second: u64, // Requests to send per second during ramp up
 
     pub enable_rpc_testing: bool,
