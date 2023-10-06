@@ -1234,9 +1234,7 @@ impl AptosVM {
             .max_gas_amount()
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount set");
-        if !self.is_simulation {
-            TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
-        }
+        TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
 
         result.unwrap_or_else(|err| {
             self.on_user_transaction_execution_failure(
@@ -1917,21 +1915,23 @@ impl VMSimulator for AptosVM {
     fn simulate_signed_transaction(
         transaction: SignedTransaction,
         state_view: &(impl StateView + Sync),
-    ) -> TransactionOutput {
+    ) -> Result<TransactionOutput, VMStatus> {
         // The caller must ensure that the signature is not invalid, as otherwise
         // this can be an attack.
         let txn = SignatureVerifiedTransaction::valid_for_simulation(transaction)
             .expect("Simulated transaction should not have a valid signature");
-        BlockAptosVM::simulate_block::<
+        Ok(BlockAptosVM::simulate_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
         >(
             Arc::clone(&RAYON_EXEC_POOL),
             std::slice::from_ref(&txn),
             state_view,
-            /*concurrency_level=*/1,
-            /*maybe_block_gas_limit=*/None,
-            /*transaction_commit_listener=*/None,
-        ).expect("Simulation cannot fail").pop().unwrap()
+            /*concurrency_level=*/ 1,
+            /*maybe_block_gas_limit=*/ None,
+            /*transaction_commit_listener=*/ None,
+        )?
+        .pop()
+        .expect("There should be 1 output for 1 simulated transaction"))
     }
 }

@@ -779,6 +779,8 @@ impl SignedTransaction {
 
     /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
     /// the signature is valid.
+    /// Verifies is the signature of given transaction is valid.
+    /// Returns `Ok(())` if so.
     pub fn verify_signature(&self) -> Result<()> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(())

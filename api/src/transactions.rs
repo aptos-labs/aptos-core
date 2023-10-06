@@ -1177,17 +1177,25 @@ impl TransactionsApi {
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         // Transactions shouldn't have a valid signature or this could be used to attack
-        txn.verify_signature().map_err(|_| {
-            SubmitTransactionError::bad_request_with_code(
+        if txn.verify_signature().is_ok() {
+            return Err(SubmitTransactionError::bad_request_with_code(
                 "Simulated transactions must have a non-valid signature",
                 AptosErrorCode::InvalidInput,
                 &ledger_info,
-            )
-        })?;
+            ));
+        }
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let output = AptosVM::simulate_signed_transaction(txn.clone(), &state_view);
+        let output = AptosVM::simulate_signed_transaction(txn.clone(), &state_view).map_err(
+            |vm_status| {
+                SubmitTransactionError::internal_with_code(
+                    format!("Failed to simulate a transaction: {}", vm_status),
+                    AptosErrorCode::InternalError,
+                    &ledger_info,
+                )
+            },
+        )?;
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)

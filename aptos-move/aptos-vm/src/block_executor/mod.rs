@@ -186,7 +186,7 @@ impl BlockAptosVM {
             concurrency_level,
             maybe_block_gas_limit,
             transaction_commit_listener,
-            true,
+            false,
         )
     }
 
@@ -209,7 +209,7 @@ impl BlockAptosVM {
             concurrency_level,
             maybe_block_gas_limit,
             transaction_commit_listener,
-            false,
+            true,
         )
     }
 
