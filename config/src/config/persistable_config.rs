@@ -22,8 +22,9 @@ pub trait PersistableConfig: Serialize + DeserializeOwned {
     /// Save the config to disk at the given output path
     fn save_config<P: AsRef<Path>>(&self, output_file: P) -> Result<(), Error> {
         // Serialize the config to a string
-        let serialized_config = serde_yaml::to_vec(&self)
-            .map_err(|e| Error::Yaml(output_file.as_ref().to_str().unwrap().to_string(), e))?;
+        let serialized_config = serde_yaml::to_string(&self)
+            .map_err(|e| Error::Yaml(output_file.as_ref().to_str().unwrap().to_string(), e))?
+            .into_bytes();
 
         Self::write_file(serialized_config, output_file)
     }

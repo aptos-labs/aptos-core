@@ -25,7 +25,7 @@ fn main() {
     let registry = options.corpus.get_registry();
     let output_file = options.corpus.output_file();
 
-    let content = serde_yaml::to_string(&registry).unwrap();
+    let content = serde_json::to_string(&registry).unwrap();
     if options.record {
         match output_file {
             Some(path) => {

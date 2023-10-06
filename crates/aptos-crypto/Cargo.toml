@@ -37,7 +37,7 @@ proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
 ring = { workspace = true }
-serde = { workspace = true }
+serde = { version = "1.0.149", features = ["derive", "rc"] }
 serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
