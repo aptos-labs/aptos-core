@@ -167,7 +167,7 @@ The last thing we want to do is display the tasks we just fetched.
         )}
       </Col>
     </Row>
-  );
+  )
 }
 ```
 
