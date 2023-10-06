@@ -203,7 +203,7 @@ export class MoveOption<T extends Serializable> extends Serializable {
 
   public readonly value?: T;
 
-  constructor(value?: T) {
+  constructor(value?: T | null) {
     super();
     if (typeof value !== "undefined" && value !== null) {
       this.vec = new Vector([value]);
@@ -260,8 +260,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<U8> with an inner value `value`
    */
-  static U8(value?: number): MoveOption<U8> {
-    return new MoveOption<U8>(value !== undefined ? new U8(value) : undefined);
+  static U8(value?: number | null): MoveOption<U8> {
+    return new MoveOption<U8>(value !== null && value !== undefined ? new U8(value) : undefined);
   }
 
   /**
@@ -275,8 +275,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<U16> with an inner value `value`
    */
-  static U16(value?: number): MoveOption<U16> {
-    return new MoveOption<U16>(value !== undefined ? new U16(value) : undefined);
+  static U16(value?: number | null): MoveOption<U16> {
+    return new MoveOption<U16>(value !== null && value !== undefined ? new U16(value) : undefined);
   }
 
   /**
@@ -290,8 +290,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<U32> with an inner value `value`
    */
-  static U32(value?: number): MoveOption<U32> {
-    return new MoveOption<U32>(value !== undefined ? new U32(value) : undefined);
+  static U32(value?: number | null): MoveOption<U32> {
+    return new MoveOption<U32>(value !== null && value !== undefined ? new U32(value) : undefined);
   }
 
   /**
@@ -305,8 +305,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<U64> with an inner value `value`
    */
-  static U64(value?: AnyNumber): MoveOption<U64> {
-    return new MoveOption<U64>(value !== undefined ? new U64(value) : undefined);
+  static U64(value?: AnyNumber | null): MoveOption<U64> {
+    return new MoveOption<U64>(value !== null && value !== undefined ? new U64(value) : undefined);
   }
 
   /**
@@ -320,8 +320,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<U128> with an inner value `value`
    */
-  static U128(value?: AnyNumber): MoveOption<U128> {
-    return new MoveOption<U128>(value !== undefined ? new U128(value) : undefined);
+  static U128(value?: AnyNumber | null): MoveOption<U128> {
+    return new MoveOption<U128>(value !== null && value !== undefined ? new U128(value) : undefined);
   }
 
   /**
@@ -335,8 +335,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<U256> with an inner value `value`
    */
-  static U256(value?: AnyNumber): MoveOption<U256> {
-    return new MoveOption<U256>(value !== undefined ? new U256(value) : undefined);
+  static U256(value?: AnyNumber | null): MoveOption<U256> {
+    return new MoveOption<U256>(value !== null && value !== undefined ? new U256(value) : undefined);
   }
 
   /**
@@ -350,8 +350,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<Bool> with an inner value `value`
    */
-  static Bool(value?: boolean): MoveOption<Bool> {
-    return new MoveOption<Bool>(value !== undefined ? new Bool(value) : undefined);
+  static Bool(value?: boolean | null): MoveOption<Bool> {
+    return new MoveOption<Bool>(value !== null && value !== undefined ? new Bool(value) : undefined);
   }
 
   /**
@@ -366,8 +366,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
    * the resulting MoveOption's .isSome() method will return false.
    * @returns a MoveOption<MoveString> with an inner value `value`
    */
-  static String(value?: string): MoveOption<MoveString> {
-    return new MoveOption<MoveString>(value !== undefined ? new MoveString(value) : undefined);
+  static String(value?: string | null): MoveOption<MoveString> {
+    return new MoveOption<MoveString>(value !== null && value !== undefined ? new MoveString(value) : undefined);
   }
 
   static deserialize<U extends Serializable>(deserializer: Deserializer, cls: Deserializable<U>): MoveOption<U> {
