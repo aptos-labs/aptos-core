@@ -105,7 +105,7 @@ export async function waitForTransaction(args: {
       // In short, this means we will retry if it was an AptosApiError and the code was 404 or 5xx.
       const isAptosApiError = e instanceof AptosApiError;
       if (!isAptosApiError) {
-        throw e // This would be unexpected
+        throw e; // This would be unexpected
       }
       lastError = e;
       const isRequestError = e.status !== 404 && e.status >= 400 && e.status < 500;
