@@ -11,7 +11,7 @@ use crate::{
     errors::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
-    task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput},
+    task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::{BlockSTMPlugin, TxnIndexProvider},
@@ -28,6 +28,7 @@ use aptos_state_view::TStateView;
 use aptos_types::{
     executable::Executable,
     fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};

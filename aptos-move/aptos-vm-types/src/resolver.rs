@@ -1,15 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::TAggregatorView};
-use aptos_state_view::StateViewId;
-use aptos_types::state_store::{
-    state_key::StateKey,
-    state_storage_usage::StateStorageUsage,
-    state_value::{StateValue, StateValueMetadataKind},
+use aptos_aggregator::resolver::TAggregatorView;
+use aptos_state_view::{StateView, StateViewId};
+use aptos_types::{
+    aggregator::AggregatorID,
+    state_store::{
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadataKind},
+    },
 };
 use bytes::Bytes;
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use std::collections::{BTreeMap, HashMap};
 
 /// Allows to query resources from the state.
 pub trait TResourceView {
@@ -40,8 +44,8 @@ pub trait TResourceView {
         state_key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         // For metadata, layouts are not important.
-        let maybe_state_value = self.get_resource_state_value(state_key, None)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
+        self.get_resource_state_value(state_key, None)
+            .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
@@ -51,31 +55,13 @@ pub trait TResourceView {
     }
 }
 
+/// Metadata and exists queries for the resource group, determined by a key, must be resolved
+/// via TResourceView's corresponding interfaces w. key (get_resource_state_value_metadata &
+/// resource_exists). This simplifies interfaces for now, TODO: revisit later.
 pub trait TResourceGroupView {
-    type Key;
-    type Tag;
-
-    fn get_resource_from_group(
-        &self,
-        _state_key: &Self::Key,
-        _resource_tag: &Self::Tag,
-    ) -> anyhow::Result<Option<Bytes>> {
-        unimplemented!("TResourceGroupView not yet implemented");
-    }
-
-    /// Implements the functionality requested by get_resource_group_state_value_metadata
-    /// from StateValueMetadataResolver, which on top of StateValueMetadataKind, requires
-    /// a speculative size of the resource group before the transaction.
-    fn get_resource_group_state_value_metadata(
-        &self,
-        _state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        unimplemented!("TResourceGroupView not yet implemented");
-    }
-
-    fn resource_group_exists(&self, _state_key: &Self::Key) -> anyhow::Result<bool> {
-        unimplemented!("TResourceGroupView not yet implemented");
-    }
+    type GroupKey;
+    type ResourceTag;
+    type Layout;
 
     /// The size of the resource group, based on the sizes of the latest entries at observed
     /// tags. During parallel execution, this is an estimated value that will get validated,
@@ -90,8 +76,31 @@ pub trait TResourceGroupView {
     /// the parallel execution setting, as a wrong value will be (later) caught by validation.
     /// Thus, R/W conflicts are avoided, as long as the estimates are correct (e.g. updating
     /// struct members of a fixed size).
-    fn resource_group_size(&self, _state_key: &Self::Key) -> anyhow::Result<u64> {
-        unimplemented!("TResourceGroupView not yet implemented");
+    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64>;
+
+    fn get_resource_from_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+        maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<Bytes>>;
+
+    /// Needed for charging storage fees for a resource group write, as that requires knowing
+    /// the size of the resource group AFTER the changeset of the transaction is applied (while
+    /// the resource_group_size method provides the total group size BEFORE). To compute the
+    /// AFTER size, for each modified resources within the group, the prior size can be
+    /// determined by the following method.
+    fn resource_size_in_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+    ) -> anyhow::Result<u64> {
+        Ok(self
+            .get_resource_from_group(group_key, resource_tag, None)?
+            .map_or(0, |bytes| {
+                debug_assert!(!bytes.is_empty(), "Must be None instead of empty Bytes");
+                bytes.len() as u64
+            }))
     }
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource
@@ -106,10 +115,23 @@ pub trait TResourceGroupView {
     /// which in the context of parallel execution does not cause a full R/W conflict.
     fn resource_exists_in_group(
         &self,
-        _state_key: &Self::Key,
-        _resource_tag: &Self::Tag,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
     ) -> anyhow::Result<bool> {
-        unimplemented!("TResourceGroupView not yet implemented");
+        self.get_resource_from_group(group_key, resource_tag, None)
+            .map(|maybe_bytes| maybe_bytes.is_some())
+    }
+
+    /// Executor view may internally implement a naive resource group cache when:
+    /// - ExecutorView is not based on block executor, such as ExecutorViewBase
+    /// - providing backwards compatibility (older gas versions) in storage adapter.
+    ///
+    /// The trait allows releasing the cache in such cases. Otherwise (default behavior),
+    /// if naive cache is not implemeneted (e.g. in block executor), None is returned.
+    fn release_group_cache(
+        &self,
+    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
+        None
     }
 }
 
@@ -161,30 +183,81 @@ pub trait StateStorageView {
 ///     1. Specialize on access type,
 ///     2. Separate execution and storage abstractions.
 ///
-///  **WARNING:** There is no default implementation of `ExecutorView` for
-///  `StateView` in order to ensure that a correct type is always used. If
-///   conversion from state to executor view is needed, an adapter can be used.
-pub trait TExecutorView<K, L, I>:
+/// StateView currently has a basic implementation of the ExecutorView trait,
+/// which is used across tests and basic applications in the system.
+/// TODO: audit and reconsider the default implementation (e.g. should not
+/// resolve AggregatorV2 via the state-view based default implementation, as it
+/// doesn't provide a value exchange functionality).
+pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
-    // + TResourceGroupView<Key = K, Tag = T>
     + TModuleView<Key = K>
     + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
     + StateStorageView
 {
 }
 
-impl<A, K, L, I> TExecutorView<K, L, I> for A where
+impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
-        // + TResourceGroupView<Key = K, Tag = T>
         + TModuleView<Key = K>
         + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
         + StateStorageView
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, MoveTypeLayout, AggregatorID> {}
+pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, MoveTypeLayout, AggregatorID> {}
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
+
+pub trait ResourceGroupView:
+    TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
+{
+}
+
+impl<T> ResourceGroupView for T where
+    T: TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
+{
+}
+
+/// Direct implementations for StateView.
+impl<S> TResourceView for S
+where
+    S: StateView,
+{
+    type Key = StateKey;
+    type Layout = MoveTypeLayout;
+
+    fn get_resource_state_value(
+        &self,
+        state_key: &Self::Key,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
+impl<S> TModuleView for S
+where
+    S: StateView,
+{
+    type Key = StateKey;
+
+    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
+impl<S> StateStorageView for S
+where
+    S: StateView,
+{
+    fn id(&self) -> StateViewId {
+        self.id()
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.get_usage()
+    }
+}
 
 /// Allows to query storage metadata in the VM session. Needed for storage refunds.
 /// - Result being Err means storage error or some incostistency (e.g. during speculation,

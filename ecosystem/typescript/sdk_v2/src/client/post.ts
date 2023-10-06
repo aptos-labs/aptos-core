@@ -75,20 +75,14 @@ export async function post<Req, Res>(options: PostRequestOptions): Promise<Aptos
   return response;
 }
 
-export async function postAptosFullNode<Req, Res>(
-  options: PostAptosRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
+export async function postAptosFullNode<Req, Res>(options: PostAptosRequestOptions): Promise<AptosResponse<Req, Res>> {
   return post<Req, Res>({ ...options, type: AptosApiType.FULLNODE });
 }
 
-export async function postAptosIndexer<Req, Res>(
-  options: PostAptosRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
+export async function postAptosIndexer<Req, Res>(options: PostAptosRequestOptions): Promise<AptosResponse<Req, Res>> {
   return post<Req, Res>({ ...options, type: AptosApiType.INDEXER });
 }
 
-export async function postAptosFaucet<Req, Res>(
-  options: PostAptosRequestOptions,
-): Promise<AptosResponse<Req, Res>> {
+export async function postAptosFaucet<Req, Res>(options: PostAptosRequestOptions): Promise<AptosResponse<Req, Res>> {
   return post<Req, Res>({ ...options, type: AptosApiType.FAUCET });
 }

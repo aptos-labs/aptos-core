@@ -43,6 +43,9 @@ use aptos_types::{
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
         TransactionStatus, VMValidatorResult,
     },
@@ -449,7 +452,7 @@ impl FakeExecutor {
 
     pub fn execute_transaction_block_parallel(
         &self,
-        txn_block: Vec<Transaction>,
+        txn_block: &[SignatureVerifiedTransaction],
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let preprocess_txn = BlockAptosVM::verify_transactions(txn_block);
         let txn_provider = Arc::new(DefaultTxnProvider::new(preprocess_txn));
@@ -484,7 +487,9 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
+        let sig_verified_block = into_signature_verified_block(txn_block);
+
+        let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
 
         let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
             no_parallel
@@ -493,7 +498,7 @@ impl FakeExecutor {
         };
 
         if !no_parallel {
-            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            let parallel_output = self.execute_transaction_block_parallel(&sig_verified_block);
             assert_eq!(output, parallel_output);
         }
 

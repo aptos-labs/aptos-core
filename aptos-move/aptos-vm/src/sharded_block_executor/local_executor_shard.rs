@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common::PreprocessedTransaction,
     sharded_block_executor::{
         coordinator_client::CoordinatorClient,
         counters::WAIT_FOR_SHARDED_OUTPUT_SECONDS,
@@ -30,6 +29,7 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -405,8 +405,8 @@ impl CrossShardClient for LocalCrossShardClient {
 }
 
 pub struct LocalCrossShardClientV3 {
-    txs: Vec<Sender<CrossShardMessage<PreprocessedTransaction, VMStatus>>>,
-    rx: Receiver<CrossShardMessage<PreprocessedTransaction, VMStatus>>,
+    txs: Vec<Sender<CrossShardMessage<SignatureVerifiedTransaction, VMStatus>>>,
+    rx: Receiver<CrossShardMessage<SignatureVerifiedTransaction, VMStatus>>,
 }
 
 impl LocalCrossShardClientV3 {
@@ -414,7 +414,7 @@ impl LocalCrossShardClientV3 {
         let mut txs = vec![];
         let mut rxs = vec![];
         for _ in 0..num_shards {
-            let (tx, rx) = unbounded::<CrossShardMessage<PreprocessedTransaction, VMStatus>>();
+            let (tx, rx) = unbounded::<CrossShardMessage<SignatureVerifiedTransaction, VMStatus>>();
             txs.push(tx);
             rxs.push(rx);
         }
@@ -427,12 +427,12 @@ impl LocalCrossShardClientV3 {
     }
 }
 
-impl CrossShardClientForV3<PreprocessedTransaction, VMStatus> for LocalCrossShardClientV3 {
-    fn send(&self, shard_idx: usize, output: CrossShardMessage<PreprocessedTransaction, VMStatus>) {
+impl CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus> for LocalCrossShardClientV3 {
+    fn send(&self, shard_idx: usize, output: CrossShardMessage<SignatureVerifiedTransaction, VMStatus>) {
         self.txs[shard_idx].send(output).unwrap();
     }
 
-    fn recv(&self) -> CrossShardMessage<PreprocessedTransaction, VMStatus> {
+    fn recv(&self) -> CrossShardMessage<SignatureVerifiedTransaction, VMStatus> {
         self.rx.recv().unwrap()
     }
 }

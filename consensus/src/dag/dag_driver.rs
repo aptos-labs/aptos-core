@@ -19,6 +19,7 @@ use crate::{
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
+        round_state::RoundState,
         types::{CertificateAckState, CertifiedNode, Node, SignatureBuilder},
     },
     payload_manager::PayloadManager,
@@ -54,13 +55,13 @@ pub(crate) struct DagDriver {
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
-    current_round: Round,
     time_service: TimeService,
     rb_abort_handle: Option<(AbortHandle, u64)>,
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
     fetch_requester: Arc<FetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+    round_state: RoundState,
 }
 
 impl DagDriver {
@@ -76,15 +77,13 @@ impl DagDriver {
         order_rule: OrderRule,
         fetch_requester: Arc<FetchRequester>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+        round_state: RoundState,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
             .expect("should be able to read dag storage");
-        let highest_round = dag.read().highest_round();
-        let highest_strong_links_round = dag
-            .read()
-            .get_strong_links_for_round(highest_round, &epoch_state.verifier)
-            .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round);
+        let highest_strong_links_round =
+            dag.read().highest_strong_links_round(&epoch_state.verifier);
 
         let mut driver = Self {
             author,
@@ -93,13 +92,13 @@ impl DagDriver {
             payload_manager,
             payload_client,
             reliable_broadcast,
-            current_round: highest_strong_links_round,
             time_service,
             rb_abort_handle: None,
             storage,
             order_rule,
             fetch_requester,
             ledger_info_provider,
+            round_state,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -110,7 +109,7 @@ impl DagDriver {
                 LogSchema::new(LogEvent::NewRound).round(node.round()),
                 "Resume round"
             );
-            driver.current_round = node.round();
+            driver.round_state.set_current_round(node.round());
             driver.broadcast_node(node);
         } else {
             // kick start a new round
@@ -119,8 +118,8 @@ impl DagDriver {
         driver
     }
 
-    pub async fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
-        let highest_strong_links_round = {
+    async fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+        let (highest_strong_link_round, strong_links) = {
             let mut dag_writer = self.dag.write();
 
             if !dag_writer.all_exists(node.parents_metadata()) {
@@ -134,20 +133,31 @@ impl DagDriver {
                 .prefetch_payload_data(node.payload(), node.metadata().timestamp());
             dag_writer.add_node(node)?;
 
-            let highest_round = dag_writer.highest_round();
-            dag_writer
-                .get_strong_links_for_round(highest_round, &self.epoch_state.verifier)
-                .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round)
+            let highest_strong_links_round =
+                dag_writer.highest_strong_links_round(&self.epoch_state.verifier);
+            (
+                highest_strong_links_round,
+                // unwrap is for round 0
+                dag_writer
+                    .get_strong_links_for_round(
+                        highest_strong_links_round,
+                        &self.epoch_state.verifier,
+                    )
+                    .unwrap_or(vec![]),
+            )
         };
-
-        if self.current_round <= highest_strong_links_round {
-            self.enter_new_round(highest_strong_links_round + 1).await;
-        }
+        self.round_state
+            .check_for_new_round(highest_strong_link_round, strong_links)
+            .await;
         Ok(())
     }
 
     pub async fn enter_new_round(&mut self, new_round: Round) {
+        if self.round_state.current_round() >= new_round {
+            return;
+        }
         debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
+        self.round_state.set_current_round(new_round);
         counters::CURRENT_ROUND.set(new_round as i64);
         let strong_links = self
             .dag
@@ -207,10 +217,9 @@ impl DagDriver {
             self.time_service.now_unix_time().as_micros() as u64,
             highest_parent_timestamp + 1,
         );
-        self.current_round = new_round;
         let new_node = Node::new(
             self.epoch_state.epoch,
-            self.current_round,
+            new_round,
             self.author,
             timestamp,
             payload,
@@ -223,7 +232,7 @@ impl DagDriver {
         self.broadcast_node(new_node);
     }
 
-    pub fn broadcast_node(&mut self, node: Node) {
+    fn broadcast_node(&mut self, node: Node) {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();

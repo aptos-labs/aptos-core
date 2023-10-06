@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    adapter_common::{preprocess_transaction, PreprocessedTransaction},
     block_executor::BlockAptosVM,
     sharded_block_executor::{
         aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
@@ -24,7 +23,10 @@ use aptos_types::{
     block_executor::partitioner::{
         PartitionV3, ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
     },
-    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+    },
 };
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
@@ -41,7 +43,7 @@ pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     coordinator_client: Arc<dyn CoordinatorClient<S>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
-    v3_client: Arc<dyn CrossShardClientForV3<PreprocessedTransaction, VMStatus>>,
+    v3_client: Arc<dyn CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus>>,
 }
 
 impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
@@ -51,7 +53,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         num_threads: usize,
         coordinator_client: Arc<dyn CoordinatorClient<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
-        v3_client: Arc<dyn CrossShardClientForV3<PreprocessedTransaction, VMStatus>>,
+        v3_client: Arc<dyn CrossShardClientForV3<SignatureVerifiedTransaction, VMStatus>>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
@@ -127,6 +129,12 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             TOTAL_SUPPLY_AGGR_BASE_VAL,
         ));
 
+        let signature_verified_transactions: Vec<SignatureVerifiedTransaction> = transactions
+            .into_iter()
+            .map(|txn| txn.into_txn().into_txn())
+            .collect();
+        let executor_thread_pool_clone = executor_thread_pool.clone();
+
         executor_thread_pool.clone().scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
@@ -136,17 +144,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 );
             });
             s.spawn(move |_| {
-                let txns = transactions
-                    .into_iter()
-                    .map(|txn| txn.into_txn().into_txn())
-                    .collect();
-                let pre_processed_txns =
-                    executor_thread_pool.install(|| BlockAptosVM::verify_transactions(txns));
-
-                let txn_provider = Arc::new(DefaultTxnProvider::new(pre_processed_txns));
+                let txn_provider = Arc::new(DefaultTxnProvider::new(signature_verified_transactions));
                 let ret = BlockAptosVM::execute_block(
                     executor_thread_pool,
-                    txn_provider,
+                    txn_provider.clone(),
                     aggr_overridden_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
@@ -170,8 +171,13 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
                 }
                 callback.send(ret).unwrap();
+                executor_thread_pool_clone.spawn(move || {
+                    // Explicit async drop
+                    drop(txn_provider);
+                });
             });
         });
+
         block_on(callback_receiver).unwrap()
     }
 
@@ -260,8 +266,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         txns.into_par_iter()
                             .with_min_len(25)
                             .map(|analyzed_txn| {
-                                let txn = analyzed_txn.into_txn();
-                                preprocess_transaction::<AptosVM>(txn)
+                                analyzed_txn.into_txn()
                             })
                             .collect()
                     });

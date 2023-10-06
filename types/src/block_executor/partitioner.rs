@@ -5,6 +5,7 @@ use crate::{
     state_store::state_key::StateKey,
     transaction::{
         analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+        signature_verified_transaction::{into_signature_verified_block, SignatureVerifiedTransaction},
         Transaction,
     },
 };
@@ -446,9 +447,18 @@ impl ExecutableBlock {
     }
 }
 
+impl From<(HashValue, Vec<SignatureVerifiedTransaction>)> for ExecutableBlock {
+    fn from((block_id, transactions): (HashValue, Vec<SignatureVerifiedTransaction>)) -> Self {
+        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+    }
+}
+
 impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
     fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
-        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+        Self::new(
+            block_id,
+            ExecutableTransactions::Unsharded(into_signature_verified_block(transactions)),
+        )
     }
 }
 
@@ -607,8 +617,8 @@ impl PartitionedTransactions {
         }
     }
 
-    pub fn add_checkpoint_txn(&mut self, last_txn: Transaction) {
-        assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
+    pub fn add_checkpoint_txn(&mut self, last_txn: SignatureVerifiedTransaction) {
+        assert!(matches!(last_txn.expect_valid(), Transaction::StateCheckpoint(_)));
         match self {
             V2(obj) => {
                 let txn_with_deps = TransactionWithDependencies::new(
@@ -670,7 +680,7 @@ impl PartitionedTransactions {
 
 // Represents the transactions in a block that are ready to be executed.
 pub enum ExecutableTransactions {
-    Unsharded(Vec<Transaction>),
+    Unsharded(Vec<SignatureVerifiedTransaction>),
     Sharded(PartitionedTransactions),
 }
 
@@ -683,8 +693,8 @@ impl ExecutableTransactions {
     }
 }
 
-impl From<Vec<Transaction>> for ExecutableTransactions {
-    fn from(txns: Vec<Transaction>) -> Self {
+impl From<Vec<SignatureVerifiedTransaction>> for ExecutableTransactions {
+    fn from(txns: Vec<SignatureVerifiedTransaction>) -> Self {
         Self::Unsharded(txns)
     }
 }

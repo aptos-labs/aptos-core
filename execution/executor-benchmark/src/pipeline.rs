@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_partitioning::BlockPartitioningStage, ledger_update_stage::LedgerUpdateStage,
+    block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
     GasMesurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
@@ -109,7 +109,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config.as_ref());
+            BlockPreparationStage::new(num_partitioner_shards, config.partitioner_config.as_ref());
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 

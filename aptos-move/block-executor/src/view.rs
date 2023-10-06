@@ -5,7 +5,6 @@ use crate::{
     captured_reads::{CapturedReads, DataRead, ReadKind},
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler},
-    task::Transaction,
     txn_provider::TxnIndexProvider,
 };
 use aptos_aggregator::{
@@ -25,10 +24,12 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceView};
+use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceGroupView, TResourceView};
+use bytes::Bytes;
 use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
@@ -207,6 +208,7 @@ impl<'a, T: Transaction, X: Executable, TP: TxnIndexProvider> ParallelState<'a, 
                     }
                 },
                 Err(DeltaApplicationFailure) => {
+                    // AggregatorV1 may have delta application failure due to speculation.
                     self.captured_reads.borrow_mut().mark_failure();
                     return ReadResult::HaltSpeculativeExecution(
                         "Delta application failure (must be speculative)".to_string(),
@@ -388,6 +390,43 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnInde
                     unreachable!("Read result must be Exists kind")
                 }
             })
+    }
+}
+
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable, TP: TxnIndexProvider> TResourceGroupView
+    for LatestView<'a, T, S, X, TP>
+{
+    type GroupKey = T::Key;
+    type Layout = MoveTypeLayout;
+    type ResourceTag = T::Tag;
+
+    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+        unimplemented!("TResourceGroupView not yet implemented");
+    }
+
+    fn get_resource_from_group(
+        &self,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
+        _maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<Bytes>> {
+        unimplemented!("TResourceGroupView not yet implemented");
+    }
+
+    fn resource_size_in_group(
+        &self,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
+    ) -> anyhow::Result<u64> {
+        unimplemented!("TResourceGroupView not yet implemented");
+    }
+
+    fn resource_exists_in_group(
+        &self,
+        _group_key: &Self::GroupKey,
+        _resource_tag: &Self::ResourceTag,
+    ) -> anyhow::Result<bool> {
+        unimplemented!("TResourceGroupView not yet implemented");
     }
 }
 
