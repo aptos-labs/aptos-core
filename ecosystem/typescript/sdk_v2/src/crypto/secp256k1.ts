@@ -70,7 +70,7 @@ export class Secp256k1PublicKey extends PublicKey {
     serializer.serializeBytes(this.key.toUint8Array());
   }
 
-  static deserialize(deserializer: Deserializer): PublicKey {
+  static deserialize(deserializer: Deserializer): Secp256k1PublicKey {
     const bytes = deserializer.deserializeBytes();
     return new Secp256k1PublicKey({ hexInput: bytes });
   }
