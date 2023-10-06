@@ -201,17 +201,13 @@ export class MoveString extends Serializable {
 export class MoveOption<T extends Serializable> extends Serializable {
   private vec: Vector<T>;
 
-  public value: T | undefined;
-
   constructor(value?: T) {
     super();
-    if (typeof value !== "undefined") {
+    if (typeof value !== "undefined" && value !== null) {
       this.vec = new Vector([value]);
     } else {
       this.vec = new Vector([]);
     }
-
-    [this.value] = this.vec.values;
   }
 
   /**
@@ -234,21 +230,19 @@ export class MoveOption<T extends Serializable> extends Serializable {
     if (!this.isSome()) {
       throw new Error("Called unwrap on a MoveOption with no value");
     } else {
-      return this.value!;
+      return this.vec.values[0];
     }
   }
 
   // Check if the MoveOption has a value.
   isSome(): boolean {
-    return this.value !== undefined;
+    return this.vec.values.length == 1;
   }
 
   serialize(serializer: Serializer): void {
     // serialize 0 or 1
     // if 1, serialize the value
-    if (this.vec) {
-      this.vec.serialize(serializer);
-    }
+    this.vec.serialize(serializer);
   }
 
   /**
