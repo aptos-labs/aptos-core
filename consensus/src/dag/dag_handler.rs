@@ -58,7 +58,6 @@ impl NetworkHandler {
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
     ) -> StateSyncStatus {
-        // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {
                 msg = dag_rpc_rx.select_next_some() => {
@@ -75,6 +74,7 @@ impl NetworkHandler {
                 },
                 Some(new_round) = self.new_round_event.recv() => {
                     self.dag_driver.enter_new_round(new_round).await;
+                    self.node_receiver.gc();
                 }
                 Some(res) = self.node_fetch_waiter.next() => {
                     match res {

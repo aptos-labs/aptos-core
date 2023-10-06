@@ -21,9 +21,8 @@ use itertools::Itertools;
 use std::sync::Arc;
 
 // TODO: move this to onchain config
-// TODO: temporarily setting DAG_WINDOW to 1 to maintain Shoal safety
-pub const DAG_WINDOW: usize = 1;
-pub const STATE_SYNC_WINDOW_MULTIPLIER: usize = 30;
+pub const DAG_WINDOW: u64 = 5;
+pub const STATE_SYNC_WINDOW_MULTIPLIER: u64 = 30;
 
 #[derive(Debug)]
 pub enum StateSyncStatus {
@@ -139,7 +138,7 @@ impl StateSyncTrigger {
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round()
-                + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
+                + (STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW)
                 < li.commit_info().round()
     }
 }
@@ -183,8 +182,7 @@ impl DagStateSynchronizer {
                     .highest_ordered_anchor_round()
                     .unwrap_or_default()
                     < commit_li.commit_info().round()
-                    || highest_committed_anchor_round
-                        + ((STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW) as Round)
+                    || highest_committed_anchor_round + STATE_SYNC_WINDOW_MULTIPLIER * DAG_WINDOW
                         < commit_li.commit_info().round()
             );
         }
@@ -194,14 +192,12 @@ impl DagStateSynchronizer {
 
         // Create a new DAG store and Fetch blocks
         let target_round = node.round();
-        let start_round = commit_li
-            .commit_info()
-            .round()
-            .saturating_sub(DAG_WINDOW as Round);
+        let start_round = commit_li.commit_info().round().saturating_sub(DAG_WINDOW);
         let sync_dag_store = Arc::new(RwLock::new(Dag::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),
             start_round,
+            DAG_WINDOW,
         )));
         let bitmask = { sync_dag_store.read().bitmask(target_round) };
         let request = RemoteFetchRequest::new(

@@ -103,8 +103,7 @@ impl OrderedNotifier for MockNotifier {
         &self,
         _ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_author: Vec<(Round, Author)>,
-    ) -> anyhow::Result<()> {
-        Ok(())
+    ) {
     }
 }
 
@@ -117,9 +116,9 @@ fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagState
 
 #[tokio::test]
 async fn test_dag_state_sync() {
-    const NUM_ROUNDS: usize = 90;
-    const LI_ROUNDS: usize = NUM_ROUNDS * 2 / 3;
-    const SLOW_DAG_ROUNDS: usize = NUM_ROUNDS / 3;
+    const NUM_ROUNDS: u64 = 90;
+    const LI_ROUNDS: u64 = NUM_ROUNDS * 2 / 3;
+    const SLOW_DAG_ROUNDS: u64 = NUM_ROUNDS / 3;
 
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let validators = validator_verifier.get_ordered_account_addresses();
@@ -148,14 +147,18 @@ async fn test_dag_state_sync() {
     let fast_dag = Arc::new(RwLock::new(fast_dag));
 
     let mut slow_dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 1, 0);
-    for round_nodes in nodes.iter().take(SLOW_DAG_ROUNDS) {
+    for round_nodes in nodes.iter().take(SLOW_DAG_ROUNDS as usize) {
         for node in round_nodes.iter().flatten() {
             slow_dag.add_node(node.clone()).unwrap();
         }
     }
     let slow_dag = Arc::new(RwLock::new(slow_dag));
 
-    let li_node = nodes[LI_ROUNDS - 1].first().unwrap().clone().unwrap();
+    let li_node = nodes[LI_ROUNDS as usize - 1]
+        .first()
+        .unwrap()
+        .clone()
+        .unwrap();
     let sync_to_li = LedgerInfoWithSignatures::new(
         LedgerInfo::new(
             BlockInfo::new(
@@ -171,7 +174,11 @@ async fn test_dag_state_sync() {
         ),
         AggregateSignature::empty(),
     );
-    let sync_to_node = nodes[NUM_ROUNDS - 1].first().unwrap().clone().unwrap();
+    let sync_to_node = nodes[NUM_ROUNDS as usize - 1]
+        .first()
+        .unwrap()
+        .clone()
+        .unwrap();
 
     let sync_node_li = CertifiedNodeMessage::new(sync_to_node, sync_to_li);
 

@@ -5,6 +5,7 @@ use crate::{
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     counters::update_counters_for_committed_blocks,
     dag::{
+        dag_store::Dag,
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
@@ -40,7 +41,7 @@ pub trait OrderedNotifier: Send + Sync {
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
-    ) -> anyhow::Result<()>;
+    );
 }
 
 #[async_trait]
@@ -83,7 +84,7 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 
 pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
-    storage: Arc<dyn DAGStorage>,
+    dag: Arc<RwLock<Dag>>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -92,14 +93,14 @@ pub(super) struct OrderedNotifierAdapter {
 impl OrderedNotifierAdapter {
     pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
-        storage: Arc<dyn DAGStorage>,
+        dag: Arc<RwLock<Dag>>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     ) -> Self {
         Self {
             executor_channel,
-            storage,
+            dag,
             parent_block_info: Arc::new(RwLock::new(parent_block_info)),
             epoch_state,
             ledger_info_provider,
@@ -112,7 +113,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
-    ) -> anyhow::Result<()> {
+    ) {
         let anchor = ordered_nodes.last().unwrap();
         let epoch = anchor.epoch();
         let round = anchor.round();
@@ -153,37 +154,33 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();
-        let storage = self.storage.clone();
         let ledger_info_provider = self.ledger_info_provider.clone();
+        let dag = self.dag.clone();
         *self.parent_block_info.write() = block_info.clone();
-        Ok(self.executor_channel.unbounded_send(OrderedBlocks {
-            ordered_blocks: vec![block],
-            ordered_proof: LedgerInfoWithSignatures::new(
-                LedgerInfo::new(block_info, anchor.digest()),
-                AggregateSignature::empty(),
-            ),
-            callback: Box::new(
-                move |committed_blocks: &[Arc<ExecutedBlock>],
-                      commit_decision: LedgerInfoWithSignatures| {
-                    ledger_info_provider
-                        .write()
-                        .notify_commit_proof(commit_decision);
-                    update_counters_for_committed_blocks(committed_blocks);
-                    for executed_block in committed_blocks {
-                        if let Some(node_digests) = executed_block.block().block_data().dag_nodes()
-                        {
-                            if let Err(e) = storage.delete_certified_nodes(node_digests.clone()) {
-                                error!(
-                                    "Failed to garbage collect committed for block {}: {:?}",
-                                    executed_block.block(),
-                                    e
-                                );
-                            }
-                        }
-                    }
-                },
-            ),
-        })?)
+        if self
+            .executor_channel
+            .unbounded_send(OrderedBlocks {
+                ordered_blocks: vec![block],
+                ordered_proof: LedgerInfoWithSignatures::new(
+                    LedgerInfo::new(block_info, anchor.digest()),
+                    AggregateSignature::empty(),
+                ),
+                callback: Box::new(
+                    move |committed_blocks: &[Arc<ExecutedBlock>],
+                          commit_decision: LedgerInfoWithSignatures| {
+                        dag.write()
+                            .commit_callback(commit_decision.commit_info().round());
+                        ledger_info_provider
+                            .write()
+                            .notify_commit_proof(commit_decision);
+                        update_counters_for_committed_blocks(committed_blocks);
+                    },
+                ),
+            })
+            .is_err()
+        {
+            error!("[DAG] execution pipeline closed");
+        }
     }
 }
 

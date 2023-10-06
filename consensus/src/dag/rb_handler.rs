@@ -60,6 +60,13 @@ impl NodeBroadcastHandler {
         }
     }
 
+    pub fn gc(&mut self) {
+        let lowest_round = self.dag.read().lowest_round();
+        if let Err(e) = self.gc_before_round(lowest_round) {
+            error!("Error deleting votes: {}", e);
+        }
+    }
+
     pub fn gc_before_round(&mut self, min_round: Round) -> anyhow::Result<()> {
         let to_retain = self.votes_by_round_peer.split_off(&min_round);
         let to_delete = mem::replace(&mut self.votes_by_round_peer, to_retain);

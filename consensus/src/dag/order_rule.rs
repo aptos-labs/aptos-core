@@ -16,8 +16,8 @@ use crate::dag::{
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
-use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
+use aptos_logger::debug;
+use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
 pub struct OrderRule {
@@ -32,19 +32,14 @@ pub struct OrderRule {
 impl OrderRule {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        latest_ledger_info: LedgerInfo,
+        lowest_unordered_anchor_round: Round,
         dag: Arc<RwLock<Dag>>,
         mut anchor_election: Box<dyn AnchorElection>,
         notifier: Arc<dyn OrderedNotifier>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
-        let committed_round = if latest_ledger_info.ends_epoch() {
-            0
-        } else {
-            latest_ledger_info.round()
-        };
         let commit_events = storage
-            .get_latest_k_committed_events(DAG_WINDOW as u64)
+            .get_latest_k_committed_events(DAG_WINDOW)
             .expect("Failed to read commit events from storage");
         // make sure it's sorted
         assert!(commit_events
@@ -71,7 +66,7 @@ impl OrderRule {
         }
         let mut order_rule = Self {
             epoch_state,
-            lowest_unordered_anchor_round: committed_round + 1,
+            lowest_unordered_anchor_round,
             dag,
             anchor_election,
             notifier,
@@ -213,12 +208,8 @@ impl OrderRule {
         );
 
         self.lowest_unordered_anchor_round = anchor.round() + 1;
-        if let Err(e) = self
-            .notifier
-            .send_ordered_nodes(ordered_nodes, failed_authors)
-        {
-            error!("Failed to send ordered nodes {:?}", e);
-        }
+        self.notifier
+            .send_ordered_nodes(ordered_nodes, failed_authors);
     }
 
     /// Check if this node can trigger anchors to be ordered
