@@ -310,7 +310,7 @@ export class Serializer {
 
 export function ensureBoolean(value: unknown): asserts value is boolean {
   if (typeof value !== "boolean") {
-    throw new Error("Invalid boolean value.");
+    throw new Error("Value needs to be a boolean");
   }
 }
 
