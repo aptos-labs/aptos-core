@@ -2,17 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    adapter_common::{PreprocessedTransaction, VMAdapter},
-    aptos_vm::AptosVM,
-    block_executor::AptosTransactionOutput,
-};
+use crate::{adapter_common::VMAdapter, aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::ExecutorView;
+use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
 use move_core_types::vm_status::VMStatus;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
@@ -24,7 +21,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
-    type Txn = PreprocessedTransaction;
+    type Txn = SignatureVerifiedTransaction;
 
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
@@ -41,13 +38,15 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        executor_view: &impl ExecutorView,
-        txn: &PreprocessedTransaction,
+        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
+        txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-        let resolver = self.vm.as_move_resolver(executor_view);
+        let resolver = self
+            .vm
+            .as_move_resolver_with_group_view(executor_with_group_view);
         match self
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)

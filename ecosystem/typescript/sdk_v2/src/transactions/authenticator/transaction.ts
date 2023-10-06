@@ -4,6 +4,7 @@ import { Deserializer, Serializer } from "../../bcs";
 import { AccountAddress } from "../../core";
 import { Ed25519PublicKey, Ed25519Signature } from "../../crypto/ed25519";
 import { MultiEd25519PublicKey, MultiEd25519Signature } from "../../crypto/multi_ed25519";
+import { Secp256k1PublicKey, Secp256k1Signature } from "../../crypto/secp256k1";
 import { TransactionAuthenticatorVariant } from "../../types";
 import { AccountAuthenticator } from "./account";
 
@@ -13,14 +14,16 @@ export abstract class TransactionAuthenticator {
   static deserialize(deserializer: Deserializer): TransactionAuthenticator {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
-      case TransactionAuthenticatorVariant.TransactionAuthenticatorEd25519:
+      case TransactionAuthenticatorVariant.Ed25519:
         return TransactionAuthenticatorEd25519.load(deserializer);
-      case TransactionAuthenticatorVariant.TransactionAuthenticatorMultiEd25519:
+      case TransactionAuthenticatorVariant.MultiEd25519:
         return TransactionAuthenticatorMultiEd25519.load(deserializer);
-      case TransactionAuthenticatorVariant.TransactionAuthenticatorMultiAgent:
+      case TransactionAuthenticatorVariant.MultiAgent:
         return TransactionAuthenticatorMultiAgent.load(deserializer);
-      case TransactionAuthenticatorVariant.TransactionAuthenticatorFeePayer:
+      case TransactionAuthenticatorVariant.FeePayer:
         return TransactionAuthenticatorFeePayer.load(deserializer);
+      case TransactionAuthenticatorVariant.Secp256k1Ecdsa:
+        return TransactionAuthenticatorSecp256k1.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionAuthenticator: ${index}`);
     }
@@ -47,7 +50,7 @@ export class TransactionAuthenticatorEd25519 extends TransactionAuthenticator {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorEd25519);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.Ed25519);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -78,7 +81,7 @@ export class TransactionAuthenticatorMultiEd25519 extends TransactionAuthenticat
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorMultiEd25519);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.MultiEd25519);
     this.public_key.serialize(serializer);
     this.signature.serialize(serializer);
   }
@@ -117,7 +120,7 @@ export class TransactionAuthenticatorMultiAgent extends TransactionAuthenticator
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorMultiAgent);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.MultiAgent);
     this.sender.serialize(serializer);
     serializer.serializeVector<AccountAddress>(this.secondary_signer_addresses);
     serializer.serializeVector<AccountAuthenticator>(this.secondary_signers);
@@ -163,7 +166,7 @@ export class TransactionAuthenticatorFeePayer extends TransactionAuthenticator {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.TransactionAuthenticatorFeePayer);
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.FeePayer);
     this.sender.serialize(serializer);
     serializer.serializeVector<AccountAddress>(this.secondary_signer_addresses);
     serializer.serializeVector<AccountAuthenticator>(this.secondary_signers);
@@ -179,5 +182,35 @@ export class TransactionAuthenticatorFeePayer extends TransactionAuthenticator {
     const authenticator = AccountAuthenticator.deserialize(deserializer);
     const fee_payer = { address, authenticator };
     return new TransactionAuthenticatorFeePayer(sender, secondary_signer_addresses, secondary_signers, fee_payer);
+  }
+}
+
+export class TransactionAuthenticatorSecp256k1 extends TransactionAuthenticator {
+  public readonly public_key: Secp256k1PublicKey;
+
+  public readonly signature: Secp256k1Signature;
+
+  /**
+   * Transaction authenticator Secp256k1 for a single signer transaction
+   *
+   * @param public_key Client's public key
+   * @param signature Secp256k1 signature of a `RawTransaction`
+   */
+  constructor(public_key: Secp256k1PublicKey, signature: Secp256k1Signature) {
+    super();
+    this.public_key = public_key;
+    this.signature = signature;
+  }
+
+  serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(TransactionAuthenticatorVariant.Secp256k1Ecdsa);
+    this.public_key.serialize(serializer);
+    this.signature.serialize(serializer);
+  }
+
+  static load(deserializer: Deserializer): TransactionAuthenticatorSecp256k1 {
+    const public_key = Secp256k1PublicKey.deserialize(deserializer);
+    const signature = Secp256k1Signature.deserialize(deserializer);
+    return new TransactionAuthenticatorSecp256k1(public_key, signature);
   }
 }

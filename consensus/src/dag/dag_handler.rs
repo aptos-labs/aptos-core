@@ -11,7 +11,7 @@ use crate::{
     network::{IncomingDAGRequest, TConsensusMsg},
 };
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, warn};
 use aptos_network::protocols::network::RpcError;
 use aptos_types::epoch_state::EpochState;
@@ -28,6 +28,7 @@ pub(crate) struct NetworkHandler {
     node_fetch_waiter: FetchWaiter<Node>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
     state_sync_trigger: StateSyncTrigger,
+    new_round_event: tokio::sync::mpsc::Receiver<Round>,
 }
 
 impl NetworkHandler {
@@ -39,6 +40,7 @@ impl NetworkHandler {
         node_fetch_waiter: FetchWaiter<Node>,
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
         state_sync_trigger: StateSyncTrigger,
+        new_round_event: tokio::sync::mpsc::Receiver<Round>,
     ) -> Self {
         Self {
             epoch_state,
@@ -48,6 +50,7 @@ impl NetworkHandler {
             node_fetch_waiter,
             certified_node_fetch_waiter,
             state_sync_trigger,
+            new_round_event,
         }
     }
 
@@ -70,6 +73,9 @@ impl NetworkHandler {
                         }
                     }
                 },
+                Some(new_round) = self.new_round_event.recv() => {
+                    self.dag_driver.enter_new_round(new_round).await;
+                }
                 Some(res) = self.node_fetch_waiter.next() => {
                     match res {
                         Ok(node) => if let Err(e) = self.node_receiver.process(node).await {

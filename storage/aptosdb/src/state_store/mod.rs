@@ -395,7 +395,6 @@ impl StateStore {
             if crash_if_difference_is_too_large {
                 assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
-            // TODO(grao): Support truncation for split ledger DBs.
             truncate_ledger_db(ledger_db, overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
@@ -409,7 +408,7 @@ impl StateStore {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
                 truncate_state_kv_db(
-                    Arc::clone(&state_kv_db),
+                    &state_kv_db,
                     state_kv_commit_progress,
                     overall_commit_progress,
                     difference as usize,
@@ -904,7 +903,9 @@ impl StateStore {
             );
             if !skip_usage || i == num_versions - 1 {
                 let version = first_version + i as u64;
-                info!("Write usage at version {version}, {usage:?}.");
+                if i == num_versions - 1 {
+                    info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
+                }
                 batch
                     .put::<VersionDataSchema>(&version, &usage.into())
                     .unwrap();

@@ -3,13 +3,13 @@
 use crate::{
     errors::Error,
     scheduler::Scheduler,
-    task::{ExecutionStatus, Transaction, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::{BlockSTMPlugin, TxnIndexProvider},
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
-use aptos_types::{executable::Executable, write_set::WriteOp};
+use aptos_types::{executable::Executable, write_set::WriteOp, transaction::BlockExecutableTransaction as Transaction};
 use dashmap::DashSet;
 use std::{
     collections::{BTreeSet, HashMap, HashSet},

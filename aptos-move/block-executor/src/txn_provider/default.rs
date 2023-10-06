@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 use crate::{
     scheduler::Scheduler,
-    task::{Transaction, TransactionOutput},
+    task::TransactionOutput,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::{BlockSTMPlugin, TxnIndexProvider},
 };
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
-use aptos_types::{executable::Executable, write_set::WriteOp};
+use aptos_types::{executable::Executable, write_set::WriteOp, transaction::BlockExecutableTransaction as Transaction};
 use move_core_types::account_address::AccountAddress;
 use std::fmt::Debug;
 

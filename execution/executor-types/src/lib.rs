@@ -43,7 +43,7 @@ mod executed_chunk;
 pub mod execution_output;
 pub mod in_memory_state_calculator;
 mod ledger_update_output;
-mod parsed_transaction_output;
+pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
 
 pub trait ChunkExecutorTrait: Send + Sync {

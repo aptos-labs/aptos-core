@@ -1,14 +1,15 @@
-import { Serializer, Deserializer } from "../../bcs";
+import { Serializer, Deserializer, Serializable } from "../../bcs";
 
 /**
  * Representation of an Identifier that can serialized and deserialized.
  * We use Identifier to represent the module "name" in "ModuleId" and
  * the "function name" in "EntryFunction"
  */
-export class Identifier {
+export class Identifier extends Serializable {
   public identifier: string;
 
   constructor(identifier: string) {
+    super();
     this.identifier = identifier;
   }
 

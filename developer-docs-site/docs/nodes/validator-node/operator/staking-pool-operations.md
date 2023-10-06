@@ -15,6 +15,9 @@ The current required minimum for staking is 1 million APT.
 Important There is no upgrade mechanism for the staking contract from staking pool to delegation pool. A new delegation pool would have to be created.
 :::
 
+:::tip Testnet vs Mainnet
+The below Aptos CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
+:::
 
 ## Initialize a staking pool
 
@@ -43,10 +46,6 @@ aptos stake create-staking-contract \
 3. Once the staking pool has been initialized, you can proceed to [connect to the Aptos Network](./connect-to-aptos-network.md).
 
 ## Perform pool owner operations
-
-:::tip Testnet vs Mainnet
-The below Aptos CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
-:::
 
 ### Transfer coin between accounts
 

@@ -147,8 +147,9 @@ impl StateComputer for ExecutionProxy {
         let fut = self
             .execution_pipeline
             .queue(
-                (block_id, transactions_to_execute).into(),
+                block_id,
                 parent_block_id,
+                transactions_to_execute,
                 maybe_block_gas_limit,
             )
             .await;
