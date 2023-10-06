@@ -1375,7 +1375,7 @@ fn netbench_config_24_megabytes_per_sec_small_messages(netbench_config: &mut Net
     netbench_config.direct_send_data_size = 100000;
     netbench_config.direct_send_per_second = 240;
     netbench_config.enable_direct_send_ramp_up = true;
-    netbench_config.direct_send_ramp_up_duration_seconds = 90;
+    netbench_config.direct_send_ramp_up_duration_seconds = 180;
     netbench_config.direct_send_ramp_up_per_second = 30;
 }
 
