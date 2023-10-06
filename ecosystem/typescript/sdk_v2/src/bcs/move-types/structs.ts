@@ -201,6 +201,8 @@ export class MoveString extends Serializable {
 export class MoveOption<T extends Serializable> extends Serializable {
   private vec: Vector<T>;
 
+  public readonly value?: T;
+
   constructor(value?: T) {
     super();
     if (typeof value !== "undefined" && value !== null) {
@@ -208,6 +210,8 @@ export class MoveOption<T extends Serializable> extends Serializable {
     } else {
       this.vec = new Vector([]);
     }
+
+    [this.value] = this.vec.values;
   }
 
   /**
@@ -236,7 +240,7 @@ export class MoveOption<T extends Serializable> extends Serializable {
 
   // Check if the MoveOption has a value.
   isSome(): boolean {
-    return this.vec.values.length == 1;
+    return this.vec.values.length === 1;
   }
 
   serialize(serializer: Serializer): void {
