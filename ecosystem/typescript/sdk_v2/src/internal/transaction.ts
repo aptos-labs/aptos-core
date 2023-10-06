@@ -150,7 +150,7 @@ export async function waitForTransaction(args: {
 
 /**
  * This error is used by `waitForTransaction` when waiting for a
- * transaction times out or when transaction is undefined
+ * transaction to time out or when the transaction response is undefined
  */
 export class WaitForTransactionError extends Error {
   public readonly lastSubmittedTransaction: TransactionResponse | undefined;
