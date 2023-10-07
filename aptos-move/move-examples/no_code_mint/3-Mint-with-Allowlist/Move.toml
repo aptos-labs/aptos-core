@@ -10,3 +10,4 @@ AptosTokenObjects = { local = "../../../framework/aptos-token-objects" }
 aptos_framework = "0x1"
 aptos_token_objects = "0x4"
 no_code_mint_p3 = "_"
+allowlisted_minter = "_"

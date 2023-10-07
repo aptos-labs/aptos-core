@@ -1,4 +1,4 @@
-module no_code_mint::allowlist {
+module no_code_mint_p3::allowlist {
     use std::vector;
     use std::string::{String};
     use std::timestamp;

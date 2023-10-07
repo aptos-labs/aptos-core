@@ -94,7 +94,8 @@ module no_code_mint_p2::object_as_creator {
         let obj_signer = object::generate_signer_for_extending(extend_ref);
 
         let obj_creator_addr = object::address_from_extend_ref(extend_ref);
-        let collection_supply = get_collection_supply(obj_creator_addr);
+        let collection_address = collection::create_collection_address(&obj_creator_addr, &mint_config.collection_name);
+        let collection_supply = get_collection_supply(collection_address);
         let full_token_name = concat_u64(mint_config.token_base_name, collection_supply);
 
         // mint the token as the collection creator object

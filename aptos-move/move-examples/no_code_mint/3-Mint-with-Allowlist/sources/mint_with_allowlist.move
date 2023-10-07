@@ -1,4 +1,4 @@
-module no_code_mint_p3::object_as_creator {
+module no_code_mint_p3::mint_with_allowlist {
     use std::string;
     use std::bcs;
     use std::error;
@@ -6,9 +6,11 @@ module no_code_mint_p3::object_as_creator {
     use std::signer;
     use std::vector;
     use std::option;
+    use std::timestamp;
     use std::string::String;
     use aptos_token_objects::aptos_token::{Self};
     use aptos_token_objects::collection::{Self, Collection};
+    use no_code_mint_p3::allowlist;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct MintConfig has key {
@@ -80,21 +82,59 @@ module no_code_mint_p3::object_as_creator {
 
         // Move the MintConfig resource to the contract address itself, since deployer == @no_code_mint_p3
         move_to(deployer, mint_config);
+
+        // Add a public allowlist tier that lets anyone mint 1 time for free
+        allowlist::upsert_tier_config(
+            &obj_signer,
+            string::utf8(b"public"),
+            true, // open_to_public,
+            0, // price in APT
+            timestamp::now_seconds(), // start_time
+            timestamp::now_seconds() + 1000000000, // end_time
+            1, // per_user_limit
+        );
+        // Note that we don't need to call `add_to_tier` for the `public` tier, since the tier is open to the public.
+
+        // Add a private allowlist tier that lets only specific addresses mint 10 times for free
+        let private_tier_name = string::utf8(b"private");
+        allowlist::upsert_tier_config(
+            &obj_signer,
+            private_tier_name,
+            false, // open_to_public,
+            0, // price in APT
+            timestamp::now_seconds(), // start_time
+            timestamp::now_seconds() + 1000000000, // end_time
+            2, // per_user_limit
+        );
+
+        // Add our allowlisted address to it
+        allowlist::add_to_tier(&obj_signer, private_tier_name, vector<address> [@allowlisted_minter]);
     }
 
     // Mint a token and transfer it to the account that called this function.
     // Note that this time, we can require that the `receiver` is the signer of the request to mint,
     // since the object is the collection creator, meaning we can automate the minting process.
     public entry fun mint(receiver: &signer) acquires MintConfig {
-        // get our contract data at the module address
+        // Get our contract data at the module address
         let mint_config = borrow_global_mut<MintConfig>(@no_code_mint_p3);
 
-        // borrow the object's ExtendRef and use it to generate the object's &signer
+        // Borrow the object's ExtendRef and use it to generate the object's &signer
         let extend_ref = &mint_config.extend_ref;
         let obj_signer = object::generate_signer_for_extending(extend_ref);
 
+        // Gate our minting function with the try_increment(...) function from allowlist.move
+        // This forces the receiver to pay the mint price and ensures they're in a valid allowlist
+        // tier with at least one mint left.
+        // @allowlisted_minter will get 3 free mints (2 from the private tier, 1 from the public tier)
+        // everyone else will get 1 (from the public tier)
+        allowlist::try_increment(
+            &obj_signer,
+            receiver,
+        );
+
         let obj_creator_addr = object::address_from_extend_ref(extend_ref);
-        let collection_supply = get_collection_supply(obj_creator_addr);
+        let collection_address = collection::create_collection_address(&obj_creator_addr, &mint_config.collection_name);
+        let collection_supply = get_collection_supply(collection_address);
         let full_token_name = concat_u64(mint_config.token_base_name, collection_supply);
 
         // mint the token as the collection creator object
