@@ -153,16 +153,19 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
 }
 
 pub struct FreshPeersSelector {
-    max_selected_peers: usize,
-    stickiness_cache: Arc<Cache<AccountAddress, Vec<PeerNetworkId>>>,
+    num_peers_to_select: usize,
+    // Note, only a single read happens at a time, so we don't use the thread-safeness of the cache
+    stickiness_cache: Arc<Cache<AccountAddress, (u64, Vec<PeerNetworkId>)>>,
+    // TODO: is there a data structure that can do peers and sorted_peers all at once?
     sorted_peers: Vec<(PeerNetworkId, Version)>,
     peers: HashSet<PeerNetworkId>,
+    peers_generation: u64,
 }
 
 impl FreshPeersSelector {
     pub fn new(max_selected_peers: usize) -> Self {
         Self {
-            max_selected_peers,
+            num_peers_to_select: max_selected_peers,
             stickiness_cache: Arc::new(
                 Cache::builder()
                     .max_capacity(100_000)
@@ -171,16 +174,17 @@ impl FreshPeersSelector {
             ),
             sorted_peers: Vec::new(),
             peers: HashSet::new(),
+            peers_generation: 0,
         }
     }
 
-    fn broadcast_peers_inner(&self, account: &PeerId) -> Vec<PeerNetworkId> {
+    fn get_or_fill_stickiness_cache(&self, account: &PeerId) -> (u64, Vec<PeerNetworkId>) {
         self.stickiness_cache.get_with_by_ref(account, || {
             let peers: Vec<_> = self
                 .sorted_peers
                 .iter()
                 .rev()
-                .take(self.max_selected_peers)
+                .take(self.num_peers_to_select)
                 .map(|(peer, _version)| *peer)
                 .collect();
             // TODO: random shuffle among similar versions to keep from biasing
@@ -191,8 +195,47 @@ impl FreshPeersSelector {
                 self.sorted_peers.len(),
                 self.sorted_peers
             );
-            peers
+            (self.peers_generation, peers)
         })
+    }
+
+    fn broadcast_peers_inner(&self, account: &PeerId) -> Vec<PeerNetworkId> {
+        // (1) get cached entry, or fill in with fresh peers
+        let (generation, mut peers) = self.get_or_fill_stickiness_cache(account);
+
+        // (2) if entry generation == current generation -- return
+        if generation == self.peers_generation {
+            return peers;
+        }
+
+        // (3) remove non-fresh peers
+        peers.retain(|peer| self.peers.contains(peer));
+
+        // (4) if not full, try to fill in more fresh peers
+        if peers.len() < self.num_peers_to_select {
+            let peers_cloned = peers.clone();
+            let peers_set: HashSet<_> = HashSet::from_iter(peers_cloned.iter());
+            let more_peers = self
+                .sorted_peers
+                .iter()
+                .rev()
+                .filter_map(|(peer, _version)| {
+                    if !peers_set.contains(peer) {
+                        Some(*peer)
+                    } else {
+                        None
+                    }
+                })
+                .take(self.num_peers_to_select - peers.len());
+            // add more_peers to end of peers
+            peers.extend(more_peers);
+        }
+
+        // (5) update the stickiness cache
+        self.stickiness_cache
+            .insert(*account, (self.peers_generation, peers.clone()));
+
+        peers
     }
 }
 
@@ -222,18 +265,13 @@ impl BroadcastPeersSelector for FreshPeersSelector {
     }
 
     fn broadcast_peers(&self, account: &PeerId) -> SelectedPeers {
-        let possibly_cached_results = self.broadcast_peers_inner(account);
-        let mut peers: Vec<_> = possibly_cached_results
-            .iter()
-            .filter(|peer| self.peers.contains(peer))
-            .cloned()
-            .collect();
+        let peers = self.broadcast_peers_inner(account);
+        // TODO: remove SelectedPeers::All/None
         if peers.is_empty() {
-            self.stickiness_cache.remove(account);
-            peers = self.broadcast_peers_inner(account);
-            info!("fresh_peers, stickiness removed");
+            SelectedPeers::None
+        } else {
+            SelectedPeers::Selected(peers)
         }
-        peers.into()
     }
 }
 
