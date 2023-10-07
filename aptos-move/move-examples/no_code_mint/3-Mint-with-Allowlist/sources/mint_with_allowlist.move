@@ -12,9 +12,8 @@ module no_code_mint_p3::mint_with_allowlist {
     use aptos_token_objects::collection::{Self, Collection};
     use no_code_mint_p3::allowlist;
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct MintConfig has key {
-        extend_ref: ExtendRef, // this is how we generate the Object's `&signer`
+        extend_ref: ExtendRef,
         collection_name: String,
         token_description: String,
         token_base_name: String,

@@ -254,7 +254,9 @@ To achieve this, in this section we'll show you how to:
 - Store the `ExtendRef` for the Object, which gives us the ability to produce a `&signer` value for it
 - Automate minting the token to the user; that is, write a mint function that works without the collection creator's signature
 
-First, let's go over how to increment the token's name with a number in it that matches the current collection supply:
+First, let's go over how to increment the token's name with a number in it that matches the current collection supply.
+
+### Incrementing the token name with the supply
 
 ```rust title="Converting a number to a string and appending it to another string"
     inline fun u64_to_string(value: u64): String {
@@ -304,7 +306,6 @@ Most of the code for our contract in this second part is very similar, so we're 
 First off, we need to store the Object's `ExtendRef` somewhere when we create it. Add it to the `MintConfig` resource:
 
 ```rust
-#[resource_group_member(group = aptos_framework::object::ObjectGroup)]
 struct MintConfig has key {
   extend_ref: ExtendRef, // this is how we generate the Object's `&signer`
   collection_name: String,
@@ -316,12 +317,6 @@ struct MintConfig has key {
   property_values: vector<vector<u8>>,
 }
 ```
-
-:::tip Advanced Tip
-Note the new `resource_group_member` tag. Any resources with this tag marks it as part of an Object's ObjectGroup resource group. This groups together the individual resources on an Object at the storage layer, (generally) resulting in faster, more efficient data storage and retrieval.
-
-See [object resource groups](https://aptos.dev/standards/aptos-object/#object-resource-group).
-:::
 
 Now let's examine how we create the object and store its ExtendRef in the MintConfig resource for later.
 
@@ -476,7 +471,7 @@ public entry fun mint(...) {
 }
 ```
 
-And other than that, the contract is largely the exact same as before! 
+And other than that, the contract is largely the exact same as before.
 
 ### Publishing the module and running the contract
 
@@ -510,5 +505,6 @@ aptos move run --function-id $MINT_DEPLOYER::mint_with_allowlist::mint   \
                --assume-yes
 ```
 
-## 4. Adding token metadata
+Congratulations! You've successfully automated a minting contract with an allowlist on Aptos.
 
+Feel free to play with the different configuration options and customizing your contract to facilitate setting/getting the different various configuration values.

@@ -10,7 +10,6 @@ module no_code_mint_p2::object_as_creator {
     use aptos_token_objects::aptos_token::{Self};
     use aptos_token_objects::collection::{Self, Collection};
 
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct MintConfig has key {
         extend_ref: ExtendRef, // this is how we generate the Object's `&signer`
         collection_name: String,
