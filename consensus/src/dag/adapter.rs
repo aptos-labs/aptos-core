@@ -157,26 +157,27 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let ledger_info_provider = self.ledger_info_provider.clone();
         let dag = self.dag.clone();
         *self.parent_block_info.write() = block_info.clone();
+        let blocks_to_send = OrderedBlocks {
+            ordered_blocks: vec![block],
+            ordered_proof: LedgerInfoWithSignatures::new(
+                LedgerInfo::new(block_info, anchor.digest()),
+                AggregateSignature::empty(),
+            ),
+            callback: Box::new(
+                move |committed_blocks: &[Arc<ExecutedBlock>],
+                      commit_decision: LedgerInfoWithSignatures| {
+                    dag.write()
+                        .commit_callback(commit_decision.commit_info().round());
+                    ledger_info_provider
+                        .write()
+                        .notify_commit_proof(commit_decision);
+                    update_counters_for_committed_blocks(committed_blocks);
+                },
+            ),
+        };
         if self
             .executor_channel
-            .unbounded_send(OrderedBlocks {
-                ordered_blocks: vec![block],
-                ordered_proof: LedgerInfoWithSignatures::new(
-                    LedgerInfo::new(block_info, anchor.digest()),
-                    AggregateSignature::empty(),
-                ),
-                callback: Box::new(
-                    move |committed_blocks: &[Arc<ExecutedBlock>],
-                          commit_decision: LedgerInfoWithSignatures| {
-                        dag.write()
-                            .commit_callback(commit_decision.commit_info().round());
-                        ledger_info_provider
-                            .write()
-                            .notify_commit_proof(commit_decision);
-                        update_counters_for_committed_blocks(committed_blocks);
-                    },
-                ),
-            })
+            .unbounded_send(blocks_to_send)
             .is_err()
         {
             error!("[DAG] execution pipeline closed");

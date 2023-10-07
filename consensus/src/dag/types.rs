@@ -641,7 +641,7 @@ impl RemoteFetchRequest {
             "Target round is not consistent"
         );
         ensure!(
-            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64
+            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64 - 1
                 == target_round,
             "Bitmask length doesn't match, first_round {}, length {}, target {}",
             self.exists_bitmask.first_round(),
@@ -860,5 +860,9 @@ impl DagSnapshotBitmask {
 
     pub fn first_round(&self) -> Round {
         self.first_round
+    }
+
+    pub fn len(&self) -> usize {
+        self.bitmask.len()
     }
 }

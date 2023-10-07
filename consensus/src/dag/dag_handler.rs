@@ -150,11 +150,11 @@ impl NetworkHandler {
                     .to_bytes(&response_msg.into_network_message())
                     .map(Bytes::from)
             })
-            .map_err(RpcError::ApplicationError);
+            .map_err(RpcError::ApplicationError)?;
 
         rpc_request
             .response_sender
-            .send(response)
+            .send(Ok(response))
             .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
             .map(|_| StateSyncStatus::Synced(None))
     }

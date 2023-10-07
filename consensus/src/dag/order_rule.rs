@@ -158,7 +158,7 @@ impl OrderRule {
             self.lowest_unordered_anchor_round,
             anchor.round(),
         ));
-        let lowest_round_to_reach = anchor.round().saturating_sub(DAG_WINDOW as u64);
+        let lowest_round_to_reach = anchor.round().saturating_sub(DAG_WINDOW);
 
         // Ceil it to the closest unordered anchor round
         let lowest_anchor_round = std::cmp::max(
