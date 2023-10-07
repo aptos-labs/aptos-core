@@ -2,17 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
-    adapter::Notifier,
+    adapter::OrderedNotifier,
     anchor_election::AnchorElection,
     dag_state_sync::DAG_WINDOW,
     dag_store::{Dag, NodeStatus},
+    observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
     storage::DAGStorage,
     types::NodeMetadata,
     CertifiedNode,
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
 use std::sync::Arc;
 
@@ -21,7 +25,7 @@ pub struct OrderRule {
     lowest_unordered_anchor_round: Round,
     dag: Arc<RwLock<Dag>>,
     anchor_election: Box<dyn AnchorElection>,
-    notifier: Arc<dyn Notifier>,
+    notifier: Arc<dyn OrderedNotifier>,
     storage: Arc<dyn DAGStorage>,
 }
 
@@ -31,7 +35,7 @@ impl OrderRule {
         latest_ledger_info: LedgerInfo,
         dag: Arc<RwLock<Dag>>,
         mut anchor_election: Box<dyn AnchorElection>,
-        notifier: Arc<dyn Notifier>,
+        notifier: Arc<dyn OrderedNotifier>,
         storage: Arc<dyn DAGStorage>,
     ) -> Self {
         let committed_round = if latest_ledger_info.ends_epoch() {
@@ -138,7 +142,7 @@ impl OrderRule {
         };
         while let Some(prev_anchor) = dag_reader
             .reachable(
-                &[current_anchor.metadata().clone()],
+                Some(current_anchor.metadata().clone()).iter(),
                 Some(self.lowest_unordered_anchor_round),
                 |node_status| matches!(node_status, NodeStatus::Unordered(_)),
             )
@@ -154,14 +158,25 @@ impl OrderRule {
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
     fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
-        let failed_authors: Vec<_> = (self.lowest_unordered_anchor_round..anchor.round())
-            .step_by(2)
-            .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
-            .collect();
+        // Check we're in the expected instance
         assert!(Self::check_parity(
             self.lowest_unordered_anchor_round,
             anchor.round(),
         ));
+        let lowest_round_to_reach = anchor.round().saturating_sub(DAG_WINDOW as u64);
+
+        // Ceil it to the closest unordered anchor round
+        let lowest_anchor_round = std::cmp::max(
+            self.lowest_unordered_anchor_round,
+            lowest_round_to_reach
+                + !Self::check_parity(lowest_round_to_reach, anchor.round()) as u64,
+        );
+        assert!(Self::check_parity(lowest_anchor_round, anchor.round()));
+
+        let failed_authors: Vec<_> = (lowest_anchor_round..anchor.round())
+            .step_by(2)
+            .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
+            .collect();
         let parents = anchor
             .parents()
             .iter()
@@ -173,17 +188,31 @@ impl OrderRule {
             parents,
             failed_authors.iter().map(|(_, author)| *author).collect(),
         );
-        self.lowest_unordered_anchor_round = anchor.round() + 1;
 
         let mut dag_writer = self.dag.write();
         let mut ordered_nodes: Vec<_> = dag_writer
-            .reachable_mut(&anchor, None)
+            .reachable_mut(&anchor, Some(lowest_round_to_reach))
             .map(|node_status| {
                 node_status.mark_as_ordered();
                 node_status.as_node().clone()
             })
             .collect();
+
+        observe_node(anchor.timestamp(), NodeStage::AnchorOrdered);
+        for node in ordered_nodes.iter().skip(1) {
+            observe_node(node.timestamp(), NodeStage::NodeOrdered);
+        }
         ordered_nodes.reverse();
+
+        debug!(
+            LogSchema::new(LogEvent::OrderedAnchor),
+            id = anchor.id(),
+            "Reached round {} with {} nodes",
+            lowest_round_to_reach,
+            ordered_nodes.len()
+        );
+
+        self.lowest_unordered_anchor_round = anchor.round() + 1;
         if let Err(e) = self
             .notifier
             .send_ordered_nodes(ordered_nodes, failed_authors)

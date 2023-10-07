@@ -6,32 +6,37 @@
  * it does not guarantee ordering for those that call into and await on enqueue.
  */
 
+interface PendingDequeue<T> {
+  resolve: (value: T) => void;
+  reject: (reason?: AsyncQueueCancelledError) => void;
+}
+
 export class AsyncQueue<T> {
   readonly queue: T[] = [];
 
-  // The resolveMap is used to handle the resolution of promises when items are enqueued and dequeued.
-  private resolveMap: Map<number, (value: T) => void> = new Map();
-
-  private counter: number = 0;
+  // The pendingDequeue is used to handle the resolution of promises when items are enqueued and dequeued.
+  private pendingDequeue: PendingDequeue<T>[] = [];
 
   private cancelled: boolean = false;
 
   /**
    * The enqueue method adds an item to the queue. If there are pending dequeued promises,
-   * in the resolveMap, it resolves the oldest promise with the enqueued item immediately.
+   * in the pendingDequeue, it resolves the oldest promise with the enqueued item immediately.
    * Otherwise, it adds the item to the queue.
    *
    * @param item T
    */
   enqueue(item: T): void {
-    if (this.resolveMap.size > 0) {
-      const resolve = this.resolveMap.get(0);
-      if (resolve) {
-        this.resolveMap.delete(0);
-        resolve(item);
-        return;
-      }
+    this.cancelled = false;
+
+    if (this.pendingDequeue.length > 0) {
+      const promise = this.pendingDequeue.shift();
+
+      promise?.resolve(item);
+
+      return;
     }
+
     this.queue.push(item);
   }
 
@@ -39,7 +44,7 @@ export class AsyncQueue<T> {
    * The dequeue method returns a promise that resolves to the next item in the queue.
    * If the queue is not empty, it resolves the promise immediately with the next item.
    * Otherwise, it creates a new promise. The promise's resolve function is stored
-   * in the resolveMap with a unique counter value as the key.
+   * in the pendingDequeue with a unique counter value as the key.
    * The newly created promise is then returned, and it will be resolved later when an item is enqueued.
    *
    * @returns Promise<T>
@@ -48,11 +53,10 @@ export class AsyncQueue<T> {
     if (this.queue.length > 0) {
       return Promise.resolve(this.queue.shift()!);
     }
-    const promise = new Promise<T>((resolve) => {
-      this.counter += 1;
-      this.resolveMap.set(this.counter, resolve);
+
+    return new Promise<T>((resolve, reject) => {
+      this.pendingDequeue.push({ resolve, reject });
     });
-    return promise;
   }
 
   /**
@@ -71,10 +75,13 @@ export class AsyncQueue<T> {
    */
   cancel(): void {
     this.cancelled = true;
-    this.resolveMap.forEach(async (resolve) => {
-      resolve(await Promise.reject(new AsyncQueueCancelledError("Task cancelled")));
+
+    this.pendingDequeue.forEach(async ({ reject }) => {
+      reject(new AsyncQueueCancelledError("Task cancelled"));
     });
-    this.resolveMap.clear();
+
+    this.pendingDequeue = [];
+
     this.queue.length = 0;
   }
 
@@ -86,11 +93,15 @@ export class AsyncQueue<T> {
   isCancelled(): boolean {
     return this.cancelled;
   }
-}
 
-export class AsyncQueueCancelledError extends Error {
-  /* eslint-disable @typescript-eslint/no-useless-constructor */
-  constructor(message: string) {
-    super(message);
+  /**
+   * The pendingDequeueLength method returns the length of the pendingDequeue.
+   *
+   * @returns number
+   */
+  pendingDequeueLength(): number {
+    return this.pendingDequeue.length;
   }
 }
+
+export class AsyncQueueCancelledError extends Error {}

@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use crate::RepeatVec;
 use proptest::{
     collection::vec, prelude::*, sample::Index as PropIndex, test_runner::TestCaseResult,

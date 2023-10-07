@@ -18,7 +18,7 @@ on:
         type: boolean
         required: false
         default: true
-        description: "If true, the release will not be created"
+        description: "Dry run - If checked, the release will not be created"
 
 jobs:
   build-ubuntu20-binary:

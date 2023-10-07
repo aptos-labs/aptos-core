@@ -21,6 +21,7 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule-updator = { workspace = true }
 aptos-genesis = { workspace = true }
+aptos-keygen = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }

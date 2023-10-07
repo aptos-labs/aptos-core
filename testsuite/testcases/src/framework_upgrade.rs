@@ -80,7 +80,7 @@ impl NetworkTest for FrameworkUpgrade {
         let mut keygen = KeyGen::from_seed(seed_slice);
         let validator_key = keygen.generate_ed25519_private_key();
         let validator_account =
-            AuthenticationKey::ed25519(&validator_key.public_key()).derived_address();
+            AuthenticationKey::ed25519(&validator_key.public_key()).account_address();
 
         let network_info = aptos_release_builder::validate::NetworkConfig {
             endpoint: ctx.swarm().validators().last().unwrap().rest_api_endpoint(),

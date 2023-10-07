@@ -285,6 +285,6 @@ impl<K: Ord + Clone, V: AbstractDomain + Clone + PartialEq> MapDomain<K, V> {
                 }
             })
             .collect_vec();
-        self.extend(new_values.into_iter());
+        self.extend(new_values);
     }
 }

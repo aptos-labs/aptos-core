@@ -243,7 +243,7 @@ async fn test_request_moderator_peer_garbage_collect() {
     let unhealthy_peer_states = request_moderator.get_unhealthy_peer_states();
 
     // Connect multiple peers
-    let peer_network_ids = vec![
+    let peer_network_ids = [
         PeerNetworkId::new(NetworkId::Validator, PeerId::random()),
         PeerNetworkId::new(NetworkId::Vfn, PeerId::random()),
         PeerNetworkId::new(NetworkId::Public, PeerId::random()),

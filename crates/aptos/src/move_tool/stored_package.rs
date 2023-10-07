@@ -10,7 +10,7 @@ use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
-use std::{fs, path::Path};
+use std::{fmt, fs, path::Path};
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.
@@ -28,6 +28,13 @@ pub struct CachedPackageMetadata<'a> {
 /// Represents the package metadata found in an registry.
 pub struct CachedModuleMetadata<'a> {
     metadata: &'a ModuleMetadata,
+}
+
+impl fmt::Display for CachedPackageMetadata<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.metadata)?;
+        Ok(())
+    }
 }
 
 impl CachedPackageRegistry {

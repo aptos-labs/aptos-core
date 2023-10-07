@@ -76,20 +76,24 @@ impl RemoteCoordinatorClient {
 
 impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command(&self) -> ExecutorShardCommand<RemoteStateViewClient> {
-        let message = self.command_rx.recv().unwrap();
-        let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
-        match request {
-            RemoteExecutionRequest::ExecuteBlock(command) => {
-                let state_keys = Self::extract_state_keys(&command);
-                self.state_view_client.init_for_block(state_keys);
-                let (sub_blocks, concurrency, gas_limit) = command.into();
-                ExecutorShardCommand::ExecuteSubBlocks(
-                    self.state_view_client.clone(),
-                    sub_blocks,
-                    concurrency,
-                    gas_limit,
-                )
+        match self.command_rx.recv() {
+            Ok(message) => {
+                let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
+                match request {
+                    RemoteExecutionRequest::ExecuteBlock(command) => {
+                        let state_keys = Self::extract_state_keys(&command);
+                        self.state_view_client.init_for_block(state_keys);
+                        let (sub_blocks, concurrency, gas_limit) = command.into();
+                        ExecutorShardCommand::ExecuteSubBlocks(
+                            self.state_view_client.clone(),
+                            sub_blocks,
+                            concurrency,
+                            gas_limit,
+                        )
+                    },
+                }
             },
+            Err(_) => ExecutorShardCommand::Stop,
         }
     }
 

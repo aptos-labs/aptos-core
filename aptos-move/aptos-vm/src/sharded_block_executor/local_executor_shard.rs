@@ -100,8 +100,8 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             .unzip();
         let executor_shards = command_rxs
             .into_iter()
-            .zip(result_txs.into_iter())
-            .zip(cross_shard_msg_rxs.into_iter())
+            .zip(result_txs)
+            .zip(cross_shard_msg_rxs)
             .enumerate()
             .map(|(shard_id, ((command_rx, result_tx), cross_shard_rxs))| {
                 let cross_shard_client = LocalCrossShardClient::new(

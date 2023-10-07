@@ -127,10 +127,10 @@ fn script_none_existing_module_dep() {
     }
     assert_eq!(
         status.status(),
-        //StatusCode::LINKER_ERROR
         Ok(ExecutionStatus::MiscellaneousError(Some(
             StatusCode::LINKER_ERROR
-        )))
+        ))),
+        "Linker Error: Transaction executed at a non-existent external module"
     );
     executor.apply_write_set(output.write_set());
 
@@ -352,7 +352,8 @@ fn script_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR))),
+        "Linker Error: Transaction executed at a non-existent external module"
     );
     executor.apply_write_set(output.write_set());
 
@@ -419,7 +420,8 @@ fn script_nested_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR))),
+        "Linker Error: Transaction executed at a non-existent external module"
     );
     executor.apply_write_set(output.write_set());
 

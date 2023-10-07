@@ -118,6 +118,9 @@ impl RemoteStateViewClient {
     }
 
     fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>) {
+        state_keys.clone().into_iter().for_each(|state_key| {
+            self.state_view.read().unwrap().insert_state_key(state_key);
+        });
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
@@ -128,9 +131,6 @@ impl RemoteStateViewClient {
                     Self::send_state_value_request(shard_id, sender, state_keys);
                 });
             });
-        state_keys.into_iter().for_each(|state_key| {
-            self.state_view.read().unwrap().insert_state_key(state_key);
-        });
     }
 
     fn send_state_value_request(
@@ -186,8 +186,7 @@ impl RemoteStateValueReceiver {
     }
 
     fn start(&self) {
-        loop {
-            let message = self.kv_rx.recv().unwrap();
+        while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();
             let shard_id = self.shard_id;
             self.thread_pool.spawn(move || {

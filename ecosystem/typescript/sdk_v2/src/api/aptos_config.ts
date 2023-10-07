@@ -67,4 +67,8 @@ export class AptosConfig {
         throw Error(`apiType ${apiType} is not supported`);
     }
   }
+
+  isIndexerRequest(url: string): boolean {
+    return NetworkToIndexerAPI[this.network] === url;
+  }
 }

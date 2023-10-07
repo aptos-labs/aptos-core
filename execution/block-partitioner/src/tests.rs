@@ -9,7 +9,6 @@ use crate::{
     v2::config::PartitionerV2Config,
     PartitionerConfig,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_types::{block_executor::partitioner::SubBlocksForShard, transaction::Transaction};
 use move_core_types::account_address::AccountAddress;
 use rand::{rngs::OsRng, Rng};
@@ -78,7 +77,7 @@ fn test_relative_ordering_for_sender() {
     SubBlocksForShard::flatten(sub_blocks)
         .iter()
         .for_each(|txn| {
-            let (sender, seq_number) = get_account_seq_number(txn.transaction());
+            let (sender, seq_number) = get_account_seq_number(txn.transaction().expect_valid());
             if account_to_expected_seq_number.contains_key(&sender) {
                 assert_eq!(
                     account_to_expected_seq_number.get(&sender).unwrap(),

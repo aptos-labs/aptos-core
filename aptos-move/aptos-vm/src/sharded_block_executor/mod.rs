@@ -30,10 +30,6 @@ pub mod messages;
 pub mod remote_state_value;
 pub mod sharded_aggregator_service;
 pub mod sharded_executor_service;
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
-mod tests;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> {

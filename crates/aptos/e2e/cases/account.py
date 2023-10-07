@@ -40,7 +40,7 @@ def test_account_fund_with_faucet(run_helper: RunHelper, test_name=None):
 
 
 @test_case
-def test_account_create(run_helper: RunHelper, test_name=None):
+def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
     # Create the new account.
     run_helper.run_command(
         test_name,
@@ -61,6 +61,59 @@ def test_account_create(run_helper: RunHelper, test_name=None):
     if balance != 0:
         raise TestError(
             f"Account {OTHER_ACCOUNT_ONE.account_address} has balance {balance}, expected 0"
+        )
+
+    transfer_amount = 1000
+
+    run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "transfer",
+            "--account",
+            OTHER_ACCOUNT_ONE.account_address,
+            "--amount",
+            str(transfer_amount),
+            "--assume-yes",
+        ],
+    )
+
+    balance = int(
+        run_helper.api_client.account_balance(OTHER_ACCOUNT_ONE.account_address)
+    )
+
+    if balance != transfer_amount:
+        raise TestError(
+            f"Account {OTHER_ACCOUNT_ONE.account_address} has balance {balance}, expected {transfer_amount}"
+        )
+
+
+@test_case
+def test_account_list(run_helper: RunHelper, test_name=None):
+    # List the created account
+    result = run_helper.run_command(
+        test_name,
+        [
+            "aptos",
+            "account",
+            "list",
+            "--account",
+            OTHER_ACCOUNT_ONE.account_address,
+        ],
+    )
+
+    json_result = json.loads(result.stdout)
+    found_account = False
+
+    # Check if the resource account is in the list
+    for module in json_result["Result"]:
+        if module.get("0x1::account::Account") != None:
+            found_account = True
+
+    if not found_account:
+        raise TestError(
+            "Cannot find the account in the account list after account creation"
         )
 
 

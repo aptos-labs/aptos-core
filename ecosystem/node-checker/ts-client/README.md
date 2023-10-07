@@ -48,7 +48,7 @@ pnpm generate-client
 ### Running tests
 Run a local node (run from the root of the repo):
 ```
-cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+cargo run -p aptos -- node run-local-testnet --faucet-port 8081 --force-restart --assume-yes
 ```
 
 Run a local Node Health Checker:

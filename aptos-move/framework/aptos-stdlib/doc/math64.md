@@ -38,18 +38,9 @@ Standard math utilities missing in the Move Language.
 ## Constants
 
 
-<a name="0x1_math64_EDIVISION_BY_ZERO"></a>
-
-
-
-<pre><code><b>const</b> <a href="math64.md#0x1_math64_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>: u64 = 1;
-</code></pre>
-
-
-
 <a name="0x1_math64_EINVALID_ARG_FLOOR_LOG2"></a>
 
-Abort value when an invalid argument is provided.
+Cannot log2 the value 0
 
 
 <pre><code><b>const</b> <a href="math64.md#0x1_math64_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>: u64 = 1;
@@ -153,6 +144,8 @@ Returns a * b / c going through u128 to prevent intermediate overflow
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_mul_div">mul_div</a>(a: u64, b: u64, c: u64): u64 {
+    // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
+    <b>assert</b>!(c != 0, std::error::invalid_argument(4));
     (((a <b>as</b> u128) * (b <b>as</b> u128) / (c <b>as</b> u128)) <b>as</b> u64)
 }
 </code></pre>
@@ -359,7 +352,8 @@ Returns square root of x, precisely floor(sqrt(x))
     // <a href="math64.md#0x1_math64_ceil_div">ceil_div</a>(x, y) = floor((x + y - 1) / y) = floor((x - 1) / y) + 1
     // (x + y - 1) could spuriously overflow. so we <b>use</b> the later version
     <b>if</b> (x == 0) {
-        <b>assert</b>!(y != 0, <a href="math64.md#0x1_math64_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>);
+        // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
+        <b>assert</b>!(y != 0, std::error::invalid_argument(4));
         0
     }
     <b>else</b> (x - 1) / y + 1
@@ -373,22 +367,6 @@ Returns square root of x, precisely floor(sqrt(x))
 <a name="@Specification_1"></a>
 
 ## Specification
-
-
-
-<a name="0x1_math64_spec_pow"></a>
-
-
-<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {
-   <b>if</b> (e == 0) {
-       1
-   }
-   <b>else</b> {
-       n * <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e-1)
-   }
-}
-</code></pre>
-
 
 
 <a name="@Specification_1_max"></a>
@@ -517,6 +495,22 @@ Returns square root of x, precisely floor(sqrt(x))
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] x &gt; 0 ==&gt; result * result &lt;= x;
 <b>ensures</b> [abstract] x &gt; 0 ==&gt; x &lt; (result+1) * (result+1);
+</code></pre>
+
+
+
+
+<a name="0x1_math64_spec_pow"></a>
+
+
+<pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {
+   <b>if</b> (e == 0) {
+       1
+   }
+   <b>else</b> {
+       n * <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n, e-1)
+   }
+}
 </code></pre>
 
 

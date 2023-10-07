@@ -2,6 +2,8 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 //! A model to test properties of common Aptos transactions.
 //!
 //! The structs and functions in this module together form a simplified *model* of how common Aptos

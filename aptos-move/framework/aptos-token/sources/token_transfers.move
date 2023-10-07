@@ -229,7 +229,7 @@ module aptos_token::token_transfers {
     }
 
     #[test_only]
-    public entry fun create_token(creator: &signer, amount: u64): TokenId {
+    public fun create_token(creator: &signer, amount: u64): TokenId {
         use std::string::{Self, String};
 
         let collection_name = string::utf8(b"Hello, World");

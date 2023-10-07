@@ -159,7 +159,7 @@ impl BufferedState {
         {
             zip_eq(
                 self.state_after_checkpoint.updates_since_base.iter_mut(),
-                updates_until_next_checkpoint_since_current.into_iter(),
+                updates_until_next_checkpoint_since_current,
             )
             .for_each(|(base, delta)| {
                 base.extend(delta);

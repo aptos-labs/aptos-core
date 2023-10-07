@@ -195,7 +195,7 @@ async fn construction_derive(
 
     let public_key: Ed25519PublicKey =
         decode_key(&request.public_key.hex_bytes, "Ed25519PublicKey")?;
-    let address = AuthenticationKey::ed25519(&public_key).derived_address();
+    let address = AuthenticationKey::ed25519(&public_key).account_address();
 
     Ok(ConstructionDeriveResponse {
         account_identifier: AccountIdentifier::base_account(address),

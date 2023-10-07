@@ -21,7 +21,7 @@ If you are new to the Aptos CLI, then see this comprehensive [Aptos CLI user doc
 You can start a local testnet using the following Aptos CLI command:
 
 ```bash
-aptos node run-local-testnet --with-faucet
+aptos node run-local-testnet
 ```
 
 The above command will start a local validator node and will display a terminal output similar to the following:
@@ -46,6 +46,8 @@ The above command will use the default configuration for the validator node.
 :::caution Do not use two instances of the same command at the same time
 Note that two instances of the same command cannot run at the same time. This will result in a conflict on ports for the validator node.
 :::
+
+You can choose to not run a faucet with the `--no-faucet` flag.
 
 ## Test with your local testnet
 
@@ -145,7 +147,7 @@ If you updated your codebase with backwards incompatible changes, or just want t
 the command with the `--force-restart` flag:
 
 ```bash
-aptos node run-local-testnet --with-faucet --force-restart
+aptos node run-local-testnet --force-restart
 ```
 
 It will then prompt you if you really want to restart the chain, to ensure that you do not delete your work by accident.

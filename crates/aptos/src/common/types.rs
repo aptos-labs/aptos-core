@@ -184,7 +184,7 @@ impl From<hex::FromHexError> for CliError {
 
 impl From<anyhow::Error> for CliError {
     fn from(e: anyhow::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
+        CliError::UnexpectedError(format!("{:#}", e))
     }
 }
 
@@ -999,7 +999,7 @@ pub fn account_address_from_public_key(public_key: &Ed25519PublicKey) -> Account
 }
 
 pub fn account_address_from_auth_key(auth_key: &AuthenticationKey) -> AccountAddress {
-    AccountAddress::new(*auth_key.derived_address())
+    AccountAddress::new(*auth_key.account_address())
 }
 
 #[derive(Debug, Parser)]
@@ -1125,6 +1125,12 @@ pub struct MovePackageDir {
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
     pub skip_attribute_checks: bool,
+
+    /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
+    /// NOTE: this behavior will become the default in the future.
+    /// See https://github.com/aptos-labs/aptos-core/issues/10335
+    #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
+    pub check_test_code: bool,
 }
 
 impl MovePackageDir {
@@ -1138,6 +1144,7 @@ impl MovePackageDir {
             bytecode_version: None,
             compiler_version: None,
             skip_attribute_checks: false,
+            check_test_code: false,
         }
     }
 
@@ -1933,25 +1940,6 @@ pub struct PoolAddressArgs {
     /// Address of the Staking pool
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) pool_address: AccountAddress,
-}
-
-// This struct includes TypeInfo (account_address, module_name, and struct_name)
-// and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
-// Since the struct RotationProofChallenge is defined in "0x1::account::RotationProofChallenge",
-// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProofChallenge" to `struct_name`
-// Originator refers to the user's address
-#[derive(Serialize, Deserialize)]
-pub struct RotationProofChallenge {
-    // Should be `CORE_CODE_ADDRESS`
-    pub account_address: AccountAddress,
-    // Should be `account`
-    pub module_name: String,
-    // Should be `RotationProofChallenge`
-    pub struct_name: String,
-    pub sequence_number: u64,
-    pub originator: AccountAddress,
-    pub current_auth_key: AccountAddress,
-    pub new_public_key: Vec<u8>,
 }
 
 /// Common options for interactions with a multisig account.

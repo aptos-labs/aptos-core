@@ -67,7 +67,7 @@ impl LocalAccount {
             .derive(&derive_path)?
             .secret_key;
         let key = AccountKey::from(Ed25519PrivateKey::try_from(key.as_bytes().as_ref())?);
-        let address = key.authentication_key().derived_address();
+        let address = key.authentication_key().account_address();
 
         Ok(Self {
             address,
@@ -84,7 +84,7 @@ impl LocalAccount {
         R: ::rand_core::RngCore + ::rand_core::CryptoRng,
     {
         let key = AccountKey::generate(rng);
-        let address = key.authentication_key().derived_address();
+        let address = key.authentication_key().account_address();
 
         Self::new(address, key, 0)
     }
@@ -291,7 +291,7 @@ impl HardwareWalletAccount {
     ) -> Result<Self, AptosLedgerError> {
         let public_key = aptos_ledger::get_public_key(&derivation_path, false)?;
         let authentication_key = AuthenticationKey::ed25519(&public_key);
-        let address = authentication_key.derived_address();
+        let address = authentication_key.account_address();
 
         Ok(Self::new(
             address,

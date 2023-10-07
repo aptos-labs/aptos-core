@@ -254,6 +254,24 @@ export const GetCollectionsWithOwnedTokens = `
   }
 }
     `;
+export const GetCurrentObjects = `
+    query getCurrentObjects($where_condition: current_objects_bool_exp, $offset: Int, $limit: Int, $order_by: [current_objects_order_by!]) {
+  current_objects(
+    where: $where_condition
+    offset: $offset
+    limit: $limit
+    order_by: $order_by
+  ) {
+    allow_ungated_transfer
+    state_key_hash
+    owner_address
+    object_address
+    last_transaction_version
+    last_guid_creation_num
+    is_deleted
+  }
+}
+    `;
 export const GetDelegatedStakingActivities = `
     query getDelegatedStakingActivities($delegatorAddress: String, $poolAddress: String) {
   delegated_staking_activities(
@@ -457,6 +475,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     getCollectionsWithOwnedTokens(variables: Types.GetCollectionsWithOwnedTokensQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCollectionsWithOwnedTokensQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCollectionsWithOwnedTokensQuery>(GetCollectionsWithOwnedTokens, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCollectionsWithOwnedTokens', 'query');
+    },
+    getCurrentObjects(variables?: Types.GetCurrentObjectsQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetCurrentObjectsQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<Types.GetCurrentObjectsQuery>(GetCurrentObjects, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getCurrentObjects', 'query');
     },
     getDelegatedStakingActivities(variables?: Types.GetDelegatedStakingActivitiesQueryVariables, requestHeaders?: Dom.RequestInit["headers"]): Promise<Types.GetDelegatedStakingActivitiesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<Types.GetDelegatedStakingActivitiesQuery>(GetDelegatedStakingActivities, variables, {...requestHeaders, ...wrappedRequestHeaders}), 'getDelegatedStakingActivities', 'query');

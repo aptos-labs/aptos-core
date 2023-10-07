@@ -4,7 +4,7 @@ module.exports = {
     es2021: true,
     node: true,
   },
-  ignorePatterns: ["*.js", "examples/*", "src/indexer/generated/**", "scripts/publish_ans_contract.ts"],
+  ignorePatterns: ["*.js", "examples/*", "scripts/publish_ans_contract.ts", "src/types/generated/**"],
   extends: ["airbnb-base", "airbnb-typescript/base", "prettier"],
   parser: "@typescript-eslint/parser",
   parserOptions: {
@@ -16,7 +16,7 @@ module.exports = {
   plugins: ["@typescript-eslint"],
   rules: {
     quotes: ["error", "double"],
-    "max-len": ["error", 120],
+    "max-len": ["error", 130],
     "import/extensions": ["error", "never"],
     "max-classes-per-file": ["error", 10],
     "import/prefer-default-export": "off",

@@ -467,21 +467,22 @@ module aptos_framework::object {
     ) acquires ObjectCore {
         let owner_address = signer::address_of(owner);
         verify_ungated_and_descendant(owner_address, object);
+        transfer_raw_inner(object, to);
+    }
 
+    inline fun transfer_raw_inner(object: address, to: address) acquires ObjectCore {
         let object_core = borrow_global_mut<ObjectCore>(object);
-        if (object_core.owner == to) {
-            return
+        if (object_core.owner != to) {
+            event::emit_event(
+                &mut object_core.transfer_events,
+                TransferEvent {
+                    object,
+                    from: object_core.owner,
+                    to,
+                },
+            );
+            object_core.owner = to;
         };
-
-        event::emit_event(
-            &mut object_core.transfer_events,
-            TransferEvent {
-                object: object,
-                from: object_core.owner,
-                to,
-            },
-        );
-        object_core.owner = to;
     }
 
     /// Transfer the given object to another object. See `transfer` for more information.
@@ -537,45 +538,23 @@ module aptos_framework::object {
     /// Original owners can reclaim burnt objects any time in the future by calling unburn.
     public entry fun burn<T: key>(owner: &signer, object: Object<T>) acquires ObjectCore {
         let original_owner = signer::address_of(owner);
-        assert!(owner(object) == original_owner, error::permission_denied(ENOT_OBJECT_OWNER));
+        assert!(is_owner(object, original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
         let object_addr = object.inner;
         move_to(&create_signer(object_addr), TombStone { original_owner });
-        let object = borrow_global_mut<ObjectCore>(object_addr);
-        object.owner = BURN_ADDRESS;
-
-        // Burn should still emit event to make sure ownership is upgrade correctly in indexing.
-        event::emit_event(
-            &mut object.transfer_events,
-            TransferEvent {
-                object: object_addr,
-                from: original_owner,
-                to: BURN_ADDRESS,
-            },
-        );
+        transfer_raw_inner(object_addr, BURN_ADDRESS);
     }
 
     /// Allow origin owners to reclaim any objects they previous burnt.
     public entry fun unburn<T: key>(
         original_owner: &signer,
         object: Object<T>,
-    ) acquires ObjectCore, TombStone {
+    ) acquires TombStone, ObjectCore {
         let object_addr = object.inner;
         assert!(exists<TombStone>(object_addr), error::invalid_argument(EOBJECT_NOT_BURNT));
 
         let TombStone { original_owner: original_owner_addr } = move_from<TombStone>(object_addr);
         assert!(original_owner_addr == signer::address_of(original_owner), error::permission_denied(ENOT_OBJECT_OWNER));
-        let object = borrow_global_mut<ObjectCore>(object_addr);
-        object.owner = original_owner_addr;
-
-        // Unburn reclaims should still emit event to make sure ownership is upgrade correctly in indexing.
-        event::emit_event(
-            &mut object.transfer_events,
-            TransferEvent {
-                object: object_addr,
-                from: BURN_ADDRESS,
-                to: original_owner_addr,
-            },
-        );
+        transfer_raw_inner(object_addr, original_owner_addr);
     }
 
     /// Accessors

@@ -64,6 +64,9 @@ impl NumberOperationProcessor {
             match item {
                 Either::Left(fid) => {
                     let func_env = env.get_function(*fid);
+                    if func_env.is_inline() {
+                        continue;
+                    }
                     for (_, target) in targets.get_targets(&func_env) {
                         if target.data.code.is_empty() {
                             continue;
@@ -74,6 +77,9 @@ impl NumberOperationProcessor {
                 Either::Right(scc) => {
                     for fid in scc {
                         let func_env = env.get_function(*fid);
+                        if func_env.is_inline() {
+                            continue;
+                        }
                         for (_, target) in targets.get_targets(&func_env) {
                             if target.data.code.is_empty() {
                                 continue;

@@ -1,0 +1,16 @@
+env_vars: []
+commands:
+  create_backup: 'echo "$BACKUP_NAME"'
+  create_for_write: |
+    FILE_HANDLE="$BACKUP_HANDLE/$FILE_NAME"
+    echo "$FILE_HANDLE"
+    exec 1>&-
+    gzip -c | s5cmd pipe "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE"
+  open_for_read: 's5cmd --no-sign-request cat "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE" | gzip -cd'
+  save_metadata_line: |
+    FILE_HANDLE="metadata/$FILE_NAME"
+    echo "$FILE_HANDLE"
+    exec 1>&-
+    gzip -c | s5cmd pipe - "s3://$BUCKET/$SUB_DIR/$FILE_HANDLE" --no-sign-request
+  list_metadata_files: '(s5cmd --no-sign-request ls s3://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#.* \(.*\)#metadata/\1#p"'
+  backup_metadata_file: 's5cmd --no-sign-request mv s3://$BUCKET/$SUB_DIR/metadata/$FILE_NAME s3://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME'

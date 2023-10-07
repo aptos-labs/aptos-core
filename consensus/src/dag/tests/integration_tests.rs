@@ -2,11 +2,12 @@
 
 use super::dag_test;
 use crate::{
-    dag::{bootstrap::bootstrap_dag_for_test, types::CertifiedNodeMessage},
+    dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::StateSyncStatus},
     experimental::buffer_manager::OrderedBlocks,
     network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
+    payload_manager::PayloadManager,
     test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -41,7 +42,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
-    nh_task_handle: JoinHandle<CertifiedNodeMessage>,
+    nh_task_handle: JoinHandle<StateSyncStatus>,
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
@@ -71,6 +72,7 @@ impl DagBootstrapUnit {
         let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
+        let payload_manager = Arc::new(PayloadManager::DirectMempool);
 
         let state_computer = Arc::new(EmptyStateComputer {});
 
@@ -83,7 +85,9 @@ impl DagBootstrapUnit {
                 Arc::new(dag_storage),
                 network.clone(),
                 network.clone(),
+                network.clone(),
                 time_service,
+                payload_manager,
                 payload_client,
                 state_computer,
             );

@@ -83,6 +83,7 @@ pub enum FeatureFlag {
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
+    Secp256k1ECDSAAuthenticator,
     ReconfigureWithDKG,
 }
 
@@ -217,6 +218,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
+            FeatureFlag::Secp256k1ECDSAAuthenticator => {
+                AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
+            },
             FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
         }
     }
@@ -274,6 +278,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
+            AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
+                FeatureFlag::Secp256k1ECDSAAuthenticator
+            },
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG, // dkg todo: update
         }
     }

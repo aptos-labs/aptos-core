@@ -45,7 +45,6 @@ pub enum LogEntry {
     PeerStates,
     StorageServiceRequest,
     StorageServiceResponse,
-    StorageSummaryRequest,
     StorageSummaryResponse,
 }
 

@@ -38,7 +38,7 @@ struct StateWithCoins {
 fn code_publishing_basic(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     let mut h = MoveHarness::new_with_features(enabled, disabled);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
@@ -77,13 +77,13 @@ fn code_publishing_upgrade_success_compat() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with compat requirements
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // We should be able to upgrade it with the compatible version
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
     ));
@@ -95,13 +95,13 @@ fn code_publishing_upgrade_fail_compat() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with compat requirements
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // We should not be able to upgrade it with the incompatible version
-    let status = h.publish_package(
+    let status = h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_upgrade_incompat"),
     );
@@ -114,13 +114,13 @@ fn code_publishing_upgrade_fail_immutable() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with immutable requirements
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial_immutable"),
     ));
 
     // We should not be able to upgrade it with the compatible version
-    let status = h.publish_package(
+    let status = h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
     );
@@ -133,13 +133,13 @@ fn code_publishing_upgrade_fail_overlapping_module() {
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_initial"),
     ));
 
     // Install a different package with the same module.
-    let status = h.publish_package(
+    let status = h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_other_name"),
     );
@@ -160,26 +160,23 @@ fn code_publishing_upgrade_loader_cache_consistency() {
 
     // Create a sequence of package upgrades
     let txns = vec![
-        h.create_publish_package(
+        h.create_publish_package_cache_building(
             &acc,
             &common::test_dir_path("code_publishing.data/pack_initial"),
-            None,
             |_| {},
         ),
         // Compatible with above package
-        h.create_publish_package(
+        h.create_publish_package_cache_building(
             &acc,
             &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
-            None,
             |_| {},
         ),
         // Not compatible with above package, but with first one.
         // Correct behavior: should create backward_incompatible error
         // Bug behavior: succeeds because is compared with the first module
-        h.create_publish_package(
+        h.create_publish_package_cache_building(
             &acc,
             &common::test_dir_path("code_publishing.data/pack_compat_first_not_second"),
-            None,
             |_| {},
         ),
     ];
@@ -196,7 +193,7 @@ fn code_publishing_framework_upgrade() {
 
     // We should be able to upgrade move-stdlib, as our local package has only
     // compatible changes. (We added a new function to string.move.)
-    assert_success!(h.publish_package(
+    assert_success!(h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_stdlib"),
     ));
@@ -209,7 +206,7 @@ fn code_publishing_framework_upgrade_fail() {
 
     // We should not be able to upgrade move-stdlib because we removed a function
     // from the string module.
-    let result = h.publish_package(
+    let result = h.publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_stdlib_incompat"),
     );
@@ -267,16 +264,14 @@ fn code_publishing_with_two_attempts_and_verify_loader_is_invalidated() {
     //
     // Depending on how the loader cache is flushed, the second attempt might even fail if the
     // entire init_module from the first attempt still lingers around and will fail if invoked.
-    let failed_module_publish = h.create_publish_package(
+    let failed_module_publish = h.create_publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_init_module_failed"),
-        None,
         |_| {},
     );
-    let module_publish_second_attempt = h.create_publish_package(
+    let module_publish_second_attempt = h.create_publish_package_cache_building(
         &acc,
         &common::test_dir_path("code_publishing.data/pack_init_module_second_attempt"),
-        None,
         |_| {},
     );
     let results = h.run_block(vec![failed_module_publish, module_publish_second_attempt]);

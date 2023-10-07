@@ -113,6 +113,7 @@ module aptos_framework::delegation_pool {
     use std::signer;
     use std::vector;
 
+    use aptos_std::math64;
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
     use aptos_std::table::{Self, Table};
     use aptos_std::smart_table::{Self, SmartTable};
@@ -1412,7 +1413,7 @@ module aptos_framework::delegation_pool {
         // operator `active` rewards not persisted yet to the active shares pool
         let commission_active = total_coins(&pool.active_shares);
         commission_active = if (active > commission_active) {
-            multiply_then_divide(active - commission_active, pool.operator_commission_percentage, MAX_FEE)
+            math64::mul_div(active - commission_active, pool.operator_commission_percentage, MAX_FEE)
         } else {
             // handle any slashing applied to `active` stake
             0
@@ -1420,7 +1421,7 @@ module aptos_framework::delegation_pool {
         // operator `pending_inactive` rewards not persisted yet to the pending_inactive shares pool
         let commission_pending_inactive = total_coins(pending_inactive_shares_pool(pool));
         commission_pending_inactive = if (pending_inactive > commission_pending_inactive) {
-            multiply_then_divide(
+            math64::mul_div(
                 pending_inactive - commission_pending_inactive,
                 pool.operator_commission_percentage,
                 MAX_FEE
@@ -1590,13 +1591,10 @@ module aptos_framework::delegation_pool {
         current_delegated_votes.pending_inactive_shares = current_delegated_votes.pending_inactive_shares - shares_to_redeem;
     }
 
+    #[deprecated]
+    /// Deprecated, prefer math64::mul_div
     public fun multiply_then_divide(x: u64, y: u64, z: u64): u64 {
-        let result = (to_u128(x) * to_u128(y)) / to_u128(z);
-        (result as u64)
-    }
-
-    fun to_u128(num: u64): u128 {
-        (num as u128)
+        math64::mul_div(x, y, z)
     }
 
     #[test_only]

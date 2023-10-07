@@ -4,6 +4,11 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 ## Unreleased
 
+## 1.20.0 (2023-09-22)
+
+- Add current objects queries support - `getAccountOwnedObjects`
+- Add `burnObject` transaction support in `AptosToken`
+
 ## 1.19.0 (2023-08-24)
 
 - Add fungible asset queries support - `getAccountCoinsData`, `getAccountCoinsDataCount`

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::remote_executor_service::ExecutorService;
 use aptos_types::block_executor::partitioner::ShardId;
-use std::{net::SocketAddr, thread, thread::JoinHandle};
+use std::net::SocketAddr;
 
 /// This is a simple implementation of RemoteExecutorService that runs the executor service in a
 /// separate thread. This should be used for testing only.
 pub struct ThreadExecutorService {
-    _child: JoinHandle<()>,
     _self_address: SocketAddr,
+    executor_service: ExecutorService,
 }
 
 impl ThreadExecutorService {
@@ -28,19 +28,14 @@ impl ThreadExecutorService {
             coordinator_address,
             remote_shard_addresses,
         );
-
-        let thread_name = format!("ThreadExecutorService-{}", shard_id);
-        let builder = thread::Builder::new().name(thread_name);
-
-        let child = builder
-            .spawn(move || {
-                executor_service.start();
-            })
-            .expect("Failed to spawn thread");
-
+        executor_service.start();
         Self {
-            _child: child,
             _self_address: self_address,
+            executor_service,
         }
+    }
+
+    pub fn shutdown(&mut self) {
+        self.executor_service.shutdown()
     }
 }

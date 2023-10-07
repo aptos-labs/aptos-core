@@ -337,8 +337,8 @@ async fn test_multi_ed25519_signed_transaction() {
     context.commit_block(&vec![create_account_txn]).await;
 
     let raw_txn = factory
-        .mint(auth_key.derived_address(), 1000)
-        .sender(auth_key.derived_address())
+        .mint(auth_key.account_address(), 1000)
+        .sender(auth_key.account_address())
         .sequence_number(0)
         .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
         .build();

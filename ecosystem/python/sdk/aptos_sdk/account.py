@@ -49,7 +49,7 @@ class Account:
         with open(path) as file:
             data = json.load(file)
         return Account(
-            AccountAddress.from_str(data["account_address"]),
+            AccountAddress.from_str_relaxed(data["account_address"]),
             ed25519.PrivateKey.from_str(data["private_key"]),
         )
 

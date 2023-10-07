@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
-    natives::aptos_natives_with_builder,
-};
+use crate::move_vm_ext::{warm_vm_cache::WarmVmCache, AptosMoveResolver, SessionExt, SessionId};
 use aptos_framework::natives::{
     aggregator_natives::NativeAggregatorContext,
     code::NativeCodeContext,
@@ -48,6 +45,7 @@ impl MoveVmExt {
         features: Features,
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -87,17 +85,21 @@ impl MoveVmExt {
         }
 
         Ok(Self {
-            inner: MoveVM::new_with_config(aptos_natives_with_builder(&mut builder), VMConfig {
-                verifier: verifier_config,
-                max_binary_format_version,
-                paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
-                enable_invariant_violation_check_in_swap_loc,
-                type_size_limit,
-                max_value_nest_depth: Some(128),
-                type_max_cost,
-                type_base_cost,
-                type_byte_cost,
-            })?,
+            inner: WarmVmCache::get_warm_vm(
+                builder,
+                VMConfig {
+                    verifier: verifier_config,
+                    max_binary_format_version,
+                    paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
+                    enable_invariant_violation_check_in_swap_loc,
+                    type_size_limit,
+                    max_value_nest_depth: Some(128),
+                    type_max_cost,
+                    type_base_cost,
+                    type_byte_cost,
+                },
+                resolver,
+            )?,
             chain_id,
             features: Arc::new(features),
         })
@@ -110,6 +112,7 @@ impl MoveVmExt {
         chain_id: u8,
         features: Features,
         timed_features: TimedFeatures,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Self> {
         Self::new_impl::<fn(DynamicExpression)>(
             native_gas_params,
@@ -119,6 +122,7 @@ impl MoveVmExt {
             features,
             timed_features,
             None,
+            resolver,
         )
     }
 
@@ -130,6 +134,7 @@ impl MoveVmExt {
         features: Features,
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
+        resolver: &impl AptosMoveResolver,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -142,6 +147,7 @@ impl MoveVmExt {
             features,
             timed_features,
             gas_hook,
+            resolver,
         )
     }
 

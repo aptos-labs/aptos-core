@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::aggregator_extension::{extension_error, AggregatorHandle, AggregatorID};
-use aptos_types::{account_address::AccountAddress, state_store::table::TableHandle};
+use aptos_aggregator::aggregator_extension::extension_error;
+use aptos_types::{
+    account_address::AccountAddress,
+    aggregator::{AggregatorHandle, AggregatorID},
+    state_store::table::TableHandle,
+};
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::values::{Reference, Struct, StructRef, Value};
 

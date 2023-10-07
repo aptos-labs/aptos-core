@@ -19,6 +19,7 @@ pub mod execution_strategies;
 pub mod executor;
 pub mod gas_costs;
 mod golden_outputs;
+pub mod loader;
 pub mod on_chain_configs;
 mod proptest_types;
 

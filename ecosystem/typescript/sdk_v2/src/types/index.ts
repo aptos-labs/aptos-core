@@ -1,9 +1,86 @@
 import { Network } from "../utils/api-endpoints";
 
+export * from "./indexer";
+
 /**
  * Hex data as input to a function
  */
 export type HexInput = string | Uint8Array;
+
+/**
+ * Script transaction arguments enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/language_storage.rs#L27}
+ */
+export enum TypeTagVariants {
+  Bool = 0,
+  U8 = 1,
+  U64 = 2,
+  U128 = 3,
+  Address = 4,
+  Signer = 5,
+  Vector = 6,
+  Struct = 7,
+  U16 = 8,
+  U32 = 9,
+  U256 = 10,
+}
+
+/**
+ * Script transaction arguments enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-core/types/src/transaction_argument.rs#L11}
+ */
+export enum ScriptTransactionArgumentVariants {
+  U8 = 0,
+  U64 = 1,
+  U128 = 2,
+  Address = 3,
+  U8Vector = 4,
+  Bool = 5,
+  U16 = 6,
+  U32 = 7,
+  U256 = 8,
+}
+
+/**
+ * Transaction payload enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L478}
+ */
+export enum TransactionPayloadVariants {
+  Script = 0,
+  EntryFunction = 2,
+  Multisig = 3,
+}
+
+/**
+ * Transaction variants enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/mod.rs#L440}
+ */
+export enum TransactionVariants {
+  MultiAgentTransaction = 0,
+  FeePayerTransaction = 1,
+}
+
+/**
+ * Transaction Authenticator enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L44}
+ */
+export enum TransactionAuthenticatorVariant {
+  Ed25519 = 0,
+  MultiEd25519 = 1,
+  MultiAgent = 2,
+  FeePayer = 3,
+  Secp256k1Ecdsa = 4,
+}
+
+/**
+ * Transaction Authenticator enum as they are represented in Rust
+ * {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L414}
+ */
+export enum AccountAuthenticatorVariant {
+  Ed25519 = 0,
+  MultiEd25519 = 1,
+  Secp256k1 = 2,
+}
 
 /**
  * BCS types
@@ -77,9 +154,10 @@ export type ClientConfig = {
 export type AptosRequest = {
   url: string;
   method: "GET" | "POST";
-  endpoint?: string;
+  path?: string;
   body?: any;
   contentType?: string;
+  acceptType?: string;
   params?: Record<string, string | AnyNumber | boolean | undefined>;
   originMethod?: string;
   overrides?: ClientConfig;
@@ -95,6 +173,24 @@ export type LedgerVersion = {
 /**
  * RESPONSE TYPES
  */
+
+/**
+ * Type holding the outputs of the estimate gas API
+ */
+export type GasEstimation = {
+  /**
+   * The deprioritized estimate for the gas unit price
+   */
+  deprioritized_gas_estimate?: number;
+  /**
+   * The current estimate for the gas unit price
+   */
+  gas_estimate: number;
+  /**
+   * The prioritized estimate for the gas unit price
+   */
+  prioritized_gas_estimate?: number;
+};
 
 export type MoveResource = {
   type: MoveResourceType;
@@ -513,9 +609,72 @@ export type Event = {
 };
 
 /**
+ * Map of Move types to local TypeScript types
+ */
+export type MoveUint8Type = number;
+export type MoveUint16Type = number;
+export type MoveUint32Type = number;
+export type MoveUint64Type = string;
+export type MoveUint128Type = string;
+export type MoveUint256Type = string;
+export type MoveAddressType = `0x${string}`;
+export type MoveObjectType = `0x${string}`;
+export type MoveStructType = `0x${string}::${string}::${string}`;
+export type MoveOptionType = MoveType | null | undefined;
+/**
  * String representation of a on-chain Move struct type.
  */
 export type MoveResourceType = `${string}::${string}::${string}`;
+
+export type MoveType =
+  | boolean
+  | string
+  | MoveUint8Type
+  | MoveUint16Type
+  | MoveUint32Type
+  | MoveUint64Type
+  | MoveUint128Type
+  | MoveUint256Type
+  | MoveAddressType
+  | MoveObjectType
+  | MoveStructType
+  | Array<MoveType>;
+
+/**
+ * Possible Move values acceptable by move functions (entry, view)
+ *
+ * `Bool -> boolean`
+ *
+ * `u8, u16, u32 -> number`
+ *
+ * `u64, u128, u256 -> string`
+ *
+ * `String -> string`
+ *
+ * `Address -> 0x${string}`
+ *
+ * `Struct - 0x${string}::${string}::${string}`
+ *
+ * `Object -> 0x${string}`
+ *
+ * `Vector -> Array<MoveValue>`
+ *
+ * `Option -> MoveValue | null | undefined`
+ */
+export type MoveValue =
+  | boolean
+  | string
+  | MoveUint8Type
+  | MoveUint16Type
+  | MoveUint32Type
+  | MoveUint64Type
+  | MoveUint128Type
+  | MoveUint256Type
+  | MoveAddressType
+  | MoveObjectType
+  | MoveStructType
+  | MoveOptionType
+  | Array<MoveValue>;
 
 /**
  * Move module id is a string representation of Move module.
@@ -627,3 +786,126 @@ export type MoveFunction = {
    */
   return: Array<string>;
 };
+
+export enum RoleType {
+  VALIDATOR = "validator",
+  FULL_NODE = "full_node",
+}
+
+export type LedgerInfo = {
+  /**
+   * Chain ID of the current chain
+   */
+  chain_id: number;
+  epoch: string;
+  ledger_version: string;
+  oldest_ledger_version: string;
+  ledger_timestamp: string;
+  node_role: RoleType;
+  oldest_block_height: string;
+  block_height: string;
+  /**
+   * Git hash of the build of the API endpoint.  Can be used to determine the exact
+   * software version used by the API endpoint.
+   */
+  git_hash?: string;
+};
+
+/**
+ * A Block type
+ */
+export type Block = {
+  block_height: string;
+  block_hash: `0x${string}`;
+  block_timestamp: string;
+  first_version: string;
+  last_version: string;
+  /**
+   * The transactions in the block in sequential order
+   */
+  transactions?: Array<TransactionResponse>;
+};
+
+// REQUEST TYPES
+
+/**
+ * View request for the Move view function API
+ *
+ * `type MoveResourceType = ${string}::${string}::${string}`;
+ */
+export type ViewRequest = {
+  function: MoveResourceType;
+  /**
+   * Type arguments of the function
+   */
+  type_arguments: Array<MoveResourceType>;
+  /**
+   * Arguments of the function
+   */
+  arguments: Array<MoveValue>;
+};
+
+/**
+ * Table Item request for the GetTableItem API
+ */
+export type TableItemRequest = {
+  key_type: MoveValue;
+  value_type: MoveValue;
+  /**
+   * The value of the table item's key
+   */
+  key: any;
+};
+
+/**
+ * A list of Authentication Key schemes that are supported by Aptos.
+ *
+ * They are combinations of signing schemes and derive schemes.
+ */
+export type AuthenticationKeyScheme = SigningScheme | DeriveScheme;
+
+/**
+ * A list of signing schemes that are supported by Aptos.
+ *
+ * https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs#L375-L378
+ */
+export enum SigningScheme {
+  /**
+   * For Ed25519PublicKey
+   */
+  Ed25519 = 0,
+  /**
+   * For MultiEd25519PublicKey
+   */
+  MultiEd25519 = 1,
+  /**
+   * For Secp256k1 ecdsa
+   */
+  Secp256k1Ecdsa = 2,
+}
+
+/**
+ * Scheme used for deriving account addresses from other data
+ */
+export enum DeriveScheme {
+  /**
+   * Derives an address using an AUID, used for objects
+   */
+  DeriveAuid = 251,
+  /**
+   * Derives an address from another object address
+   */
+  DeriveObjectAddressFromObject = 252,
+  /**
+   * Derives an address from a GUID, used for objects
+   */
+  DeriveObjectAddressFromGuid = 253,
+  /**
+   * Derives an address from seed bytes, used for named objects
+   */
+  DeriveObjectAddressFromSeed = 254,
+  /**
+   * Derives an address from seed bytes, used for resource accounts
+   */
+  DeriveResourceAccountAddress = 255,
+}

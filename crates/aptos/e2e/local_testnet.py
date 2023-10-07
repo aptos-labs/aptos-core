@@ -14,7 +14,7 @@ LOG = logging.getLogger(__name__)
 
 # Run a local testnet in a docker container. We choose to detach here and we'll
 # stop running it later using the container name.
-def run_node(network: Network, image_repo_with_project: str):
+def run_node(network: Network, image_repo_with_project: str, pull=True):
     image_name = build_image_name(image_repo_with_project, network)
     container_name = f"aptos-tools-{network}"
     LOG.info(f"Trying to run aptos CLI local testnet from image: {image_name}")
@@ -43,28 +43,34 @@ def run_node(network: Network, image_repo_with_project: str):
     if LOG.getEffectiveLevel() > 10:
         kwargs = {**kwargs, **{"stdout": subprocess.PIPE, "stderr": subprocess.PIPE}}
 
+    args = [
+        "docker",
+        "run",
+    ]
+
+    if pull:
+        args += ["--pull", "always"]
+
+    args += [
+        "--detach",
+        "--name",
+        container_name,
+        "-p",
+        f"{NODE_PORT}:{NODE_PORT}",
+        "-p",
+        f"{METRICS_PORT}:{METRICS_PORT}",
+        "-p",
+        f"{FAUCET_PORT}:{FAUCET_PORT}",
+        image_name,
+        "aptos",
+        "node",
+        "run-local-testnet",
+        "--with-faucet",
+    ]
+
     # Run the container.
     subprocess.run(
-        [
-            "docker",
-            "run",
-            "--pull",
-            "always",
-            "--detach",
-            "--name",
-            container_name,
-            "-p",
-            f"{NODE_PORT}:{NODE_PORT}",
-            "-p",
-            f"{METRICS_PORT}:{METRICS_PORT}",
-            "-p",
-            f"{FAUCET_PORT}:{FAUCET_PORT}",
-            image_name,
-            "aptos",
-            "node",
-            "run-local-testnet",
-            "--with-faucet",
-        ],
+        args,
         **kwargs,
     )
 

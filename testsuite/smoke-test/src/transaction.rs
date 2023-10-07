@@ -29,7 +29,7 @@ async fn test_external_transaction_signer() {
 
     // create transfer parameters
     let sender_auth_key = AuthenticationKey::ed25519(&public_key);
-    let sender_address = sender_auth_key.derived_address();
+    let sender_address = sender_auth_key.account_address();
     info.create_user_account(&public_key).await.unwrap();
     // TODO(Gas): double check if this is correct
     info.mint(sender_address, 10_000_000).await.unwrap();

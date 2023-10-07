@@ -13,7 +13,7 @@ import textwrap
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import (
     Any,
@@ -29,7 +29,7 @@ from typing import (
     TypedDict,
     Union,
 )
-from urllib.parse import ParseResult, urlunparse, urlencode
+from urllib.parse import ParseResult, urlunparse, urlencode, quote as urlquote
 from test_framework.logging import init_logging, log
 from test_framework.filesystem import Filesystem, LocalFilesystem
 from test_framework.git import Git
@@ -393,7 +393,7 @@ def apply_humio_time_filter(
     return urlparts
 
 
-def get_humio_forge_link(
+def get_humio_link_for_test_runner_logs(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
@@ -435,7 +435,7 @@ def get_humio_forge_link(
     )
 
 
-def get_humio_logs_link(
+def get_humio_link_for_node_logs(
     forge_namespace: str,
     time_filter: Union[bool, Tuple[datetime, datetime]],
 ) -> str:
@@ -488,6 +488,58 @@ def get_humio_logs_link(
     )
 
 
+def get_axiom_link_for_test_runner_logs(
+    forge_namespace: str,
+    time_filter: Union[bool, Tuple[datetime, datetime]],
+) -> str:
+    """Get a link to the forge test runner logs in axiom for a given test run in a given namespace"""
+
+    apl_query = f"""
+        k8s
+        | where ['k8s.cluster'] contains "forge" and ['k8s.container_name'] != "calico-node" and ['k8s.namespace'] != "calico-apiserver" and ['k8s.container_name'] != "kube-proxy" and 
+        ['k8s.labels.app.kubernetes.io/name'] = "forge" and ['k8s.namespace'] == "{forge_namespace}"
+        """
+
+    logs_url = f"https://app.axiom.co/aptoslabs-hghf/explorer?initForm={urlquote( json.dumps({ 'apl': apl_query, 'queryOptions': apply_axiom_time_filter(time_filter), }) )}"
+
+    return logs_url
+
+
+def get_axiom_link_for_node_logs(
+    forge_namespace: str,
+    time_filter: Union[bool, Tuple[datetime, datetime]],
+) -> str:
+    """Get a link to the node logs in axiom for a given test run in a given namespace"""
+
+    apl_query = f"""
+        k8s
+        | where ['k8s.cluster'] contains "forge" and ['k8s.container_name'] != "calico-node" and ['k8s.namespace'] != "calico-apiserver" and ['k8s.container_name'] != "kube-proxy" and 
+            (
+            ['k8s.namespace'] == "{forge_namespace}" // filters on namespace which contains validator logs
+            or // remove either side of the OR operator to only display validator or forge-runner logs
+            ['k8s.labels.forge-namespace'] == "{forge_namespace}" // filters on specific forge-runner pod in default namespace
+            )
+        """
+
+    logs_url = f"https://app.axiom.co/aptoslabs-hghf/explorer?initForm={urlquote( json.dumps({ 'apl': apl_query, 'queryOptions': apply_axiom_time_filter(time_filter), }) )}"
+
+    return logs_url
+
+
+def apply_axiom_time_filter(
+    time_filter: Union[bool, Tuple[datetime, datetime]],
+) -> Mapping:
+    if time_filter is True:
+        return {"quickRange": "30m"}
+    elif isinstance(time_filter, tuple):
+        return {
+            "startTime": time_filter[0].astimezone(timezone.utc).isoformat(),
+            "endTime": time_filter[1].astimezone(timezone.utc).isoformat(),
+        }
+    else:
+        raise Exception(f"Invalid refresh argument: {time_filter}")
+
+
 def format_github_info(context: ForgeContext) -> str:
     if not context.github_job_url:
         return ""
@@ -518,7 +570,11 @@ def format_pre_comment(context: ForgeContext) -> str:
         context.forge_chain_name,
         True,
     )
-    humio_logs_link = get_humio_logs_link(
+    humio_logs_link = get_humio_link_for_node_logs(
+        context.forge_namespace,
+        True,
+    )
+    axiom_logs_link = get_axiom_link_for_node_logs(
         context.forge_namespace,
         True,
     )
@@ -529,6 +585,7 @@ def format_pre_comment(context: ForgeContext) -> str:
             ### Forge is running suite `{context.forge_test_suite}` on {get_testsuite_images(context)}
             * [Grafana dashboard (auto-refresh)]({dashboard_link})
             * [Humio Logs]({humio_logs_link})
+            * [Axiom Logs]({axiom_logs_link})
             """
         ).lstrip()
         + format_github_info(context)
@@ -541,7 +598,11 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         context.forge_chain_name,
         (result.start_time, result.end_time),
     )
-    humio_logs_link = get_humio_logs_link(
+    humio_logs_link = get_humio_link_for_node_logs(
+        context.forge_namespace,
+        (result.start_time, result.end_time),
+    )
+    axiom_logs_link = get_axiom_link_for_node_logs(
         context.forge_namespace,
         (result.start_time, result.end_time),
     )
@@ -568,6 +629,7 @@ def format_comment(context: ForgeContext, result: ForgeResult) -> str:
         ```
         * [Grafana dashboard]({dashboard_link})
         * [Humio Logs]({humio_logs_link})
+        * [Axiom Logs]({axiom_logs_link})
         """
         )
         + format_github_info(context)
@@ -1133,8 +1195,10 @@ async def run_multiple(
 
     for suite in forge_test_suites:
         new_namespace = f"{forge_namespace}-{suite}"
-        link = get_humio_forge_link(new_namespace, True)
-        pending_comment.append(f"Running {suite}: [Runner logs]({link})")
+        humio_link = get_humio_link_for_test_runner_logs(new_namespace, True)
+        axiom_link = get_axiom_link_for_test_runner_logs(new_namespace, True)
+        pending_comment.append(f"Running {suite}: [Runner logs in Humio]({humio_link})")
+        pending_comment.append(f"Running {suite}: [Runner logs in Axiom]({axiom_link})")
         if forge_runner_mode != "pre-forge":
             pending_results.append(
                 context.shell.gen_run(

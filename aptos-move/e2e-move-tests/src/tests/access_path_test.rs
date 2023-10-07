@@ -4,6 +4,7 @@
 use crate::{assert_success, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
+    move_utils::MemberId,
     transaction::{ExecutionStatus, ModuleBundle, TransactionPayload},
 };
 use move_binary_format::{
@@ -105,7 +106,7 @@ fn access_path_panic() {
 
     let res = h.run_entry_function(
         &acc,
-        aptos::move_tool::MemberId {
+        MemberId {
             module_id: cm.self_id(),
             member_id: Identifier::new("f").unwrap(),
         },

@@ -73,6 +73,18 @@ pub enum Attribute {
     Assign(NodeId, Symbol, AttributeValue),
 }
 
+impl Attribute {
+    pub fn name(&self) -> Symbol {
+        match self {
+            Attribute::Assign(_, s, _) | Attribute::Apply(_, s, _) => *s,
+        }
+    }
+
+    pub fn has(attrs: &[Attribute], pred: impl Fn(&Attribute) -> bool) -> bool {
+        attrs.iter().any(pred)
+    }
+}
+
 // =================================================================================================
 /// # Conditions
 

@@ -6,6 +6,7 @@ module marketplace::fee_schedule {
     use std::error;
     use std::signer;
     use std::string::{Self, String};
+    use aptos_std::math64;
 
     use aptos_std::type_info;
 
@@ -319,7 +320,7 @@ module marketplace::fee_schedule {
             borrow_global<FixedRateCommission>(fee_schedule_addr).commission
         } else if (exists<PercentageRateCommission>(fee_schedule_addr)) {
             let fees = borrow_global<PercentageRateCommission>(fee_schedule_addr);
-            ((price as u128) * (fees.numerator as u128) / (fees.denominator as u128) as u64)
+            math64::mul_div(price, fees.numerator, fees.denominator)
         } else {
             0
         }

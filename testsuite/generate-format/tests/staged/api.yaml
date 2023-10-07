@@ -37,6 +37,13 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+    2:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256k1EcdsaPublicKey
+          - signature:
+              TYPENAME: Secp256k1EcdsaSignature
 BlockMetadata:
   STRUCT:
     - id:
@@ -217,6 +224,12 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
+Secp256k1EcdsaPrivateKey:
+  NEWTYPESTRUCT: BYTES
+Secp256k1EcdsaPublicKey:
+  NEWTYPESTRUCT: BYTES
+Secp256k1EcdsaSignature:
+  NEWTYPESTRUCT: BYTES
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -352,6 +365,13 @@ TransactionAuthenticator:
               TYPENAME: AccountAddress
           - fee_payer_signer:
               TYPENAME: AccountAuthenticator
+    4:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256k1EcdsaPublicKey
+          - signature:
+              TYPENAME: Secp256k1EcdsaSignature
 TransactionData:
   ENUM:
     0:

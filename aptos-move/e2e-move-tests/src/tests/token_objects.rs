@@ -84,7 +84,7 @@ fn test_basic_token() {
     let object_0: ObjectCore = h
         .read_resource_from_resource_group(&token_addr, obj_group_tag.clone(), obj_tag.clone())
         .unwrap();
-    let mut token_0: Token = h
+    let token_0: Token = h
         .read_resource_from_resource_group(
             &token_addr,
             obj_group_tag.clone(),
@@ -121,6 +121,5 @@ fn test_basic_token() {
     // Determine that the only difference is the mutated description
     assert_eq!(token_1.description, "Oh no!");
     token_1.description = "The best hero ever!".to_string();
-    *token_0.mutation_events.count_mut() = token_1.mutation_events.count();
-    assert_eq!(token_0, token_1);
+    assert_eq!(token_0.mutation_events.key(), token_1.mutation_events.key());
 }

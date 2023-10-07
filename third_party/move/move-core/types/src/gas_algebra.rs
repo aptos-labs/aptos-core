@@ -139,7 +139,7 @@ impl<U> From<GasQuantity<U>> for u64 {
  **************************************************************************************************/
 impl<U> Clone for GasQuantity<U> {
     fn clone(&self) -> Self {
-        Self::new(self.val)
+        *self
     }
 }
 

@@ -73,7 +73,7 @@ To develop in a local environment, you need to use the SDK from the [main](https
 Run a local node (run from the root of the [repo](https://github.com/aptos-labs/aptos-core/)):
 
 ```ts
-cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+cargo run -p aptos -- node run-local-testnet --force-restart --assume-yes
 ```
 
 ## Contributing

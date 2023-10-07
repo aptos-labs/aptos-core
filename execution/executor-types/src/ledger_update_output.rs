@@ -19,11 +19,11 @@ use std::sync::Arc;
 #[derive(Default, Debug)]
 pub struct LedgerUpdateOutput {
     pub status: Vec<TransactionStatus>,
-    pub to_commit: Vec<Arc<TransactionToCommit>>,
+    pub to_commit: Vec<TransactionToCommit>,
     pub reconfig_events: Vec<ContractEvent>,
     pub dkg_events: Vec<ContractEvent>,
     pub transaction_info_hashes: Vec<HashValue>,
-    pub block_state_updates: ShardedStateUpdates,
+    pub state_updates_before_last_checkpoint: ShardedStateUpdates,
     pub sharded_state_cache: ShardedStateCache,
     /// The in-memory Merkle Accumulator representing a blockchain state consistent with the
     /// `state_tree`.
@@ -51,8 +51,8 @@ impl LedgerUpdateOutput {
         &self.transaction_accumulator
     }
 
-    pub fn transactions_to_commit(&self) -> Vec<Arc<TransactionToCommit>> {
-        self.to_commit.iter().map(Arc::clone).collect()
+    pub fn transactions_to_commit(&self) -> &Vec<TransactionToCommit> {
+        &self.to_commit
     }
 
     /// Ensure that every block committed by consensus ends with a state checkpoint. That can be

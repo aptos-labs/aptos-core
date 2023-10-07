@@ -24,8 +24,11 @@ bytes = { workspace = true }
 either = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
+aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-vm = { workspace = true }
 claims = { workspace = true }
+test-case = { workspace = true }

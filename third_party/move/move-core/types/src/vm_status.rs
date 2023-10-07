@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::unit_arg)]
+#![allow(clippy::arc_with_non_send_sync)]
 
 use crate::language_storage::ModuleId;
 use anyhow::Result;

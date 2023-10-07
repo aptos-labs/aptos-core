@@ -28,7 +28,7 @@ impl DbDir {
         StateMerkleDb::new(
             self.db_dir.join(STATE_MERKLE_DB_NAME).as_path(),
             RocksdbConfigs {
-                use_sharded_state_merkle_db: self.sharding_config.use_sharded_state_merkle_db,
+                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },
             false,
@@ -40,7 +40,7 @@ impl DbDir {
         LedgerDb::new(
             self.db_dir.as_path(),
             RocksdbConfigs {
-                split_ledger_db: self.sharding_config.split_ledger_db,
+                enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()
             },
             true,

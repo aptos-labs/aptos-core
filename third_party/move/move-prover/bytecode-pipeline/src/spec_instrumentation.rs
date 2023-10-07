@@ -154,6 +154,9 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 continue;
             }
             for ref fun in module.get_functions() {
+                if fun.is_inline() {
+                    continue;
+                }
                 for (variant, target) in targets.get_targets(fun) {
                     let spec = &*target.get_spec();
                     if !spec.conditions.is_empty() {

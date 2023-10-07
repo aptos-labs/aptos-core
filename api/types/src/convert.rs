@@ -734,7 +734,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
         );
         arg_types
             .into_iter()
-            .zip(args.into_iter())
+            .zip(args)
             .enumerate()
             .map(|(i, (arg_type, arg))| {
                 self.try_into_vm_value(&arg_type.clone().try_into()?, arg)

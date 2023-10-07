@@ -107,6 +107,6 @@ impl IntoIterator for ValidatorSet {
     fn into_iter(self) -> Self::IntoIter {
         self.active_validators
             .into_iter()
-            .chain(self.pending_inactive.into_iter())
+            .chain(self.pending_inactive)
     }
 }

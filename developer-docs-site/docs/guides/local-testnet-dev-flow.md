@@ -20,7 +20,7 @@ git clone git@github.com:aptos-labs/aptos-core.git ~/aptos-core && cd ~/aptos-co
 
 Run a local testnet with a faucet:
 ```
-cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+cargo run -p aptos -- node run-local-testnet --faucet-port 8081 --force-restart --assume-yes
 ```
 You may add the `--release` flag after `cargo run` if you want to build a release version of the CLI for running the local testnet.
 

@@ -195,7 +195,6 @@ transferred to A
 -  [Function `update_governanace_records_for_redeem_active_shares`](#0x1_delegation_pool_update_governanace_records_for_redeem_active_shares)
 -  [Function `update_governanace_records_for_redeem_pending_inactive_shares`](#0x1_delegation_pool_update_governanace_records_for_redeem_pending_inactive_shares)
 -  [Function `multiply_then_divide`](#0x1_delegation_pool_multiply_then_divide)
--  [Function `to_u128`](#0x1_delegation_pool_to_u128)
 -  [Specification](#@Specification_1)
 
 
@@ -3360,7 +3359,7 @@ whether the lockup expired on the stake pool.
     // operator `active` rewards not persisted yet <b>to</b> the active shares pool
     <b>let</b> commission_active = total_coins(&pool.active_shares);
     commission_active = <b>if</b> (active &gt; commission_active) {
-        <a href="delegation_pool.md#0x1_delegation_pool_multiply_then_divide">multiply_then_divide</a>(active - commission_active, pool.operator_commission_percentage, <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>)
+        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(active - commission_active, pool.operator_commission_percentage, <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>)
     } <b>else</b> {
         // handle <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> slashing applied <b>to</b> `active` <a href="stake.md#0x1_stake">stake</a>
         0
@@ -3368,7 +3367,7 @@ whether the lockup expired on the stake pool.
     // operator `pending_inactive` rewards not persisted yet <b>to</b> the pending_inactive shares pool
     <b>let</b> commission_pending_inactive = total_coins(<a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool));
     commission_pending_inactive = <b>if</b> (pending_inactive &gt; commission_pending_inactive) {
-        <a href="delegation_pool.md#0x1_delegation_pool_multiply_then_divide">multiply_then_divide</a>(
+        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(
             pending_inactive - commission_pending_inactive,
             pool.operator_commission_percentage,
             <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>
@@ -3667,9 +3666,11 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 ## Function `multiply_then_divide`
 
+Deprecated, prefer math64::mul_div
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_multiply_then_divide">multiply_then_divide</a>(x: u64, y: u64, z: u64): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_multiply_then_divide">multiply_then_divide</a>(x: u64, y: u64, z: u64): u64
 </code></pre>
 
 
@@ -3679,32 +3680,7 @@ shares pools, assign commission to operator and eventually prepare delegation po
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_multiply_then_divide">multiply_then_divide</a>(x: u64, y: u64, z: u64): u64 {
-    <b>let</b> result = (<a href="delegation_pool.md#0x1_delegation_pool_to_u128">to_u128</a>(x) * <a href="delegation_pool.md#0x1_delegation_pool_to_u128">to_u128</a>(y)) / <a href="delegation_pool.md#0x1_delegation_pool_to_u128">to_u128</a>(z);
-    (result <b>as</b> u64)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_delegation_pool_to_u128"></a>
-
-## Function `to_u128`
-
-
-
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_to_u128">to_u128</a>(num: u64): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_to_u128">to_u128</a>(num: u64): u128 {
-    (num <b>as</b> u128)
+    <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(x, y, z)
 }
 </code></pre>
 

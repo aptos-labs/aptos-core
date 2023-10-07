@@ -1,0 +1,6 @@
+Move prover returns: exiting with model building errors
+error: duplicate declaration of `double`
+   ┌─ tests/sources/functional/duplicate_function_declarations.move:11:9
+   │
+11 │     fun double(x: u8): u8 {
+   │         ^^^^^^

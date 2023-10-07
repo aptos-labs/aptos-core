@@ -249,7 +249,7 @@ impl<T> Response<T> {
 }
 
 /// The different data client response payloads as an enum.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
@@ -261,6 +261,8 @@ pub enum ResponsePayload {
 }
 
 impl ResponsePayload {
+    /// Returns a label for the response payload. This is useful
+    /// for logging and metrics.
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
@@ -270,6 +272,34 @@ impl ResponsePayload {
             Self::StateValuesWithProof(_) => "state_values_with_proof",
             Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
             Self::TransactionsWithProof(_) => "transactions_with_proof",
+        }
+    }
+
+    /// Returns the chunk size of the response payload (i.e., the
+    /// number of data items held in the response).
+    pub fn get_data_chunk_size(&self) -> usize {
+        match self {
+            Self::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
+                epoch_ending_ledger_infos.len()
+            },
+            Self::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            Self::NewTransactionsWithProof((transactions_with_proof, _)) => {
+                transactions_with_proof.transactions.len()
+            },
+            Self::NumberOfStates(_) => {
+                1 // The number of states is a single u64
+            },
+            Self::StateValuesWithProof(state_values_with_proof) => {
+                state_values_with_proof.raw_values.len()
+            },
+            Self::TransactionOutputsWithProof(outputs_with_proof) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            Self::TransactionsWithProof(transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
         }
     }
 }

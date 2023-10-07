@@ -12,7 +12,7 @@ use crate::{
     expansion::ast::{AbilitySet, ModuleIdent},
     hlir::ast::{self as H, Label, Value, Value_},
     parser::ast::{ConstantName, FunctionName, StructName, Var},
-    shared::{unique_map::UniqueMap, CompilationEnv},
+    shared::{ast_debug, unique_map::UniqueMap, CompilationEnv},
     FullyCompiledProgram,
 };
 use cfgir::ast::LoopInfo;
@@ -78,6 +78,10 @@ impl<'env> Context<'env> {
         }
     }
 
+    fn reset_labels(&mut self) {
+        self.label_count = 0;
+    }
+
     fn new_label(&mut self) -> Label {
         let count = self.label_count;
         self.label_count += 1;
@@ -102,7 +106,6 @@ impl<'env> Context<'env> {
         let block_ordering = mem::take(&mut self.block_ordering);
         let block_info = mem::take(&mut self.block_info);
         self.loop_bounds = BTreeMap::new();
-        self.label_count = 0;
         self.loop_begin = None;
         self.loop_end = None;
 
@@ -281,6 +284,12 @@ fn constant_(
     assert!(infinite_loop_starts.is_empty(), "{}", ICE_MSG);
     assert!(errors.is_empty(), "{}", ICE_MSG);
 
+    let needs_recompute = cfg.remove_critical_edges(|| context.new_label());
+    if needs_recompute {
+        let dead_blocks = cfg.recompute();
+        assert!(dead_blocks.is_empty())
+    }
+
     let num_previous_errors = context.env.count_diags();
     let fake_signature = H::FunctionSignature {
         type_parameters: vec![],
@@ -423,7 +432,33 @@ fn function_body(
 
             let (mut cfg, infinite_loop_starts, diags) =
                 BlockCFG::new(start, &mut blocks, &block_info);
+
             context.env.add_diags(diags);
+            if context.env.flags().debug() {
+                eprintln!("BlockCFG is {}", ast_debug::display_verbose(&cfg));
+            }
+
+            let needs_recompute = cfg.remove_critical_edges(|| context.new_label());
+            if context.env.flags().debug() {
+                eprintln!(
+                    "AFter removing critical edges, BlockCFG is {}",
+                    ast_debug::display_verbose(&cfg)
+                );
+            }
+            if needs_recompute {
+                let dead_blocks = cfg.recompute();
+                if context.env.flags().debug() {
+                    eprintln!(
+                        "After recompute, BlockCFG is {}",
+                        ast_debug::display_verbose(&cfg)
+                    );
+                    eprintln!(
+                        "dead_blocks is {}",
+                        ast_debug::display_verbose(&dead_blocks)
+                    );
+                }
+                assert!(dead_blocks.is_empty())
+            }
 
             cfgir::refine_inference_and_verify(
                 context.env,
@@ -434,9 +469,22 @@ fn function_body(
                 &mut cfg,
                 &infinite_loop_starts,
             );
+            if context.env.flags().debug() {
+                eprintln!(
+                    "After refine_inference_and_verify, BlockCFG is {}",
+                    ast_debug::display_verbose(&cfg)
+                );
+            }
+
             // do not optimize if there are errors, warnings are okay
             if !context.env.has_errors() {
                 cfgir::optimize(signature, &locals, &mut cfg);
+            }
+            if context.env.flags().debug() {
+                eprintln!(
+                    "After optimize, BlockCFG is {}",
+                    ast_debug::display_verbose(&cfg)
+                );
             }
 
             let loop_heads = block_info
@@ -462,6 +510,7 @@ fn function_body(
 //**************************************************************************************************
 
 fn initial_block(context: &mut Context, blocks: H::Block) {
+    context.reset_labels();
     let start = context.new_label();
     context.start = Some(start);
     block(context, start, blocks)

@@ -31,6 +31,7 @@ use crate::{
     ty::{
         PrimitiveType, ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
+    well_known,
 };
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
@@ -989,10 +990,10 @@ impl GlobalEnv {
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
-    pub fn report_diag_with_filter<W: WriteColor, F: Fn(&Diagnostic<FileId>) -> bool>(
+    pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
         &self,
         writer: &mut W,
-        filter: F,
+        mut filter: F,
     ) {
         let mut shown = BTreeSet::new();
         for (diag, reported) in self
@@ -2085,6 +2086,27 @@ impl<'env> ModuleEnv<'env> {
         &self.data.attributes
     }
 
+    /// Checks whether the module has an attribute.
+    pub fn has_attribute(&self, pred: impl Fn(&Attribute) -> bool) -> bool {
+        Attribute::has(&self.data.attributes, pred)
+    }
+
+    /// Checks whether this item is only used in tests.
+    pub fn is_test_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_test_only_attribute_name(s.as_str())
+        })
+    }
+
+    /// Checks whether this item is only used in verification.
+    pub fn is_verify_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_verify_only_attribute_name(s.as_str())
+        })
+    }
+
     /// Returns the use declarations of this module.
     pub fn get_use_decls(&self) -> &[UseDecl] {
         &self.data.use_decls
@@ -2751,6 +2773,27 @@ impl<'env> StructEnv<'env> {
         &self.data.attributes
     }
 
+    /// Checks whether the struct has an attribute.
+    pub fn has_attribute(&self, pred: impl Fn(&Attribute) -> bool) -> bool {
+        Attribute::has(&self.data.attributes, pred)
+    }
+
+    /// Checks whether this item is only used in tests.
+    pub fn is_test_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_test_only_attribute_name(s.as_str())
+        })
+    }
+
+    /// Checks whether this item is only used in verification.
+    pub fn is_verify_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_verify_only_attribute_name(s.as_str())
+        })
+    }
+
     /// Get documentation associated with this struct.
     pub fn get_doc(&self) -> &str {
         self.module_env.env.get_doc(&self.data.loc)
@@ -3237,6 +3280,27 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the attributes of this function.
     pub fn get_attributes(&self) -> &[Attribute] {
         &self.data.attributes
+    }
+
+    /// Checks whether the function has an attribute.
+    pub fn has_attribute(&self, pred: impl Fn(&Attribute) -> bool) -> bool {
+        Attribute::has(&self.data.attributes, pred)
+    }
+
+    /// Checks whether this item is only used in tests.
+    pub fn is_test_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_test_only_attribute_name(s.as_str())
+        })
+    }
+
+    /// Checks whether this item is only used in verification.
+    pub fn is_verify_only(&self) -> bool {
+        self.has_attribute(|a| {
+            let s = self.symbol_pool().string(a.name());
+            well_known::is_verify_only_attribute_name(s.as_str())
+        })
     }
 
     /// Returns the location of the specification block of this function. If the function has

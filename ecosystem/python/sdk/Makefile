@@ -21,6 +21,7 @@ examples:
 	poetry run python -m examples.aptos_token
 	poetry run python -m examples.read_aggregator
 	poetry run python -m examples.simple_nft
+	poetry run python -m examples.simple_aptos_token
 	poetry run python -m examples.simulate_transfer_coin
 	poetry run python -m examples.transfer_coin
 	poetry run python -m examples.transfer_two_by_two

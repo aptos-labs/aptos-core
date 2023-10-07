@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use crate::{
     pre_partition::{
         connected_component::ConnectedComponentPartitioner, uniform_partitioner::UniformPartitioner,

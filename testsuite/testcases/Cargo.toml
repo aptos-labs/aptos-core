@@ -38,6 +38,9 @@ reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 
+[dev-dependencies]
+assert_approx_eq = { workspace = true }
+
 [[test]]
 name = "forge-local-compatibility"
 harness = false

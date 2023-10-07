@@ -20,17 +20,17 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::BTreeMap;
+use std::collections::{btree_map::BTreeMap, hash_map::HashMap};
 
 pub struct AccountDataCache {
-    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
+    data_map: HashMap<Type, (MoveTypeLayout, GlobalValue)>,
     module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
     fn new() -> Self {
         Self {
-            data_map: BTreeMap::new(),
+            data_map: HashMap::new(),
             module_map: BTreeMap::new(),
         }
     }
@@ -231,7 +231,10 @@ impl<'r> TransactionDataCache<'r> {
         match self.remote.get_module(module_id) {
             Ok(Some(bytes)) => Ok(bytes),
             Ok(None) => Err(PartialVMError::new(StatusCode::LINKER_ERROR)
-                .with_message(format!("Cannot find {:?} in data cache", module_id))
+                .with_message(format!(
+                    "Linker Error: Cannot find {:?} in data cache",
+                    module_id
+                ))
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);

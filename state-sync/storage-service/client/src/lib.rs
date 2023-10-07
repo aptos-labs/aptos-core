@@ -13,7 +13,7 @@ use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
     StorageServiceMessage,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -63,9 +63,10 @@ impl<NetworkClient: NetworkClientInterface<StorageServiceMessage>>
         }
     }
 
-    pub fn get_available_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+    pub fn get_available_peers(&self) -> Result<HashSet<PeerNetworkId>, Error> {
         self.network_client
             .get_available_peers()
+            .map(|peers| peers.into_iter().collect())
             .map_err(|error| Error::NetworkError(error.to_string()))
     }
 

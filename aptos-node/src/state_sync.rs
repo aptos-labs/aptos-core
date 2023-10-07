@@ -4,7 +4,7 @@
 use crate::network::ApplicationNetworkInterfaces;
 use aptos_config::config::{NodeConfig, StateSyncConfig};
 use aptos_consensus_notifications::ConsensusNotifier;
-use aptos_data_client::client::AptosDataClient;
+use aptos_data_client::{client::AptosDataClient, poller};
 use aptos_data_streaming_service::{
     streaming_client::{new_streaming_service_client_listener_pair, StreamingServiceClient},
     streaming_service::DataStreamingService,
@@ -195,7 +195,7 @@ fn setup_aptos_data_client(
         storage_service_client,
         Some(aptos_data_client_runtime.handle().clone()),
     );
-    aptos_data_client_runtime.spawn(data_summary_poller.start_poller());
+    aptos_data_client_runtime.spawn(poller::start_poller(data_summary_poller));
 
     Ok((aptos_data_client, aptos_data_client_runtime))
 }

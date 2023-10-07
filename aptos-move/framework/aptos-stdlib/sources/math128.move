@@ -6,9 +6,8 @@ module aptos_std::math128 {
     use aptos_std::fixed_point64::FixedPoint64;
     use aptos_std::fixed_point64;
 
-    /// Abort value when an invalid argument is provided.
+    /// Cannot log2 the value 0
     const EINVALID_ARG_FLOOR_LOG2: u64 = 1;
-    const EDIVISION_BY_ZERO: u64 = 2;
 
     /// Return the largest of two numbers.
     public fun max(a: u128, b: u128): u128 {
@@ -29,8 +28,10 @@ module aptos_std::math128 {
         }
     }
 
-    /// Returns a * b / c going through u128 to prevent intermediate overflow
+    /// Returns a * b / c going through u256 to prevent intermediate overflow
     public inline fun mul_div(a: u128, b: u128, c: u128): u128 {
+        // Inline functions cannot take constants, as then every module using it needs the constant
+        assert!(c != 0, std::error::invalid_argument(4));
         (((a as u256) * (b as u256) / (c as u256)) as u128)
     }
 
@@ -142,7 +143,8 @@ module aptos_std::math128 {
         // ceil_div(x, y) = floor((x + y - 1) / y) = floor((x - 1) / y) + 1
         // (x + y - 1) could spuriously overflow. so we use the later version
         if (x == 0) {
-            assert!(y != 0, EDIVISION_BY_ZERO);
+            // Inline functions cannot take constants, as then every module using it needs the constant
+            assert!(y != 0, std::error::invalid_argument(4));
             0
         }
         else (x - 1) / y + 1
@@ -206,6 +208,12 @@ module aptos_std::math128 {
         assert!(mul_div(tmp,5,5) == tmp, 0);
         // Note that ordering other way is imprecise.
         assert!((tmp / 5) * 5 != tmp, 0);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10004, location = aptos_std::math128)]
+    public entry fun test_mul_div_by_zero() {
+        mul_div(1, 1, 0);
     }
 
     #[test]

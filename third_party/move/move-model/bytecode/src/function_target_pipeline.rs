@@ -524,6 +524,9 @@ impl FunctionTargetPipeline {
                             // check for fixedpoint in summaries
                             for fid in scc {
                                 let func_env = env.get_function(*fid);
+                                if func_env.is_inline() {
+                                    continue;
+                                }
                                 for (_, target) in targets.get_targets(&func_env) {
                                     if !target.data.annotations.reached_fixedpoint() {
                                         continue 'fixedpoint;

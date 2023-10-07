@@ -2,10 +2,23 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-//! Names of well-known functions.
+//! Names of well-known functions or attributes.
 //!
 //! This currently only contains those declarations used somewhere, not all well-known
 //! declarations. It can be extended on the go.
+//!
+
+/// Function identifying the name of an attribute which declares an
+/// item to be part of test.
+pub fn is_test_only_attribute_name(s: &str) -> bool {
+    s == "test" || s == "test_only "
+}
+
+/// Function identifying the name of an attribute which declares an
+/// item to be part of verification only.
+pub fn is_verify_only_attribute_name(s: &str) -> bool {
+    s == "verify_only"
+}
 
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";

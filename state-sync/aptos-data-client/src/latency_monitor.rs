@@ -35,7 +35,7 @@ pub struct LatencyMonitor {
 
 impl LatencyMonitor {
     pub fn new(
-        data_client_config: AptosDataClientConfig,
+        data_client_config: Arc<AptosDataClientConfig>,
         data_client: Arc<dyn AptosDataClientInterface + Send + Sync>,
         storage: Arc<dyn DbReader>,
         time_service: TimeService,
@@ -318,7 +318,7 @@ mod tests {
     };
     use aptos_config::config::AptosDataClientConfig;
     use aptos_time_service::{TimeService, TimeServiceTrait};
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
     #[test]
     fn test_calculate_duration_from_proposal() {
@@ -626,7 +626,7 @@ mod tests {
 
     /// Creates a latency monitor for testing
     fn create_latency_monitor() -> (TimeService, LatencyMonitor) {
-        let data_client_config = AptosDataClientConfig::default();
+        let data_client_config = Arc::new(AptosDataClientConfig::default());
         let data_client = create_mock_data_client();
         let storage = create_mock_db_reader();
         let time_service = TimeService::mock();

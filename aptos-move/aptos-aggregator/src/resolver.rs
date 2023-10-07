@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaOp},
     module::AGGREGATOR_MODULE,
 };
+use aptos_state_view::StateView;
 use aptos_types::{
+    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadataKind},
@@ -127,14 +128,32 @@ impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>> A
 {
 }
 
+impl<S> TAggregatorView for S
+where
+    S: StateView,
+{
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = AggregatorID;
+
+    fn get_aggregator_v1_state_value(
+        &self,
+        state_key: &Self::IdentifierV1,
+        // Reading from StateView can be in precise mode only.
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
+}
+
 // Utils to store aggregator values in data store. Here, we
 // only care about aggregators which are state items (V1).
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils {
     use super::*;
-    use crate::{aggregator_extension::AggregatorHandle, delta_change_set::serialize};
-    use aptos_types::state_store::{
-        state_key::StateKey, state_value::StateValue, table::TableHandle,
+    use crate::delta_change_set::serialize;
+    use aptos_types::{
+        aggregator::AggregatorHandle,
+        state_store::{state_key::StateKey, state_value::StateValue, table::TableHandle},
     };
     use move_core_types::account_address::AccountAddress;
     use std::collections::HashMap;

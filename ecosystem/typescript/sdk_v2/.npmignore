@@ -3,3 +3,4 @@ node_modules
 .aptos
 .env
 examples/
+src/types/generated/types.ts

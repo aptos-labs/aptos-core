@@ -24,8 +24,7 @@ impl Cmd {
         AptosDB::create_checkpoint(
             self.db_dir,
             self.output_dir,
-            sharding_config.use_sharded_state_merkle_db,
-            sharding_config.split_ledger_db,
+            sharding_config.enable_storage_sharding,
         )
     }
 }

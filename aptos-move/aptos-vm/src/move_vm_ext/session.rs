@@ -16,8 +16,11 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    block_metadata::BlockMetadata, contract_event::ContractEvent, on_chain_config::Features,
-    state_store::state_key::StateKey, transaction::SignatureCheckedTransaction,
+    block_metadata::BlockMetadata,
+    contract_event::ContractEvent,
+    on_chain_config::Features,
+    state_store::state_key::StateKey,
+    transaction::{SignatureCheckedTransaction, SignedTransaction},
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use bytes::Bytes;
@@ -66,8 +69,8 @@ pub enum SessionId {
 }
 
 impl SessionId {
-    pub fn txn(txn: &SignatureCheckedTransaction) -> Self {
-        Self::txn_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    pub fn txn(txn: &SignedTransaction) -> Self {
+        Self::txn_meta(&TransactionMetadata::new(&txn.clone()))
     }
 
     pub fn txn_meta(txn_data: &TransactionMetadata) -> Self {
@@ -88,8 +91,8 @@ impl SessionId {
         }
     }
 
-    pub fn prologue(txn: &SignatureCheckedTransaction) -> Self {
-        Self::prologue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
+    pub fn prologue(txn: &SignedTransaction) -> Self {
+        Self::prologue_meta(&TransactionMetadata::new(&txn.clone()))
     }
 
     pub fn prologue_meta(txn_data: &TransactionMetadata) -> Self {
@@ -221,7 +224,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut change_set_filtered = MoveChangeSet::new();
 
         let mut resource_group_change_set = HashMap::new();
-        let mut resource_group_cache = remote.release_resource_group_cache();
+        // TODO: with the new resource group handling, the cache will be provided only for
+        // backwards compatibility.
+        let mut resource_group_cache = remote
+            .release_resource_group_cache()
+            .expect("Cache must be provided w. current resource group handling");
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
@@ -368,6 +375,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         VMChangeSet::new(
             resource_write_set,
+            // TODO: properly populate resource group write-set.
+            HashMap::new(),
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set,

@@ -30,6 +30,7 @@ use aptos_schemadb::{
 };
 use aptos_types::{proof::position::Position, transaction::Version};
 use claims::{assert_ge, assert_lt};
+use rayon::prelude::*;
 use status_line::StatusLine;
 use std::{
     fmt::{Display, Formatter},
@@ -68,17 +69,12 @@ pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Versi
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
     let start_version = target_version + 1;
-    truncate_ledger_db_single_batch(
-        ledger_db.clone(),
-        &event_store,
-        &transaction_store,
-        start_version,
-    )?;
+    truncate_ledger_db_single_batch(&ledger_db, &event_store, &transaction_store, start_version)?;
     Ok(())
 }
 
 pub(crate) fn truncate_state_kv_db(
-    state_kv_db: Arc<StateKvDb>,
+    state_kv_db: &StateKvDb,
     current_version: Version,
     target_version: Version,
     batch_size: usize,
@@ -91,7 +87,7 @@ pub(crate) fn truncate_state_kv_db(
             std::cmp::max(current_version - batch_size as u64, target_version);
         state_kv_db.write_progress(target_version_for_this_batch)?;
         truncate_state_kv_db_shards(
-            &state_kv_db,
+            state_kv_db,
             target_version_for_this_batch,
             Some(current_version),
         )?;
@@ -107,16 +103,16 @@ pub(crate) fn truncate_state_kv_db_shards(
     target_version: Version,
     expected_current_version: Option<Version>,
 ) -> Result<()> {
-    // TODO(grao): Consider do it in parallel.
-    for shard_id in 0..NUM_STATE_SHARDS {
-        truncate_state_kv_db_single_shard(
-            state_kv_db,
-            shard_id as u8,
-            target_version,
-            expected_current_version,
-        )?;
-    }
-    Ok(())
+    (0..NUM_STATE_SHARDS)
+        .into_par_iter()
+        .try_for_each(|shard_id| {
+            truncate_state_kv_db_single_shard(
+                state_kv_db,
+                shard_id as u8,
+                target_version,
+                expected_current_version,
+            )
+        })
 }
 
 pub(crate) fn truncate_state_kv_db_single_shard(
@@ -173,12 +169,11 @@ pub(crate) fn truncate_state_merkle_db_shards(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    // TODO(grao): Consider do it in parallel.
-    for shard_id in 0..NUM_STATE_SHARDS {
-        truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)?;
-    }
-
-    Ok(())
+    (0..NUM_STATE_SHARDS)
+        .into_par_iter()
+        .try_for_each(|shard_id| {
+            truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)
+        })
 }
 
 pub(crate) fn truncate_state_merkle_db_single_shard(
@@ -244,7 +239,7 @@ fn truncate_transaction_accumulator(
 }
 
 fn truncate_ledger_db_single_batch(
-    ledger_db: Arc<LedgerDb>,
+    ledger_db: &LedgerDb,
     event_store: &EventStore,
     transaction_store: &TransactionStore,
     start_version: Version,
@@ -261,7 +256,7 @@ fn truncate_ledger_db_single_batch(
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
-    delete_per_version_data(&ledger_db, start_version, &batch)?;
+    delete_per_version_data(ledger_db, start_version, &batch)?;
 
     delete_event_data(event_store, start_version, &batch.event_db_batches)?;
 

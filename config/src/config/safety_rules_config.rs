@@ -70,7 +70,7 @@ impl SafetyRulesConfig {
 
 impl ConfigSanitizer for SafetyRulesConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn test_sanitize_invalid_backend_for_mainnet() {
         // Create a node config with an invalid backend for mainnet
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             consensus: ConsensusConfig {
                 safety_rules: SafetyRulesConfig {
                     backend: SecureBackend::InMemoryStorage,
@@ -245,7 +245,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn test_sanitize_backend_for_mainnet_fullnodes() {
         // Create a node config with an invalid backend for mainnet validators
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             consensus: ConsensusConfig {
                 safety_rules: SafetyRulesConfig {
                     backend: SecureBackend::InMemoryStorage,
@@ -265,18 +265,14 @@ mod tests {
         };
 
         // Verify that the config sanitizer passes because the node is a fullnode
-        SafetyRulesConfig::sanitize(
-            &mut node_config,
-            NodeType::PublicFullnode,
-            ChainId::mainnet(),
-        )
-        .unwrap();
+        SafetyRulesConfig::sanitize(&node_config, NodeType::PublicFullnode, ChainId::mainnet())
+            .unwrap();
     }
 
     #[test]
     fn test_sanitize_invalid_service_for_mainnet() {
         // Create a node config with a non-local service
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             consensus: ConsensusConfig {
                 safety_rules: SafetyRulesConfig {
                     service: SafetyRulesService::Serializer,
@@ -289,7 +285,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -297,7 +293,7 @@ mod tests {
     #[test]
     fn test_sanitize_test_config_on_mainnet() {
         // Create a node config with a test config
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             consensus: ConsensusConfig {
                 safety_rules: SafetyRulesConfig {
                     test: Some(SafetyRulesTestConfig::new(PeerId::random())),
@@ -310,7 +306,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
@@ -318,7 +314,7 @@ mod tests {
     #[test]
     fn test_sanitize_missing_initial_safety_rules() {
         // Create a node config with a test config
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             consensus: ConsensusConfig {
                 safety_rules: SafetyRulesConfig {
                     test: Some(SafetyRulesTestConfig::new(PeerId::random())),
@@ -331,7 +327,7 @@ mod tests {
 
         // Verify that the config sanitizer fails
         let error =
-            SafetyRulesConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::mainnet())
+            SafetyRulesConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet())
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

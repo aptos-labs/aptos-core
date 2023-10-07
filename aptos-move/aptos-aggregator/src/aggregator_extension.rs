@@ -5,12 +5,8 @@ use crate::{
     delta_change_set::{addition, subtraction},
     resolver::{AggregatorReadMode, AggregatorResolver},
 };
-use aptos_types::{
-    state_store::{state_key::StateKey, table::TableHandle},
-    vm_status::StatusCode,
-};
+use aptos_types::{aggregator::AggregatorID, vm_status::StatusCode};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Describes the state of each aggregator instance.
@@ -22,28 +18,6 @@ pub enum AggregatorState {
     PositiveDelta,
     // If aggregator stores a negative delta.
     NegativeDelta,
-}
-
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AggregatorHandle(pub AccountAddress);
-
-/// Uniquely identifies each aggregator instance in storage.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct AggregatorID(StateKey);
-
-impl AggregatorID {
-    pub fn new(handle: TableHandle, key: AggregatorHandle) -> Self {
-        let state_key = StateKey::table_item(handle, key.0.to_vec());
-        AggregatorID(state_key)
-    }
-
-    pub fn as_state_key(&self) -> &StateKey {
-        &self.0
-    }
-
-    pub fn into_state_key(self) -> StateKey {
-        self.0
-    }
 }
 
 /// Tracks values seen by aggregator. In particular, stores information about

@@ -2266,7 +2266,6 @@ impl Transfer {
             let op_type = OperationType::from_str(&op.operation_type)?;
             op_map.insert(op_type, op);
         }
-        if !op_map.contains_key(&OperationType::Withdraw) {}
 
         if !op_map.contains_key(&OperationType::Deposit) {
             return Err(ApiError::InvalidTransferOperations(Some(

@@ -120,6 +120,12 @@ pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
 /// override_config, base_config (see OverrideNodeConfig)
 pub type OverrideNodeConfigFn = Arc<dyn Fn(&mut NodeConfig, &mut NodeConfig) + Send + Sync>;
 
+#[derive(Clone, Copy, Default)]
+pub struct NodeResourceOverride {
+    pub cpu_cores: Option<usize>,
+    pub memory_gib: Option<usize>,
+}
+
 pub struct ForgeConfig {
     aptos_tests: Vec<Box<dyn AptosTest>>,
     admin_tests: Vec<Box<dyn AdminTest>>,
@@ -156,6 +162,10 @@ pub struct ForgeConfig {
 
     /// The label of existing DBs to use, if None, will create new db.
     existing_db_tag: Option<String>,
+
+    validator_resource_override: NodeResourceOverride,
+
+    fullnode_resource_override: NodeResourceOverride,
 }
 
 impl ForgeConfig {
@@ -223,6 +233,22 @@ impl ForgeConfig {
         self
     }
 
+    pub fn with_validator_resource_override(
+        mut self,
+        resource_override: NodeResourceOverride,
+    ) -> Self {
+        self.validator_resource_override = resource_override;
+        self
+    }
+
+    pub fn with_fullnode_resource_override(
+        mut self,
+        resource_override: NodeResourceOverride,
+    ) -> Self {
+        self.fullnode_resource_override = resource_override;
+        self
+    }
+
     fn override_node_config_from_fn(config_fn: OverrideNodeConfigFn) -> OverrideNodeConfig {
         let mut override_config = NodeConfig::default();
         let mut base_config = NodeConfig::default();
@@ -241,13 +267,15 @@ impl ForgeConfig {
             .map(|config_fn| Self::override_node_config_from_fn(config_fn));
         let multi_region_config = self.multi_region_config;
         let existing_db_tag = self.existing_db_tag.clone();
+        let validator_resource_override = self.validator_resource_override;
+        let fullnode_resource_override = self.fullnode_resource_override;
 
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
             if let Some(override_config) = &validator_override_node_config {
                 helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
             }
             if let Some(override_config) = &fullnode_override_node_config {
-                helm_values["validator"]["config"] = override_config.get_yaml().unwrap();
+                helm_values["fullnode"]["config"] = override_config.get_yaml().unwrap();
             }
             if multi_region_config {
                 helm_values["multicluster"]["enabled"] = true.into();
@@ -263,6 +291,29 @@ impl ForgeConfig {
                     existing_db_tag.clone().into();
                 helm_values["fullnode"]["storage"]["labels"]["tag"] =
                     existing_db_tag.clone().into();
+            }
+
+            // validator resource overrides
+            if let Some(cpu_cores) = validator_resource_override.cpu_cores {
+                helm_values["validator"]["resources"]["requests"]["cpu"] = cpu_cores.into();
+                helm_values["validator"]["resources"]["limits"]["cpu"] = cpu_cores.into();
+            }
+            if let Some(memory_gib) = validator_resource_override.memory_gib {
+                helm_values["validator"]["resources"]["requests"]["memory"] =
+                    format!("{}Gi", memory_gib).into();
+                helm_values["validator"]["resources"]["limits"]["memory"] =
+                    format!("{}Gi", memory_gib).into();
+            }
+            // fullnode resource overrides
+            if let Some(cpu_cores) = fullnode_resource_override.cpu_cores {
+                helm_values["fullnode"]["resources"]["requests"]["cpu"] = cpu_cores.into();
+                helm_values["fullnode"]["resources"]["limits"]["cpu"] = cpu_cores.into();
+            }
+            if let Some(memory_gib) = fullnode_resource_override.memory_gib {
+                helm_values["fullnode"]["resources"]["requests"]["memory"] =
+                    format!("{}Gi", memory_gib).into();
+                helm_values["fullnode"]["resources"]["limits"]["memory"] =
+                    format!("{}Gi", memory_gib).into();
             }
         }))
     }
@@ -423,6 +474,8 @@ impl Default for ForgeConfig {
             }),
             success_criteria,
             existing_db_tag: None,
+            validator_resource_override: NodeResourceOverride::default(),
+            fullnode_resource_override: NodeResourceOverride::default(),
         }
     }
 }

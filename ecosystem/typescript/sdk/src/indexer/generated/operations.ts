@@ -78,6 +78,16 @@ export type GetCollectionsWithOwnedTokensQueryVariables = Types.Exact<{
 
 export type GetCollectionsWithOwnedTokensQuery = { __typename?: 'query_root', current_collection_ownership_v2_view: Array<{ __typename?: 'current_collection_ownership_v2_view', collection_id?: string | null, collection_name?: string | null, collection_uri?: string | null, creator_address?: string | null, distinct_tokens?: any | null, last_transaction_version?: any | null, owner_address?: string | null, single_token_uri?: string | null, current_collection?: { __typename?: 'current_collections_v2', collection_id: string, collection_name: string, creator_address: string, current_supply: any, description: string, last_transaction_timestamp: any, last_transaction_version: any, mutable_description?: boolean | null, max_supply?: any | null, mutable_uri?: boolean | null, table_handle_v1?: string | null, token_standard: string, total_minted_v2?: any | null, uri: string } | null }> };
 
+export type GetCurrentObjectsQueryVariables = Types.Exact<{
+  where_condition?: Types.InputMaybe<Types.Current_Objects_Bool_Exp>;
+  offset?: Types.InputMaybe<Types.Scalars['Int']>;
+  limit?: Types.InputMaybe<Types.Scalars['Int']>;
+  order_by?: Types.InputMaybe<Array<Types.Current_Objects_Order_By> | Types.Current_Objects_Order_By>;
+}>;
+
+
+export type GetCurrentObjectsQuery = { __typename?: 'query_root', current_objects: Array<{ __typename?: 'current_objects', allow_ungated_transfer: boolean, state_key_hash: string, owner_address: string, object_address: string, last_transaction_version: any, last_guid_creation_num: any, is_deleted: boolean }> };
+
 export type GetDelegatedStakingActivitiesQueryVariables = Types.Exact<{
   delegatorAddress?: Types.InputMaybe<Types.Scalars['String']>;
   poolAddress?: Types.InputMaybe<Types.Scalars['String']>;

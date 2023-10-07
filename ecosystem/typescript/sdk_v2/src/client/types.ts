@@ -53,3 +53,18 @@ export class AptosApiError extends Error {
     this.request = request;
   }
 }
+
+export enum MimeType {
+  /**
+   * JSON representation, used for transaction submission and accept type JSON output
+   */
+  JSON = "application/json",
+  /**
+   * BCS representation, used for accept type BCS output
+   */
+  BCS = "application/x-bcs",
+  /**
+   * BCS representation, used for transaction submission in BCS input
+   */
+  BCS_SIGNED_TRANSACTION = "application/x.aptos.signed_transaction+bcs",
+}

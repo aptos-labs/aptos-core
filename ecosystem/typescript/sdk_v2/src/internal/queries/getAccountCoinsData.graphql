@@ -1,0 +1,32 @@
+query getAccountCoinsData(
+  $where_condition: current_fungible_asset_balances_bool_exp!
+  $offset: Int
+  $limit: Int
+  $order_by: [current_fungible_asset_balances_order_by!]
+) {
+  current_fungible_asset_balances(where: $where_condition, offset: $offset, limit: $limit, order_by: $order_by) {
+    amount
+    asset_type
+    is_frozen
+    is_primary
+    last_transaction_timestamp
+    last_transaction_version
+    owner_address
+    storage_id
+    token_standard
+    metadata {
+      token_standard
+      symbol
+      supply_aggregator_table_key_v1
+      supply_aggregator_table_handle_v1
+      project_uri
+      name
+      last_transaction_version
+      last_transaction_timestamp
+      icon_uri
+      decimals
+      creator_address
+      asset_type
+    }
+  }
+}

@@ -39,7 +39,6 @@ use aptos_config::{
     network_id::NetworkContext,
 };
 use aptos_crypto::x25519;
-use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_num_variants::NumVariants;
@@ -59,7 +58,7 @@ use serde::Serialize;
 use std::{
     cmp::{min, Ordering},
     collections::{hash_map::Entry, HashMap, HashSet},
-    fmt, mem,
+    fmt,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -322,7 +321,7 @@ where
                 panic!("Trusted peers must exist, but found error: {:?}", error)
             });
         assert!(
-            trusted_peers.read().is_empty(),
+            trusted_peers.is_empty(),
             "Trusted peers must be empty. Found: {:?}",
             trusted_peers
         );
@@ -415,7 +414,7 @@ where
 
     /// Returns the trusted peers for the current network context.
     /// If no set exists, an error is logged and None is returned.
-    fn get_trusted_peers(&self) -> Option<Arc<RwLock<PeerSet>>> {
+    fn get_trusted_peers(&self) -> Option<PeerSet> {
         let network_id = self.network_context.network_id();
         match self.peers_and_metadata.get_trusted_peers(&network_id) {
             Ok(trusted_peers) => Some(trusted_peers),
@@ -439,7 +438,6 @@ where
     async fn close_stale_connections(&mut self) {
         if let Some(trusted_peers) = self.get_trusted_peers() {
             // Identify stale peer connections
-            let trusted_peers = trusted_peers.read().clone();
             let stale_peers = self
                 .connected
                 .iter()
@@ -492,7 +490,6 @@ where
     async fn cancel_stale_dials(&mut self) {
         if let Some(trusted_peers) = self.get_trusted_peers() {
             // Identify stale peer dials
-            let trusted_peers = trusted_peers.read().clone();
             let stale_peer_dials: Vec<AccountAddress> = self
                 .dial_queue
                 .keys()
@@ -810,13 +807,16 @@ where
             // to generate the new eligible peers set.
             let new_eligible = self.discovered_peers.to_eligible_peers();
 
-            // Swap in the new eligible peers set. Drop the old set after releasing
-            // the write lock.
-            if let Some(trusted_peers) = self.get_trusted_peers() {
-                let _old_eligible = {
-                    let mut trusted_peers = trusted_peers.write();
-                    mem::replace(&mut *trusted_peers, new_eligible)
-                };
+            // Swap in the new eligible peers set
+            if let Err(error) = self
+                .peers_and_metadata
+                .set_trusted_peers(&self.network_context.network_id(), new_eligible)
+            {
+                error!(
+                    NetworkSchema::new(&self.network_context),
+                    error = %error,
+                    "Failed to update trusted peers set"
+                );
             }
         }
     }

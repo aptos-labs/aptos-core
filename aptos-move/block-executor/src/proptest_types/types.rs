@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::{ExecutionStatus, ExecutorTask, Transaction, TransactionOutput};
+use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -13,7 +13,11 @@ use aptos_types::{
     event::EventKey,
     executable::ModulePath,
     fee_statement::FeeStatement,
-    state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+    state_store::{
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadataKind},
+    },
+    transaction::BlockExecutableTransaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::resolver::TExecutorView;
@@ -34,6 +38,7 @@ use std::{
         Arc,
     },
 };
+
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -96,7 +101,7 @@ where
 ///////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Ord, Eq)]
-pub struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
+pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
     /// Wrapping the types used for testing to add ModulePath trait implementation (below).
     pub K,
     /// The bool field determines for testing purposes, whether the key will be interpreted
@@ -129,6 +134,7 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd + Ord> ModulePath for KeyType<K> 
 pub(crate) struct ValueType {
     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     bytes: Option<Bytes>,
+    metadata: StateValueMetadataKind,
 }
 
 impl Arbitrary for ValueType {
@@ -159,6 +165,14 @@ impl ValueType {
                 v.resize(16, 1);
                 v.into()
             }),
+            metadata: None,
+        }
+    }
+
+    pub(crate) fn with_len_and_metadata(len: usize, metadata: StateValueMetadataKind) -> Self {
+        Self {
+            bytes: (len > 0).then_some(vec![100_u8; len].into()),
+            metadata,
         }
     }
 }
@@ -169,13 +183,23 @@ impl TransactionWrite for ValueType {
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
+        let (maybe_metadata, maybe_bytes) =
+            match maybe_state_value.map(|state_value| state_value.into()) {
+                Some((maybe_metadata, bytes)) => (maybe_metadata, Some(bytes)),
+                None => (None, None),
+            };
+
         Self {
-            bytes: maybe_state_value.map(|state_value| state_value.bytes().clone()),
+            bytes: maybe_bytes,
+            metadata: maybe_metadata,
         }
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        self.extract_raw_bytes().map(StateValue::new_legacy)
+        self.extract_raw_bytes().map(|bytes| match &self.metadata {
+            Some(metadata) => StateValue::new_with_metadata(bytes, metadata.clone()),
+            None => StateValue::new_legacy(bytes),
+        })
     }
 }
 
@@ -277,7 +301,7 @@ impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
         V: Clone + Send + Sync + TransactionWrite + 'static,
         E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
-    > Transaction for MockTransaction<K, V, E>
+    > BlockExecutableTransaction for MockTransaction<K, V, E>
 {
     type Event = E;
     type Identifier = ();
@@ -401,8 +425,8 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             allow_deletes,
         )
         .into_iter()
-        .zip(reads.into_iter())
-        .zip(gas.into_iter())
+        .zip(reads)
+        .zip(gas)
         .map(|(((writes, deltas), reads), gas)| MockIncarnation {
             reads,
             writes,
@@ -535,7 +559,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<K, MoveTypeLayout, ()>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout, ()>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -664,7 +688,7 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct MockEvent {
+pub(crate) struct MockEvent {
     key: EventKey,
     sequence_number: u64,
     type_tag: TypeTag,

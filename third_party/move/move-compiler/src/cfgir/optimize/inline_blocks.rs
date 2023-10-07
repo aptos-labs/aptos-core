@@ -32,11 +32,11 @@ fn optimize_(start: Label, blocks: &mut BasicBlocks) -> bool {
     inline_single_target_blocks(&single_target_labels, start, blocks)
 }
 
+// Return a list of labels that have just a single branch to them.
 fn find_single_target_labels(start: Label, blocks: &BasicBlocks) -> BTreeSet<Label> {
     use Command_ as C;
     let mut counts = BTreeMap::new();
-    // 'start' block starts as one as it is the entry point of the function. In some sense,
-    // there is an implicit "jump" to this label to begin executing the function
+    // 'start' block has an implicit branch to it.
     counts.insert(start, 1);
     for block in blocks.values() {
         match &block.back().unwrap().value {
@@ -67,14 +67,22 @@ fn inline_single_target_blocks(
 ) -> bool {
     //cleanup of needless_collect would result in mut and non mut borrows, and compilation warning.
     let labels_vec = blocks.keys().cloned().collect::<Vec<_>>();
-    let mut labels = labels_vec.into_iter();
-    let mut next = labels.next();
 
+    // Blocks move from working_blocks to finished_blocks as
+    // they are processed (unless they are dropped).
     let mut working_blocks = std::mem::take(blocks);
+    // Note that std::mem::take() replaces `*blocks` by
+    // the default (a new empty BTreeMap), which we
+    // borrow &mut to as finished_blocks.
     let finished_blocks = blocks;
 
     let mut remapping = BTreeMap::new();
+
+    // Iterate through labels.
+    let mut labels = labels_vec.into_iter();
+    let mut next = labels.next();
     while let Some(cur) = next {
+        // temporarily get cur's block for mutability.
         let mut block = match working_blocks.remove(&cur) {
             None => {
                 next = labels.next();
@@ -84,26 +92,31 @@ fn inline_single_target_blocks(
         };
 
         match block.back().unwrap() {
-            // Do not need to worry about infinitely unwrapping loops as loop heads will always
-            // be the target of at least 2 jumps: the jump to the loop and the "continue" jump
-            // This is always true as long as we start the count for the start label at 1
             sp!(_, Command_::Jump { target, .. }) if single_jump_targets.contains(target) => {
+                // Note that only the last merged block will be left for cur.
                 remapping.insert(cur, *target);
-                let target_block = working_blocks.remove(target).unwrap();
+                let target_block = working_blocks.remove(target).unwrap_or_else(|| {
+                    finished_blocks.remove(target).unwrap_or_else(|| {
+                        panic!(
+                            "ICE: Target {} not found in working_blocks or finished_blocks",
+                            target
+                        )
+                    })
+                });
                 block.pop_back();
                 block.extend(target_block);
+                // put cur's block back into working_blocks, as we will revisit it on next iter.
                 working_blocks.insert(cur, block);
+                // Note that target_block is droppped.
             },
             _ => {
-                finished_blocks.insert(cur, block);
                 next = labels.next();
+                finished_blocks.insert(cur, block);
             },
         }
     }
 
-    let changed = !remapping.is_empty();
-    remap_to_last_target(remapping, start, finished_blocks);
-    changed
+    remap_to_last_target(remapping, start, finished_blocks)
 }
 
 /// In order to preserve loop invariants at the bytecode level, when a block is "inlined", that
@@ -119,23 +132,49 @@ fn inline_single_target_blocks(
 ///
 /// After:
 ///   B: block_a; block_b
+/// Returns true if a label might have changed.
 fn remap_to_last_target(
     mut remapping: BTreeMap<Label, Label>,
     start: Label,
     blocks: &mut BasicBlocks,
-) {
+) -> bool {
     // The start block can't be relabelled in the current CFG API.
     // But it does not need to be since it will always be the first block, thus it will not run
     // into issues in the bytecode verifier
     remapping.remove(&start);
     if remapping.is_empty() {
-        return;
+        return false;
     }
-    // populate remapping for non changed blocks
+
+    // close transitive chains (lab1 -> lab2 -> lab3 becomes lab1 -> lab3).
     for label in blocks.keys() {
-        remapping.entry(*label).or_insert(*label);
+        if let Some(target_label) = remapping.get(label) {
+            let mut prev_label = label;
+            let mut next_label = target_label;
+            while prev_label != next_label {
+                match remapping.get(next_label) {
+                    Some(next_next_label) => {
+                        prev_label = next_label;
+                        next_label = next_next_label;
+                    },
+                    None => {
+                        break;
+                    },
+                };
+            }
+            if next_label != label {
+                remapping.insert(*label, *next_label);
+            } else {
+                remapping.remove(label);
+            }
+        }
     }
-    let owned_blocks = std::mem::take(blocks);
-    let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);
-    *blocks = remapped_blocks;
+    if !remapping.is_empty() {
+        let owned_blocks = std::mem::take(blocks);
+        let (_start, remapped_blocks) = remap_labels(&remapping, start, owned_blocks);
+        *blocks = remapped_blocks;
+        true
+    } else {
+        false
+    }
 }

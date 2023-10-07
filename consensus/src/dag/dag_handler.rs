@@ -3,20 +3,15 @@
 use super::{
     dag_driver::DagDriver,
     dag_fetcher::{FetchRequestHandler, FetchWaiter},
-    dag_state_sync::{
-        StateSyncStatus::{self, NeedsSync, Synced},
-        StateSyncTrigger,
-    },
-    types::{CertifiedNodeMessage, TDAGMessage},
+    dag_state_sync::{StateSyncStatus, StateSyncTrigger},
     CertifiedNode, Node,
 };
 use crate::{
     dag::{dag_network::RpcHandler, rb_handler::NodeBroadcastHandler, types::DAGMessage},
     network::{IncomingDAGRequest, TConsensusMsg},
 };
-use anyhow::bail;
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, warn};
 use aptos_network::protocols::network::RpcError;
 use aptos_types::epoch_state::EpochState;
@@ -33,6 +28,7 @@ pub(crate) struct NetworkHandler {
     node_fetch_waiter: FetchWaiter<Node>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
     state_sync_trigger: StateSyncTrigger,
+    new_round_event: tokio::sync::mpsc::Receiver<Round>,
 }
 
 impl NetworkHandler {
@@ -44,6 +40,7 @@ impl NetworkHandler {
         node_fetch_waiter: FetchWaiter<Node>,
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
         state_sync_trigger: StateSyncTrigger,
+        new_round_event: tokio::sync::mpsc::Receiver<Round>,
     ) -> Self {
         Self {
             epoch_state,
@@ -53,21 +50,22 @@ impl NetworkHandler {
             node_fetch_waiter,
             certified_node_fetch_waiter,
             state_sync_trigger,
+            new_round_event,
         }
     }
 
     pub async fn run(
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
-    ) -> CertifiedNodeMessage {
+    ) -> StateSyncStatus {
         // TODO(ibalajiarun): clean up Reliable Broadcast storage periodically.
         loop {
             select! {
-                Some(msg) = dag_rpc_rx.next() => {
+                msg = dag_rpc_rx.select_next_some() => {
                     match self.process_rpc(msg).await {
                         Ok(sync_status) => {
-                            if let StateSyncStatus::NeedsSync(certified_node_msg) = sync_status {
-                                return certified_node_msg;
+                            if matches!(sync_status, StateSyncStatus::NeedsSync(_) | StateSyncStatus::EpochEnds) {
+                                return sync_status;
                             }
                         },
                         Err(e) =>  {
@@ -75,6 +73,9 @@ impl NetworkHandler {
                         }
                     }
                 },
+                Some(new_round) = self.new_round_event.recv() => {
+                    self.dag_driver.enter_new_round(new_round).await;
+                }
                 Some(res) = self.node_fetch_waiter.next() => {
                     match res {
                         Ok(node) => if let Err(e) = self.node_receiver.process(node).await {
@@ -98,48 +99,33 @@ impl NetworkHandler {
         }
     }
 
-    fn verify_incoming_rpc(&self, dag_message: &DAGMessage) -> Result<(), anyhow::Error> {
-        match dag_message {
-            DAGMessage::NodeMsg(node) => node.verify(&self.epoch_state.verifier),
-            DAGMessage::CertifiedNodeMsg(certified_node) => {
-                certified_node.verify(&self.epoch_state.verifier)
-            },
-            DAGMessage::FetchRequest(request) => request.verify(&self.epoch_state.verifier),
-            _ => Err(anyhow::anyhow!(
-                "unexpected rpc message{:?}",
-                std::mem::discriminant(dag_message)
-            )),
-        }
-    }
-
     async fn process_rpc(
         &mut self,
         rpc_request: IncomingDAGRequest,
     ) -> anyhow::Result<StateSyncStatus> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
 
-        let author = dag_message
-            .author()
-            .map_err(|_| anyhow::anyhow!("unexpected rpc message {:?}", dag_message))?;
-        if author != rpc_request.sender {
-            bail!("message author and network author mismatch");
-        }
+        debug!(
+            "processing rpc message {} from {}",
+            dag_message.name(),
+            rpc_request.sender
+        );
 
         let response: anyhow::Result<DAGMessage> = {
-            let verification_result = self.verify_incoming_rpc(&dag_message);
-            match verification_result {
+            match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
                 Ok(_) => match dag_message {
                     DAGMessage::NodeMsg(node) => {
                         self.node_receiver.process(node).await.map(|r| r.into())
                     },
                     DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
-                        match self.state_sync_trigger.check(certified_node_msg).await {
-                            ret @ (NeedsSync(_), None) => return Ok(ret.0),
-                            (Synced, Some(certified_node_msg)) => self
+                        match self.state_sync_trigger.check(certified_node_msg).await? {
+                            StateSyncStatus::Synced(Some(certified_node_msg)) => self
                                 .dag_driver
                                 .process(certified_node_msg.certified_node())
                                 .await
                                 .map(|r| r.into()),
+                            status @ (StateSyncStatus::NeedsSync(_)
+                            | StateSyncStatus::EpochEnds) => return Ok(status),
                             _ => unreachable!(),
                         }
                     },
@@ -151,6 +137,11 @@ impl NetworkHandler {
                 Err(err) => Err(err),
             }
         };
+
+        debug!(
+            "responding to process_rpc {:?}",
+            response.as_ref().map(|r| r.name())
+        );
 
         let response = response
             .and_then(|response_msg| {
@@ -165,6 +156,6 @@ impl NetworkHandler {
             .response_sender
             .send(response)
             .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
-            .map(|_| StateSyncStatus::Synced)
+            .map(|_| StateSyncStatus::Synced(None))
     }
 }

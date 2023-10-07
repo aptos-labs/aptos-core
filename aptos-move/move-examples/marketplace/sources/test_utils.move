@@ -99,6 +99,45 @@ module marketplace::test_utils {
         (object::convert(collection_object), object::convert(aptos_token))
     }
 
+    public fun mint_tokenv2_with_collection_royalty(
+        seller: &signer,
+        royalty_numerator: u64,
+        royalty_denominator: u64
+    ): (Object<Collection>, Object<Token>) {
+        let collection_name = string::utf8(b"collection_name");
+
+        let collection_object = aptos_token::create_collection_object(
+            seller,
+            string::utf8(b"collection description"),
+            2,
+            collection_name,
+            string::utf8(b"collection uri"),
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            royalty_numerator,
+            royalty_denominator,
+        );
+
+        let aptos_token = aptos_token::mint_token_object(
+            seller,
+            collection_name,
+            string::utf8(b"description"),
+            string::utf8(b"token_name"),
+            string::utf8(b"uri"),
+            vector::empty(),
+            vector::empty(),
+            vector::empty(),
+        );
+        (object::convert(collection_object), object::convert(aptos_token))
+    }
+
     public fun mint_tokenv2(seller: &signer): Object<Token> {
         let (_collection, token) = mint_tokenv2_with_collection(seller);
         token
@@ -172,6 +211,38 @@ module marketplace::test_utils {
             signer::address_of(seller),
             100,
             1,
+            vector[true, true, true, true, true],
+            vector::empty(),
+            vector::empty(),
+            vector::empty(),
+        );
+
+        tokenv1::create_token_id_raw(
+            signer::address_of(seller),
+            collection_name,
+            token_name,
+            0,
+        )
+    }
+
+    public fun mint_tokenv1_additional_royalty(
+        seller: &signer,
+        royalty_numerator: u64,
+        royalty_denominator: u64
+    ): tokenv1::TokenId {
+        let collection_name = string::utf8(b"collection_name");
+        let token_name = string::utf8(b"token_name_2");
+        tokenv1::create_token_script(
+            seller,
+            collection_name,
+            token_name,
+            string::utf8(b"Hello, Token"),
+            1,
+            1,
+            string::utf8(b"https://aptos.dev"),
+            signer::address_of(seller),
+            royalty_denominator,
+            royalty_numerator,
             vector[true, true, true, true, true],
             vector::empty(),
             vector::empty(),

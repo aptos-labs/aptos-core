@@ -127,7 +127,7 @@ impl Default for NodeMonitoringConfig {
 
 impl ConfigSanitizer for PeerMonitoringServiceConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
@@ -138,7 +138,7 @@ impl ConfigSanitizer for PeerMonitoringServiceConfig {
 
 impl ConfigSanitizer for PerformanceMonitoringConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {

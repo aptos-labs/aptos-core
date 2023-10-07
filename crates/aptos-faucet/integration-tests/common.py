@@ -59,5 +59,10 @@ def network_from_str(str: str, tag: Optional[str]) -> Network:
         return CustomNetwork(tag)
 
 
-def build_image_name(image_repo_with_project: str, network: Network):
-    return f"{image_repo_with_project}/tools:{network.tag()}"
+def build_image_name(image_repo_with_project: str, tag: str):
+    # If no repo is specified, leave it that way. Otherwise make sure we have a slash
+    # between the image repo and the image name.
+    image_repo_with_project = image_repo_with_project.rstrip("/")
+    if image_repo_with_project != "":
+        image_repo_with_project = f"{image_repo_with_project}/"
+    return f"{image_repo_with_project}tools:{tag}"

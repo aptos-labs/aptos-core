@@ -74,13 +74,11 @@ impl StateDelta {
 
     pub fn merge(&mut self, other: StateDelta) {
         assert!(other.follow(self));
-        zip_eq(
-            self.updates_since_base.iter_mut(),
-            other.updates_since_base.into_iter(),
-        )
-        .for_each(|(base, delta)| {
-            base.extend(delta);
-        });
+        zip_eq(self.updates_since_base.iter_mut(), other.updates_since_base).for_each(
+            |(base, delta)| {
+                base.extend(delta);
+            },
+        );
 
         self.current = other.current;
         self.current_version = other.current_version;

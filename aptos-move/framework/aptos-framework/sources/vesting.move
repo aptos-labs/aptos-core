@@ -1012,7 +1012,7 @@ module aptos_framework::vesting {
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
 
     #[test_only]
-    public entry fun setup(aptos_framework: &signer, accounts: &vector<address>) {
+    public fun setup(aptos_framework: &signer, accounts: &vector<address>) {
         use aptos_framework::aptos_account::create_account;
 
         stake::initialize_for_test_custom(aptos_framework, MIN_STAKE, GRANT_AMOUNT * 10, 3600, true, 10, 10000, 1000000);

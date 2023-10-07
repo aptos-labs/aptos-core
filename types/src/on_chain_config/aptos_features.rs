@@ -40,7 +40,8 @@ pub enum FeatureFlag {
     AGGREGATOR_SNAPSHOTS = 30,
     SAFER_RESOURCE_GROUPS = 31,
     SAFER_METADATA = 32,
-    RECONFIGURE_WITH_DKG = 33,
+    SECP256K1_ECDSA_AUTHENTICATOR = 33,
+    RECONFIGURE_WITH_DKG = 34,
 }
 
 /// Representation of features on chain as a bitset.

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { Deserializer, Serializer } from "../../src/bcs";
 import { AccountAddress, AddressInvalidReason } from "../../src/core/account_address";
 
 type Addresses = {
@@ -354,5 +355,60 @@ describe("AccountAddress other parsing", () => {
     const addressOne = AccountAddress.fromStringRelaxed({ input: "0x123" });
     const addressTwo = AccountAddress.fromStringRelaxed({ input: "0x123" });
     expect(addressOne.equals(addressTwo)).toBeTruthy();
+  });
+});
+
+describe("AccountAddress serialization and deserialization", () => {
+  const serializeAndCheckEquality = (address: AccountAddress) => {
+    const serializer = new Serializer();
+    serializer.serialize(address);
+    expect(serializer.toUint8Array()).toEqual(address.toUint8Array());
+    expect(serializer.toUint8Array()).toEqual(address.bcsToBytes());
+  };
+
+  it("serializes an unpadded, full, and reserved address correctly", () => {
+    const address1 = AccountAddress.fromStringRelaxed({ input: "0x0102030a0b0c" });
+    const address2 = AccountAddress.fromStringRelaxed({ input: ADDRESS_OTHER.longWith0x });
+    const address3 = AccountAddress.fromStringRelaxed({ input: ADDRESS_ZERO.shortWithout0x });
+    serializeAndCheckEquality(address1);
+    serializeAndCheckEquality(address2);
+    serializeAndCheckEquality(address3);
+  });
+
+  it("deserializes a byte buffer into an address correctly", () => {
+    const bytes = ADDRESS_TEN.bytes;
+    const deserializer = new Deserializer(bytes);
+    const deserializedAddress = AccountAddress.deserialize(deserializer);
+    expect(deserializedAddress.toUint8Array()).toEqual(bytes);
+  });
+
+  it("deserializes an unpadded, full, and reserved address correctly", () => {
+    const serializer = new Serializer();
+    const address1 = AccountAddress.fromStringRelaxed({ input: "0x123abc" });
+    const address2 = AccountAddress.fromStringRelaxed({ input: ADDRESS_OTHER.longWith0x });
+    const address3 = AccountAddress.fromStringRelaxed({ input: ADDRESS_ZERO.shortWithout0x });
+    serializer.serialize(address1);
+    serializer.serialize(address2);
+    serializer.serialize(address3);
+    const deserializer = new Deserializer(serializer.toUint8Array());
+    const deserializedAddress1 = AccountAddress.deserialize(deserializer);
+    const deserializedAddress2 = AccountAddress.deserialize(deserializer);
+    const deserializedAddress3 = AccountAddress.deserialize(deserializer);
+    expect(deserializedAddress1.toUint8Array()).toEqual(address1.toUint8Array());
+    expect(deserializedAddress2.toUint8Array()).toEqual(address2.toUint8Array());
+    expect(deserializedAddress3.toUint8Array()).toEqual(address3.toUint8Array());
+  });
+
+  it("serializes and deserializes an address correctly", () => {
+    const address = AccountAddress.fromStringRelaxed({ input: "0x0102030a0b0c" });
+    const serializer = new Serializer();
+    serializer.serialize(address);
+    const deserializer = new Deserializer(serializer.toUint8Array());
+    const deserializedAddress = AccountAddress.deserialize(deserializer);
+    expect(deserializedAddress.toUint8Array()).toEqual(address.toUint8Array());
+    const bytes = new Uint8Array([
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 10, 11, 12,
+    ]);
+    expect(deserializedAddress.toUint8Array()).toEqual(bytes);
   });
 });

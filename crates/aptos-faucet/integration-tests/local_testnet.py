@@ -62,6 +62,8 @@ def run_node(network: Network, image_repo_with_project: str, external_test_dir: 
             "run-local-testnet",
             "--test-dir",
             internal_mount_path,
+            "--no-faucet",
+            "--no-txn-stream",
         ],
     )
     LOG.info(f"Running local testnet from image: {image_name}")

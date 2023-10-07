@@ -271,7 +271,10 @@ async fn test_genesis_transaction_flow() {
         backup_path.path(),
         db_dir.as_path(),
         &[waypoint],
-        node.config().storage.rocksdb_configs.split_ledger_db,
+        node.config()
+            .storage
+            .rocksdb_configs
+            .enable_storage_sharding,
         None,
     );
 
