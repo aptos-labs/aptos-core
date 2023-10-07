@@ -18,23 +18,25 @@ We build upon this several times until we eventually create an automated NFT min
 
 This tutorial assumes you have:
 
-* the [Aptos CLI](../../tools/install-cli/index.md) (or you can run from [aptos-core](https://github.com/aptos-labs/aptos-core) source via `cargo run`)
-* the `aptos-core` repository checked out: `git clone https://github.com/aptos-labs/aptos-core.git`
+* the [Aptos CLI](../../tools/aptos-cli/install-cli/)
+* the `aptos-core` repository cloned to your local machine: `git clone https://github.com/aptos-labs/aptos-core.git`
 * a basic understanding of Move, NFTs and NFT Collections
-* installed `jq` a CLI tool to parse JSON values
+* ideally, you've installed `jq`, a CLI tool to parse JSON values
 
-## 0. Set up your CLI profile
+## 0. Setup your CLI profile
 
 To make things simple, let's initialize a profile and export its account address and the corresponding contract address to our environment variables, so we can easily re-use them later.
 
-```shell
+```shell title="Create the profiles"
 echo '' | aptos init --profile mint_deployer --network devnet --assume-yes
 echo '' | aptos init --profile nft_minter --network devnet --assume-yes
+```
+
+```shell title="Export them as shell environment variables"
 export MINT_DEPLOYER=0x(aptos account lookup-address --profile mint_deployer | jq -r ".Result")
 export NFT_MINTER=0x(aptos account lookup-address --profile nft_minter | jq -r ".Result")
-export RESOURCE_ACCOUNT_ADDRESS=0x(aptos account derive-resource-account-address --address $MINT_DEPLOYER --seed '' --seed-encoding utf8 | jq -r ".Result")
+
 echo "Mint deployer address    => $MINT_DEPLOYER"
-echo "Resource account address => $RESOURCE_ACCOUNT_ADDRESS"
 echo "NFT minter address       => $NFT_MINTER"
 ```
 
@@ -56,7 +58,7 @@ The first thing we need to do is store the fields necessary to identify the coll
 
 ```rust
 // This struct stores all the relevant NFT collection and token's metadata
-struct Metadata has key {
+struct MintConfig has key {
     collection_name: String,
     creator: address,
     token_description: String,
@@ -68,7 +70,7 @@ struct Metadata has key {
 }
 ```
 
-We give `Metadata` the `key` ability so that the module contract can store it as a global resource at an address. This means we can retrieve it in the contract later if we know of an address with the `Metadata` resource.
+We give `MintConfig` the `key` ability so that the module contract can store it as a global resource at an address. This means we can retrieve it in the contract later if we know of an address with the `MintConfig` resource.
 
 We set this data to the deploying account in our `init_module` function, which is set when we first publish the module.
 
@@ -94,8 +96,8 @@ aptos_token::create_collection(
 );
 ```
 
-```rust title="Create the Metadata resource and move it to the deployer account"
-let metadata = Metadata {
+```rust title="Create the MintConfig resource and move it to the deployer account which is also @no_code_mint_p1"
+let mint_config = MintConfig {
     collection_name,
     creator: deployer_address,
     token_description: string::utf8(b""),
@@ -105,7 +107,9 @@ let metadata = Metadata {
     property_types: vector<String>[ string::utf8(b"address") ],
     property_values: vector<vector<u8>>[bcs::to_bytes(&deployer_address)],
 };
-move_to(deployer, metadata);
+
+// Move the MintConfig resource to the contract address itself, since deployer == @no_code_mint_p2
+move_to(deployer, mint_config);
 ```
 
 ### Writing a simple mint function
@@ -116,7 +120,7 @@ First off, note the first few lines of the `mint_to` function. We assert that th
 public entry fun mint_to(
     deployer: &signer,
     receiver_address: address
-) acquires Metadata {
+) acquires MintConfig {
     let deployer_address = signer::address_of(deployer);
     assert!(deployer_address == @no_code_mint_p1, error::permission_denied(ENOT_AUTHORIZED));
     // ...
@@ -127,34 +131,36 @@ public entry fun mint_to(
 We define `@no_code_mint_p1` when we deploy the module with the `--named-addresses no_code_mint_p1=$MINT_DEPLOYER` flag.
 :::
 
-We then borrow the `Metadata` resource from where we stored it in `init_module` and create the token with it:
+We then borrow the `MintConfig` resource from where we stored it in `init_module` and create the token with it:
 
-```rust title="Populate the mint_token_object function with the data from our Metadata resource and transfer it to the designated receiver"
-let metadata = borrow_global_mut<Metadata>(@no_code_mint_p1);
-        // mint the token object
-        let token_object = aptos_token::mint_token_object(
-            deployer,
-            metadata.collection_name,
-            metadata.token_description,
-            metadata.token_name,
-            metadata.token_uri,
-            metadata.property_keys,
-            metadata.property_types,
-            metadata.property_values,
-        );
+```rust title="Populate the mint_token_object function with the data from our MintConfig resource and transfer it to the designated receiver"
+// borrow the MintConfig resource and store it locally as mint_config
+let mint_config = borrow_global_mut<MintConfig>(@no_code_mint_p1);
 
-        // transfer it to the receiver
-        object::transfer(deployer, token_object, receiver_address);
+// mint the token object
+let token_object = aptos_token::mint_token_object(
+    deployer,
+    mint_config.collection_name,
+    mint_config.token_description,
+    mint_config.token_name,
+    mint_config.token_uri,
+    mint_config.property_keys,
+    mint_config.property_types,
+    mint_config.property_values,
+);
+
+// transfer it to the receiver
+object::transfer(deployer, token_object, receiver_address);
 ```
 
-```rust title="Update the PropertyMap metadata on the token
-// Remember that prior to this, the `color` property on the token was a string "BLUE", taken from our original `Metadata` resource:
+```rust title="Update the PropertyMap metadata on the token"
+// Remember that prior to this, the `color` property on the token was a string "BLUE",
+// taken from our original `MintConfig` resource:
 property_keys: vector<String>[string::utf8(b"color")],
 property_types: vector<String>[ string::utf8(b"string") ],
 property_values: vector<vector<u8>>[bcs::to_bytes(&string::utf8(b"BLUE"))],
 
-// we passed this to `mint_token_object`, so it has an initial property "color": "BLUE"
-// we then update it with:
+// we then update it to "RED" with:
 aptos_token::update_property(
   deployer,
   token_object,
@@ -171,18 +177,19 @@ Great! We now have a very simple module that initializes a collection and can mi
 
 ### Publishing the module
 
-Navigate to the `no_code_mint/1-Create-NFT` folder and let's publish our module:
+Navigate to the `aptos-core/aptos-move/move-examples/no_code_mint/1-Create-NFT` folder and let's publish our module:
 
 ```rust title="Publish the module"
-aptos move publish --named-addresses no_code_mint_p1=$MINT_DEPLOYER
+aptos move publish --named-addresses no_code_mint_p1=$MINT_DEPLOYER \
+                   --profile mint_deployer \
                    --assume-yes
 ```
 
-```tip title="Move.toml"
-The `Move.toml` file in the top directory for a Move contract shoould have a Move.toml file. This file specifies logistical things like the package name, dependencies and named addresses.
+:::tip Move.toml configuration
+The `Move.toml` file in the top directory for a Move contract should have a `Move.toml` file. This file specifies logistical things like the package name, dependencies and named addresses.
 
-Here is where we declare that we want to specify our `no_code_mint_p1` named address in the contract when we publish the contract with the `--named-addresses no_code_mint_p1=$MINT_DEPLOYER` flag. This lets us use @no_code_mint_p1 in our *.move files as an address.
-```
+Here is where we declare that we want to specify our `no_code_mint_p1` named address in the contract when we publish the contract with the `--named-addresses no_code_mint_p1=$MINT_DEPLOYER` flag. This lets us use `@no_code_mint_p1` in our *.move files as an address.
+:::
 
 ### Running the contract
 
@@ -209,183 +216,181 @@ We don't need to provide any `&signer` arguments, so we only need to provide a s
 
 In our case, that's just the `$NFT_MINTER` address.
 
+Note that `$MINT_DEPLOYER` can be used interchangeably with `mint_deployer` in the CLI, because `mint_deployer` is our named Aptos CLI profile.
+
 ```shell title="Construct the function call with the Aptos CLI"
-aptos move run --function-id $MINT_DEPLOYER::create_nft::mint_to
-               --profile mint_deployer
-               --args address: $NFT_MINTER
+aptos move run --function-id $MINT_DEPLOYER::create_nft::mint_to     \
+               --profile mint_deployer                               \
+               --args address:$NFT_MINTER                            \
                --assume-yes
 ```
 
-Note that `$MINT_DEPLOYER` can be used interchangeably with `mint_deployer` in the CLI, because `mint_deployer` is our named Aptos CLI profile.
-
-:::info title="Why don't you need to provide a &signer argument?"
-When you sign and submit a transaction with an account's private key, you automatically pass the first `&signer` parameter to the function.
-
-Running an entry function with `--profile mint_deployer` signs and submits the transaction for the `mint_deployer` profile, which is why you don't need to provide the signer to the `--args` parameter list.
-:::
-
-Congratulations! You've created a collection, minted an NFT, and transferred the NFT to another account.
-
-To view the events in this transaction, paste the transaction hash in the Aptos explorer search bar and navigate to the events section, or directly go to:
+After running that command, you should get back a JSON response with a bunch of fields. Take the transaction hash from those fields
+and paste it into the URL below to see more details about the transaction:
 
 https://explorer.aptoslabs.com/txn/YOUR_TRANSACTION_HASH_HERE/events?network=devnet
 
 You should see a `0x4::collection::MintEvent` and a `0x1::object::TransferEvent`.
 
+Congratulations! You've created a collection, minted an NFT, and transferred the NFT to another account.
+
+:::tip Why don't I need to provide a `&signer` argument?
+When you sign and submit a transaction with an account's private key, you automatically pass the first `&signer` parameter to the function.
+
+Running an entry function with `--profile mint_deployer` signs and submits the transaction with your `mint_deployer` profile's account, which is why you don't need to provide the signer to the `--args` parameter list.
+:::
+
 ## 2. Automating the mint function with a resource account
 
 The issue with the code we've written so far is that it requires explicit approval from the creator to mint a token. The process isn't automated and the receiver doesn't ever approve of receiving the token.
 
-The first step to improving the flow of this process is automating the creator's approval. We can do this with the use of what's called a resource account.
+The first step to improving the flow of this process is automating the creator's approval. We can create an Aptos framework Object that
+manages the collection, where the Object itself is managed by the contract.
 
 To achieve this, in this section we'll show you how to:
 
-- Create the NFT collection with a resource account
-- Store the capability to sign things with the resource account, a `SignerCapability`, into the owner's resources on-chain
+- Use a token base name that increments with the current collection supply, i.e., Token #1, Token #2, etc
+- Create the NFT collection with an Aptos Object
+- Store the `ExtendRef` for the Object, which gives us the ability to produce a `&signer` value for it
 - Automate minting the token to the user; that is, write a mint function that works without the collection creator's signature
 
-### What is a resource account?
+First, let's go over how to increment the token's name with a number in it that matches the current collection supply:
 
-A resource account is essentially an account that another account can own. They are useful for separating and managing different types of resources, but they're also capable of delegating decisions to sign transactions to the logic in a smart contract.
+```rust title="Converting a number to a string and appending it to another string"
+    inline fun u64_to_string(value: u64): String {
+        // ... some clever logic to convert a u64 to a utf8 character
+    }
 
-If you want to approve a transaction for later, but don't want to have to be present to sign the transaction, you can write Move code to manage the conditional signature from a resource account to approve that transaction. You can view the resource account functionality in [account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/account.move) and [resource_account.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/resource_account.move).
+    inline fun concat_u64(s: String, n: u64): String {
+        let n_str = u64_to_string(n);
+        string::append(&mut s, n_str);
+        s
+    }
 
-### Adding a resource account to our contract
+    inline fun get_collection_supply(creator_addr: address): u64 {
+      option::extract(&mut collection::count(object::address_to_object<Collection>(creator_addr)))
+    }
+```
+
+```rust title="When we mint the token, we construct the token name from the base name + the supply"
+public entry fun mint(receiver: &signer) acquires MintConfig {
+  // ...
+  // Note that we changed the `token_name` field in `MintConfig` to `token_base_name`.
+  // We can now call `concat_u64(string::utf8(b"Token #"), 0)` to get a string: `Token #0`
+  // Append the collection supply to the base name to create the token name
+  let obj_creator_addr = object::address_from_extend_ref(&extend_ref);
+  let collection_supply = get_collection_supply(obj_creator_addr);
+  let full_token_name = concat_u64(mint_config.token_base_name, collection_supply);
+
+  let token_object = aptos_token::mint_token_object(
+    // ...
+    full_token_name,
+    // ...
+  );
+
+  // ...
+}
+```
+
+### What is an Aptos Object?
+
+In short, an Aptos Object is a core Aptos primitive that facilitates resource management and complex, on-chain representations of data at a single address. If you'd like to read more, head over to the [Object](../../standards/aptos-object) page.
+
+If you want to manage an account's resources but don't want to be present to approve of it, you can write Move code to automate it by creating an Object, storing its [ExtendRef](https://aptos.dev/standards/aptos-object/#object-capabilities-refs) in a resource which you can use programmatically to generate the Object's `&signer`.
+### Making an Object our collection creator
 
 Most of the code for our contract in this second part is very similar, so we're only going to discuss the parts added that make it different.
 
-:::note
-Please note that in this contract, the resource account will now technically be the `creator` of the collection, so for clarity we've changed the account representing the deployer (you) to be named `owner` and the account that creates the collection and mints tokens to remain `creator.`
-:::
-
-Let's start by adding the `SignerCapability` to our contract, which is the structure that produces the capability to sign a transaction programmatically.
-
-We'll store it in our `MintConfiguration`:
+First off, we need to store the Object's `ExtendRef` somewhere when we create it. Add it to the `MintConfig` resource:
 
 ```rust
-struct MintConfiguration has key {
-    signer_capability: SignerCapability,
-    collection_name: String,
-    token_name: String,
-    token_uri: String,
-}
-```
-
-We create it, providing it a seed in the form of the collection name.
-
-```rust
-let seed = *string::bytes(&collection_name);
-let (resource_signer, resource_signer_cap) = account::create_resource_account(owner, seed);
-```
-
-:::info
-The seed can be anything we want, but since resource accounts are unique hashes of the combination of the creating account + seed, it's good to make the seed something that will also be unique. In our case, the owner and collection name combination will always be unique because that is a constraint enforced by the `collection.move` contract, so the seed being the collection name logically follows.
-:::
-
-To clarify, the `resource_signer` is the actual structure on chain that signs things, it is of type `signer`; whereas the `SignerCapability` is a unique
-on-chain resource that generates a signer for an account, given whomever requesting it has permission to access the `SignerCapability` resource.
-
-Now we can provide the `resource_signer` as the creator of the collection, and move the `resource_signer_cap` to the `MintConfiguration`, so we can programmatically retrieve the creator's ability to sign later.
-
-Note also that we store the `MintConfiguration` resource onto the resource account now, so when you call `create_collection` you'll have to look up the resource account's address to call the mint function later.
-
-```rust
-aptos_token::create_collection(
-    &resource_signer,
-    // ...
-);
-
-move_to(&resource_signer, MintConfiguration {
-    signer_capability: resource_signer_cap,
-    collection_name,
-    token_name,
-    token_uri,
-});
-```
-
-Let's alter the mint function so that it uses the resource account instead of the owner account.
-
-The first thing to notice is that the arguments to the function have changed. We no longer need the owner or the creator to sign the transaction. To do this before, we would've had to implement a function that takes two signers, which would've been complex. Not requiring the signer, however, meant the receiver had no say in whether or not they even wanted to receive the NFT.
-
-Now, we can require the receiver to sign so that a user can mint whenever they like, and the owner doesn't have to approve of it beforehand.
-
-```rust
-public entry fun mint(receiver: &signer, resource_addr: address) acquires MintConfiguration {
-    //...
-}
-```
-
-Note that we require the user to pass in the resource address- we've provided a view function as one way for you to calculate it. We show you how to use this function later in the [Running the contract section](#running-the-contract-1).
-
-```rust
-#[view]
-public fun get_resource_address(collection_name: String): address {
-    account::create_resource_address(&@mint_nft_v2_part2, *string::bytes(&collection_name))
+#[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+struct MintConfig has key {
+  extend_ref: ExtendRef, // this is how we generate the Object's `&signer`
+  collection_name: String,
+  token_description: String,
+  token_name: String,
+  token_uri: String,
+  property_keys: vector<String>,
+  property_types: vector<String>,
+  property_values: vector<vector<u8>>,
 }
 ```
 
 :::tip Advanced Tip
-Computing the `resource_addr` inside the `mint` function with `account::create_resource_address(...)` has heavy computational overhead because it uses a cryptographic hashing function. In some instances where we only call the `mint` function a few times, this might be okay, but since a `mint` function is intended to be called by potentially thousands of users in a very short period of time, we ensure that it has been precomputed and have the user pass it in as an argument.
+Note the new `resource_group_member` tag. Any resources with this tag marks it as part of an Object's ObjectGroup resource group. This groups together the individual resources on an Object at the storage layer, (generally) resulting in faster, more efficient data storage and retrieval.
+
+See [object resource groups](https://aptos.dev/standards/aptos-object/#object-resource-group).
 :::
 
-Next, we access the mint configuration data to retrieve the signer capability. We generate a temporary signer with `account::create_signer_with_capability` and use it to sign the mint function and transfer the token object to the receiver.
+Now let's examine how we create the object and store its ExtendRef in the MintConfig resource for later.
 
-```rust
-public entry fun mint(receiver: &signer) acquires MintConfiguration {
-    // access the configuration resources stored on-chain at @mint_nft_v2_part2's address
-    let mint_configuration = borrow_global<MintConfiguration>(@mint_nft_v2_part2);
-    let signer_cap = &mint_configuration.signer_capability;
-    let resource_signer: &signer = &account::create_signer_with_capability(signer_cap);
+```rust title="Create an object and have it create the collection. Store its ExtendRef in MintConfig"
+// Create an object that will be the collection creator
+// The object will be owned by the deployer account
+let constructor_ref = object::create_object(deployer);
+// generate its &signer to create the collection
+let obj_signer = object::generate_signer(&constructor_ref);
+
+aptos_token::create_collection(
+    obj_signer, // the object is now the creator of the collection
     // ...
-    // ... similar code as part 1
-    // ... just replace `creator` and `creator_addr` with `resource_signer` and `resource_addr`
+);
+
+// generate the ExtendRef with the returned ConstructorRef from the creation function
+let extend_ref = object::generate_extend_ref(&constructor_ref);
+
+// store it in the MintConfig resource
+let mint_config = MintConfig {
+    extend_ref,
     // ...
+};
+
+// Move the MintConfig resource to the contract address itself, since deployer == @no_code_mint_p2
+move_to(deployer, mint_config);
+```
+
+Now our object, owned by `deployer`, will actually be the collection creator!
+
+We now need to replace the `mint_to` function with a `mint` function, where instead of having the creator send a token to a designated receiver, we send the token directly to the `receiver`, only when they request it.
+
+```rust title="The receiver: &signer argument means the receiver requests to mint now, instead of the creator."
+public entry fun mint(receiver: &signer) acquires MintConfig {
+  // get our contract data at the module address
+  let mint_config = borrow_global_mut<MintConfig>(@no_code_mint_p2);
+
+  // borrow the object's ExtendRef and use it to generate the object's &signer
+  let extend_ref = &mint_config.extend_ref;
+  let obj_signer = object::generate_signer_for_extending(&mint_config.extend_ref);
+  // ...
+  // the rest of the function uses `obj_signer` like we used `deployer` (aka: you) before
+  // ... transfer the newly minted Token Object to `receiver`
 }
 ```
-:::warning
-Be careful about how you generate and retrieve signers from a `SignerCapability` resource. It is, in essence, the keys to a resource account. If you purposely or inadvertently let any account access a `SignerCapability` freely, they can do almost anything they want with the resources in the associated account.
 
-In our case, our code essentially makes the mint free, because there is no cost to mint and anyone can do it as many times as they like. This could be
-intentional in some cases, but should be considered before hand. Always be highly aware of how you grant access to a resource account's signer capability.
-:::
+Now the `receiver` only has to request to mint an NFT, and the object creator will mint it and send it over.
+You, the deployer, no longer need to be involved in the transaction!
+
+This means the contract is fully automated now- however, tihs function has no form of access control, meaning anyone can mint a token as many times as they want!
+
+Next section, we'll examine how to implement gating access to the `mint` function.
+
+But for now, let's publish the module and run the contract.
 
 ### Publishing the module and running the contract
 
-Publishing the module is basically the same as before. Just make sure you're in the `2-Using-Resource-Account` directory and run this command, note the only thing that changed is the module name in the first line, `create_nft_with_resource_account` instead of `create_nft`:
+Publishing the module is basically the same as before. Just make sure you're in the `2-Object-as-Creator` directory and run this command:
 
-```shell
-aptos move publish --named-addresses mint_nft_v2_part2=default --profile default --assume-yes
+```shell title="Publish the new module. The only difference here is the no_code_mint_p2 address"
+aptos move publish --named-addresses no_code_mint_p2=$MINT_DEPLOYER \
+                   --profile mint_deployer                          \
+                   --assume-yes
 ```
 
-Call this function as the owner of the contract, which is our `default` profile. Keep in mind the `--profile default` flag:
-
-```shell
-aptos move run --function-id default::create_nft_with_resource_account::initialize_collection   \
-               --profile default                                          \
-               --args                                                     \
-                  string:"Krazy Kangaroos"                                \
-                  string:"https://www.link-to-your-collection-image.com"  \
-                  u64:3                                                   \
-                  u64:5                                                   \
-                  u64:100                                                 \
-                  string:"Krazy Kangaroo #1"                              \
-                  string:"https://www.link-to-your-token-image.com"       
-```
-
-Next we need to get the resource address for the contract with our view function.
-
-```shell
-aptos move view --function-id default::create_nft_with_resource_account::get_resource_address \
-                --profile default \
-                --args string:"Krazy Kangaroos"
-```
-
-Now we call this function as a user, which we simulate with our `nft-receiver` profile:
-
-```shell
-aptos move run --function-id default::create_nft_with_resource_account::mint \
-               --profile nft-receiver \
-               --args address:YOUR_RESOURCE_ADDRESS_HERE
+```shell title="Mint the token, except this time with the nft_minter profile"
+aptos move run --function-id $MINT_DEPLOYER::object_as_creator::mint     \
+               --profile nft_minter                                      \
+               --assume-yes
 ```
 
 Great! Now you've created the collection as an owner and requested to mint as a user and received the newly minted NFT.
@@ -394,17 +399,36 @@ It may not feel different since you're acting as the owner and the receiver all 
 
 In the first section, the user has to wait for the owner of the contract to mint and send them an NFT. In the second section, the user can request to mint and receive an NFT themselves.
 
-## 3. Adding restrictions: a whitelist, an end time, an admin, and an enabled flag
+Look up the transaction hash on the [Aptos explorer](https://explorer.aptoslabs.com/?network=devnet) if you'd like- although for the most part, the transaction appears very similarly to before.
+
+## 3. Adding restrictions with an allowlist
 
 We're still missing some very common features for NFT minting contracts:
 
-1. A whitelist that restricts minting to whitelisted addresses
-2. The ability to add/remove addresses from the whitelist
-3. A start* and end time
+1. An allowlist that restricts minting to allowlisted addresses
+2. The ability to add and remove addresses from the allowlist
+3. A start and end time
 4. The ability to enable or disable the mint
-5. An admin model: restricting using these functions to an assigned admin account
+5. Setting a price to mint
 
-*We add the start time in part 4 to keep this section brief.
+The rest we can add by creating an allowlist with `allowlist.move` and then simply gating our `mint` function with the allowlist's `increment` function.
+
+Explaining the inner workings of the `allowlist.move` and how to write it is beyond the scope of this tutorial, but let's at least review how to use it:
+
+For each tier, you **must** specify the following:
+ - Tier name
+ - Open to the public, that is, is it an allowlist (not public) or merely a registry that tracks # of mints (public)
+ - Price
+ - Start time
+ - End time
+ - Per user limit (# of mints)
+
+If you do not create a valid allowlist, **you will not** be able to enable the mint function.
+ - You must either have a public allowlist or a gated allowlist with at least one address in it.
+
+If a user exists under multiple allowlists, the allowlist contract will mint from the earliest, cheapest one.
+
+
 
 ### Adding the new configuration options
 
@@ -413,16 +437,16 @@ We need to add the expiration timestamp, the enabled flag, and the admin address
 ```rust
 struct MintConfiguration has key {
     // ...
-    whitelist: Table<address, bool>,
+    allowlist: Table<address, bool>,
     expiration_timestamp: u64,
     minting_enabled: bool,
     admin: address,
 }
 ```
 
-Note that we're storing a `bool` in the whitelist as the value in each key: value pair. We won't use it in this tutorial, but you could easily use it to limit each account to 1 mint or even use an integer type to limit it to an arbitrary number of mints.  
+Note that we're storing a `bool` in the allowlist as the value in each key: value pair. We won't use it in this tutorial, but you could easily use it to limit each account to 1 mint or even use an integer type to limit it to an arbitrary number of mints.  
 
-When we initialize the collection, we create a default empty whitelist, an expiration timestamp that's one second in the past, and disable the mint:
+When we initialize the collection, we create a default empty allowlist, an expiration timestamp that's one second in the past, and disable the mint:
 
 ```rust
 public entry fun initialize_collection( /* ... */ ) {
@@ -430,7 +454,7 @@ public entry fun initialize_collection( /* ... */ ) {
 
     move_to(&resource_signer, MintConfiguration {
         // ...
-        whitelist: table::new<address, bool>(),
+        allowlist: table::new<address, bool>(),
         expiration_timestamp: timestamp::now_seconds() - 1,
         minting_enabled: false,
         admin: owner_addr,
@@ -446,8 +470,8 @@ We can utilize these fields to enforce restrictions on the mint function by abor
 public entry fun mint(receiver: &signer, resource_addr: address) acquires MintConfiguration {
     // ...
 
-    // abort if user is not in whitelist
-    assert!(table::contains(&mint_configuration.whitelist, receiver_addr), ENOT_IN_WHITELIST);
+    // abort if user is not in allowlist
+    assert!(table::contains(&mint_configuration.allowlist, receiver_addr), ENOT_IN_WHITELIST);
     // abort if this function is called after the expiration_timestamp
     assert!(timestamp::now_seconds() < mint_configuration.expiration_timestamp, error::permission_denied(ECOLLECTION_EXPIRED));
     // abort if minting is disabled
@@ -503,12 +527,12 @@ public entry fun set_admin(
 ```
 Note the extra error check to make sure the new admin account exists. If we don't check this, we could accidentally lock ourselves out by setting the admin to an account that doesn't exist yet.
 
-### Adding to the whitelist
+### Adding to the allowlist
 
-Now let's add our add_to_whitelist and remove_from_whitelist functions. They're very similar, so we'll just show the former:
+Now let's add our add_to_allowlist and remove_from_allowlist functions. They're very similar, so we'll just show the former:
 
 ```rust
-public entry fun add_to_whitelist(
+public entry fun add_to_allowlist(
     admin: &signer,
     addresses: vector<address>,
     resource_addr: address
@@ -519,14 +543,14 @@ public entry fun add_to_whitelist(
 
     vector::for_each(addresses, |user_addr| {
         // note that this will abort in `table` if the address exists already- use `upsert` to ignore this
-        table::add(&mut mint_configuration.whitelist, user_addr, true);
+        table::add(&mut mint_configuration.allowlist, user_addr, true);
     });
 }
 ```
 
 Most of this is fairly straightforward, although note the new inline function we use with `for_each`. This is a functional programming construct Aptos Move offers that lets us run an inline function over each element in a vector. `user_addr` is the locally named element that's passed into the `for_each` function block.
 
-:::tip Why do we use a table instead of a vector for the whitelist?
+:::tip Why do we use a table instead of a vector for the allowlist?
 You might be tempted to use a `vector<address>` for this, but the lookup time of a vector gets prohibitively expensive when the size of the list starts growing into the thousands.
 
 A Table offers very efficient lookup times. Since it's a hashing function, it's an O(1) lookup time. A vector is O(n). When it comes to thousands of calls on-chain, that can make a substantial difference in execution cost and time.
@@ -610,42 +634,42 @@ aptos move run --function-id default::create_nft_with_resource_and_admin_account
                    address:YOUR_RESOURCE_ADDRESS_HERE   
 ```
 
-Last error we'll get is the user not being on the whitelist:
+Last error we'll get is the user not being on the allowlist:
 
 ```shell
-"ENOT_IN_WHITELIST(0x5): The user account is not in the whitelist"
+"ENOT_IN_WHITELIST(0x5): The user account is not in the allowlist"
 ```
 
-Add the user to the whitelist:
+Add the user to the allowlist:
 
 ```shell
-aptos move run --function-id default::create_nft_with_resource_and_admin_accounts::add_to_whitelist \
+aptos move run --function-id default::create_nft_with_resource_and_admin_accounts::add_to_allowlist \
                --profile default                           \
                --args                                      \
                    "vector<address>:nft-receiver"          \
                    address:YOUR_RESOURCE_ADDRESS_HERE
 ```
 
-Try to mint again, and it should succeed! You can try setting the admin with the `set_admin(...)` call and then set the `whitelist`, `expiration_timestamp` and `minting_enabled` fields on your own. Use the correct and incorrect admin to see how it works.
+Try to mint again, and it should succeed! You can try setting the admin with the `set_admin(...)` call and then set the `allowlist`, `expiration_timestamp` and `minting_enabled` fields on your own. Use the correct and incorrect admin to see how it works.
 
 
 ## 4. Adding a public phase, custom events, and unit tests
 
 We've got most of the basics down, but there are some additions we can still make to round out the contract:
 
-1. Add a public phase after the whitelist phase where accounts not on the whitelist are allowed to mint
+1. Add a public phase after the allowlist phase where accounts not on the allowlist are allowed to mint
 2. Add a `TokenMintingEvent` that we emit whenever a user calls the `mint` function successfully
 3. Write Move unit tests to more efficiently test our code
 
 ### Adding a public phase
 
-The simplest way to set a public phase is to add a start timestamp for both the public and whitelist minters. 
+The simplest way to set a public phase is to add a start timestamp for both the public and allowlist minters. 
 
 ```rust
 struct MintConfiguration has key {
     // ...
     start_timestamp_public: u64,
-    start_timestamp_whitelist: u64,
+    start_timestamp_allowlist: u64,
 }
 
 const U64_MAX: u64 = 18446744073709551615;
@@ -655,7 +679,7 @@ public entry fun initialize_collection( ... ) {
     move_to(&resource_signer, MintConfiguration {
         // ...
         // default to an impossibly distant future time to force owner to set this
-        start_timestamp_whitelist: U64_MAX,
+        start_timestamp_allowlist: U64_MAX,
         start_timestamp_public: U64_MAX,
         // ...
     });
@@ -664,18 +688,18 @@ public entry fun initialize_collection( ... ) {
 
 Then we enforce those restrictions in the mint function again.
 
-We add an abort for trying to mint before the whitelist time, then check to see if the user is even on the whitelist. If they aren't, we abort if the public time hasn't come yet.
+We add an abort for trying to mint before the allowlist time, then check to see if the user is even on the allowlist. If they aren't, we abort if the public time hasn't come yet.
 
-If the user is whitelisted and the whitelist time has begun or the public minting has begun, we finish our checks for `expiration_timestamp` and `minting_enabled`.
+If the user is allowlisted and the allowlist time has begun or the public minting has begun, we finish our checks for `expiration_timestamp` and `minting_enabled`.
 
 ```rust
 public entry fun mint(receiver: &signer, resource_addr: address) acquires MintConfiguration {
     // ...
 
-    assert!(timestamp::now_seconds() >= mint_configuration.start_timestamp_whitelist, EWHITELIST_MINT_NOT_STARTED);
-    // we are at least past the whitelist start. Now check for if the user is in the whitelist
-    if (!table::contains(&mint_configuration.whitelist, signer::address_of(receiver))) {
-        // user address is not in the whitelist, assert public minting has begun
+    assert!(timestamp::now_seconds() >= mint_configuration.start_timestamp_allowlist, EWHITELIST_MINT_NOT_STARTED);
+    // we are at least past the allowlist start. Now check for if the user is in the allowlist
+    if (!table::contains(&mint_configuration.allowlist, signer::address_of(receiver))) {
+        // user address is not in the allowlist, assert public minting has begun
         assert!(timestamp::now_seconds() >= mint_configuration.start_timestamp_public, EPUBLIC_MINT_NOT_STARTED);
     };
 
@@ -688,7 +712,7 @@ public entry fun mint(receiver: &signer, resource_addr: address) acquires MintCo
 }
 ```
 
-Note that we haven't had a start time- we've been using the `minting_enabled` variable to gate access, but it's better design to have `minting_enabled` as a hard on/off switch for the contract and an actual start time for public and whitelist mints.
+Note that we haven't had a start time- we've been using the `minting_enabled` variable to gate access, but it's better design to have `minting_enabled` as a hard on/off switch for the contract and an actual start time for public and allowlist mints.
 
 Our setter functions are nearly identical to `set_expiration_timestamp` just with a few additional checks to ensure our times make sense with each other:
 
@@ -699,16 +723,16 @@ public entry fun set_start_timestamp_public(
     resource_addr: address,
 ) acquires MintConfiguration {
     // ...
-    assert!(mint_configuration.start_timestamp_whitelist <= start_timestamp_public, EPUBLIC_NOT_AFTER_WHITELIST);
+    assert!(mint_configuration.start_timestamp_allowlist <= start_timestamp_public, EPUBLIC_NOT_AFTER_WHITELIST);
     // ...
 }
-public entry fun set_start_timestamp_whitelist(
+public entry fun set_start_timestamp_allowlist(
     admin: &signer,
-    start_timestamp_whitelist: u64,
+    start_timestamp_allowlist: u64,
     resource_addr: address,
 ) acquires MintConfiguration {
     // ...
-    assert!(mint_configuration.start_timestamp_public >= start_timestamp_whitelist, EPUBLIC_NOT_AFTER_WHITELIST);
+    assert!(mint_configuration.start_timestamp_public >= start_timestamp_allowlist, EPUBLIC_NOT_AFTER_WHITELIST);
     // ...
 }
 ```
@@ -788,13 +812,13 @@ const ECOLLECTION_EXPIRED: u64 = 2;
 const EMINTING_DISABLED: u64 = 3;
 /// The requested admin account does not exist
 const ENOT_FOUND: u64 = 4;
-/// The user account is not in the whitelist
+/// The user account is not in the allowlist
 const ENOT_IN_WHITELIST: u64 = 5;
 /// Whitelist minting hasn't begun yet
 const EWHITELIST_MINT_NOT_STARTED: u64 = 6;
 /// Public minting hasn't begun yet
 const EPUBLIC_MINT_NOT_STARTED: u64 = 7;
-/// The public time must be after the whitelist time
+/// The public time must be after the allowlist time
 const EPUBLIC_NOT_AFTER_WHITELIST: u64 = 8;
 ```
 

@@ -1,4 +1,4 @@
-module no_code_mint_p3::object_as_creator {
+module no_code_mint_p2::object_as_creator {
     use std::string;
     use std::bcs;
     use std::error;
@@ -30,7 +30,7 @@ module no_code_mint_p3::object_as_creator {
     fun init_module(deployer: &signer) {
         let deployer_address = signer::address_of(deployer);
         // ensure that the contract address itself is also the deployer and deployer of this module
-        assert!(deployer_address == @no_code_mint_p3, error::permission_denied(ENOT_AUTHORIZED));
+        assert!(deployer_address == @no_code_mint_p2, error::permission_denied(ENOT_AUTHORIZED));
 
         let collection_name = string::utf8(b"Collection name");
         let description = string::utf8(b"Description");
@@ -78,7 +78,7 @@ module no_code_mint_p3::object_as_creator {
             property_values: vector<vector<u8>>[bcs::to_bytes(&string::utf8(b"BLUE"))],
         };
 
-        // Move the MintConfig resource to the contract address itself, since deployer == @no_code_mint_p3
+        // Move the MintConfig resource to the contract address itself, since deployer == @no_code_mint_p2
         move_to(deployer, mint_config);
     }
 
@@ -87,7 +87,7 @@ module no_code_mint_p3::object_as_creator {
     // since the object is the collection creator, meaning we can automate the minting process.
     public entry fun mint(receiver: &signer) acquires MintConfig {
         // get our contract data at the module address
-        let mint_config = borrow_global_mut<MintConfig>(@no_code_mint_p3);
+        let mint_config = borrow_global_mut<MintConfig>(@no_code_mint_p2);
 
         // borrow the object's ExtendRef and use it to generate the object's &signer
         let extend_ref = &mint_config.extend_ref;
