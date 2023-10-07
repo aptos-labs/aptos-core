@@ -54,6 +54,10 @@ clap = { workspace = true, features = ["env", "unstable-styles"] }
 clap_complete = { workspace = true }
 codespan-reporting = { workspace = true }
 dashmap = { workspace = true }
+diesel = { workspace = true, features = [
+    "postgres_backend",
+] }
+diesel-async = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }

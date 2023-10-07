@@ -3,8 +3,10 @@
 
 mod faucet;
 mod health_checker;
+mod indexer_api;
 mod logging;
 mod node;
+mod postgres;
 mod ready_server;
 mod traits;
 mod utils;
@@ -12,8 +14,10 @@ mod utils;
 use self::{
     faucet::FaucetArgs,
     health_checker::HealthChecker,
+    indexer_api::IndexerApiArgs,
     logging::ThreadNameMakeWriter,
     node::NodeArgs,
+    postgres::PostgresArgs,
     ready_server::ReadyServerArgs,
     traits::{PostHealthyStep, ServiceManager},
 };
@@ -71,6 +75,12 @@ pub struct RunLocalTestnet {
     faucet_args: FaucetArgs,
 
     #[clap(flatten)]
+    postgres_args: PostgresArgs,
+
+    #[clap(flatten)]
+    indexer_api_args: IndexerApiArgs,
+
+    #[clap(flatten)]
     ready_server_args: ReadyServerArgs,
 
     #[clap(flatten)]
@@ -79,7 +89,7 @@ pub struct RunLocalTestnet {
 
 impl RunLocalTestnet {
     /// Wait for many services to start up. This prints a message like "X is starting,
-    /// please wait..." for each service and then "X is running. Endpoint: <url>"
+    /// please wait..." for each service and then "X is ready. Endpoint: <url>"
     /// when it's ready.
     async fn wait_for_startup<'a>(
         &self,
@@ -89,11 +99,12 @@ impl RunLocalTestnet {
             Vec::new();
 
         for health_checker in health_checkers {
-            // We don't want to print anything for the processors, it'd be too spammy.
             let silent = match health_checker {
                 HealthChecker::NodeApi(_) => false,
+                // We don't want to print anything for the processors, it'd be too spammy.
                 HealthChecker::Http(_, name) => name.contains("processor"),
                 HealthChecker::DataServiceGrpc(_) => false,
+                HealthChecker::Postgres(_) => false,
             };
             if !silent {
                 eprintln!("{} is starting, please wait...", health_checker);
@@ -102,7 +113,7 @@ impl RunLocalTestnet {
                 health_checker.wait(None).await?;
                 if !silent {
                     eprintln!(
-                        "{} is running. Endpoint: {}",
+                        "{} is ready. Endpoint: {}",
                         health_checker,
                         health_checker.address_str()
                     );
@@ -189,8 +200,14 @@ impl CliCommand<()> for RunLocalTestnet {
             managers.push(Box::new(faucet_manager));
         }
 
-        // Now we put the node manager into managers, just so we have access to it
-        // before this so we can call things like `node_manager.get_node_api_url()`.
+        if self.indexer_api_args.with_indexer_api {
+            let postgres_manager = postgres::PostgresManager::new(&self, test_dir.clone())
+                .context("Failed to build postgres service manager")?;
+            managers.push(Box::new(postgres_manager));
+        }
+
+        // We put the node manager into managers at the end just so we have access to
+        // it before this so we can call things like `node_manager.get_node_api_url()`.
         managers.push(Box::new(node_manager));
 
         // Get the healthcheckers from all the managers. We'll pass to this
