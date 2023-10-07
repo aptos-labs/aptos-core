@@ -34,6 +34,7 @@ parking_lot = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+threadpool = "1.8.1"
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }

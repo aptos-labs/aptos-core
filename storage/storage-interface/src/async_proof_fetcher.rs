@@ -21,14 +21,10 @@ use std::{
     },
     time::Duration,
 };
+use threadpool::ThreadPool;
 
-static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(AptosVM::get_num_proof_reading_threads())
-        .thread_name(|index| format!("proof_reader-{}", index))
-        .build()
-        .unwrap()
-});
+static IO_POOL: Lazy<ThreadPool> =
+    Lazy::new(|| ThreadPool::new(AptosVM::get_num_proof_reading_threads()));
 
 struct Proof {
     state_key_hash: HashValue,
@@ -118,7 +114,7 @@ impl AsyncProofFetcher {
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();
-        IO_POOL.spawn(move || {
+        IO_POOL.execute(move || {
             let proof = reader
                 .get_state_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
