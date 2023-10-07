@@ -23,7 +23,7 @@ use std::{
 };
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
-pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 20_000;
+pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 
 /// The in-memory buffered state that consists of two pieces:
 /// `state_until_checkpoint`: The ready-to-commit data in range (last snapshot, latest checkpoint].

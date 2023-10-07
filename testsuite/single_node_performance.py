@@ -73,15 +73,15 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # Local machine numbers will be higher.
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=22700, key=RunGroupKey("no-op"), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=3200, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=15000, key=RunGroupKey("coin-transfer"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=29000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=Flow.LAND_BLOCKING),
-    RunGroupConfig(expected_tps=12700, key=RunGroupKey("account-generation"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=25000, key=RunGroupKey("no-op"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=3300, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=16000, key=RunGroupKey("coin-transfer"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=34000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=13000, key=RunGroupKey("account-generation"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=26500, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=20000, key=RunGroupKey("account-resource32-b"), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=21000, key=RunGroupKey("account-resource32-b"), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.LAND_BLOCKING),
+    RunGroupConfig(expected_tps=12800, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.LAND_BLOCKING),
     RunGroupConfig(expected_tps=140, key=RunGroupKey("publish-package"), included_in=Flow.LAND_BLOCKING | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=2600, key=RunGroupKey(
         "mix_publish_transfer",
