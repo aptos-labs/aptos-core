@@ -77,7 +77,7 @@ pub struct TransactionStore {
     size_bytes: usize,
     // keeps track of txns that were resubmitted with higher gas
     gas_upgraded_index: HashMap<TxnPointer, u64>,
-    ready_no_peers_index: HashSet<TxnPointer>,
+    ready_peers_needed_index: HashSet<TxnPointer>,
 
     // configuration
     capacity: usize,
@@ -123,7 +123,7 @@ impl TransactionStore {
             // estimated size in bytes
             size_bytes: 0,
             gas_upgraded_index: HashMap::new(),
-            ready_no_peers_index: HashSet::new(),
+            ready_peers_needed_index: HashSet::new(),
 
             // configuration
             capacity: config.capacity,
@@ -477,7 +477,7 @@ impl TransactionStore {
                         .broadcast_peers(address)
                     {
                         SelectedPeers::None => {
-                            self.ready_no_peers_index
+                            self.ready_peers_needed_index
                                 .insert(TxnPointer::from(&txn.clone()));
                         },
                         SelectedPeers::All => {
@@ -485,7 +485,7 @@ impl TransactionStore {
                         },
                         SelectedPeers::Selected(peers) => {
                             if peers.len() < self.num_peers_to_select {
-                                self.ready_no_peers_index
+                                self.ready_peers_needed_index
                                     .insert(TxnPointer::from(&txn.clone()));
                             }
                             self.timeline_index.insert(txn, Some(peers));
@@ -613,7 +613,7 @@ impl TransactionStore {
         self.size_bytes -= txn.get_estimated_bytes();
         let txn_pointer = TxnPointer::from(txn);
         self.gas_upgraded_index.remove(&txn_pointer);
-        self.ready_no_peers_index.remove(&txn_pointer);
+        self.ready_peers_needed_index.remove(&txn_pointer);
 
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();
@@ -808,12 +808,12 @@ impl TransactionStore {
     }
 
     pub(crate) fn redirect_no_peers(&mut self) {
-        if self.ready_no_peers_index.is_empty() {
+        if self.ready_peers_needed_index.is_empty() {
             return;
         }
 
         let mut reinsert = vec![];
-        for txn_pointer in &self.ready_no_peers_index {
+        for txn_pointer in &self.ready_peers_needed_index {
             if let Some(mempool_txn) =
                 self.get_mempool_txn(&txn_pointer.sender, txn_pointer.sequence_number)
             {
@@ -833,9 +833,9 @@ impl TransactionStore {
             }
         }
         // TODO: Does it have to be a HashSet?
-        self.ready_no_peers_index.clear();
+        self.ready_peers_needed_index.clear();
         for txn_pointer in reinsert {
-            self.ready_no_peers_index.insert(txn_pointer);
+            self.ready_peers_needed_index.insert(txn_pointer);
         }
     }
 
@@ -843,7 +843,7 @@ impl TransactionStore {
         let to_redirect = self.timeline_index.timeline(Some(peer));
         info!("to_redirect: {:?}", to_redirect);
         for (sender, sequence_number) in to_redirect {
-            self.ready_no_peers_index
+            self.ready_peers_needed_index
                 .insert(TxnPointer::new(sender, sequence_number));
         }
         self.redirect_no_peers();
