@@ -3983,6 +3983,8 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "serde",
+ "test-case",
 ]
 
 [[package]]

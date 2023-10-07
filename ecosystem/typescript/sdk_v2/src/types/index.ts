@@ -68,7 +68,8 @@ export enum TransactionAuthenticatorVariant {
   Ed25519 = 0,
   MultiEd25519 = 1,
   MultiAgent = 2,
-  FeePayer = 4,
+  FeePayer = 3,
+  Secp256k1Ecdsa = 4,
 }
 
 /**

@@ -224,7 +224,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut change_set_filtered = MoveChangeSet::new();
 
         let mut resource_group_change_set = HashMap::new();
-        let mut resource_group_cache = remote.release_resource_group_cache();
+        // TODO: with the new resource group handling, the cache will be provided only for
+        // backwards compatibility.
+        let mut resource_group_cache = remote
+            .release_resource_group_cache()
+            .expect("Cache must be provided w. current resource group handling");
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<StructTag, AccountChangeSet> = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
@@ -371,6 +375,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         VMChangeSet::new(
             resource_write_set,
+            // TODO: properly populate resource group write-set.
+            HashMap::new(),
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set,

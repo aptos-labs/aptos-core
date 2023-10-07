@@ -5,6 +5,7 @@ use crate::{
     delta_change_set::{serialize, DeltaOp},
     module::AGGREGATOR_MODULE,
 };
+use aptos_state_view::StateView;
 use aptos_types::{
     aggregator::AggregatorID,
     state_store::{
@@ -125,6 +126,23 @@ pub trait AggregatorResolver:
 impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>> AggregatorResolver
     for T
 {
+}
+
+impl<S> TAggregatorView for S
+where
+    S: StateView,
+{
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = AggregatorID;
+
+    fn get_aggregator_v1_state_value(
+        &self,
+        state_key: &Self::IdentifierV1,
+        // Reading from StateView can be in precise mode only.
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<Option<StateValue>> {
+        self.get_state_value(state_key)
+    }
 }
 
 // Utils to store aggregator values in data store. Here, we
