@@ -240,7 +240,7 @@ When you sign and submit a transaction with an account's private key, you automa
 Running an entry function with `--profile mint_deployer` signs and submits the transaction with your `mint_deployer` profile's account, which is why you don't need to provide the signer to the `--args` parameter list.
 :::
 
-## 3. Automating the mint function with a resource account
+## 3. Automating the mint function with an object
 
 The issue with the code we've written so far is that it requires explicit approval from the creator to mint a token. The process isn't automated and the receiver doesn't ever approve of receiving the token.
 
