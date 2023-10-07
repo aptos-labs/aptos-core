@@ -5,7 +5,7 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     network::MempoolSyncMsg,
-    shared_mempool::broadcast_peers_selector::AllPeersSelector,
+    tests::mocks::MockPeersSelector,
 };
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
@@ -41,7 +41,7 @@ pub(crate) fn setup_mempool_with_broadcast_buckets(
 pub(crate) fn mempool_with_config(config: &NodeConfig) -> CoreMempool {
     CoreMempool::new(
         config,
-        Arc::new(RwLock::new(Box::new(AllPeersSelector::new()))),
+        Arc::new(RwLock::new(Box::new(MockPeersSelector::new()))),
     )
 }
 

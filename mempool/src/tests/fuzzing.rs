@@ -5,7 +5,9 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::MempoolSyncMsg,
-    shared_mempool::{broadcast_peers_selector::AllPeersSelector, tasks, types::SharedMempool},
+    shared_mempool::{
+        broadcast_peers_selector::PrioritizedPeersSelector, tasks, types::SharedMempool,
+    },
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
@@ -51,7 +53,7 @@ pub fn test_mempool_process_incoming_transactions_impl(
         // TODO: test all cases of broadcast peers selector
         Arc::new(Mutex::new(CoreMempool::new(
             &config,
-            Arc::new(RwLock::new(Box::new(AllPeersSelector::new()))),
+            Arc::new(RwLock::new(Box::new(PrioritizedPeersSelector::new(1)))),
         ))),
         config.mempool.clone(),
         network_client,

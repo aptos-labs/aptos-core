@@ -2,8 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters;
 use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
-use aptos_logger::info;
+use aptos_logger::prelude::*;
 use aptos_network::application::metadata::PeerMetadata;
 use aptos_types::{account_address::AccountAddress, transaction::Version, PeerId};
 use itertools::Itertools;
@@ -16,27 +17,13 @@ use std::{
     time::Duration,
 };
 
-pub enum SelectedPeers {
-    All,
-    Selected(Vec<PeerNetworkId>),
-    None,
-}
-
-impl From<Vec<PeerNetworkId>> for SelectedPeers {
-    fn from(peers: Vec<PeerNetworkId>) -> Self {
-        if peers.is_empty() {
-            SelectedPeers::None
-        } else {
-            SelectedPeers::Selected(peers)
-        }
-    }
-}
-
 pub trait BroadcastPeersSelector: Send + Sync {
-    fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>);
-    // TODO: for backwards compatibility, an empty vector could mean we send to all?
-    // TODO: for all the tests, just added an empty vector, need to audit later
-    fn broadcast_peers(&self, account: &AccountAddress) -> SelectedPeers;
+    fn update_peers(
+        &mut self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>);
+    fn broadcast_peers(&self, account: &AccountAddress) -> Vec<PeerNetworkId>;
+    fn num_peers_to_select(&self) -> usize;
 }
 
 #[derive(Clone, Debug)]
@@ -92,55 +79,48 @@ impl PrioritizedPeersComparator {
     }
 }
 
-pub struct AllPeersSelector {}
-
-impl AllPeersSelector {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl BroadcastPeersSelector for AllPeersSelector {
-    fn update_peers(&mut self, _updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
-        // Do nothing
-    }
-
-    fn broadcast_peers(&self, _account: &AccountAddress) -> SelectedPeers {
-        SelectedPeers::All
-    }
-}
-
 pub struct PrioritizedPeersSelector {
-    max_selected_peers: usize,
+    num_peers_to_select: usize,
     prioritized_peers: Vec<PeerNetworkId>,
     prioritized_peers_comparator: PrioritizedPeersComparator,
+    peers: HashSet<PeerNetworkId>,
 }
 
 impl PrioritizedPeersSelector {
-    pub fn new(max_selected_peers: usize) -> Self {
+    pub fn new(num_peers_to_select: usize) -> Self {
         Self {
-            max_selected_peers,
+            num_peers_to_select,
             prioritized_peers: Vec::new(),
             prioritized_peers_comparator: PrioritizedPeersComparator::new(),
+            peers: HashSet::new(),
         }
     }
 }
 
 impl BroadcastPeersSelector for PrioritizedPeersSelector {
-    fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
+    fn update_peers(
+        &mut self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
+        let new_peers = HashSet::from_iter(updated_peers.keys().cloned());
+        let added: Vec<_> = new_peers.difference(&self.peers).cloned().collect();
+        let removed: Vec<_> = self.peers.difference(&new_peers).cloned().collect();
+
         self.prioritized_peers = updated_peers
             .iter()
             .map(|(peer, metadata)| (*peer, metadata.get_connection_metadata().role))
             .sorted_by(|peer_a, peer_b| self.prioritized_peers_comparator.compare(peer_a, peer_b))
             .map(|(peer, _)| peer)
             .collect();
+
+        (added, removed)
     }
 
-    fn broadcast_peers(&self, _account: &AccountAddress) -> SelectedPeers {
+    fn broadcast_peers(&self, _account: &AccountAddress) -> Vec<PeerNetworkId> {
         let peers: Vec<_> = self
             .prioritized_peers
             .iter()
-            .take(self.max_selected_peers)
+            .take(self.num_peers_to_select)
             .cloned()
             .collect();
         info!(
@@ -148,21 +128,33 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
             self.prioritized_peers.len(),
             peers
         );
-        peers.into()
+        peers
+    }
+
+    fn num_peers_to_select(&self) -> usize {
+        self.num_peers_to_select
     }
 }
 
 pub struct FreshPeersSelector {
-    max_selected_peers: usize,
-    stickiness_cache: Arc<Cache<AccountAddress, Vec<PeerNetworkId>>>,
+    num_peers_to_select: usize,
+    // TODO: what is a reasonable threshold? is there a way to make it time-based instead?
+    // TODO: also, maybe only apply the threshold if there are more than num_peers_to_select peers?
+    version_threshold: u64,
+    // Note, only a single read happens at a time, so we don't use the thread-safeness of the cache
+    stickiness_cache: Arc<Cache<AccountAddress, (u64, Vec<PeerNetworkId>)>>,
+    // TODO: is there a data structure that can do peers and sorted_peers all at once?
+    // Sorted in descending order (highest version first, i.e., up-to-date peers first)
     sorted_peers: Vec<(PeerNetworkId, Version)>,
     peers: HashSet<PeerNetworkId>,
+    peers_generation: u64,
 }
 
 impl FreshPeersSelector {
-    pub fn new(max_selected_peers: usize) -> Self {
+    pub fn new(num_peers_to_select: usize, version_threshold: u64) -> Self {
         Self {
-            max_selected_peers,
+            num_peers_to_select,
+            version_threshold,
             stickiness_cache: Arc::new(
                 Cache::builder()
                     .max_capacity(100_000)
@@ -171,16 +163,16 @@ impl FreshPeersSelector {
             ),
             sorted_peers: Vec::new(),
             peers: HashSet::new(),
+            peers_generation: 0,
         }
     }
 
-    fn broadcast_peers_inner(&self, account: &PeerId) -> Vec<PeerNetworkId> {
+    fn get_or_fill_stickiness_cache(&self, account: &PeerId) -> (u64, Vec<PeerNetworkId>) {
         self.stickiness_cache.get_with_by_ref(account, || {
             let peers: Vec<_> = self
                 .sorted_peers
                 .iter()
-                .rev()
-                .take(self.max_selected_peers)
+                .take(self.num_peers_to_select)
                 .map(|(peer, _version)| *peer)
                 .collect();
             // TODO: random shuffle among similar versions to keep from biasing
@@ -191,15 +183,54 @@ impl FreshPeersSelector {
                 self.sorted_peers.len(),
                 self.sorted_peers
             );
-            peers
+            (self.peers_generation, peers)
         })
+    }
+
+    fn broadcast_peers_inner(&self, account: &PeerId) -> Vec<PeerNetworkId> {
+        // (1) get cached entry, or fill in with fresh peers
+        let (generation, mut peers) = self.get_or_fill_stickiness_cache(account);
+
+        // (2) if entry generation == current generation -- return
+        if generation == self.peers_generation {
+            return peers;
+        }
+
+        // (3) remove non-fresh peers
+        peers.retain(|peer| self.peers.contains(peer));
+
+        // (4) if not full, try to fill in more fresh peers
+        if peers.len() < self.num_peers_to_select {
+            let peers_cloned = peers.clone();
+            let peers_set: HashSet<_> = HashSet::from_iter(peers_cloned.iter());
+            let more_peers = self
+                .sorted_peers
+                .iter()
+                .filter_map(|(peer, _version)| {
+                    if !peers_set.contains(peer) {
+                        Some(*peer)
+                    } else {
+                        None
+                    }
+                })
+                .take(self.num_peers_to_select - peers.len());
+            // add more_peers to end of peers
+            peers.extend(more_peers);
+        }
+
+        // (5) update the stickiness cache
+        self.stickiness_cache
+            .insert(*account, (self.peers_generation, peers.clone()));
+
+        peers
     }
 }
 
 impl BroadcastPeersSelector for FreshPeersSelector {
-    fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
-        // TODO: Also need prioritized peers for VFN. Or is it always better to send to fresh peer?
-
+    fn update_peers(
+        &mut self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         let mut peer_versions: Vec<_> = updated_peers
             .iter()
             .map(|(peer, metadata)| {
@@ -212,28 +243,56 @@ impl BroadcastPeersSelector for FreshPeersSelector {
                 (*peer, 0)
             })
             .collect();
-        // TODO: what if we don't actually have a mempool connection to this host?
-        // TODO: do we have to filter? or penalize but still allow selection?
-        peer_versions.sort_by_key(|(_peer, version)| *version);
+        // Sort in descending order (highest version first, i.e., up-to-date peers first)
+        peer_versions.sort_by(|(_, version_a), (_, version_b)| version_b.cmp(version_a));
         info!("fresh_peers update_peers: {:?}", peer_versions);
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_PEERS.observe(peer_versions.len() as f64);
 
-        self.sorted_peers = peer_versions;
-        self.peers = HashSet::from_iter(self.sorted_peers.iter().map(|(peer, _version)| *peer));
+        // Select a minimum of num_peers_to_select, and include all peers within version_threshold
+        let max_version = peer_versions
+            .first()
+            .map(|(_peer, version)| *version)
+            .unwrap_or(0);
+        let mut selected_peer_versions = vec![];
+        let mut num_selected = 0;
+        let mut num_fresh = 0;
+        for (peer, version) in peer_versions {
+            let mut to_select = false;
+            if num_selected < self.num_peers_to_select {
+                to_select = true;
+            }
+            if max_version - version <= self.version_threshold {
+                to_select = true;
+                num_fresh += 1;
+            }
+            if to_select {
+                selected_peer_versions.push((peer, version));
+                num_selected += 1;
+            } else {
+                break;
+            }
+        }
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_SELECTED_PEERS.observe(num_selected as f64);
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS.observe(num_fresh as f64);
+
+        let selected_peers =
+            HashSet::from_iter(selected_peer_versions.iter().map(|(peer, _version)| *peer));
+        let added: Vec<_> = selected_peers.difference(&self.peers).cloned().collect();
+        let removed: Vec<_> = self.peers.difference(&selected_peers).cloned().collect();
+        counters::SHARED_MEMPOOL_SELECTOR_REMOVED_PEERS.observe(removed.len() as f64);
+
+        self.sorted_peers = selected_peer_versions;
+        self.peers = selected_peers;
+
+        (added, removed)
     }
 
-    fn broadcast_peers(&self, account: &PeerId) -> SelectedPeers {
-        let possibly_cached_results = self.broadcast_peers_inner(account);
-        let mut peers: Vec<_> = possibly_cached_results
-            .iter()
-            .filter(|peer| self.peers.contains(peer))
-            .cloned()
-            .collect();
-        if peers.is_empty() {
-            self.stickiness_cache.remove(account);
-            peers = self.broadcast_peers_inner(account);
-            info!("fresh_peers, stickiness removed");
-        }
-        peers.into()
+    fn broadcast_peers(&self, account: &PeerId) -> Vec<PeerNetworkId> {
+        self.broadcast_peers_inner(account)
+    }
+
+    fn num_peers_to_select(&self) -> usize {
+        self.num_peers_to_select
     }
 }
 

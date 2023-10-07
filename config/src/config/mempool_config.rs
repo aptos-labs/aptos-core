@@ -77,7 +77,7 @@ impl Default for MempoolConfig {
             eager_expire_threshold_ms: Some(10_000),
             eager_expire_time_ms: 3_000,
             peer_update_interval_ms: 1_000,
-            broadcast_peers_selector: BroadcastPeersSelectorConfig::AllPeers,
+            broadcast_peers_selector: BroadcastPeersSelectorConfig::PrioritizedPeers(1),
         }
     }
 }
@@ -118,10 +118,11 @@ impl ConfigOptimizer for MempoolConfig {
         }
         if node_type.is_validator_fullnode() {
             // Set broadcast peers to prioritized, with a max of 1
-            // TODO: as a workaround for smoke tests, always apply even if there is an override
-            mempool_config.broadcast_peers_selector =
-                BroadcastPeersSelectorConfig::PrioritizedPeers(1);
-            modified_config = true;
+            if local_mempool_config_yaml["broadcast_peers_selector"].is_null() {
+                mempool_config.broadcast_peers_selector =
+                    BroadcastPeersSelectorConfig::PrioritizedPeers(1);
+                modified_config = true;
+            }
 
             // Set the shared_mempool_max_concurrent_inbound_syncs to 16 (default is 4)
             if local_mempool_config_yaml["shared_mempool_max_concurrent_inbound_syncs"].is_null() {
@@ -135,13 +136,20 @@ impl ConfigOptimizer for MempoolConfig {
                 modified_config = true;
             }
         } else if node_type.is_validator() {
-            // None for now
+            // TODO: With quorum store, this isn't used. Used for testing, but should be removed.
+            if local_mempool_config_yaml["broadcast_peers_selector"].is_null() {
+                mempool_config.broadcast_peers_selector =
+                    BroadcastPeersSelectorConfig::PrioritizedPeers(1);
+                modified_config = true;
+            }
         } else {
             // The node is a PFN
             // Set broadcast peers to fresh, with a max of 2
-            // TODO: as a workaround for smoke tests, always apply even if there is an override
-            mempool_config.broadcast_peers_selector = BroadcastPeersSelectorConfig::FreshPeers(2);
-            modified_config = true;
+            if local_mempool_config_yaml["broadcast_peers_selector"].is_null() {
+                mempool_config.broadcast_peers_selector =
+                    BroadcastPeersSelectorConfig::FreshPeers(2, 1000);
+                modified_config = true;
+            }
         }
 
         Ok(modified_config)
@@ -151,8 +159,8 @@ impl ConfigOptimizer for MempoolConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BroadcastPeersSelectorConfig {
-    AllPeers,
-    FreshPeers(usize),
+    /// num_peers_to_select, version_threshold
+    FreshPeers(usize, u64),
     PrioritizedPeers(usize),
 }
 
@@ -267,10 +275,6 @@ mod tests {
         assert_eq!(
             mempool_config.max_broadcasts_per_peer,
             local_max_broadcasts_per_peer
-        );
-        assert_ne!(
-            mempool_config.broadcast_peers_selector,
-            default_mempool_config.broadcast_peers_selector
         );
         assert_ne!(
             mempool_config.shared_mempool_tick_interval_ms,

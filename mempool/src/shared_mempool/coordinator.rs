@@ -354,17 +354,11 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
     TransactionValidator: TransactionValidation + 'static,
 {
     if let Ok(connected_peers) = peers_and_metadata.get_connected_peers_and_metadata() {
-        broadcast_peers_selector
-            .write()
-            .update_peers(&connected_peers);
         let (newly_added_upstream, disabled) = smp.network_interface.update_peers(&connected_peers);
         // TODO: anything that is old, filter out of newly_add_upstream and add to disabled
         if !newly_added_upstream.is_empty() || !disabled.is_empty() {
             counters::shared_mempool_event_inc("peer_update");
             notify_subscribers(SharedMempoolNotification::PeerStateChange, &smp.subscribers);
-        }
-        if !newly_added_upstream.is_empty() {
-            smp.mempool.lock().redirect_no_peers();
         }
         for peer in &newly_added_upstream {
             debug!(LogSchema::new(LogEntry::NewPeer).peer(peer));
@@ -373,8 +367,15 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
         }
         for peer in &disabled {
             debug!(LogSchema::new(LogEntry::LostPeer).peer(peer));
-            // TODO: Also need to redirect the out of date ones, based on some threshold
-            // TODO: of out-of-date versions
+        }
+
+        let (added_selector_peers, removed_selector_peers) = broadcast_peers_selector
+            .write()
+            .update_peers(&connected_peers);
+        if !added_selector_peers.is_empty() {
+            smp.mempool.lock().redirect_no_peers();
+        }
+        for peer in &removed_selector_peers {
             smp.mempool.lock().redirect(*peer);
         }
     }

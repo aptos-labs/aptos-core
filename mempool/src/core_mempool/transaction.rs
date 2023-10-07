@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters};
+use aptos_config::network_id::PeerNetworkId;
 use aptos_crypto::HashValue;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
@@ -73,7 +74,7 @@ pub enum TimelineState {
     // The transaction is ready for broadcast.
     // The vector shows the position in the log -- the transaction can be present in multiple
     // positions in the log due to retries to other peers.
-    Ready(Vec<u64>),
+    Ready(Vec<(PeerNetworkId, u64)>),
     // Transaction is not yet ready for broadcast, but it might change in the future.
     NotReady,
     // Transaction will never be qualified for broadcasting.

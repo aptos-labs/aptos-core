@@ -408,7 +408,7 @@ impl Mempool {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
-        peer: Option<PeerNetworkId>,
+        peer: PeerNetworkId,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         self.transactions.read_timeline(timeline_id, count, peer)
     }
@@ -417,6 +417,7 @@ impl Mempool {
     pub(crate) fn timeline_range(
         &self,
         start_end_pairs: &Vec<(u64, u64)>,
+        // TODO: do we need option here?
         peer: Option<PeerNetworkId>,
     ) -> Vec<SignedTransaction> {
         self.transactions.timeline_range(start_end_pairs, peer)

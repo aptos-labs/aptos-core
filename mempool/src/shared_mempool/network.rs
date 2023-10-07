@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use aptos_config::{
-    config::{BroadcastPeersSelectorConfig, MempoolConfig, RoleType},
+    config::{MempoolConfig, RoleType},
     network_id::PeerNetworkId,
 };
 use aptos_infallible::RwLock;
@@ -317,11 +317,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         }
         let retry_batch_id = state.broadcast_info.retry_batches.iter().next_back();
 
-        let timeline_peer = match self.mempool_config.broadcast_peers_selector {
-            BroadcastPeersSelectorConfig::AllPeers => None,
-            BroadcastPeersSelectorConfig::FreshPeers(_)
-            | BroadcastPeersSelectorConfig::PrioritizedPeers(_) => Some(peer),
-        };
         let (batch_id, transactions, metric_label) =
             match std::cmp::max(expired_batch_id, retry_batch_id) {
                 Some(id) => {
@@ -331,7 +326,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                         Some(counters::RETRY_BROADCAST_LABEL)
                     };
 
-                    let txns = mempool.timeline_range(&id.0, timeline_peer);
+                    let txns = mempool.timeline_range(&id.0, Some(peer));
                     (id.clone(), txns, metric_label)
                 },
                 None => {
@@ -339,7 +334,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
                     let (txns, new_timeline_id) = mempool.read_timeline(
                         &state.timeline_id,
                         self.mempool_config.shared_mempool_batch_size,
-                        timeline_peer,
+                        peer,
                     );
                     (
                         MultiBatchId::from_timeline_ids(&state.timeline_id, &new_timeline_id),
