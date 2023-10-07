@@ -280,7 +280,6 @@ Aborts if conditions of SetStakePoolOperator are not met
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> verify_duration_estimate = 360;
 <b>pragma</b> aborts_if_is_partial;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolOperator">SetStakePoolOperator</a>;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a>;
@@ -334,8 +333,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>pragma</b> aborts_if_is_partial;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 <b>pragma</b> verify_duration_estimate = 120;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractOperator">SetStakingContractOperator</a>;
 </code></pre>

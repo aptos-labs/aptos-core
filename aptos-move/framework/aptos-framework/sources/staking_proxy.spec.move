@@ -7,9 +7,9 @@ spec aptos_framework::staking_proxy {
     /// Aborts if conditions of SetStakePoolOperator are not met
     spec set_operator(owner: &signer, old_operator: address, new_operator: address) {
         pragma verify = false;
-        pragma verify_duration_estimate = 360; // TODO: set because of timeout (property proved)
-        // TODO: Can't verify `set_vesting_contract_operator` and `set_staking_contract_operator`
         pragma aborts_if_is_partial;
+        // TODO: Can't verify due to timeout (>1000)
+        // TODO: Can't verify `set_vesting_contract_operator` and `set_staking_contract_operator`
         include SetStakePoolOperator;
         include SetStakingContractOperator;
     }
@@ -28,12 +28,9 @@ spec aptos_framework::staking_proxy {
     }
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
-        pragma verify = false;
-        // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         pragma aborts_if_is_partial;
-        // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 120;
-
+        // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         include SetStakingContractOperator;
     }
 
