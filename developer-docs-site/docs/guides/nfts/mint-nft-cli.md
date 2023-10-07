@@ -42,7 +42,7 @@ echo "NFT minter address       => $NFT_MINTER"
 
 If you didn't install `jq`, replace `jq -r ".Result"` with `grep "Result" | cut -d'"' -f4`.
 
-## 1. Creating a simple smart contract to mint an NFT
+## 2. Creating a simple smart contract to mint an NFT
 
 We're going to start by making the simplest form of the flow for creating a collection and minting a token and sending it to a user. The code for this part of the tutorial is in the first section of the `aptos-core/aptos-move/move-examples/no_code_mint/1-Create-NFT` folder in your cloned `aptos-core` repository.
 
@@ -240,7 +240,7 @@ When you sign and submit a transaction with an account's private key, you automa
 Running an entry function with `--profile mint_deployer` signs and submits the transaction with your `mint_deployer` profile's account, which is why you don't need to provide the signer to the `--args` parameter list.
 :::
 
-## 2. Automating the mint function with a resource account
+## 3. Automating the mint function with a resource account
 
 The issue with the code we've written so far is that it requires explicit approval from the creator to mint a token. The process isn't automated and the receiver doesn't ever approve of receiving the token.
 
@@ -396,7 +396,7 @@ In the first section, the user has to wait for the owner of the contract to mint
 
 Look up the transaction hash on the [Aptos explorer](https://explorer.aptoslabs.com/?network=devnet) if you'd like- although for the most part, the transaction appears very similarly to before.
 
-## 3. Adding restrictions with an allowlist
+## 4. Adding restrictions with an allowlist
 
 We're still missing some very common features for NFT minting contracts:
 
