@@ -17,7 +17,6 @@ use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
-use itertools::Itertools;
 use std::sync::Arc;
 
 // TODO: move this to onchain config
@@ -132,9 +131,9 @@ impl StateSyncTrigger {
         // (meaning consensus is behind) or
         // the highest committed anchor round is 2*DAG_WINDOW behind the given ledger info round
         // (meaning execution is behind the DAG window)
-        dag_reader
-            .highest_ordered_anchor_round()
-            .is_some_and(|r| r < li.commit_info().round())
+
+        // fetch can't work since nodes are garbage collected
+        dag_reader.highest_round() + 1 + DAG_WINDOW < li.commit_info().round()
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round()
@@ -202,7 +201,7 @@ impl DagStateSynchronizer {
         let bitmask = { sync_dag_store.read().bitmask(target_round) };
         let request = RemoteFetchRequest::new(
             self.epoch_state.epoch,
-            node.parents_metadata().cloned().collect_vec(),
+            vec![node.metadata().clone()],
             bitmask,
         );
 
