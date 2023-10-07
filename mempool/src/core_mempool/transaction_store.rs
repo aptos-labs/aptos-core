@@ -20,7 +20,10 @@ use crate::{
         types::MultiBucketTimelineIndexIds,
     },
 };
-use aptos_config::{config::MempoolConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::{BroadcastPeersSelectorConfig, MempoolConfig},
+    network_id::PeerNetworkId,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
@@ -87,6 +90,7 @@ pub struct TransactionStore {
     eager_expire_time: Duration,
 
     broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
+    num_peers_to_select: usize,
 }
 
 impl TransactionStore {
@@ -94,6 +98,13 @@ impl TransactionStore {
         config: &MempoolConfig,
         broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
     ) -> Self {
+        // TODO: this is funky, get the selector to give us this value or whether things are full or not
+        let num_peers_to_select = match config.broadcast_peers_selector {
+            BroadcastPeersSelectorConfig::AllPeers => 0,
+            BroadcastPeersSelectorConfig::FreshPeers(n) => n,
+            BroadcastPeersSelectorConfig::PrioritizedPeers(n) => n,
+        };
+
         Self {
             // main DS
             transactions: HashMap::new(),
@@ -125,6 +136,7 @@ impl TransactionStore {
             eager_expire_time: Duration::from_millis(config.eager_expire_time_ms),
 
             broadcast_peers_selector,
+            num_peers_to_select,
         }
     }
 
@@ -472,6 +484,10 @@ impl TransactionStore {
                             self.timeline_index.insert(txn, None);
                         },
                         SelectedPeers::Selected(peers) => {
+                            if peers.len() < self.num_peers_to_select {
+                                self.ready_no_peers_index
+                                    .insert(TxnPointer::from(&txn.clone()));
+                            }
                             self.timeline_index.insert(txn, Some(peers));
                         },
                     }
@@ -791,41 +807,32 @@ impl TransactionStore {
         self.track_indices();
     }
 
-    // TODO: there's repeated code, kind of hard to refactor because of mutable/immutable borrows.
     pub(crate) fn redirect_no_peers(&mut self) {
         if self.ready_no_peers_index.is_empty() {
             return;
         }
-        info!(
-            "redirect_no_peers, with index size: {}",
-            self.ready_no_peers_index.len()
-        );
 
         let mut reinsert = vec![];
         for txn_pointer in &self.ready_no_peers_index {
             if let Some(mempool_txn) =
                 self.get_mempool_txn(&txn_pointer.sender, txn_pointer.sequence_number)
             {
-                match self
+                // TODO: optimize by only calling this once per sender, not txn? e.g., local cache
+                let selected_peers = self
                     .broadcast_peers_selector
                     .read()
-                    .broadcast_peers(&txn_pointer.sender)
-                {
-                    SelectedPeers::All => panic!("Unexpected"),
-                    SelectedPeers::None => {
-                        warn!("On redirect, empty again!");
+                    .broadcast_peers(&txn_pointer.sender);
+                if let SelectedPeers::Selected(peers) = selected_peers {
+                    if peers.len() < self.num_peers_to_select {
                         reinsert.push(TxnPointer::from(mempool_txn));
-                    },
-                    SelectedPeers::Selected(new_peers) => {
-                        let mut txn = mempool_txn.clone();
-                        self.timeline_index.update(&mut txn, new_peers);
-                        if let Some(txns) = self.transactions.get_mut(&txn_pointer.sender) {
-                            txns.insert(txn_pointer.sequence_number, txn);
-                        }
-                    },
+                    }
+                    self.timeline_index.update(&mut mempool_txn.clone(), peers);
+                } else {
+                    reinsert.push(TxnPointer::from(mempool_txn));
                 }
             }
         }
+        // TODO: Does it have to be a HashSet?
         self.ready_no_peers_index.clear();
         for txn_pointer in reinsert {
             self.ready_no_peers_index.insert(txn_pointer);
@@ -833,31 +840,13 @@ impl TransactionStore {
     }
 
     pub(crate) fn redirect(&mut self, peer: PeerNetworkId) {
-        // TODO: look at this again
         let to_redirect = self.timeline_index.timeline(Some(peer));
         info!("to_redirect: {:?}", to_redirect);
-        for (account, seq_no) in &to_redirect {
-            if let Some(mempool_txn) = self.get_mempool_txn(account, *seq_no) {
-                match self
-                    .broadcast_peers_selector
-                    .read()
-                    .broadcast_peers(account)
-                {
-                    SelectedPeers::All => panic!("Unexpected"),
-                    SelectedPeers::None => {
-                        self.ready_no_peers_index
-                            .insert(TxnPointer::from(mempool_txn));
-                    },
-                    SelectedPeers::Selected(new_peers) => {
-                        let mut txn = mempool_txn.clone();
-                        self.timeline_index.update(&mut txn, new_peers);
-                        if let Some(txns) = self.transactions.get_mut(account) {
-                            txns.insert(*seq_no, txn);
-                        }
-                    },
-                }
-            }
+        for (sender, sequence_number) in to_redirect {
+            self.ready_no_peers_index
+                .insert(TxnPointer::new(sender, sequence_number));
         }
+        self.redirect_no_peers();
     }
 
     pub(crate) fn iter_queue(&self) -> PriorityQueueIter {

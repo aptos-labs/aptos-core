@@ -9,7 +9,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
-use aptos_config::network_id::PeerNetworkId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::TransactionSummary;
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
@@ -289,11 +289,12 @@ impl TimelineIndex {
                         Some(peer),
                     ),
                 );
-                timeline_ids.push(self.timeline_id);
+                timeline_ids.push((peer, self.timeline_id));
                 self.timeline_id += 1;
             }
             txn.timeline_state = TimelineState::Ready(timeline_ids);
         } else {
+            // TODO: remove Peers:All
             self.timeline.insert(
                 self.timeline_id,
                 (
@@ -302,7 +303,11 @@ impl TimelineIndex {
                     None,
                 ),
             );
-            txn.timeline_state = TimelineState::Ready(vec![self.timeline_id]);
+            // TODO: so, this is bogus just to compile for now.
+            txn.timeline_state = TimelineState::Ready(vec![(
+                PeerNetworkId::new(NetworkId::Public, AccountAddress::ZERO),
+                self.timeline_id,
+            )]);
             self.timeline_id += 1;
         }
     }
@@ -310,19 +315,45 @@ impl TimelineIndex {
     pub(crate) fn update(&mut self, txn: &mut MempoolTransaction, peers: Vec<PeerNetworkId>) {
         let sender = txn.get_sender();
         let sequence_number = txn.sequence_info.transaction_sequence_number;
-        if let TimelineState::Ready(ref mut timeline_ids) = txn.timeline_state {
-            for peer in peers {
-                self.timeline
-                    .insert(self.timeline_id, (sender, sequence_number, Some(peer)));
-                timeline_ids.push(self.timeline_id);
-                self.timeline_id += 1;
+        if let TimelineState::Ready(previous_timeline_entries) = &mut txn.timeline_state {
+            // TODO: this seems pretty inefficient, but a more efficient way might be harder to understand
+
+            // (1) partition previous_timeline_entries into those that are still in peers and those
+            // that are not
+            let (to_remain, to_remove): (Vec<_>, Vec<_>) = previous_timeline_entries
+                .clone()
+                .into_iter()
+                .partition(|(peer, _)| peers.contains(peer));
+
+            // (2) remove the ones that are not in peers
+            for (_peer, timeline_id) in &to_remove {
+                self.timeline.remove(timeline_id);
             }
+
+            // (3) add the new peers that are not already in the timeline
+            let new_peers = peers
+                .iter()
+                .filter(|&peer| !to_remain.iter().any(|(peer2, _)| peer == peer2))
+                .map(|peer| {
+                    let timeline_id = self.timeline_id;
+                    self.timeline
+                        .insert(timeline_id, (sender, sequence_number, Some(*peer)));
+                    self.timeline_id += 1;
+                    (*peer, timeline_id)
+                });
+
+            // (4) combine the remaining with the new
+            previous_timeline_entries.extend(new_peers);
+        } else {
+            // TODO: possibly this should just be one method?
+            // self.insert(txn, Some(peers));
+            panic!("unexpected");
         };
     }
 
     pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
         if let TimelineState::Ready(timeline_ids) = &txn.timeline_state {
-            for timeline_id in timeline_ids {
+            for (_peer, timeline_id) in timeline_ids {
                 self.timeline.remove(timeline_id);
             }
         }

@@ -163,9 +163,9 @@ pub struct FreshPeersSelector {
 }
 
 impl FreshPeersSelector {
-    pub fn new(max_selected_peers: usize) -> Self {
+    pub fn new(num_peers_to_select: usize) -> Self {
         Self {
-            num_peers_to_select: max_selected_peers,
+            num_peers_to_select,
             stickiness_cache: Arc::new(
                 Cache::builder()
                     .max_capacity(100_000)
