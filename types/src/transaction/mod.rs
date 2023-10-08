@@ -594,6 +594,17 @@ impl Debug for SignedTransaction {
 }
 
 impl SignedTransaction {
+    pub fn new_signed_transaction(
+        raw_txn: RawTransaction,
+        authenticator: TransactionAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            size: OnceCell::new(),
+        }
+    }
+
     pub fn new(
         raw_txn: RawTransaction,
         public_key: Ed25519PublicKey,
@@ -738,6 +749,14 @@ impl SignedTransaction {
     /// the signature is valid.
     pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
         self.authenticator.verify(&self.raw_txn)?;
+        Ok(SignatureCheckedTransaction(self))
+    }
+
+    /// Special check for fee payer transaction having optional fee payer address in the
+    /// transaction. This will be removed after 1.8 has been fully released.
+    pub fn check_fee_payer_signature(self) -> Result<SignatureCheckedTransaction> {
+        self.authenticator
+            .verify_with_optional_fee_payer(&self.raw_txn)?;
         Ok(SignatureCheckedTransaction(self))
     }
 
