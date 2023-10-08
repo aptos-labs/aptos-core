@@ -430,6 +430,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SAFER_METADATA,
         FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
+        FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
     ]
 }
 
