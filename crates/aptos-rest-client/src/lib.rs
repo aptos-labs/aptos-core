@@ -1256,6 +1256,7 @@ impl Client {
         let response = self.inner.post(url).json(&data).send().await?;
         self.json(response).await
     }
+
     pub async fn get_table_item_at_version<K: Serialize>(
         &self,
         table_handle: AccountAddress,
