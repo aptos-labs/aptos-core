@@ -1164,7 +1164,8 @@ fn member_has_deprecated_annotation(
 }
 
 fn check_for_deprecated_module_use(context: &mut Context, mident: &ModuleIdent) -> bool {
-    if context.in_deprecated_code || context.in_aptos_libs {
+    let warn_deprecation = &context.env.flags().warn_of_deprecation_use();
+    if !warn_deprecation || context.in_deprecated_code || context.in_aptos_libs {
         return false;
     }
     if let Some(loc) = module_has_deprecated_annotation(context, mident) {
@@ -1188,7 +1189,8 @@ fn check_for_deprecated_member_use(
     member: &Spanned<Symbol>,
     deprecated_item: DeprecatedItem,
 ) {
-    if context.in_deprecated_code || context.in_aptos_libs {
+    let warn_deprecation = &context.env.flags().warn_of_deprecation_use();
+    if !warn_deprecation || context.in_deprecated_code || context.in_aptos_libs {
         return;
     }
     let mident = match mident_in {

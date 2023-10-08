@@ -299,6 +299,20 @@ pub fn debug_compiler_env_var_str() -> &'static str {
     }
 }
 
+pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
+    static WARN_OF_DEPRECATION: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_DEPRECATION_USE));
+    *WARN_OF_DEPRECATION
+}
+
+pub fn move_compiler_warn_of_deprecation_use_env_var_str() -> &'static str {
+    if move_compiler_warn_of_deprecation_use_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Flags {
     /// Compile in test mode
@@ -350,6 +364,11 @@ pub struct Flags {
     /// Debug compiler by printing out internal information
     #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
     debug: bool,
+
+    /// Show warnings about use of deprecated functions, modules, constants, etc.
+    /// Note that current value of this constant is "Wdeprecation"
+    #[clap(long = cli::WARN_OF_DEPRECATION_USE_FLAG, default_value=move_compiler_warn_of_deprecation_use_env_var_str())]
+    warn_of_deprecation_use: bool,
 }
 
 impl Flags {
@@ -363,6 +382,7 @@ impl Flags {
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
         }
     }
 
@@ -376,6 +396,7 @@ impl Flags {
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
         }
     }
 
@@ -389,6 +410,7 @@ impl Flags {
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
         }
     }
 
@@ -402,6 +424,7 @@ impl Flags {
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
         }
     }
 
@@ -415,6 +438,7 @@ impl Flags {
             keep_testing_functions: true,
             skip_attribute_checks: false,
             debug: false,
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
         }
     }
 
@@ -474,6 +498,17 @@ impl Flags {
     pub fn set_skip_attribute_checks(self, new_value: bool) -> Self {
         Self {
             skip_attribute_checks: new_value,
+            ..self
+        }
+    }
+
+    pub fn warn_of_deprecation_use(&self) -> bool {
+        self.warn_of_deprecation_use
+    }
+
+    pub fn set_warn_of_deprecation_use(self, new_value: bool) -> Self {
+        Self {
+            warn_of_deprecation_use: new_value,
             ..self
         }
     }
