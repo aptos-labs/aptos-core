@@ -143,7 +143,7 @@ impl EventSubscriptionService {
                 .and_modify(|subscriptions| {
                     subscriptions.insert(subscription_id);
                 })
-                .or_insert_with(|| HashSet::from_iter(vec![subscription_id].iter().cloned()));
+                .or_insert_with(|| HashSet::from_iter([subscription_id].iter().cloned()));
         }
 
         Ok(EventNotificationListener {

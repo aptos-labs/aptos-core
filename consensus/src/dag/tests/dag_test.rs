@@ -116,7 +116,7 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone(), 0, DAG_WINDOW);
+    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1, DAG_WINDOW);
     (signers, epoch_state, dag, storage)
 }
 

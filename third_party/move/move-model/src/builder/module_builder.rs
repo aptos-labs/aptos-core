@@ -43,7 +43,7 @@ use move_bytecode_source_map::source_map::SourceMap;
 use move_compiler::{
     compiled_unit::{FunctionInfo, SpecInfo},
     expansion::ast as EA,
-    parser::ast as PA,
+    parser::{ast as PA, ast::FunctionName},
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
 use move_ir_types::{ast::ConstantName, location::Spanned};
@@ -830,15 +830,14 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let mut visited = BTreeMap::new();
         for (idx, (name, _)) in module_def.functions.key_cloned_iter().enumerate() {
             let is_pure = self.propagate_function_impurity(&mut visited, SpecFunId::new(idx));
-            let full_name = self.qualified_by_module_from_name(&name.0);
             if is_pure {
                 // Modify the types of parameters, return values and expressions
                 // of pure Move functions so they no longer have references.
-                self.deref_move_fun_types(full_name.clone(), idx);
+                self.deref_move_fun_types(name, idx);
             }
             self.parent
                 .fun_table
-                .entry(full_name)
+                .entry(self.qualified_by_module_from_name(&name.0))
                 .and_modify(|e| e.is_pure = is_pure);
         }
 
@@ -1319,16 +1318,32 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         is_pure
     }
 
-    fn deref_move_fun_types(&mut self, full_name: QualifiedSymbol, spec_fun_idx: usize) {
-        self.parent.spec_fun_table.entry(full_name).and_modify(|e| {
-            assert!(e.len() == 1);
-            e[0].params = e[0]
-                .params
-                .iter()
-                .map(|Parameter(n, ty)| Parameter(*n, ty.skip_reference().clone()))
-                .collect_vec();
-            e[0].result_type = e[0].result_type.skip_reference().clone();
-        });
+    fn deref_move_fun_types(&mut self, name: FunctionName, spec_fun_idx: usize) {
+        if let Some(entry) = self
+            .parent
+            .spec_fun_table
+            .get_mut(&self.qualified_by_module_from_name(&name.0))
+        {
+            if entry.len() != 1 {
+                let error_msg = if entry.is_empty() {
+                    "missing"
+                } else {
+                    "duplicate"
+                };
+                self.parent.error(
+                    &self.parent.to_loc(&name.loc()),
+                    &format!("{} declaration of `{}`", error_msg, name.value()),
+                );
+            } else {
+                let e = &mut entry[0];
+                e.params = e
+                    .params
+                    .iter()
+                    .map(|Parameter(n, ty)| Parameter(*n, ty.skip_reference().clone()))
+                    .collect_vec();
+                e.result_type = e.result_type.skip_reference().clone();
+            }
+        };
 
         let spec_fun_decl = &mut self.spec_funs[spec_fun_idx];
         spec_fun_decl.params = spec_fun_decl

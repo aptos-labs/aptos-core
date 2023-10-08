@@ -557,7 +557,7 @@ pub trait DbWriter: Send + Sync {
     /// ../aptosdb/struct.AptosDB.html#method.save_transaction_block
     fn save_transaction_block(
         &self,
-        txns_to_commit: &[Arc<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,

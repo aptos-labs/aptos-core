@@ -188,16 +188,20 @@ impl DbReader for StateDb {
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
-        if self.skip_usage {
-            return Ok(StateStorageUsage::new_untracked());
-        }
         version.map_or(Ok(StateStorageUsage::zero()), |version| {
-            Ok(self
-                .ledger_db
-                .metadata_db()
-                .get::<VersionDataSchema>(&version)?
-                .ok_or_else(|| AptosDbError::NotFound(format!("VersionData at {}", version)))?
-                .get_state_storage_usage())
+            Ok(
+                match self
+                    .ledger_db
+                    .metadata_db()
+                    .get::<VersionDataSchema>(&version)?
+                {
+                    Some(data) => data.get_state_storage_usage(),
+                    None => {
+                        ensure!(self.skip_usage, "VersionData at {version} is missing.");
+                        StateStorageUsage::new_untracked()
+                    },
+                },
+            )
         })
     }
 }
@@ -391,7 +395,6 @@ impl StateStore {
             if crash_if_difference_is_too_large {
                 assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
             }
-            // TODO(grao): Support truncation for split ledger DBs.
             truncate_ledger_db(ledger_db, overall_commit_progress)
                 .expect("Failed to truncate ledger db.");
 
@@ -405,7 +408,7 @@ impl StateStore {
                     assert_le!(difference, MAX_COMMIT_PROGRESS_DIFFERENCE);
                 }
                 truncate_state_kv_db(
-                    Arc::clone(&state_kv_db),
+                    &state_kv_db,
                     state_kv_commit_progress,
                     overall_commit_progress,
                     difference as usize,
@@ -887,26 +890,30 @@ impl StateStore {
             })
             .collect();
 
-        if !skip_usage {
-            for i in 0..num_versions {
-                let mut items_delta = 0;
-                let mut bytes_delta = 0;
-                for usage_delta in usage_deltas.iter() {
-                    items_delta += usage_delta[i].0;
-                    bytes_delta += usage_delta[i].1;
-                }
-                usage = StateStorageUsage::new(
-                    (usage.items() as i64 + items_delta) as usize,
-                    (usage.bytes() as i64 + bytes_delta) as usize,
-                );
+        for i in 0..num_versions {
+            let mut items_delta = 0;
+            let mut bytes_delta = 0;
+            for usage_delta in usage_deltas.iter() {
+                items_delta += usage_delta[i].0;
+                bytes_delta += usage_delta[i].1;
+            }
+            usage = StateStorageUsage::new(
+                (usage.items() as i64 + items_delta) as usize,
+                (usage.bytes() as i64 + bytes_delta) as usize,
+            );
+            if !skip_usage || i == num_versions - 1 {
                 let version = first_version + i as u64;
+                if i == num_versions - 1 {
+                    info!("Write usage at version {version}, {usage:?}, skip_usage: {skip_usage}.");
+                }
                 batch
                     .put::<VersionDataSchema>(&version, &usage.into())
                     .unwrap();
             }
+        }
 
-            if !expected_usage.is_untracked() {
-                ensure!(
+        if !expected_usage.is_untracked() {
+            ensure!(
                 expected_usage == usage,
                 "Calculated state db usage at version {} not expected. expected: {:?}, calculated: {:?}, base version: {:?}, base version usage: {:?}",
                 first_version + value_state_sets.len() as u64 - 1,
@@ -915,11 +922,10 @@ impl StateStore {
                 base_version,
                 base_version_usage,
             );
-            }
-
-            STATE_ITEMS.set(usage.items() as i64);
-            TOTAL_STATE_BYTES.set(usage.bytes() as i64);
         }
+
+        STATE_ITEMS.set(usage.items() as i64);
+        TOTAL_STATE_BYTES.set(usage.bytes() as i64);
 
         Ok(())
     }

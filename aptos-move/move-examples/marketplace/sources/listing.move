@@ -255,19 +255,17 @@ module marketplace::listing {
             let payee_address = tokenv1::get_royalty_payee(&royalty);
             let numerator = tokenv1::get_royalty_numerator(&royalty);
             let denominator = tokenv1::get_royalty_denominator(&royalty);
-
-            let royalty_amount = math64::mul_div(amount, numerator, denominator);
+            let royalty_amount = bounded_percentage(amount, numerator, denominator);
             (payee_address, royalty_amount)
         } else {
             let royalty = tokenv2::royalty(listing.object);
             if (option::is_some(&royalty)) {
                 let royalty = option::destroy_some(royalty);
                 let payee_address = royalty::payee_address(&royalty);
-                let royalty_amount = math64::mul_div(
-                    amount,
-                    royalty::numerator(&royalty),
-                    royalty::denominator(&royalty)
-                );
+                let numerator = royalty::numerator(&royalty);
+                let denominator = royalty::denominator(&royalty);
+
+                let royalty_amount = bounded_percentage(amount, numerator, denominator);
                 (payee_address, royalty_amount)
             } else {
                 (@0x0, 0)
@@ -288,6 +286,15 @@ module marketplace::listing {
             events::token_metadata_for_tokenv1(token_id)
         } else {
             events::token_metadata_for_tokenv2(object::convert(listing.object))
+        }
+    }
+
+    /// Calculates a bounded percentage that can't go over 100% and handles 0 denominator as 0
+    public inline fun bounded_percentage(amount: u64, numerator: u64, denominator: u64): u64 {
+        if (denominator == 0) {
+            0
+        } else {
+            math64::min(amount, math64::mul_div(amount, numerator, denominator))
         }
     }
 

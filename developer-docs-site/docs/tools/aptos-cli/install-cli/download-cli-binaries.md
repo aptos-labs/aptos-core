@@ -35,6 +35,27 @@ These instructions have been tested on macOS Monterey (12.6)
 1. Follow the simple steps recommended by the Apple support in [Open a Mac app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unidentified-developer-mh40616/mac) to remove the "unknown developer" blocker.
 1. Type `~/bin/aptos help` to read help instructions.
 1. Add `~/bin` to your path in your `.bashrc` or `.zshrc` file for future use.
+1. Run `aptos help` to see the list of commands and verify that the CLI is working.
+
+Note: You will need to manually install `openssl3` if you encounter an error message like the following:
+```
+dyld[81095]: Library not loaded: /usr/local/opt/openssl@3/lib/libssl.3.dylib
+  Referenced from: <56FDDCBF-43F4-381E-9ECA-ACEBC556EAB7> /Users/jinhou/.local/bin/aptos
+  Reason: tried: '/usr/local/opt/openssl@3/lib/libssl.3.dylib' (no such file), '/System/Volumes/Preboot/Cryptexes/OS/usr/local/opt/openssl@3/lib/libssl.3.dylib' (no such file), '/usr/local/opt/openssl@3/lib/libssl.3.dylib' (no such file), '/usr/local/lib/libssl.3.dylib' (no such file), '/usr/lib/libssl.3.dylib' (no such file, not in dyld cache)
+[1]    81095 abort      aptos
+```
+
+Take the following steps to install `openssl3`:
+1. Download the latest version from [OpenSSL](https://www.openssl.org/source).
+2. Unzip the downloaded file.
+3. `cd` into the unzipped folder, for example: `cd openssl-3.1.2`
+4. Run `./config --prefix /usr/local darwin64-x86_64-cc` to configure openssl3.
+5. Run `make` to build openssl3.
+6. Run `sudo make install` to install openssl3. Notice that `sudo` is required to install openssl3 to the `/usr/local` folder.
+7. Run `openssl version` to verify the installation. You should see something similar to the following output:
+```
+OpenSSL 3.1.2 1 Aug 2023
+```
 
 </details>
 

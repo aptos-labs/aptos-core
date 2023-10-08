@@ -20,17 +20,17 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
 };
-use std::collections::btree_map::BTreeMap;
+use std::collections::{btree_map::BTreeMap, hash_map::HashMap};
 
 pub struct AccountDataCache {
-    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue)>,
+    data_map: HashMap<Type, (MoveTypeLayout, GlobalValue)>,
     module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
     fn new() -> Self {
         Self {
-            data_map: BTreeMap::new(),
+            data_map: HashMap::new(),
             module_map: BTreeMap::new(),
         }
     }

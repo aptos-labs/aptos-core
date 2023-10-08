@@ -6,13 +6,17 @@ use crate::dag::{
     anchor_election::AnchorElection,
     dag_state_sync::DAG_WINDOW,
     dag_store::{Dag, NodeStatus},
+    observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
     storage::DAGStorage,
     types::NodeMetadata,
     CertifiedNode,
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, ledger_info::LedgerInfo};
 use std::sync::Arc;
 
@@ -193,7 +197,20 @@ impl OrderRule {
                 node_status.as_node().clone()
             })
             .collect();
+
+        observe_node(anchor.timestamp(), NodeStage::AnchorOrdered);
+        for node in ordered_nodes.iter().skip(1) {
+            observe_node(node.timestamp(), NodeStage::NodeOrdered);
+        }
         ordered_nodes.reverse();
+
+        debug!(
+            LogSchema::new(LogEvent::OrderedAnchor),
+            id = anchor.id(),
+            "Reached round {} with {} nodes",
+            lowest_round_to_reach,
+            ordered_nodes.len()
+        );
 
         self.lowest_unordered_anchor_round = anchor.round() + 1;
         if let Err(e) = self

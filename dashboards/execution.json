@@ -452,7 +452,16 @@
           },
           "unit": "s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": { "mode": "exclude", "names": ["blk_exec"], "prefix": "All except:", "readOnly": true }
+            },
+            "properties": [{ "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } }]
+          }
+        ]
       },
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 17 },
       "id": 41,
@@ -571,6 +580,15 @@
           "legendFormat": "rayon_execution",
           "range": true,
           "refId": "L"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${Datasource}" },
+          "editorMode": "code",
+          "expr": "quantile(0.67, rate(block_executor_execute_block_seconds_sum{ chain_name=~\"$chain_name\", cluster=~\"$cluster\", metrics_source=~\"$metrics_source\", namespace=~\"$namespace\", kubernetes_pod_name=~\"$kubernetes_pod_name\", role=~\"$role\"}[$interval]) ) ",
+          "hide": false,
+          "legendFormat": "blk_exec",
+          "range": true,
+          "refId": "M"
         }
       ],
       "title": "BlockSTM  time breakdown per second",
@@ -3973,8 +3991,8 @@
         "multiFormat": "",
         "name": "interval",
         "options": [
-          { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
-          { "selected": false, "text": "1m", "value": "1m" },
+          { "selected": false, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": true, "text": "1m", "value": "1m" },
           { "selected": false, "text": "5m", "value": "5m" },
           { "selected": false, "text": "10m", "value": "10m" },
           { "selected": false, "text": "30m", "value": "30m" },
@@ -4004,6 +4022,6 @@
   "timezone": "",
   "title": "execution",
   "uid": "execution",
-  "version": 53,
+  "version": 54,
   "weekStart": ""
 }

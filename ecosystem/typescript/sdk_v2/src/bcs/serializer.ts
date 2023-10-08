@@ -12,8 +12,22 @@ import {
 } from "./consts";
 import { AnyNumber, Uint16, Uint32, Uint8 } from "../types";
 
-export interface Serializable {
-  serialize(serializer: Serializer): void;
+// This class is intended to be used as a base class for all serializable types.
+// It can be used to facilitate composable serialization of a complex type and
+// in general to serialize a type to its BCS representation.
+export abstract class Serializable {
+  abstract serialize(serializer: Serializer): void;
+
+  /**
+   * Serializes a `Serializable` value to its BCS representation.
+   * This function is the Typescript SDK equivalent of `bcs::to_bytes` in Move.
+   * @returns the BCS representation of the Serializable instance as a byte buffer
+   */
+  bcsToBytes(): Uint8Array {
+    const serializer = new Serializer();
+    this.serialize(serializer);
+    return serializer.toUint8Array();
+  }
 }
 
 export class Serializer {
@@ -104,9 +118,7 @@ export class Serializer {
    * BCS layout for "boolean": One byte. "0x01" for true and "0x00" for false.
    */
   serializeBool(value: boolean) {
-    if (typeof value !== "boolean") {
-      throw new Error("Value needs to be a boolean");
-    }
+    ensureBoolean(value);
     const byteValue = value ? 1 : 0;
     this.appendToBuffer(new Uint8Array([byteValue]));
   }
@@ -235,9 +247,9 @@ export class Serializer {
    *
    * @example
    * // Define the MoveStruct class that implements the Serializable interface
-   * class MoveStruct implements Serializable {
+   * class MoveStruct extends Serializable {
    *     constructor(
-   *         public creatorAddress: AccountAddress, // where AccountAddress implements Serializable
+   *         public creatorAddress: AccountAddress, // where AccountAddress extends Serializable
    *         public collectionName: string,
    *         public tokenName: string
    *     ) {}
@@ -263,30 +275,69 @@ export class Serializer {
    *
    * @returns the serializer instance
    */
-  serialize<T extends Serializable>(value: T) {
+  serialize<T extends Serializable>(value: T): void {
     // NOTE: The `serialize` method called by `value` is defined in `value`'s
     // Serializable interface, not the one defined in this class.
     value.serialize(this);
   }
+
+  /**
+   * Serializes an array of BCS Serializable values to a serializer instance.
+   * Note that this does not return anything- the bytes are added to the serializer instance's byte buffer.
+   *
+   * @param values The array of BCS Serializable values
+   * @example
+   * const addresses = new Array<AccountAddress>(
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0x2" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+   *   AccountAddress.fromHexInputRelaxed({ input: "0xb" }),
+   * );
+   * const serializer = new Serializer();
+   * serializer.serializeVector(addresses);
+   * const serializedBytes = serializer.toUint8Array();
+   * // serializedBytes is now the BCS-serialized bytes
+   * // The equivalent value in Move would be:
+   * // `bcs::to_bytes(&vector<address> [@0x1, @0x2, @0xa, @0xb])`;
+   */
+  serializeVector<T extends Serializable>(values: Array<T>): void {
+    this.serializeU32AsUleb128(values.length);
+    values.forEach((item) => {
+      item.serialize(this);
+    });
+  }
+}
+
+export function ensureBoolean(value: unknown): asserts value is boolean {
+  if (typeof value !== "boolean") {
+    throw new Error(`${value} is not a boolean value`);
+  }
+}
+
+export const outOfRangeErrorMessage = (value: AnyNumber, min: AnyNumber, max: AnyNumber) =>
+  `${value} is out of range: [${min}, ${max}]`;
+
+export function validateNumberInRange<T extends AnyNumber>(value: T, minValue: T, maxValue: T) {
+  const valueBigInt = BigInt(value.toString());
+  if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
+    throw new Error(outOfRangeErrorMessage(value, minValue, maxValue));
+  }
 }
 
 /**
- * A decorator that ensures the input argument for a function is within a range.
+ * A decorator to ensure the input argument for a function is within a range.
  * @param minValue The input argument must be >= minValue
  * @param maxValue The input argument must be <= maxValue
- * @param message Error message
  */
-function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T, message?: string) {
+function checkNumberRange<T extends AnyNumber>(minValue: T, maxValue: T) {
   return (target: unknown, propertyKey: string, descriptor: PropertyDescriptor) => {
     const childFunction = descriptor.value;
     // eslint-disable-next-line no-param-reassign
-    descriptor.value = function deco(value: AnyNumber): Serializer {
-      const valueBigInt = BigInt(value.toString());
-      if (valueBigInt > BigInt(maxValue.toString()) || valueBigInt < BigInt(minValue.toString())) {
-        throw new Error(message || "Value is out of range");
-      }
+    descriptor.value = function deco(value: AnyNumber) {
+      validateNumberInRange(value, minValue, maxValue);
       return childFunction.apply(this, [value]);
     };
+
     return descriptor;
   };
 }

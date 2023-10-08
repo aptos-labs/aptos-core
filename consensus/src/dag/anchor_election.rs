@@ -3,7 +3,7 @@
 
 use aptos_consensus_types::common::{Author, Round};
 
-pub trait AnchorElection: Send {
+pub trait AnchorElection: Send + Sync {
     fn get_anchor(&self, round: Round) -> Author;
 
     fn update_reputation(

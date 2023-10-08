@@ -75,7 +75,7 @@ impl ExecutedBlock {
     }
 
     pub fn parent_id(&self) -> HashValue {
-        self.quorum_cert().certified_block().id()
+        self.block.parent_id()
     }
 
     pub fn quorum_cert(&self) -> &QuorumCert {

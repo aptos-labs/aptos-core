@@ -124,7 +124,6 @@ use rayon::prelude::*;
 #[cfg(any(test, feature = "fuzzing"))]
 use std::default::Default;
 use std::{
-    borrow::Borrow,
     collections::HashMap,
     fmt::{Debug, Formatter},
     iter::Iterator,
@@ -197,6 +196,24 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
         Ok(())
     }
 }
+fn set_property(cf_name: &str, db: &DB) -> Result<()> {
+    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+        ROCKSDB_PROPERTIES
+            .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    }
+    Ok(())
+}
+
+fn set_property_sharded(cf_name: &str, db: &DB, db_shard_id: usize) -> Result<()> {
+    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+        let cf_label = format!("{}_{}", cf_name, db_shard_id);
+        ROCKSDB_PROPERTIES
+            .with_label_values(&[&cf_label, aptos_rocksdb_property_name])
+            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    }
+    Ok(())
+}
 
 fn update_rocksdb_properties(
     ledger_db: &LedgerDb,
@@ -207,70 +224,52 @@ fn update_rocksdb_properties(
         .with_label_values(&["update_rocksdb_properties"])
         .start_timer();
 
-    let set_property_fn = |cf_name: &str, db: &DB| -> Result<()> {
-        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-            ROCKSDB_PROPERTIES
-                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
-        }
-        Ok(())
-    };
+    let enable_storage_sharding = state_kv_db.enabled_sharding();
 
-    let gen_shard_cf_name =
-        |cf_name: &str, shard_id: u8| -> String { format!("shard_{}_{}", shard_id, cf_name) };
-
-    let split_ledger = state_kv_db.enabled_sharding();
-
-    if split_ledger {
+    if enable_storage_sharding {
         for cf in ledger_metadata_db_column_families() {
-            set_property_fn(cf, ledger_db.metadata_db())?;
+            set_property(cf, ledger_db.metadata_db())?;
         }
 
         for cf in write_set_db_column_families() {
-            set_property_fn(cf, ledger_db.write_set_db())?;
+            set_property(cf, ledger_db.write_set_db())?;
         }
 
         for cf in transaction_info_db_column_families() {
-            set_property_fn(cf, ledger_db.transaction_info_db())?;
+            set_property(cf, ledger_db.transaction_info_db())?;
         }
 
         for cf in transaction_db_column_families() {
-            set_property_fn(cf, ledger_db.transaction_db())?;
+            set_property(cf, ledger_db.transaction_db())?;
         }
 
         for cf in event_db_column_families() {
-            set_property_fn(cf, ledger_db.event_db())?;
+            set_property(cf, ledger_db.event_db())?;
         }
 
         for cf in transaction_accumulator_db_column_families() {
-            set_property_fn(cf, ledger_db.transaction_accumulator_db())?;
+            set_property(cf, ledger_db.transaction_accumulator_db())?;
         }
 
         for cf in state_kv_db_column_families() {
-            set_property_fn(cf, state_kv_db.metadata_db())?;
+            set_property(cf, state_kv_db.metadata_db())?;
             if state_kv_db.enabled_sharding() {
                 for shard in 0..NUM_STATE_SHARDS {
-                    set_property_fn(
-                        gen_shard_cf_name(cf, shard as u8).as_str(),
-                        state_kv_db.db_shard(shard as u8),
-                    )?;
+                    set_property_sharded(cf, state_kv_db.db_shard(shard as u8), shard)?;
                 }
             }
         }
     } else {
         for cf in ledger_db_column_families() {
-            set_property_fn(cf, ledger_db.metadata_db())?;
+            set_property(cf, ledger_db.metadata_db())?;
         }
     }
 
     for cf_name in state_merkle_db_column_families() {
-        set_property_fn(cf_name, state_merkle_db.metadata_db())?;
+        set_property(cf_name, state_merkle_db.metadata_db())?;
         if state_merkle_db.sharding_enabled() {
             for shard in 0..NUM_STATE_SHARDS {
-                set_property_fn(
-                    gen_shard_cf_name(cf_name, shard as u8).as_str(),
-                    state_merkle_db.db_shard(shard as u8),
-                )?;
+                set_property_sharded(cf_name, state_merkle_db.db_shard(shard as u8), shard)?;
             }
         }
     }
@@ -430,7 +429,7 @@ impl AptosDB {
             buffered_state_target_items,
             readonly,
             empty_buffered_state_for_restore,
-            rocksdb_configs.skip_index_and_usage,
+            rocksdb_configs.enable_storage_sharding,
         );
 
         if !readonly && enable_indexer {
@@ -585,8 +584,7 @@ impl AptosDB {
         max_node_cache: usize,
     ) -> Self {
         let db_config = RocksdbConfigs {
-            use_sharded_state_merkle_db: true,
-            split_ledger_db: true,
+            enable_storage_sharding: true,
             ..Default::default()
         };
         Self::open(
@@ -767,26 +765,17 @@ impl AptosDB {
     pub fn create_checkpoint(
         db_path: impl AsRef<Path>,
         cp_path: impl AsRef<Path>,
-        use_split_ledger_db: bool,
-        use_sharded_state_merkle_db: bool,
+        sharding: bool,
     ) -> Result<()> {
         let start = Instant::now();
 
-        info!(
-            use_split_ledger_db = use_split_ledger_db,
-            use_sharded_state_merkle_db = use_sharded_state_merkle_db,
-            "Creating checkpoint for AptosDB."
-        );
+        info!(sharding = sharding, "Creating checkpoint for AptosDB.");
 
-        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), use_split_ledger_db)?;
-        if use_split_ledger_db {
+        LedgerDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
+        if sharding {
             StateKvDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
         }
-        StateMerkleDb::create_checkpoint(
-            db_path.as_ref(),
-            cp_path.as_ref(),
-            use_sharded_state_merkle_db,
-        )?;
+        StateMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref(), sharding)?;
 
         info!(
             db_path = db_path.as_ref(),
@@ -879,7 +868,7 @@ impl AptosDB {
 
     fn save_transactions_validation(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
@@ -945,7 +934,7 @@ impl AptosDB {
 
     fn calculate_and_commit_ledger_and_state_kv(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
@@ -998,7 +987,7 @@ impl AptosDB {
 
     fn commit_state_kv_and_ledger_metadata(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         expected_state_db_usage: StateStorageUsage,
         sharded_state_cache: Option<&ShardedStateCache>,
@@ -1009,7 +998,7 @@ impl AptosDB {
             .start_timer();
         let state_updates_vec = txns_to_commit
             .iter()
-            .map(|txn_to_commit| txn_to_commit.borrow().state_updates())
+            .map(|txn_to_commit| txn_to_commit.state_updates())
             .collect::<Vec<_>>();
 
         let ledger_metadata_batch = SchemaBatch::new();
@@ -1063,7 +1052,7 @@ impl AptosDB {
 
     fn commit_events(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         skip_index: bool,
     ) -> Result<()> {
@@ -1078,7 +1067,7 @@ impl AptosDB {
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.event_store.put_events(
                     first_version + i as u64,
-                    txn_to_commit.borrow().events(),
+                    txn_to_commit.events(),
                     skip_index,
                     &batch,
                 )?;
@@ -1093,7 +1082,7 @@ impl AptosDB {
 
     fn commit_transactions(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         skip_index: bool,
     ) -> Result<()> {
@@ -1111,7 +1100,7 @@ impl AptosDB {
                     |(i, txn_to_commit)| -> Result<()> {
                         self.transaction_store.put_transaction(
                             chunk_first_version + i as u64,
-                            txn_to_commit.borrow().transaction(),
+                            txn_to_commit.transaction(),
                             skip_index,
                             &batch,
                         )?;
@@ -1128,7 +1117,7 @@ impl AptosDB {
 
     fn commit_transaction_accumulator(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: u64,
     ) -> Result<HashValue> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -1152,7 +1141,7 @@ impl AptosDB {
 
     fn commit_transaction_infos(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: u64,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -1167,7 +1156,7 @@ impl AptosDB {
                 let version = first_version + i as u64;
                 self.ledger_store.put_transaction_info(
                     version,
-                    txn_to_commit.borrow().transaction_info(),
+                    txn_to_commit.transaction_info(),
                     &batch,
                 )?;
 
@@ -1182,7 +1171,7 @@ impl AptosDB {
 
     fn commit_write_sets(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
@@ -1196,7 +1185,7 @@ impl AptosDB {
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.transaction_store.put_write_set(
                     first_version + i as u64,
-                    txn_to_commit.borrow().write_set(),
+                    txn_to_commit.write_set(),
                     &batch,
                 )?;
 
@@ -1303,7 +1292,7 @@ impl AptosDB {
 
     fn post_commit(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
@@ -1330,10 +1319,7 @@ impl AptosDB {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["indexer_index"])
                 .start_timer();
-            let write_sets: Vec<_> = txns_to_commit
-                .iter()
-                .map(|txn| txn.borrow().write_set())
-                .collect();
+            let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
             indexer.index(self.state_store.clone(), first_version, &write_sets)?;
         }
 
@@ -2123,7 +2109,7 @@ impl DbWriter for AptosDB {
                 first_version,
                 latest_in_memory_state.current.usage(),
                 None,
-                /*skip_index_and_usage=*/ false,
+                self.skip_index_and_usage,
             )?;
 
             {
@@ -2148,7 +2134,7 @@ impl DbWriter for AptosDB {
     /// Same as save_transactions, but only for a whole block.
     fn save_transaction_block(
         &self,
-        txns_to_commit: &[Arc<TransactionToCommit>],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,

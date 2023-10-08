@@ -21,6 +21,7 @@ pub mod governance;
 pub mod ledger_info;
 pub mod mempool_status;
 pub mod move_resource;
+pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
 pub mod on_chain_config;
@@ -52,6 +53,7 @@ pub use utility_coin::*;
 
 pub mod account_view;
 pub mod aggregate_signature;
+pub mod aggregator;
 pub mod block_executor;
 pub mod bytes;
 pub mod state_store;

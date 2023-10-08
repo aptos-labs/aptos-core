@@ -56,8 +56,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     }
 
     pub fn start(&self) {
-        loop {
-            let message = self.kv_rx.recv().unwrap();
+        while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();
             let kv_txs = self.kv_tx.clone();
             self.thread_pool.spawn(move || {
