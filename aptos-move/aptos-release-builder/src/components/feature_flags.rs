@@ -85,6 +85,7 @@ pub enum FeatureFlag {
     SaferMetadata,
     Secp256k1ECDSAAuthenticator,
     SponsoredAutomaticAccountCreation,
+    FeePayerAccountOptional,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -224,6 +225,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SponsoredAutomaticAccountCreation => {
                 AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
             },
+            FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         }
     }
 }
@@ -286,6 +288,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
                 FeatureFlag::SponsoredAutomaticAccountCreation
             },
+            AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
         }
     }
 }
