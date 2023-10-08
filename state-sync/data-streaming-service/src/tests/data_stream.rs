@@ -37,6 +37,7 @@ use aptos_data_client::{
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
 use aptos_storage_service_types::responses::CompleteDataRange;
+use aptos_time_service::TimeService;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleRangeProof,
@@ -1189,6 +1190,7 @@ fn create_data_stream(
         aptos_data_client,
         notification_generator,
         &advertised_data,
+        TimeService::mock(),
     )
     .unwrap()
 }

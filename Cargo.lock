@@ -997,6 +997,7 @@ dependencies = [
  "aptos-network",
  "aptos-short-hex-str",
  "aptos-storage-service-types",
+ "aptos-time-service",
  "aptos-types",
  "async-trait",
  "claims",
