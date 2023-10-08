@@ -490,10 +490,7 @@ where
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
-        let cost = self
-            .storage_gas_params()
-            .pricing
-            .io_gas_per_write(key, op, None);
+        let cost = self.storage_gas_params().pricing.io_gas_per_write(key, op);
 
         self.algebra
             .charge_io(cost)
@@ -505,12 +502,10 @@ where
         key: &StateKey,
         group_write: &GroupWrite,
     ) -> VMResult<()> {
-        let group_size = group_write.encoded_group_size()?;
-        let cost = self.storage_gas_params().pricing.io_gas_per_write(
-            key,
-            &group_write.metadata_op,
-            Some(group_size),
-        );
+        let cost = self
+            .storage_gas_params()
+            .pricing
+            .io_gas_per_group_write(key, group_write);
 
         self.algebra
             .charge_io(cost)
@@ -525,15 +520,10 @@ where
         self.vm_gas_params().txn.storage_fee_refund_for_slot(op)
     }
 
-    fn storage_fee_for_state_bytes(
-        &self,
-        key: &StateKey,
-        op: &WriteOp,
-        maybe_group_size: Option<u64>,
-    ) -> Fee {
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee {
         self.vm_gas_params()
             .txn
-            .storage_fee_for_bytes(key, op, maybe_group_size)
+            .storage_fee_for_bytes(key, maybe_value_size)
     }
 
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee {

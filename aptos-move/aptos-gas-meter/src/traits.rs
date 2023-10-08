@@ -124,14 +124,10 @@ pub trait AptosGasMeter: MoveGasMeter {
     /// Calculates the storage fee refund for a state slot deallocation.
     fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
 
-    /// Calculates the storage fee for state bytes. If maybe_group_size is provided, then it
-    /// must be used instead of the data size in op, as op contains placeholer bytes.
-    fn storage_fee_for_state_bytes(
-        &self,
-        key: &StateKey,
-        op: &WriteOp,
-        maybe_group_size: Option<u64>,
-    ) -> Fee;
+    /// Calculates the storage fee for state byte, None value size corresponds to a deletion,
+    /// while Some(num_bytes) is the number of bytes contained in the creation/modification
+    /// WriteOp (or a GroupWrite for resource groups, which will be converted to a WriteOp).
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee;
 
     /// Calculates the storage fee for an event.
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -174,7 +170,8 @@ pub trait AptosGasMeter: MoveGasMeter {
         for (key, op) in change_set.write_set_iter_mut() {
             let slot_fee = self.storage_fee_for_state_slot(op);
             let refund = self.storage_fee_refund_for_state_slot(op);
-            let bytes_fee = self.storage_fee_for_state_bytes(key, op, None);
+            let bytes_fee =
+                self.storage_fee_for_state_bytes(key, op.bytes().map(|data| data.len() as u64));
 
             Self::maybe_record_storage_deposit(op, slot_fee);
             total_refund += refund;
@@ -183,8 +180,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         }
 
         for (key, group_write) in change_set.group_write_set_iter_mut() {
-            let group_size = group_write.encoded_group_size()?;
-            let group_metadata_op = &mut group_write.metadata_op;
+            let group_metadata_op = &mut group_write.metadata_op_mut();
 
             let slot_fee = self.storage_fee_for_state_slot(group_metadata_op);
             let refund = self.storage_fee_refund_for_state_slot(group_metadata_op);
@@ -192,8 +188,7 @@ pub trait AptosGasMeter: MoveGasMeter {
             Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
             total_refund += refund;
 
-            let bytes_fee =
-                self.storage_fee_for_state_bytes(key, group_metadata_op, Some(group_size));
+            let bytes_fee = self.storage_fee_for_state_bytes(key, group_write.encoded_group_size());
 
             write_fee += slot_fee + bytes_fee;
         }

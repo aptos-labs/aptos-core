@@ -197,6 +197,57 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ctx.requested_module_bundle.take()
     }
 
+    fn populate_v0_resource_group_change_set(
+        change_set: &mut HashMap<StateKey, MoveStorageOp<Bytes>>,
+        state_key: StateKey,
+        mut source_data: BTreeMap<StructTag, Bytes>,
+        resources: HashMap<StructTag, MoveStorageOp<Bytes>>,
+    ) -> VMResult<()> {
+        let common_error = || {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("populate v0 resource group change set error".to_string())
+                .finish(Location::Undefined)
+        };
+
+        let create = source_data.is_empty();
+
+        for (struct_tag, current_op) in resources {
+            match current_op {
+                MoveStorageOp::Delete => {
+                    source_data.remove(&struct_tag).ok_or_else(common_error)?;
+                },
+                MoveStorageOp::Modify(new_data) => {
+                    let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
+                    *data = new_data;
+                },
+                MoveStorageOp::New(data) => {
+                    let data = source_data.insert(struct_tag, data);
+                    if data.is_some() {
+                        return Err(common_error());
+                    }
+                },
+            }
+        }
+
+        let op = if source_data.is_empty() {
+            MoveStorageOp::Delete
+        } else if create {
+            MoveStorageOp::New(
+                bcs::to_bytes(&source_data)
+                    .map_err(|_| common_error())?
+                    .into(),
+            )
+        } else {
+            MoveStorageOp::Modify(
+                bcs::to_bytes(&source_data)
+                    .map_err(|_| common_error())?
+                    .into(),
+            )
+        };
+        change_set.insert(state_key, op);
+        Ok(())
+    }
+
     /// * Separate the resource groups from the non-resource.
     /// * non-resource groups are kept as is
     /// * resource groups are merged into the correct format as deltas to the source data
@@ -278,49 +329,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 );
                 match &mut resource_group_change_set {
                     ResourceGroupChangeSet::V0(v0_changes) => {
-                        let mut source_data = maybe_resource_group_cache
+                        let source_data = maybe_resource_group_cache
                             .as_mut()
                             .expect("V0 cache must be set")
                             .remove(&state_key)
                             .unwrap_or_default();
-                        let create = source_data.is_empty();
-
-                        for (struct_tag, current_op) in resources {
-                            match current_op {
-                                MoveStorageOp::Delete => {
-                                    source_data.remove(&struct_tag).ok_or_else(common_error)?;
-                                },
-                                MoveStorageOp::Modify(new_data) => {
-                                    let data = source_data
-                                        .get_mut(&struct_tag)
-                                        .ok_or_else(common_error)?;
-                                    *data = new_data;
-                                },
-                                MoveStorageOp::New(data) => {
-                                    let data = source_data.insert(struct_tag, data);
-                                    if data.is_some() {
-                                        return Err(common_error());
-                                    }
-                                },
-                            }
-                        }
-
-                        let op = if source_data.is_empty() {
-                            MoveStorageOp::Delete
-                        } else if create {
-                            MoveStorageOp::New(
-                                bcs::to_bytes(&source_data)
-                                    .map_err(|_| common_error())?
-                                    .into(),
-                            )
-                        } else {
-                            MoveStorageOp::Modify(
-                                bcs::to_bytes(&source_data)
-                                    .map_err(|_| common_error())?
-                                    .into(),
-                            )
-                        };
-                        v0_changes.insert(state_key, op);
+                        Self::populate_v0_resource_group_change_set(
+                            v0_changes,
+                            state_key,
+                            source_data,
+                            resources,
+                        )?;
                     },
                     ResourceGroupChangeSet::V1(v1_changes) => {
                         // Maintain the behavior of failing the transaction on resource

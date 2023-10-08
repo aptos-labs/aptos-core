@@ -484,7 +484,7 @@ where
 
         fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
 
-        fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOp, maybe_group_size: Option<u64>) -> Fee;
+        fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee;
 
         fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
 
@@ -528,7 +528,7 @@ where
         self.write_set_transient.push(WriteTransient {
             key: key.clone(),
             cost,
-            op_type: write_op_type(&group_write.metadata_op),
+            op_type: write_op_type(group_write.metadata_op()),
         });
 
         res
@@ -559,7 +559,8 @@ where
         for (key, op) in change_set.write_set_iter_mut() {
             let slot_fee = self.storage_fee_for_state_slot(op);
             let slot_refund = self.storage_fee_refund_for_state_slot(op);
-            let bytes_fee = self.storage_fee_for_state_bytes(key, op, None);
+            let bytes_fee =
+                self.storage_fee_for_state_bytes(key, op.bytes().map(|data| data.len() as u64));
 
             Self::maybe_record_storage_deposit(op, slot_fee);
             total_refund += slot_refund;
@@ -575,8 +576,7 @@ where
         }
 
         for (key, group_write) in change_set.group_write_set_iter_mut() {
-            let group_size = group_write.encoded_group_size()?;
-            let group_metadata_op = &mut group_write.metadata_op;
+            let group_metadata_op = &mut group_write.metadata_op_mut();
 
             let slot_fee = self.storage_fee_for_state_slot(group_metadata_op);
             let refund = self.storage_fee_refund_for_state_slot(group_metadata_op);
@@ -584,14 +584,13 @@ where
             Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
             total_refund += refund;
 
-            let bytes_fee =
-                self.storage_fee_for_state_bytes(key, group_metadata_op, Some(group_size));
+            let bytes_fee = self.storage_fee_for_state_bytes(key, group_write.encoded_group_size());
 
             let fee = slot_fee + bytes_fee;
             // TODO: should we distringuish group writes.
             write_set_storage.push(WriteStorage {
                 key: key.clone(),
-                op_type: write_op_type(group_metadata_op),
+                op_type: write_op_type(group_write.metadata_op()),
                 cost: fee,
             });
 
