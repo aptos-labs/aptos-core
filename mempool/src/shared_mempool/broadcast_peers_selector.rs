@@ -2,8 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::counters;
 use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
-use aptos_logger::info;
+use aptos_logger::prelude::*;
 use aptos_network::application::metadata::PeerMetadata;
 use aptos_types::{account_address::AccountAddress, transaction::Version, PeerId};
 use itertools::Itertools;
@@ -118,6 +119,9 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
 
 pub struct FreshPeersSelector {
     num_peers_to_select: usize,
+    // TODO: what is a reasonable threshold? is there a way to make it time-based instead?
+    // TODO: also, maybe only apply the threshold if there are more than num_peers_to_select peers?
+    version_threshold: u64,
     // Note, only a single read happens at a time, so we don't use the thread-safeness of the cache
     stickiness_cache: Arc<Cache<AccountAddress, (u64, Vec<PeerNetworkId>)>>,
     // TODO: is there a data structure that can do peers and sorted_peers all at once?
@@ -127,9 +131,10 @@ pub struct FreshPeersSelector {
 }
 
 impl FreshPeersSelector {
-    pub fn new(num_peers_to_select: usize) -> Self {
+    pub fn new(num_peers_to_select: usize, version_threshold: u64) -> Self {
         Self {
             num_peers_to_select,
+            version_threshold,
             stickiness_cache: Arc::new(
                 Cache::builder()
                     .max_capacity(100_000)
@@ -205,8 +210,6 @@ impl FreshPeersSelector {
 
 impl BroadcastPeersSelector for FreshPeersSelector {
     fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
-        // TODO: Also need prioritized peers for VFN. Or is it always better to send to fresh peer?
-
         let mut peer_versions: Vec<_> = updated_peers
             .iter()
             .map(|(peer, metadata)| {
@@ -223,6 +226,18 @@ impl BroadcastPeersSelector for FreshPeersSelector {
         // TODO: do we have to filter? or penalize but still allow selection?
         peer_versions.sort_by_key(|(_peer, version)| *version);
         info!("fresh_peers update_peers: {:?}", peer_versions);
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_PEERS.observe(peer_versions.len() as f64);
+
+        let max_version = peer_versions
+            .last()
+            .map(|(_peer, version)| *version)
+            .unwrap_or(0);
+        // TODO: remove, this is just for logging purposes
+        peer_versions.iter().filter(|(_peer, version)| max_version - *version > self.version_threshold).for_each(|(peer, version)| {
+            warn!("fresh_peers: peer {} has version {} which is more than {} behind max version {}", peer, version, self.version_threshold, max_version);
+        });
+        peer_versions.retain(|(_peer, version)| max_version - *version <= self.version_threshold);
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS.observe(peer_versions.len() as f64);
 
         self.sorted_peers = peer_versions;
         self.peers = HashSet::from_iter(self.sorted_peers.iter().map(|(peer, _version)| *peer));

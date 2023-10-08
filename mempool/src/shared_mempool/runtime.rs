@@ -109,7 +109,8 @@ pub fn bootstrap(
         let inner_selector: Box<dyn BroadcastPeersSelector> =
             match config.mempool.broadcast_peers_selector {
                 BroadcastPeersSelectorConfig::FreshPeers(max_selected_peers) => {
-                    Box::new(FreshPeersSelector::new(max_selected_peers))
+                    // TODO: make this a config
+                    Box::new(FreshPeersSelector::new(max_selected_peers, 1000))
                 },
                 BroadcastPeersSelectorConfig::PrioritizedPeers(max_selected_peers) => {
                     Box::new(PrioritizedPeersSelector::new(max_selected_peers))

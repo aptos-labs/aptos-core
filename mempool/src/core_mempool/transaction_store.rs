@@ -346,6 +346,10 @@ impl TransactionStore {
             self.hash_index.len(),
         );
         counters::core_mempool_index_size(counters::SIZE_BYTES_LABEL, self.size_bytes);
+        counters::core_mempool_index_size(
+            counters::PEERS_NEEDED_LABEL,
+            self.ready_peers_needed_index.len(),
+        );
     }
 
     /// Checks if Mempool is full.
@@ -820,6 +824,7 @@ impl TransactionStore {
         for txn_pointer in reinsert {
             self.ready_peers_needed_index.insert(txn_pointer);
         }
+        self.track_indices();
     }
 
     pub(crate) fn redirect(&mut self, peer: PeerNetworkId) {
