@@ -759,7 +759,6 @@ pub mod known_attributes {
 
     impl DeprecationAttribute {
         const ALL_ATTRIBUTE_NAMES: [&'static str; 1] = [Self::DEPRECATED_NAME];
-        pub const DEPRECATED_HELP: &'static str = "help";
         pub const DEPRECATED_NAME: &'static str = "deprecated";
     }
 

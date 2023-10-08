@@ -12,7 +12,7 @@ use crate::{
     },
     naming::ast as N,
     parser::ast::{Ability_, ConstantName, Field, FunctionName, StructName, Var},
-    shared::{known_attributes::KnownAttribute, unique_map::UniqueMap, CompilationEnv, Name, *},
+    shared::{unique_map::UniqueMap, *},
     FullyCompiledProgram,
 };
 use move_ir_types::location::*;
@@ -49,11 +49,6 @@ struct Context<'env> {
     scoped_functions: BTreeMap<ModuleIdent, BTreeMap<Symbol, Loc>>,
     unscoped_constants: BTreeMap<Symbol, Loc>,
     scoped_constants: BTreeMap<ModuleIdent, BTreeMap<Symbol, Loc>>,
-    module_deprecation_attribute_locs: BTreeMap<ModuleIdent, Loc>, // if any
-    types_deprecation_attribute_locs: BTreeMap<ModuleIdent, BTreeMap<Symbol, Loc>>, // if any
-    functions_deprecation_attribute_locs: BTreeMap<ModuleIdent, BTreeMap<Symbol, Loc>>, // if any
-    constants_deprecation_attribute_locs: BTreeMap<ModuleIdent, BTreeMap<Symbol, Loc>>, // if any
-                                                                   // module_info: BTreeMap<ModuleIdent, (Loc, bool)>,
 }
 
 impl<'env> Context<'env> {
@@ -63,6 +58,8 @@ impl<'env> Context<'env> {
         prog: &E::Program,
     ) -> Self {
         use ResolvedType as RT;
+
+        // make a list of all moodules first to avoid repeated visitation.
         let all_modules: Vec<_> = prog
             .modules
             .key_cloned_iter()
@@ -75,15 +72,8 @@ impl<'env> Context<'env> {
             }))
             .collect();
 
-        let module_deprecation_attribute_locs: BTreeMap<_, _> = all_modules
-            .iter()
-            .filter_map(|(mident, mdef)| {
-                let attributes = &mdef.attributes;
-                let loc = deprecated_attribute_location(attributes);
-                loc.map(|loc| (*mident, loc))
-            })
-            .collect();
-
+        // for each module name ModuleIdent, map each struct name in the module to a set of
+        // properties: (Loc, ModuleIdent, AbilitySet, usize)i.
         let scoped_types = all_modules
             .iter()
             .map(|(mident, mdef)| {
@@ -101,26 +91,9 @@ impl<'env> Context<'env> {
             })
             .collect();
 
-        let types_deprecation_attribute_locs: BTreeMap<_, _> = all_modules
-            .iter()
-            .map(|(mident, mdef)| {
-                if module_deprecation_attribute_locs.contains_key(mident) {
-                    (*mident, BTreeMap::new())
-                } else {
-                    let mdef_map: BTreeMap<_, _> = mdef
-                        .structs
-                        .key_cloned_iter()
-                        .filter_map(|(s, sdef)| {
-                            let attributes = &sdef.attributes;
-                            let loc = deprecated_attribute_location(attributes);
-                            loc.map(|loc| (s.value(), loc))
-                        })
-                        .collect();
-                    (*mident, mdef_map)
-                }
-            })
-            .collect();
-
+        // For each module name ModuleIdent, map each function name in the module to the name and location
+        // of the function.  Why this info?  It doesn't seem to be used, so maybe it doesn't matter.
+        // Leave it alone for now.
         let scoped_functions = all_modules
             .iter()
             .map(|(mident, mdef)| {
@@ -133,26 +106,9 @@ impl<'env> Context<'env> {
             })
             .collect();
 
-        let functions_deprecation_attribute_locs: BTreeMap<_, _> = all_modules
-            .iter()
-            .map(|(mident, mdef)| {
-                if module_deprecation_attribute_locs.contains_key(mident) {
-                    (*mident, BTreeMap::new())
-                } else {
-                    let mdef_map: BTreeMap<_, _> = mdef
-                        .functions
-                        .iter()
-                        .filter_map(|(_sloc, s, fdef)| {
-                            let attributes = &fdef.attributes;
-                            let loc = deprecated_attribute_location(attributes);
-                            loc.map(|loc| (*s, loc))
-                        })
-                        .collect();
-                    (*mident, mdef_map)
-                }
-            })
-            .collect();
-
+        // For each module name ModuleIdent, map each constant name in the module to the name and location
+        // of the constant.  Why this info?  It doesn't seem to be used, so maybe it doesn't matter.
+        // Leave it alone for now.
         let scoped_constants = all_modules
             .iter()
             .map(|(mident, mdef)| {
@@ -162,26 +118,6 @@ impl<'env> Context<'env> {
                     .map(|(nloc, n, _)| (*n, nloc))
                     .collect();
                 (*mident, mems)
-            })
-            .collect();
-
-        let constants_deprecation_attribute_locs: BTreeMap<_, _> = all_modules
-            .iter()
-            .map(|(mident, mdef)| {
-                if module_deprecation_attribute_locs.contains_key(mident) {
-                    (*mident, BTreeMap::new())
-                } else {
-                    let mdef_map: BTreeMap<_, _> = mdef
-                        .constants
-                        .iter()
-                        .filter_map(|(_sloc, s, cdef)| {
-                            let attributes = &cdef.attributes;
-                            let loc = deprecated_attribute_location(attributes);
-                            loc.map(|loc| (*s, loc))
-                        })
-                        .collect();
-                    (*mident, mdef_map)
-                }
             })
             .collect();
 
@@ -198,11 +134,6 @@ impl<'env> Context<'env> {
             scoped_constants,
             unscoped_types,
             unscoped_constants: BTreeMap::new(),
-
-            module_deprecation_attribute_locs,
-            types_deprecation_attribute_locs,
-            functions_deprecation_attribute_locs,
-            constants_deprecation_attribute_locs,
         }
     }
 
@@ -218,93 +149,6 @@ impl<'env> Context<'env> {
             ))
         }
         resolved
-    }
-
-    // Returns loc of #[deprecated] attribute
-    fn module_is_deprecated(&mut self, mident: &ModuleIdent) -> Option<Loc> {
-        self.module_deprecation_attribute_locs.get(mident).copied()
-    }
-
-    fn check_for_member_in_deprecated_module(
-        &mut self,
-        mident: &ModuleIdent,
-        member: &Spanned<Symbol>,
-        code: impl DiagnosticCode,
-        member_kind: &str,
-        member_kind_capitalized: &str,
-    ) -> bool {
-        if let Some(loc) = self.module_is_deprecated(mident) {
-            self.env.add_diag(diag!(
-                code,
-                (
-                    mident.loc,
-                    format!(
-                        "Use of {} '{}' from deprecated module '{}'",
-                        member_kind, member, mident
-                    ),
-                ),
-                (
-                    member.loc,
-                    format!(
-                        "{} '{}' from module '{}' used here",
-                        member_kind_capitalized, member, mident
-                    )
-                ),
-                (loc, format!("Module '{}' deprecated here", mident)),
-            ));
-            true
-        } else {
-            false
-        }
-    }
-
-    // Returns loc of #[deprecated] attribute
-    fn member_has_deprecated_annotation(
-        member_deprecation_attribute_locs: &BTreeMap<ModuleIdent, BTreeMap<Symbol, Loc>>,
-        mident: &ModuleIdent,
-        member: &Spanned<Symbol>,
-    ) -> Option<Loc> {
-        member_deprecation_attribute_locs
-            .get(mident)
-            .and_then(|members| members.get(&member.value))
-            .copied()
-    }
-
-    fn check_for_deprecated_member_use(
-        &mut self,
-        member_deprecation_loc: Option<Loc>,
-        mident: &ModuleIdent,
-        member: &Spanned<Symbol>,
-        code: impl DiagnosticCode,
-        member_kind: &str,
-        member_kind_capitalized: &str,
-    ) {
-        self.check_for_member_in_deprecated_module(
-            mident,
-            member,
-            code,
-            member_kind,
-            member_kind_capitalized,
-        );
-        if let Some(loc) = member_deprecation_loc {
-            self.env.add_diag(diag!(
-                code,
-                (
-                    member.loc,
-                    format!(
-                        "Use of deprecated {} '{}' from module '{}'",
-                        member_kind, member, mident
-                    )
-                ),
-                (
-                    loc,
-                    format!(
-                        "{} '{}' from module '{}' deprecated here",
-                        member_kind_capitalized, member, mident
-                    )
-                ),
-            ));
-        }
     }
 
     fn resolve_module_type(
@@ -323,7 +167,7 @@ impl<'env> Context<'env> {
             },
             Some(members) => members,
         };
-        let result = match types.get(&n.value) {
+        match types.get(&n.value) {
             None => {
                 let msg = format!(
                     "Invalid module access. Unbound struct '{}' in module '{}'",
@@ -336,18 +180,7 @@ impl<'env> Context<'env> {
             Some((decl_loc, _, abilities, arity)) => {
                 Some((*decl_loc, StructName(*n), abilities.clone(), *arity))
             },
-        };
-        let struct_deprecation_loc =
-            Self::member_has_deprecated_annotation(&self.types_deprecation_attribute_locs, m, n);
-        self.check_for_deprecated_member_use(
-            struct_deprecation_loc,
-            m,
-            n,
-            NameResolution::DeprecatedStruct,
-            "struct",
-            "Struct",
-        );
-        result
+        }
     }
 
     fn resolve_module_function(
@@ -366,7 +199,7 @@ impl<'env> Context<'env> {
             },
             Some(members) => members,
         };
-        let result = match functions.get(&n.value).cloned() {
+        match functions.get(&n.value).cloned() {
             None => {
                 let msg = format!(
                     "Invalid module access. Unbound function '{}' in module '{}'",
@@ -377,21 +210,7 @@ impl<'env> Context<'env> {
                 None
             },
             Some(_) => Some(FunctionName(*n)),
-        };
-        let function_deprecation_loc = Self::member_has_deprecated_annotation(
-            &self.functions_deprecation_attribute_locs,
-            m,
-            n,
-        );
-        self.check_for_deprecated_member_use(
-            function_deprecation_loc,
-            m,
-            n,
-            NameResolution::DeprecatedFunction,
-            "function",
-            "Function",
-        );
-        result
+        }
     }
 
     fn resolve_module_constant(
@@ -410,7 +229,7 @@ impl<'env> Context<'env> {
             },
             Some(members) => members,
         };
-        let result = match constants.get(&n.value).cloned() {
+        match constants.get(&n.value).cloned() {
             None => {
                 let msg = format!(
                     "Invalid module access. Unbound constant '{}' in module '{}'",
@@ -421,21 +240,7 @@ impl<'env> Context<'env> {
                 None
             },
             Some(_) => Some(ConstantName(*n)),
-        };
-        let constant_deprecation_loc = Self::member_has_deprecated_annotation(
-            &self.constants_deprecation_attribute_locs,
-            m,
-            n,
-        );
-        self.check_for_deprecated_member_use(
-            constant_deprecation_loc,
-            m,
-            n,
-            NameResolution::DeprecatedConstant,
-            "constant",
-            "Constant",
-        );
-        result
+        }
     }
 
     fn resolve_unscoped_type(&mut self, n: &Name) -> Option<ResolvedType> {
@@ -1489,15 +1294,4 @@ fn check_builtin_ty_args_impl(
 
         args
     })
-}
-
-// If attributes contains a #![deprecated] attribute, then returns the location of the attribute.
-fn deprecated_attribute_location(attributes: &E::Attributes) -> Option<Loc> {
-    attributes
-        .key_cloned_iter()
-        .filter_map(|(attribute_name, _attribute)| match attribute_name.value {
-            E::AttributeName_::Known(KnownAttribute::Deprecation(_)) => Some(attribute_name.loc),
-            _ => None,
-        })
-        .next()
 }
