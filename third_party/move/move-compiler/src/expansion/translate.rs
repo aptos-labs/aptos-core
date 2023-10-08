@@ -27,6 +27,7 @@ use crate::{
 use move_command_line_common::parser::{parse_u16, parse_u256, parse_u32};
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     iter::IntoIterator,
@@ -48,6 +49,7 @@ struct Context<'env, 'map> {
     is_source_definition: bool,
     in_spec_context: bool,
     in_deprecated_code: bool,
+    in_aptos_libs: bool,
     exp_specs: BTreeMap<SpecId, E::SpecBlock>,
     env: &'env mut CompilationEnv,
 }
@@ -68,6 +70,7 @@ impl<'env, 'map> Context<'env, 'map> {
             is_source_definition: false,
             in_spec_context: false,
             in_deprecated_code: false,
+            in_aptos_libs: false,
             exp_specs: BTreeMap::new(),
         }
     }
@@ -444,6 +447,50 @@ fn set_sender_address(
     })
 }
 
+// This is a hack to recognize APTOS StdLib, Framework, and Token libs to avoid warnings on some old errors.
+// This will be removed after library attributes are cleaned up.
+// (See https://github.com/aptos-labs/aptos-core/issues/9410)
+fn module_is_in_aptos_libs(module_address: Option<Spanned<Address>>) -> bool {
+    const APTOS_STDLIB_NAME: &str = "aptos_std";
+    static APTOS_STDLIB_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+        Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
+    const APTOS_FRAMEWORK_NAME: &str = "aptos_framework";
+    static APTOS_FRAMEWORK_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+        Lazy::new(|| NumericalAddress::parse_str("0x1").unwrap());
+    const APTOS_TOKEN_NAME: &str = "aptos_token";
+    static APTOS_TOKEN_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+        Lazy::new(|| NumericalAddress::parse_str("0x3").unwrap());
+    const APTOS_TOKEN_OBJECTS_NAME: &str = "aptos_token_objects";
+    static APTOS_TOKEN_OBJECTS_NUMERICAL_ADDRESS: Lazy<NumericalAddress> =
+        Lazy::new(|| NumericalAddress::parse_str("0x4").unwrap());
+    match &module_address {
+        Some(spanned_address) => {
+            let address = spanned_address.value;
+            match address {
+                Address::Numerical(optional_name, spanned_numerical_address) => match optional_name
+                {
+                    Some(spanned_symbol) => {
+                        ((&spanned_symbol.value as &str) == APTOS_STDLIB_NAME
+                            && (spanned_numerical_address.value == *APTOS_STDLIB_NUMERICAL_ADDRESS))
+                            || ((&spanned_symbol.value as &str) == APTOS_FRAMEWORK_NAME
+                                && (spanned_numerical_address.value
+                                    == *APTOS_FRAMEWORK_NUMERICAL_ADDRESS))
+                            || ((&spanned_symbol.value as &str) == APTOS_TOKEN_NAME
+                                && (spanned_numerical_address.value
+                                    == *APTOS_TOKEN_NUMERICAL_ADDRESS))
+                            || ((&spanned_symbol.value as &str) == APTOS_TOKEN_OBJECTS_NAME
+                                && (spanned_numerical_address.value
+                                    == *APTOS_TOKEN_OBJECTS_NUMERICAL_ADDRESS))
+                    },
+                    None => false,
+                },
+                Address::NamedUnassigned(_) => false,
+            }
+        },
+        None => false,
+    }
+}
+
 fn module_(
     context: &mut Context,
     package_name: Option<Symbol>,
@@ -484,6 +531,7 @@ fn module_(
     {
         context.in_deprecated_code = true;
     }
+    context.in_aptos_libs = module_is_in_aptos_libs(module_address);
 
     let mut new_scope = AliasMapBuilder::new();
     module_self_aliases(&mut new_scope, &current_module);
@@ -580,6 +628,7 @@ fn script_(context: &mut Context, package_name: Option<Symbol>, pscript: P::Scri
         "ICE there should be no aliases entering a script"
     );
     context.set_current_module(None);
+    context.in_aptos_libs = false;
 
     let mut constants = UniqueMap::new();
     for c in pconstants {
@@ -1115,7 +1164,7 @@ fn member_has_deprecated_annotation(
 }
 
 fn check_for_deprecated_module_use(context: &mut Context, mident: &ModuleIdent) -> bool {
-    if context.in_deprecated_code {
+    if context.in_deprecated_code || context.in_aptos_libs {
         return false;
     }
     if let Some(loc) = module_has_deprecated_annotation(context, mident) {
@@ -1139,7 +1188,7 @@ fn check_for_deprecated_member_use(
     member: &Spanned<Symbol>,
     deprecated_item: DeprecatedItem,
 ) {
-    if context.in_deprecated_code {
+    if context.in_deprecated_code || context.in_aptos_libs {
         return;
     }
     let mident = match mident_in {
@@ -1252,11 +1301,18 @@ fn use_(context: &mut Context, acc: &mut AliasMapBuilder, u: P::UseDecl) {
                     },
                     Some(m) => m,
                 };
+                let deprecated_item_kind = match member_kind {
+                    ModuleMemberKind::Constant => DeprecatedItem::Constant,
+                    ModuleMemberKind::Function => DeprecatedItem::Function,
+
+                    ModuleMemberKind::Struct => DeprecatedItem::Struct,
+                    _ => DeprecatedItem::Member,
+                };
                 check_for_deprecated_member_use(
                     context,
                     Some(&mident),
                     &member,
-                    DeprecatedItem::Member,
+                    deprecated_item_kind,
                 );
 
                 let alias = alias_opt.unwrap_or(member);

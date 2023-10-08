@@ -13,23 +13,23 @@ warning[W09001]: unused alias
 12 │     use 0x42::mod1;
    │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
 
-warning[W03014]: Use of deprecated member
+warning[W03017]: Use of deprecated constant
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:13:21
    │
  4 │     #[deprecated]
-   │       ---------- Member 'C' in module '0x42::mod1' deprecated here
+   │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
    ·
 13 │     use 0x42::mod1::C as D;
-   │                     ^ Use of deprecated member 'C' from module '0x42::mod1'
+   │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
-warning[W03014]: Use of deprecated member
+warning[W03017]: Use of deprecated constant
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:14:21
    │
  4 │     #[deprecated]
-   │       ---------- Member 'C' in module '0x42::mod1' deprecated here
+   │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
    ·
 14 │     use 0x42::mod1::C as C;
-   │                     ^ Use of deprecated member 'C' from module '0x42::mod1'
+   │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning[W03015]: Use of deprecated struct
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:17:27
@@ -58,14 +58,14 @@ error[E04001]: restricted visibility
 19 │     C;
    │     ^ Invalid access of '0x42::mod1::C'
 
-warning[W03014]: Use of deprecated member
+warning[W03017]: Use of deprecated constant
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:21:22
    │
  4 │     #[deprecated]
-   │       ---------- Member 'C' in module '0x42::mod1' deprecated here
+   │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
    ·
 21 │         use 0x42::mod1::C;
-   │                         ^ Use of deprecated member 'C' from module '0x42::mod1'
+   │                         ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning[W03014]: Use of deprecated member
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:22:6
@@ -121,14 +121,14 @@ warning[W09001]: unused alias
 31 │     use 0x42::mod1;
    │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
 
-warning[W03014]: Use of deprecated member
+warning[W03017]: Use of deprecated constant
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:32:21
    │
  4 │     #[deprecated]
-   │       ---------- Member 'C' in module '0x42::mod1' deprecated here
+   │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
    ·
 32 │     use 0x42::mod1::C as mod1;
-   │                     ^ Use of deprecated member 'C' from module '0x42::mod1'
+   │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 error[E02010]: invalid name
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:32:26
@@ -136,14 +136,14 @@ error[E02010]: invalid name
 32 │     use 0x42::mod1::C as mod1;
    │                          ^^^^ Invalid constant alias name 'mod1'. Constant alias names must start with 'A'..'Z'
 
-warning[W03014]: Use of deprecated member
+warning[W03017]: Use of deprecated constant
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:33:21
    │
  4 │     #[deprecated]
-   │       ---------- Member 'C' in module '0x42::mod1' deprecated here
+   │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
    ·
 33 │     use 0x42::mod1::C as C;
-   │                     ^ Use of deprecated member 'C' from module '0x42::mod1'
+   │                     ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 error[E04007]: incompatible types
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:36:9
@@ -196,14 +196,14 @@ error[E04007]: incompatible types
 42 │ │     }
    │ ╰─────^ Invalid return expression
 
-warning[W03014]: Use of deprecated member
+warning[W03017]: Use of deprecated constant
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:40:22
    │
  4 │     #[deprecated]
-   │       ---------- Member 'C' in module '0x42::mod1' deprecated here
+   │       ---------- Constant 'C' in module '0x42::mod1' deprecated here
    ·
 40 │         use 0x42::mod1::C;
-   │                         ^ Use of deprecated member 'C' from module '0x42::mod1'
+   │                         ^ Use of deprecated constant 'C' from module '0x42::mod1'
 
 warning[W03014]: Use of deprecated member
    ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct2.move:41:6

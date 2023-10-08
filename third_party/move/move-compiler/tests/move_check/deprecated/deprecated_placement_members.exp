@@ -1,11 +1,11 @@
-warning[W03014]: Use of deprecated member
+warning[W03015]: Use of deprecated struct
    ┌─ tests/move_check/deprecated/deprecated_placement_members.move:31:18
    │
 19 │     #[deprecated]
-   │       ---------- Member 'S' in module '0x41::N' deprecated here
+   │       ---------- Struct 'S' in module '0x41::N' deprecated here
    ·
 31 │     use 0x41::N::S;
-   │                  ^ Use of deprecated member 'S' from module '0x41::N'
+   │                  ^ Use of deprecated struct 'S' from module '0x41::N'
 
 warning[W03015]: Use of deprecated struct
    ┌─ tests/move_check/deprecated/deprecated_placement_members.move:34:11

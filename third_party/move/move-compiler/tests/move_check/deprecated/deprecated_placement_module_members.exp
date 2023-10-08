@@ -16,14 +16,14 @@ warning[W03013]: Use of deprecated module
 33 │     use 0x41::N::S;
    │         ^^^^^^^ Use of deprecated module '0x41::N'
 
-warning[W03014]: Use of deprecated member
+warning[W03015]: Use of deprecated struct
    ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:33:18
    │
 21 │     #[deprecated]
-   │       ---------- Member 'S' in module '0x41::N' deprecated here
+   │       ---------- Struct 'S' in module '0x41::N' deprecated here
    ·
 33 │     use 0x41::N::S;
-   │                  ^ Use of deprecated member 'S' from module '0x41::N'
+   │                  ^ Use of deprecated struct 'S' from module '0x41::N'
 
 warning[W03015]: Use of deprecated struct
    ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:36:11
