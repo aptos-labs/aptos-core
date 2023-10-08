@@ -18,6 +18,7 @@ use aptos_data_client::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
+use aptos_time_service::TimeService;
 use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time::interval;
@@ -52,6 +53,9 @@ pub struct DataStreamingService<T> {
     // Unique ID generators to maintain unique IDs across streams
     stream_id_generator: U64IdGenerator,
     notification_id_generator: Arc<U64IdGenerator>,
+
+    // The time service used to track elapsed time (e.g., for stream progress checks)
+    time_service: TimeService,
 }
 
 impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<T> {
@@ -60,6 +64,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         streaming_service_config: DataStreamingServiceConfig,
         aptos_data_client: T,
         stream_requests: StreamingServiceListener,
+        time_service: TimeService,
     ) -> Self {
         Self {
             data_client_config,
@@ -70,6 +75,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             stream_requests,
             stream_id_generator: U64IdGenerator::new(),
             notification_id_generator: Arc::new(U64IdGenerator::new()),
+            time_service,
         }
     }
 
@@ -212,6 +218,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             self.aptos_data_client.clone(),
             self.notification_id_generator.clone(),
             &self.global_data_summary.advertised_data,
+            self.time_service.clone(),
         )?;
 
         // Verify the data stream can be fulfilled using the currently advertised data

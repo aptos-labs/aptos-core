@@ -171,6 +171,7 @@ fn setup_data_streaming_service(
         state_sync_config.data_streaming_service,
         aptos_data_client,
         streaming_service_listener,
+        TimeService::real(),
     );
 
     // Start the data streaming service
