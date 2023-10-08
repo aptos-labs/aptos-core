@@ -2,19 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    captured_reads::CapturedReads,
     errors::Error,
-    task::{ExecutionStatus, Transaction, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
 };
-use anyhow::anyhow;
-use aptos_mvhashmap::types::{TxnIndex, Version};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    access_path::AccessPath, executable::ModulePath, fee_statement::FeeStatement,
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
     write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use std::{
+    collections::HashMap,
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -23,119 +24,41 @@ use std::{
     },
 };
 
-type TxnInput<K> = Vec<ReadDescriptor<K>>;
+type TxnInput<T> = CapturedReads<T>;
+
 // When a transaction is committed, the output delta writes must be populated by
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
-pub(crate) struct TxnOutput<T: TransactionOutput, E: Debug> {
-    output_status: ExecutionStatus<T, Error<E>>,
+pub(crate) struct TxnOutput<O: TransactionOutput, E: Debug> {
+    output_status: ExecutionStatus<O, Error<E>>,
 }
 
-impl<T: TransactionOutput, E: Debug> TxnOutput<T, E> {
-    pub fn from_output_status(output_status: ExecutionStatus<T, Error<E>>) -> Self {
+impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
+    pub fn from_output_status(output_status: ExecutionStatus<O, Error<E>>) -> Self {
         Self { output_status }
     }
 
-    pub fn output_status(&self) -> &ExecutionStatus<T, Error<E>> {
+    pub fn output_status(&self) -> &ExecutionStatus<O, Error<E>> {
         &self.output_status
     }
 }
 
-/// Information about the read which is used by validation.
-#[derive(Debug, Clone, PartialEq)]
-enum ReadKind {
-    /// Read returned a value from the multi-version data-structure, with index
-    /// and incarnation number of the execution associated with the write of
-    /// that entry.
-    Versioned(Version),
-    /// Read resolved a delta.
-    Resolved(u128),
-    /// Speculative inconsistency failure.
-    SpeculativeFailure,
-    /// Module read. TODO: Design a better representation once more meaningfully separated.
-    Module,
-}
+pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
+    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
 
-#[derive(Debug, Clone)]
-pub struct ReadDescriptor<K> {
-    access_path: K,
-    kind: ReadKind,
-}
-
-impl<K: Debug + ModulePath> ReadDescriptor<K> {
-    pub fn from_versioned(access_path: K, version: Version) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Versioned(version),
-        }
-    }
-
-    pub fn from_resolved(access_path: K, value: u128) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Resolved(value),
-        }
-    }
-
-    pub fn from_module(access_path: K) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::Module,
-        }
-    }
-
-    pub fn from_speculative_failure(access_path: K) -> Self {
-        Self {
-            access_path,
-            kind: ReadKind::SpeculativeFailure,
-        }
-    }
-
-    fn module_path(&self) -> Option<AccessPath> {
-        self.access_path.module_path()
-    }
-
-    pub fn path(&self) -> &K {
-        &self.access_path
-    }
-
-    // Does the read descriptor describe a read from MVHashMap w. a specified version.
-    pub fn validate_versioned(&self, version: Version) -> bool {
-        self.kind == ReadKind::Versioned(version)
-    }
-
-    // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
-    pub fn validate_resolved(&self, value: u128) -> bool {
-        self.kind == ReadKind::Resolved(value)
-    }
-
-    // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
-    pub fn validate_module(&self) -> bool {
-        self.kind == ReadKind::Module
-    }
-
-    // Does the read descriptor describe to a read with a delta application failure.
-    pub fn is_speculative_failure(&self) -> bool {
-        self.kind == ReadKind::SpeculativeFailure
-    }
-}
-
-pub struct TxnLastInputOutput<K, T: TransactionOutput, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
-
-    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
+    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
 
     // Record all writes and reads to access paths corresponding to modules (code) in any
     // (speculative) executions. Used to avoid a potential race with module publishing and
     // Move-VM loader cache - see 'record' function comment for more information.
-    module_writes: DashSet<AccessPath>,
-    module_reads: DashSet<AccessPath>,
+    module_writes: DashSet<T::Key>,
+    module_reads: DashSet<T::Key>,
 
     module_read_write_intersection: AtomicBool,
 }
 
-impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
-    TxnLastInputOutput<K, T, E>
+impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
+    TxnLastInputOutput<T, O, E>
 {
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
@@ -151,23 +74,23 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
         }
     }
 
-    fn append_and_check(
-        paths: Vec<AccessPath>,
-        set_to_append: &DashSet<AccessPath>,
-        set_to_check: &DashSet<AccessPath>,
+    fn append_and_check<'a>(
+        paths: impl Iterator<Item = &'a T::Key>,
+        set_to_append: &DashSet<T::Key>,
+        set_to_check: &DashSet<T::Key>,
     ) -> bool {
         for path in paths {
             // Standard flags, first show, then look.
             set_to_append.insert(path.clone());
 
-            if set_to_check.contains(&path) {
+            if set_to_check.contains(path) {
                 return true;
             }
         }
         false
     }
 
-    /// Returns an error if a module path that was read was previously written to, and vice versa.
+    /// Returns false on an error - if a module path that was read was previously written to, and vice versa.
     /// Since parallel executor is instantiated per block, any module that is in the Move-VM loader
     /// cache must previously be read and would be recorded in the 'module_reads' set. Any module
     /// that is written (published or re-published) goes through transaction output write-set and
@@ -182,55 +105,40 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: Vec<ReadDescriptor<K>>,
-        output: ExecutionStatus<T, Error<E>>,
-    ) -> anyhow::Result<()> {
-        let read_modules: Vec<AccessPath> = input
-            .iter()
-            .filter_map(|desc| {
-                matches!(desc.kind, ReadKind::Module).then(|| {
-                    desc.module_path()
-                        .unwrap_or_else(|| panic!("Module path guaranteed to exist {:?}", desc))
-                })
-            })
-            .collect();
-        let written_modules: Vec<AccessPath> = match &output {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
-                .module_write_set()
-                .keys()
-                .map(|k| {
-                    k.module_path().unwrap_or_else(|| {
-                        panic!("Unexpected non-module key found in putput: {:?}", k)
-                    })
-                })
-                .collect(),
-            ExecutionStatus::Abort(_) => Vec::new(),
+        input: CapturedReads<T>,
+        output: ExecutionStatus<O, Error<E>>,
+    ) -> bool {
+        let written_modules = match &output {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                output.module_write_set()
+            },
+            ExecutionStatus::Abort(_) => HashMap::new(),
         };
 
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {
             // Check if adding new read & write modules leads to intersections.
-            if Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
-                || Self::append_and_check(written_modules, &self.module_writes, &self.module_reads)
-            {
+            if Self::append_and_check(
+                input.module_reads.iter(),
+                &self.module_reads,
+                &self.module_writes,
+            ) || Self::append_and_check(
+                written_modules.keys(),
+                &self.module_writes,
+                &self.module_reads,
+            ) {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
-                return Err(anyhow!(
-                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
-                ));
+                return false;
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
 
-        Ok(())
+        true
     }
 
-    pub(crate) fn module_publishing_may_race(&self) -> bool {
-        self.module_read_write_intersection.load(Ordering::Acquire)
-    }
-
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
         self.inputs[txn_idx as usize].load_full()
     }
 
@@ -249,14 +157,29 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
     }
 
     /// Does a transaction at txn_idx have SkipRest or Abort status.
-    pub(crate) fn block_truncated_at_idx(&self, txn_idx: TxnIndex) -> bool {
+    pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
             &self.outputs[txn_idx as usize]
                 .load_full()
                 .expect("[BlockSTM]: Execution output must be recorded after execution")
                 .output_status,
-            ExecutionStatus::SkipRest(_) | ExecutionStatus::Abort(_)
+            ExecutionStatus::SkipRest(_)
         )
+    }
+
+    pub(crate) fn execution_error(&self, txn_idx: TxnIndex) -> Option<Error<E>> {
+        if self.module_read_write_intersection.load(Ordering::Acquire) {
+            return Some(Error::ModulePathReadWrite);
+        }
+
+        if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            return Some(err.clone());
+        }
+        None
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
@@ -269,7 +192,7 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
         }
     }
 
-    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<T, E>>> {
+    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<O, E>>> {
         self.outputs[txn_idx as usize].load_full()
     }
 
@@ -278,8 +201,7 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
     pub(crate) fn modified_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = (<<T as TransactionOutput>::Txn as Transaction>::Key, bool)>>
-    {
+    ) -> Option<impl Iterator<Item = (T::Key, bool)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
@@ -295,10 +217,7 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn delta_keys(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Vec<<<T as TransactionOutput>::Txn as Transaction>::Key> {
+    pub(crate) fn delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             vec![],
             |txn_output| match &txn_output.output_status {
@@ -310,20 +229,15 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn events(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Box<dyn Iterator<Item = <<T as TransactionOutput>::Txn as Transaction>::Event>> {
+    pub(crate) fn events(&self, txn_idx: TxnIndex) -> Box<dyn Iterator<Item = T::Event>> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
-            Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>()),
+            Box::new(empty::<T::Event>()),
             |txn_output| match &txn_output.output_status {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_) => {
-                    Box::new(empty::<<<T as TransactionOutput>::Txn as Transaction>::Event>())
-                },
+                ExecutionStatus::Abort(_) => Box::new(empty::<T::Event>()),
             },
         )
     }
@@ -333,7 +247,7 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
     pub(crate) fn record_delta_writes(
         &self,
         txn_idx: TxnIndex,
-        delta_writes: Vec<(<<T as TransactionOutput>::Txn as Transaction>::Key, WriteOp)>,
+        delta_writes: Vec<(T::Key, WriteOp)>,
     ) {
         match &self.outputs[txn_idx as usize]
             .load_full()
@@ -349,7 +263,7 @@ impl<K: Debug + ModulePath, T: TransactionOutput, E: Debug + Send + Clone>
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<T, Error<E>> {
+    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, Error<E>> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");

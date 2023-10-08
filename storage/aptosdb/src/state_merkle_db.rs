@@ -69,6 +69,7 @@ impl StateMerkleDb {
         readonly: bool,
         max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
+        let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
@@ -79,7 +80,7 @@ impl StateMerkleDb {
             version_caches.insert(Some(i as u8), VersionedNodeCache::new());
         }
         let lru_cache = LruNodeCache::new(max_nodes_per_lru_cache_shard);
-        if !rocksdb_configs.use_sharded_state_merkle_db {
+        if !sharding {
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
             let db = Arc::new(Self::open_db(
@@ -160,7 +161,7 @@ impl StateMerkleDb {
         sharding: bool,
     ) -> Result<()> {
         let rocksdb_configs = RocksdbConfigs {
-            use_sharded_state_merkle_db: sharding,
+            enable_storage_sharding: sharding,
             ..Default::default()
         };
         let state_merkle_db = Self::new(

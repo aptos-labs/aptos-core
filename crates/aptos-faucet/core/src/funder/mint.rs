@@ -58,7 +58,7 @@ impl MintFunderConfig {
 
         let faucet_account = LocalAccount::new(
             self.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).derived_address()
+                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
             }),
             key,
             0,
@@ -156,7 +156,7 @@ impl MintFunder {
             delegated_account
                 .authentication_key()
                 .clone()
-                .derived_address(),
+                .account_address(),
             false,
             true,
         )

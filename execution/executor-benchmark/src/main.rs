@@ -222,13 +222,7 @@ struct Opt {
     pruner_opt: PrunerOpt,
 
     #[clap(long)]
-    split_ledger_db: bool,
-
-    #[clap(long)]
-    use_sharded_state_merkle_db: bool,
-
-    #[clap(long)]
-    skip_index_and_usage: bool,
+    enable_storage_sharding: bool,
 
     #[clap(flatten)]
     pipeline_opt: PipelineOpt,
@@ -337,9 +331,7 @@ where
                 data_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
-                opt.split_ledger_db,
-                opt.use_sharded_state_merkle_db,
-                opt.skip_index_and_usage,
+                opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -387,9 +379,7 @@ where
                 checkpoint_dir,
                 opt.verify_sequence_numbers,
                 opt.pruner_opt.pruner_config(),
-                opt.split_ledger_db,
-                opt.use_sharded_state_merkle_db,
-                opt.skip_index_and_usage,
+                opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
             );
         },
@@ -407,9 +397,7 @@ where
                 checkpoint_dir,
                 opt.pruner_opt.pruner_config(),
                 opt.verify_sequence_numbers,
-                opt.split_ledger_db,
-                opt.use_sharded_state_merkle_db,
-                opt.skip_index_and_usage,
+                opt.enable_storage_sharding,
                 opt.pipeline_opt.pipeline_config(),
             );
         },

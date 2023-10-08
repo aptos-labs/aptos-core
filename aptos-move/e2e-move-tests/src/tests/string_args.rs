@@ -318,13 +318,13 @@ fn string_args_bad_utf8() {
     tests.push(("0xcafe::test::hi", args, abort_info()));
 
     // vector of strings
-    let bad = vec![0xC3u8, 0x28u8];
+    let bad = [0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let i = 0u64;
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
     tests.push(("0xcafe::test::str_vec", args, abort_info()));
 
-    let bad = vec![0xC3u8, 0x28u8];
+    let bad = [0xC3u8, 0x28u8];
     let s_vec = vec![&bad[..], "hello".as_bytes(), "world".as_bytes()];
     let args = vec![bcs::to_bytes(&s_vec).unwrap(), bcs::to_bytes(&i).unwrap()];
     tests.push(("0xcafe::test::str_vec", args, abort_info()));
@@ -333,7 +333,7 @@ fn string_args_bad_utf8() {
     let i = 0u64;
     let j = 0u64;
 
-    let bad = vec![0x40u8, 0xFEu8];
+    let bad = [0x40u8, 0xFEu8];
     let s_vec = vec![
         vec![&bad[..], "hello".as_bytes(), "world".as_bytes()],
         vec![
@@ -354,7 +354,7 @@ fn string_args_bad_utf8() {
     ];
     tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
 
-    let bad = vec![0xF0u8, 0x28u8, 0x8Cu8, 0x28u8];
+    let bad = [0xF0u8, 0x28u8, 0x8Cu8, 0x28u8];
     let s_vec = vec![
         vec![
             "hi there!".as_bytes(),
@@ -375,7 +375,7 @@ fn string_args_bad_utf8() {
     ];
     tests.push(("0xcafe::test::str_vec_vec", args, abort_info()));
 
-    let bad = vec![0x60u8, 0xFFu8];
+    let bad = [0x60u8, 0xFFu8];
     let s_vec = vec![
         vec![
             "hi there!".as_bytes(),

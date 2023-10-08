@@ -15,7 +15,7 @@ fn main() {
     println!();
 
     let auth_key = AuthenticationKey::ed25519(&pubkey);
-    let account_addr = auth_key.derived_address();
+    let account_addr = auth_key.account_address();
 
     println!("Auth Key:");
     println!("{}", auth_key.to_encoded_string().unwrap());

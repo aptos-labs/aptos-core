@@ -194,32 +194,32 @@ impl TryFrom<ValidatorConfiguration> for Validator {
         };
 
         let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
-        let derived_address = auth_key.derived_address();
+        let account_address = auth_key.account_address();
         let owner_address = AccountAddress::from(config.owner_account_address);
-        if owner_address != derived_address {
+        if owner_address != account_address {
             return Err(anyhow::Error::msg(format!(
                 "owner_account_address {} does not match account key derived one {}",
-                owner_address, derived_address
+                owner_address, account_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
-        let derived_address = auth_key.derived_address();
+        let account_address = auth_key.account_address();
         let operator_address = AccountAddress::from(config.operator_account_address);
-        if operator_address != derived_address {
+        if operator_address != account_address {
             return Err(anyhow::Error::msg(format!(
                 "operator_account_address {} does not match account key derived one {}",
-                operator_address, derived_address
+                operator_address, account_address
             )));
         }
 
         let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
-        let derived_address = auth_key.derived_address();
+        let account_address = auth_key.account_address();
         let voter_address = AccountAddress::from(config.voter_account_address);
-        if voter_address != derived_address {
+        if voter_address != account_address {
             return Err(anyhow::Error::msg(format!(
                 "voter_account_address {} does not match account key derived one {}",
-                voter_address, derived_address
+                voter_address, account_address
             )));
         }
 

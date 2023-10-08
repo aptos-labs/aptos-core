@@ -14,9 +14,7 @@ use clap::Parser;
 #[derive(Parser, Clone)]
 pub struct ShardingConfig {
     #[clap(long)]
-    split_ledger_db: bool,
-    #[clap(long)]
-    use_sharded_state_merkle_db: bool,
+    enable_storage_sharding: bool,
 }
 
 #[derive(Parser)]
