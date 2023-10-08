@@ -174,7 +174,7 @@ Events and transactions pruning can be disabled via setting the [`enable_ledger_
 The REST API offers querying transactions and events in these ways:
 
 * [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
-* [A transaction by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
+* [Transaction by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
 * [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 
 ## Exchanging and tracking coins
