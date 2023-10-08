@@ -50,6 +50,7 @@ import {
   GetAccountTokensCount,
   GetAccountTransactionsCount,
 } from "../types/generated/queries";
+import { getTableItem } from "./general";
 
 export async function getInfo(args: { aptosConfig: AptosConfig; accountAddress: HexInput }): Promise<AccountData> {
   const { aptosConfig, accountAddress } = args;
@@ -146,6 +147,36 @@ export async function getResource(args: {
     params: { ledger_version: options?.ledgerVersion },
   });
   return data;
+}
+
+export async function lookupOriginalAccountAddress(args: {
+  aptosConfig: AptosConfig;
+  addressOrAuthKey: HexInput;
+  options?: LedgerVersion;
+}): Promise<Hex> {
+  const { aptosConfig, addressOrAuthKey, options } = args;
+  const resource = await getResource({
+    aptosConfig,
+    accountAddress: "0x1",
+    resourceType: "0x1::account::OriginatingAddress",
+    options,
+  });
+
+  const {
+    address_map: { handle },
+  } = resource.data as any;
+  const originalAddr = await getTableItem({
+    aptosConfig,
+    handle,
+    data: {
+      key: Hex.fromHexInput({ hexInput: addressOrAuthKey }).toString(),
+      key_type: "address",
+      value_type: "address",
+    },
+    options: options,
+  });
+
+  return Hex.fromHexInput({ hexInput: originalAddr });
 }
 
 export async function getAccountTokensCount(args: {

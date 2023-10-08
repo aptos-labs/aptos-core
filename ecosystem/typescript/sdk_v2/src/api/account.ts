@@ -35,7 +35,9 @@ import {
   getResource,
   getResources,
   getTransactions,
+  lookupOriginalAccountAddress,
 } from "../internal/account";
+import { Hex } from "../core/hex";
 
 /**
  * A class to query all `Account` related queries on Aptos.
@@ -168,6 +170,17 @@ export class Account {
   }): Promise<MoveResource> {
     const resource = await getResource({ aptosConfig: this.config, ...args });
     return resource;
+  }
+
+  /**
+   * Lookup the original address by the current derived address or authentication key
+   *
+   * @param args.addressOrAuthKey The derived address or authentication key
+   * @returns Promise<Hex> The original address
+   */
+  async lookupOriginalAccountAddress(args: { addressOrAuthKey: HexInput; options?: LedgerVersion }): Promise<Hex> {
+    const address = await lookupOriginalAccountAddress({ aptosConfig: this.config, ...args });
+    return address;
   }
 
   /**
