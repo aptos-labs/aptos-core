@@ -9,7 +9,7 @@ use crate::{
     logging::{LogEntry, LogSchema},
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use aptos_config::network_id::PeerNetworkId;
 use aptos_consensus_types::common::TransactionSummary;
 use aptos_logger::prelude::*;
 use aptos_types::account_address::AccountAddress;
@@ -273,43 +273,21 @@ impl TimelineIndex {
             .collect()
     }
 
-    pub(crate) fn insert(
-        &mut self,
-        txn: &mut MempoolTransaction,
-        peers: Option<Vec<PeerNetworkId>>,
-    ) {
-        if let Some(peers) = peers {
-            let mut timeline_ids = vec![];
-            for peer in peers {
-                self.timeline.insert(
-                    self.timeline_id,
-                    (
-                        txn.get_sender(),
-                        txn.sequence_info.transaction_sequence_number,
-                        Some(peer),
-                    ),
-                );
-                timeline_ids.push((peer, self.timeline_id));
-                self.timeline_id += 1;
-            }
-            txn.timeline_state = TimelineState::Ready(timeline_ids);
-        } else {
-            // TODO: remove Peers:All
+    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction, peers: Vec<PeerNetworkId>) {
+        let mut timeline_ids = vec![];
+        for peer in peers {
             self.timeline.insert(
                 self.timeline_id,
                 (
                     txn.get_sender(),
                     txn.sequence_info.transaction_sequence_number,
-                    None,
+                    Some(peer),
                 ),
             );
-            // TODO: so, this is bogus just to compile for now.
-            txn.timeline_state = TimelineState::Ready(vec![(
-                PeerNetworkId::new(NetworkId::Public, AccountAddress::ZERO),
-                self.timeline_id,
-            )]);
+            timeline_ids.push((peer, self.timeline_id));
             self.timeline_id += 1;
         }
+        txn.timeline_state = TimelineState::Ready(timeline_ids);
     }
 
     pub(crate) fn update(&mut self, txn: &mut MempoolTransaction, peers: Vec<PeerNetworkId>) {
@@ -465,11 +443,7 @@ impl MultiBucketTimelineIndex {
         self.timelines.get_mut(index).unwrap()
     }
 
-    pub(crate) fn insert(
-        &mut self,
-        txn: &mut MempoolTransaction,
-        peers: Option<Vec<PeerNetworkId>>,
-    ) {
+    pub(crate) fn insert(&mut self, txn: &mut MempoolTransaction, peers: Vec<PeerNetworkId>) {
         self.get_timeline(txn.ranking_score).insert(txn, peers);
     }
 

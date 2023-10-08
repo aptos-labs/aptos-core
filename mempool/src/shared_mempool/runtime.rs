@@ -7,7 +7,7 @@ use crate::{
     network::MempoolSyncMsg,
     shared_mempool::{
         broadcast_peers_selector::{
-            AllPeersSelector, BroadcastPeersSelector, FreshPeersSelector, PrioritizedPeersSelector,
+            BroadcastPeersSelector, FreshPeersSelector, PrioritizedPeersSelector,
         },
         coordinator::{coordinator, gc_coordinator, snapshot_job},
         types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
@@ -108,7 +108,6 @@ pub fn bootstrap(
     let broadcast_peers_selector = {
         let inner_selector: Box<dyn BroadcastPeersSelector> =
             match config.mempool.broadcast_peers_selector {
-                BroadcastPeersSelectorConfig::AllPeers => Box::new(AllPeersSelector::new()),
                 BroadcastPeersSelectorConfig::FreshPeers(max_selected_peers) => {
                     Box::new(FreshPeersSelector::new(max_selected_peers))
                 },

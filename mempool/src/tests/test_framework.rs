@@ -5,7 +5,7 @@
 use crate::{
     core_mempool::CoreMempool,
     shared_mempool::{
-        broadcast_peers_selector::{AllPeersSelector, BroadcastPeersSelector},
+        broadcast_peers_selector::{BroadcastPeersSelector, PrioritizedPeersSelector},
         start_shared_mempool,
         types::MultiBatchId,
     },
@@ -590,7 +590,8 @@ fn setup_mempool(
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair();
 
-    let inner_selector: Box<dyn BroadcastPeersSelector> = Box::new(AllPeersSelector::new());
+    let inner_selector: Box<dyn BroadcastPeersSelector> =
+        Box::new(PrioritizedPeersSelector::new(1));
     let broadcast_peers_selector = Arc::new(RwLock::new(inner_selector));
     let mempool = Arc::new(Mutex::new(CoreMempool::new(
         &config,

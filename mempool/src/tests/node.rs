@@ -6,7 +6,7 @@ use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::MempoolSyncMsg,
     shared_mempool::{
-        broadcast_peers_selector::{AllPeersSelector, BroadcastPeersSelector},
+        broadcast_peers_selector::{BroadcastPeersSelector, PrioritizedPeersSelector},
         start_shared_mempool,
         types::SharedMempoolNotification,
     },
@@ -603,7 +603,8 @@ fn start_node_mempool(
     Runtime,
     UnboundedReceiver<SharedMempoolNotification>,
 ) {
-    let inner_selector: Box<dyn BroadcastPeersSelector> = Box::new(AllPeersSelector::new());
+    let inner_selector: Box<dyn BroadcastPeersSelector> =
+        Box::new(PrioritizedPeersSelector::new(1));
     let broadcast_peers_selector = Arc::new(RwLock::new(inner_selector));
     let mempool = Arc::new(Mutex::new(CoreMempool::new(
         &config,

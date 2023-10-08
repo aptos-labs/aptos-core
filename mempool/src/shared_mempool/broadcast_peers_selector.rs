@@ -16,27 +16,9 @@ use std::{
     time::Duration,
 };
 
-pub enum SelectedPeers {
-    All,
-    Selected(Vec<PeerNetworkId>),
-    None,
-}
-
-impl From<Vec<PeerNetworkId>> for SelectedPeers {
-    fn from(peers: Vec<PeerNetworkId>) -> Self {
-        if peers.is_empty() {
-            SelectedPeers::None
-        } else {
-            SelectedPeers::Selected(peers)
-        }
-    }
-}
-
 pub trait BroadcastPeersSelector: Send + Sync {
     fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>);
-    // TODO: for backwards compatibility, an empty vector could mean we send to all?
-    // TODO: for all the tests, just added an empty vector, need to audit later
-    fn broadcast_peers(&self, account: &AccountAddress) -> SelectedPeers;
+    fn broadcast_peers(&self, account: &AccountAddress) -> Vec<PeerNetworkId>;
 }
 
 #[derive(Clone, Debug)]
@@ -92,24 +74,6 @@ impl PrioritizedPeersComparator {
     }
 }
 
-pub struct AllPeersSelector {}
-
-impl AllPeersSelector {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl BroadcastPeersSelector for AllPeersSelector {
-    fn update_peers(&mut self, _updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
-        // Do nothing
-    }
-
-    fn broadcast_peers(&self, _account: &AccountAddress) -> SelectedPeers {
-        SelectedPeers::All
-    }
-}
-
 pub struct PrioritizedPeersSelector {
     max_selected_peers: usize,
     prioritized_peers: Vec<PeerNetworkId>,
@@ -136,7 +100,7 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
             .collect();
     }
 
-    fn broadcast_peers(&self, _account: &AccountAddress) -> SelectedPeers {
+    fn broadcast_peers(&self, _account: &AccountAddress) -> Vec<PeerNetworkId> {
         let peers: Vec<_> = self
             .prioritized_peers
             .iter()
@@ -148,7 +112,7 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
             self.prioritized_peers.len(),
             peers
         );
-        peers.into()
+        peers
     }
 }
 
@@ -264,14 +228,8 @@ impl BroadcastPeersSelector for FreshPeersSelector {
         self.peers = HashSet::from_iter(self.sorted_peers.iter().map(|(peer, _version)| *peer));
     }
 
-    fn broadcast_peers(&self, account: &PeerId) -> SelectedPeers {
-        let peers = self.broadcast_peers_inner(account);
-        // TODO: remove SelectedPeers::All/None
-        if peers.is_empty() {
-            SelectedPeers::None
-        } else {
-            SelectedPeers::Selected(peers)
-        }
+    fn broadcast_peers(&self, account: &PeerId) -> Vec<PeerNetworkId> {
+        self.broadcast_peers_inner(account)
     }
 }
 

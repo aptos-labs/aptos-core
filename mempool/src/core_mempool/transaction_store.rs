@@ -16,8 +16,7 @@ use crate::{
     counters::{BROADCAST_BATCHED_LABEL, BROADCAST_READY_LABEL, CONSENSUS_READY_LABEL},
     logging::{LogEntry, LogEvent, LogSchema, TxnsLog},
     shared_mempool::{
-        broadcast_peers_selector::{BroadcastPeersSelector, SelectedPeers},
-        types::MultiBucketTimelineIndexIds,
+        broadcast_peers_selector::BroadcastPeersSelector, types::MultiBucketTimelineIndexIds,
     },
 };
 use aptos_config::{
@@ -100,7 +99,6 @@ impl TransactionStore {
     ) -> Self {
         // TODO: this is funky, get the selector to give us this value or whether things are full or not
         let num_peers_to_select = match config.broadcast_peers_selector {
-            BroadcastPeersSelectorConfig::AllPeers => 0,
             BroadcastPeersSelectorConfig::FreshPeers(n) => n,
             BroadcastPeersSelectorConfig::PrioritizedPeers(n) => n,
         };
@@ -471,26 +469,15 @@ impl TransactionStore {
 
                 let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
                 if process_broadcast_ready {
-                    match self
+                    let peers = self
                         .broadcast_peers_selector
                         .read()
-                        .broadcast_peers(address)
-                    {
-                        SelectedPeers::None => {
-                            self.ready_peers_needed_index
-                                .insert(TxnPointer::from(&txn.clone()));
-                        },
-                        SelectedPeers::All => {
-                            self.timeline_index.insert(txn, None);
-                        },
-                        SelectedPeers::Selected(peers) => {
-                            if peers.len() < self.num_peers_to_select {
-                                self.ready_peers_needed_index
-                                    .insert(TxnPointer::from(&txn.clone()));
-                            }
-                            self.timeline_index.insert(txn, Some(peers));
-                        },
+                        .broadcast_peers(address);
+                    if peers.len() < self.num_peers_to_select {
+                        self.ready_peers_needed_index
+                            .insert(TxnPointer::from(&txn.clone()));
                     }
+                    self.timeline_index.insert(txn, peers);
                 }
 
                 if process_ready {
@@ -818,18 +805,14 @@ impl TransactionStore {
                 self.get_mempool_txn(&txn_pointer.sender, txn_pointer.sequence_number)
             {
                 // TODO: optimize by only calling this once per sender, not txn? e.g., local cache
-                let selected_peers = self
+                let peers = self
                     .broadcast_peers_selector
                     .read()
                     .broadcast_peers(&txn_pointer.sender);
-                if let SelectedPeers::Selected(peers) = selected_peers {
-                    if peers.len() < self.num_peers_to_select {
-                        reinsert.push(TxnPointer::from(mempool_txn));
-                    }
-                    self.timeline_index.update(&mut mempool_txn.clone(), peers);
-                } else {
+                if peers.len() < self.num_peers_to_select {
                     reinsert.push(TxnPointer::from(mempool_txn));
                 }
+                self.timeline_index.update(&mut mempool_txn.clone(), peers);
             }
         }
         // TODO: Does it have to be a HashSet?

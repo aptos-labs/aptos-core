@@ -77,7 +77,7 @@ impl Default for MempoolConfig {
             eager_expire_threshold_ms: Some(10_000),
             eager_expire_time_ms: 3_000,
             peer_update_interval_ms: 1_000,
-            broadcast_peers_selector: BroadcastPeersSelectorConfig::AllPeers,
+            broadcast_peers_selector: BroadcastPeersSelectorConfig::PrioritizedPeers(1),
         }
     }
 }
@@ -151,7 +151,6 @@ impl ConfigOptimizer for MempoolConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BroadcastPeersSelectorConfig {
-    AllPeers,
     FreshPeers(usize),
     PrioritizedPeers(usize),
 }

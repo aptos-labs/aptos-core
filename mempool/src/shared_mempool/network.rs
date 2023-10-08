@@ -318,7 +318,6 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
         let retry_batch_id = state.broadcast_info.retry_batches.iter().next_back();
 
         let timeline_peer = match self.mempool_config.broadcast_peers_selector {
-            BroadcastPeersSelectorConfig::AllPeers => None,
             BroadcastPeersSelectorConfig::FreshPeers(_)
             | BroadcastPeersSelectorConfig::PrioritizedPeers(_) => Some(peer),
         };
