@@ -1293,6 +1293,7 @@ impl Client {
         let response = self.post_bcs(url, data).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
+
     pub async fn get_table_item_bcs_at_version<K: Serialize, T: DeserializeOwned>(
         &self,
         table_handle: AccountAddress,
