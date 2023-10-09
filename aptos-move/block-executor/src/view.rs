@@ -506,7 +506,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                             let patched_state_value = match res {
                                                 Ok((patched_state_value, delayed_field_keys)) => {
                                                     state.delayed_field_keys_in_resources.borrow_mut().insert(state_key.clone(), delayed_field_keys);
-                                                    // state.unsync_map.write(*state_key, patched_state_value, maybe_layout.clone().map(Arc::new));
+                                                    state.unsync_map.write(*state_key, patched_state_value, maybe_layout.map(|layout| Arc::new(layout.clone())));
                                                     Some(patched_state_value)
                                                 }
                                                 Err(err) => {
