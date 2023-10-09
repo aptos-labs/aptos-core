@@ -542,7 +542,7 @@ describe("Tests for the Serializable class", () => {
     );
   });
 
-  it("serializes and deserializes a FixedByte class correctly", () => {
+  it("serializes and deserializes a FixedBytes class correctly", () => {
     const address = AccountAddress.ONE;
     const fixedBytes = new FixedBytes(address.data);
     expect(fixedBytes.bcsToBytes()).toEqual(address.data);
