@@ -140,14 +140,6 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// In parallel execution, will be called once per transaction when the output is
     /// ready to be committed. In sequential execution, won't be called (deltas are
     /// materialized and incorporated during execution).
-    fn incorporate_delta_writes(
-        &self,
-        delta_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-    );
-
-    /// In parallel execution, will be called once per transaction when the output is
-    /// ready to be committed. In sequential execution, won't be called (deltas are
-    /// materialized and incorporated during execution).
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,

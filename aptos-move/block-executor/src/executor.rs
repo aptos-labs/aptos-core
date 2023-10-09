@@ -1011,10 +1011,10 @@ where
                         &latest_view,
                     );
 
-                    // No delta writes are needed for sequential execution.
                     output.incorporate_materialized_txn_output(
+                        // No aggregator v1 delta writes are needed for sequential execution.
                         vec![],
-                        HashMap::new(),
+                        patched_resource_write_set,
                         patched_events,
                     );
 
