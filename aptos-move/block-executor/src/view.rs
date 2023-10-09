@@ -45,7 +45,7 @@ use move_vm_types::{
 };
 use std::{
     cell::RefCell,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fmt::Debug,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -283,6 +283,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X, T::Identifier>,
+    pub(crate) delayed_field_keys_in_resources: RefCell<HashMap<T::Key, HashSet<T::Identifier>>>,
     pub(crate) counter: &'a RefCell<u32>,
 }
 
@@ -322,6 +323,25 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ViewState::Unsync(_) => {
                 unreachable!("Take reads called in sequential setting (not captured)")
             },
+        }
+    }
+
+    pub(crate) fn read_set_sequential_execution(
+        &self,
+    ) -> RefCell<HashMap<T::Key, HashSet<T::Identifier>>> {
+        match &self.latest_view {
+            ViewState::Sync(_) => unreachable!("Take reads called in parallel setting"),
+            ViewState::Unsync(state) => state.delayed_field_keys_in_resources.clone(),
+        }
+    }
+
+    pub(crate) fn fetch_from_unsync_map(
+        &self,
+        key: T::Key,
+    ) -> Option<(Arc<T::Value>, Option<Arc<MoveTypeLayout>>)> {
+        match &self.latest_view {
+            ViewState::Sync(_) => None,
+            ViewState::Unsync(state) => state.unsync_map.fetch_data(&key),
         }
     }
 
@@ -472,10 +492,48 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 }
             },
             ViewState::Unsync(state) => {
-                let ret = state.unsync_map.fetch_data(state_key).map_or_else(
-                    || self.get_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                );
+                let ret = match state.unsync_map.fetch_data(state_key) {
+                    // TODO: Should we ignore the layout from fetch_data?
+                    // What if it doesn't match with the maybe_layout given as input to this function?
+                    Some((v, _)) => Ok(v.as_state_value()),
+                    None => {
+                        self.get_base_value(state_key).map(
+                            |maybe_state_value| {
+                                if let ReadKind::Value = kind {
+                                    match (maybe_state_value, maybe_layout) {
+                                        (Some(state_value), Some(layout)) => {
+                                            let res = self.replace_values_with_identifiers(state_value, layout);
+                                            let patched_state_value = match res {
+                                                Ok((patched_state_value, delayed_field_keys)) => {
+                                                    state.delayed_field_keys_in_resources.borrow_mut().insert(state_key.clone(), delayed_field_keys);
+                                                    // state.unsync_map.write(*state_key, patched_state_value, maybe_layout.clone().map(Arc::new));
+                                                    Some(patched_state_value)
+                                                }
+                                                Err(err) => {
+                                                    let log_context = AdapterLogSchema::new(
+                                                        self.base_view.id(),
+                                                        self.txn_idx as usize,
+                                                    );
+                                                    alert!(
+                                                        log_context,
+                                                        "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
+                                                        state_key,
+                                                        err
+                                                    );
+                                                    None
+                                                }
+                                            };
+                                            patched_state_value
+                                        },
+                                        (maybe_state_value, _) => {maybe_state_value}
+                                    }
+                                } else {
+                                    maybe_state_value
+                                }
+                            }
+                        )
+                    },
+                };
                 ret.map(|maybe_state_value| match kind {
                     // TODO: check if we need to track layout for unsync
                     ReadKind::Value => ReadResult::Value(maybe_state_value, None),
@@ -567,7 +625,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             },
             ViewState::Unsync(state) => state.unsync_map.fetch_data(state_key).map_or_else(
                 || self.get_base_value(state_key),
-                |v| Ok(v.as_state_value()),
+                |(v, _)| Ok(v.as_state_value()),
             ),
         }
     }

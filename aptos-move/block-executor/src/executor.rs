@@ -40,6 +40,7 @@ use aptos_types::{
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use bytes::Bytes;
 use claims::assert_none;
+use move_core_types::value::MoveTypeLayout;
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -433,14 +434,12 @@ where
         }
     }
 
-    fn map_id_to_values_in_read_write_set(
-        txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+    // For each delayed field in resource write set, replace the identifiers with values.
+    fn map_id_to_values_in_write_set(
+        resource_write_set: Option<HashMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>>,
         latest_view: &LatestView<T, S, X>,
-    ) -> HashMap<T::Key, T::Value> {
-        // For each delayed field in resource write set, replace the identifiers with values.
+    ) -> (HashMap<T::Key, T::Value>, HashSet<T::Key>) {
         let mut write_set_keys = HashSet::new();
-        let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let mut patched_resource_write_set = HashMap::new();
         if let Some(resource_write_set) = resource_write_set {
             for (key, (write_op, layout)) in resource_write_set.iter() {
@@ -461,14 +460,50 @@ where
                 }
             }
         }
+        (patched_resource_write_set, write_set_keys)
+    }
 
-        // For each resource that satisfies the following conditions,
-        //     1. Resource is in read set
-        //     2. Resource is not in write set
-        // replace the delayed field identifiers in the resource with corresponding values.
-        // If any of the delayed field identifiers in the resource are part of delayed_field_write_set,
-        // then include the resource in the write set.
-        let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
+    // Parse the input `value` and replace delayed field identifiers with
+    // corresponding values
+    fn replace_ids_with_values(
+        value: Arc<T::Value>,
+        layout: &MoveTypeLayout,
+        latest_view: &LatestView<T, S, X>,
+        delayed_field_keys: &HashSet<T::Identifier>,
+    ) -> Option<T::Value> {
+        if let Some(value_bytes) = value.bytes() {
+            match latest_view.replace_identifiers_with_values(value_bytes, layout) {
+                Ok((patched_bytes, delayed_field_keys_in_resource)) => {
+                    if !delayed_field_keys.is_disjoint(&delayed_field_keys_in_resource) {
+                        let mut patched_value = value.as_ref().clone();
+                        patched_value.set_bytes(patched_bytes);
+                        Some(patched_value)
+                    } else {
+                        None
+                    }
+                },
+                Err(_) => unreachable!("Failed to replace identifiers with values in read set"),
+            }
+        } else {
+            // TODO: Is this unreachable?
+            unreachable!("Data read value must exist");
+        }
+    }
+
+    // For each resource that satisfies the following conditions,
+    //     1. Resource is in read set
+    //     2. Resource is not in write set
+    // replace the delayed field identifiers in the resource with corresponding values.
+    // If any of the delayed field identifiers in the resource are part of delayed_field_write_set,
+    // then include the resource in the write set.
+    fn map_id_to_values_in_read_set_parallel(
+        txn_idx: TxnIndex,
+        delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
+        write_set_keys: HashSet<T::Key>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        latest_view: &LatestView<T, S, X>,
+    ) -> HashMap<T::Key, T::Value> {
+        let mut patched_resource_write_set = HashMap::new();
         if let Some(delayed_field_keys) = delayed_field_keys {
             let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
             let read_set = last_input_output.read_set(txn_idx);
@@ -479,26 +514,46 @@ where
                     }
                     // layout is Some(_) if it contains an delayed field
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                        if let Some(value_bytes) = value.bytes() {
-                            match latest_view.replace_identifiers_with_values(value_bytes, layout) {
-                                Ok((patched_bytes, delayed_field_keys_in_resource)) => {
-                                    if !delayed_field_keys
-                                        .is_disjoint(&delayed_field_keys_in_resource)
-                                    {
-                                        let mut patched_value = value.as_ref().clone();
-                                        patched_value.set_bytes(patched_bytes);
-                                        patched_resource_write_set
-                                            .insert(key.clone(), patched_value);
-                                    }
-                                },
-                                Err(_) => unreachable!(
-                                    "Failed to replace identifiers with values in read set"
-                                ),
-                            };
-                        } else {
-                            // TODO: Is this unreachable?
-                            unreachable!("Data read value must exist");
+                        if let Some(patched_value) = Self::replace_ids_with_values(
+                            value.clone(),
+                            layout,
+                            latest_view,
+                            &delayed_field_keys,
+                        ) {
+                            patched_resource_write_set.insert(key.clone(), patched_value);
                         }
+                    }
+                }
+            }
+        }
+        patched_resource_write_set
+    }
+
+    fn map_id_to_values_in_read_set_sequential(
+        delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
+        write_set_keys: HashSet<T::Key>,
+        read_set: RefCell<HashMap<T::Key, HashSet<T::Identifier>>>,
+        latest_view: &LatestView<T, S, X>,
+    ) -> HashMap<T::Key, T::Value> {
+        let mut patched_resource_write_set = HashMap::new();
+        if let Some(delayed_field_keys) = delayed_field_keys {
+            let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
+            for (key, delayed_field_keys_in_resource) in read_set.borrow().iter() {
+                if write_set_keys.contains(key)
+                    || delayed_field_keys.is_disjoint(delayed_field_keys_in_resource)
+                {
+                    continue;
+                }
+                // layout is Some(_) if it contains an delayed field
+                if let Some((value, Some(layout))) = latest_view.fetch_from_unsync_map(key.clone())
+                {
+                    if let Some(patched_value) = Self::replace_ids_with_values(
+                        value.clone(),
+                        &layout,
+                        latest_view,
+                        &delayed_field_keys,
+                    ) {
+                        patched_resource_write_set.insert(key.clone(), patched_value);
                     }
                 }
             }
@@ -508,11 +563,9 @@ where
 
     // For each delayed field in the event, replace delayed field identifier with value.
     fn map_id_to_values_events(
-        txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
         latest_view: &LatestView<T, S, X>,
     ) -> Vec<T::Event> {
-        let events = last_input_output.events(txn_idx);
         let mut patched_events = vec![];
         for (event, layout) in events {
             if let Some(layout) = layout {
@@ -594,10 +647,22 @@ where
     ) {
         let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
-        let patched_resource_write_set =
-            Self::map_id_to_values_in_read_write_set(txn_idx, last_input_output, &latest_view);
-        let patched_events =
-            Self::map_id_to_values_events(txn_idx, last_input_output, &latest_view);
+        let resource_write_set = last_input_output.resource_write_set(txn_idx);
+        let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
+        // let read_set = last_input_output.read_set(txn_idx).map(|read_set| read_set.);
+
+        let (mut patched_resource_write_set, write_set_keys) =
+            Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
+        patched_resource_write_set.extend(Self::map_id_to_values_in_read_set_parallel(
+            txn_idx,
+            delayed_field_keys,
+            write_set_keys,
+            last_input_output,
+            &latest_view,
+        ));
+
+        let events = last_input_output.events(txn_idx);
+        let patched_events = Self::map_id_to_values_events(events, &latest_view);
         let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
             txn_idx,
             last_input_output,
@@ -813,6 +878,72 @@ where
         }
     }
 
+    fn apply_delayed_field_writes_sequential(
+        unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
+        output: &E::Output,
+    ) {
+        for (key, (write_op, layout)) in output.resource_write_set().into_iter() {
+            unsync_map.write(key, write_op, layout);
+        }
+
+        for (key, write_op) in output
+            .aggregator_v1_write_set()
+            .into_iter()
+            .chain(output.module_write_set().into_iter())
+        {
+            unsync_map.write(key, write_op, None);
+        }
+
+        // TODO for materialization, we need to understand what we read,
+        // or do exchange on every transaction, so this logic might change
+        let mut second_phase = Vec::new();
+        let mut updates = HashMap::new();
+        for (id, change) in output.delayed_field_change_set().into_iter() {
+            match change {
+                DelayedChange::Create(value) => {
+                    assert_none!(
+                        unsync_map.fetch_delayed_field(&id),
+                        "Sequential execution must not create duplicate aggregators"
+                    );
+                    updates.insert(id, value);
+                },
+                DelayedChange::Apply(apply) => {
+                    match apply.get_apply_base_id(&id) {
+                        ApplyBase::Previous(base_id) => {
+                            updates.insert(
+                                id,
+                                expect_ok(apply.apply_to_base(
+                                    unsync_map.fetch_delayed_field(&base_id).unwrap(),
+                                ))
+                                .unwrap(),
+                            );
+                        },
+                        ApplyBase::Current(base_id) => {
+                            second_phase.push((id, base_id, apply));
+                        },
+                    };
+                },
+            }
+        }
+        for (id, base_id, apply) in second_phase.into_iter() {
+            updates.insert(
+                id,
+                expect_ok(
+                    apply.apply_to_base(
+                        updates
+                            .get(&base_id)
+                            .cloned()
+                            .unwrap_or_else(|| unsync_map.fetch_delayed_field(&base_id).unwrap()),
+                    ),
+                )
+                .unwrap(),
+            );
+        }
+        for (id, value) in updates.into_iter() {
+            unsync_map.write_delayed_field(id, value);
+        }
+    }
+
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
@@ -825,20 +956,21 @@ where
         drop(init_timer);
 
         let counter = RefCell::new(0);
-        let data_map = UnsyncMap::new();
+        let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_fee_statement = FeeStatement::zero();
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let unsync_view = LatestView::<T, S, X>::new(
+            let latest_view = LatestView::<T, S, X>::new(
                 base_view,
                 ViewState::Unsync(SequentialState {
-                    unsync_map: &data_map,
+                    unsync_map: &unsync_map,
                     counter: &counter,
+                    delayed_field_keys_in_resources: RefCell::new(HashMap::new()),
                 }),
                 idx as TxnIndex,
             );
-            let res = executor.execute_transaction(&unsync_view, txn, idx as TxnIndex, true);
+            let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, true);
 
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
@@ -848,71 +980,43 @@ where
                         0,
                         "Sequential execution must materialize deltas"
                     );
-                    // Apply the writes.
-                    for (key, write_op) in output
-                        .resource_write_set()
-                        .into_iter()
-                        .map(|(k, (v, _))| (k, v))
-                        .chain(output.aggregator_v1_write_set().into_iter())
-                        .chain(output.module_write_set().into_iter())
-                    {
-                        data_map.write(key, write_op);
-                    }
 
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
                     accumulated_fee_statement.add_fee_statement(&fee_statement);
                     counters::update_sequential_txn_gas_counters(&fee_statement);
 
-                    // TODO for materialization, we need to understand what we read,
-                    // or do exchange on every transaction, so this logic might change
-                    let mut second_phase = Vec::new();
-                    let mut updates = HashMap::new();
-                    for (id, change) in output.delayed_field_change_set().into_iter() {
-                        match change {
-                            DelayedChange::Create(value) => {
-                                assert_none!(
-                                    data_map.fetch_delayed_field(&id),
-                                    "Sequential execution must not create duplicate aggregators"
-                                );
-                                updates.insert(id, value);
-                            },
-                            DelayedChange::Apply(apply) => {
-                                match apply.get_apply_base_id(&id) {
-                                    ApplyBase::Previous(base_id) => {
-                                        updates.insert(
-                                            id,
-                                            expect_ok(apply.apply_to_base(
-                                                data_map.fetch_delayed_field(&base_id).unwrap(),
-                                            ))
-                                            .unwrap(),
-                                        );
-                                    },
-                                    ApplyBase::Current(base_id) => {
-                                        second_phase.push((id, base_id, apply));
-                                    },
-                                };
-                            },
-                        }
-                    }
-                    for (id, base_id, apply) in second_phase.into_iter() {
-                        updates.insert(
-                            id,
-                            expect_ok(apply.apply_to_base(
-                                updates.get(&base_id).cloned().unwrap_or_else(|| {
-                                    data_map.fetch_delayed_field(&base_id).unwrap()
-                                }),
-                            ))
-                            .unwrap(),
-                        );
-                    }
-                    for (id, value) in updates.into_iter() {
-                        data_map.write_delayed_field(id, value);
-                    }
+                    // Apply the writes.
+                    Self::apply_delayed_field_writes_sequential(&unsync_map, &output);
+
+                    // Replace delayed field id with values in resource write set and read set.
+                    let delayed_field_keys = Some(output.delayed_field_change_set().into_keys());
+                    let resource_change_set = Some(output.resource_write_set());
+                    let (mut patched_resource_write_set, write_set_keys) =
+                        Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
+
+                    let read_set = latest_view.read_set_sequential_execution();
+                    patched_resource_write_set.extend(
+                        Self::map_id_to_values_in_read_set_sequential(
+                            delayed_field_keys,
+                            write_set_keys,
+                            read_set,
+                            &latest_view,
+                        ),
+                    );
+
+                    // Replace delayed field id with values in events
+                    let patched_events = Self::map_id_to_values_events(
+                        Box::new(output.get_events().into_iter()),
+                        &latest_view,
+                    );
 
                     // No delta writes are needed for sequential execution.
-                    // TODO: Should we replace this with output.incorporate_materialized_txn_output(..)?
-                    output.incorporate_delta_writes(vec![]);
+                    output.incorporate_materialized_txn_output(
+                        vec![],
+                        HashMap::new(),
+                        patched_events,
+                    );
 
                     //
                     if let Some(commit_hook) = &self.transaction_commit_hook {
