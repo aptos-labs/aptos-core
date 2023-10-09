@@ -2016,7 +2016,7 @@ fn name_access_chain(
                 check_for_deprecated_member_use(context, Some(mident), n, deprecated_item_kind);
             },
             EN::Name(n) => {
-                check_for_deprecated_member_use(context, None, &n, deprecated_item_kind);
+                check_for_deprecated_member_use(context, None, n, deprecated_item_kind);
             },
         };
     };
