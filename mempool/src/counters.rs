@@ -510,6 +510,13 @@ pub static SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS: Lazy<Histogram> = Lazy::new(
     )
 });
 
+pub static SHARED_MEMPOOL_SELECTOR_CHURN_RATE: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_shared_mempool_selector_churn_rate",
+        "Churn rate of peers for broadcast",
+    )
+});
+
 static TASK_SPAWN_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_mempool_bounded_executor_spawn_latency",

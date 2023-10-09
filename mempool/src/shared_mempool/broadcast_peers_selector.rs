@@ -236,11 +236,17 @@ impl BroadcastPeersSelector for FreshPeersSelector {
         peer_versions.iter().filter(|(_peer, version)| max_version - *version > self.version_threshold).for_each(|(peer, version)| {
             warn!("fresh_peers: peer {} has version {} which is more than {} behind max version {}", peer, version, self.version_threshold, max_version);
         });
+        // TODO: instead, we need to keep peers if there are less than num_peers_to_select
+        // TODO: this probably means we should change the ordering to descending order, then iterate
         peer_versions.retain(|(_peer, version)| max_version - *version <= self.version_threshold);
         counters::SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS.observe(peer_versions.len() as f64);
 
+        let new_peers = HashSet::from_iter(peer_versions.iter().map(|(peer, _version)| *peer));
+        counters::SHARED_MEMPOOL_SELECTOR_CHURN_RATE
+            .observe(self.peers.difference(&new_peers).count() as f64 / self.peers.len() as f64);
+
         self.sorted_peers = peer_versions;
-        self.peers = HashSet::from_iter(self.sorted_peers.iter().map(|(peer, _version)| *peer));
+        self.peers = new_peers;
     }
 
     fn broadcast_peers(&self, account: &PeerId) -> Vec<PeerNetworkId> {
