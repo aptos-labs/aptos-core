@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Deserializable, Deserializer } from "../../src/bcs/deserializer";
-import { Bool, U128, U16, U256, U32, U64, U8 } from "../../src/bcs/move-types/primitives";
-import { MoveObject, MoveOption, MoveString, MoveVector } from "../../src/bcs/move-types/structs";
+import { FixedBytes } from "../../src/bcs/serializable/fixed-bytes";
+import { Bool, U128, U16, U256, U32, U64, U8 } from "../../src/bcs/serializable/move-primitives";
+import { MoveObject, MoveOption, MoveString, MoveVector } from "../../src/bcs/serializable/move-structs";
 import { Serializable, Serializer } from "../../src/bcs/serializer";
 import { AccountAddress } from "../../src/core";
 
@@ -539,5 +540,14 @@ describe("Tests for the Serializable class", () => {
     expect(deserializedComplexSerializable.myOptionString.value!.value).toEqual(
       complexSerializable.myOptionString.value!.value,
     );
+  });
+
+  it("serializes and deserializes a FixedByte class correctly", () => {
+    const address = AccountAddress.ONE;
+    const fixedBytes = new FixedBytes(address.data);
+    expect(fixedBytes.bcsToBytes()).toEqual(address.data);
+    const deserializer = new Deserializer(fixedBytes.bcsToBytes());
+    const deserializedFixedBytes = FixedBytes.deserialize(deserializer, AccountAddress.LENGTH);
+    expect(deserializedFixedBytes.value).toEqual(address.data);
   });
 });
