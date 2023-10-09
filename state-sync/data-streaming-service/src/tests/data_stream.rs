@@ -37,7 +37,7 @@ use aptos_data_client::{
 use aptos_id_generator::U64IdGenerator;
 use aptos_infallible::Mutex;
 use aptos_storage_service_types::responses::CompleteDataRange;
-use aptos_time_service::TimeService;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::SparseMerkleRangeProof,
@@ -47,7 +47,7 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use claims::{assert_err, assert_ge, assert_matches, assert_none, assert_ok};
+use claims::{assert_err, assert_ge, assert_matches, assert_none, assert_ok, assert_some};
 use futures::{FutureExt, StreamExt};
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
@@ -407,19 +407,19 @@ async fn test_continuous_stream_epoch_change_retry() {
     };
 
     // Test all types of continuous data streams
-    let (data_stream_1, _stream_listener_1) = create_continuous_transaction_stream(
+    let (data_stream_1, _stream_listener_1, _) = create_continuous_transaction_stream(
         AptosDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION,
         MIN_ADVERTISED_EPOCH_END,
     );
-    let (data_stream_2, _stream_listener_2) = create_continuous_transaction_output_stream(
+    let (data_stream_2, _stream_listener_2, _) = create_continuous_transaction_output_stream(
         AptosDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
         MIN_ADVERTISED_EPOCH_END,
     );
-    let (data_stream_3, _stream_listener_3) = create_continuous_transaction_or_output_stream(
+    let (data_stream_3, _stream_listener_3, _) = create_continuous_transaction_or_output_stream(
         AptosDataClientConfig::default(),
         streaming_service_config,
         MIN_ADVERTISED_TRANSACTION_OUTPUT,
@@ -482,8 +482,13 @@ async fn test_continuous_stream_optimistic_fetch_retry() {
         AptosDataClientConfig::default(),
         streaming_service_config,
     );
-    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in
-        continuous_data_streams
+    for (
+        mut data_stream,
+        mut stream_listener,
+        _,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ) in continuous_data_streams
     {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
@@ -588,8 +593,13 @@ async fn test_continuous_stream_subscription_failures() {
         AptosDataClientConfig::default(),
         streaming_service_config,
     );
-    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in
-        continuous_data_streams
+    for (
+        mut data_stream,
+        mut stream_listener,
+        _,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ) in continuous_data_streams
     {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
@@ -699,6 +709,482 @@ async fn test_continuous_stream_subscription_failures() {
 }
 
 #[tokio::test]
+async fn test_continuous_stream_subscription_lag() {
+    // Create a test streaming service config with subscriptions enabled
+    let max_concurrent_requests = 3;
+    let max_subscription_stream_lag_secs = 10;
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_subscription_stream_lag_secs,
+        max_concurrent_requests,
+        ..Default::default()
+    };
+
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+    );
+    for (
+        mut data_stream,
+        mut stream_listener,
+        time_service,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ) in continuous_data_streams
+    {
+        // Initialize the data stream
+        let mut global_data_summary = create_global_data_summary(1);
+        initialize_data_requests(&mut data_stream, &global_data_summary);
+
+        // Fetch the subscription stream ID from the first pending request
+        let subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
+
+        // Verify the pending subscription requests
+        verify_pending_subscription_requests(
+            &mut data_stream,
+            max_concurrent_requests,
+            allow_transactions_or_outputs,
+            transactions_only,
+            0,
+            subscription_stream_id,
+            0,
+        );
+
+        // Update the global data summary to be ahead of the subscription stream
+        let highest_advertised_version = MAX_ADVERTISED_TRANSACTION + 1000;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_advertised_version - 900; // Behind the advertised version
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Update the global data summary to be further ahead of the subscription stream
+        let highest_advertised_version = MAX_ADVERTISED_TRANSACTION + 2000;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Elapse some time (but not enough for the stream to be killed)
+        let time_service = time_service.into_mock();
+        time_service.advance_secs(max_subscription_stream_lag_secs / 2);
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_advertised_version - 1000; // Further behind the advertised
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Elapse enough time for the stream to be killed
+        time_service.advance_secs(max_subscription_stream_lag_secs);
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_advertised_version - 901; // Behind the initial lag
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify that we no longer have pending subscription requests (the stream was killed)
+        let client_request = get_pending_client_request(&mut data_stream, 0);
+        assert!(!client_request.is_subscription_request());
+
+        // Verify that the subscription stream lag has been reset
+        assert!(data_stream.get_subscription_stream_lag().is_none());
+    }
+}
+
+#[tokio::test]
+async fn test_continuous_stream_subscription_lag_bounded() {
+    // Create a test streaming service config with subscriptions enabled
+    let max_subscription_stream_lag_secs = 10;
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_subscription_stream_lag_secs,
+        ..Default::default()
+    };
+
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+    );
+    for (mut data_stream, mut stream_listener, time_service, transactions_only, _) in
+        continuous_data_streams
+    {
+        // Initialize the data stream
+        let mut global_data_summary = create_global_data_summary(1);
+        initialize_data_requests(&mut data_stream, &global_data_summary);
+
+        // Update the global data summary to be ahead of the subscription stream
+        let highest_advertised_version = MAX_ADVERTISED_TRANSACTION + 500;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_advertised_version - 300; // Behind the advertised version
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify the stream is now tracking the subscription lag
+        let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+        assert_eq!(
+            subscription_stream_lag.version_lag,
+            highest_advertised_version - highest_response_version
+        );
+
+        // Elapse enough time for the stream to be killed
+        let time_service = time_service.into_mock();
+        time_service.advance_secs(max_subscription_stream_lag_secs);
+
+        // Update the global data summary to be further ahead (by 1)
+        let highest_advertised_version = highest_advertised_version + 1;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_response_version + 1; // Still behind, but not worse
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Elapse enough time for the stream to be killed (again)
+        time_service.advance_secs(max_subscription_stream_lag_secs);
+
+        // Update the global data summary to be further ahead (by 10)
+        let highest_advertised_version = highest_advertised_version + 10;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_response_version + 10; // Still behind, but not worse
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Elapse enough time for the stream to be killed (again)
+        time_service.advance_secs(max_subscription_stream_lag_secs);
+
+        // Update the global data summary to be further ahead (by 100)
+        let highest_advertised_version = highest_advertised_version + 100;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_response_version + 101; // Still behind, but slightly better
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify the state of the subscription stream lag
+        let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+        assert_eq!(
+            subscription_stream_lag.version_lag,
+            highest_advertised_version - highest_response_version
+        );
+
+        // Update the global data summary to be further ahead (by 100)
+        let highest_advertised_version = highest_advertised_version + 100;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_response_version + 150; // Still behind, but slightly better
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify the state of the subscription stream lag
+        let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+        assert_eq!(
+            subscription_stream_lag.version_lag,
+            highest_advertised_version - highest_response_version
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_continuous_stream_subscription_lag_catch_up() {
+    // Create a test streaming service config with subscriptions enabled
+    let max_concurrent_requests = 3;
+    let max_subscription_stream_lag_secs = 10;
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_subscription_stream_lag_secs,
+        max_concurrent_requests,
+        ..Default::default()
+    };
+
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+    );
+    for (
+        mut data_stream,
+        mut stream_listener,
+        time_service,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ) in continuous_data_streams
+    {
+        // Initialize the data stream
+        let mut global_data_summary = create_global_data_summary(1);
+        initialize_data_requests(&mut data_stream, &global_data_summary);
+
+        // Fetch the subscription stream ID from the first pending request
+        let subscription_stream_id = get_subscription_stream_id(&mut data_stream, 0);
+
+        // Update the global data summary to be ahead of the subscription stream
+        let highest_advertised_version = MAX_ADVERTISED_TRANSACTION + 1000;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_advertised_version - 500; // Behind the advertised version
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify the stream is now tracking the subscription lag
+        let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+        assert_eq!(subscription_stream_lag.start_time, time_service.now());
+        assert_eq!(
+            subscription_stream_lag.version_lag,
+            highest_advertised_version - highest_response_version
+        );
+
+        // Elapse enough time for the stream to be killed
+        let time_service = time_service.into_mock();
+        time_service.advance_secs(max_subscription_stream_lag_secs);
+
+        // Update the global data summary to be further ahead (by 1)
+        let highest_advertised_version = highest_advertised_version + 1;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_response_version + 1; // Still behind, but not worse
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify that we still have pending subscription requests (the stream hasn't fallen further behind)
+        verify_pending_subscription_requests(
+            &mut data_stream,
+            max_concurrent_requests,
+            allow_transactions_or_outputs,
+            transactions_only,
+            2,
+            subscription_stream_id,
+            0,
+        );
+
+        // Verify the state of the subscription stream lag
+        let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+        assert_eq!(
+            subscription_stream_lag.version_lag,
+            highest_advertised_version - highest_response_version
+        );
+
+        // Set a valid response for the first subscription request and process it
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_advertised_version, // Catch the stream up to the advertised version
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify that the subscription stream lag has now been reset (the stream caught up)
+        assert!(data_stream.get_subscription_stream_lag().is_none());
+    }
+}
+
+#[tokio::test]
+async fn test_continuous_stream_subscription_lag_time() {
+    // Create a test streaming service config with subscriptions enabled
+    let max_subscription_stream_lag_secs = 100;
+    let streaming_service_config = DataStreamingServiceConfig {
+        enable_subscription_streaming: true,
+        max_subscription_stream_lag_secs,
+        ..Default::default()
+    };
+
+    // Test all types of continuous data streams
+    let continuous_data_streams = enumerate_continuous_data_streams(
+        AptosDataClientConfig::default(),
+        streaming_service_config,
+    );
+    for (mut data_stream, mut stream_listener, time_service, transactions_only, _) in
+        continuous_data_streams
+    {
+        // Initialize the data stream
+        let mut global_data_summary = create_global_data_summary(1);
+        initialize_data_requests(&mut data_stream, &global_data_summary);
+
+        // Update the global data summary to be ahead of the subscription stream
+        let highest_advertised_version = MAX_ADVERTISED_TRANSACTION + 1000;
+        global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+            highest_advertised_version,
+            MAX_ADVERTISED_EPOCH_END,
+            false,
+        )];
+
+        // Set a valid response for the first subscription request and process it
+        let highest_response_version = highest_advertised_version - 200; // Behind the advertised version
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version,
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify the stream is now tracking the subscription lag
+        let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+        assert_eq!(subscription_stream_lag.start_time, time_service.now());
+        assert_eq!(
+            subscription_stream_lag.version_lag,
+            highest_advertised_version - highest_response_version
+        );
+
+        // Elapse some time (but not enough for the stream to be killed)
+        let time_service = time_service.into_mock();
+        time_service.advance_secs(max_subscription_stream_lag_secs / 10);
+
+        // Go through several iterations of being behind, but not lagging for too long
+        for _ in 0..5 {
+            // Update the global data summary to be further ahead (by 1)
+            let highest_advertised_version = highest_advertised_version + 1;
+            global_data_summary.advertised_data.synced_ledger_infos = vec![create_ledger_info(
+                highest_advertised_version,
+                MAX_ADVERTISED_EPOCH_END,
+                false,
+            )];
+
+            // Elapse some time (but not enough for the stream to be killed)
+            time_service.advance_secs(max_subscription_stream_lag_secs / 10);
+
+            // Set a valid response for the first subscription request and process it
+            let highest_response_version = highest_response_version + 1; // Still behind, but not worse
+            set_new_data_response_in_queue(
+                &mut data_stream,
+                0,
+                highest_response_version,
+                transactions_only,
+            );
+            process_data_responses(&mut data_stream, &global_data_summary).await;
+            assert_some!(stream_listener.select_next_some().now_or_never());
+
+            // Verify the state of the subscription stream lag
+            let subscription_stream_lag = data_stream.get_subscription_stream_lag().unwrap();
+            assert_eq!(
+                subscription_stream_lag.version_lag,
+                highest_advertised_version - highest_response_version
+            );
+        }
+
+        // Elapse enough time for the stream to be killed
+        time_service.advance_secs(max_subscription_stream_lag_secs);
+
+        // Set a valid response for the first subscription request and process it
+        set_new_data_response_in_queue(
+            &mut data_stream,
+            0,
+            highest_response_version - 1, // Even further behind the last iteration
+            transactions_only,
+        );
+        process_data_responses(&mut data_stream, &global_data_summary).await;
+        assert_some!(stream_listener.select_next_some().now_or_never());
+
+        // Verify that the subscription stream lag has now been reset (the stream was killed)
+        assert!(data_stream.get_subscription_stream_lag().is_none());
+    }
+}
+
+#[tokio::test]
 async fn test_continuous_stream_subscription_max() {
     // Create a test streaming service config with subscriptions enabled
     let max_concurrent_requests = 3;
@@ -715,7 +1201,7 @@ async fn test_continuous_stream_subscription_max() {
         AptosDataClientConfig::default(),
         streaming_service_config,
     );
-    for (mut data_stream, _stream_listener, transactions_only, allow_transactions_or_outputs) in
+    for (mut data_stream, _stream_listener, _, transactions_only, allow_transactions_or_outputs) in
         continuous_data_streams
     {
         // Initialize the data stream
@@ -1044,7 +1530,10 @@ fn create_state_value_stream(
         version,
         start_index: 0,
     });
-    create_data_stream(data_client_config, streaming_service_config, stream_request)
+    let (data_stream, data_stream_listener, _) =
+        create_data_stream(data_client_config, streaming_service_config, stream_request);
+
+    (data_stream, data_stream_listener)
 }
 
 /// Creates an epoch ending stream starting at `start_epoch`
@@ -1058,7 +1547,10 @@ fn create_epoch_ending_stream(
         StreamRequest::GetAllEpochEndingLedgerInfos(GetAllEpochEndingLedgerInfosRequest {
             start_epoch,
         });
-    create_data_stream(data_client_config, streaming_service_config, stream_request)
+    let (data_stream, data_stream_listener, _) =
+        create_data_stream(data_client_config, streaming_service_config, stream_request);
+
+    (data_stream, data_stream_listener)
 }
 
 /// Creates a continuous transaction output stream for the given `version`.
@@ -1067,7 +1559,11 @@ fn create_continuous_transaction_output_stream(
     streaming_service_config: DataStreamingServiceConfig,
     known_version: Version,
     known_epoch: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (
+    DataStream<MockAptosDataClient>,
+    DataStreamListener,
+    TimeService,
+) {
     // Create a continuous transaction output stream request
     let stream_request = StreamRequest::ContinuouslyStreamTransactionOutputs(
         ContinuouslyStreamTransactionOutputsRequest {
@@ -1085,7 +1581,11 @@ fn create_continuous_transaction_stream(
     streaming_service_config: DataStreamingServiceConfig,
     known_version: Version,
     known_epoch: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (
+    DataStream<MockAptosDataClient>,
+    DataStreamListener,
+    TimeService,
+) {
     // Create a continuous transaction stream request
     let stream_request =
         StreamRequest::ContinuouslyStreamTransactions(ContinuouslyStreamTransactionsRequest {
@@ -1103,7 +1603,11 @@ fn create_continuous_transaction_or_output_stream(
     streaming_service_config: DataStreamingServiceConfig,
     known_version: Version,
     known_epoch: Version,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (
+    DataStream<MockAptosDataClient>,
+    DataStreamListener,
+    TimeService,
+) {
     // Create a continuous transaction stream request
     let stream_request = StreamRequest::ContinuouslyStreamTransactionsOrOutputs(
         ContinuouslyStreamTransactionsOrOutputsRequest {
@@ -1130,7 +1634,10 @@ fn create_transaction_stream(
         proof_version: end_version,
         include_events: false,
     });
-    create_data_stream(data_client_config, streaming_service_config, stream_request)
+    let (data_stream, data_stream_listener, _) =
+        create_data_stream(data_client_config, streaming_service_config, stream_request);
+
+    (data_stream, data_stream_listener)
 }
 
 /// Creates an output stream for the given `version`.
@@ -1146,7 +1653,10 @@ fn create_output_stream(
         end_version,
         proof_version: end_version,
     });
-    create_data_stream(data_client_config, streaming_service_config, stream_request)
+    let (data_stream, data_stream_listener, _) =
+        create_data_stream(data_client_config, streaming_service_config, stream_request);
+
+    (data_stream, data_stream_listener)
 }
 
 /// Creates an output stream for the given `version`.
@@ -1164,14 +1674,21 @@ fn create_transactions_or_output_stream(
             proof_version: end_version,
             include_events: false,
         });
-    create_data_stream(data_client_config, streaming_service_config, stream_request)
+    let (data_stream, data_stream_listener, _) =
+        create_data_stream(data_client_config, streaming_service_config, stream_request);
+
+    (data_stream, data_stream_listener)
 }
 
 fn create_data_stream(
     data_client_config: AptosDataClientConfig,
     streaming_service_config: DataStreamingServiceConfig,
     stream_request: StreamRequest,
-) -> (DataStream<MockAptosDataClient>, DataStreamListener) {
+) -> (
+    DataStream<MockAptosDataClient>,
+    DataStreamListener,
+    TimeService,
+) {
     initialize_logger();
 
     // Create an advertised data
@@ -1181,8 +1698,9 @@ fn create_data_stream(
     let aptos_data_client = MockAptosDataClient::new(data_client_config, true, false, true, false);
     let notification_generator = Arc::new(U64IdGenerator::new());
 
-    // Return the data stream and listener pair
-    DataStream::new(
+    // Create the data stream and listener pair
+    let time_service = TimeService::mock();
+    let (data_stream, data_stream_listener) = DataStream::new(
         data_client_config,
         streaming_service_config,
         create_random_u64(10000),
@@ -1190,9 +1708,11 @@ fn create_data_stream(
         aptos_data_client,
         notification_generator,
         &advertised_data,
-        TimeService::mock(),
+        time_service.clone(),
     )
-    .unwrap()
+    .unwrap();
+
+    (data_stream, data_stream_listener, time_service)
 }
 
 fn create_advertised_data() -> AdvertisedData {
@@ -1246,6 +1766,7 @@ fn enumerate_continuous_data_streams(
 ) -> Vec<(
     DataStream<MockAptosDataClient>,
     DataStreamListener,
+    TimeService,
     bool,
     bool,
 )> {
@@ -1254,7 +1775,7 @@ fn enumerate_continuous_data_streams(
     // Create a continuous transaction stream
     let transactions_only = true;
     let allow_transactions_or_outputs = false;
-    let (data_stream, stream_listener) = create_continuous_transaction_stream(
+    let (data_stream, stream_listener, time_service) = create_continuous_transaction_stream(
         data_client_config,
         streaming_service_config,
         MAX_ADVERTISED_TRANSACTION,
@@ -1263,6 +1784,7 @@ fn enumerate_continuous_data_streams(
     continuous_data_streams.push((
         data_stream,
         stream_listener,
+        time_service,
         transactions_only,
         allow_transactions_or_outputs,
     ));
@@ -1270,7 +1792,7 @@ fn enumerate_continuous_data_streams(
     // Create a continuous transaction output stream
     let transactions_only = false;
     let allow_transactions_or_outputs = false;
-    let (data_stream, stream_listener) = create_continuous_transaction_output_stream(
+    let (data_stream, stream_listener, time_service) = create_continuous_transaction_output_stream(
         data_client_config,
         streaming_service_config,
         MAX_ADVERTISED_TRANSACTION_OUTPUT,
@@ -1279,6 +1801,7 @@ fn enumerate_continuous_data_streams(
     continuous_data_streams.push((
         data_stream,
         stream_listener,
+        time_service,
         transactions_only,
         allow_transactions_or_outputs,
     ));
@@ -1286,15 +1809,17 @@ fn enumerate_continuous_data_streams(
     // Create a continuous transaction or output stream
     let transactions_only = false;
     let allow_transactions_or_outputs = true;
-    let (data_stream, stream_listener) = create_continuous_transaction_or_output_stream(
-        data_client_config,
-        streaming_service_config,
-        MAX_ADVERTISED_TRANSACTION_OUTPUT,
-        MAX_ADVERTISED_EPOCH_END,
-    );
+    let (data_stream, stream_listener, time_service) =
+        create_continuous_transaction_or_output_stream(
+            data_client_config,
+            streaming_service_config,
+            MAX_ADVERTISED_TRANSACTION_OUTPUT,
+            MAX_ADVERTISED_EPOCH_END,
+        );
     continuous_data_streams.push((
         data_stream,
         stream_listener,
+        time_service,
         transactions_only,
         allow_transactions_or_outputs,
     ));
@@ -1498,8 +2023,13 @@ async fn verify_continuous_stream_request_timeouts(
     // Test all types of continuous data streams
     let continuous_data_streams =
         enumerate_continuous_data_streams(data_client_config, streaming_service_config);
-    for (mut data_stream, mut stream_listener, transactions_only, allow_transactions_or_outputs) in
-        continuous_data_streams
+    for (
+        mut data_stream,
+        mut stream_listener,
+        _,
+        transactions_only,
+        allow_transactions_or_outputs,
+    ) in continuous_data_streams
     {
         // Initialize the data stream
         let global_data_summary = create_global_data_summary(1);
