@@ -2,7 +2,7 @@ import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { AccountAddress } from "../../core";
 import { AnyNumber, HexInput, ScriptTransactionArgumentVariants, Uint16, Uint32, Uint8 } from "../../types";
 import { U8, U16, U32, U64, U128, U256, Bool } from "../../bcs/serializable/move-primitives";
-import { MoveVector } from "../../bcs/serializable/move-structs";
+import { MoveObject, MoveString, MoveVector } from "../../bcs/serializable/move-structs";
 /**
  * Representation of a Script Transaction Argument that can be serialized and deserialized
  */
@@ -74,8 +74,14 @@ export abstract class ScriptTransactionArgument extends Serializable {
       if (allArgsU8) {
         return new ScriptTransactionArgumentU8Vector(arg.values.map((v) => v.value));
       }
-      throw new Error("Unsupported vector type");
+      throw new Error("Unsupported vector type. Script payloads only support vector<u8>");
     }
+    // TODO: investigate if script payloads support MoveObjects, MoveStrings, and MoveOptions
+    //       We may support them in the form of vector<u8>, which would actually make things simpler
+    //       overall. We would just convert them to their BCS serialized representations first and
+    //       then pass those in as ScriptTransactionArgumentVectorU8s
+    // if (arg instanceof MoveObject || arg instanceof MoveString) { 
+    // }
     throw new Error("Unsupported argument type");
   }
 }
