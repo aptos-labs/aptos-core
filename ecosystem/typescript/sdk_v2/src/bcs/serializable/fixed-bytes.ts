@@ -7,8 +7,9 @@ import { HexInput } from "../../types";
 import { Hex } from "../../core";
 
 /**
- *  When you need to represent a contiguous sequence of BCS bytes and expect that when serialized
- *  it does *not* prepend its length to the beginning of the byte sequence.
+ *  This class exists to represent a contiguous sequence of BCS bytes that when serialized
+ *  do *not* prepend the length of the byte sequence at the beginning.
+ *
  *  The main time to use this class is when you are passing around already BCS-serialized bytes
  *  that do not need to undergo another round of BCS serialization.
  *
