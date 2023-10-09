@@ -327,7 +327,8 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
-                let function = Function::new(natives, findex, &module, signature_table.as_slice());
+                let function =
+                    Function::new(natives, findex, &module, &signature_table, &struct_names)?;
 
                 function_map.insert(function.name.to_owned(), idx);
                 function_defs.push(Arc::new(function));

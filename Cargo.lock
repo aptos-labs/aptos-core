@@ -4170,8 +4170,6 @@ dependencies = [
  "rand 0.7.3",
  "rayon",
  "regex",
- "ring 0.16.20",
- "rsa 0.9.6",
  "serde",
  "serde-big-array",
  "serde_bytes",
@@ -8529,7 +8527,7 @@ dependencies = [
  "regex",
  "reqwest",
  "ring 0.16.20",
- "rsa 0.6.1",
+ "rsa",
  "serde",
  "serde_json",
  "sha2 0.10.8",
@@ -11333,8 +11331,6 @@ dependencies = [
  "bytes",
  "fail 0.4.0",
  "hex",
- "lazy_static",
- "lru 0.7.8",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-compiler",
@@ -11378,13 +11374,12 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
- "claims",
  "derivative",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-core-types",
  "once_cell",
  "proptest",
- "rand 0.8.5",
  "serde",
  "smallbitvec",
  "smallvec",
@@ -12437,17 +12432,6 @@ dependencies = [
  "der 0.5.1",
  "pkcs8 0.8.0",
  "zeroize",
-]
-
-[[package]]
-name = "pkcs1"
-version = "0.7.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8ffb9f10fa047879315e6625af03c164b16962a5368d724ed16323b68ace47f"
-dependencies = [
- "der 0.7.8",
- "pkcs8 0.10.2",
- "spki 0.7.3",
 ]
 
 [[package]]
@@ -13869,30 +13853,10 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
- "pkcs1 0.3.3",
+ "pkcs1",
  "pkcs8 0.8.0",
  "rand_core 0.6.4",
  "smallvec",
- "subtle",
- "zeroize",
-]
-
-[[package]]
-name = "rsa"
-version = "0.9.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d0e5124fcb30e76a7e79bfee683a2746db83784b86289f6251b54b7950a0dfc"
-dependencies = [
- "const-oid 0.9.6",
- "digest 0.10.7",
- "num-bigint-dig",
- "num-integer",
- "num-traits",
- "pkcs1 0.7.5",
- "pkcs8 0.10.2",
- "rand_core 0.6.4",
- "signature 2.2.0",
- "spki 0.7.3",
  "subtle",
  "zeroize",
 ]
