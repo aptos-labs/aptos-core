@@ -5,7 +5,7 @@ import { Serializable, Serializer } from "../serializer";
 import { Deserializable, Deserializer } from "../deserializer";
 import { Bool, U128, U16, U256, U32, U64, U8 } from "./move-primitives";
 import { AnyNumber, HexInput } from "../../types";
-import { AccountAddress } from "../../core";
+import { AccountAddress, Hex } from "../../core";
 
 /**
  * This class is the Aptos Typescript SDK representation of a Move `vector<T>`,
@@ -66,8 +66,21 @@ export class MoveVector<T extends Serializable> extends Serializable {
    * @params values: an array of `numbers` to convert to U8s
    * @returns a `MoveVector<U8>`
    */
-  static U8(values: Array<number>): MoveVector<U8> {
-    return new MoveVector<U8>(values.map((v) => new U8(v)));
+  static U8(values: Array<number> | HexInput): MoveVector<U8> {
+    let numbers: Array<number>;
+
+    if (Array.isArray(values) && typeof values[0] === "number") {
+      numbers = values;
+    } else if (typeof values === "string") {
+      const hex = Hex.fromHexInput({ hexInput: values });
+      numbers = Array.from(hex.toUint8Array());
+    } else if (values instanceof Uint8Array) {
+      numbers = Array.from(values);
+    } else {
+      throw new Error("Invalid input type");
+    }
+
+    return new MoveVector<U8>(numbers.map((v) => new U8(v)));
   }
 
   /**

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+import { hexToBytes } from "@noble/hashes/utils";
 import { Deserializable, Deserializer } from "../../src/bcs/deserializer";
 import { FixedBytes } from "../../src/bcs/serializable/fixed-bytes";
 import { Bool, U128, U16, U256, U32, U64, U8 } from "../../src/bcs/serializable/move-primitives";
@@ -549,5 +550,44 @@ describe("Tests for the Serializable class", () => {
     const deserializer = new Deserializer(fixedBytes.bcsToBytes());
     const deserializedFixedBytes = FixedBytes.deserialize(deserializer, AccountAddress.LENGTH);
     expect(deserializedFixedBytes.value).toEqual(address.data);
+  });
+
+  describe("MoveVector.U8 factory method tests", () => {
+    it("creates a MoveVector.U8 correctly", () => {
+      const vec = MoveVector.U8([1, 2, 3]);
+      const vecFromString = MoveVector.U8("0x010203");
+      const vecFromUint8Array = MoveVector.U8(new Uint8Array([1, 2, 3]));
+      expect(vec.bcsToBytes()).toEqual(vecFromString.bcsToBytes());
+      expect(vec.bcsToBytes()).toEqual(vecFromUint8Array.bcsToBytes());
+    });
+
+    it("serializes and deserializes a MoveVector.U8 from various input types correctly", () => {
+      const vec = MoveVector.U8([1, 2, 3]);
+      const vecFromString = MoveVector.U8("0x010203");
+      const vecFromUint8Array = MoveVector.U8(new Uint8Array([1, 2, 3]));
+      const deserializedVec = MoveVector.deserialize(new Deserializer(vec.bcsToBytes()), U8);
+      const deserializedVecFromString = MoveVector.deserialize(new Deserializer(vecFromString.bcsToBytes()), U8);
+      const deserializedVecFromUint8Array = MoveVector.deserialize(
+        new Deserializer(vecFromUint8Array.bcsToBytes()),
+        U8,
+      );
+      expect(deserializedVec.values.map((v) => v.value)).toEqual(vec.values.map((v) => v.value));
+      expect(deserializedVecFromString.values.map((v) => v.value)).toEqual(vec.values.map((v) => v.value));
+      expect(deserializedVecFromUint8Array.values.map((v) => v.value)).toEqual(vec.values.map((v) => v.value));
+    });
+
+    it("throws an error when trying to create a MoveVector.U8 from an invalid hex string", () => {
+      expect(() => MoveVector.U8("0x0102030")).toThrow();
+      expect(() => MoveVector.U8("0xgg")).toThrow();
+      // TODO: Add input validation to HexInput for truncating non-hex values like below
+      // expect(() => MoveVector.U8("asdf")).toThrow();
+      expect(() => MoveVector.U8("gg")).toThrow();
+    });
+
+    it("throws an error when trying to create a MoveVector.U8 from an invalid input type", () => {
+      expect(() => MoveVector.U8({} as any)).toThrow();
+      expect(() => MoveVector.U8(["01", "02", "03"] as any)).toThrow();
+      expect(() => MoveVector.U8([BigInt(1)] as any)).toThrow();
+    });
   });
 });

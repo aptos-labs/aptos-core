@@ -1,7 +1,8 @@
 import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { AccountAddress } from "../../core";
-import { ScriptTransactionArgumentVariants } from "../../types";
-
+import { AnyNumber, HexInput, ScriptTransactionArgumentVariants, Uint16, Uint32, Uint8 } from "../../types";
+import { U8, U16, U32, U64, U128, U256, Bool } from "../../bcs/serializable/move-primitives";
+import { MoveVector } from "../../bcs/serializable/move-structs";
 /**
  * Representation of a Script Transaction Argument that can be serialized and deserialized
  */
@@ -40,19 +41,56 @@ export abstract class ScriptTransactionArgument extends Serializable {
         throw new Error(`Unknown variant index for ScriptTransactionArgument: ${index}`);
     }
   }
+
+  static fromMovePrimitive(
+    arg: U8 | U16 | U32 | U64 | U128 | U256 | Bool | MoveVector<U8> | AccountAddress,
+  ): ScriptTransactionArgument {
+    if (arg instanceof U8) {
+      return new ScriptTransactionArgumentU8(arg.value);
+    }
+    if (arg instanceof U16) {
+      return new ScriptTransactionArgumentU16(arg.value);
+    }
+    if (arg instanceof U32) {
+      return new ScriptTransactionArgumentU32(arg.value);
+    }
+    if (arg instanceof U64) {
+      return new ScriptTransactionArgumentU64(arg.value);
+    }
+    if (arg instanceof U128) {
+      return new ScriptTransactionArgumentU128(arg.value);
+    }
+    if (arg instanceof U256) {
+      return new ScriptTransactionArgumentU256(arg.value);
+    }
+    if (arg instanceof Bool) {
+      return new ScriptTransactionArgumentBool(arg.value);
+    }
+    if (arg instanceof AccountAddress) {
+      return new ScriptTransactionArgumentAddress(arg);
+    }
+    if (arg instanceof MoveVector) {
+      const allArgsU8 = arg.values.every((v) => v instanceof U8);
+      if (allArgsU8) {
+        return new ScriptTransactionArgumentU8Vector(arg.values.map((v) => v.value));
+      }
+      throw new Error("Unsupported vector type");
+    }
+    throw new Error("Unsupported argument type");
+  }
 }
 
 export class ScriptTransactionArgumentU8 extends ScriptTransactionArgument {
-  public readonly value: number;
+  public readonly value: U8;
 
-  constructor(value: number) {
+  constructor(value: Uint8) {
     super();
-    this.value = value;
+    this.value = new U8(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U8);
-    serializer.serializeU8(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU8 {
@@ -62,16 +100,16 @@ export class ScriptTransactionArgumentU8 extends ScriptTransactionArgument {
 }
 
 export class ScriptTransactionArgumentU16 extends ScriptTransactionArgument {
-  public readonly value: number;
+  public readonly value: U16;
 
-  constructor(value: number) {
+  constructor(value: Uint16) {
     super();
-    this.value = value;
+    this.value = new U16(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U16);
-    serializer.serializeU16(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU16 {
@@ -81,16 +119,16 @@ export class ScriptTransactionArgumentU16 extends ScriptTransactionArgument {
 }
 
 export class ScriptTransactionArgumentU32 extends ScriptTransactionArgument {
-  public readonly value: number;
+  public readonly value: U32;
 
-  constructor(value: number) {
+  constructor(value: Uint32) {
     super();
-    this.value = value;
+    this.value = new U32(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U32);
-    serializer.serializeU32(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU32 {
@@ -100,16 +138,16 @@ export class ScriptTransactionArgumentU32 extends ScriptTransactionArgument {
 }
 
 export class ScriptTransactionArgumentU64 extends ScriptTransactionArgument {
-  public readonly value: bigint;
+  public readonly value: U64;
 
-  constructor(value: bigint) {
+  constructor(value: AnyNumber) {
     super();
-    this.value = value;
+    this.value = new U64(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U64);
-    serializer.serializeU64(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU64 {
@@ -119,16 +157,16 @@ export class ScriptTransactionArgumentU64 extends ScriptTransactionArgument {
 }
 
 export class ScriptTransactionArgumentU128 extends ScriptTransactionArgument {
-  public readonly value: bigint;
+  public readonly value: U128;
 
-  constructor(value: bigint) {
+  constructor(value: AnyNumber) {
     super();
-    this.value = value;
+    this.value = new U128(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U128);
-    serializer.serializeU128(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU128 {
@@ -138,16 +176,16 @@ export class ScriptTransactionArgumentU128 extends ScriptTransactionArgument {
 }
 
 export class ScriptTransactionArgumentU256 extends ScriptTransactionArgument {
-  public readonly value: bigint;
+  public readonly value: U256;
 
-  constructor(value: bigint) {
+  constructor(value: AnyNumber) {
     super();
-    this.value = value;
+    this.value = new U256(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U256);
-    serializer.serializeU256(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU256 {
@@ -166,7 +204,7 @@ export class ScriptTransactionArgumentAddress extends ScriptTransactionArgument 
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.Address);
-    this.value.serialize(serializer);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentAddress {
@@ -176,16 +214,16 @@ export class ScriptTransactionArgumentAddress extends ScriptTransactionArgument 
 }
 
 export class ScriptTransactionArgumentU8Vector extends ScriptTransactionArgument {
-  public readonly value: Uint8Array;
+  public readonly value: MoveVector<U8>;
 
-  constructor(value: Uint8Array) {
+  constructor(values: Array<number> | HexInput) {
     super();
-    this.value = value;
+    this.value = MoveVector.U8(values);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.U8Vector);
-    serializer.serializeBytes(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentU8Vector {
@@ -195,16 +233,16 @@ export class ScriptTransactionArgumentU8Vector extends ScriptTransactionArgument
 }
 
 export class ScriptTransactionArgumentBool extends ScriptTransactionArgument {
-  public readonly value: boolean;
+  public readonly value: Bool;
 
   constructor(value: boolean) {
     super();
-    this.value = value;
+    this.value = new Bool(value);
   }
 
   serialize(serializer: Serializer): void {
     serializer.serializeU32AsUleb128(ScriptTransactionArgumentVariants.Bool);
-    serializer.serializeBool(this.value);
+    serializer.serialize(this.value);
   }
 
   static load(deserializer: Deserializer): ScriptTransactionArgumentBool {
