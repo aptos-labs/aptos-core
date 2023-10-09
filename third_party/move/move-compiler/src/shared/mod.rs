@@ -301,12 +301,26 @@ pub fn debug_compiler_env_var_str() -> &'static str {
 
 pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
     static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_DEPRECATION_USE));
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE));
     *WARN_OF_DEPRECATION
 }
 
 pub fn move_compiler_warn_of_deprecation_use_env_var_str() -> &'static str {
     if move_compiler_warn_of_deprecation_use_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
+    static WARN_OF_DEPRECATION: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
+    *WARN_OF_DEPRECATION
+}
+
+pub fn warn_of_deprecation_use_in_aptos_libs_env_var_str() -> &'static str {
+    if warn_of_deprecation_use_in_aptos_libs_env_var() {
         "true"
     } else {
         "false"
@@ -367,8 +381,14 @@ pub struct Flags {
 
     /// Show warnings about use of deprecated functions, modules, constants, etc.
     /// Note that current value of this constant is "Wdeprecation"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_FLAG, default_value=move_compiler_warn_of_deprecation_use_env_var_str())]
+    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG, default_value=move_compiler_warn_of_deprecation_use_env_var_str())]
     warn_of_deprecation_use: bool,
+
+    /// Show warnings about use of deprecated usage in the Aptos libraries,
+    /// which we should generally not bother users with.
+    /// Note that current value of this constant is "Wdeprecation-aptos"
+    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=warn_of_deprecation_use_in_aptos_libs_env_var_str())]
+    warn_of_deprecation_use_in_aptos_libs: bool,
 }
 
 impl Flags {
@@ -383,6 +403,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -397,6 +418,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -411,6 +433,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -425,6 +448,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -439,6 +463,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: false,
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -509,6 +534,17 @@ impl Flags {
     pub fn set_warn_of_deprecation_use(self, new_value: bool) -> Self {
         Self {
             warn_of_deprecation_use: new_value,
+            ..self
+        }
+    }
+
+    pub fn warn_of_deprecation_use_in_aptos_libs(&self) -> bool {
+        self.warn_of_deprecation_use_in_aptos_libs
+    }
+
+    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
+        Self {
+            warn_of_deprecation_use_in_aptos_libs: new_value,
             ..self
         }
     }

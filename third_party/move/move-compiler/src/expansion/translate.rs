@@ -531,7 +531,11 @@ fn module_(
     {
         context.in_deprecated_code = true;
     }
-    context.in_aptos_libs = module_is_in_aptos_libs(module_address);
+    if context.env.flags().warn_of_deprecation_use_in_aptos_libs() {
+        context.in_aptos_libs = false;
+    } else {
+        context.in_aptos_libs = module_is_in_aptos_libs(module_address);
+    }
 
     let mut new_scope = AliasMapBuilder::new();
     module_self_aliases(&mut new_scope, &current_module);
