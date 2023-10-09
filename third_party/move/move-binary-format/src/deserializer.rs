@@ -13,7 +13,7 @@ use std::{collections::HashSet, convert::TryInto, io::Read};
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -38,7 +38,7 @@ impl CompiledScript {
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -170,6 +170,27 @@ where
     })
 }
 
+fn load_option<T>(
+    cursor: &mut VersionedCursor,
+    loader: impl Fn(&mut VersionedCursor) -> BinaryLoaderResult<T>,
+) -> BinaryLoaderResult<Option<T>> {
+    let b = load_u8(cursor)?;
+    if b == SerializedOption::NONE as u8 {
+        Ok(None)
+    } else if b == SerializedOption::SOME as u8 {
+        Ok(Some(loader(cursor)?))
+    } else {
+        Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("invalid option flag".to_owned()))
+    }
+}
+
+fn load_u8(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
+    cursor.read_u8().map_err(|_| {
+        PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
+    })
+}
+
 fn load_signature_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<SignatureIndex> {
     Ok(SignatureIndex(read_uleb_internal(
         cursor,
@@ -284,6 +305,10 @@ fn load_field_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
 
 fn load_type_parameter_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
     read_uleb_internal(cursor, TYPE_PARAMETER_COUNT_MAX)
+}
+
+fn load_access_specifier_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
+    read_uleb_internal(cursor, ACCESS_SPECIFIER_COUNT_MAX)
 }
 
 fn load_signature_size(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
@@ -780,12 +805,19 @@ fn load_function_handles(
         let type_parameters =
             load_ability_sets(&mut cursor, AbilitySetPosition::FunctionTypeParameters)?;
 
+        let accesses = if binary.version() >= VERSION_7 {
+            load_access_specifiers(&mut cursor)?
+        } else {
+            None
+        };
+
         function_handles.push(FunctionHandle {
             module,
             name,
             parameters,
             return_,
             type_parameters,
+            access_specifiers: accesses,
         });
     }
     Ok(())
@@ -968,6 +1000,87 @@ fn load_signature_tokens(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec
         tokens.push(load_signature_token(cursor)?);
     }
     Ok(tokens)
+}
+
+fn load_access_specifiers(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<Option<Vec<AccessSpecifier>>> {
+    load_option(cursor, |cursor| {
+        let mut specs: Vec<AccessSpecifier> = vec![];
+        for _ in 0..load_access_specifier_count(cursor)? {
+            specs.push(load_access_specifier(cursor)?)
+        }
+        Ok(specs)
+    })
+}
+
+fn load_access_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AccessSpecifier> {
+    let b = load_u8(cursor)?;
+    let kind = if b == SerializedAccessKind::READ as u8 {
+        AccessKind::Reads
+    } else if b == SerializedAccessKind::WRITE as u8 {
+        AccessKind::Writes
+    } else if b == SerializedAccessKind::ACQUIRES as u8 {
+        AccessKind::Acquires
+    } else {
+        return Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("invalid access kind".to_owned()));
+    };
+    let b = load_u8(cursor)?;
+    let negated = if b == SerializedOption::SOME as u8 {
+        true
+    } else if b == SerializedOption::NONE as u8 {
+        false
+    } else {
+        return Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("invalid access kind".to_owned()));
+    };
+    let resource = load_resource_specifier(cursor)?;
+    let address = load_address_specifier(cursor)?;
+    Ok(AccessSpecifier {
+        kind,
+        negated,
+        resource,
+        address,
+    })
+}
+
+fn load_resource_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ResourceSpecifier> {
+    let b = load_u8(cursor)?;
+    Ok(if b == SerializedResourceSpecifier::ANY as u8 {
+        ResourceSpecifier::Any
+    } else if b == SerializedResourceSpecifier::AT_ADDRESS as u8 {
+        ResourceSpecifier::DeclaredAtAddress(load_address_identifier_index(cursor)?)
+    } else if b == SerializedResourceSpecifier::IN_MODULE as u8 {
+        let module = load_module_handle_index(cursor)?;
+        ResourceSpecifier::DeclaredInModule(module)
+    } else if b == SerializedResourceSpecifier::RESOURCE as u8 {
+        let handle = load_struct_handle_index(cursor)?;
+        ResourceSpecifier::Resource(handle)
+    } else if b == SerializedResourceSpecifier::RESOURCE_INSTANTIATION as u8 {
+        let handle = load_struct_handle_index(cursor)?;
+        let sign = load_signature_index(cursor)?;
+        ResourceSpecifier::ResourceInstantiation(handle, sign)
+    } else {
+        return Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("invalid resource specifier".to_owned()));
+    })
+}
+
+fn load_address_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AddressSpecifier> {
+    let b = load_u8(cursor)?;
+    Ok(if b == SerializedAddressSpecifier::ANY as u8 {
+        AddressSpecifier::Any
+    } else if b == SerializedAddressSpecifier::LITERAL as u8 {
+        AddressSpecifier::Literal(load_address_identifier_index(cursor)?)
+    } else if b == SerializedAddressSpecifier::PARAMETER as u8 {
+        let parameter = load_local_index(cursor)?;
+        let handle = load_option(cursor, load_function_inst_index)?;
+        AddressSpecifier::Parameter(parameter, handle)
+    } else {
+        return Err(PartialVMError::new(StatusCode::MALFORMED)
+            .with_message("invalid address specifier".to_owned()));
+    })
 }
 
 #[cfg(test)]
