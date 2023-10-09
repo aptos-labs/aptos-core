@@ -1,7 +1,8 @@
 #syntax=docker/dockerfile:1.4
 
-FROM debian AS debian-base
+FROM --platform=$TARGETPLATFORM debian AS debian-base
 
+ARG TARGETPLATFORM
 ARG TARGETARCH
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache

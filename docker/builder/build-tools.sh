@@ -9,8 +9,26 @@ echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
+
+# set rust target based on TARGETPLATFORM
+case $TARGETPLATFORM in
+    "linux/amd64")
+        export RUST_TARGET="x86_64-unknown-linux-gnu"
+        export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR="/usr/lib/x86_64-linux-gnu"
+        export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR="/usr/include/x86_64-linux-gnu/openssl"
+        ;;
+    "linux/arm64")
+        export RUST_TARGET="aarch64-unknown-linux-gnu"
+        ;;
+    *)
+        echo "Unsupported TARGETPLATFORM: $TARGETPLATFORM"
+        exit 1
+        ;;
+esac
+
 # Build all the rust binaries
 cargo build --locked --profile=$PROFILE \
+    --target $RUST_TARGET \
     -p aptos \
     -p aptos-backup-cli \
     -p aptos-faucet-service \

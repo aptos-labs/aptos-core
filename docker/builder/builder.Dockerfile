@@ -1,9 +1,20 @@
 #syntax=docker/dockerfile:1.4
 
-FROM rust as rust-base
+FROM --platform=$BUILDPLATFORM rust as rust-base
+
+ARG TARGETPLATFORM
+ENV TARGETPLATFORM ${TARGETPLATFORM}
+ARG BUILDPLATFORM
+ENV BUILDPLATFORM ${BUILDPLATFORM}
+ARG TARGETARCH
+
 WORKDIR /aptos
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+
+ADD --chmod=755 ./docker/builder/setup_cross_compilation.sh /setup_cross_compilation.sh
+RUN bash /setup_cross_compilation.sh
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && apt-get --no-install-recommends install -y \
@@ -11,15 +22,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl \
         clang \
         git \
-        pkg-config \
-        libssl-dev \
-        libpq-dev \
         binutils \
         lld \
-        libudev-dev
+        libudev-dev \
+        pkg-config:$TARGETARCH \
+        libssl-dev:$TARGETARCH \
+        libpq-dev:$TARGETARCH \
+        libudev-dev:$TARGETARCH
 
 ### Build Rust code ###
 FROM rust-base as builder-base
+
+ARG BUILDARCH
+ENV BUILDARCH ${BUILDARCH}
 
 # Confirm that this Dockerfile is being invoked from an appropriate builder.
 # See https://github.com/aptos-labs/aptos-core/pull/2471
