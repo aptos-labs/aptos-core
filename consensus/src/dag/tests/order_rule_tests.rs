@@ -19,6 +19,8 @@ use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;
 use std::sync::Arc;
 
+use super::helpers::TEST_DAG_WINDOW;
+
 /// Generate a virtual dag that first layer represents round
 /// second layer represents nodes, Some => node exist, None => not exist
 /// third layer is a bitmask that represents compressed strong links (true => linked, false => not linked),
@@ -105,6 +107,7 @@ fn create_order_rule(
             anchor_election,
             Arc::new(TestNotifier { tx }),
             Arc::new(MockStorage::new()),
+            TEST_DAG_WINDOW as Round
         ),
         rx,
     )
@@ -131,7 +134,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, DAG_WINDOW);
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, TEST_DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -222,7 +225,7 @@ fn test_order_rule_basic() {
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         0,
-        DAG_WINDOW,
+        1,
     );
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {

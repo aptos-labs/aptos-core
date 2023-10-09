@@ -75,6 +75,8 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         RpcWithFallback::new(
             responders,
@@ -83,6 +85,8 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
             rpc_timeout,
             self.clone(),
             self.time_service.clone(),
+            min_concurrent_responders,
+            max_concurrent_responders,
         )
     }
 }
@@ -117,6 +121,8 @@ async fn test_send_rpc_with_fallback() {
             message.into(),
             Duration::from_millis(100),
             Duration::from_secs(5),
+            1,
+            4,
         )
         .await;
 

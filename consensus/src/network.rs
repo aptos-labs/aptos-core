@@ -465,6 +465,8 @@ impl TDAGNetworkSender for NetworkSender {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         RpcWithFallback::new(
             responders,
@@ -473,6 +475,8 @@ impl TDAGNetworkSender for NetworkSender {
             rpc_timeout,
             self.clone(),
             self.time_service.clone(),
+            min_concurrent_responders,
+            max_concurrent_responders,
         )
     }
 }

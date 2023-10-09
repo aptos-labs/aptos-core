@@ -42,6 +42,8 @@ pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> RpcWithFallback;
 }
 
@@ -93,9 +95,15 @@ impl RpcWithFallback {
         rpc_timeout: Duration,
         sender: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> Self {
         Self {
-            responders: Responders::new(responders, 1, 4),
+            responders: Responders::new(
+                responders,
+                min_concurrent_responders,
+                max_concurrent_responders,
+            ),
             message,
             rpc_timeout,
 

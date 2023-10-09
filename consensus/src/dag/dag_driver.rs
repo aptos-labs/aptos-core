@@ -12,7 +12,6 @@ use super::{
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
-        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         observability::{
             counters,
@@ -26,6 +25,7 @@ use crate::{
     state_replication::PayloadClient,
 };
 use anyhow::bail;
+use aptos_config::config::DagNodePayloadConfig;
 use aptos_consensus_types::common::{Author, PayloadFilter};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
@@ -62,6 +62,8 @@ pub(crate) struct DagDriver {
     fetch_requester: Arc<FetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
+    window_size_config: Round,
+    payload_config: DagNodePayloadConfig,
 }
 
 impl DagDriver {
@@ -78,6 +80,8 @@ impl DagDriver {
         fetch_requester: Arc<FetchRequester>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         round_state: RoundState,
+        window_size_config: Round,
+        payload_config: DagNodePayloadConfig,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -99,6 +103,8 @@ impl DagDriver {
             fetch_requester,
             ledger_info_provider,
             round_state,
+            window_size_config,
+            payload_config,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -181,7 +187,7 @@ impl DagDriver {
                     &dag_reader
                         .reachable(
                             strong_links.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(DAG_WINDOW)),
+                            Some(highest_commit_round.saturating_sub(self.window_size_config)),
                             |_| true,
                         )
                         .map(|node_status| node_status.as_node().payload())
@@ -192,9 +198,9 @@ impl DagDriver {
         let payload = match self
             .payload_client
             .pull_payload(
-                Duration::from_secs(1),
-                1000,
-                10 * 1024 * 1024,
+                Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
+                self.payload_config.max_sending_txns,
+                self.payload_config.max_sending_size_bytes,
                 payload_filter,
                 Box::pin(async {}),
                 false,
