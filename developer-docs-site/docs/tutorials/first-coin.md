@@ -72,7 +72,7 @@ curl -sSL https://install.python-poetry.org | python3
 poetry install
 ```
 
-Run the Python [`your-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/your-coin.py) example:
+Run the Python [`your-coin`](https://github.com/aptos-labs/aptos-core/blob/main/ecosystem/python/sdk/examples/your_coin.py) example:
 
 ```bash
 poetry run python -m examples.your-coin ~/aptos-core/aptos-move/move-examples/moon_coin
@@ -81,7 +81,17 @@ poetry run python -m examples.your-coin ~/aptos-core/aptos-move/move-examples/mo
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-    Coming soon.
+Navigate to the Rust SDK directory:
+
+```bash
+cd ~/aptos-core/sdk
+```
+
+Run the Rust [`your_coin`](...) example:
+
+```bash
+cargo run --example your-coin ~/aptos-core/aptos-move/move-examples/moon_coin
+```
 
   </TabItem>
 </Tabs>
