@@ -1265,7 +1265,10 @@ impl Client {
         key: K,
         version: u64,
     ) -> AptosResult<Response<Value>> {
-        let url = self.build_path(&format!("tables/{}/item?ledger_version={}", table_handle,version))?;
+        let url = self.build_path(&format!(
+            "tables/{}/item?ledger_version={}",
+            table_handle, version
+        ))?;
         let data = json!({
             "key_type": key_type,
             "value_type": value_type,
