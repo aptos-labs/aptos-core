@@ -85,11 +85,8 @@ pub enum FeatureFlag {
     SaferMetadata,
     Secp256k1ECDSAAuthenticator,
     SponsoredAutomaticAccountCreation,
-<<<<<<< HEAD
-    LimitMaxIdentifierLength,
-=======
     FeePayerAccountOptional,
->>>>>>> 90f4bac7ae ([fee-payer] make fee payer address optionally set during signing)
+    LimitMaxIdentifierLength,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
