@@ -228,7 +228,7 @@ impl BroadcastPeersSelector for FreshPeersSelector {
 
         // Select a minimum of num_peers_to_select, and include all peers within version_threshold
         let max_version = peer_versions
-            .last()
+            .first()
             .map(|(_peer, version)| *version)
             .unwrap_or(0);
         let mut selected_peer_versions = vec![];
