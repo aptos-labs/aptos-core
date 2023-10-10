@@ -160,7 +160,7 @@ This can be called by on chain governance.
     <b>let</b> old_major = <b>borrow_global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;
     <b>assert</b>!(old_major &lt; major, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="version.md#0x1_version_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>));
 
-    <b>if</b> (std::features::slow_reconfigure_enabled()) {
+    <b>if</b> (std::features::reconfigure_with_dkg_enabled()) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(<a href="account.md#0x1_account">account</a>, <a href="version.md#0x1_version_Version">Version</a> {major});
     } <b>else</b> {
         <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);

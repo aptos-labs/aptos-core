@@ -24,6 +24,7 @@ module aptos_framework::execution_config {
         config_for_next_epoch::upsert(account, ExecutionConfig { config });
     }
 
+    /// Only used in reconfiguration with DKG.
     public(friend) fun on_new_epoch(account: &signer) acquires ExecutionConfig {
         system_addresses::assert_vm(account);
         if (config_for_next_epoch::does_exist<ExecutionConfig>()) {

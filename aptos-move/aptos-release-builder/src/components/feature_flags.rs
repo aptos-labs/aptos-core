@@ -84,6 +84,7 @@ pub enum FeatureFlag {
     SaferResourceGroups,
     SaferMetadata,
     Secp256k1ECDSAAuthenticator,
+    ReconfigureWithDKG,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -220,6 +221,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::Secp256k1ECDSAAuthenticator => {
                 AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
             },
+            FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
         }
     }
 }
@@ -279,6 +281,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
                 FeatureFlag::Secp256k1ECDSAAuthenticator
             },
+            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
         }
     }
 }

@@ -251,14 +251,14 @@ module std::features {
         is_enabled(AGGREGATOR_SNAPSHOTS)
     }
 
-    /// Whether slow reconfigure feature is enabled.
+    /// Whether reconfiguration with DKG is enabled.
     /// Lifetime: transient
-    const SLOW_RECONFIGURE: u64 = 31;
+    const RECONFIGURE_WITH_DKG: u64 = 34;
 
-    public fun get_slow_reconfigure_feature(): u64 { SLOW_RECONFIGURE }
+    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
 
-    public fun slow_reconfigure_enabled(): bool acquires Features {
-        is_enabled(SLOW_RECONFIGURE)
+    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
+        is_enabled(RECONFIGURE_WITH_DKG)
     }
 
     // ============================================================================================
@@ -276,7 +276,7 @@ module std::features {
     public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>)
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
-        if (slow_reconfigure_enabled()) {
+        if (reconfigure_with_dkg_enabled()) {
             let features = if (config_for_next_epoch::does_exist<Features>()) {
                 config_for_next_epoch::extract<Features>(framework)
             } else if (exists<Features>(@std)) {

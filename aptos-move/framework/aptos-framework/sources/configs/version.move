@@ -38,7 +38,7 @@ module aptos_framework::version {
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
 
-        if (std::features::slow_reconfigure_enabled()) {
+        if (std::features::reconfigure_with_dkg_enabled()) {
             config_for_next_epoch::upsert(account, Version {major});
         } else {
             let config = borrow_global_mut<Version>(@aptos_framework);

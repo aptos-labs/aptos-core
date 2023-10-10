@@ -72,8 +72,8 @@ return true.
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
 -  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
 -  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
--  [Function `get_slow_reconfigure_feature`](#0x1_features_get_slow_reconfigure_feature)
--  [Function `slow_reconfigure_enabled`](#0x1_features_slow_reconfigure_enabled)
+-  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
+-  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
 -  [Function `apply_diff`](#0x1_features_apply_diff)
@@ -357,6 +357,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_RECONFIGURE_WITH_DKG"></a>
+
+Whether reconfiguration with DKG is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 34;
+</code></pre>
+
+
+
 <a name="0x1_features_RESOURCE_GROUPS"></a>
 
 Whether resource groups are enabled.
@@ -398,17 +409,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
-</code></pre>
-
-
-
-<a name="0x1_features_SLOW_RECONFIGURE"></a>
-
-Whether slow reconfigure feature is enabled.
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_SLOW_RECONFIGURE">SLOW_RECONFIGURE</a>: u64 = 31;
 </code></pre>
 
 
@@ -1394,13 +1394,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_slow_reconfigure_feature"></a>
+<a name="0x1_features_get_reconfigure_with_dkg_feature"></a>
 
-## Function `get_slow_reconfigure_feature`
+## Function `get_reconfigure_with_dkg_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_slow_reconfigure_feature">get_slow_reconfigure_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64
 </code></pre>
 
 
@@ -1409,20 +1409,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_slow_reconfigure_feature">get_slow_reconfigure_feature</a>(): u64 { <a href="features.md#0x1_features_SLOW_RECONFIGURE">SLOW_RECONFIGURE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64 { <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_slow_reconfigure_enabled"></a>
+<a name="0x1_features_reconfigure_with_dkg_enabled"></a>
 
-## Function `slow_reconfigure_enabled`
+## Function `reconfigure_with_dkg_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_slow_reconfigure_enabled">slow_reconfigure_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool
 </code></pre>
 
 
@@ -1431,8 +1431,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_slow_reconfigure_enabled">slow_reconfigure_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SLOW_RECONFIGURE">SLOW_RECONFIGURE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>)
 }
 </code></pre>
 
@@ -1459,7 +1459,7 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
-    <b>if</b> (<a href="features.md#0x1_features_slow_reconfigure_enabled">slow_reconfigure_enabled</a>()) {
+    <b>if</b> (<a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>()) {
         <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
             <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework)
         } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {

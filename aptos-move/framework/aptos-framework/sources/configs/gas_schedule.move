@@ -46,7 +46,7 @@ module aptos_framework::gas_schedule {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
-        if (std::features::slow_reconfigure_enabled()) {
+        if (std::features::reconfigure_with_dkg_enabled()) {
             config_for_next_epoch::upsert(aptos_framework, new_gas_schedule);
         } else {
             if (exists<GasScheduleV2>(@aptos_framework)) {

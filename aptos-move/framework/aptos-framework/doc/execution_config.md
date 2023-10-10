@@ -95,6 +95,7 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 ## Function `on_new_epoch`
 
+Only used in reconfiguration with DKG.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_on_new_epoch">on_new_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
