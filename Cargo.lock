@@ -3422,6 +3422,7 @@ dependencies = [
  "rayon",
  "serde",
  "thiserror",
+ "threadpool",
 ]
 
 [[package]]
