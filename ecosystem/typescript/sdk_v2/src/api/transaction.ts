@@ -43,7 +43,7 @@ export class Transaction {
    * @param txnHash - Transaction hash should be hex-encoded bytes string with 0x prefix.
    * @returns Transaction from mempool (pending) or on-chain (committed) transaction
    */
-  async getTransactionByHash(args: { txnHash: string }): Promise<TransactionResponse> {
+  async getTransactionByHash(args: { txnHash: HexInput }): Promise<TransactionResponse> {
     const transaction = await getTransactionByHash({ aptosConfig: this.config, ...args });
     return transaction;
   }
