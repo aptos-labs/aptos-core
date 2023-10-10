@@ -215,12 +215,12 @@ module aptos_framework::block {
 
         if (reconfiguration::slow_reconfigure_in_progress()) {
             if (timestamp >= reconfiguration::current_slow_reconfigure_deadline()) {
-                reconfiguration::terminate_slow_reconfigure();
+                reconfiguration::terminate_slow_reconfigure(&vm);
             } else {
                 reconfiguration::update_slow_reconfigure(slow_reconfigure_params);
             }
         } else if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
-            reconfiguration::start_slow_reconfigure();
+            reconfiguration::start_slow_reconfigure(&vm);
         };
     }
 

@@ -72,7 +72,11 @@ return true.
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
 -  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
 -  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
+-  [Function `get_slow_reconfigure_feature`](#0x1_features_get_slow_reconfigure_feature)
+-  [Function `slow_reconfigure_enabled`](#0x1_features_slow_reconfigure_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
+-  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
+-  [Function `apply_diff`](#0x1_features_apply_diff)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
@@ -87,7 +91,8 @@ return true.
     -  [Function `contains`](#@Specification_1_contains)
 
 
-<pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
+<b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
@@ -100,7 +105,7 @@ return true.
 The enabled features, represented by a bitset stored on chain.
 
 
-<pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> <b>copy</b>, drop, store, key
 </code></pre>
 
 
@@ -393,6 +398,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
+</code></pre>
+
+
+
+<a name="0x1_features_SLOW_RECONFIGURE"></a>
+
+Whether slow reconfigure feature is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SLOW_RECONFIGURE">SLOW_RECONFIGURE</a>: u64 = 31;
 </code></pre>
 
 
@@ -1378,6 +1394,52 @@ Lifetime: transient
 
 </details>
 
+<a name="0x1_features_get_slow_reconfigure_feature"></a>
+
+## Function `get_slow_reconfigure_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_slow_reconfigure_feature">get_slow_reconfigure_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_slow_reconfigure_feature">get_slow_reconfigure_feature</a>(): u64 { <a href="features.md#0x1_features_SLOW_RECONFIGURE">SLOW_RECONFIGURE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_slow_reconfigure_enabled"></a>
+
+## Function `slow_reconfigure_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_slow_reconfigure_enabled">slow_reconfigure_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_slow_reconfigure_enabled">slow_reconfigure_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SLOW_RECONFIGURE">SLOW_RECONFIGURE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1397,15 +1459,79 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
-    <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
+    <b>if</b> (<a href="features.md#0x1_features_slow_reconfigure_enabled">slow_reconfigure_enabled</a>()) {
+        <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
+            <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework)
+        } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+            *<b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)
+        } <b>else</b> {
+            <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] }
+        };
+        <a href="features.md#0x1_features_apply_diff">apply_diff</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>, enable, disable);
+        <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(framework, <a href="features.md#0x1_features">features</a>);
+    } <b>else</b> {
+        <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+            <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
+        };
+        <b>let</b> <a href="features.md#0x1_features">features</a> = <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+        <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>, enable, disable);
     };
-    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_on_new_epoch"></a>
+
+## Function `on_new_epoch`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account) == @vm, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+    <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
+        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(account);
+        *<b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) = <a href="features.md#0x1_features">features</a>;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_apply_diff"></a>
+
+## Function `apply_diff`
+
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="features.md#0x1_features_Features">features::Features</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="features.md#0x1_features_Features">Features</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
     <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
+        <a href="features.md#0x1_features_set">set</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>.<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
     });
     <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
-        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
+        <a href="features.md#0x1_features_set">set</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>.<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
     });
 }
 </code></pre>
@@ -1511,7 +1637,7 @@ Helper to check whether a feature flag is enabled.
 ### Resource `Features`
 
 
-<pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> <b>copy</b>, drop, store, key
 </code></pre>
 
 

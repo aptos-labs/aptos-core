@@ -86,6 +86,11 @@ fn generate_script(gas_schedule: &GasScheduleV2) -> Result<String> {
         "gas_schedule::set_gas_schedule(&framework_signer, gas_schedule_blob);"
     );
 
+    emitln!(
+        writer,
+        "aptos_governance::reconfigure(&framework_signer);"
+    );
+
     writer.unindent();
     emitln!(writer, "}");
 

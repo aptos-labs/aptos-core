@@ -1,14 +1,15 @@
 /// Maintains the version number for the blockchain.
 module aptos_framework::version {
+    use std::config_for_next_epoch;
     use std::error;
     use std::signer;
 
-    use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration;
 
-    struct Version has key {
+    struct Version has drop, key, store {
         major: u64,
     }
 
@@ -34,15 +35,22 @@ module aptos_framework::version {
     /// This can be called by on chain governance.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
-
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
 
-        let config = borrow_global_mut<Version>(@aptos_framework);
-        config.major = major;
+        if (std::features::slow_reconfigure_enabled()) {
+            config_for_next_epoch::upsert(account, Version {major});
+        } else {
+            let config = borrow_global_mut<Version>(@aptos_framework);
+            config.major = major;
+        }
+    }
 
-        // Need to trigger reconfiguration so validator nodes can sync on the updated version.
-        reconfiguration::reconfigure();
+    public(friend) fun on_new_epoch(account: &signer) acquires Version {
+        system_addresses::assert_vm(account);
+        if (config_for_next_epoch::does_exist<Version>()) {
+            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>(account);
+        }
     }
 
     /// Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,

@@ -3,7 +3,6 @@
 module aptos_framework::consensus_config {
     use std::error;
     use std::vector;
-    use aptos_framework::config_for_next_epoch;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
@@ -27,10 +26,10 @@ module aptos_framework::consensus_config {
     public fun set(account: &signer, config: vector<u8>) {
         system_addresses::assert_aptos_framework(account);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
-        config_for_next_epoch::upsert<ConsensusConfig>(account, ConsensusConfig {config});
+        std::config_for_next_epoch::upsert<ConsensusConfig>(account, ConsensusConfig {config});
     }
 
-    public(friend) fun on_new_epoch() acquires ConsensusConfig {
-        *borrow_global_mut<ConsensusConfig>(@aptos_framework) = config_for_next_epoch::pop();
+    public(friend) fun on_new_epoch(account: &signer) acquires ConsensusConfig {
+        *borrow_global_mut<ConsensusConfig>(@aptos_framework) = std::config_for_next_epoch::extract(account);
     }
 }

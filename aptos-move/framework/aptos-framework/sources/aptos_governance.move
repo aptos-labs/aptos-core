@@ -539,14 +539,23 @@ module aptos_framework::aptos_governance {
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration::start_slow_reconfigure();
+        if (features::slow_reconfigure_enabled()) {
+            reconfiguration::start_slow_reconfigure(aptos_framework);
+        } else {
+            reconfiguration::reconfigure();
+        }
     }
 
     /// Update feature flags and also trigger reconfiguration.
     public fun toggle_features(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         features::change_feature_flags(aptos_framework, enable, disable);
-        reconfiguration::reconfigure();
+
+        if (features::slow_reconfigure_enabled()) {
+            reconfiguration::start_slow_reconfigure(aptos_framework);
+        } else {
+            reconfiguration::reconfigure();
+        }
     }
 
     /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.

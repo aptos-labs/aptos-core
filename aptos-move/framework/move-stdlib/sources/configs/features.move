@@ -23,10 +23,10 @@
 /// is a public function. However, once the feature flag is disabled, those functions can constantly
 /// return true.
 module std::features {
+    use std::config_for_next_epoch;
     use std::error;
     use std::signer;
     use std::vector;
-
     // --------------------------------------------------------------------------------------------
     // Code Publishing
 
@@ -251,6 +251,16 @@ module std::features {
         is_enabled(AGGREGATOR_SNAPSHOTS)
     }
 
+    /// Whether slow reconfigure feature is enabled.
+    /// Lifetime: transient
+    const SLOW_RECONFIGURE: u64 = 31;
+
+    public fun get_slow_reconfigure_feature(): u64 { SLOW_RECONFIGURE }
+
+    public fun slow_reconfigure_enabled(): bool acquires Features {
+        is_enabled(SLOW_RECONFIGURE)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -258,7 +268,7 @@ module std::features {
     const EFRAMEWORK_SIGNER_NEEDED: u64 = 1;
 
     /// The enabled features, represented by a bitset stored on chain.
-    struct Features has key {
+    struct Features has copy, drop, key, store {
         features: vector<u8>,
     }
 
@@ -266,15 +276,39 @@ module std::features {
     public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>)
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
-        if (!exists<Features>(@std)) {
-            move_to<Features>(framework, Features { features: vector[] })
+        if (slow_reconfigure_enabled()) {
+            let features = if (config_for_next_epoch::does_exist<Features>()) {
+                config_for_next_epoch::extract<Features>(framework)
+            } else if (exists<Features>(@std)) {
+                *borrow_global_mut<Features>(@std)
+            } else {
+                Features { features: vector[] }
+            };
+            apply_diff(&mut features, enable, disable);
+            config_for_next_epoch::upsert(framework, features);
+        } else {
+            if (!exists<Features>(@std)) {
+                move_to<Features>(framework, Features { features: vector[] })
+            };
+            let features = borrow_global_mut<Features>(@std);
+            apply_diff(features, enable, disable);
         };
-        let features = &mut borrow_global_mut<Features>(@std).features;
+    }
+
+    public fun on_new_epoch(account: &signer) acquires Features {
+        assert!(signer::address_of(account) == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+        if (config_for_next_epoch::does_exist<Features>()) {
+            let features = config_for_next_epoch::extract<Features>(account);
+            *borrow_global_mut<Features>(@std) = features;
+        }
+    }
+
+    fun apply_diff(features: &mut Features, enable: vector<u64>, disable: vector<u64>) {
         vector::for_each_ref(&enable, |feature| {
-            set(features, *feature, true);
+            set(&mut features.features, *feature, true);
         });
         vector::for_each_ref(&disable, |feature| {
-            set(features, *feature, false);
+            set(&mut features.features, *feature, false);
         });
     }
 

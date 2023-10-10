@@ -4,3 +4,4 @@ version = "1.5.0"
 
 [addresses]
 std = "0x1"
+vm = "0x0"

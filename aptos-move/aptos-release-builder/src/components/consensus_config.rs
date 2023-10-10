@@ -37,10 +37,18 @@ pub fn generate_consensus_upgrade_proposal(
                     writer,
                     "consensus_config::set(framework_signer, consensus_blob);"
                 );
+                emitln!(
+                    writer,
+                    "aptos_governance::reconfigure(framework_signer);"
+                );
             } else {
                 emitln!(
                     writer,
                     "consensus_config::set(&framework_signer, consensus_blob);"
+                );
+                emitln!(
+                    writer,
+                    "aptos_governance::reconfigure(&framework_signer);"
                 );
             }
         },

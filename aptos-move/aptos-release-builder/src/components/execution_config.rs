@@ -37,10 +37,18 @@ pub fn generate_execution_config_upgrade_proposal(
                     writer,
                     "execution_config::set(framework_signer, execution_blob);"
                 );
+                emitln!(
+                    writer,
+                    "aptos_governance::reconfigure(framework_signer);"
+                );
             } else {
                 emitln!(
                     writer,
                     "execution_config::set(&framework_signer, execution_blob);"
+                );
+                emitln!(
+                    writer,
+                    "aptos_governance::reconfigure(&framework_signer);"
                 );
             }
         },
