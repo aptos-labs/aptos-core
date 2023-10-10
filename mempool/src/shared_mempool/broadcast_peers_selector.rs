@@ -125,6 +125,7 @@ pub struct FreshPeersSelector {
     // Note, only a single read happens at a time, so we don't use the thread-safeness of the cache
     stickiness_cache: Arc<Cache<AccountAddress, (u64, Vec<PeerNetworkId>)>>,
     // TODO: is there a data structure that can do peers and sorted_peers all at once?
+    // Sorted in descending order (highest version first, i.e., up-to-date peers first)
     sorted_peers: Vec<(PeerNetworkId, Version)>,
     peers: HashSet<PeerNetworkId>,
     peers_generation: u64,
@@ -152,7 +153,6 @@ impl FreshPeersSelector {
             let peers: Vec<_> = self
                 .sorted_peers
                 .iter()
-                .rev()
                 .take(self.num_peers_to_select)
                 .map(|(peer, _version)| *peer)
                 .collect();
@@ -187,7 +187,6 @@ impl FreshPeersSelector {
             let more_peers = self
                 .sorted_peers
                 .iter()
-                .rev()
                 .filter_map(|(peer, _version)| {
                     if !peers_set.contains(peer) {
                         Some(*peer)
@@ -222,31 +221,45 @@ impl BroadcastPeersSelector for FreshPeersSelector {
                 (*peer, 0)
             })
             .collect();
-        // TODO: what if we don't actually have a mempool connection to this host?
-        // TODO: do we have to filter? or penalize but still allow selection?
-        peer_versions.sort_by_key(|(_peer, version)| *version);
+        // Sort in descending order (highest version first, i.e., up-to-date peers first)
+        peer_versions.sort_by(|(_, version_a), (_, version_b)| version_b.cmp(version_a));
         info!("fresh_peers update_peers: {:?}", peer_versions);
         counters::SHARED_MEMPOOL_SELECTOR_NUM_PEERS.observe(peer_versions.len() as f64);
 
+        // Select a minimum of num_peers_to_select, and include all peers within version_threshold
         let max_version = peer_versions
             .last()
             .map(|(_peer, version)| *version)
             .unwrap_or(0);
-        // TODO: remove, this is just for logging purposes
-        peer_versions.iter().filter(|(_peer, version)| max_version - *version > self.version_threshold).for_each(|(peer, version)| {
-            warn!("fresh_peers: peer {} has version {} which is more than {} behind max version {}", peer, version, self.version_threshold, max_version);
-        });
-        // TODO: instead, we need to keep peers if there are less than num_peers_to_select
-        // TODO: this probably means we should change the ordering to descending order, then iterate
-        peer_versions.retain(|(_peer, version)| max_version - *version <= self.version_threshold);
-        counters::SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS.observe(peer_versions.len() as f64);
+        let mut selected_peer_versions = vec![];
+        let mut num_selected = 0;
+        let mut num_fresh = 0;
+        for (peer, version) in peer_versions {
+            let mut to_select = false;
+            if num_selected < self.num_peers_to_select {
+                to_select = true;
+                num_selected += 1;
+            }
+            if max_version - version <= self.version_threshold {
+                to_select = true;
+                num_fresh += 1;
+            }
+            if to_select {
+                selected_peer_versions.push((peer, version));
+            } else {
+                break;
+            }
+        }
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_SELECTED_PEERS.observe(num_selected as f64);
+        counters::SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS.observe(num_fresh as f64);
 
-        let new_peers = HashSet::from_iter(peer_versions.iter().map(|(peer, _version)| *peer));
-        counters::SHARED_MEMPOOL_SELECTOR_CHURN_RATE
-            .observe(self.peers.difference(&new_peers).count() as f64 / self.peers.len() as f64);
+        let selected_peers =
+            HashSet::from_iter(selected_peer_versions.iter().map(|(peer, _version)| *peer));
+        counters::SHARED_MEMPOOL_SELECTOR_REMOVED_PEERS
+            .observe(self.peers.difference(&selected_peers).count() as f64);
 
-        self.sorted_peers = peer_versions;
-        self.peers = new_peers;
+        self.sorted_peers = selected_peer_versions;
+        self.peers = selected_peers;
     }
 
     fn broadcast_peers(&self, account: &PeerId) -> Vec<PeerNetworkId> {

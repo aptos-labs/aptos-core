@@ -510,10 +510,17 @@ pub static SHARED_MEMPOOL_SELECTOR_NUM_FRESH_PEERS: Lazy<Histogram> = Lazy::new(
     )
 });
 
-pub static SHARED_MEMPOOL_SELECTOR_CHURN_RATE: Lazy<Histogram> = Lazy::new(|| {
+pub static SHARED_MEMPOOL_SELECTOR_NUM_SELECTED_PEERS: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
-        "aptos_shared_mempool_selector_churn_rate",
-        "Churn rate of peers for broadcast",
+        "aptos_shared_mempool_selector_num_selected_peers",
+        "Number of peers selected for broadcast",
+    )
+});
+
+pub static SHARED_MEMPOOL_SELECTOR_REMOVED_PEERS: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_shared_mempool_selector_removed_peers",
+        "Number of peers removed from selector, i.e., the churn in peers",
     )
 });
 
