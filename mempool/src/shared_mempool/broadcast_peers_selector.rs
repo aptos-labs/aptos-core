@@ -238,7 +238,6 @@ impl BroadcastPeersSelector for FreshPeersSelector {
             let mut to_select = false;
             if num_selected < self.num_peers_to_select {
                 to_select = true;
-                num_selected += 1;
             }
             if max_version - version <= self.version_threshold {
                 to_select = true;
@@ -246,6 +245,7 @@ impl BroadcastPeersSelector for FreshPeersSelector {
             }
             if to_select {
                 selected_peer_versions.push((peer, version));
+                num_selected += 1;
             } else {
                 break;
             }
