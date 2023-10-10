@@ -596,6 +596,7 @@ mod tests {
             let network_sender = network::NetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
+                None,
             );
             let network_client = NetworkClient::new(
                 DIRECT_SEND.into(),
@@ -702,6 +703,7 @@ mod tests {
             let network_sender = network::NetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
+                None,
             );
 
             let network_client = NetworkClient::new(

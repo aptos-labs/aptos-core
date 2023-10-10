@@ -54,6 +54,7 @@ impl MockMonitoringServer {
             let network_sender = NetworkSender::new(
                 PeerManagerRequestSender::new(peer_manager_request_sender),
                 ConnectionRequestSender::new(connection_request_sender),
+                None,
             );
 
             // Store the channels and network sender

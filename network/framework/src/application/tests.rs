@@ -920,6 +920,7 @@ fn create_network_sender_and_events(
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(outbound_request_sender),
             ConnectionRequestSender::new(connection_outbound_sender),
+            None,
         );
         let network_events =
             NetworkEvents::new(inbound_request_receiver, connection_inbound_receiver, None);

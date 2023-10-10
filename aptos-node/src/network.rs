@@ -346,6 +346,7 @@ fn register_client_and_service_with_network<
 ) -> ApplicationNetworkHandle<T> {
     let (network_sender, network_events) = network_builder.add_client_and_service(
         &application_config,
+        network_config.max_parallel_serialization_tasks,
         network_config.max_parallel_deserialization_tasks,
     );
     ApplicationNetworkHandle {

@@ -123,6 +123,8 @@ pub struct NetworkConfig {
     pub outbound_rate_limit_config: Option<RateLimitConfig>,
     /// The maximum size of an inbound or outbound message (it may be divided into multiple frame)
     pub max_message_size: usize,
+    /// The maximum number of parallel message serialization tasks that can run (per application)
+    pub max_parallel_serialization_tasks: Option<usize>,
     /// The maximum number of parallel message deserialization tasks that can run (per application)
     pub max_parallel_deserialization_tasks: Option<usize>,
 }
@@ -165,11 +167,12 @@ impl NetworkConfig {
             inbound_tx_buffer_size_bytes: None,
             outbound_rx_buffer_size_bytes: None,
             outbound_tx_buffer_size_bytes: None,
+            max_parallel_serialization_tasks: None,
             max_parallel_deserialization_tasks: None,
         };
 
-        // Configure the number of parallel deserialization tasks
-        config.configure_num_deserialization_tasks();
+        // Configure the number of parallel serialization/deserialization tasks
+        config.configure_num_serialization_tasks();
 
         // Prepare the identity based on the identity format
         config.prepare_identity();
@@ -177,10 +180,14 @@ impl NetworkConfig {
         config
     }
 
-    /// Configures the number of parallel deserialization tasks
-    /// based on the number of CPU cores of the machine. This is
+    /// Configures the number of parallel serialization/deserialization
+    /// tasks based on the number of CPU cores of the machine. This is
     /// only done if the config does not specify a value.
-    fn configure_num_deserialization_tasks(&mut self) {
+    fn configure_num_serialization_tasks(&mut self) {
+        if self.max_parallel_serialization_tasks.is_none() {
+            self.max_parallel_serialization_tasks = Some(num_cpus::get());
+        }
+
         if self.max_parallel_deserialization_tasks.is_none() {
             self.max_parallel_deserialization_tasks = Some(num_cpus::get());
         }
@@ -511,22 +518,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_num_parallel_deserialization_tasks() {
-        // Create a default network config and verify the number of deserialization tasks
+    fn test_num_parallel_serialization_tasks() {
+        // Create a default network config and verify the number of tasks
         let network_config = NetworkConfig::default();
+        assert_eq!(
+            network_config.max_parallel_serialization_tasks,
+            Some(num_cpus::get())
+        );
         assert_eq!(
             network_config.max_parallel_deserialization_tasks,
             Some(num_cpus::get())
         );
 
-        // Create a network config with the number of deserialization tasks set to 1
+        // Create a network config and specify the number of serialization tasks
+        let max_parallel_serialization_tasks = 55;
         let mut network_config = NetworkConfig {
-            max_parallel_deserialization_tasks: Some(1),
+            max_parallel_serialization_tasks: Some(max_parallel_serialization_tasks),
             ..NetworkConfig::default()
         };
 
-        // Configure the number of deserialization tasks and verify that it is not overridden
-        network_config.configure_num_deserialization_tasks();
-        assert_eq!(network_config.max_parallel_deserialization_tasks, Some(1));
+        // Configure the number of tasks and verify that it is not overridden
+        network_config.configure_num_serialization_tasks();
+        assert_eq!(
+            network_config.max_parallel_serialization_tasks,
+            Some(max_parallel_serialization_tasks)
+        );
+        assert_eq!(
+            network_config.max_parallel_deserialization_tasks,
+            Some(num_cpus::get())
+        );
+
+        // Create a network config and specify the number of deserialization tasks
+        let max_parallel_deserialization_tasks = 100;
+        let mut network_config = NetworkConfig {
+            max_parallel_deserialization_tasks: Some(max_parallel_deserialization_tasks),
+            ..NetworkConfig::default()
+        };
+
+        // Configure the number of tasks and verify that it is not overridden
+        network_config.configure_num_serialization_tasks();
+        assert_eq!(
+            network_config.max_parallel_serialization_tasks,
+            Some(num_cpus::get())
+        );
+        assert_eq!(
+            network_config.max_parallel_deserialization_tasks,
+            Some(max_parallel_deserialization_tasks)
+        );
     }
 }
