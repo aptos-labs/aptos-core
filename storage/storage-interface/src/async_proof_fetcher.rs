@@ -15,6 +15,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::Lazy;
 use std::{
     collections::HashMap,
+    string::ToString,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -23,8 +24,12 @@ use std::{
 };
 use threadpool::ThreadPool;
 
-static IO_POOL: Lazy<ThreadPool> =
-    Lazy::new(|| ThreadPool::new(AptosVM::get_num_proof_reading_threads()));
+static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
+    ThreadPool::with_name(
+        "proof_reader".to_string(),
+        AptosVM::get_num_proof_reading_threads(),
+    )
+});
 
 struct Proof {
     state_key_hash: HashValue,
