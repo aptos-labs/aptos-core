@@ -84,12 +84,14 @@ export async function waitForTransaction(args: {
   const checkSuccess = extraArgs?.checkSuccess ?? true;
 
   let isPending = true;
-  let count = 0;
+  let timeElapsed = 0;
   let lastTxn: TransactionResponse | undefined;
   let lastError: AptosApiError | undefined;
+  let backoffIntervalMs = 200;
+  const backoffMultiplier = 1.5;
 
   while (isPending) {
-    if (count >= timeoutSecs) {
+    if (timeElapsed >= timeoutSecs) {
       break;
     }
     try {
@@ -114,8 +116,9 @@ export async function waitForTransaction(args: {
       }
     }
     // eslint-disable-next-line no-await-in-loop
-    await sleep(1000);
-    count += 1;
+    await sleep(backoffIntervalMs);
+    timeElapsed += backoffIntervalMs/1000; // Convert to seconds
+    backoffIntervalMs *= backoffMultiplier
   }
 
   // There is a chance that lastTxn is still undefined. Let's throw the last error otherwise a WaitForTransactionError
