@@ -133,7 +133,8 @@ impl StateSyncTrigger {
         // (meaning execution is behind the DAG window)
 
         // fetch can't work since nodes are garbage collected
-        dag_reader.highest_round() + 1 + DAG_WINDOW < li.commit_info().round()
+        dag_reader.is_empty()
+            || dag_reader.highest_round() + 1 + DAG_WINDOW < li.commit_info().round()
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round()
