@@ -226,7 +226,7 @@ impl TransactionAuthenticator {
                 // address, so we verify both and only fail if the signature fails for either of
                 // them. The legacy approach is to assume the address of the fee payer is signed
                 // over.
-                let mut to_verify = vec![sender, fee_payer_signer];
+                let mut to_verify = vec![sender];
                 let _ = secondary_signers
                     .iter()
                     .map(|signer| to_verify.push(signer))
@@ -238,13 +238,12 @@ impl TransactionAuthenticator {
                     AccountAddress::ZERO,
                 );
 
-                let remaining = to_verify
+                let mut remaining = to_verify
                     .iter()
                     .filter(|verifier| verifier.verify(&no_fee_payer_address_message).is_err())
                     .collect::<Vec<_>>();
-                if remaining.is_empty() {
-                    return Ok(());
-                }
+
+                remaining.push(&fee_payer_signer);
 
                 let fee_payer_address_message = RawTransactionWithData::new_fee_payer(
                     raw_txn.clone(),
@@ -804,7 +803,7 @@ mod tests {
             .check_fee_payer_signature()
             .unwrap();
 
-        let (sender_actual, second_signers_actual, fee_payer_signer_actual) =
+        let (_sender_actual, second_signers_actual, fee_payer_signer_actual) =
             match original_fee_payer.authenticator_ref() {
                 TransactionAuthenticator::FeePayer {
                     sender,
@@ -876,18 +875,18 @@ mod tests {
         fee_payer_unset_at_signing
             .clone()
             .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap();
+            .unwrap_err();
         fee_payer_unset_at_signing
             .clone()
             .verify(&raw_txn)
             .unwrap_err();
 
         let fee_payer_partial_at_signing_0 = TransactionAuthenticator::fee_payer(
-            sender_actual.clone(),
+            sender_zero.clone(),
             vec![second_sender_0_addr, second_sender_1_addr],
             second_signers_zero.clone(),
             fee_payer_addr,
-            fee_payer_signer_zero.clone(),
+            fee_payer_signer_actual.clone(),
         );
         fee_payer_partial_at_signing_0
             .clone()
