@@ -88,6 +88,106 @@ impl<'a> CoinClient<'a> {
             .context("Failed to get account balance")?;
         Ok(response.inner().get())
     }
+    
+    pub async fn get_balance(&self, account: &AccountAddress, coin_type: &str) -> Result<u64> {
+        let response = self
+            .api_client
+            .get_balance(*account, coin_type)
+            .await
+            .context("Failed to get account balance")?;
+        Ok(response.inner().get())
+    }
+
+    pub async fn register_coin(
+        &self,
+        from_account: &mut LocalAccount,
+        options: Option<ManagedCoinOptions<'_>>,
+    ) -> Result<PendingTransaction> {
+        let options = options.unwrap_or_default();
+
+        // :!:>section_1
+        let chain_id = self
+            .api_client
+            .get_index()
+            .await
+            .context("Failed to get chain ID")?
+            .inner()
+            .chain_id;
+        let transaction_builder = TransactionBuilder::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
+                ModuleId::new(AccountAddress::ONE, Identifier::new("managed_coin").unwrap()),
+                Identifier::new("register").unwrap(),
+                vec![TypeTag::from_str(options.coin_type).unwrap()],
+                vec![],
+            )),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + options.timeout_secs,
+            ChainId::new(chain_id),
+        )
+        .sender(from_account.address())
+        .sequence_number(from_account.sequence_number())
+        .max_gas_amount(options.max_gas_amount)
+        .gas_unit_price(options.gas_unit_price);
+        let signed_txn = from_account.sign_with_transaction_builder(transaction_builder);
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transfer transaction")?
+            .into_inner())
+        // <:!:section_1
+    }
+
+    pub async fn mint_coin(
+        &self,
+        from_account: &mut LocalAccount,
+        to_account: AccountAddress,
+        amount: u64,
+        options: Option<ManagedCoinOptions<'_>>,
+    ) -> Result<PendingTransaction> {
+        let options = options.unwrap_or_default();
+
+        // :!:>section_1
+        let chain_id = self
+            .api_client
+            .get_index()
+            .await
+            .context("Failed to get chain ID")?
+            .inner()
+            .chain_id;
+        let transaction_builder = TransactionBuilder::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
+                ModuleId::new(AccountAddress::ONE, Identifier::new("managed_coin").unwrap()),
+                Identifier::new("mint").unwrap(),
+                vec![TypeTag::from_str(options.coin_type).unwrap()],
+                vec![
+                    bcs::to_bytes(&to_account).unwrap(),
+                    bcs::to_bytes(&amount).unwrap(),
+                ],
+            )),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + options.timeout_secs,
+            ChainId::new(chain_id),
+        )
+        .sender(from_account.address())
+        .sequence_number(from_account.sequence_number())
+        .max_gas_amount(options.max_gas_amount)
+        .gas_unit_price(options.gas_unit_price);
+        let signed_txn = from_account.sign_with_transaction_builder(transaction_builder);
+        Ok(self
+            .api_client
+            .submit(&signed_txn)
+            .await
+            .context("Failed to submit transfer transaction")?
+            .into_inner())
+        // <:!:section_1
+    }
 }
 
 pub struct TransferOptions<'a> {
@@ -104,6 +204,30 @@ pub struct TransferOptions<'a> {
 }
 
 impl<'a> Default for TransferOptions<'a> {
+    fn default() -> Self {
+        Self {
+            max_gas_amount: 5_000,
+            gas_unit_price: 100,
+            timeout_secs: 10,
+            coin_type: "0x1::aptos_coin::AptosCoin",
+        }
+    }
+}
+
+pub struct ManagedCoinOptions<'a> {
+    pub max_gas_amount: u64,
+
+    pub gas_unit_price: u64,
+
+    /// This is the number of seconds from now you're willing to wait for the
+    /// transaction to be committed.
+    pub timeout_secs: u64,
+
+    /// This is the coin type to transfer.
+    pub coin_type: &'a str,
+}
+
+impl<'a> Default for ManagedCoinOptions<'a> {
     fn default() -> Self {
         Self {
             max_gas_amount: 5_000,

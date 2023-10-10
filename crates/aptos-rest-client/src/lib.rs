@@ -220,6 +220,25 @@ impl Client {
         })
     }
 
+    pub async fn get_balance(
+        &self,
+        address: AccountAddress,
+        coin_type: &str,
+    ) -> AptosResult<Response<Balance>> {
+        let resp = self
+            .get_account_resource(address, 
+                &format!("0x1::coin::CoinStore<{}>", coin_type),
+            )
+            .await?;
+        resp.and_then(|resource| {
+            if let Some(res) = resource {
+                Ok(serde_json::from_value::<Balance>(res.data)?)
+            } else {
+                Err(anyhow!("No data returned").into())
+            }
+        })
+    }
+
     pub async fn get_account_balance_bcs(
         &self,
         address: AccountAddress,
@@ -1580,6 +1599,10 @@ impl Client {
             }
         }
     }
+
+
+    
+
 }
 
 // If the user provided no version in the path, use the default. If the
