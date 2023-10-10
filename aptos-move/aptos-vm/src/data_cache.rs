@@ -13,8 +13,9 @@ use crate::{
 #[allow(unused_imports)]
 use anyhow::{bail, Error};
 use aptos_aggregator::{
-    resolver::{DelayedFieldReadMode, TDelayedFieldView},
-    types::{DelayedFieldID, DelayedFieldValue},
+    bounded_math::SignedU128,
+    resolver::TDelayedFieldView,
+    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
@@ -269,17 +270,26 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
-        self.executor_view.get_aggregator_v1_state_value(id, mode)
+        self.executor_view.get_aggregator_v1_state_value(id)
     }
 
     fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue> {
-        self.executor_view.get_delayed_field_value(id, mode)
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        self.executor_view.get_delayed_field_value(id)
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::IdentifierV2,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        self.executor_view
+            .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
     }
 
     fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {

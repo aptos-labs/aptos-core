@@ -13,10 +13,10 @@ use crate::natives::{
     AccountAddress,
 };
 use aptos_aggregator::{
-    bounded_math::BoundedMath,
-    delayed_field_extension::AggregatorData,
+    bounded_math::{BoundedMath, SignedU128},
+    delayed_field_extension::DelayedFieldData,
     resolver::DelayedFieldResolver,
-    types::{AggregatorVersionedID, ReadPosition, SnapshotToStringFormula, SnapshotValue},
+    types::{SnapshotToStringFormula, SnapshotValue},
     utils::{string_to_bytes, to_utf8_bytes, u128_to_u64},
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -186,11 +186,11 @@ impl SnapshotType {
 
 fn get_context_data<'t, 'b>(
     context: &'t mut SafeNativeContext<'_, 'b, '_, '_>,
-) -> (&'b dyn DelayedFieldResolver, RefMut<'t, AggregatorData>) {
+) -> (&'b dyn DelayedFieldResolver, RefMut<'t, DelayedFieldData>) {
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     (
         aggregator_context.resolver,
-        aggregator_context.aggregator_data.borrow_mut(),
+        aggregator_context.delayed_field_data.borrow_mut(),
     )
 }
 
@@ -215,9 +215,9 @@ fn native_create_aggregator(
     let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
 
     let value_field_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
+        let (resolver, mut delayed_field_data) = get_context_data(context);
         let id = resolver.generate_delayed_field_id();
-        aggregator_data.create_new_aggregator(AggregatorVersionedID::V2(id), max_value);
+        delayed_field_data.create_new_aggregator(id);
         id.as_u64() as u128
     } else {
         0
@@ -245,10 +245,14 @@ fn native_try_add(
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
-        let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
-        let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
-        aggregator.try_add(input, resolver)?
+        let (resolver, mut delayed_field_data) = get_context_data(context);
+        let id = aggregator_value_field_as_id(agg_value)?;
+        delayed_field_data.try_add_delta(
+            id,
+            agg_max_value,
+            SignedU128::Positive(input),
+            resolver,
+        )?
     } else {
         let math = BoundedMath::new(agg_max_value);
         match math.unsigned_add(agg_value, input) {
@@ -279,10 +283,14 @@ fn native_try_sub(
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
-        let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
-        let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
-        aggregator.try_sub(input, resolver)?
+        let (resolver, mut delayed_field_data) = get_context_data(context);
+        let id = aggregator_value_field_as_id(agg_value)?;
+        delayed_field_data.try_add_delta(
+            id,
+            agg_max_value,
+            SignedU128::Negative(input),
+            resolver,
+        )?
     } else {
         let math = BoundedMath::new(agg_max_value);
         match math.unsigned_subtract(agg_value, input) {
@@ -312,10 +320,9 @@ fn native_read(
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
-        let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
-        let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
-        aggregator.read_aggregated_aggregator_value(resolver, ReadPosition::AfterCurrentTxn)?
+        let (resolver, delayed_field_data) = get_context_data(context);
+        let id = aggregator_value_field_as_id(agg_value)?;
+        delayed_field_data.read_aggregator(id, resolver)?
     } else {
         agg_value
     };
@@ -344,9 +351,9 @@ fn native_snapshot(
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
+        let (resolver, mut delayed_field_data) = get_context_data(context);
         let aggregator_id = aggregator_value_field_as_id(agg_value)?;
-        aggregator_data
+        delayed_field_data
             .snapshot(aggregator_id, agg_max_value, resolver)?
             .as_u64() as u128
     } else {
@@ -381,8 +388,8 @@ fn native_create_snapshot(
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
 
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
-        let snapshot_id = aggregator_data.create_new_snapshot(input, resolver);
+        let (resolver, mut delayed_field_data) = get_context_data(context);
+        let snapshot_id = delayed_field_data.create_new_snapshot(input, resolver);
         SnapshotValue::Integer(snapshot_id.as_u64() as u128)
     } else {
         input
@@ -444,10 +451,10 @@ fn native_read_snapshot(
     let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
     let result_value = if context.aggregator_v2_delayed_fields_enabled() {
-        let (resolver, mut aggregator_data) = get_context_data(context);
+        let (resolver, mut delayed_field_data) = get_context_data(context);
 
         let aggregator_id = aggregator_snapshot_value_field_as_id(snapshot_value)?;
-        aggregator_data.read_snapshot(aggregator_id, resolver)?
+        delayed_field_data.read_snapshot(aggregator_id, resolver)?
     } else {
         snapshot_value
     };
@@ -493,7 +500,11 @@ fn native_string_concat(
 
     let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
 
-    if prefix.len().checked_add(suffix.len()).map_or(false, |v| v > CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH) {
+    if prefix
+        .len()
+        .checked_add(suffix.len())
+        .map_or(false, |v| v > CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH)
+    {
         return Err(SafeNativeError::Abort {
             abort_code: ECONCAT_STRING_LENGTH_TOO_LARGE,
         });

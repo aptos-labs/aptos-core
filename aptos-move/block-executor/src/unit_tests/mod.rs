@@ -11,7 +11,9 @@ use crate::{
             MockTransaction, ValueType,
         },
     },
-    scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
+    scheduler::{
+        DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
+    },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::{

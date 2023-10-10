@@ -2,17 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use aptos_aggregator::types::{
-    code_invariant_error, DelayedFieldValue, PanicError, PanicOr, ReadPosition,
+use aptos_aggregator::{
+    delta_math::DeltaHistory,
+    types::{
+        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
+        ReadPosition,
+    },
 };
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVDelayedFieldsError, TxnIndex, Version},
     versioned_data::VersionedData,
-    versioned_delayed_fields::VersionedDelayedFields,
+    versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    state_store::state_value::StateValueMetadataKind,
+    aggregator::PanicError, state_store::state_value::StateValueMetadataKind,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use derivative::Derivative;
@@ -150,6 +154,118 @@ struct GroupRead<T: Transaction> {
     inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
 }
 
+/// Defines different ways `DelayedFieldResolver` can be used to read its values
+/// from the state.
+/// The enum variants should not be re-ordered, as it defines a relation
+/// HistoryBounded < Value
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DelayedFieldReadKind {
+    /// The returned value is guaranteed to be correct.
+    HistoryBounded,
+    /// The returned value is based on last committed value, ignoring
+    /// any pending changes.
+    Value,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DelayedFieldRead {
+    // Represents a full read - that value has been returned to the caller,
+    // meaning that read is valid only if value is identical.
+    Value {
+        value: DelayedFieldValue,
+    },
+    // Represents a restricted read - where a range of values that satisfy DeltaHistory
+    // are all valid and produce the same outcome.
+    // Only boolean outcomes of "try_add_delta" operations have been returned to the caller,
+    // and so we need to respect that those return the same outcome when doing the validation.
+    // Running inner_aggregator_value is kept only for internal bookeeping - and is used to
+    // as a value against which results are computed, but is not checked for read validation.
+    // Only aggregators can be in the HistoryBounded state.
+    HistoryBounded {
+        restriction: DeltaHistory,
+        max_value: u128,
+        inner_aggregator_value: u128,
+    },
+}
+
+impl DelayedFieldRead {
+    fn get_kind(&self) -> DelayedFieldReadKind {
+        use DelayedFieldRead::*;
+        match self {
+            Value { .. } => DelayedFieldReadKind::Value,
+            HistoryBounded { .. } => DelayedFieldReadKind::HistoryBounded,
+        }
+    }
+
+    /// If the reads contains sufficient information, return it, otherwise return None
+    pub(crate) fn filter_by_kind(
+        &self,
+        min_kind: DelayedFieldReadKind,
+    ) -> Option<DelayedFieldRead> {
+        let self_kind = self.get_kind();
+        // Respecting the ordering based on information: HistoryBounded < Value
+        if self_kind >= min_kind {
+            Some(self.clone())
+        } else {
+            None
+        }
+    }
+
+    // A convenience method, since the same key can be read in different modes, producing
+    // different DataRead / ReadKinds. Returns true if self has >= kind than other, i.e.
+    // contains more or equal information, and is consistent with the information in other.
+    fn contains(&self, other: &DelayedFieldRead) -> DataReadComparison {
+        use DelayedFieldRead::*;
+        match (&self, other) {
+            (Value { value: v1, .. }, Value { value: v2, .. }) => {
+                if v1 == v2 {
+                    DataReadComparison::Contains
+                } else {
+                    DataReadComparison::Inconsistent
+                }
+            },
+            (
+                HistoryBounded {
+                    restriction: h1,
+                    inner_aggregator_value: v1,
+                    max_value: m1,
+                },
+                HistoryBounded {
+                    restriction: h2,
+                    inner_aggregator_value: v2,
+                    max_value: m2,
+                },
+            ) => {
+                // TODO see if we want to perform checks on max value/delta
+                if v1 == v2 && m1 == m2 && h1.stricter_than(h2) {
+                    DataReadComparison::Contains
+                } else {
+                    DataReadComparison::Inconsistent
+                }
+            },
+            (HistoryBounded { .. }, Value { .. }) => DataReadComparison::Insufficient,
+            (
+                Value { value: v1 },
+                HistoryBounded {
+                    restriction: h2,
+                    max_value: m2,
+                    ..
+                },
+            ) => {
+                if let Ok(v1) = v1.clone().into_aggregator_value() {
+                    if h2.validate_against_base_value(v1, *m2).is_ok() {
+                        DataReadComparison::Contains
+                    } else {
+                        DataReadComparison::Inconsistent
+                    }
+                } else {
+                    DataReadComparison::Inconsistent
+                }
+            },
+        }
+    }
+}
+
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
@@ -166,7 +282,7 @@ pub(crate) struct CapturedReads<T: Transaction> {
     // TODO: implement a general functionality once the fallback is removed.
     pub(crate) module_reads: Vec<T::Key>,
 
-    delayed_field_reads: HashMap<T::Identifier, DelayedFieldValue>,
+    delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
     /// If there is a speculative failure (e.g. delta application failure, or an
     /// observed inconsistency), the transaction output is irrelevant (must be
@@ -281,31 +397,6 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
-    pub(crate) fn capture_delayed_field_read(
-        &mut self,
-        id: T::Identifier,
-        value: DelayedFieldValue,
-    ) -> Result<(), PanicError> {
-        match self.delayed_field_reads.entry(id) {
-            Vacant(e) => {
-                e.insert(value);
-                // Inserted
-                Ok(())
-            },
-            Occupied(e) => Err(code_invariant_error(format!(
-                "We should read a single DelayedField only once within a transaction, for id {:?}",
-                e.key(),
-            ))),
-        }
-    }
-
-    pub(crate) fn capture_delayed_field_read_error(&mut self, e: &PanicOr<MVDelayedFieldsError>) {
-        match e {
-            PanicOr::CodeInvariantError(_) => self.incorrect_use = true,
-            PanicOr::Or(_) => self.speculative_failure = true,
-        };
-    }
-
     // If maybe_tag is provided, then we check the group, otherwise, normal reads.
     pub(crate) fn get_by_kind(
         &self,
@@ -329,6 +420,80 @@ impl<T: Transaction> CapturedReads<T> {
                 .and_then(|r| r.downcast(kind)),
         }
     }
+
+    pub(crate) fn capture_delayed_field_read(
+        &mut self,
+        id: T::Identifier,
+        update: bool,
+        read: DelayedFieldRead,
+    ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
+        let result = match self.delayed_field_reads.entry(id) {
+            Vacant(e) => {
+                e.insert(read);
+                UpdateResult::Inserted
+            },
+            Occupied(mut e) => {
+                let existing_read = e.get_mut();
+                let read_kind = read.get_kind();
+                let existing_kind = existing_read.get_kind();
+                if read_kind < existing_kind || (!update && read_kind == existing_kind) {
+                    UpdateResult::IncorrectUse(format!(
+                        "Incorrect use CaptureReads, read {:?}, existing {:?}",
+                        read, existing_read
+                    ))
+                } else {
+                    match read.contains(existing_read) {
+                        DataReadComparison::Contains => {
+                            *existing_read = read;
+                            UpdateResult::Updated
+                        },
+                        DataReadComparison::Inconsistent => UpdateResult::Inconsistency(format!(
+                            "Read {:?} must be consistent with the already stored read {:?}",
+                            read, existing_read
+                        )),
+                        DataReadComparison::Insufficient => unreachable!(
+                            "{:?} Insufficient for {:?}, but has higher kind",
+                            read, existing_read
+                        ),
+                    }
+                }
+            },
+        };
+
+        match result {
+            UpdateResult::IncorrectUse(m) => {
+                self.incorrect_use = true;
+                Err(code_invariant_error(m).into())
+            },
+            UpdateResult::Inconsistency(_) => {
+                // Record speculative failure.
+                self.speculative_failure = true;
+                Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead))
+            },
+            UpdateResult::Updated | UpdateResult::Inserted => Ok(()),
+        }
+    }
+
+    pub(crate) fn capture_delayed_field_read_error<E: std::fmt::Debug>(&mut self, e: &PanicOr<E>) {
+        match e {
+            PanicOr::CodeInvariantError(_) => self.incorrect_use = true,
+            PanicOr::Or(_) => self.speculative_failure = true,
+        };
+    }
+
+    pub(crate) fn get_delayed_field_by_kind(
+        &self,
+        id: &T::Identifier,
+        min_kind: DelayedFieldReadKind,
+    ) -> Option<DelayedFieldRead> {
+        self.delayed_field_reads
+            .get(id)
+            .and_then(|r| r.filter_by_kind(min_kind))
+    }
+
+    // pub(crate) fn get_delayed_field_keys(&self) -> impl Iterator<Item = &T::Identifier> {
+    //     self.delayed_field_reads.keys()
+    // }
 
     pub(crate) fn validate_incorrect_use(&self) -> bool {
         self.incorrect_use
@@ -396,26 +561,50 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
+    // This validation needs to be called at commit time
+    // (as it internally uses read_latest_committed_value to get the current value).
     pub(crate) fn validate_delayed_field_reads(
         &self,
-        delayed_fields: &VersionedDelayedFields<T::Identifier>,
+        delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
         idx_to_validate: TxnIndex,
-    ) -> bool {
+    ) -> Result<bool, PanicError> {
         if self.speculative_failure {
-            return false;
+            return Ok(false);
         }
 
         use MVDelayedFieldsError::*;
-        self.delayed_field_reads.iter().all(|(id, read_value)| {
+        for (id, read_value) in &self.delayed_field_reads {
             match delayed_fields.read_latest_committed_value(
-                *id,
+                id,
                 idx_to_validate,
                 ReadPosition::BeforeCurrentTxn,
             ) {
-                Ok(current_value) => read_value == &current_value,
-                Err(NotFound) | Err(Dependency(_)) | Err(DeltaApplicationFailure) => false,
+                Ok(current_value) => match read_value {
+                    DelayedFieldRead::Value { value, .. } => {
+                        if value != &current_value {
+                            return Ok(false);
+                        }
+                    },
+                    DelayedFieldRead::HistoryBounded {
+                        restriction,
+                        max_value,
+                        ..
+                    } => match restriction.validate_against_base_value(
+                        current_value.into_aggregator_value()?,
+                        *max_value,
+                    ) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            return Ok(false);
+                        },
+                    },
+                },
+                Err(NotFound) | Err(Dependency(_)) | Err(DeltaApplicationFailure) => {
+                    return Ok(false);
+                },
             }
-        })
+        }
+        Ok(true)
     }
 
     pub(crate) fn mark_failure(&mut self) {
