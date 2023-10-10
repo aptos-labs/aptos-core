@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    delayed_change::{DelayedApplyChange, DelayedChange},
-    delayed_field_extension::{AggregatorData, AggregatorSnapshotState, AggregatorState},
+    aggregator_v1_extension::{AggregatorData, AggregatorState},
+    bounded_math::SignedU128,
+    delayed_change::DelayedChange,
+    delayed_field_extension::DelayedFieldData,
     delta_change_set::DeltaOp,
-    delta_math::DeltaHistory,
     resolver::DelayedFieldResolver,
-    types::{AggregatorVersionedID, DelayedFieldID, DelayedFieldValue, SnapshotValue},
+    types::DelayedFieldID,
 };
 use aptos_types::state_store::state_key::StateKey;
 use better_any::{Tid, TidAble};
@@ -40,6 +41,7 @@ pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
     pub(crate) resolver: &'a dyn DelayedFieldResolver,
     pub(crate) aggregator_data: RefCell<AggregatorData>,
+    pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
@@ -50,6 +52,7 @@ impl<'a> NativeAggregatorContext<'a> {
             txn_hash,
             resolver,
             aggregator_data: Default::default(),
+            delayed_field_data: Default::default(),
         }
     }
 
@@ -62,100 +65,46 @@ impl<'a> NativeAggregatorContext<'a> {
     /// transaction).
     pub fn into_change_set(self) -> AggregatorChangeSet {
         let NativeAggregatorContext {
-            aggregator_data, ..
+            aggregator_data,
+            delayed_field_data,
+            ..
         } = self;
-        let (_, destroyed_aggregators, aggregators, snapshots) =
-            aggregator_data.into_inner().into();
+        let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
-        let mut delayed_field_changes = HashMap::new();
 
-        // First process all snapshots (they need access to aggregators)
-        for (id, snapshot) in snapshots {
-            let state = snapshot.into();
-            let change = match state {
-                AggregatorSnapshotState::Create {
-                    value: SnapshotValue::Integer(value),
-                } => Some(DelayedChange::Create(DelayedFieldValue::Snapshot(value))),
-                AggregatorSnapshotState::Create {
-                    value: SnapshotValue::String(value),
-                } => Some(DelayedChange::Create(DelayedFieldValue::Derived(value))),
-                AggregatorSnapshotState::Delta {
-                    base_aggregator,
-                    delta,
-                } => {
-                    let delta_op = aggregators.get(&AggregatorVersionedID::V2(base_aggregator)).map_or_else(
-                        || DeltaOp::new(delta, u128::MAX, DeltaHistory::new()),
-                        |v| match v.state {
-                            AggregatorState::Create { .. } => unreachable!("Aggregator that snapshot in Delta state depends on cannot be in Create state"),
-                            AggregatorState::Delta { history, .. } => DeltaOp::new(delta, v.max_value, history),
-                        }
-                    );
-                    Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
-                        base_aggregator,
-                        delta: delta_op,
-                    }))
-                },
-                AggregatorSnapshotState::Derived {
-                    base_snapshot,
-                    formula,
-                } => Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
-                    base_snapshot,
-                    formula,
-                })),
-                // Not a write
-                AggregatorSnapshotState::Reference { .. } => None,
-            };
-            if let Some(change) = change {
-                delayed_field_changes.insert(id, change);
-            }
-        }
-
-        // Second, process all aggregators.
+        // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
-            let (max_value, state) = aggregator.into();
-            match id {
-                AggregatorVersionedID::V1(state_key) => {
-                    let change = match state {
-                        AggregatorState::Create { value } => AggregatorChangeV1::Write(value),
-                        AggregatorState::Delta { delta, history, .. } => {
-                            let delta_op = DeltaOp::new(delta, max_value, history);
-                            AggregatorChangeV1::Merge(delta_op)
-                        },
-                    };
-                    aggregator_v1_changes.insert(state_key, change);
+            let (value, state, limit, history) = aggregator.into();
+
+            let change = match state {
+                AggregatorState::Data => AggregatorChangeV1::Write(value),
+                AggregatorState::PositiveDelta => {
+                    let history = history.unwrap();
+                    let plus = SignedU128::Positive(value);
+                    let delta_op = DeltaOp::new(plus, limit, history);
+                    AggregatorChangeV1::Merge(delta_op)
                 },
-                AggregatorVersionedID::V2(id) => {
-                    let change = match state {
-                        AggregatorState::Create { value } => {
-                            Some(DelayedChange::Create(DelayedFieldValue::Aggregator(value)))
-                        },
-                        AggregatorState::Delta { delta, history, .. } => {
-                            if delta.is_zero() && history.is_empty() {
-                                // not a write
-                                None
-                            } else {
-                                Some(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
-                                    delta: DeltaOp::new(delta, max_value, history),
-                                }))
-                            }
-                        },
-                    };
-                    if let Some(change) = change {
-                        delayed_field_changes.insert(id, change);
-                    }
+                AggregatorState::NegativeDelta => {
+                    let history = history.unwrap();
+                    let minus = SignedU128::Negative(value);
+                    let delta_op = DeltaOp::new(minus, limit, history);
+                    AggregatorChangeV1::Merge(delta_op)
                 },
-            }
+            };
+            aggregator_v1_changes.insert(id.0, change);
         }
 
         // Additionally, do not forget to delete destroyed values from storage.
         for id in destroyed_aggregators {
-            aggregator_v1_changes.insert(id, AggregatorChangeV1::Delete);
+            aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
         }
+
+        let delayed_field_changes = delayed_field_data.into_inner().into();
 
         AggregatorChangeSet {
             aggregator_v1_changes,
-            delayed_field_changes,
+            delayed_field_changes: HashMap::from_iter(delayed_field_changes),
         }
     }
 }
@@ -165,7 +114,8 @@ mod test {
     use super::*;
     use aptos_aggregator::{
         aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, bounded_math::SignedU128,
-        delta_math::DeltaHistory, FakeAggregatorView,
+        delayed_change::DelayedApplyChange, delta_change_set::DeltaWithMax,
+        delta_math::DeltaHistory, types::DelayedFieldValue, FakeAggregatorView,
     };
     use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
@@ -204,26 +154,23 @@ mod test {
 
         assert_ok!(aggregator_data.get_aggregator(aggregator_v1_id_for_test(100), 100));
         assert_ok!(aggregator_data.get_aggregator(aggregator_v1_id_for_test(200), 200));
-        assert!(aggregator_data
+        assert_ok!(aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(500), 500)
             .unwrap()
-            .try_add(150, context.resolver)
-            .unwrap());
-        assert!(aggregator_data
+            .add(150));
+        assert_ok!(aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(600), 600)
             .unwrap()
-            .try_add(100, context.resolver)
-            .unwrap());
-        assert!(aggregator_data
+            .add(100));
+        assert_ok!(aggregator_data
             .get_aggregator(aggregator_v1_id_for_test(700), 700)
             .unwrap()
-            .try_add(200, context.resolver)
-            .unwrap());
+            .add(200));
 
-        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(100));
-        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(300));
-        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(500));
-        aggregator_data.remove_aggregator_v1(aggregator_v1_id_for_test(800));
+        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(100));
+        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(300));
+        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(500));
+        aggregator_data.remove_aggregator(aggregator_v1_id_for_test(800));
     }
 
     #[test]
@@ -310,79 +257,91 @@ mod test {
     //                                 |
     //                              string_concat(3)
     fn test_set_up_v2(context: &NativeAggregatorContext) {
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut delayed_field_data = context.delayed_field_data.borrow_mut();
 
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(900), 900)
-                .unwrap()
-                .try_add(200, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(900),
+                900,
+                SignedU128::Positive(200),
+                context.resolver
+            ),
             true
         );
 
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(900), 900)
-                .unwrap()
-                .try_sub(501, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(900),
+                900,
+                SignedU128::Negative(501),
+                context.resolver
+            ),
             false
         );
 
         // failed because of wrong max_value
-        assert!(aggregator_data
+        assert!(delayed_field_data
             .snapshot(DelayedFieldID::new(900), 800, context.resolver)
             .is_err());
 
         assert_ok_eq!(
-            aggregator_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
+            delayed_field_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
             DelayedFieldID::new(1)
         );
 
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(900), 900)
-                .unwrap()
-                .try_add(300, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(900),
+                900,
+                SignedU128::Positive(300),
+                context.resolver
+            ),
             true
         );
 
         assert_ok_eq!(
-            aggregator_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
+            delayed_field_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
             DelayedFieldID::new(2)
         );
 
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(900), 900)
-                .unwrap()
-                .try_add(100, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(900),
+                900,
+                SignedU128::Positive(100),
+                context.resolver
+            ),
             true
         );
 
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(900), 900)
-                .unwrap()
-                .try_add(51, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(900),
+                900,
+                SignedU128::Positive(51),
+                context.resolver
+            ),
             false
         );
 
-        aggregator_data.create_new_aggregator(AggregatorVersionedID::v2(2000), 2000);
+        delayed_field_data.create_new_aggregator(DelayedFieldID::new(2000));
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(2000), 2000)
-                .unwrap()
-                .try_add(500, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(2000),
+                2000,
+                SignedU128::Positive(500),
+                context.resolver
+            ),
             true
         );
 
         assert_ok_eq!(
-            aggregator_data.snapshot(DelayedFieldID::new(2000), 2000, context.resolver),
+            delayed_field_data.snapshot(DelayedFieldID::new(2000), 2000, context.resolver),
             DelayedFieldID::new(3)
         );
 
         assert_eq!(
-            aggregator_data.string_concat(
+            delayed_field_data.string_concat(
                 DelayedFieldID::new(2200),
                 "prefix".as_bytes().to_vec(),
                 "suffix".as_bytes().to_vec(),
@@ -392,17 +351,21 @@ mod test {
         );
 
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(2000), 2000)
-                .unwrap()
-                .try_add(1700, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(2000),
+                2000,
+                SignedU128::Positive(1700),
+                context.resolver
+            ),
             false
         );
         assert_ok_eq!(
-            aggregator_data
-                .get_aggregator(AggregatorVersionedID::v2(2000), 2000)
-                .unwrap()
-                .try_sub(501, context.resolver),
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(2000),
+                2000,
+                SignedU128::Positive(501),
+                context.resolver
+            ),
             false
         );
     }
@@ -420,12 +383,12 @@ mod test {
         assert_some_eq!(
             delayed_field_changes.get(&DelayedFieldID::new(900)),
             &DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Positive(600), 900, DeltaHistory {
-                    max_achieved_positive_delta: 600,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: Some(651),
-                    max_underflow_negative_delta: Some(501),
-                },),
+                delta: DeltaWithMax::new(SignedU128::Positive(600), 900) // , DeltaHistory {
+                                                                         //     max_achieved_positive_delta: 600,
+                                                                         //     min_achieved_negative_delta: 0,
+                                                                         //     min_overflow_positive_delta: Some(651),
+                                                                         //     max_underflow_negative_delta: Some(501),
+                                                                         // }),
             }),
         );
         // Snapshots have full history (not just until their point),
@@ -435,23 +398,23 @@ mod test {
             delayed_field_changes.get(&DelayedFieldID::new(1)),
             &DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
                 base_aggregator: DelayedFieldID::new(900),
-                delta: DeltaOp::new(SignedU128::Positive(200), 900, DeltaHistory {
-                    max_achieved_positive_delta: 600,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: Some(651),
-                    max_underflow_negative_delta: Some(501),
-                },),
+                delta: DeltaWithMax::new(SignedU128::Positive(200), 900) // , DeltaHistory {
+                                                                         //     max_achieved_positive_delta: 600,
+                                                                         //     min_achieved_negative_delta: 0,
+                                                                         //     min_overflow_positive_delta: Some(651),
+                                                                         //     max_underflow_negative_delta: Some(501),
+                                                                         // },),
             }),
         );
         assert_some_eq!(
             delayed_field_changes.get(&DelayedFieldID::new(2)),
             &DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Positive(500), 900, DeltaHistory {
-                    max_achieved_positive_delta: 600,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: Some(651),
-                    max_underflow_negative_delta: Some(501),
-                },),
+                delta: DeltaWithMax::new(SignedU128::Positive(500), 900) // , DeltaHistory {
+                                                                         //     max_achieved_positive_delta: 600,
+                                                                         //     min_achieved_negative_delta: 0,
+                                                                         //     min_overflow_positive_delta: Some(651),
+                                                                         //     max_underflow_negative_delta: Some(501),
+                                                                         // },),
             }),
         );
 

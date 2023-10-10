@@ -82,7 +82,7 @@ impl std::fmt::Debug for DeltaHistory {
             self.min_achieved_negative_delta, self.max_achieved_positive_delta
         )?;
         if let Some(overflow) = self.min_overflow_positive_delta {
-            write!(f, ", overflow: -{}", overflow)?;
+            write!(f, ", overflow: {}", overflow)?;
         };
         Ok(())
     }
@@ -107,7 +107,7 @@ impl DeltaHistory {
 
     /// Records observed delta in history. Should be called after an operation (addition/subtraction)
     /// is successful to record its side-effects.
-    pub(crate) fn record_success(&mut self, delta: SignedU128) {
+    pub fn record_success(&mut self, delta: SignedU128) {
         match delta {
             SignedU128::Positive(value) => {
                 self.max_achieved_positive_delta =
@@ -126,13 +126,13 @@ impl DeltaHistory {
 
     /// Records overflows in history. Should be called after an addition is unsuccessful
     /// to record its side-effects.
-    pub(crate) fn record_overflow(&mut self, delta: u128) {
+    pub fn record_overflow(&mut self, delta: u128) {
         Self::record_failure(&mut self.min_overflow_positive_delta, delta);
     }
 
     /// Records underflows in history. Should be called after a subtraction is unsuccessful
     /// to record its side-effects.
-    pub(crate) fn record_underflow(&mut self, delta: u128) {
+    pub fn record_underflow(&mut self, delta: u128) {
         Self::record_failure(&mut self.max_underflow_negative_delta, delta);
     }
 
@@ -310,6 +310,19 @@ impl DeltaHistory {
             max_underflow_negative_delta: new_max_underflow,
         })
     }
+
+    pub fn stricter_than(&self, other: &DeltaHistory) -> bool {
+        self.max_achieved_positive_delta >= other.max_achieved_positive_delta
+            && self.min_achieved_negative_delta >= other.min_achieved_negative_delta
+            && other.min_overflow_positive_delta.map_or(true, |other_v| {
+                self.min_overflow_positive_delta
+                    .map_or(false, |self_v| self_v <= other_v)
+            })
+            && other.max_underflow_negative_delta.map_or(true, |other_v| {
+                self.max_underflow_negative_delta
+                    .map_or(false, |self_v| self_v <= other_v)
+            })
+    }
 }
 
 pub fn merge_data_and_delta(
@@ -336,4 +349,56 @@ pub fn merge_two_deltas(
     let new_history = next_history.offset_and_merge_history(prev_delta, prev_history, max_value)?;
     let new_delta = expect_ok(BoundedMath::new(max_value).signed_add(prev_delta, next_delta))?;
     Ok((new_delta, new_history))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::delta_math::DeltaHistory;
+    use claims::{assert_err, assert_ok};
+
+    #[test]
+    fn test_change_in_base_value_1() {
+        let history = DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 200,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        };
+        let max_value = 600;
+        assert_ok!(history.validate_against_base_value(200, max_value));
+        assert_err!(history.validate_against_base_value(199, max_value));
+        assert_ok!(history.validate_against_base_value(300, max_value));
+        assert_err!(history.validate_against_base_value(301, max_value));
+    }
+
+    #[test]
+    fn test_change_in_base_value_2() {
+        let history = DeltaHistory {
+            max_achieved_positive_delta: 300,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: Some(401),
+            max_underflow_negative_delta: None,
+        };
+        let max_value = 600;
+        assert_err!(history.validate_against_base_value(199, max_value));
+        assert_ok!(history.validate_against_base_value(200, max_value));
+        assert_ok!(history.validate_against_base_value(300, max_value));
+        assert_err!(history.validate_against_base_value(301, max_value));
+    }
+
+    #[test]
+    fn test_change_in_base_value_3() {
+        let history = DeltaHistory {
+            max_achieved_positive_delta: 200,
+            min_achieved_negative_delta: 100,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: Some(201),
+        };
+        let max_value = 600;
+        assert_ok!(history.validate_against_base_value(100, max_value));
+        assert_ok!(history.validate_against_base_value(199, max_value));
+        assert_ok!(history.validate_against_base_value(200, max_value));
+        assert_err!(history.validate_against_base_value(201, max_value));
+        assert_err!(history.validate_against_base_value(400, max_value));
+    }
 }

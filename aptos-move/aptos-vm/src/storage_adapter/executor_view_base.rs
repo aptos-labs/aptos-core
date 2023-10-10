@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    resolver::{DelayedFieldReadMode, TDelayedFieldView},
-    types::{DelayedFieldID, DelayedFieldValue},
+    bounded_math::SignedU128,
+    resolver::TDelayedFieldView,
+    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::{
@@ -50,7 +51,6 @@ impl<'s, S: StateView> TDelayedFieldView for ExecutorViewBase<'s, S> {
         &self,
         state_key: &Self::IdentifierV1,
         // Reading from StateView can be in precise mode only.
-        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.base.get_state_value(state_key)
     }
@@ -62,8 +62,17 @@ impl<'s, S: StateView> TDelayedFieldView for ExecutorViewBase<'s, S> {
     fn get_delayed_field_value(
         &self,
         _id: &Self::IdentifierV2,
-        _mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue> {
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!()
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        _id: &Self::IdentifierV2,
+        _base_delta: &SignedU128,
+        _delta: &SignedU128,
+        _max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
         unimplemented!()
     }
 }

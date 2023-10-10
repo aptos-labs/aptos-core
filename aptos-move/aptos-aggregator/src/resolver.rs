@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
-    types::{DelayedFieldID, DelayedFieldValue},
+    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -15,16 +16,6 @@ use aptos_types::{
 };
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::vm_status::{StatusCode, VMStatus};
-
-/// Defines different ways `AggregatorResolver` can be used to read its value
-/// from the state.
-pub enum DelayedFieldReadMode {
-    /// The returned value is guaranteed to be correct.
-    Aggregated,
-    /// The returned value is based on last committed value, ignoring
-    /// any pending changes.
-    LastCommitted,
-}
 
 /// Allows to query aggregator values from the state storage.
 /// Because there are two types of aggregators in the system, V1 and V2, we use
@@ -45,15 +36,10 @@ pub trait TDelayedFieldView {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_aggregator_v1_value(
-        &self,
-        id: &Self::IdentifierV1,
-        mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<Option<u128>> {
-        let maybe_state_value = self.get_aggregator_v1_state_value(id, mode)?;
+    fn get_aggregator_v1_value(&self, id: &Self::IdentifierV1) -> anyhow::Result<Option<u128>> {
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         match maybe_state_value {
             Some(state_value) => Ok(Some(bcs::from_bytes(state_value.bytes())?)),
             None => Ok(None),
@@ -68,16 +54,37 @@ pub trait TDelayedFieldView {
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
-        let maybe_state_value =
-            self.get_aggregator_v1_state_value(id, DelayedFieldReadMode::Aggregated)?;
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
+    /// Fetch a value of a DelayedField.
     fn get_delayed_field_value(
         &self,
-        _id: &Self::IdentifierV2,
-        _mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue>;
+        id: &Self::IdentifierV2,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>>;
+
+    /// Fetch an outcome of whether additional delta can be applied.
+    /// `base_delta` argument represents a cumulative value that we previously checked,
+    /// and `delta` argument represents a new increment.
+    /// (This allows method to be stateless, and not require it to required previous calls,
+    /// i.e. for sequential execution)
+    ///
+    /// For example, calls would go like this:
+    /// try_add_delta_outcome(base_delta = 0, delta = 5) -> true
+    /// try_add_delta_outcome(base_delta = 5, delta = 3) -> true
+    /// try_add_delta_outcome(base_delta = 8, delta = 2) -> false
+    /// try_add_delta_outcome(base_delta = 8, delta = 3) -> false
+    /// try_add_delta_outcome(base_delta = 8, delta = -3) -> true
+    /// try_add_delta_outcome(base_delta = 5, delta = 2) -> true
+    /// ...
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::IdentifierV2,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>>;
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
@@ -90,10 +97,9 @@ pub trait TDelayedFieldView {
         &self,
         id: &Self::IdentifierV1,
         delta_op: &DeltaOp,
-        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         let base = self
-            .get_aggregator_v1_value(id, mode)
+            .get_aggregator_v1_value(id)
             .map_err(|e| {
                 VMStatus::error(
                     StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -134,7 +140,6 @@ where
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
-        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.get_state_value(state_key)
     }
@@ -142,8 +147,17 @@ where
     fn get_delayed_field_value(
         &self,
         _id: &Self::IdentifierV2,
-        _mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue> {
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!()
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        _id: &Self::IdentifierV2,
+        _base_delta: &SignedU128,
+        _delta: &SignedU128,
+        _max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
         unimplemented!()
     }
 

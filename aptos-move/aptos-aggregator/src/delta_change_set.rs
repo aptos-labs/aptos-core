@@ -6,10 +6,83 @@
 //! postcondition.
 
 use crate::{
-    bounded_math::SignedU128,
+    bounded_math::{BoundedMath, SignedU128},
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
-    types::{code_invariant_error, DelayedFieldsSpeculativeError, PanicOr},
+    types::{
+        code_invariant_error, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr,
+    },
 };
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct DeltaWithMax {
+    /// Delta which is the result of the execution.
+    pub update: SignedU128,
+    /// The maximum value the aggregator can reach.
+    pub max_value: u128,
+}
+
+impl DeltaWithMax {
+    /// Creates a new delta op.
+    pub fn new(update: SignedU128, max_value: u128) -> Self {
+        Self { max_value, update }
+    }
+
+    /// Returns the kind of update for the delta op.
+    pub fn get_update(&self) -> SignedU128 {
+        self.update
+    }
+
+    /// Returns the result of delta application to `base` or error if
+    /// postcondition is not satisfied.
+    pub fn apply_to(&self, base: u128) -> Result<u128, DelayedFieldsSpeculativeError> {
+        let math = BoundedMath::new(self.max_value);
+        match self.update {
+            SignedU128::Positive(value) => math.unsigned_add(base, value).map_err(|_e| {
+                DelayedFieldsSpeculativeError::DeltaApplication {
+                    base_value: base,
+                    max_value: self.max_value,
+                    delta: self.update,
+                    reason: DeltaApplicationFailureReason::Overflow,
+                }
+            }),
+            SignedU128::Negative(value) => math.unsigned_subtract(base, value).map_err(|_e| {
+                DelayedFieldsSpeculativeError::DeltaApplication {
+                    base_value: base,
+                    max_value: self.max_value,
+                    delta: self.update,
+                    reason: DeltaApplicationFailureReason::Underflow,
+                }
+            }),
+        }
+    }
+
+    pub fn create_merged_delta(
+        prev_delta: &DeltaWithMax,
+        next_delta: &DeltaWithMax,
+    ) -> Result<DeltaWithMax, PanicOr<DelayedFieldsSpeculativeError>> {
+        if prev_delta.max_value != next_delta.max_value {
+            Err(code_invariant_error(
+                "Cannot merge deltas with different limits",
+            ))?;
+        }
+
+        let new_delta = BoundedMath::new(prev_delta.max_value)
+            .signed_add(&prev_delta.update, &next_delta.update)
+            .map_err(|_| DelayedFieldsSpeculativeError::DeltaMerge {
+                base_delta: prev_delta.update,
+                delta: next_delta.update,
+                max_value: prev_delta.max_value,
+            })?;
+
+        Ok(DeltaWithMax::new(new_delta, prev_delta.max_value))
+    }
+
+    pub fn into_op_no_additional_history(self) -> DeltaOp {
+        let mut history = DeltaHistory::new();
+        history.record_success(self.update);
+        DeltaOp::new(self.update, self.max_value, history)
+    }
+}
 
 /// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -84,6 +157,10 @@ impl DeltaOp {
         *self = Self::create_merged_delta(self, &next_delta)?;
         Ok(())
     }
+
+    pub fn into_inner(self) -> (SignedU128, DeltaHistory, u128) {
+        (self.update, self.history, self.max_value)
+    }
 }
 
 impl std::fmt::Debug for DeltaOp {
@@ -135,11 +212,7 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        resolver::{DelayedFieldReadMode, TDelayedFieldView},
-        types::DelayedFieldValue,
-        FakeAggregatorView,
-    };
+    use crate::{resolver::TDelayedFieldView, types::DelayedFieldValue, FakeAggregatorView};
     use aptos_types::{
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
@@ -396,11 +469,7 @@ mod test {
         let state_view = FakeAggregatorView::default();
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(
-                &KEY,
-                &delta_op,
-                DelayedFieldReadMode::Aggregated
-            ),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op,),
             Err(VMStatus::Error {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 message: Some(_),
@@ -418,7 +487,6 @@ mod test {
         fn get_aggregator_v1_state_value(
             &self,
             _id: &Self::IdentifierV1,
-            _mode: DelayedFieldReadMode,
         ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
@@ -429,12 +497,18 @@ mod test {
         fn get_delayed_field_value(
             &self,
             _id: &Self::IdentifierV2,
-            _mode: DelayedFieldReadMode,
-        ) -> anyhow::Result<DelayedFieldValue> {
-            Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                Some("Error message from BadStorage.".to_string()),
-            )))
+        ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+            Err(code_invariant_error("Error message from BadStorage.").into())
+        }
+
+        fn delayed_field_try_add_delta_outcome(
+            &self,
+            _id: &Self::IdentifierV2,
+            _base_delta: &SignedU128,
+            _delta: &SignedU128,
+            _max_value: u128,
+        ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+            Err(code_invariant_error("Error message from BadStorage.").into())
         }
 
         fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
@@ -447,11 +521,7 @@ mod test {
         let state_view = BadStorage;
         let delta_op = delta_add(10, 1000);
         assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(
-                &KEY,
-                &delta_op,
-                DelayedFieldReadMode::Aggregated
-            ),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op,),
             Err(VMStatus::Error {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 message: Some(_),
@@ -469,18 +539,10 @@ mod test {
         let add_op = delta_add(100, 200);
         let sub_op = delta_sub(100, 200);
 
-        let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(
-            &KEY,
-            &add_op,
-            DelayedFieldReadMode::Aggregated,
-        );
+        let add_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200).into()));
 
-        let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(
-            &KEY,
-            &sub_op,
-            DelayedFieldReadMode::Aggregated,
-        );
+        let sub_result = state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op);
         assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0).into()));
     }
 
@@ -494,22 +556,14 @@ mod test {
         let sub_op = delta_sub(101, 1000);
 
         assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(
-                &KEY,
-                &add_op,
-                DelayedFieldReadMode::Aggregated
-            ),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op,),
             Err(VMStatus::ExecutionFailure {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 ..
             })
         );
         assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(
-                &KEY,
-                &sub_op,
-                DelayedFieldReadMode::Aggregated
-            ),
+            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op,),
             Err(VMStatus::ExecutionFailure {
                 status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 ..
