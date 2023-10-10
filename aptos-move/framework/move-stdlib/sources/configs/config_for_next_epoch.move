@@ -30,7 +30,7 @@ module std::config_for_next_epoch {
     }
 
     public fun does_exist<T: store>(): bool acquires ForNextEpoch {
-        option::is_some(&borrow_global<ForNextEpoch<T>>(@std).payload)
+        exists<ForNextEpoch<T>>(@std) && option::is_some(&borrow_global<ForNextEpoch<T>>(@std).payload)
     }
 
     public fun upsert<T: drop + store>(std: &signer, config: T) acquires ForNextEpoch {
