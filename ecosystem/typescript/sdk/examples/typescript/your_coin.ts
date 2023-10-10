@@ -90,7 +90,7 @@ async function main() {
   const client = new CoinClient();
   const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
-  // Create two accounts, Alice and Bob, and fund Alice but not Bob
+  // Create two accounts, Alice and Bob, and fund both Alice and Bob
   const alice = new AptosAccount();
   const bob = new AptosAccount();
 
@@ -133,5 +133,5 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().then((resp) => console.log(resp));
+  main().then(() => null);
 }
