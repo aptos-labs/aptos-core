@@ -22,6 +22,8 @@
 
 pub use bcs;
 
+pub mod package_publisher;
+
 pub mod coin_client;
 
 pub mod crypto {
