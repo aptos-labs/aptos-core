@@ -119,6 +119,14 @@ impl Dag {
             .unwrap_or(&self.initial_round)
     }
 
+    /// The highest strong links round is either the highest round or the highest round - 1
+    /// because we ensure all parents (strong links) exist for any nodes in the store
+    pub fn highest_strong_links_round(&self, validator_verifier: &ValidatorVerifier) -> Round {
+        let highest_round = self.highest_round();
+        self.get_strong_links_for_round(highest_round, validator_verifier)
+            .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round)
+    }
+
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let node = Arc::new(node);
         let author = node.metadata().author();
@@ -323,7 +331,7 @@ impl Dag {
 
         let bitmask = self
             .nodes_by_round
-            .range(lowest_round..=target_round)
+            .range(lowest_round..target_round)
             .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
             .collect();
 

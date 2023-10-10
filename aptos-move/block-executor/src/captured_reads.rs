@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::task::Transaction;
 use anyhow::bail;
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, TxnIndex, Version},
     versioned_data::VersionedData,
     versioned_group_data::VersionedGroupData,
 };
-use aptos_types::{state_store::state_value::StateValueMetadataKind, write_set::TransactionWrite};
+use aptos_types::{
+    state_store::state_value::StateValueMetadataKind,
+    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+};
 use derivative::Derivative;
 use std::{
     collections::{
@@ -356,13 +358,11 @@ impl<T: Transaction> CapturedReads<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        proptest_types::types::{KeyType, MockEvent, ValueType},
-        task::Transaction,
-    };
+    use crate::proptest_types::types::{KeyType, MockEvent, ValueType};
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
+        transaction::BlockExecutableTransaction,
     };
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
     use test_case::test_case;
@@ -450,12 +450,12 @@ mod test {
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata())),
+            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(None));
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
         let not_exists = DataRead::Exists(false);
 
@@ -523,7 +523,7 @@ mod test {
     #[derive(Clone, Debug)]
     struct TestTransactionType {}
 
-    impl Transaction for TestTransactionType {
+    impl BlockExecutableTransaction for TestTransactionType {
         type Event = MockEvent;
         type Identifier = ();
         type Key = KeyType<u32>;
@@ -573,9 +573,9 @@ mod test {
         }};
     }
 
-    fn raw_metadata() -> StateValueMetadataKind {
-        Some(StateValueMetadata::new(5, &CurrentTimeMicroseconds {
-            microseconds: 7,
+    fn raw_metadata(v: u64) -> StateValueMetadataKind {
+        Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
+            microseconds: v,
         }))
     }
 
@@ -592,12 +592,12 @@ mod test {
         );
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata())),
+            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(None));
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
         let not_exists = DataRead::Exists(false);
 
@@ -685,9 +685,9 @@ mod test {
     fn with_metadata_reads_by_kind() -> Vec<DataRead<ValueType>> {
         let versioned_with_metadata = DataRead::Versioned(
             Ok((7, 0)),
-            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata())),
+            Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let exists = DataRead::Exists(true);
         vec![exists, metadata, versioned_with_metadata]
     }
@@ -833,7 +833,7 @@ mod test {
             Arc::new(ValueType::with_len_and_metadata(1, None)),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
-        let metadata = DataRead::Metadata(Some(raw_metadata()));
+        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
         let deletion_metadata = DataRead::Metadata(None);
         let exists = DataRead::Exists(true);
 

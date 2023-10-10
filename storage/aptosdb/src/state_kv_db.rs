@@ -40,7 +40,8 @@ impl StateKvDb {
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        if !rocksdb_configs.split_ledger_db {
+        let sharding = rocksdb_configs.enable_storage_sharding;
+        if !sharding {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),

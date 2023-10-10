@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
+    aggregator_extension::{AggregatorData, AggregatorState},
     delta_change_set::{DeltaOp, DeltaUpdate},
     resolver::AggregatorResolver,
 };
-use aptos_types::vm_status::VMStatus;
+use aptos_types::{aggregator::AggregatorID, vm_status::VMStatus};
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::Location;
 use std::{

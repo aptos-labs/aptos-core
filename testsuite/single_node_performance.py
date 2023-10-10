@@ -152,9 +152,7 @@ else:
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
 else:
-    DB_CONFIG_FLAGS = (
-        "--split-ledger-db --use-sharded-state-merkle-db --skip-index-and-usage"
-    )
+    DB_CONFIG_FLAGS = "--enable-storage-sharding"
 
 if os.environ.get("ENABLE_PRUNER"):
     DB_PRUNER_FLAGS = "--enable-state-pruner --enable-ledger-pruner --enable-epoch-snapshot-pruner --ledger-pruning-batch-size 10000 --state-prune-window 3000000 --epoch-snapshot-prune-window 3000000 --ledger-prune-window 3000000"

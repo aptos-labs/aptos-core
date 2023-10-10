@@ -3,10 +3,11 @@
 
 import { sha3_256 as sha3Hash } from "@noble/hashes/sha3";
 import { AccountAddress, Hex } from "../core";
-import { AuthenticationKeyScheme, HexInput } from "../types";
+import { AuthenticationKeyScheme, HexInput, SigningScheme } from "../types";
 import { MultiEd25519PublicKey } from "./multi_ed25519";
 import { PublicKey } from "./asymmetric_crypto";
 import { Ed25519PublicKey } from "./ed25519";
+import { Secp256k1PublicKey } from "./secp256k1";
 
 /**
  * Each account stores an authentication key. Authentication key enables account owners to rotate
@@ -75,9 +76,11 @@ export class AuthenticationKey {
 
     let scheme: number;
     if (publicKey instanceof Ed25519PublicKey) {
-      scheme = AuthenticationKeyScheme.Ed25519.valueOf();
+      scheme = SigningScheme.Ed25519.valueOf();
     } else if (publicKey instanceof MultiEd25519PublicKey) {
-      scheme = AuthenticationKeyScheme.MultiEd25519.valueOf();
+      scheme = SigningScheme.MultiEd25519.valueOf();
+    } else if (publicKey instanceof Secp256k1PublicKey) {
+      scheme = SigningScheme.Secp256k1Ecdsa.valueOf();
     } else {
       throw new Error("No supported authentication scheme for public key");
     }

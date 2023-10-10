@@ -20,6 +20,7 @@ use crate::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         dag_state_sync::StateSyncStatus,
         observability::logging::{LogEvent, LogSchema},
+        round_state::{AdaptiveResponsive, RoundState},
     },
     experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
@@ -152,6 +153,15 @@ impl DagBootstrapper {
                 self.time_service.clone(),
             );
         let fetch_requester = Arc::new(fetch_requester);
+        let (new_round_tx, new_round_rx) = tokio::sync::mpsc::channel(1024);
+        let round_state = RoundState::new(
+            new_round_tx.clone(),
+            Box::new(AdaptiveResponsive::new(
+                new_round_tx,
+                self.epoch_state.clone(),
+                Duration::from_millis(300),
+            )),
+        );
 
         let dag_driver = DagDriver::new(
             self.self_peer,
@@ -165,6 +175,7 @@ impl DagBootstrapper {
             order_rule,
             fetch_requester.clone(),
             ledger_info_provider,
+            round_state,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag.clone(),
@@ -183,6 +194,7 @@ impl DagBootstrapper {
             node_fetch_waiter,
             certified_node_fetch_waiter,
             state_sync_trigger,
+            new_round_rx,
         );
 
         (dag_handler, dag_fetcher)

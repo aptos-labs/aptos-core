@@ -4,11 +4,13 @@
 use crate::{
     captured_reads::CapturedReads,
     errors::Error,
-    task::{ExecutionStatus, Transaction, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
 };
-use anyhow::anyhow;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::{fee_statement::FeeStatement, write_set::WriteOp};
+use aptos_types::{
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
+};
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -88,7 +90,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         false
     }
 
-    /// Returns an error if a module path that was read was previously written to, and vice versa.
+    /// Returns false on an error - if a module path that was read was previously written to, and vice versa.
     /// Since parallel executor is instantiated per block, any module that is in the Move-VM loader
     /// cache must previously be read and would be recorded in the 'module_reads' set. Any module
     /// that is written (published or re-published) goes through transaction output write-set and
@@ -105,7 +107,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         txn_idx: TxnIndex,
         input: CapturedReads<T>,
         output: ExecutionStatus<O, Error<E>>,
-    ) -> anyhow::Result<()> {
+    ) -> bool {
         let written_modules = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
@@ -126,20 +128,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ) {
                 self.module_read_write_intersection
                     .store(true, Ordering::Release);
-                return Err(anyhow!(
-                    "[BlockSTM]: Detect module r/w intersection, will fallback to sequential execution"
-                ));
+                return false;
             }
         }
 
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
 
-        Ok(())
-    }
-
-    pub(crate) fn module_publishing_may_race(&self) -> bool {
-        self.module_read_write_intersection.load(Ordering::Acquire)
+        true
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
@@ -161,14 +157,29 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     /// Does a transaction at txn_idx have SkipRest or Abort status.
-    pub(crate) fn block_truncated_at_idx(&self, txn_idx: TxnIndex) -> bool {
+    pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
             &self.outputs[txn_idx as usize]
                 .load_full()
                 .expect("[BlockSTM]: Execution output must be recorded after execution")
                 .output_status,
-            ExecutionStatus::SkipRest(_) | ExecutionStatus::Abort(_)
+            ExecutionStatus::SkipRest(_)
         )
+    }
+
+    pub(crate) fn execution_error(&self, txn_idx: TxnIndex) -> Option<Error<E>> {
+        if self.module_read_write_intersection.load(Ordering::Acquire) {
+            return Some(Error::ModulePathReadWrite);
+        }
+
+        if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
+            .load_full()
+            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .output_status
+        {
+            return Some(err.clone());
+        }
+        None
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
