@@ -5,7 +5,10 @@
 
 use crate::{
     aptos_vm_impl::gas_config,
-    move_vm_ext::{get_max_binary_format_version, AptosMoveResolver, StateValueMetadataResolver},
+    move_vm_ext::{
+        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver,
+        StateValueMetadataResolver,
+    },
 };
 #[allow(unused_imports)]
 use anyhow::Error;
@@ -25,7 +28,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
 };
-use move_binary_format::{errors::*, CompiledModule};
+use move_binary_format::{deserializer::DeserializerConfig, errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
@@ -51,7 +54,7 @@ pub(crate) fn get_resource_group_from_metadata(
 pub struct StorageAdapter<'a, S> {
     state_store: &'a S,
     accurate_byte_count: bool,
-    max_binary_format_version: u32,
+    deserializer_config: DeserializerConfig,
     resource_group_cache:
         RefCell<BTreeMap<AccountAddress, BTreeMap<StructTag, BTreeMap<StructTag, Vec<u8>>>>>,
 }
@@ -62,16 +65,22 @@ impl<'a, S> StorageAdapter<'a, S> {
         gas_feature_version: u64,
         features: &Features,
     ) -> Self {
+        let max_binary_format_version =
+            get_max_binary_format_version(features, gas_feature_version);
+        let max_identifier_size = get_max_identifier_size(features);
+
         let mut s = Self {
             state_store,
             accurate_byte_count: false,
-            max_binary_format_version: 0,
+            deserializer_config: DeserializerConfig::new(
+                max_binary_format_version,
+                max_identifier_size,
+            ),
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
         if gas_feature_version >= 9 {
             s.accurate_byte_count = true;
         }
-        s.max_binary_format_version = get_max_binary_format_version(features, gas_feature_version);
         s
     }
 }
@@ -81,7 +90,7 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         let mut s = Self {
             state_store,
             accurate_byte_count: false,
-            max_binary_format_version: 0,
+            deserializer_config: DeserializerConfig::new(0, 0),
             resource_group_cache: RefCell::new(BTreeMap::new()),
         };
         let (_, gas_feature_version) = gas_config(&s);
@@ -89,7 +98,10 @@ impl<'a, S: StateView> StorageAdapter<'a, S> {
         if gas_feature_version >= 9 {
             s.accurate_byte_count = true;
         }
-        s.max_binary_format_version = get_max_binary_format_version(&features, gas_feature_version);
+        s.deserializer_config = DeserializerConfig::new(
+            get_max_binary_format_version(&features, gas_feature_version),
+            get_max_identifier_size(&features),
+        );
         s
     }
 
@@ -189,13 +201,12 @@ impl<'a, S: StateView> ModuleResolver for StorageAdapter<'a, S> {
             Ok(Some(bytes)) => bytes,
             _ => return vec![],
         };
-        let module = match CompiledModule::deserialize_with_max_version(
-            &module_bytes,
-            self.max_binary_format_version,
-        ) {
-            Ok(module) => module,
-            _ => return vec![],
-        };
+        let module =
+            match CompiledModule::deserialize_with_config(&module_bytes, &self.deserializer_config)
+            {
+                Ok(module) => module,
+                _ => return vec![],
+            };
         module.metadata
     }
 

@@ -53,7 +53,9 @@ use fail::fail_point;
 use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
+    deserializer::DeserializerConfig,
     errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
     CompiledModule, IndexKind,
 };
 use move_core_types::{
@@ -443,7 +445,7 @@ impl AptosVM {
                     // Gerardo: consolidate the extended validation to verifier.
                     verifier::event_validation::verify_no_event_emission_in_script(
                         script.code(),
-                        session.get_vm_config().max_binary_format_version,
+                        &session.get_vm_config().deserializer_config,
                     )?;
 
                     let args =
@@ -763,7 +765,10 @@ impl AptosVM {
         module_bundle: &ModuleBundle,
     ) -> VMResult<()> {
         for module_blob in module_bundle.iter() {
-            match CompiledModule::deserialize(module_blob.code()) {
+            match CompiledModule::deserialize_with_config(
+                module_blob.code(),
+                &session.get_vm_config().deserializer_config,
+            ) {
                 Ok(module) => {
                     // verify the module doesn't exist
                     if session.load_module(&module.self_id()).is_ok() {
@@ -837,9 +842,19 @@ impl AptosVM {
         } else {
             5
         };
+        let max_identifier_size = if self
+            .0
+            .get_features()
+            .is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH)
+        {
+            IDENTIFIER_SIZE_MAX
+        } else {
+            LEGACY_IDENTIFIER_SIZE_MAX
+        };
+        let config = DeserializerConfig::new(max_version, max_identifier_size);
         let mut result = vec![];
         for module_blob in modules.iter() {
-            match CompiledModule::deserialize_with_max_version(module_blob.code(), max_version) {
+            match CompiledModule::deserialize_with_config(module_blob.code(), &config) {
                 Ok(module) => {
                     result.push(module);
                 },
