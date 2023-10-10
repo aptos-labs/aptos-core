@@ -619,6 +619,7 @@ termcolor = "1.1.2"
 test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+threadpool = "1.8.1"
 time = { version = "0.3.24", features = ["serde"] }
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
