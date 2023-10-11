@@ -834,6 +834,7 @@ impl TransactionStore {
             self.ready_peers_needed_index
                 .insert(TxnPointer::new(sender, sequence_number));
         }
+        self.track_indices();
         self.redirect_no_peers();
     }
 

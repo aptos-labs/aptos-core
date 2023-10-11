@@ -18,7 +18,10 @@ use std::{
 };
 
 pub trait BroadcastPeersSelector: Send + Sync {
-    fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>);
+    fn update_peers(
+        &mut self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>);
     fn broadcast_peers(&self, account: &AccountAddress) -> Vec<PeerNetworkId>;
 }
 
@@ -79,6 +82,7 @@ pub struct PrioritizedPeersSelector {
     max_selected_peers: usize,
     prioritized_peers: Vec<PeerNetworkId>,
     prioritized_peers_comparator: PrioritizedPeersComparator,
+    peers: HashSet<PeerNetworkId>,
 }
 
 impl PrioritizedPeersSelector {
@@ -87,18 +91,28 @@ impl PrioritizedPeersSelector {
             max_selected_peers,
             prioritized_peers: Vec::new(),
             prioritized_peers_comparator: PrioritizedPeersComparator::new(),
+            peers: HashSet::new(),
         }
     }
 }
 
 impl BroadcastPeersSelector for PrioritizedPeersSelector {
-    fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
+    fn update_peers(
+        &mut self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
+        let new_peers = HashSet::from_iter(updated_peers.keys().cloned());
+        let added: Vec<_> = new_peers.difference(&self.peers).cloned().collect();
+        let removed: Vec<_> = self.peers.difference(&new_peers).cloned().collect();
+
         self.prioritized_peers = updated_peers
             .iter()
             .map(|(peer, metadata)| (*peer, metadata.get_connection_metadata().role))
             .sorted_by(|peer_a, peer_b| self.prioritized_peers_comparator.compare(peer_a, peer_b))
             .map(|(peer, _)| peer)
             .collect();
+
+        (added, removed)
     }
 
     fn broadcast_peers(&self, _account: &AccountAddress) -> Vec<PeerNetworkId> {
@@ -208,7 +222,10 @@ impl FreshPeersSelector {
 }
 
 impl BroadcastPeersSelector for FreshPeersSelector {
-    fn update_peers(&mut self, updated_peers: &HashMap<PeerNetworkId, PeerMetadata>) {
+    fn update_peers(
+        &mut self,
+        updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         let mut peer_versions: Vec<_> = updated_peers
             .iter()
             .map(|(peer, metadata)| {
@@ -255,11 +272,14 @@ impl BroadcastPeersSelector for FreshPeersSelector {
 
         let selected_peers =
             HashSet::from_iter(selected_peer_versions.iter().map(|(peer, _version)| *peer));
-        counters::SHARED_MEMPOOL_SELECTOR_REMOVED_PEERS
-            .observe(self.peers.difference(&selected_peers).count() as f64);
+        let added: Vec<_> = selected_peers.difference(&self.peers).cloned().collect();
+        let removed: Vec<_> = self.peers.difference(&selected_peers).cloned().collect();
+        counters::SHARED_MEMPOOL_SELECTOR_REMOVED_PEERS.observe(removed.len() as f64);
 
         self.sorted_peers = selected_peer_versions;
         self.peers = selected_peers;
+
+        (added, removed)
     }
 
     fn broadcast_peers(&self, account: &PeerId) -> Vec<PeerNetworkId> {
