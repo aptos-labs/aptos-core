@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::traits::ShutdownStep;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
+use bollard::{container::RemoveContainerOptions, image::CreateImageOptions, Docker};
+use futures::TryStreamExt;
 use reqwest::Url;
-use std::{fs::create_dir_all, net::SocketAddr, path::Path, process::Stdio};
-use tokio::process::Command;
+use std::{fs::create_dir_all, net::SocketAddr, path::Path};
 use tracing::info;
 
 pub fn socket_addr_to_url(socket_addr: &SocketAddr, scheme: &str) -> Result<Url> {
@@ -18,22 +19,18 @@ pub fn socket_addr_to_url(socket_addr: &SocketAddr, scheme: &str) -> Result<Url>
     Ok(Url::parse(&full_url)?)
 }
 
+pub fn get_docker() -> Result<Docker> {
+    let docker = Docker::connect_with_local_defaults()
+        .context("Docker is not available, confirm it is installed and running: {:?}")?;
+    Ok(docker)
+}
+
 pub async fn confirm_docker_available() -> Result<()> {
-    let status = Command::new("docker")
-        .arg("info")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
+    let docker = get_docker()?;
+    docker
+        .info()
         .await
-        .context("Failed to check if Docker is available")?;
-
-    if !status.success() {
-        bail!(
-            "Docker is not available, confirm it is installed and running: {:?}",
-            status
-        );
-    }
-
+        .context("Docker is not available, confirm it is installed and running: {:?}")?;
     Ok(())
 }
 
@@ -44,18 +41,15 @@ pub async fn delete_container(container_name: &str) -> Result<()> {
         container_name
     );
 
-    let _ = Command::new("docker")
-        .arg("rm")
-        .arg("-f")
-        .arg(container_name)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .context(format!(
-            "Failed to remove existing container with name {}",
-            container_name
-        ))?;
+    let docker = get_docker()?;
+
+    let options = Some(RemoveContainerOptions {
+        force: true,
+        ..Default::default()
+    });
+
+    // Ignore any error, it'll be because the container doesn't exist.
+    let _ = docker.remove_container(container_name, options).await;
 
     info!(
         "Removed any existing postgres container with name {}",
@@ -67,19 +61,28 @@ pub async fn delete_container(container_name: &str) -> Result<()> {
 
 pub async fn pull_docker_image(image_name: &str) -> Result<()> {
     info!("Pulling docker image {}", image_name);
-    let status = Command::new("docker")
-        .arg("pull")
-        .arg(image_name)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .context("Failed to pull postgres image")?;
-    info!("Pulled docker image {}", image_name);
 
-    if !status.success() {
-        bail!("Failed to pull postgres image: {:?}", status);
-    }
+    let docker = get_docker()?;
+
+    let options = Some(CreateImageOptions {
+        from_image: image_name,
+        ..Default::default()
+    });
+
+    // Check if the image is there. If not, print that we'll pull it.
+    if docker.inspect_image(image_name).await.is_err() {
+        eprintln!("Image {} not found, pulling it now", image_name);
+    };
+
+    // The docker pull CLI command is just sugar around this API.
+    docker
+        .create_image(options, None, None)
+        // Just wait for the whole stream, we don't need to do other things in parallel.
+        .try_collect::<Vec<_>>()
+        .await
+        .with_context(|| format!("Failed to pull image {}", image_name))?;
+
+    info!("Pulled docker image {}", image_name);
 
     Ok(())
 }
@@ -88,11 +91,7 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
 /// file called README.md that tells the user where to go to see logs. We do this since
 /// having the user use `docker logs` is the preferred approach. To help debug any
 /// potential startup failures however, we also create files for the command to write to.
-pub fn setup_docker_logging(
-    test_dir: &Path,
-    dir_name: &str,
-    container_name: &str,
-) -> Result<(Stdio, Stdio)> {
+pub fn setup_docker_logging(test_dir: &Path, dir_name: &str, container_name: &str) -> Result<()> {
     // Create dir.
     let log_dir = test_dir.join(dir_name);
     create_dir_all(log_dir.as_path()).context(format!("Failed to create {}", log_dir.display()))?;
@@ -104,25 +103,7 @@ pub fn setup_docker_logging(
     );
     std::fs::write(log_dir.join("README.md"), data).context("Unable to write README file")?;
 
-    // Create file for stdout.
-    let path = log_dir.join("stdout.log");
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(path.clone())
-        .context(format!("Failed to create {}", path.display()))?;
-    let stdout = Stdio::from(file);
-
-    // Create file for stderr.
-    let path = log_dir.join("stderr.log");
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(path.clone())
-        .context(format!("Failed to create {}", path.display()))?;
-    let stderr = Stdio::from(file);
-
-    Ok((stdout, stderr))
+    Ok(())
 }
 
 /// This shutdown step forcibly kills a container with the given name. If no container

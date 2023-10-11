@@ -7,15 +7,21 @@ use super::{
     utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
 };
-use crate::node::local_testnet::utils::{setup_docker_logging, KillContainerShutdownStep};
+use crate::node::local_testnet::utils::{
+    get_docker, setup_docker_logging, KillContainerShutdownStep,
+};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
+use bollard::{
+    container::{Config, CreateContainerOptions, StartContainerOptions, WaitContainerOptions},
+    models::{HostConfig, PortBinding},
+};
 use clap::Parser;
-use maplit::hashset;
+use futures::TryStreamExt;
+use maplit::{hashmap, hashset};
 use reqwest::Url;
-use std::{collections::HashSet, path::PathBuf, process::Stdio};
-use tokio::process::Command;
-use tracing::info;
+use std::{collections::HashSet, path::PathBuf};
+use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "indexer-api";
 const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.33.0";
@@ -112,77 +118,90 @@ impl ServiceManager for IndexerApiManager {
     }
 
     async fn run_service(self: Box<Self>) -> Result<()> {
-        let (stdout, stderr) =
-            setup_docker_logging(&self.test_dir, "indexer-api", INDEXER_API_CONTAINER_NAME)?;
+        setup_docker_logging(&self.test_dir, "indexer-api", INDEXER_API_CONTAINER_NAME)?;
 
-        // If we're on Mac, replace 127.0.0.1 with host.docker.internal.
-        // https://stackoverflow.com/a/24326540/3846032
-        let postgres_connection_string = if cfg!(target_os = "macos") {
-            self.postgres_connection_string
-                .replace("127.0.0.1", "host.docker.internal")
-        } else {
-            self.postgres_connection_string.to_string()
+        // Unconditionally use host.docker.internal instead of 127.0.0.1 to access the
+        // host system. This currently works out of the box on Docker for Desktop on
+        // Mac and Windows. On Linux, this requires that you bind the name to the host
+        // gateway, which we do below.
+        let postgres_connection_string = self
+            .postgres_connection_string
+            .replace("127.0.0.1", "host.docker.internal");
+
+        info!(
+            "Using postgres connection string: {}",
+            postgres_connection_string
+        );
+
+        let options = Some(CreateContainerOptions {
+            name: INDEXER_API_CONTAINER_NAME,
+            ..Default::default()
+        });
+
+        let exposed_ports = Some(hashmap! {self.indexer_api_port.to_string() => hashmap!{}});
+        let mut host_config = HostConfig {
+            port_bindings: Some(hashmap! {
+                self.indexer_api_port.to_string() => Some(vec![PortBinding {
+                    host_ip: Some("127.0.0.1".to_string()),
+                    host_port: Some(self.indexer_api_port.to_string()),
+                }]),
+            }),
+            ..Default::default()
         };
 
-        // https://stackoverflow.com/q/77171786/3846032
-        let mut command = Command::new("docker");
-        command
-            .arg("run")
-            .arg("-q")
-            .arg("--rm")
-            .arg("--tty")
-            .arg("--no-healthcheck")
-            .arg("--name")
-            .arg(INDEXER_API_CONTAINER_NAME)
-            .arg("-p")
-            .arg(format!(
-                "{}:{}",
-                self.indexer_api_port, self.indexer_api_port
-            ))
-            .arg("-e")
-            .arg(format!("PG_DATABASE_URL={}", postgres_connection_string))
-            .arg("-e")
-            .arg(format!(
-                "HASURA_GRAPHQL_METADATA_DATABASE_URL={}",
-                postgres_connection_string
-            ))
-            .arg("-e")
-            .arg(format!(
-                "INDEXER_V2_POSTGRES_URL={}",
-                postgres_connection_string
-            ))
-            .arg("-e")
-            .arg("HASURA_GRAPHQL_DEV_MODE=true")
-            .arg("-e")
-            .arg("HASURA_GRAPHQL_ENABLE_CONSOLE=true")
-            .arg("-e")
-            .arg("HASURA_GRAPHQL_CONSOLE_ASSETS_DIR=/srv/console-assets")
-            .arg("-e")
-            .arg(format!(
-                "HASURA_GRAPHQL_SERVER_PORT={}",
-                self.indexer_api_port
-            ))
-            .arg(HASURA_IMAGE)
-            .stdin(Stdio::null())
-            .stdout(stdout)
-            .stderr(stderr);
+        if cfg!(target_os = "linux") {
+            host_config.extra_hosts = Some(vec!["host.docker.internal:host-gateway".to_string()]);
+        }
 
-        info!("Running command: {:?}", command);
+        let config = Config {
+            image: Some(HASURA_IMAGE.to_string()),
+            tty: Some(true),
+            exposed_ports,
+            host_config: Some(host_config),
+            env: Some(vec![
+                format!("PG_DATABASE_URL={}", postgres_connection_string),
+                format!(
+                    "HASURA_GRAPHQL_METADATA_DATABASE_URL={}",
+                    postgres_connection_string
+                ),
+                format!("INDEXER_V2_POSTGRES_URL={}", postgres_connection_string),
+                "HASURA_GRAPHQL_DEV_MODE=true".to_string(),
+                "HASURA_GRAPHQL_ENABLE_CONSOLE=true".to_string(),
+                "HASURA_GRAPHQL_CONSOLE_ASSETS_DIR=/srv/console-assets".to_string(),
+                format!("HASURA_GRAPHQL_SERVER_PORT={}", self.indexer_api_port),
+            ]),
+            ..Default::default()
+        };
 
-        let child = command
-            .spawn()
+        info!("Starting indexer API with this config: {:#?}", config);
+
+        let docker = get_docker()?;
+
+        let id = docker.create_container(options, config).await?.id;
+
+        info!("Created container with this ID: {}", id);
+
+        docker
+            .start_container(&id, None::<StartContainerOptions<&str>>)
+            .await
             .context("Failed to start indexer API container")?;
 
-        // When sigint is received the container can error out, which we don't want to
-        // show to the user, so we log instead.
-        match child.wait_with_output().await {
-            Ok(output) => {
-                info!("Indexer API stopped with output: {:?}", output);
-            },
-            Err(err) => {
-                info!("Indexer API stopped unexpectedly with error: {}", err);
-            },
-        }
+        info!("Started container {}", id);
+
+        // Wait for the container to stop, which it never should unless we receive
+        // ctrl-c.
+        let wait = docker
+            .wait_container(
+                &id,
+                Some(WaitContainerOptions {
+                    condition: "not-running",
+                }),
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .context("Failed to wait on indexer API container")?;
+
+        warn!("Indexer API stopped: {:?}", wait.last());
 
         Ok(())
     }
