@@ -209,6 +209,7 @@ impl NetworkBuilder {
             config.ping_interval_ms,
             config.ping_timeout_ms,
             config.ping_failures_tolerated,
+            config.max_parallel_serialization_tasks,
             config.max_parallel_deserialization_tasks,
         );
 
@@ -418,11 +419,13 @@ impl NetworkBuilder {
         ping_interval_ms: u64,
         ping_timeout_ms: u64,
         ping_failures_tolerated: u64,
+        max_parallel_serialization_tasks: Option<usize>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> &mut Self {
         // Initialize and start HealthChecker.
         let (hc_network_tx, hc_network_rx) = self.add_client_and_service(
             &health_checker::health_checker_network_config(),
+            max_parallel_serialization_tasks,
             max_parallel_deserialization_tasks,
         );
         self.health_checker_builder = Some(HealthCheckerBuilder::new(
@@ -448,10 +451,14 @@ impl NetworkBuilder {
     pub fn add_client_and_service<SenderT: NewNetworkSender, EventsT: NewNetworkEvents>(
         &mut self,
         config: &NetworkApplicationConfig,
+        max_parallel_serialization_tasks: Option<usize>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> (SenderT, EventsT) {
         (
-            self.add_client(&config.network_client_config),
+            self.add_client(
+                &config.network_client_config,
+                max_parallel_serialization_tasks,
+            ),
             self.add_service(
                 &config.network_service_config,
                 max_parallel_deserialization_tasks,
@@ -461,9 +468,17 @@ impl NetworkBuilder {
 
     /// Register a new client application with the network. Return the client
     /// interface for sending messages.
-    fn add_client<SenderT: NewNetworkSender>(&mut self, config: &NetworkClientConfig) -> SenderT {
+    fn add_client<SenderT: NewNetworkSender>(
+        &mut self,
+        config: &NetworkClientConfig,
+        max_parallel_serialization_tasks: Option<usize>,
+    ) -> SenderT {
         let (peer_mgr_reqs_tx, connection_reqs_tx) = self.peer_manager_builder.add_client(config);
-        SenderT::new(peer_mgr_reqs_tx, connection_reqs_tx)
+        SenderT::new(
+            peer_mgr_reqs_tx,
+            connection_reqs_tx,
+            max_parallel_serialization_tasks,
+        )
     }
 
     /// Register a new service application with the network. Return the service

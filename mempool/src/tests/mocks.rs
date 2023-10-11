@@ -113,6 +113,7 @@ impl MockSharedMempool {
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
+            None,
         );
         let network_events = NetworkEvents::new(network_notifs_rx, conn_notifs_rx, None);
         let (ac_client, client_events) = mpsc::channel(1_024);

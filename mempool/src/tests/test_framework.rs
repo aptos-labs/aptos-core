@@ -545,6 +545,7 @@ fn setup_network(
     let network_sender = NetworkSender::new(
         PeerManagerRequestSender::new(reqs_outbound_sender),
         ConnectionRequestSender::new(connection_outbound_sender),
+        None,
     );
     let network_events =
         NetworkEvents::new(reqs_inbound_receiver, connection_inbound_receiver, None);

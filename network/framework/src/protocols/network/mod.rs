@@ -8,16 +8,20 @@ pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
     peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
+        ConnectionNotification, ConnectionRequestSender, PeerManagerError, PeerManagerNotification,
         PeerManagerRequestSender,
     },
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_channels::{
+    aptos_channel,
+    aptos_channel::{Receiver, Sender},
+    message_queues::QueueStyle,
+};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -33,7 +37,7 @@ pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
 
 // TODO: do we want to make this configurable?
-const MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER: usize = 50;
+const MAX_SERIALIZATION_QUEUE_SIZE_PER_APPLICATION: usize = 500;
 
 /// Events received by network clients in a validator
 ///
@@ -157,7 +161,7 @@ impl NetworkApplicationConfig {
 pub struct NetworkEvents<TMessage> {
     #[pin]
     event_stream: Select<
-        aptos_channel::Receiver<PeerId, Event<TMessage>>,
+        aptos_channel::Receiver<(), Event<TMessage>>,
         Map<
             aptos_channel::Receiver<PeerId, ConnectionNotification>,
             fn(ConnectionNotification) -> Event<TMessage>,
@@ -181,10 +185,37 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
         connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self {
+        // Spawn a task to deserialize inbound messages
+        let deserialized_message_receiver = Self::spawn_deserialization_handler(
+            peer_mgr_notifs_rx,
+            max_parallel_deserialization_tasks,
+        );
+
+        // Process the control messages
+        let control_event_stream = connection_notifs_rx
+            .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
+
+        Self {
+            event_stream: ::futures::stream::select(
+                deserialized_message_receiver,
+                control_event_stream,
+            ),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<TMessage: Message + Send + 'static> NetworkEvents<TMessage> {
+    /// Spawns a message deserialization handler that deserializes
+    /// messages in parallel and sends them to the receiver.
+    fn spawn_deserialization_handler(
+        peer_mgr_notifs_rx: Receiver<(AccountAddress, ProtocolId), PeerManagerNotification>,
+        max_parallel_deserialization_tasks: Option<usize>,
+    ) -> Receiver<(), Event<TMessage>> {
         // Create a channel for deserialized messages
         let (deserialized_message_sender, deserialized_message_receiver) = aptos_channel::new(
             QueueStyle::FIFO,
-            MAX_DESERIALIZATION_QUEUE_SIZE_PER_PEER,
+            MAX_SERIALIZATION_QUEUE_SIZE_PER_APPLICATION,
             None,
         );
 
@@ -197,17 +228,15 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
                 .for_each_concurrent(
                     max_parallel_deserialization_tasks,
                     move |peer_manager_notification| {
-                        // Get the peer ID for the notification
                         let deserialized_message_sender = deserialized_message_sender.clone();
-                        let peer_id_for_notification = peer_manager_notification.get_peer_id();
 
                         // Spawn a new blocking task to deserialize the message
                         tokio::task::spawn_blocking(move || {
                             if let Some(deserialized_message) =
                                 peer_mgr_notif_to_event(peer_manager_notification)
                             {
-                                if let Err(error) = deserialized_message_sender
-                                    .push(peer_id_for_notification, deserialized_message)
+                                if let Err(error) =
+                                    deserialized_message_sender.push((), deserialized_message)
                                 {
                                     warn!(
                                         "Failed to send deserialized message to receiver: {:?}",
@@ -222,17 +251,7 @@ impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMes
                 .await
         });
 
-        // Process the control messages
-        let control_event_stream = connection_notifs_rx
-            .map(control_msg_to_event as fn(ConnectionNotification) -> Event<TMessage>);
-
-        Self {
-            event_stream: ::futures::stream::select(
-                deserialized_message_receiver,
-                control_event_stream,
-            ),
-            _marker: PhantomData,
-        }
+        deserialized_message_receiver
     }
 }
 
@@ -298,6 +317,13 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
     }
 }
 
+/// A simple enum that contains a message serialization request (i.e., a
+/// message that needs to be serialized before being sent).
+enum MessageSerializationRequest<TMessage> {
+    SendToPeer(PeerId, ProtocolId, TMessage),
+    SendToManyPeers(Vec<PeerId>, ProtocolId, TMessage),
+}
+
 /// `NetworkSender` is the generic interface from upper network applications to
 /// the lower network layer. It provides the full API for network applications,
 /// including sending direct-send messages, sending rpc requests, as well as
@@ -311,11 +337,11 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// interface they need.
 ///
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct NetworkSender<TMessage> {
     peer_mgr_reqs_tx: PeerManagerRequestSender,
     connection_reqs_tx: ConnectionRequestSender,
-    _marker: PhantomData<TMessage>,
+    serializing_message_sender: aptos_channel::Sender<(), MessageSerializationRequest<TMessage>>,
 }
 
 /// Trait specifying the signature for `new()` `NetworkSender`s
@@ -323,19 +349,102 @@ pub trait NewNetworkSender {
     fn new(
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
+        max_parallel_serialization_tasks: Option<usize>,
     ) -> Self;
 }
 
-impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
+impl<TMessage: Message + Send + 'static> NewNetworkSender for NetworkSender<TMessage> {
     fn new(
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
+        max_parallel_serialization_tasks: Option<usize>,
     ) -> Self {
+        // Spawn a task to serialize outbound messages
+        let serializing_message_sender =
+            Self::spawn_serialization_handler(&peer_mgr_reqs_tx, max_parallel_serialization_tasks);
+
         Self {
             peer_mgr_reqs_tx,
             connection_reqs_tx,
-            _marker: PhantomData,
+            serializing_message_sender,
         }
+    }
+}
+
+impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
+    /// Spawns a message serialization handler that serializes
+    /// messages in parallel and sends them to the receiver.
+    fn spawn_serialization_handler(
+        peer_mgr_reqs_tx: &PeerManagerRequestSender,
+        max_parallel_serialization_tasks: Option<usize>,
+    ) -> Sender<(), MessageSerializationRequest<TMessage>> {
+        // Create a channel for serializing messages
+        let (serializing_message_sender, serializing_message_receiver) = aptos_channel::new(
+            QueueStyle::FIFO,
+            MAX_SERIALIZATION_QUEUE_SIZE_PER_APPLICATION,
+            None,
+        );
+
+        // Serialize the peer manager notifications in parallel (for each
+        // network application) and send them to the peer manager. Note: this
+        // may cause out of order message sending, but applications
+        // should already be handling this on the receiving end.
+        let peer_mgr_reqs_tx_clone = peer_mgr_reqs_tx.clone();
+        tokio::spawn(async move {
+            serializing_message_receiver
+                .for_each_concurrent(
+                    max_parallel_serialization_tasks,
+                    move |message_serialization_request| {
+                        let peer_mgr_reqs_tx = peer_mgr_reqs_tx_clone.clone();
+
+                        // Spawn a new blocking task to serialize the
+                        // messages and send them to the peer manager.
+                        tokio::task::spawn_blocking(move || {
+                            match message_serialization_request {
+                                MessageSerializationRequest::SendToPeer(
+                                    peer_id,
+                                    protocol_id,
+                                    message,
+                                ) => {
+                                    // Serialize and send the message to the specified peer
+                                    let serialize_and_send_result =
+                                        protocol_id.to_bytes(&message).map(|message_bytes| {
+                                            peer_mgr_reqs_tx.send_to(
+                                                peer_id,
+                                                protocol_id,
+                                                message_bytes.into(),
+                                            )
+                                        });
+
+                                    // Log any potential errors
+                                    log_serialize_and_send_errors(serialize_and_send_result);
+                                },
+                                MessageSerializationRequest::SendToManyPeers(
+                                    peer_ids,
+                                    protocol_id,
+                                    message,
+                                ) => {
+                                    // Serialize and send the message to the specified peers
+                                    let serialize_and_send_result =
+                                        protocol_id.to_bytes(&message).map(|message_bytes| {
+                                            peer_mgr_reqs_tx.send_to_many(
+                                                peer_ids.into_iter(),
+                                                protocol_id,
+                                                message_bytes.into(),
+                                            )
+                                        });
+
+                                    // Log any potential errors
+                                    log_serialize_and_send_errors(serialize_and_send_result);
+                                },
+                            }
+                        })
+                        .map(|_| ())
+                    },
+                )
+                .await
+        });
+        serializing_message_sender
     }
 }
 
@@ -355,18 +464,21 @@ impl<TMessage> NetworkSender<TMessage> {
     }
 }
 
-impl<TMessage: Message> NetworkSender<TMessage> {
+impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
     /// Send a protobuf message to a single recipient. Provides a wrapper over
     /// `[peer_manager::PeerManagerRequestSender::send_to]`.
     pub fn send_to(
         &self,
         recipient: PeerId,
-        protocol: ProtocolId,
+        protocol_id: ProtocolId,
         message: TMessage,
     ) -> Result<(), NetworkError> {
-        let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx.send_to(recipient, protocol, mdata)?;
-        Ok(())
+        // Create and send the message serialization request
+        let message_send_request =
+            MessageSerializationRequest::SendToPeer(recipient, protocol_id, message);
+        self.serializing_message_sender
+            .push((), message_send_request)
+            .map_err(|error| error.into())
     }
 
     /// Send a protobuf message to a many recipients. Provides a wrapper over
@@ -374,14 +486,18 @@ impl<TMessage: Message> NetworkSender<TMessage> {
     pub fn send_to_many(
         &self,
         recipients: impl Iterator<Item = PeerId>,
-        protocol: ProtocolId,
+        protocol_id: ProtocolId,
         message: TMessage,
     ) -> Result<(), NetworkError> {
-        // Serialize message.
-        let mdata = protocol.to_bytes(&message)?.into();
-        self.peer_mgr_reqs_tx
-            .send_to_many(recipients, protocol, mdata)?;
-        Ok(())
+        // Create and send the message serialization request
+        let message_send_request = MessageSerializationRequest::SendToManyPeers(
+            recipients.collect(),
+            protocol_id,
+            message,
+        );
+        self.serializing_message_sender
+            .push((), message_send_request)
+            .map_err(|error| error.into())
     }
 
     /// Send a protobuf rpc request to a single recipient while handling
@@ -390,18 +506,43 @@ impl<TMessage: Message> NetworkSender<TMessage> {
     pub async fn send_rpc(
         &self,
         recipient: PeerId,
-        protocol: ProtocolId,
-        req_msg: TMessage,
+        protocol_id: ProtocolId,
+        message: TMessage,
         timeout: Duration,
     ) -> Result<TMessage, RpcError> {
-        // serialize request
-        let req_data = protocol.to_bytes(&req_msg)?.into();
-        let res_data = self
+        // Note: we do not use the serialization channel when sending RPC
+        // requests because we block the task until the response is received.
+        // Instead, we do everything inline here.
+
+        // Spawn a blocking task to perform serialization
+        let protocol_id_copy = protocol_id;
+        let message_bytes =
+            tokio::task::spawn_blocking(move || protocol_id_copy.to_bytes(&message)).await??;
+
+        // Send the request to the peer manager and wait for the response
+        let response_bytes = self
             .peer_mgr_reqs_tx
-            .send_rpc(recipient, protocol, req_data, timeout)
+            .send_rpc(recipient, protocol_id, message_bytes.into(), timeout)
             .await?;
-        let res_msg: TMessage = protocol.from_bytes(&res_data)?;
-        Ok(res_msg)
+
+        // Spawn a blocking task to perform deserialization
+        let protocol_id_copy = protocol_id;
+        let response_message =
+            tokio::task::spawn_blocking(move || protocol_id_copy.from_bytes(&response_bytes))
+                .await?;
+
+        // Return the response
+        response_message.map_err(|error| error.into())
+    }
+}
+
+impl<TMessage> Debug for NetworkSender<TMessage> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NetworkSender {{ peer_mgr_reqs_tx: {:?}, connection_reqs_tx: {:?} }}",
+            self.peer_mgr_reqs_tx, self.connection_reqs_tx
+        )
     }
 }
 
@@ -414,5 +555,22 @@ pub trait SerializedRequest {
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]
     fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
         self.protocol_id().from_bytes(self.data())
+    }
+}
+
+/// A helper method that logs any errors that occur when
+/// serializing and sending a message.
+fn log_serialize_and_send_errors(
+    serialize_and_send_result: Result<Result<(), PeerManagerError>, anyhow::Error>,
+) {
+    match serialize_and_send_result {
+        Ok(send_result) => {
+            if let Err(send_error) = send_result {
+                warn!("Failed to send message! Error: {:?}", send_error);
+            }
+        },
+        Err(serialize_error) => {
+            warn!("Failed to serialize message! Error: {:?}", serialize_error);
+        },
     }
 }
