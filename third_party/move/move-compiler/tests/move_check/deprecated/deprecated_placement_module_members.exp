@@ -34,6 +34,15 @@ warning[W03015]: Use of deprecated struct
 36 │     let foo: S = M::foo();
    │              ^ Use of deprecated struct 'S' from module '0x41::N'
 
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:36:15
+   │
+ 2 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+36 │     let foo: S = M::foo();
+   │                  ^ Use of deprecated module '0x42::M'
+
 warning[W03016]: Use of deprecated function
    ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:36:18
    │
@@ -42,6 +51,15 @@ warning[W03016]: Use of deprecated function
    ·
 36 │     let foo: S = M::foo();
    │                     ^^^ Use of deprecated function 'foo' from module '0x42::M'
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:37:2
+   │
+19 │ #[deprecated]
+   │   ---------- Module '0x41::N' deprecated here
+   ·
+37 │     0x41::N::consume(foo);
+   │     ^^^^^^^ Use of deprecated module '0x41::N'
 
 warning[W03016]: Use of deprecated function
    ┌─ tests/move_check/deprecated/deprecated_placement_module_members.move:37:11

@@ -1207,10 +1207,7 @@ fn check_for_deprecated_member_use(
             }
         },
         Some(mident) => {
-            // If external module is deprecated, skip member warnings
-            // if check_for_deprecated_module_use(context, mident) {
-            //     return;
-            // }
+            check_for_deprecated_module_use(context, mident);
             *mident
         },
     };

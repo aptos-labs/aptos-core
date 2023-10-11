@@ -59,7 +59,7 @@ impl<'env> Context<'env> {
     ) -> Self {
         use ResolvedType as RT;
 
-        // make a list of all moodules first to avoid repeated visitation.
+        // make a list of all modules first to avoid repeated visitation.
         let all_modules: Vec<_> = prog
             .modules
             .key_cloned_iter()
@@ -73,7 +73,7 @@ impl<'env> Context<'env> {
             .collect();
 
         // for each module name ModuleIdent, map each struct name in the module to a set of
-        // properties: (Loc, ModuleIdent, AbilitySet, usize)i.
+        // properties: (Loc, ModuleIdent, AbilitySet, usize).
         let scoped_types = all_modules
             .iter()
             .map(|(mident, mdef)| {
