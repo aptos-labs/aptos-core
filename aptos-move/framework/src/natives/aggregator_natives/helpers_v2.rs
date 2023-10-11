@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::helpers_v1::set_aggregator_field;
-use crate::natives::aggregator_natives::helpers_v1::get_aggregator_field;
+use super::helpers_v1::{get_aggregator_field, set_aggregator_field};
 use aptos_aggregator::{
     types::{DelayedFieldID, SnapshotValue},
     utils::{from_utf8_bytes, u128_to_u64},

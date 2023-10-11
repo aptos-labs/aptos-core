@@ -155,21 +155,10 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     // Bypass stored in the estimate does not match the new entry.
                     (Estimate(_), _) => false,
 
-                    // The following two cases are acceptable uses to record a value after txn
-                    // materialization / commit, as the value will never change.
-                    //
-                    // value & value pattern is allowed to not be too restrictive to the caller.
-                    //
-                    // The patterns ensure to avoid panic in the unreachable branch below, and
-                    // returning 'true' ensures that the bypass enabling logic is not affected.
-                    (Value(val_l, None), Value(val_r, _)) if val_l == val_r => true,
-                    (Value(_, None), Apply(_)) => true,
-
                     // TODO: change to code_invariant_error
-                    (_, _) => unreachable!(
-                        "Replaced entry must be an Estimate, \
-			 or we should be recording the final committed value"
-                    ),
+                    (cur, new) => {
+                        unreachable!("Replaced entry must be an Estimate, {:?} to {:?}", cur, new,)
+                    },
                 } {
                     // TODO: handle invalidation when we change read_estimate_deltas
                     self.read_estimate_deltas = false;
@@ -180,6 +169,22 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                 v.insert(CachePadded::new(entry));
             },
         }
+    }
+
+    fn insert_final_value(&mut self, txn_idx: TxnIndex, value: DelayedFieldValue) {
+        use VersionEntry::*;
+
+        match self.versioned_map.entry(txn_idx) {
+            Entry::Occupied(mut o) => {
+                match &**o.get() {
+                    Value(v, _) => assert_eq!(v, &value),
+                    Apply(_) => (),
+                    _ => unreachable!("When inserting final value, it needs to be either be Apply or have the same value"),
+                };
+                o.insert(CachePadded::new(VersionEntry::Value(value, None)));
+            },
+            Entry::Vacant(_) => unreachable!("When inserting final value, it needs to be present"),
+        };
     }
 
     // Given a transaction index which should be committed next, returns the latest value
@@ -531,7 +536,9 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                 .expect("Value in commit at that transaction version needs to be in the HashMap");
 
             let new_entry = match &**entry_to_commit {
-                VersionEntry::Value(_, _) => None,
+                VersionEntry::Value(_, None) => None,
+                // remove delta in the commit
+                VersionEntry::Value(v, Some(_)) => Some(v.clone()),
                 VersionEntry::Apply(AggregatorDelta { delta }) => {
                     let prev_value = versioned_value.read_latest_committed_value(idx_to_commit)
                         .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for Apply(AggregatorDelta) during commit: {:?}", e)))?;
@@ -542,10 +549,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                                 e
                             ))
                         })?;
-                        Some(VersionEntry::Value(
-                            DelayedFieldValue::Aggregator(new_value),
-                            None,
-                        ))
+                        Some(DelayedFieldValue::Aggregator(new_value))
                     } else {
                         return Err(CommitError::CodeInvariantError(
                             "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
@@ -569,10 +573,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                                 e
                             ))
                         })?;
-                        Some(VersionEntry::Value(
-                            DelayedFieldValue::Snapshot(new_value),
-                            None,
-                        ))
+                        Some(DelayedFieldValue::Snapshot(new_value))
                     } else {
                         return Err(CommitError::CodeInvariantError(
                             "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
@@ -592,7 +593,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             };
 
             if let Some(new_entry) = new_entry {
-                versioned_value.insert(idx_to_commit, new_entry);
+                versioned_value.insert_final_value(idx_to_commit, new_entry);
             }
         }
 
@@ -619,7 +620,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
 
                     if let DelayedFieldValue::Snapshot(base) = prev_value {
                         let new_value = formula.apply_to(base);
-                        VersionEntry::Value(DelayedFieldValue::Derived(new_value), None)
+                        DelayedFieldValue::Derived(new_value)
                     } else {
                         return Err(CommitError::CodeInvariantError(
                             "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
@@ -629,7 +630,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                 _ => unreachable!("We've only added derived values into derived_ids"),
             };
 
-            versioned_value.insert(idx_to_commit, new_entry);
+            versioned_value.insert_final_value(idx_to_commit, new_entry);
         }
 
         // Should be guaranteed, as this is the only function modifying the idx,
