@@ -380,7 +380,7 @@ impl ApplyChunkOutput {
         let num_txns = to_keep.len();
         to_keep
             .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 16))
+            .with_min_len(optimal_min_len(num_txns, 64))
             .map(|txn_output| {
                 (
                     txn_output
