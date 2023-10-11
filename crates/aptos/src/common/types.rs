@@ -20,7 +20,8 @@ use crate::{
 use anyhow::Context;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
-    x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
+    encoding_type::{EncodingError, EncodingType},
+    x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
 use aptos_debugger::AptosDebugger;
 use aptos_gas_profiling::FrameName;
@@ -197,6 +198,17 @@ impl From<bcs::Error> for CliError {
 impl From<aptos_ledger::AptosLedgerError> for CliError {
     fn from(e: aptos_ledger::AptosLedgerError) -> Self {
         CliError::UnexpectedError(e.to_string())
+    }
+}
+
+impl From<EncodingError> for CliError {
+    fn from(e: EncodingError) -> Self {
+        match e {
+            EncodingError::BCS(s, e) => CliError::BCS(s, e),
+            EncodingError::UnableToParse(s, e) => CliError::UnableToParse(s, e),
+            EncodingError::UnableToReadFile(s, e) => CliError::UnableToReadFile(s, e),
+            EncodingError::UTF8(s) => CliError::UnexpectedError(s),
+        }
     }
 }
 
@@ -470,66 +482,6 @@ impl ProfileOptions {
     }
 }
 
-/// Types of encodings used by the blockchain
-#[derive(ValueEnum, Clone, Copy, Debug, Default)]
-pub enum EncodingType {
-    /// Binary Canonical Serialization
-    BCS,
-    /// Hex encoded e.g. 0xABCDE12345
-    #[default]
-    Hex,
-    /// Base 64 encoded
-    Base64,
-}
-
-impl EncodingType {
-    /// Encodes `Key` into one of the `EncodingType`s
-    pub fn encode_key<Key: ValidCryptoMaterial>(
-        &self,
-        name: &'static str,
-        key: &Key,
-    ) -> CliTypedResult<Vec<u8>> {
-        Ok(match self {
-            EncodingType::Hex => hex::encode_upper(key.to_bytes()).into_bytes(),
-            EncodingType::BCS => bcs::to_bytes(key).map_err(|err| CliError::BCS(name, err))?,
-            EncodingType::Base64 => base64::encode(key.to_bytes()).into_bytes(),
-        })
-    }
-
-    /// Loads a key from a file
-    pub fn load_key<Key: ValidCryptoMaterial>(
-        &self,
-        name: &'static str,
-        path: &Path,
-    ) -> CliTypedResult<Key> {
-        self.decode_key(name, read_from_file(path)?)
-    }
-
-    /// Decodes an encoded key given the known encoding
-    pub fn decode_key<Key: ValidCryptoMaterial>(
-        &self,
-        name: &'static str,
-        data: Vec<u8>,
-    ) -> CliTypedResult<Key> {
-        match self {
-            EncodingType::BCS => bcs::from_bytes(&data).map_err(|err| CliError::BCS(name, err)),
-            EncodingType::Hex => {
-                let hex_string = String::from_utf8(data)?;
-                Key::from_encoded_string(hex_string.trim())
-                    .map_err(|err| CliError::UnableToParse(name, err.to_string()))
-            },
-            EncodingType::Base64 => {
-                let string = String::from_utf8(data)?;
-                let bytes = base64::decode(string.trim())
-                    .map_err(|err| CliError::UnableToParse(name, err.to_string()))?;
-                Key::try_from(bytes.as_slice()).map_err(|err| {
-                    CliError::UnableToParse(name, format!("Failed to parse key {:?}", err))
-                })
-            },
-        }
-    }
-}
-
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
     /// The seed used for key generation, should be a 64 character hex string and only used for testing
@@ -572,30 +524,6 @@ impl RngArgs {
             Ok(KeyGen::from_seed(seed_slice))
         } else {
             Ok(KeyGen::from_os_rng())
-        }
-    }
-}
-
-impl Display for EncodingType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            EncodingType::BCS => "bcs",
-            EncodingType::Hex => "hex",
-            EncodingType::Base64 => "base64",
-        };
-        write!(f, "{}", str)
-    }
-}
-
-impl FromStr for EncodingType {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "hex" => Ok(EncodingType::Hex),
-            "bcs" => Ok(EncodingType::BCS),
-            "base64" => Ok(EncodingType::Base64),
-            _ => Err("Invalid encoding type"),
         }
     }
 }
@@ -700,10 +628,10 @@ impl ExtractPublicKey for PublicKeyInputOptions {
         profile: &ProfileOptions,
     ) -> CliTypedResult<Ed25519PublicKey> {
         if let Some(ref file) = self.public_key_file {
-            encoding.load_key("--public-key-file", file.as_path())
+            Ok(encoding.load_key("--public-key-file", file.as_path())?)
         } else if let Some(ref key) = self.public_key {
             let key = key.as_bytes().to_vec();
-            encoding.decode_key("--public-key", key)
+            Ok(encoding.decode_key("--public-key", key)?)
         } else if let Some(Some(public_key)) = CliConfig::load_profile(
             profile.profile_name(),
             ConfigSearchMode::CurrentDirAndParents,
