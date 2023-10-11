@@ -507,8 +507,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                             let res = self.replace_values_with_identifiers(state_value, layout);
                                             let patched_state_value = match res {
                                                 Ok((patched_state_value, delayed_field_keys)) => {
-                                                    state.delayed_field_keys_in_resources.borrow_mut().insert(state_key.clone(), delayed_field_keys);
-                                                    state.unsync_map.write(state_key.clone(), TransactionWrite::from_state_value(Some(patched_state_value.clone())), maybe_layout.map(|layout| Arc::new(layout.clone())));
+                                                    state.delayed_field_keys_in_resources
+                                                        .borrow_mut()
+                                                        .insert(state_key.clone(), delayed_field_keys);
+                                                    state.unsync_map.write(state_key.clone(),
+                                                        TransactionWrite::from_state_value(Some(patched_state_value.clone())),
+                                                        maybe_layout.map(|layout| Arc::new(layout.clone())));
                                                     Some(patched_state_value)
                                                 }
                                                 Err(err) => {
