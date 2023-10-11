@@ -6,8 +6,9 @@ use crate::quorum_store::{
     types::{Batch, BatchPayload, BatchRequest},
 };
 use aptos_consensus_types::proof_of_store::BatchId;
-use aptos_crypto::hash::CryptoHash;
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::account_address::AccountAddress;
+use claims::{assert_err, assert_ok};
 
 #[test]
 fn test_batch() {
@@ -32,6 +33,10 @@ fn test_batch() {
         0,
     );
 
-    assert!(batch.verify().is_ok());
+    assert_ok!(batch.verify());
+    assert_ok!(batch.verify_with_digest(digest));
+    // verify should fail if the digest does not match.
+    assert_err!(batch.verify_with_digest(HashValue::random()));
+
     assert_eq!(batch.into_transactions(), signed_txns);
 }

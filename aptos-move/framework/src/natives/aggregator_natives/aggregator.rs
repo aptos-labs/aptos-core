@@ -5,11 +5,11 @@ use crate::natives::aggregator_natives::{
     helpers::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
-use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
+use aptos_types::aggregator::AggregatorID;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -68,7 +68,7 @@ fn native_read(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 

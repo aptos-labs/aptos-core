@@ -33,4 +33,5 @@ module 0x8675309::M {
         Eq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
         Tuple()
     }
+    spec fun $t0(r: &M::R,r_mut: &mut M::R,s: M::S,s_ref: &M::S,s_mut: &mut M::S);
 } // end 0x8675309::M

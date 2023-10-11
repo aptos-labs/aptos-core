@@ -82,6 +82,10 @@ pub enum FeatureFlag {
     AggregatorSnapshots,
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
+    SaferMetadata,
+    Secp256k1ECDSAAuthenticator,
+    SponsoredAutomaticAccountCreation,
+    FeePayerAccountOptional,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -214,6 +218,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
+            FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
+            FeatureFlag::Secp256k1ECDSAAuthenticator => {
+                AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
+            },
+            FeatureFlag::SponsoredAutomaticAccountCreation => {
+                AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
+            },
+            FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
         }
     }
 }
@@ -269,6 +281,14 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
+            AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
+            AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
+                FeatureFlag::Secp256k1ECDSAAuthenticator
+            },
+            AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
+                FeatureFlag::SponsoredAutomaticAccountCreation
+            },
+            AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
         }
     }
 }

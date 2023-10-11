@@ -6,7 +6,7 @@ use crate::{
     global_summary::GlobalDataSummary,
     interface::{
         AptosDataClientInterface, Response, ResponseCallback, ResponseContext, ResponseError,
-        ResponseId,
+        ResponseId, SubscriptionRequestMetadata,
     },
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
@@ -15,22 +15,29 @@ use crate::{
     },
     peer_states::{ErrorType, PeerStates},
     poller::DataSummaryPoller,
+    utils,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
     network_id::PeerNetworkId,
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
-use aptos_infallible::RwLock;
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, info, sample, sample::SampleRate, trace, warn};
-use aptos_network::{application::interface::NetworkClient, protocols::network::RpcError};
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
+    protocols::network::RpcError,
+};
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
         NewTransactionsOrOutputsWithProofRequest, NewTransactionsWithProofRequest,
-        StateValuesWithProofRequest, StorageServiceRequest, TransactionOutputsWithProofRequest,
+        StateValuesWithProofRequest, StorageServiceRequest,
+        SubscribeTransactionOutputsWithProofRequest,
+        SubscribeTransactionsOrOutputsWithProofRequest, SubscribeTransactionsWithProofRequest,
+        SubscriptionStreamMetadata, TransactionOutputsWithProofRequest,
         TransactionsOrOutputsWithProofRequest, TransactionsWithProofRequest,
     },
     responses::{StorageServerSummary, StorageServiceResponse, TransactionOrOutputListWithProof},
@@ -43,13 +50,13 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
-use rand::prelude::SliceRandom;
-use std::{fmt, sync::Arc, time::Duration};
+use maplit::hashset;
+use std::{collections::HashSet, fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
 // Useful constants
-const IN_FLIGHT_METRICS_SAMPLE_FREQ: u64 = 5;
 const PEER_LOG_FREQ_SECS: u64 = 10;
 
 /// An [`AptosDataClientInterface`] that fulfills requests from remote peers' Storage Service
@@ -72,16 +79,22 @@ const PEER_LOG_FREQ_SECS: u64 = 10;
 /// and/or threads.
 #[derive(Clone, Debug)]
 pub struct AptosDataClient {
-    /// Config for AptosNet data client.
-    data_client_config: AptosDataClientConfig,
+    /// The base config of the node.
+    base_config: Arc<BaseConfig>,
+    /// The config for the AptosNet data client.
+    data_client_config: Arc<AptosDataClientConfig>,
     /// The underlying AptosNet storage service client.
     storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
+    /// The state of the active subscription stream.
+    active_subscription_state: Arc<Mutex<Option<SubscriptionState>>>,
     /// All of the data-client specific data we have on each network peer.
-    peer_states: Arc<RwLock<PeerStates>>,
+    peer_states: Arc<PeerStates>,
     /// A cached, aggregate data summary of all unbanned peers' data summaries.
-    global_summary_cache: Arc<RwLock<GlobalDataSummary>>,
+    global_summary_cache: Arc<ArcSwap<GlobalDataSummary>>,
     /// Used for generating the next request/response id.
     response_id_generator: Arc<U64IdGenerator>,
+    /// Time service used for calculating peer lag
+    time_service: TimeService,
 }
 
 impl AptosDataClient {
@@ -93,24 +106,27 @@ impl AptosDataClient {
         storage_service_client: StorageServiceClient<NetworkClient<StorageServiceMessage>>,
         runtime: Option<Handle>,
     ) -> (Self, DataSummaryPoller) {
+        // Wrap the configs in an Arc (to be shared across components)
+        let base_config = Arc::new(base_config);
+        let data_client_config = Arc::new(data_client_config);
+
         // Create the data client
         let data_client = Self {
-            data_client_config,
+            base_config,
+            data_client_config: data_client_config.clone(),
             storage_service_client: storage_service_client.clone(),
-            peer_states: Arc::new(RwLock::new(PeerStates::new(
-                base_config,
-                data_client_config,
-                storage_service_client.get_peers_and_metadata(),
-            ))),
-            global_summary_cache: Arc::new(RwLock::new(GlobalDataSummary::empty())),
+            active_subscription_state: Arc::new(Mutex::new(None)),
+            peer_states: Arc::new(PeerStates::new(data_client_config.clone())),
+            global_summary_cache: Arc::new(ArcSwap::from(Arc::new(GlobalDataSummary::empty()))),
             response_id_generator: Arc::new(U64IdGenerator::new()),
+            time_service: time_service.clone(),
         };
 
         // Create the data summary poller
         let data_summary_poller = DataSummaryPoller::new(
             data_client_config,
             data_client.clone(),
-            Duration::from_millis(data_client.data_client_config.summary_poll_loop_interval_ms),
+            storage_service_client.get_peers_and_metadata(),
             runtime,
             storage,
             time_service,
@@ -119,29 +135,19 @@ impl AptosDataClient {
         (data_client, data_summary_poller)
     }
 
-    /// Returns true iff compression should be requested
-    pub fn use_compression(&self) -> bool {
-        self.data_client_config.use_compression
-    }
-
-    /// Returns the response timeout in milliseconds
-    pub fn get_response_timeout_ms(&self) -> u64 {
-        self.data_client_config.response_timeout_ms
-    }
-
     /// Returns the max number of output reductions as defined by the config
     fn get_max_num_output_reductions(&self) -> u64 {
         self.data_client_config.max_num_output_reductions
     }
 
-    /// Generates a new response id
-    fn next_response_id(&self) -> u64 {
-        self.response_id_generator.next()
+    /// Returns the peers and metadata struct
+    pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        self.storage_service_client.get_peers_and_metadata()
     }
 
-    /// Update a peer's data summary.
-    pub fn update_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
-        self.peer_states.write().update_summary(peer, summary)
+    /// Update a peer's storage summary
+    pub fn update_peer_storage_summary(&self, peer: PeerNetworkId, summary: StorageServerSummary) {
+        self.peer_states.update_summary(peer, summary)
     }
 
     /// Recompute and update the global data summary cache
@@ -150,9 +156,12 @@ impl AptosDataClient {
         // the peer states (to handle disconnected peers).
         self.garbage_collect_peer_states()?;
 
-        // Calculate the aggregate data summary
-        let aggregate = self.peer_states.read().calculate_aggregate_summary();
-        *self.global_summary_cache.write() = aggregate;
+        // Calculate the global data summary
+        let global_data_summary = self.peer_states.calculate_global_data_summary();
+
+        // Update the cached data summary
+        self.global_summary_cache
+            .store(Arc::new(global_data_summary));
 
         Ok(())
     }
@@ -164,10 +173,27 @@ impl AptosDataClient {
 
         // Garbage collect the disconnected peers
         self.peer_states
-            .write()
             .garbage_collect_peer_states(all_connected_peers);
 
         Ok(())
+    }
+
+    /// Chooses the peer with the lowest latency from the given set of serviceable peers
+    fn choose_lowest_latency_peer(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> Result<PeerNetworkId, Error> {
+        // Choose the peer with the lowest latency
+        if let Some(peer) = utils::choose_lowest_latency_peer(
+            serviceable_peers.clone(),
+            self.get_peers_and_metadata(),
+        ) {
+            return Ok(peer); // Return the peer if we found one
+        }
+
+        // Otherwise, simply select a peer at random
+        self.choose_random_peer(request, serviceable_peers)
     }
 
     /// Choose a connected peer that can service the given request.
@@ -186,91 +212,131 @@ impl AptosDataClient {
             self.identify_serviceable(regular_peers, request)
         };
 
-        // Randomly select a peer to handle the request
-        serviceable_peers
-            .choose(&mut rand::thread_rng())
-            .copied()
-            .ok_or_else(|| {
-                Error::DataIsUnavailable(
-                    format!("No connected peers are advertising that they can serve this data! Request: {:?}",request),
-                )
-            })
+        // Identify the peer based on the request type
+        if request.data_request.is_subscription_request() {
+            // Choose a peer to handle the subscription request
+            self.choose_peer_for_subscription_request(request, serviceable_peers)
+        } else if request.data_request.is_optimistic_fetch() {
+            // Choose the peer with the lowest latency for the optimistic fetch
+            self.choose_lowest_latency_peer(request, serviceable_peers)
+        } else {
+            // Choose the peer randomly weighted by latency
+            self.choose_random_peer_by_latency(request, serviceable_peers)
+        }
+    }
+
+    /// Choose a peer that can service the given subscription request
+    fn choose_peer_for_subscription_request(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> crate::error::Result<PeerNetworkId, Error> {
+        // Get the stream ID from the request
+        let request_stream_id = match &request.data_request {
+            DataRequest::SubscribeTransactionsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
+            DataRequest::SubscribeTransactionOutputsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
+            DataRequest::SubscribeTransactionsOrOutputsWithProof(request) => {
+                request.subscription_stream_metadata.subscription_stream_id
+            },
+            data_request => {
+                return Err(Error::UnexpectedErrorEncountered(format!(
+                    "Invalid subscription request type found: {:?}",
+                    data_request
+                )))
+            },
+        };
+
+        // Grab the lock on the active subscription state
+        let mut active_subscription_state = self.active_subscription_state.lock();
+
+        // If we have an active subscription and the request is for the same
+        // stream ID, use the same peer (as long as it is still serviceable).
+        if let Some(subscription_state) = active_subscription_state.take() {
+            if subscription_state.subscription_stream_id == request_stream_id {
+                // The stream IDs match. Verify that the request is still serviceable.
+                let peer_network_id = subscription_state.peer_network_id;
+                if serviceable_peers.contains(&peer_network_id) {
+                    // The previously chosen peer can still service the request
+                    *active_subscription_state = Some(subscription_state);
+                    return Ok(peer_network_id);
+                } else {
+                    // The previously chosen peer can no longer service
+                    // the request, so we need to return an error.
+                    return Err(Error::DataIsUnavailable(format!(
+                        "The peer that we were previously subscribing to can no longer service \
+                         the subscriptions! Peer: {:?}, request: {:?}",
+                        peer_network_id, request
+                    )));
+                }
+            }
+        }
+
+        // Otherwise, we need to choose a new peer and update the subscription state
+        let peer_network_id = self.choose_lowest_latency_peer(request, serviceable_peers)?;
+        let subscription_state = SubscriptionState::new(peer_network_id, request_stream_id);
+        *active_subscription_state = Some(subscription_state);
+
+        Ok(peer_network_id)
+    }
+
+    /// Chooses a peer at random from the given set of serviceable peers
+    fn choose_random_peer(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> Result<PeerNetworkId, Error> {
+        utils::choose_random_peer(serviceable_peers).ok_or_else(|| {
+            Error::DataIsUnavailable(format!(
+                "Unable to select random peer for request: {:?}",
+                request
+            ))
+        })
+    }
+
+    /// Chooses a peer randomly weighted by latency from the given set of serviceable peers
+    fn choose_random_peer_by_latency(
+        &self,
+        request: &StorageServiceRequest,
+        serviceable_peers: HashSet<PeerNetworkId>,
+    ) -> Result<PeerNetworkId, Error> {
+        // Choose a peer weighted by latency
+        let peer_set = utils::choose_peers_by_latency(
+            self.data_client_config.clone(),
+            1,
+            serviceable_peers.clone(),
+            self.get_peers_and_metadata(),
+            true,
+        );
+        if let Some(peer) = peer_set.into_iter().next() {
+            return Ok(peer); // Return the peer if we found one
+        }
+
+        // Otherwise, simply select a peer at random
+        self.choose_random_peer(request, serviceable_peers)
     }
 
     /// Identifies the peers in the given set of prospective peers
     /// that can service the specified request.
     fn identify_serviceable(
         &self,
-        prospective_peers: Vec<PeerNetworkId>,
+        prospective_peers: HashSet<PeerNetworkId>,
         request: &StorageServiceRequest,
-    ) -> Vec<PeerNetworkId> {
+    ) -> HashSet<PeerNetworkId> {
         prospective_peers
             .into_iter()
-            .filter(|peer| self.peer_states.read().can_service_request(peer, request))
-            .collect::<Vec<_>>()
-    }
-
-    /// Fetches the next prioritized peer to poll
-    pub fn fetch_prioritized_peer_to_poll(
-        &self,
-    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
-        // Fetch the number of in-flight polls and update the metrics
-        let num_in_flight_polls = self.peer_states.read().num_in_flight_priority_polls();
-        update_in_flight_metrics(PRIORITIZED_PEER, num_in_flight_polls);
-
-        // Ensure we don't go over the maximum number of in-flight polls
-        if num_in_flight_polls >= self.data_client_config.max_num_in_flight_priority_polls {
-            return Ok(None);
-        }
-
-        // Select a priority peer to poll
-        let (priority_connected_peers, _) = self.get_priority_and_regular_peers()?;
-        self.select_peer_to_poll(priority_connected_peers)
-    }
-
-    /// Fetches the next regular peer to poll
-    pub fn fetch_regular_peer_to_poll(&self) -> crate::error::Result<Option<PeerNetworkId>, Error> {
-        // Fetch the number of in-flight polls and update the metrics
-        let num_in_flight_polls = self.peer_states.read().num_in_flight_regular_polls();
-        update_in_flight_metrics(REGULAR_PEER, num_in_flight_polls);
-
-        // Ensure we don't go over the maximum number of in-flight polls
-        if num_in_flight_polls >= self.data_client_config.max_num_in_flight_regular_polls {
-            return Ok(None);
-        }
-
-        // Select a regular peer to poll
-        let (_, regular_connected_peers) = self.get_priority_and_regular_peers()?;
-        self.select_peer_to_poll(regular_connected_peers)
-    }
-
-    /// Randomly selects a peer to poll that does not have an in-flight request
-    fn select_peer_to_poll(
-        &self,
-        mut peers: Vec<PeerNetworkId>,
-    ) -> crate::error::Result<Option<PeerNetworkId>, Error> {
-        // Identify the peers who do not already have in-flight requests.
-        peers.retain(|peer| !self.peer_states.read().existing_in_flight_request(peer));
-
-        // Select a peer at random for polling
-        let peer_to_poll = peers.choose(&mut rand::thread_rng());
-        Ok(peer_to_poll.cloned())
-    }
-
-    /// Marks the given peers as having an in-flight poll request
-    pub fn in_flight_request_started(&self, peer: &PeerNetworkId) {
-        self.peer_states.write().new_in_flight_request(peer);
-    }
-
-    /// Marks the given peers as polled
-    pub fn in_flight_request_complete(&self, peer: &PeerNetworkId) {
-        self.peer_states
-            .write()
-            .mark_in_flight_request_complete(peer);
+            .filter(|peer| {
+                self.peer_states
+                    .can_service_request(peer, self.time_service.clone(), request)
+            })
+            .collect()
     }
 
     /// Returns all peers connected to us
-    fn get_all_connected_peers(&self) -> crate::error::Result<Vec<PeerNetworkId>, Error> {
+    fn get_all_connected_peers(&self) -> crate::error::Result<HashSet<PeerNetworkId>, Error> {
         let connected_peers = self.storage_service_client.get_available_peers()?;
         if connected_peers.is_empty() {
             return Err(Error::DataIsUnavailable(
@@ -284,18 +350,22 @@ impl AptosDataClient {
     /// Returns all priority and regular peers
     pub(crate) fn get_priority_and_regular_peers(
         &self,
-    ) -> crate::error::Result<(Vec<PeerNetworkId>, Vec<PeerNetworkId>), Error> {
+    ) -> crate::error::Result<(HashSet<PeerNetworkId>, HashSet<PeerNetworkId>), Error> {
         // Get all connected peers
         let all_connected_peers = self.get_all_connected_peers()?;
 
         // Filter the peers based on priority
-        let mut priority_peers = vec![];
-        let mut regular_peers = vec![];
+        let mut priority_peers = hashset![];
+        let mut regular_peers = hashset![];
         for peer in all_connected_peers {
-            if self.peer_states.read().is_priority_peer(&peer) {
-                priority_peers.push(peer);
+            if utils::is_priority_peer(
+                self.base_config.clone(),
+                self.get_peers_and_metadata(),
+                &peer,
+            ) {
+                priority_peers.insert(peer);
             } else {
-                regular_peers.push(peer);
+                regular_peers.insert(peer);
             }
         }
 
@@ -322,7 +392,7 @@ impl AptosDataClient {
             debug!(
                 (LogSchema::new(LogEntry::StorageServiceRequest)
                     .event(LogEvent::PeerSelectionError)
-                    .message("Unable to select peer")
+                    .message("Unable to select peer for request!")
                     .error(&error))
             );
             error
@@ -382,7 +452,7 @@ impl AptosDataClient {
         request: StorageServiceRequest,
         request_timeout_ms: u64,
     ) -> crate::error::Result<Response<StorageServiceResponse>, Error> {
-        let id = self.next_response_id();
+        let id = self.response_id_generator.next();
         trace!(
             (LogSchema::new(LogEntry::StorageServiceRequest)
                 .event(LogEvent::SendRequest)
@@ -420,7 +490,7 @@ impl AptosDataClient {
                 // On the one hand, scoring dynamics are simpler when each request
                 // is successful or failed but not both; on the other hand, this
                 // feels simpler for the consumer.
-                self.peer_states.write().update_score_success(peer);
+                self.peer_states.update_score_success(peer);
 
                 // Package up all of the context needed to fully report an error
                 // with this RPC.
@@ -485,9 +555,7 @@ impl AptosDataClient {
         _request: &StorageServiceRequest,
         error_type: ErrorType,
     ) {
-        self.peer_states
-            .write()
-            .update_score_error(peer, error_type);
+        self.peer_states.update_score_error(peer, error_type);
     }
 
     /// Creates a storage service request using the given data request
@@ -501,22 +569,23 @@ impl AptosDataClient {
         T: TryFrom<StorageServiceResponse, Error = E>,
         E: Into<Error>,
     {
-        let storage_request = StorageServiceRequest::new(data_request, self.use_compression());
+        let storage_request =
+            StorageServiceRequest::new(data_request, self.data_client_config.use_compression);
         self.send_request_and_decode(storage_request, request_timeout_ms)
             .await
     }
 
     /// Returns a copy of the peer states for testing
     #[cfg(test)]
-    pub(crate) fn get_peer_states(&self) -> PeerStates {
-        self.peer_states.read().clone()
+    pub(crate) fn get_peer_states(&self) -> Arc<PeerStates> {
+        self.peer_states.clone()
     }
 }
 
 #[async_trait]
 impl AptosDataClientInterface for AptosDataClient {
     fn get_global_data_summary(&self) -> GlobalDataSummary {
-        self.global_summary_cache.read().clone()
+        self.global_summary_cache.load().clone().deref().clone()
     }
 
     async fn get_epoch_ending_ledger_infos(
@@ -668,6 +737,72 @@ impl AptosDataClientInterface for AptosDataClient {
         self.create_and_send_storage_request(request_timeout_ms, data_request)
             .await
     }
+
+    async fn subscribe_to_transaction_outputs_with_proof(
+        &self,
+        request_metadata: SubscriptionRequestMetadata,
+        request_timeout_ms: u64,
+    ) -> crate::error::Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>
+    {
+        let subscription_stream_metadata = SubscriptionStreamMetadata {
+            known_version_at_stream_start: request_metadata.known_version_at_stream_start,
+            known_epoch_at_stream_start: request_metadata.known_epoch_at_stream_start,
+            subscription_stream_id: request_metadata.subscription_stream_id,
+        };
+        let data_request = DataRequest::SubscribeTransactionOutputsWithProof(
+            SubscribeTransactionOutputsWithProofRequest {
+                subscription_stream_metadata,
+                subscription_stream_index: request_metadata.subscription_stream_index,
+            },
+        );
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn subscribe_to_transactions_with_proof(
+        &self,
+        request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> crate::error::Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>> {
+        let subscription_stream_metadata = SubscriptionStreamMetadata {
+            known_version_at_stream_start: request_metadata.known_version_at_stream_start,
+            known_epoch_at_stream_start: request_metadata.known_epoch_at_stream_start,
+            subscription_stream_id: request_metadata.subscription_stream_id,
+        };
+        let data_request =
+            DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
+                subscription_stream_metadata,
+                include_events,
+                subscription_stream_index: request_metadata.subscription_stream_index,
+            });
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
+
+    async fn subscribe_to_transactions_or_outputs_with_proof(
+        &self,
+        request_metadata: SubscriptionRequestMetadata,
+        include_events: bool,
+        request_timeout_ms: u64,
+    ) -> crate::error::Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>
+    {
+        let subscription_stream_metadata = SubscriptionStreamMetadata {
+            known_version_at_stream_start: request_metadata.known_version_at_stream_start,
+            known_epoch_at_stream_start: request_metadata.known_epoch_at_stream_start,
+            subscription_stream_id: request_metadata.subscription_stream_id,
+        };
+        let data_request = DataRequest::SubscribeTransactionsOrOutputsWithProof(
+            SubscribeTransactionsOrOutputsWithProofRequest {
+                subscription_stream_metadata,
+                include_events,
+                max_num_output_reductions: self.get_max_num_output_reductions(),
+                subscription_stream_index: request_metadata.subscription_stream_index,
+            },
+        );
+        self.create_and_send_storage_request(request_timeout_ms, data_request)
+            .await
+    }
 }
 
 /// The AptosNet-specific request context needed to update a peer's scoring.
@@ -697,6 +832,23 @@ impl fmt::Debug for AptosNetResponseCallback {
     }
 }
 
+/// A struct that holds a subscription state, including
+/// the subscription stream ID and the peer serving the requests.
+#[derive(Clone, Debug)]
+struct SubscriptionState {
+    peer_network_id: PeerNetworkId,
+    subscription_stream_id: u64,
+}
+
+impl SubscriptionState {
+    fn new(peer_network_id: PeerNetworkId, subscription_stream_id: u64) -> Self {
+        Self {
+            peer_network_id,
+            subscription_stream_id,
+        }
+    }
+}
+
 /// Updates the metrics for the number of connected peers (priority and regular)
 fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: usize) {
     // Log the number of connected peers
@@ -719,17 +871,5 @@ fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: u
         &metrics::CONNECTED_PEERS,
         REGULAR_PEER,
         num_regular_peers as u64,
-    );
-}
-
-/// Updates the metrics for the number of in-flight polls
-fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
-    sample!(
-        SampleRate::Frequency(IN_FLIGHT_METRICS_SAMPLE_FREQ),
-        set_gauge(
-            &metrics::IN_FLIGHT_POLLS,
-            label,
-            num_in_flight_polls,
-        );
     );
 }

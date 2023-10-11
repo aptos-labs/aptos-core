@@ -1798,7 +1798,7 @@ module aptos_token::token {
     }
 
     #[test_only]
-    public entry fun create_collection_and_token(
+    public fun create_collection_and_token(
         creator: &signer,
         amount: u64,
         collection_max: u64,

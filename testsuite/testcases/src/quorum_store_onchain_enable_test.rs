@@ -69,6 +69,7 @@ impl NetworkLoadTest for QuorumStoreOnChainEnableTest {
             let inner = match current_consensus_config {
                 OnChainConsensusConfig::V1(inner) => inner,
                 OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
+                _ => unimplemented!()
             };
 
             // Change to V2

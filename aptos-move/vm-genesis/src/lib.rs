@@ -23,7 +23,7 @@ use aptos_types::{
     contract_event::{ContractEvent, ContractEventV1},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        TimedFeatures, APTOS_MAX_KNOWN_VERSION,
+        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
@@ -110,7 +110,8 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -218,7 +219,8 @@ pub fn encode_genesis_change_set(
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -427,6 +429,10 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
         FeatureFlag::AGGREGATOR_SNAPSHOTS,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
+        FeatureFlag::SAFER_METADATA,
+        FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR,
+        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
+        FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
     ]
 }
 
@@ -751,7 +757,7 @@ impl TestValidator {
     fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let owner_address = auth_key.derived_address();
+        let owner_address = auth_key.account_address();
         let consensus_key = bls12381::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
@@ -902,7 +908,8 @@ pub fn test_genesis_module_publishing() {
         LATEST_GAS_FEATURE_VERSION,
         ChainId::test().id(),
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &data_cache,
     )
     .unwrap();
     let id1 = HashValue::zero();

@@ -8,10 +8,10 @@ pub enum InjectedError {
     EndOfRunEpilogue,
 }
 
-pub(crate) fn maybe_raise_injected_error(error_type: InjectedError) -> VMResult<()> {
+pub(crate) fn maybe_raise_injected_error(_error_type: InjectedError) -> VMResult<()> {
     #[cfg(feature = "testing")]
     {
-        testing_only::maybe_raise_injected_error(error_type)
+        testing_only::maybe_raise_injected_error(_error_type)
     }
 
     #[cfg(not(feature = "testing"))]

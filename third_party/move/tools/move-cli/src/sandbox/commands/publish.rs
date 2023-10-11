@@ -170,7 +170,7 @@ pub fn publish(
         for unit in modules_to_publish {
             let id = module(&unit.unit)?.self_id();
             let module_bytes = unit.unit.serialize(bytecode_version);
-            serialized_modules.push((id, module_bytes));
+            serialized_modules.push((id, module_bytes.into()));
         }
         state.save_modules(&serialized_modules)?;
     }

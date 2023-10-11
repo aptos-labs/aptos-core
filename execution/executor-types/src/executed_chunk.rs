@@ -4,22 +4,20 @@
 
 #![forbid(unsafe_code)]
 
-use crate::TransactionData;
 use anyhow::{bail, ensure, Result};
-use aptos_crypto::hash::CryptoHash;
 use aptos_storage_interface::ExecutedTrees;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::create_empty_sharded_state_updates,
     transaction::{Transaction, TransactionInfo, TransactionStatus, TransactionToCommit},
 };
+use itertools::zip_eq;
 
 #[derive(Default)]
 pub struct ExecutedChunk {
     pub status: Vec<TransactionStatus>,
-    pub to_commit: Vec<(Transaction, TransactionData)>,
+    pub to_commit: Vec<TransactionToCommit>,
     pub result_view: ExecutedTrees,
     /// If set, this is the new epoch info that should be changed to if this is committed.
     pub next_epoch_state: Option<EpochState>,
@@ -43,34 +41,22 @@ impl ExecutedChunk {
         }
     }
 
-    pub fn transactions_to_commit(&self) -> Result<Vec<TransactionToCommit>> {
-        self.to_commit
-            .iter()
-            .map(|(txn, txn_data)| {
-                let mut sharded_state_updates = create_empty_sharded_state_updates();
-                txn_data.state_updates().iter().for_each(|(k, v)| {
-                    sharded_state_updates[k.get_shard_id() as usize].insert(k.clone(), v.clone());
-                });
-                Ok(TransactionToCommit::new(
-                    txn.clone(),
-                    txn_data.txn_info.clone(),
-                    sharded_state_updates,
-                    txn_data.write_set().clone(),
-                    txn_data.events().to_vec(),
-                    txn_data.is_reconfig(),
-                ))
-            })
-            .collect()
+    pub fn transactions_to_commit(&self) -> &Vec<TransactionToCommit> {
+        &self.to_commit
     }
 
     pub fn transactions(&self) -> Vec<Transaction> {
-        self.to_commit.iter().map(|(txn, _)| txn).cloned().collect()
+        self.to_commit
+            .iter()
+            .map(|txn_to_commit| txn_to_commit.transaction())
+            .cloned()
+            .collect()
     }
 
     pub fn events_to_commit(&self) -> Vec<ContractEvent> {
         self.to_commit
             .iter()
-            .flat_map(|(_, txn_data)| txn_data.events())
+            .flat_map(|txn_to_commit| txn_to_commit.events())
             .cloned()
             .collect()
     }
@@ -89,34 +75,21 @@ impl ExecutedChunk {
             self.to_commit.len(),
             transaction_infos.len(),
         );
-        let txn_info_hashes = self
-            .to_commit
-            .iter()
-            .map(|(_, txn_data)| txn_data.txn_info_hash())
-            .collect::<Vec<_>>();
-        let expected_txn_info_hashes = transaction_infos
-            .iter()
-            .map(CryptoHash::hash)
-            .collect::<Vec<_>>();
 
-        if txn_info_hashes != expected_txn_info_hashes {
-            for (idx, ((_, txn_data), expected_txn_info)) in
-                itertools::zip_eq(self.to_commit.iter(), transaction_infos.iter()).enumerate()
-            {
-                if &txn_data.txn_info != expected_txn_info {
+        let start_version =
+            self.result_view.txn_accumulator().version() + 1 - self.to_commit.len() as u64;
+        zip_eq(self.to_commit.iter(), transaction_infos.iter())
+            .enumerate()
+            .try_for_each(|(idx, (txn_to_commit, expected_txn_info))| {
+                let txn_info = txn_to_commit.transaction_info();
+                if txn_info != expected_txn_info {
                     bail!(
-                        "Transaction infos don't match. version: {}, txn_info:{}, expected_txn_info:{}",
-                        self.result_view.txn_accumulator().version() + 1 + idx as u64
-                            - self.to_commit.len() as u64,
-                        &txn_data.txn_info,
-                        expected_txn_info,
-                    )
+                        "Transaction infos don't match. version: {}, txn_info:{txn_info}, expected_txn_info:{expected_txn_info}",
+                        start_version + idx as u64
+                    );
                 }
-            }
-            unreachable!()
-        } else {
-            Ok(())
-        }
+                Ok(())
+            })
     }
 
     pub fn maybe_select_chunk_ending_ledger_info(
@@ -133,7 +106,9 @@ impl ExecutedChunk {
                     .ledger_info()
                     .transaction_accumulator_hash()
                     == result_accumulator.root_hash(),
-                "Root hash in target ledger info does not match local computation."
+                "Root hash in target ledger info does not match local computation. {:?} != {:?}",
+                verified_target_li,
+                result_accumulator
             );
             Ok(Some(verified_target_li.clone()))
         } else if let Some(epoch_change_li) = epoch_change_li {
@@ -168,8 +143,8 @@ impl ExecutedChunk {
     }
 
     pub fn combine(&mut self, rhs: Self) {
-        self.to_commit.extend(rhs.to_commit.into_iter());
-        self.status.extend(rhs.status.into_iter());
+        self.to_commit.extend(rhs.to_commit);
+        self.status.extend(rhs.status);
         self.result_view = rhs.result_view;
         self.next_epoch_state = rhs.next_epoch_state;
         self.ledger_info = rhs.ledger_info;

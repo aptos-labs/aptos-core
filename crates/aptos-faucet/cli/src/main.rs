@@ -61,7 +61,7 @@ impl FaucetCliArgs {
         // Build the account that the MintFunder will use.
         let faucet_account = LocalAccount::new(
             self.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).derived_address()
+                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
             }),
             key,
             0,
@@ -108,17 +108,13 @@ impl FaucetCliArgs {
             match response {
                 Ok(response) => println!(
                     "SUCCESS: Account: {}, txn hashes: {:?}",
-                    account.to_hex_literal(),
+                    account,
                     response
                         .into_iter()
-                        .map(|r| r.committed_hash().to_hex_literal())
+                        .map(|r| r.committed_hash().to_string())
                         .collect::<Vec<_>>()
                 ),
-                Err(err) => println!(
-                    "FAILURE: Account: {} Response: {:#}",
-                    account.to_hex_literal(),
-                    err
-                ),
+                Err(err) => println!("FAILURE: Account: {} Response: {:#}", account, err),
             }
         }
 
@@ -129,9 +125,7 @@ impl FaucetCliArgs {
 /// Allow 0x to be in front of addresses.
 fn process_account_address(str: &str) -> AccountAddress {
     let str = str.trim();
-    if let Ok(address) = AccountAddress::from_hex_literal(str) {
-        address
-    } else if let Ok(address) = AccountAddress::from_str(str) {
+    if let Ok(address) = AccountAddress::from_str(str) {
         address
     } else {
         panic!("Account address is in an invalid format {}", str)

@@ -26,7 +26,7 @@ impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
-            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 3,
+            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
@@ -184,7 +184,7 @@ impl QuorumStoreConfig {
 
 impl ConfigSanitizer for QuorumStoreConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
         _chain_id: ChainId,
     ) -> Result<(), Error> {

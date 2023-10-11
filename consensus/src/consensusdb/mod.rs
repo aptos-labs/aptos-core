@@ -16,13 +16,13 @@ use aptos_schemadb::{
 };
 pub use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema},
+    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
     quorum_certificate::QCSchema,
 };
 use schema::{
     single_entry::{SingleEntryKey, SingleEntrySchema},
-    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME,
-    ORDERED_ANCHOR_ID_CF_NAME, QC_CF_NAME, SINGLE_ENTRY_CF_NAME,
+    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, QC_CF_NAME,
+    SINGLE_ENTRY_CF_NAME,
 };
 use std::{iter::Iterator, path::Path, time::Instant};
 
@@ -59,7 +59,7 @@ impl ConsensusDB {
             NODE_CF_NAME,
             CERTIFIED_NODE_CF_NAME,
             DAG_VOTE_CF_NAME,
-            ORDERED_ANCHOR_ID_CF_NAME,
+            "ordered_anchor_id", // deprecated CF
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);

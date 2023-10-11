@@ -4,7 +4,7 @@ title: "Labs-Hosted Transaction Stream Service"
 
 # Labs-Hosted Transaction Stream Service
 
-If you are running your own instance of the [Indexer API](../api), or a [custom processor](../custom-processors), you must have access to an instance of the Transaction Stream Service. This page contains information about how to use the Labs-Hosted Transaction Stream Service.
+If you are running your own instance of the [Indexer API](/indexer/api), or a [custom processor](/indexer/custom-processors), you must have access to an instance of the Transaction Stream Service. This page contains information about how to use the Labs-Hosted Transaction Stream Service.
 
 ## Endpoints
 All endpoints are in GCP us-central1 unless otherwise specified.
@@ -35,5 +35,5 @@ curl -H 'Authorization: Bearer aptoslabs_yj4donpaKy_Q6RBP4cdBmjA8T51hto1GcVX5ZS9
 ```
 
 For more comprehensive information about how to use the Transaction Stream Service, see the docs for the downstream systems:
-- [Indexer API](../api/self-hosted)
-- [Custom Processors](../custom-processors)
+- [Indexer API](/indexer/api/self-hosted)
+- [Custom Processors](/indexer/custom-processors)

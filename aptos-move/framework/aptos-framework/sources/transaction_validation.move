@@ -1,4 +1,5 @@
 module aptos_framework::transaction_validation {
+    use std::bcs;
     use std::error;
     use std::features;
     use std::signer;
@@ -83,29 +84,47 @@ module aptos_framework::transaction_validation {
         assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
 
         let transaction_sender = signer::address_of(&sender);
-        assert!(account::exists_at(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
-        assert!(
-            txn_authentication_key == account::get_authentication_key(transaction_sender),
-            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        );
 
-        assert!(
-            txn_sequence_number < (1u64 << 63),
-            error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
-        );
+        if (
+            transaction_sender == gas_payer
+            || account::exists_at(transaction_sender)
+            || !features::sponsored_automatic_account_creation_enabled()
+            || txn_sequence_number > 0
+        ) {
+            assert!(account::exists_at(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
+            assert!(
+                txn_authentication_key == account::get_authentication_key(transaction_sender),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+            );
 
-        let account_sequence_number = account::get_sequence_number(transaction_sender);
-        assert!(
-            txn_sequence_number >= account_sequence_number,
-            error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
-        );
+            let account_sequence_number = account::get_sequence_number(transaction_sender);
+            assert!(
+                txn_sequence_number < (1u64 << 63),
+                error::out_of_range(PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG)
+            );
 
-        // [PCA12]: Check that the transaction's sequence number matches the
-        // current sequence number. Otherwise sequence number is too new by [PCA11].
-        assert!(
-            txn_sequence_number == account_sequence_number,
-            error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
-        );
+            assert!(
+                txn_sequence_number >= account_sequence_number,
+                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD)
+            );
+
+            assert!(
+                txn_sequence_number == account_sequence_number,
+                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            );
+        } else {
+            // In this case, the transaction is sponsored and the account does not exist, so ensure
+            // the default values match.
+            assert!(
+                txn_sequence_number == 0,
+                error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
+            );
+
+            assert!(
+                txn_authentication_key == bcs::to_bytes(&transaction_sender),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+            );
+        };
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         assert!(

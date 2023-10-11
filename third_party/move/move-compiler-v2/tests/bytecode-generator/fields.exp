@@ -7,20 +7,20 @@ module 0x42::fields {
         f: u64,
         g: fields::T,
     }
-    private fun read_ref(x: &fields::S) {
+    private fun read_ref(x: &fields::S): u64 {
         select fields::T.h(select fields::S.g(x))
     }
-    private fun read_val(x: fields::S) {
+    private fun read_val(x: fields::S): u64 {
         select fields::T.h(select fields::S.g(x))
     }
-    private fun write_local_direct() {
+    private fun write_local_direct(): fields::S {
         {
           let x: fields::S = pack fields::S(0, pack fields::T(0));
           select fields::T.h(select fields::S.g(x)) = 42;
           x
         }
     }
-    private fun write_local_via_ref() {
+    private fun write_local_via_ref(): fields::S {
         {
           let x: fields::S = pack fields::S(0, pack fields::T(0));
           {
@@ -34,10 +34,20 @@ module 0x42::fields {
         select fields::T.h(select fields::S.g(x)) = 42;
         Tuple()
     }
-    private fun write_val(x: fields::S) {
+    private fun write_val(x: fields::S): fields::S {
         select fields::T.h(select fields::S.g(x)) = 42;
         x
     }
+    spec fun $read_ref(x: fields::S): u64 {
+        select fields::T.h(select fields::S.g(x))
+    }
+    spec fun $read_val(x: fields::S): u64 {
+        select fields::T.h(select fields::S.g(x))
+    }
+    spec fun $write_local_direct(): fields::S;
+    spec fun $write_local_via_ref(): fields::S;
+    spec fun $write_param(x: &mut fields::S);
+    spec fun $write_val(x: fields::S): fields::S;
 } // end 0x42::fields
 
 ============ initial bytecode ================

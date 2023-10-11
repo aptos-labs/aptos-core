@@ -13,6 +13,9 @@
 #![cfg_attr(feature = "fuzzing", allow(dead_code))]
 #![recursion_limit = "512"]
 
+#[macro_use(defer)]
+extern crate scopeguard;
+
 extern crate core;
 
 mod block_storage;
@@ -46,6 +49,7 @@ mod util;
 pub mod consensus_provider;
 /// Required by the telemetry service
 pub mod counters;
+mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
