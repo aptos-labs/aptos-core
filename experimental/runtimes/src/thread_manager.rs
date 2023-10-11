@@ -67,9 +67,9 @@ impl ThreadManagerBuilder {
     }
 }
 
-/// This assumes that we get a peak performance at 48 parallelism - in future if we can scale up
+/// This assumes that we get a peak performance at 64 parallelism - in future if we can scale up
 /// our code for higher parallelism, we can increase this number.
-static OPTIMAL_MAX_PARALLELISM: usize = 48;
+static OPTIMAL_MAX_PARALLELISM: usize = 64;
 pub fn optimal_min_parallelism(num_tasks: usize, min_threshold: usize) -> usize {
     max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
 }
