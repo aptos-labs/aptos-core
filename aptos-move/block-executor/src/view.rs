@@ -330,18 +330,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
     ) -> RefCell<HashMap<T::Key, HashSet<T::Identifier>>> {
         match &self.latest_view {
-            ViewState::Sync(_) => unreachable!("Take reads called in parallel setting"),
+            ViewState::Sync(_) => unreachable!(
+                "Read set for sequential execution while running in parallel execution mode"
+            ),
             ViewState::Unsync(state) => state.delayed_field_keys_in_resources.clone(),
-        }
-    }
-
-    pub(crate) fn fetch_from_unsync_map(
-        &self,
-        key: T::Key,
-    ) -> Option<(Arc<T::Value>, Option<Arc<MoveTypeLayout>>)> {
-        match &self.latest_view {
-            ViewState::Sync(_) => None,
-            ViewState::Unsync(state) => state.unsync_map.fetch_data(&key),
         }
     }
 

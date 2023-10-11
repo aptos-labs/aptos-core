@@ -533,6 +533,7 @@ where
         delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
         write_set_keys: HashSet<T::Key>,
         read_set: RefCell<HashMap<T::Key, HashSet<T::Identifier>>>,
+        unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
         latest_view: &LatestView<T, S, X>,
     ) -> HashMap<T::Key, T::Value> {
         let mut patched_resource_write_set = HashMap::new();
@@ -545,8 +546,7 @@ where
                     continue;
                 }
                 // layout is Some(_) if it contains an delayed field
-                if let Some((value, Some(layout))) = latest_view.fetch_from_unsync_map(key.clone())
-                {
+                if let Some((value, Some(layout))) = unsync_map.fetch_data(key) {
                     if let Some(patched_value) = Self::replace_ids_with_values(
                         value.clone(),
                         &layout,
@@ -649,7 +649,6 @@ where
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
-        // let read_set = last_input_output.read_set(txn_idx).map(|read_set| read_set.);
 
         let (mut patched_resource_write_set, write_set_keys) =
             Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
@@ -1001,6 +1000,7 @@ where
                             delayed_field_keys,
                             write_set_keys,
                             read_set,
+                            &unsync_map,
                             &latest_view,
                         ),
                     );
