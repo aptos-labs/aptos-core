@@ -405,6 +405,7 @@ async fn execute_release(
 
     // Execute proposals
     for proposal in &release_config.proposals {
+        println!("[TTT] proposal.name={}", proposal.name);
         let mut proposal_path = proposal_folder.to_path_buf();
         proposal_path.push("sources");
         proposal_path.push(&release_config.name);
@@ -465,6 +466,7 @@ async fn execute_release(
                 }
             },
         };
+        println!("[TTT] about to verify proposal.name={}", proposal.name);
         if validate_release {
             release_config.validate_upgrade(&network_config.endpoint, proposal)?;
         }
