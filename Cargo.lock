@@ -5983,6 +5983,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "diesel-async"
+version = "0.4.1"
+source = "git+https://github.com/banool/diesel_async?rev=7115c8668b88d56029cb1471e84d2ea0234ff035#7115c8668b88d56029cb1471e84d2ea0234ff035"
+dependencies = [
+ "async-trait",
+ "bb8",
+ "diesel",
+ "futures-util",
+ "scoped-futures",
+ "tokio",
+ "tokio-postgres",
+]
+
+[[package]]
+name = "diesel_async_migrations"
+version = "0.11.0"
+source = "git+https://github.com/niroco/diesel_async_migrations?rev=11f331b73c5cfcc894380074f748d8fda710ac12#11f331b73c5cfcc894380074f748d8fda710ac12"
+dependencies = [
+ "diesel",
+ "diesel-async",
+ "macros",
+ "scoped-futures",
+ "tracing",
+]
+
+[[package]]
 name = "diesel_derives"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

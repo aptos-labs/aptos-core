@@ -13,12 +13,53 @@ use poem::{
     EndpointExt, IntoResponse, Route, Server,
 };
 use serde::Serialize;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::{
+    collections::HashSet,
+    net::{Ipv4Addr, SocketAddrV4},
+    time::Duration,
+};
+use tokio::time::timeout;
 
 #[derive(Debug, Clone, Parser)]
 pub struct ReadyServerConfig {
     #[clap(long, default_value_t = 8090)]
     pub ready_server_listen_port: u16,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReadyServerManager {
+    config: ReadyServerArgs,
+    health_checkers: HashSet<HealthChecker>,
+}
+
+impl ReadyServerManager {
+    pub fn new(args: &RunLocalTestnet, health_checkers: HashSet<HealthChecker>) -> Result<Self> {
+        Ok(ReadyServerManager {
+            config: args.ready_server_args.clone(),
+            health_checkers,
+        })
+    }
+}
+
+#[async_trait]
+impl ServiceManager for ReadyServerManager {
+    fn get_name(&self) -> String {
+        "Ready Server".to_string()
+    }
+
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
+        // We don't health check the service that exposes health checks.
+        hashset! {}
+    }
+
+    fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker> {
+        // This service should start before the other services are ready.
+        hashset! {}
+    }
+
+    async fn run_service(self: Box<ReadyServerManager>) -> Result<()> {
+        run_ready_server(self.health_checkers, self.config).await
+    }
 }
 
 /// This returns a future that runs a web server that exposes a single unified health
@@ -57,9 +98,12 @@ async fn root(health_checkers: Data<&HealthCheckers>) -> impl IntoResponse {
     let mut ready = vec![];
     let mut not_ready = vec![];
     for health_checker in &health_checkers.health_checkers {
-        match health_checker.check().await {
-            Ok(()) => ready.push(health_checker.clone()),
-            Err(_) => {
+        // Use timeout since some of these checks can take quite a while if the
+        // underlying service is not ready. This is best effort of course, see the docs
+        // for tokio::time::timeout for more information.
+        match timeout(Duration::from_secs(3), health_checker.check()).await {
+            Ok(Ok(())) => ready.push(health_checker.clone()),
+            _ => {
                 not_ready.push(health_checker.clone());
             },
         }
