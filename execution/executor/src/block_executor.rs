@@ -248,6 +248,13 @@ where
                     V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
                 };
 
+                info!(
+                    txns = chunk_output.transactions,
+                    txn_outs = chunk_output.transaction_outputs,
+                    first_version = parent_output.next_version(),
+                    "Gonna return state checkpoint output."
+                );
+
                 let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
                     .with_label_values(&["state_checkpoint"])
                     .start_timer();
@@ -325,7 +332,7 @@ where
             current_output.output.epoch_state().clone(),
         );
         info!(
-            next_version = output.transaction_accumulator.num_leaves(),
+            first_version = parent_accumulator.num_leaves(),
             txns_to_commit = output
                 .transactions_to_commit()
                 .iter()
