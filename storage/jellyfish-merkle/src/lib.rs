@@ -76,7 +76,6 @@ pub mod iterator;
 #[cfg(test)]
 mod jellyfish_merkle_test;
 pub mod metrics;
-#[cfg(any(test, feature = "fuzzing"))]
 pub mod mock_tree_store;
 pub mod node_type;
 pub mod restore;
@@ -661,7 +660,6 @@ where
 
     /// This is a convenient function for test only, without providing the node hash
     /// cache and assuming the base version is the immediate previous version.
-    #[cfg(any(test, feature = "fuzzing"))]
     pub fn put_value_set_test(
         &self,
         value_set: Vec<(HashValue, Option<&(HashValue, K)>)>,
