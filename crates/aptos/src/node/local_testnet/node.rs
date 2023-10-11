@@ -117,7 +117,7 @@ impl ServiceManager for NodeManager {
     /// We return health checkers for both the Node API and the txn stream (if enabled).
     /// As it is now, it is fine to make downstream services wait for both but if that
     /// changes we can refactor.
-    fn get_healthchecks(&self) -> HashSet<HealthChecker> {
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         let node_api_url = self.get_node_api_url();
         let mut checkers = HashSet::new();
         checkers.insert(HealthChecker::NodeApi(node_api_url));

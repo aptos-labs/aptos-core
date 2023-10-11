@@ -31,7 +31,7 @@ const POSTGRES_DEFAULT_PORT: u16 = 5432;
 #[derive(Clone, Debug, Parser)]
 pub struct PostgresArgs {
     /// This is the database to connect to, both when --use-host-postgres is set
-    /// and when it is not (i.e. when postgres is running in a container).
+    /// and when it is not (when postgres is running in a container).
     #[clap(long, default_value = "local_testnet")]
     pub postgres_database: String,
 
@@ -46,12 +46,12 @@ pub struct PostgresArgs {
     pub postgres_port: u16,
 
     /// If set, connect to the postgres instance specified by the rest of the
-    /// `postgres_args` (e.g. --host-postgres-host, --host-postgres-user, etc) rather
-    /// than running a new one with Docker. This can be used to connect to an existing
-    /// postgres instance running on the host system. Do not include the database.
+    /// `postgres_args` (e.g. --host-postgres-port) rather than running an instance
+    /// with Docker. This can be used to connect to an existing postgres instance
+    /// running on the host system.
     ///
     /// WARNING: Any existing database it finds (based on --postgres-database) will be
-    /// dropped.
+    /// dropped and recreated.
     #[clap(long, requires = "with_indexer_api")]
     pub use_host_postgres: bool,
 
@@ -73,7 +73,7 @@ impl PostgresArgs {
     }
 
     /// Get the connection string for the postgres database. If `database` is specified
-    /// we will use that rather than `postgres_database`.
+    /// we will use that rather than `self.postgres_database`.
     pub fn get_connection_string(&self, database: Option<&str>) -> String {
         let password = match self.use_host_postgres {
             true => match &self.host_postgres_password {
@@ -173,7 +173,7 @@ impl ServiceManager for PostgresManager {
         Ok(())
     }
 
-    fn get_healthchecks(&self) -> HashSet<HealthChecker> {
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         hashset! {HealthChecker::Postgres(
             self.args.get_connection_string(None),
         )}
@@ -211,10 +211,14 @@ impl ServiceManager for PostgresManager {
 
         let config = Config {
             image: Some(POSTGRES_IMAGE.to_string()),
-            tty: Some(true),
+            // We set this to false so the container keeps running after the CLI
+            // shuts down by default. We manually kill the container if applicable,
+            // for example if the user set --force-restart.
+            tty: Some(false),
             exposed_ports,
             host_config,
             env: Some(vec![
+                // We run postgres without any auth + no password.
                 "POSTGRES_HOST_AUTH_METHOD=trust".to_string(),
                 format!("POSTGRES_USER={}", self.args.postgres_user),
                 format!("POSTGRES_DB={}", self.args.postgres_database),
@@ -231,8 +235,7 @@ impl ServiceManager for PostgresManager {
             .await
             .context("Failed to start postgres container")?;
 
-        // Wait for the container to stop, which it never should unless we receive
-        // ctrl-c.
+        // Wait for the container to stop (which it shouldn't).
         let wait = docker
             .wait_container(
                 &id,
@@ -250,9 +253,13 @@ impl ServiceManager for PostgresManager {
     }
 
     fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
-        // Shutdown the postgres container, if any.
-        vec![Box::new(KillContainerShutdownStep::new(
-            POSTGRES_CONTAINER_NAME,
-        ))]
+        // If --force-restart was set, shutdown the postgres container (if any).
+        if self.force_restart {
+            vec![Box::new(KillContainerShutdownStep::new(
+                POSTGRES_CONTAINER_NAME,
+            ))]
+        } else {
+            vec![]
+        }
     }
 }

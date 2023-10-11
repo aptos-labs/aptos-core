@@ -18,7 +18,9 @@ use serde::Serialize;
 use std::{
     collections::HashSet,
     net::{Ipv4Addr, SocketAddrV4},
+    time::Duration,
 };
+use tokio::time::timeout;
 
 /// Args related to running a ready server in the local testnet. The ready server lets
 /// users / clients check that if all the services in the local testnet are ready
@@ -52,7 +54,7 @@ impl ServiceManager for ReadyServerManager {
         "Ready Server".to_string()
     }
 
-    fn get_healthchecks(&self) -> HashSet<HealthChecker> {
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         // We don't health check the service that exposes health checks.
         hashset! {}
     }
@@ -103,9 +105,12 @@ async fn root(health_checkers: Data<&HealthCheckers>) -> impl IntoResponse {
     let mut ready = vec![];
     let mut not_ready = vec![];
     for health_checker in &health_checkers.health_checkers {
-        match health_checker.check().await {
-            Ok(()) => ready.push(health_checker.clone()),
-            Err(_) => {
+        // Use timeout since some of these checks can take quite a while if the
+        // underlying service is not ready. This is best effort of course, see the docs
+        // for tokio::time::timeout for more information.
+        match timeout(Duration::from_secs(3), health_checker.check()).await {
+            Ok(Ok(())) => ready.push(health_checker.clone()),
+            _ => {
                 not_ready.push(health_checker.clone());
             },
         }

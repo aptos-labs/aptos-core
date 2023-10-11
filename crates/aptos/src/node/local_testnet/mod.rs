@@ -116,6 +116,12 @@ impl RunLocalTestnet {
                 HealthChecker::Http(_, name) => name.contains("processor"),
                 HealthChecker::DataServiceGrpc(_) => false,
                 HealthChecker::Postgres(_) => false,
+                // We don't want to actually wait on this health checker here because
+                // it will never return true since we apply the metadata in a post
+                // healthy step (which comes after we call this function). So we move
+                // on. This is a bit of a leaky abstraction that we can solve with more
+                // lifecycle hooks down the line.
+                HealthChecker::IndexerApiMetadata(_) => continue,
             };
             if !silent {
                 eprintln!("{} is starting, please wait...", health_checker);
@@ -191,11 +197,11 @@ impl CliCommand<()> for RunLocalTestnet {
             info!("Created test directory: {:?}", test_dir);
         }
 
-        // Set up logging for anything that uses tracing. These logs will go to
-        // different directories based on the name of the runtime.
         if self.log_to_stdout {
             setup_logging(None);
         } else {
+            // Set up logging for anything that uses tracing. These logs will go to
+            // different directories based on the name of the runtime.
             let td = test_dir.clone();
             let make_writer = move || {
                 ThreadNameMakeWriter::new(td.clone()).make_writer() as Box<dyn std::io::Write>
@@ -208,7 +214,7 @@ impl CliCommand<()> for RunLocalTestnet {
         // Build the node manager. We do this unconditionally.
         let node_manager = NodeManager::new(&self, test_dir.clone())
             .context("Failed to build node service manager")?;
-        let node_health_checkers = node_manager.get_healthchecks();
+        let node_health_checkers = node_manager.get_health_checkers();
 
         // If configured to do so, build the faucet manager.
         if !self.faucet_args.no_faucet {
@@ -225,7 +231,7 @@ impl CliCommand<()> for RunLocalTestnet {
         if self.indexer_api_args.with_indexer_api {
             let postgres_manager = postgres::PostgresManager::new(&self, test_dir.clone())
                 .context("Failed to build postgres service manager")?;
-            let postgres_health_checkers = postgres_manager.get_healthchecks();
+            let postgres_health_checkers = postgres_manager.get_health_checkers();
             managers.push(Box::new(postgres_manager));
 
             let processor_preqrequisite_healthcheckers =
@@ -241,9 +247,12 @@ impl CliCommand<()> for RunLocalTestnet {
             )
             .context("Failed to build processor service managers")?;
 
-            // We have already ensured that at least one processor is used when
-            // building the processor managers with `many_new`.
-            let processor_health_checkers = processor_managers[0].get_healthchecks();
+            // All processors return the same health checkers so we only need to call
+            // `get_health_checkers` for one of them. This is a bit of a leaky abstraction
+            // but it works well enough for now. Note: We have already ensured that at
+            // least one processor is used when building the processor managers with
+            // `many_new`.
+            let processor_health_checkers = processor_managers[0].get_health_checkers();
 
             let mut processor_managers = processor_managers
                 .into_iter()
@@ -267,8 +276,10 @@ impl CliCommand<()> for RunLocalTestnet {
 
         // Get the healthcheckers from all the managers. We'll pass to this
         // `wait_for_startup`.
-        let health_checkers: HashSet<HealthChecker> =
-            managers.iter().flat_map(|m| m.get_healthchecks()).collect();
+        let health_checkers: HashSet<HealthChecker> = managers
+            .iter()
+            .flat_map(|m| m.get_health_checkers())
+            .collect();
 
         // The final manager we add is the ready server. This must happen last since
         // it use the health checkers from all the other services.
@@ -277,7 +288,8 @@ impl CliCommand<()> for RunLocalTestnet {
             health_checkers.clone(),
         )?));
 
-        // Collect steps to run on shutdown. We run these in reverse.
+        // Collect steps to run on shutdown. We run these in reverse. This is somewhat
+        // arbitrary, each shutdown step should work no matter the order it is run in.
         let shutdown_steps: Vec<Box<dyn ShutdownStep>> = managers
             .iter()
             .flat_map(|m| m.get_shutdown_steps())
@@ -351,9 +363,6 @@ impl CliCommand<()> for RunLocalTestnet {
             Err(err) => err.id(),
         };
 
-        // Because we added the ctrl-c task last, we can figure out if that was the one
-        // that ended based on `finished_future_index`. We modify our messaging and the
-        // return value based on this.
         let was_ctrl_c = finished_task_id == ctrl_c_task_id;
         if was_ctrl_c {
             eprintln!("\nReceived ctrl-c, running shutdown steps...");
@@ -361,7 +370,7 @@ impl CliCommand<()> for RunLocalTestnet {
             eprintln!("\nOne of the futures exited unexpectedly, running shutdown steps...");
         }
 
-        // At this point replace the ctrl-c handler so the user can kill the CLI
+        // At this point register another ctrl-c handler so the user can kill the CLI
         // instantly if they send the signal twice.
         tokio::spawn(async move {
             tokio::signal::ctrl_c()

@@ -21,7 +21,7 @@ pub fn socket_addr_to_url(socket_addr: &SocketAddr, scheme: &str) -> Result<Url>
 
 pub fn get_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()
-        .context("Docker is not available, confirm it is installed and running: {:?}")?;
+        .context("Docker is not available, confirm it is installed and running. On Linux you may need to use sudo.")?;
     Ok(docker)
 }
 
@@ -30,7 +30,7 @@ pub async fn confirm_docker_available() -> Result<()> {
     docker
         .info()
         .await
-        .context("Docker is not available, confirm it is installed and running: {:?}")?;
+        .context("Docker is not available, confirm it is installed and running. On Linux you may need to use sudo.")?;
     Ok(())
 }
 
@@ -69,10 +69,18 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
         ..Default::default()
     });
 
-    // Check if the image is there. If not, print that we'll pull it.
-    if docker.inspect_image(image_name).await.is_err() {
-        eprintln!("Image {} not found, pulling it now", image_name);
-    };
+    // Check if the image is there. If it is, exit early, the user can update any
+    // images we've already pulled manually if they want.
+    if docker.inspect_image(image_name).await.is_ok() {
+        info!(
+            "Image {} found locally, not attempting to pull it",
+            image_name
+        );
+        return Ok(());
+    }
+
+    // The image is not present, let the user know we'll pull it.
+    eprintln!("Image {} not found, pulling it now...", image_name);
 
     // The docker pull CLI command is just sugar around this API.
     docker
@@ -89,8 +97,8 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
 
 /// This function creates a directory called `dir_name` under `test_dir` and writes a
 /// file called README.md that tells the user where to go to see logs. We do this since
-/// having the user use `docker logs` is the preferred approach. To help debug any
-/// potential startup failures however, we also create files for the command to write to.
+/// having the user use `docker logs` is the preferred approach, rather than writing
+/// logs to files (which is complex and can slow down the container).
 pub fn setup_docker_logging(test_dir: &Path, dir_name: &str, container_name: &str) -> Result<()> {
     // Create dir.
     let log_dir = test_dir.join(dir_name);
