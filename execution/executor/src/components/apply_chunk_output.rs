@@ -21,7 +21,7 @@ use aptos_executor_types::{
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
     ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput,
 };
-use aptos_experimental_runtimes::thread_manager::optimal_min_parallelism;
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::error;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
@@ -380,7 +380,7 @@ impl ApplyChunkOutput {
         let num_txns = to_keep.len();
         to_keep
             .par_iter()
-            .with_min_len(optimal_min_parallelism(num_txns, 16))
+            .with_min_len(optimal_min_len(num_txns, 16))
             .map(|txn_output| {
                 (
                     txn_output

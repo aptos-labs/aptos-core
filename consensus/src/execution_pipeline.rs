@@ -9,7 +9,7 @@ use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
     ExecutorResult, StateComputeResult,
 };
-use aptos_experimental_runtimes::thread_manager::optimal_min_parallelism;
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, error};
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
@@ -101,7 +101,7 @@ impl ExecutionPipeline {
                             let num_txns = txns_to_execute.len();
                             txns_to_execute
                                 .into_par_iter()
-                                .with_min_len(optimal_min_parallelism(num_txns, 32))
+                                .with_min_len(optimal_min_len(num_txns, 32))
                                 .map(|t| t.into())
                                 .collect::<Vec<_>>()
                         });

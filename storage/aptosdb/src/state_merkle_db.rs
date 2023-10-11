@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_experimental_runtimes::thread_manager::{optimal_min_parallelism, THREAD_MANAGER};
+use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_jellyfish_merkle::{
     node_type::{NodeKey, NodeType},
     JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
@@ -329,7 +329,7 @@ impl StateMerkleDb {
         let num_nodes = node_batch.len();
         node_batch
             .par_iter()
-            .with_min_len(optimal_min_parallelism(num_nodes, 128))
+            .with_min_len(optimal_min_len(num_nodes, 128))
             .try_for_each(|(node_key, node)| {
                 ensure!(node_key.get_shard_id() == shard_id);
                 batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
@@ -343,7 +343,7 @@ impl StateMerkleDb {
         let num_stale_nodes = stale_node_index_batch.len();
         stale_node_index_batch
             .par_iter()
-            .with_min_len(optimal_min_parallelism(num_stale_nodes, 128))
+            .with_min_len(optimal_min_len(num_stale_nodes, 128))
             .try_for_each(|row| {
                 ensure!(row.node_key.get_shard_id() == shard_id);
                 if previous_epoch_ending_version.is_some()
