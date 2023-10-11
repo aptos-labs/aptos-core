@@ -138,9 +138,11 @@ def run_docker_compose(
             + extra_args,
             stream_output=True,
         )
-        
+
         if not res.succeeded():
-            error_msg = "Failed to run docker compose: \n\n{}\n\n".format(res.output_str())
+            error_msg = "Failed to run docker compose: \n\n{}\n\n".format(
+                res.output_str()
+            )
             raise DockerComposeError(error_msg)
     except Exception as e:
         if "No such file or directory" in str(e):
