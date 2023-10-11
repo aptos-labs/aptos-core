@@ -25,7 +25,7 @@ impl DefaultThreadManager {
             "non_exe".into(),
             Some(min(num_cpus::get(), MAX_THREAD_POOL_SIZE)),
         );
-        let io_threads = spawn_rayon_thread_pool("io".into(), Some(MAX_THREAD_POOL_SIZE));
+        let io_threads = spawn_rayon_thread_pool("io".into(), Some(64));
         let background_threads =
             spawn_rayon_thread_pool("background".into(), Some(MAX_THREAD_POOL_SIZE));
         Self {
