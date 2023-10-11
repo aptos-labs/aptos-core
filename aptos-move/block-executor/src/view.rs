@@ -501,40 +501,36 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     None => {
                         self.get_base_value(state_key).map(
                             |maybe_state_value| {
-                                if let ReadKind::Value = kind {
-                                    match (maybe_state_value, maybe_layout) {
-                                        (Some(state_value), Some(layout)) => {
-                                            let res = self.replace_values_with_identifiers(state_value, layout);
-                                            let patched_state_value = match res {
-                                                Ok((patched_state_value, delayed_field_keys)) => {
-                                                    state.delayed_field_keys_in_resources
-                                                        .borrow_mut()
-                                                        .insert(state_key.clone(), delayed_field_keys);
-                                                    state.unsync_map.write(state_key.clone(),
-                                                        TransactionWrite::from_state_value(Some(patched_state_value.clone())),
-                                                        maybe_layout.map(|layout| Arc::new(layout.clone())));
-                                                    Some(patched_state_value)
-                                                }
-                                                Err(err) => {
-                                                    let log_context = AdapterLogSchema::new(
-                                                        self.base_view.id(),
-                                                        self.txn_idx as usize,
-                                                    );
-                                                    alert!(
-                                                        log_context,
-                                                        "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
-                                                        state_key,
-                                                        err
-                                                    );
-                                                    None
-                                                }
-                                            };
-                                            patched_state_value
-                                        },
-                                        (maybe_state_value, _) => {maybe_state_value}
-                                    }
-                                } else {
-                                    maybe_state_value
+                                match (kind.clone(), maybe_state_value, maybe_layout) {
+                                    (ReadKind::Value, Some(state_value), Some(layout)) => {
+                                        let res = self.replace_values_with_identifiers(state_value, layout);
+                                        let patched_state_value = match res {
+                                            Ok((patched_state_value, delayed_field_keys)) => {
+                                                state.delayed_field_keys_in_resources
+                                                    .borrow_mut()
+                                                    .insert(state_key.clone(), delayed_field_keys);
+                                                state.unsync_map.write(state_key.clone(),
+                                                    TransactionWrite::from_state_value(Some(patched_state_value.clone())),
+                                                    maybe_layout.map(|layout| Arc::new(layout.clone())));
+                                                Some(patched_state_value)
+                                            }
+                                            Err(err) => {
+                                                let log_context = AdapterLogSchema::new(
+                                                    self.base_view.id(),
+                                                    self.txn_idx as usize,
+                                                );
+                                                alert!(
+                                                    log_context,
+                                                    "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
+                                                    state_key,
+                                                    err
+                                                );
+                                                None
+                                            }
+                                        };
+                                        patched_state_value
+                                    },
+                                    (_, maybe_state_value, _) => {maybe_state_value}
                                 }
                             }
                         )
