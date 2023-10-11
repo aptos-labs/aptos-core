@@ -11,6 +11,8 @@ use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
 use std::cmp::max;
 
+pub static MAX_THREAD_POOL_SIZE: usize = 32;
+
 pub static THREAD_MANAGER: Lazy<Box<dyn ThreadManager>> = Lazy::new(|| {
     ThreadManagerBuilder::create_thread_manager(ThreadManagerBuilder::get_thread_config_strategy())
 });
@@ -67,9 +69,10 @@ impl ThreadManagerBuilder {
     }
 }
 
-/// This assumes that we get a peak performance at 64 parallelism - in future if we can scale up
-/// our code for higher parallelism, we can increase this number.
-static OPTIMAL_MAX_PARALLELISM: usize = 64;
+/// This assumes that we have a minimum of 4 stealable tasks per thread - this tries to find an optimal balance
+/// between not having too many small tasks which introduces signficant overhead of task stealing and not having
+/// too few tasks which leads to under utilization of threads.
+static OPTIMAL_MAX_PARALLELISM: usize = MAX_THREAD_POOL_SIZE * 4;
 pub fn optimal_min_len(num_tasks: usize, min_threshold: usize) -> usize {
     max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
 }
