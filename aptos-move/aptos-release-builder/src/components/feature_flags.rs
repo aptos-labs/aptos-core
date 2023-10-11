@@ -90,6 +90,7 @@ pub enum FeatureFlag {
     ConcurrentAssets,
     LimitMaxIdentifierLength,
     OperatorBeneficiaryChange,
+    ResourceGroupsChargeAsSizeSum,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -234,6 +235,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+            FeatureFlag::ResourceGroupsChargeAsSizeSum => {
+                AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
+            },
         }
     }
 }
@@ -301,6 +305,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
             AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
+            AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
+                FeatureFlag::ResourceGroupsChargeAsSizeSum
+            },
         }
     }
 }

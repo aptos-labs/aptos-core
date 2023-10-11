@@ -16,6 +16,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map, BTreeMap},
+    fmt::Debug,
     ops::{Deref, DerefMut},
 };
 
@@ -32,6 +33,13 @@ pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
         ],
     )
 });
+
+#[derive(Eq, Clone, Debug, PartialEq)]
+pub enum WriteOpKind {
+    Creation,
+    Modification,
+    Deletion,
+}
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
@@ -52,37 +60,6 @@ pub enum WriteOp {
 }
 
 impl WriteOp {
-    #[inline]
-    pub fn is_deletion(&self) -> bool {
-        match self {
-            WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => true,
-            WriteOp::Modification(_)
-            | WriteOp::ModificationWithMetadata { .. }
-            | WriteOp::Creation(_)
-            | WriteOp::CreationWithMetadata { .. } => false,
-        }
-    }
-
-    pub fn is_creation(&self) -> bool {
-        match self {
-            WriteOp::Creation(_) | WriteOp::CreationWithMetadata { .. } => true,
-            WriteOp::Modification(_)
-            | WriteOp::ModificationWithMetadata { .. }
-            | WriteOp::Deletion
-            | WriteOp::DeletionWithMetadata { .. } => false,
-        }
-    }
-
-    pub fn is_modification(&self) -> bool {
-        match self {
-            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => true,
-            WriteOp::Creation(_)
-            | WriteOp::CreationWithMetadata { .. }
-            | WriteOp::Deletion
-            | WriteOp::DeletionWithMetadata { .. } => false,
-        }
-    }
-
     /// Merges two write ops on the same state item.
     ///
     /// returns `false` if the result indicates no op has happened -- that's when the first op
@@ -167,7 +144,7 @@ impl WriteOp {
     }
 }
 
-pub trait TransactionWrite {
+pub trait TransactionWrite: Debug {
     fn bytes(&self) -> Option<&Bytes>;
 
     // Returns state value that would be observed by a read following the 'self' write.
@@ -193,10 +170,6 @@ pub trait TransactionWrite {
         self.bytes().cloned()
     }
 
-    fn bytes_len(&self) -> usize {
-        self.bytes().map(|bytes| bytes.len()).unwrap_or(0)
-    }
-
     fn as_u128(&self) -> anyhow::Result<Option<u128>> {
         match self.bytes() {
             Some(bytes) => Ok(Some(bcs::from_bytes(bytes)?)),
@@ -204,8 +177,18 @@ pub trait TransactionWrite {
         }
     }
 
+    fn write_op_kind(&self) -> WriteOpKind;
+
     fn is_deletion(&self) -> bool {
-        self.bytes().is_none()
+        self.write_op_kind() == WriteOpKind::Deletion
+    }
+
+    fn is_creation(&self) -> bool {
+        self.write_op_kind() == WriteOpKind::Creation
+    }
+
+    fn is_modification(&self) -> bool {
+        self.write_op_kind() == WriteOpKind::Modification
     }
 
     fn set_bytes(&mut self, bytes: Bytes);
@@ -237,6 +220,16 @@ impl TransactionWrite for WriteOp {
                 data: bytes,
                 metadata,
             },
+        }
+    }
+
+    fn write_op_kind(&self) -> WriteOpKind {
+        match self {
+            WriteOp::Creation(_) | WriteOp::CreationWithMetadata { .. } => WriteOpKind::Creation,
+            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => {
+                WriteOpKind::Modification
+            },
+            WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => WriteOpKind::Deletion,
         }
     }
 

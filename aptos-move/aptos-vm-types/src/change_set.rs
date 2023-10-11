@@ -333,7 +333,7 @@ impl VMChangeSet {
         &self.module_write_set
     }
 
-    // Called by `try_into_transaction_output_with_materialized_writes` only.
+    // Called by `into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_aggregator_v1_write_set(
         &mut self,
         additional_aggregator_writes: impl Iterator<Item = (StateKey, WriteOp)>,
@@ -342,12 +342,17 @@ impl VMChangeSet {
             .extend(additional_aggregator_writes)
     }
 
+    // Called by `into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_resource_write_set(
         &mut self,
         patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        finalized_group_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) {
-        self.resource_write_set
-            .extend(patched_resource_writes.map(|(k, v)| (k, (v, None))))
+        self.resource_write_set.extend(
+            patched_resource_writes
+                .chain(finalized_group_writes)
+                .map(|(k, v)| (k, (v, None))),
+        );
     }
 
     /// The events are set to the input events.

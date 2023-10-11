@@ -10,7 +10,10 @@ use aptos_aggregator::{
     },
 };
 use aptos_mvhashmap::{
-    types::{MVDataError, MVDataOutput, MVDelayedFieldsError, TxnIndex, Version},
+    types::{
+        MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
+        Version,
+    },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
@@ -145,12 +148,15 @@ impl<V: TransactionWrite> DataRead<V> {
 
 /// Additional state regarding groups that may be provided to the VM during transaction
 /// execution and is captured. There may be a DataRead per tag within the group, and also
-/// the group size (also computed based on speculative information in MVHashMap).
+/// the group size, computed based on speculative information in MVHashMap, by "collecting"
+/// over the latest contents present in the group, i.e. the respective tags and values (in
+/// this sense, group size is even more speculative than other captured information, as it
+/// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
-    speculative_size: Option<u64>,
+    collected_size: Option<u64>,
     /// Reads to individual resources in the group, keyed by a tag.
     inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
 }
@@ -351,20 +357,27 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn capture_group_size(
         &mut self,
-        _state_key: T::Key,
-        _group_size: u64,
+        group_key: T::Key,
+        group_size: u64,
     ) -> anyhow::Result<()> {
-        unimplemented!("Group size capturing not implemented");
+        let group = self.group_reads.entry(group_key).or_default();
+
+        if let Some(recorded_size) = group.collected_size {
+            if recorded_size != group_size {
+                bail!("Inconsistent recorded group size");
+            }
+        }
+
+        group.collected_size = Some(group_size);
+        Ok(())
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn group_size(&self, state_key: &T::Key) -> Option<u64> {
+    pub(crate) fn group_size(&self, group_key: &T::Key) -> Option<u64> {
         self.group_reads
-            .get(state_key)
-            .and_then(|group| group.speculative_size)
+            .get(group_key)
+            .and_then(|group| group.collected_size)
     }
 
     // Error means there was a inconsistency in information read (must be due to the
@@ -538,25 +551,44 @@ impl<T: Transaction> CapturedReads<T> {
         group_map: &VersionedGroupData<T::Key, T::Tag, T::Value>,
         idx_to_validate: TxnIndex,
     ) -> bool {
+        use MVGroupError::*;
+
         if self.speculative_failure {
             return false;
         }
 
         self.group_reads.iter().all(|(key, group)| {
             let mut ret = true;
-            if let Some(size) = group.speculative_size {
+            if let Some(size) = group.collected_size {
                 ret &= Ok(size) == group_map.get_group_size(key, idx_to_validate);
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                group_map
-                    .read_from_group(key, tag, idx_to_validate)
-                    .is_ok_and(|(version, v, layout)| {
+                match group_map.read_from_group(key, tag, idx_to_validate) {
+                    Ok((version, v, layout)) => {
                         matches!(
                             DataRead::Versioned(version, v, layout).contains(r),
                             DataReadComparison::Contains
                         )
-                    })
+                    },
+                    Err(TagNotFound) => {
+                        let sentinel_deletion =
+                            Arc::<T::Value>::new(TransactionWrite::from_state_value(None));
+                        assert!(sentinel_deletion.is_deletion());
+                        matches!(
+                            DataRead::Versioned(Err(StorageVersion), sentinel_deletion, None)
+                                .contains(r),
+                            DataReadComparison::Contains
+                        )
+                    },
+                    Err(Dependency(_)) => false,
+                    Err(Uninitialized) => {
+                        unreachable!("May not be uninitialized if captured for validation");
+                    },
+                    Err(TagSerializationError) => {
+                        unreachable!("Should not require tag serialization");
+                    },
+                }
             })
         })
     }
@@ -615,12 +647,9 @@ impl<T: Transaction> CapturedReads<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::proptest_types::types::{KeyType, MockEvent, ValueType};
+    use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
     use aptos_aggregator::types::DelayedFieldID;
     use aptos_mvhashmap::types::StorageVersion;
-    use aptos_types::{
-        on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
-    };
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
     use test_case::test_case;
 
@@ -833,12 +862,6 @@ mod test {
             );
             assert_some_eq!($m.get(&$x), &$y);
         }};
-    }
-
-    fn raw_metadata(v: u64) -> StateValueMetadataKind {
-        Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
-            microseconds: v,
-        }))
     }
 
     #[test]

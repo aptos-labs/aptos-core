@@ -31,14 +31,16 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::output::VMOutput;
-use move_core_types::{value::MoveTypeLayout, vm_status::VMStatus};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{collections::BTreeMap, sync::Arc};
 
-// Wrapper to avoid orphan rule
+/// Output type wrapper used by block executor. VM output is stored first, then
+/// transformed into TransactionOutput type that is returned.
 #[derive(Debug)]
 pub struct AptosTransactionOutput {
+    // Note: should these mutexes be changed to ExplicitSyncSwapper?
     vm_output: Mutex<Option<VMOutput>>,
     committed_output: OnceCell<TransactionOutput>,
 }
@@ -63,7 +65,12 @@ impl AptosTransactionOutput {
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .into_transaction_output_with_materialized_deltas(vec![]),
+                .into_transaction_output_with_materialized_write_set(
+                    vec![],
+                    BTreeMap::new(),
+                    vec![],
+                    vec![],
+                ),
         }
     }
 }
@@ -71,14 +78,53 @@ impl AptosTransactionOutput {
 impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     type Txn = SignatureVerifiedTransaction;
 
-    /// Execution output for transactions that comes after SkipRest signal.
+    /// Execution output for transactions that comes after SkipRest signal or when there was a
+    /// problem creating the output (e.g. group serialization issue).
     fn skip_output() -> Self {
         Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
 
-    /// Should never be called after incorporate_delta_writes, as it
+    /// Should never be called after incorporate_additional_writes, as it
+    /// will consume vm_output to prepare an output with deltas.
+    fn resource_group_write_set(&self) -> Vec<(StateKey, WriteOp, BTreeMap<StructTag, WriteOp>)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
+            .change_set()
+            .resource_group_write_set()
+            .iter()
+            .map(|(group_key, group_write)| {
+                (
+                    group_key.clone(),
+                    group_write.metadata_op().clone(),
+                    // TODO: propagate layouts.
+                    group_write
+                        .inner_ops()
+                        .iter()
+                        .map(|(tag, (op, _maybe_layout))| (tag.clone(), op.clone()))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    /// More efficient implementation to avoid unnecessarily cloning inner_ops.
+    fn resource_group_metadata_ops(&self) -> Vec<(StateKey, WriteOp)> {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get writes")
+            .change_set()
+            .resource_group_write_set()
+            .iter()
+            .map(|(group_key, group_write)| (group_key.clone(), group_write.metadata_op().clone()))
+            .collect()
+    }
+
+    /// Should never be called after incorporate_additional_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn resource_write_set(&self) -> BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         self.vm_output
@@ -90,7 +136,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
+    /// Should never be called after incorporate_additional_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
@@ -102,7 +148,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
+    /// Should never be called after incorporate_additional_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
@@ -114,7 +160,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
+    /// Should never be called after incorporate_additional_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
         self.vm_output
@@ -126,7 +172,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    /// Should never be called after incorporate_delta_writes, as it
+    /// Should never be called after incorporate_additional_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.vm_output
@@ -158,6 +204,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             <Self::Txn as BlockExecutableTransaction>::Value,
         >,
         patched_events: Vec<<Self::Txn as BlockExecutableTransaction>::Event>,
+        combined_groups: Vec<(
+            <Self::Txn as BlockExecutableTransaction>::Key,
+            <Self::Txn as BlockExecutableTransaction>::Value,
+        )>,
     ) {
         assert!(
             self.committed_output
@@ -169,7 +219,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .into_transaction_output_with_materialized_write_set(
                             aggregator_v1_writes,
                             patched_resource_write_set,
-                            patched_events
+                            patched_events,
+                            combined_groups,
                         ),
                 )
                 .is_ok(),

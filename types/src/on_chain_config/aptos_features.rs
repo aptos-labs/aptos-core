@@ -47,6 +47,7 @@ pub enum FeatureFlag {
     CONCURRENT_ASSETS = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
+    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 40,
 }
 
 /// Representation of features on chain as a bitset.
@@ -110,6 +111,10 @@ impl Features {
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
+    }
+
+    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 }
 
