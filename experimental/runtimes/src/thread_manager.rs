@@ -9,6 +9,7 @@ use crate::strategies::{
 };
 use once_cell::sync::{Lazy, OnceCell};
 use rayon::ThreadPool;
+use std::cmp::max;
 
 pub static THREAD_MANAGER: Lazy<Box<dyn ThreadManager>> = Lazy::new(|| {
     ThreadManagerBuilder::create_thread_manager(ThreadManagerBuilder::get_thread_config_strategy())
@@ -64,4 +65,11 @@ impl ThreadManagerBuilder {
             },
         }
     }
+}
+
+/// This assumes that we get a peak performance at 48 parallelism - in future if we can scale up
+/// our code for higher parallelism, we can increase this number.
+static OPTIMAL_MAX_PARALLELISM: usize = 48;
+pub fn optimal_min_parallelism(num_tasks: usize, min_threshold: usize) -> usize {
+    max(min_threshold, num_tasks / OPTIMAL_MAX_PARALLELISM)
 }

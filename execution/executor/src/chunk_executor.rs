@@ -21,6 +21,7 @@ use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
     TransactionReplayer, VerifyExecutionMode,
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_parallelism;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
@@ -222,10 +223,11 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
         // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
         // as only transactions with verified signatures are committed to the storage.
+        let num_txns = transactions.len();
         let sig_verified_txns = SIG_VERIFY_POOL.install(|| {
             transactions
                 .into_par_iter()
-                .with_min_len(25)
+                .with_min_len(optimal_min_parallelism(num_txns, 32))
                 .map(|t| t.into())
                 .collect::<Vec<_>>()
         });

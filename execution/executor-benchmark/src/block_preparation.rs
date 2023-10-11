@@ -3,6 +3,7 @@
 use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
 use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};
 use aptos_crypto::HashValue;
+use aptos_experimental_runtimes::thread_manager::optimal_min_parallelism;
 use aptos_logger::info;
 use aptos_types::{
     block_executor::partitioner::{ExecutableBlock, ExecutableTransactions},
@@ -54,8 +55,9 @@ impl BlockPreparationStage {
         let block_id = HashValue::random();
         let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             SIG_VERIFY_POOL.install(|| {
+                let num_txns = txns.len();
                 txns.into_par_iter()
-                    .with_min_len(25)
+                    .with_min_len(optimal_min_parallelism(num_txns, 32))
                     .map(|t| t.into())
                     .collect::<Vec<_>>()
             });
