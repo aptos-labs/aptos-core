@@ -121,7 +121,7 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Err(Dependency(10)), r_11);
 
     // Delete the entry written by 10, write to a different ap.
-    mvtbl.data().delete(&ap1, 10);
+    mvtbl.data().remove(&ap1, 10);
     mvtbl
         .data()
         .write(ap2.clone(), 10, 2, (value_for(10, 2), None));
@@ -143,9 +143,9 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Versioned(Ok((20, 4)), arc_value_for(20, 4), None)), r_20);
 
     // Clear ap1 and ap3.
-    mvtbl.data().delete(&ap1, 12);
-    mvtbl.data().delete(&ap1, 8);
-    mvtbl.data().delete(&ap3, 20);
+    mvtbl.data().remove(&ap1, 12);
+    mvtbl.data().remove(&ap1, 8);
+    mvtbl.data().remove(&ap3, 20);
 
     // Reads from ap1 and ap3 go to db.
     match_unresolved(
