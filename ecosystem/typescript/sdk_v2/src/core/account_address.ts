@@ -246,7 +246,8 @@ export class AccountAddress extends Serializable {
       } else if (args.input.length !== 3) {
         // 0x + one hex char is the only valid SHORT form for special addresses.
         throw new ParsingError(
-          "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes.",
+          `The given hex string ${args.input} is a special address not in LONG form, 
+          it must be 0x0 to 0xf without padding zeroes.`,
           AddressInvalidReason.INVALID_PADDING_ZEROES,
         );
       }

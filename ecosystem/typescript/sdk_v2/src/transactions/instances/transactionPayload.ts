@@ -6,7 +6,10 @@ import { Identifier } from "./identifier";
 import { ScriptTransactionArgument } from "./scriptTransactionArguments";
 import { ModuleId } from "./moduleId";
 import { TransactionPayloadVariants } from "../../types";
-import { TypeTag } from "./typeTag";
+import { TypeTag } from "../typeTag/typeTag";
+import { U8 } from "../../bcs/serializable/move-primitives";
+import { MoveVector } from "../../bcs/serializable/move-structs";
+import { FixedBytes } from "../../bcs/serializable/fixed-bytes";
 
 /**
  * Representation of the supported Transaction Payload
@@ -113,7 +116,7 @@ export class EntryFunction {
 
   public readonly type_args: Array<TypeTag>;
 
-  public readonly args: Array<Uint8Array>;
+  public readonly args: Array<Serializable>;
 
   /**
    * Contains the payload to run a function within a module.
@@ -134,11 +137,41 @@ export class EntryFunction {
    * public entry fun transfer<CoinType>(from: &signer, to: address, amount: u64)
    * ```
    */
-  constructor(module_name: ModuleId, function_name: Identifier, type_args: Array<TypeTag>, args: Array<Uint8Array>) {
+  constructor(module_name: ModuleId, function_name: Identifier, type_args: Array<TypeTag>, args: Array<Serializable>) {
     this.module_name = module_name;
     this.function_name = function_name;
     this.type_args = type_args;
     this.args = args;
+  }
+
+  /**
+   * A helper function to build a EntryFunction payload from raw primitive values
+   *
+   * @param module_name Fully qualified module name in format "AccountAddress::module_name" e.g. "0x1::coin"
+   * @param function_name Function name
+   * @param type_args Type arguments that move function requires.
+   *
+   * @example
+   * A coin transfer function has one type argument "CoinType".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   * @param args Arugments to the move function.
+   *
+   * @example
+   * A coin transfer function has three arugments "from", "to" and "amount".
+   * ```
+   * public(script) fun transfer<CoinType>(from: &signer, to: address, amount: u64,)
+   * ```
+   * @returns EntryFunction
+   */
+  static build(
+    module_name: `${string}::${string}`,
+    function_name: string,
+    type_args: Array<TypeTag>,
+    args: Array<Serializable>,
+  ): EntryFunction {
+    return new EntryFunction(ModuleId.fromStr(module_name), new Identifier(function_name), type_args, args);
   }
 
   serialize(serializer: Serializer): void {
@@ -147,23 +180,44 @@ export class EntryFunction {
     serializer.serializeVector<TypeTag>(this.type_args);
 
     serializer.serializeU32AsUleb128(this.args.length);
-    this.args.forEach((item: Uint8Array) => {
-      serializer.serializeBytes(item);
+    this.args.forEach((item: Serializable) => {
+      const bytes = item.bcsToBytes();
+      serializer.serializeBytes(bytes);
     });
   }
 
+  /**
+   * Deserializes an entry function payload with the arguments represented as FixedBytes instances.
+   * @see FixedBytes
+   *
+   * NOTE: When you deserialize an EntryFunction payload with this method, the entry function
+   * arguments are populated as type-agnostic, raw fixed bytes in the form of the FixedBytes class.
+   * In order to correctly deserialize these arguments as their actual type representations, you
+   * must know the types of the arguments beforehand and deserialize them yourself individually.
+   *
+   * One way you could achieve this is by using the ABIs for an entry function and deserializing each
+   * argument as its given, corresponding type.
+   *
+   * @param deserializer
+   * @returns A deserialized EntryFunction payload for a transaction.
+   *
+   */
   static deserialize(deserializer: Deserializer): EntryFunction {
     const module_name = ModuleId.deserialize(deserializer);
     const function_name = Identifier.deserialize(deserializer);
     const type_args = deserializer.deserializeVector(TypeTag);
 
     const length = deserializer.deserializeUleb128AsU32();
-    const list: Array<Uint8Array> = [];
+    const list: Array<Serializable> = new Array<MoveVector<U8>>();
+
     for (let i = 0; i < length; i += 1) {
-      list.push(deserializer.deserializeBytes());
+      const fixedBytesLength = deserializer.deserializeUleb128AsU32();
+      const fixedBytes = FixedBytes.deserialize(deserializer, fixedBytesLength);
+      list.push(fixedBytes);
     }
 
     const args = list;
+
     return new EntryFunction(module_name, function_name, type_args, args);
   }
 }

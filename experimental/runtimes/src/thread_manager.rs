@@ -30,6 +30,7 @@ pub trait ThreadManager<'a>: Send + Sync {
     fn get_non_exe_cpu_pool(&'a self) -> &'a ThreadPool;
     fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool;
     fn get_io_pool(&'a self) -> &'a ThreadPool;
+    fn get_background_pool(&'a self) -> &'a ThreadPool;
 }
 
 pub struct ThreadManagerBuilder;

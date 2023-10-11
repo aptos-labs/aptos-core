@@ -17,9 +17,11 @@ use crate::{
     state_kv_db::StateKvDb,
     OTHER_TIMERS_SECONDS,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_types::transaction::{AtomicVersion, Version};
+use rayon::prelude::*;
 use std::{
     cmp::min,
     sync::{atomic::Ordering, Arc},
@@ -63,10 +65,18 @@ impl DBPruner for StateKvPruner {
             self.metadata_pruner
                 .prune(progress, current_batch_target_version)?;
 
-            // NOTE: If necessary, this can be done in parallel.
-            self.shard_pruners
-                .iter()
-                .try_for_each(|pruner| pruner.prune(progress, current_batch_target_version))?;
+            THREAD_MANAGER.get_background_pool().install(|| {
+                self.shard_pruners.par_iter().try_for_each(|shard_pruner| {
+                    shard_pruner
+                        .prune(progress, current_batch_target_version)
+                        .map_err(|err| {
+                            anyhow!(
+                                "Failed to prune state kv shard {}: {err}",
+                                shard_pruner.shard_id(),
+                            )
+                        })
+                })
+            })?;
 
             progress = current_batch_target_version;
             self.record_progress(progress);

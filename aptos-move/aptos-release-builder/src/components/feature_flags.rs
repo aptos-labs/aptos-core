@@ -84,6 +84,8 @@ pub enum FeatureFlag {
     SaferResourceGroups,
     SaferMetadata,
     Secp256k1ECDSAAuthenticator,
+    SponsoredAutomaticAccountCreation,
+    FeePayerAccountOptional,
     ReconfigureWithDKG,
 }
 
@@ -221,6 +223,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::Secp256k1ECDSAAuthenticator => {
                 AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
             },
+            FeatureFlag::SponsoredAutomaticAccountCreation => {
+                AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
+            },
+            FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
             FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
         }
     }
@@ -281,6 +287,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
                 FeatureFlag::Secp256k1ECDSAAuthenticator
             },
+            AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
+                FeatureFlag::SponsoredAutomaticAccountCreation
+            },
+            AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
         }
     }

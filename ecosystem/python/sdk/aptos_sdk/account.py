@@ -7,7 +7,7 @@ import json
 import tempfile
 import unittest
 
-from . import ed25519
+from . import asymmetric_crypto, ed25519
 from .account_address import AccountAddress
 from .bcs import Serializer
 
@@ -86,14 +86,14 @@ class RotationProofChallenge:
     sequence_number: int
     originator: AccountAddress
     current_auth_key: AccountAddress
-    new_public_key: bytes
+    new_public_key: asymmetric_crypto.PublicKey
 
     def __init__(
         self,
         sequence_number: int,
         originator: AccountAddress,
         current_auth_key: AccountAddress,
-        new_public_key: bytes,
+        new_public_key: asymmetric_crypto.PublicKey,
     ):
         self.sequence_number = sequence_number
         self.originator = originator
@@ -107,7 +107,7 @@ class RotationProofChallenge:
         serializer.u64(self.sequence_number)
         self.originator.serialize(serializer)
         self.current_auth_key.serialize(serializer)
-        serializer.to_bytes(self.new_public_key)
+        serializer.struct(self.new_public_key)
 
 
 class Test(unittest.TestCase):
@@ -141,7 +141,7 @@ class Test(unittest.TestCase):
             sequence_number=1234,
             originator=originating_account.address(),
             current_auth_key=originating_account.address(),
-            new_public_key=target_account.public_key().key.encode(),
+            new_public_key=target_account.public_key(),
         )
         # Serialize transaction.
         serializer = Serializer()

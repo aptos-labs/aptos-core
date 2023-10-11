@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import { Deserializer, Serializer } from "../../bcs";
+import { Deserializer, Serializer, Serializable } from "../../bcs";
 import { AccountAddress } from "../../core";
 import { TransactionVariants } from "../../types";
 import { ChainId } from "./chainId";
@@ -9,7 +9,7 @@ import { TransactionPayload } from "./transactionPayload";
 /**
  * Representation of a Raw Transaction that can serialized and deserialized
  */
-export class RawTransaction {
+export class RawTransaction extends Serializable {
   public readonly sender: AccountAddress;
 
   public readonly sequence_number: bigint;
@@ -48,6 +48,7 @@ export class RawTransaction {
     expiration_timestamp_secs: bigint,
     chain_id: ChainId,
   ) {
+    super();
     this.sender = sender;
     this.sequence_number = sequence_number;
     this.payload = payload;
@@ -90,7 +91,7 @@ export class RawTransaction {
 /**
  * Representation of a Raw Transaction With Data that can serialized and deserialized
  */
-export abstract class RawTransactionWithData {
+export abstract class RawTransactionWithData extends Serializable {
   /**
    * Serialize a Raw Transaction With Data
    */

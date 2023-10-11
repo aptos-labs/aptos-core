@@ -6,7 +6,7 @@
 /* eslint-disable max-classes-per-file */
 import { AccountAddress } from "../../core";
 import { Deserializer, Serializable, Serializer } from "../../bcs";
-import { Identifier } from "./identifier";
+import { Identifier } from "../instances/identifier";
 import { TypeTagVariants } from "../../types";
 
 export abstract class TypeTag extends Serializable {

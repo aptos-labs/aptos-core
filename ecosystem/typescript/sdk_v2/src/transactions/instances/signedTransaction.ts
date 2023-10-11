@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 
-import { Serializer, Deserializer } from "../../bcs";
+import { Serializer, Deserializer, Serializable } from "../../bcs";
 import { TransactionAuthenticator } from "../authenticator/transaction";
 import { RawTransaction } from "./rawTransaction";
 
-export class SignedTransaction {
+export class SignedTransaction extends Serializable {
   public readonly raw_txn: RawTransaction;
 
   public readonly authenticator: TransactionAuthenticator;
@@ -21,6 +21,7 @@ export class SignedTransaction {
    * @see {@link https://github.com/aptos-labs/aptos-core/blob/main/types/src/transaction/authenticator.rs} for details.
    */
   constructor(raw_txn: RawTransaction, authenticator: TransactionAuthenticator) {
+    super();
     this.raw_txn = raw_txn;
     this.authenticator = authenticator;
   }

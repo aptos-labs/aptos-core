@@ -1109,6 +1109,27 @@ impl AptosVM {
             session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
+        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
+            ..
+        } = &txn.authenticator_ref()
+        {
+            if self
+                .0
+                .get_features()
+                .is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+            {
+                if let Err(err) = session.execute_function_bypass_visibility(
+                    &ACCOUNT_MODULE,
+                    CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
+                    vec![],
+                    serialize_values(&vec![MoveValue::Address(txn.sender())]),
+                    gas_meter,
+                ) {
+                    return discard_error_vm_status(err.into());
+                };
+            }
+        }
+
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
 
@@ -1633,7 +1654,7 @@ impl VMValidator for AptosVM {
             }
         }
 
-        let txn = match Self::check_signature(transaction) {
+        let txn = match self.check_signature(transaction) {
             Ok(t) => t,
             _ => {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
@@ -1679,7 +1700,19 @@ impl VMAdapter for AptosVM {
         self.0.new_session(resolver, session_id)
     }
 
-    fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
+    fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
+        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
+            ..
+        } = &txn.authenticator_ref()
+        {
+            if self
+                .0
+                .get_features()
+                .is_enabled(FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL)
+            {
+                return txn.check_fee_payer_signature();
+            }
+        }
         txn.check_signature()
     }
 
