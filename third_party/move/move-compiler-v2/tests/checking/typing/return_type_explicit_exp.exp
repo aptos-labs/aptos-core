@@ -10,10 +10,10 @@ module 0x8675309::M {
           return Tuple()
         }
     }
-    private fun t1() {
+    private fun t1(): u64 {
         return 0
     }
-    private fun t2() {
+    private fun t2(): (u64, bool, M::R) {
         loop {
           if true {
             return Tuple(0, false, pack M::R(false))
@@ -23,4 +23,7 @@ module 0x8675309::M {
         };
         Abort(0)
     }
+    spec fun $t0();
+    spec fun $t1(): u64;
+    spec fun $t2(): (u64, bool, M::R);
 } // end 0x8675309::M

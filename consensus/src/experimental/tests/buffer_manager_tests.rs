@@ -8,7 +8,8 @@ use crate::{
             create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest, Sender,
         },
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
-        execution_phase::ExecutionPhase,
+        execution_schedule_phase::ExecutionSchedulePhase,
+        execution_wait_phase::ExecutionWaitPhase,
         ordering_state_computer::OrderingStateComputer,
         persisting_phase::PersistingPhase,
         pipeline_phase::PipelinePhase,
@@ -60,7 +61,8 @@ pub fn prepare_buffer_manager() -> (
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
     aptos_channels::Receiver<Event<ConsensusMsg>>,
-    PipelinePhase<ExecutionPhase>,
+    PipelinePhase<ExecutionSchedulePhase>,
+    PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
     PipelinePhase<PersistingPhase>,
     HashValue,
@@ -137,7 +139,8 @@ pub fn prepare_buffer_manager() -> (
     let hash_val = mocked_execution_proxy.get_root_hash();
 
     let (
-        execution_phase_pipeline,
+        execution_schedule_phase_pipeline,
+        execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
         buffer_manager,
@@ -159,7 +162,8 @@ pub fn prepare_buffer_manager() -> (
         buffer_reset_tx,
         msg_tx,       // channel to pass commit messages into the buffer manager
         self_loop_rx, // channel to receive message from the buffer manager itself
-        execution_phase_pipeline,
+        execution_schedule_phase_pipeline,
+        execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
         hash_val,
@@ -188,7 +192,8 @@ pub fn launch_buffer_manager() -> (
         reset_tx,
         msg_tx,       // channel to pass commit messages into the buffer manager
         self_loop_rx, // channel to receive message from the buffer manager itself
-        execution_phase_pipeline,
+        execution_schedule_phase_pipeline,
+        execution_wait_phase_pipeline,
         signing_phase_pipeline,
         persisting_phase_pipeline,
         hash_val,
@@ -197,7 +202,8 @@ pub fn launch_buffer_manager() -> (
         validators,
     ) = prepare_buffer_manager();
 
-    runtime.spawn(execution_phase_pipeline.start());
+    runtime.spawn(execution_schedule_phase_pipeline.start());
+    runtime.spawn(execution_wait_phase_pipeline.start());
     runtime.spawn(signing_phase_pipeline.start());
     runtime.spawn(persisting_phase_pipeline.start());
     runtime.spawn(buffer_manager.start());
@@ -396,6 +402,6 @@ fn buffer_manager_sync_test() {
         // we should only see batches[dropped_batches..num_batches]
         assert_results(batches.drain(dropped_batches..).collect(), &mut result_rx).await;
 
-        assert!(matches!(result_rx.next().now_or_never(), None));
+        assert!(result_rx.next().now_or_never().is_none());
     });
 }

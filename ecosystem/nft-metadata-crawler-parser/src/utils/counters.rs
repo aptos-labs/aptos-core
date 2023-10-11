@@ -7,10 +7,10 @@ use once_cell::sync::Lazy;
 
 // OVERALL METRICS
 
-/// Number of times a given processor has been invoked
+/// Number of times the NFT Metadata Crawler Parser has been invoked
 pub static PARSER_INVOCATIONS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_processor_invocation_count",
+        "nft_metadata_crawler_parser_invocation_count",
         "Number of times the parser has been invoked",
     )
     .unwrap()
@@ -19,7 +19,7 @@ pub static PARSER_INVOCATIONS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 /// Number of times the NFT Metadata Crawler Parser has completed successfully
 pub static PARSER_SUCCESSES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_processor_success_count",
+        "nft_metadata_crawler_parser_success_count",
         "Number of times the parser has completed successfully",
     )
     .unwrap()
@@ -28,11 +28,13 @@ pub static PARSER_SUCCESSES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 /// Number of times the NFT Metadata Crawler Parser has failed
 pub static PARSER_FAIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_processor_fail_count",
+        "nft_metadata_crawler_parser_fail_count",
         "Number of times the parser has failed",
     )
     .unwrap()
 });
+
+// PUBSUB METRICS
 
 /// Number of times the PubSub subscription stream has been reset
 pub static PUBSUB_STREAM_RESET_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -51,6 +53,8 @@ pub static PUBSUB_ACK_SUCCESS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+// POSTGRES METRICS
 
 /// Number of times the connection pool has timed out when trying to get a connection
 pub static UNABLE_TO_GET_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
@@ -72,11 +76,11 @@ pub static GOT_CONNECTION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 
 // DEDUPLICATION METRICS
 
-/// Number of times the NFT Metadata Crawler Parser has found a duplicate token URI
-pub static DUPLICATE_TOKEN_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+/// Number of times the NFT Metadata Crawler Parser has found a duplicate asset URI
+pub static DUPLICATE_ASSET_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "nft_metadata_crawler_parser_duplicate_token_uri_count",
-        "Number of times the NFT Metadata Crawler Parser has found a duplicate token URI"
+        "nft_metadata_crawler_parser_duplicate_asset_uri_count",
+        "Number of times the NFT Metadata Crawler Parser has found a duplicate asset URI"
     )
     .unwrap()
 });
@@ -102,10 +106,11 @@ pub static DUPLICATE_RAW_ANIMATION_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 // URI PARSER METRICS
 
 /// Number of URIs skipped because of matches on the URI skip list
-pub static SKIP_URI_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
+pub static SKIP_URI_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
         "nft_metadata_crawler_parser_skip_uri_count",
         "Number of URIs skipped because of matches on the URI skip list",
+        &["reason"]
     )
     .unwrap()
 });
@@ -195,6 +200,35 @@ pub static FAILED_TO_OPTIMIZE_IMAGE_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "nft_metadata_crawler_parser_failed_to_optimize_image_count",
         "Number of times the NFT Metadata Crawler Parser has failed to optimize an image and the error type",
         &["error_type"]
+    )
+    .unwrap()
+});
+
+/// GCS METRICS
+
+/// Number of times the NFT Metadata Crawler Parser has attempted to upload to GCS
+pub static GCS_UPLOAD_INVOCATION_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_gcs_upload_invocation_count",
+        "Number of times the NFT Metadata Crawler Parser has attempted to upload to GCS"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has successfully uploaded to GCS
+pub static SUCCESSFULLY_UPLOADED_TO_GCS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_successfully_uploaded_to_gcs_count",
+        "Number of times the NFT Metadata Crawler Parser has successfully uploaded to GCS"
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has failed to upload to GCS
+pub static FAILED_TO_UPLOAD_TO_GCS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_failed_to_upload_to_gcs_count",
+        "Number of times the NFT Metadata Crawler Parser has failed to upload to GCS"
     )
     .unwrap()
 });

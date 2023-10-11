@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
 hex = { workspace = true }
@@ -36,6 +37,8 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
 

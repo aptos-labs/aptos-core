@@ -3,6 +3,7 @@
 use crate::{
     block_executor::BlockAptosVM,
     sharded_block_executor::{
+        aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
         counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
@@ -17,7 +18,10 @@ use aptos_types::{
     block_executor::partitioner::{
         ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies,
     },
-    transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
+    transaction::{
+        analyzed_transaction::AnalyzedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+    },
 };
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
@@ -44,6 +48,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             rayon::ThreadPoolBuilder::new()
                 // We need two extra threads for the cross-shard commit receiver and the thread
                 // that is blocked on waiting for execute block to finish.
+                .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
                 .num_threads(num_threads + 2)
                 .build()
                 .unwrap(),
@@ -106,6 +111,18 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
 
         let cross_shard_state_view_clone = cross_shard_state_view.clone();
         let cross_shard_client_clone = cross_shard_client.clone();
+
+        let aggr_overridden_state_view = Arc::new(AggregatorOverriddenStateView::new(
+            cross_shard_state_view.as_ref(),
+            TOTAL_SUPPLY_AGGR_BASE_VAL,
+        ));
+
+        let signature_verified_transactions: Vec<SignatureVerifiedTransaction> = transactions
+            .into_iter()
+            .map(|txn| txn.into_txn().into_txn())
+            .collect();
+        let executor_thread_pool_clone = executor_thread_pool.clone();
+
         executor_thread_pool.clone().scope(|s| {
             s.spawn(move |_| {
                 CrossShardCommitReceiver::start(
@@ -117,11 +134,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             s.spawn(move |_| {
                 let ret = BlockAptosVM::execute_block(
                     executor_thread_pool,
-                    transactions
-                        .into_iter()
-                        .map(|txn| txn.into_txn().into_txn())
-                        .collect(),
-                    cross_shard_state_view.as_ref(),
+                    &signature_verified_transactions,
+                    aggr_overridden_state_view.as_ref(),
                     concurrency_level,
                     maybe_block_gas_limit,
                     cross_shard_commit_sender,
@@ -144,8 +158,13 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     cross_shard_client_clone.send_global_msg(CrossShardMsg::StopMsg);
                 }
                 callback.send(ret).unwrap();
+                executor_thread_pool_clone.spawn(move || {
+                    // Explicit async drop
+                    drop(signature_verified_transactions);
+                });
             });
         });
+
         block_on(callback_receiver).unwrap()
     }
 

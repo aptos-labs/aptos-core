@@ -1,0 +1,33 @@
+overwrite: true
+documents: src/internal/queries/**/*.graphql
+schema: https://indexer.mainnet.aptoslabs.com/v1/graphql
+generates:
+  src/types/generated/types.ts:
+    plugins:
+      - typescript
+    config:
+      skipTypename: true
+      namingConvention:
+        transformUnderscore: true
+  src/types/generated/operations.ts:
+    preset: import-types-preset
+    presetConfig:
+      typesPath: ./types
+    plugins:
+      - typescript-operations
+    config:
+      skipTypename: true
+      namingConvention:
+        transformUnderscore: true
+  src/types/generated/queries.ts:
+    preset: import-types-preset
+    presetConfig:
+      typesPath: ./operations
+    plugins:
+      - typescript-graphql-request
+    config:
+      documentMode: string
+      documentVariableSuffix: ""
+      skipTypename: true
+      namingConvention:
+        transformUnderscore: true

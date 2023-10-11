@@ -204,7 +204,7 @@ fn test_multi_ed25519_signature_serialization() {
     // We can construct signatures from 32 single signatures.
     let sigs_32 = vec![single_signature.clone(); 32];
     let indices: Vec<u8> = (0..32).collect();
-    let sig32_tuple = sigs_32.into_iter().zip(indices.into_iter()).collect();
+    let sig32_tuple = sigs_32.into_iter().zip(indices).collect();
 
     let multi_sig32 = MultiEd25519Signature::new(sig32_tuple);
     assert!(multi_sig32.is_ok());
@@ -224,7 +224,7 @@ fn test_multi_ed25519_signature_serialization() {
     // Fail to construct a MultiEd25519Signature object from 33 or more single signatures.
     let sigs_33 = vec![single_signature.clone(); 33];
     let indices: Vec<u8> = (0..33).collect();
-    let sig33_tuple = sigs_33.into_iter().zip(indices.into_iter()).collect();
+    let sig33_tuple = sigs_33.into_iter().zip(indices).collect();
 
     let multi_sig33 = MultiEd25519Signature::new(sig33_tuple);
     assert!(multi_sig33.is_err());
@@ -239,7 +239,7 @@ fn test_multi_ed25519_signature_serialization() {
     let sig3_tuple = sigs_3
         .clone()
         .into_iter()
-        .zip(indices_with_duplicate.into_iter())
+        .zip(indices_with_duplicate)
         .collect();
 
     let multi_sig3 = MultiEd25519Signature::new(sig3_tuple);
@@ -253,7 +253,7 @@ fn test_multi_ed25519_signature_serialization() {
     let indices_with_out_of_range = vec![0u8, 33u8, 1u8];
     let sig3_tuple = sigs_3
         .into_iter()
-        .zip(indices_with_out_of_range.into_iter())
+        .zip(indices_with_out_of_range)
         .collect();
 
     let multi_sig3 = MultiEd25519Signature::new(sig3_tuple);

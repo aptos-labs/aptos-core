@@ -26,15 +26,16 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
+    bytes::NumToBytes,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
     state_store::{state_key::StateKey, state_value::StateValue},
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
-        Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
+        TransactionOutput, TransactionPayload, TransactionStatus, Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -184,6 +185,7 @@ fn test_executor_status_consensus_only() {
         .execute_block(
             (block_id, block(vec![txn0, txn1, txn2], BLOCK_GAS_LIMIT)).into(),
             parent_block_id,
+            BLOCK_GAS_LIMIT,
         )
         .unwrap();
 
@@ -351,13 +353,13 @@ fn create_transaction_chunks(
     // separate DB. Then we call get_transactions to retrieve them.
     let TestExecutor { executor, .. } = TestExecutor::new();
 
-    let mut txns = vec![];
+    let mut txns: Vec<SignatureVerifiedTransaction> = vec![];
     for i in 1..(chunk_ranges.last().unwrap().end - 1) {
         let txn = encode_mint_transaction(gen_address(i), 100);
-        txns.push(txn);
+        txns.push(txn.into());
     }
     if BLOCK_GAS_LIMIT.is_none() {
-        txns.push(Transaction::StateCheckpoint(HashValue::random()));
+        txns.push(Transaction::StateCheckpoint(HashValue::random()).into());
     }
     let id = gen_block_id(1);
 
@@ -484,11 +486,13 @@ fn apply_transaction_by_writeset(
     let chunk_output =
         ChunkOutput::by_transaction_output(transactions_and_outputs, state_view).unwrap();
 
-    let (executed, _, _) = chunk_output.apply_to_ledger(&ledger_view, None).unwrap();
+    let (executed, _, _) = chunk_output
+        .apply_to_ledger(&ledger_view, None, None)
+        .unwrap();
 
     db.writer
         .save_transactions(
-            &executed.transactions_to_commit().unwrap(),
+            executed.transactions_to_commit(),
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             None,
@@ -503,9 +507,9 @@ fn test_deleted_key_from_state_store() {
     let executor = TestExecutor::new();
     let db = &executor.db;
     let dummy_state_key1 = StateKey::raw(String::from("test_key1").into_bytes());
-    let dummy_value1 = 10u64.to_le_bytes().to_vec();
+    let dummy_value1 = 10u64.le_bytes();
     let dummy_state_key2 = StateKey::raw(String::from("test_key2").into_bytes());
-    let dummy_value2 = 20u64.to_le_bytes().to_vec();
+    let dummy_value2 = 20u64.le_bytes();
     // Create test transaction, event and transaction output
     let transaction1 = create_test_transaction(0);
     let transaction2 = create_test_transaction(1);
@@ -593,7 +597,9 @@ fn test_reconfig_suffix_empty_blocks() {
     let mut block_b = TestBlock::new(10000, 1, gen_block_id(2), Some(0));
     let block_c = TestBlock::new(1, 1, gen_block_id(3), BLOCK_GAS_LIMIT);
     let block_d = TestBlock::new(1, 1, gen_block_id(4), BLOCK_GAS_LIMIT);
-    block_b.txns.push(encode_reconfiguration_transaction());
+    block_b
+        .txns
+        .push(encode_reconfiguration_transaction().into());
     let parent_block_id = executor.committed_block_id();
     executor
         .execute_block(
@@ -635,7 +641,7 @@ fn test_reconfig_suffix_empty_blocks() {
 }
 
 struct TestBlock {
-    txns: Vec<Transaction>,
+    txns: Vec<SignatureVerifiedTransaction>,
     id: HashValue,
 }
 
@@ -658,12 +664,16 @@ impl TestBlock {
         };
         TestBlock { txns, id }
     }
+
+    fn inner_txns(&self) -> Vec<Transaction> {
+        self.txns.iter().map(|t| t.clone().into_inner()).collect()
+    }
 }
 
 // Executes a list of transactions by executing and immediately committing one at a time. Returns
 // the root hash after all transactions are committed.
 fn run_transactions_naive(
-    transactions: Vec<Transaction>,
+    transactions: Vec<SignatureVerifiedTransaction>,
     maybe_block_gas_limit: Option<u64>,
 ) -> HashValue {
     let executor = TestExecutor::new();
@@ -683,10 +693,10 @@ fn run_transactions_naive(
             maybe_block_gas_limit,
         )
         .unwrap();
-        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None).unwrap();
+        let (executed, _, _) = out.apply_to_ledger(&ledger_view, None, None).unwrap();
         db.writer
             .save_transactions(
-                &executed.transactions_to_commit().unwrap(),
+                executed.transactions_to_commit(),
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 None,
@@ -716,7 +726,7 @@ proptest! {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id, BLOCK_GAS_LIMIT);
             let num_txns = block.txns.len() as LeafCount;
-            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction();
+            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction().into();
 
             let parent_block_id = executor.committed_block_id();
             let output = executor.execute_block(
@@ -739,7 +749,7 @@ proptest! {
             // retry txns after reconfiguration
             let retry_block_id = gen_block_id(2);
             let retry_output = executor.execute_block(
-                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect()).into(), parent_block_id, BLOCK_GAS_LIMIT
+                (retry_block_id, block.txns.iter().skip(reconfig_txn_index as usize + 1).cloned().collect::<Vec<SignatureVerifiedTransaction>>()).into(), parent_block_id, BLOCK_GAS_LIMIT
             ).unwrap();
             prop_assert!(retry_output.compute_status().iter().all(|s| matches!(*s, TransactionStatus::Keep(_))));
 
@@ -753,7 +763,7 @@ proptest! {
             let db = executor.db.reader.clone();
             prop_assert_eq!(db.get_latest_version().unwrap(), ledger_version);
             let txn_list = db.get_transactions(1 /* start version */, num_txns, ledger_version /* ledger version */, false /* fetch events */).unwrap();
-            prop_assert_eq!(&block.txns, &txn_list.transactions);
+            prop_assert_eq!(&block.inner_txns(), &txn_list.transactions);
             let txn_infos = txn_list.proof.transaction_infos;
             let write_sets = db.get_write_set_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
             let event_vecs = db.get_events_iterator(1, num_txns).unwrap().collect::<Result<_>>().unwrap();
@@ -761,7 +771,7 @@ proptest! {
             // replay txns in one batch across epoch boundary,
             // and the replayer should deal with `Retry`s automatically
             let replayer = chunk_executor_tests::TestExecutor::new();
-            replayer.executor.replay(block.txns, txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
+            replayer.executor.replay(block.inner_txns(), txn_infos, write_sets, event_vecs, &VerifyExecutionMode::verify_all()).unwrap();
             replayer.executor.commit().unwrap();
             let replayed_db = replayer.db.reader.clone();
             prop_assert_eq!(
@@ -811,11 +821,11 @@ proptest! {
             let mut txns = vec![];
             txns.extend(block_a.txns.iter().cloned());
             if BLOCK_GAS_LIMIT.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_a.id));
+                txns.push(Transaction::StateCheckpoint(block_a.id).into());
             }
             txns.extend(block_b.txns.iter().cloned());
             if BLOCK_GAS_LIMIT.is_some() {
-                txns.push(Transaction::StateCheckpoint(block_b.id));
+                txns.push(Transaction::StateCheckpoint(block_b.id).into());
             }
             txns
         }, BLOCK_GAS_LIMIT);

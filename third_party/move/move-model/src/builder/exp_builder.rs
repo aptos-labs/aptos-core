@@ -4,11 +4,12 @@
 
 use crate::{
     ast::{
-        Address, Exp, ExpData, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, Value,
+        Address, Exp, ExpData, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, Spec,
+        Value,
     },
     builder::{
         model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry},
-        module_builder::ModuleBuilder,
+        module_builder::{ModuleBuilder, SpecBlockContext},
     },
     model::{
         FieldId, Loc, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
@@ -23,7 +24,10 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_compiler::{
-    expansion::{ast as EA, ast::ModuleAccess_},
+    expansion::{
+        ast as EA,
+        ast::{ModuleAccess_, SpecBlock, SpecId},
+    },
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast as PA,
@@ -48,6 +52,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// A scoped symbol table for local names. The first element in the list contains the most
     /// inner scope.
     pub local_table: LinkedList<BTreeMap<Symbol, LocalVarEntry>>,
+    /// The name of the function this expression is associated with, if there is one.
+    pub fun_name: Option<QualifiedSymbol>,
     /// The result type of the function this expression is associated with.
     pub result_type: Option<Type>,
     /// Status for the `old(...)` expression form.
@@ -68,6 +74,8 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     pub had_errors: bool,
     /// Set containing all the functions called during translation.
     pub called_spec_funs: BTreeSet<(ModuleId, SpecFunId)>,
+    /// A mapping from SpecId to SpecBlock (expansion ast)
+    pub spec_block_map: BTreeMap<SpecId, SpecBlock>,
 }
 
 /// Mode of translation
@@ -101,6 +109,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_params: vec![],
             fun_ptrs_table: BTreeMap::new(),
             local_table: LinkedList::new(),
+            fun_name: None,
             result_type: None,
             old_status: OldExpStatus::NotSupported,
             subs: Substitution::new(),
@@ -110,6 +119,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             outer_context_scopes: 0,
             had_errors: false,
             called_spec_funs: BTreeSet::new(),
+            spec_block_map: BTreeMap::new(),
         }
     }
 
@@ -124,6 +134,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             et.old_status = OldExpStatus::NotSupported;
         };
         et
+    }
+
+    pub fn set_spec_block_map(&mut self, map: BTreeMap<SpecId, SpecBlock>) {
+        self.spec_block_map = map
+    }
+
+    pub fn set_fun_name(&mut self, name: QualifiedSymbol) {
+        self.fun_name = Some(name)
     }
 
     pub fn set_result_type(&mut self, ty: Type) {
@@ -219,6 +237,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if self.mode != ExpTranslationMode::TryImplAsSpec {
             self.parent.parent.env.diag(Severity::Note, loc, msg)
         }
+    }
+
+    /// Shortcut for reporting a bug
+    pub fn bug(&mut self, loc: &Loc, msg: &str) {
+        self.parent.parent.env.diag(Severity::Bug, loc, msg)
     }
 
     /// Creates a fresh type variable.
@@ -1155,17 +1178,54 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     vec![code.into_exp()],
                 )
             },
-            EA::Exp_::Spec(..) => {
-                // TODO: revisit spec blocks
+            EA::Exp_::Spec(spec_id, ..) => {
                 let rt = self.check_type(&loc, &Type::unit(), expected_type, "");
                 let id = self.new_node_id_with_type_loc(&rt, &loc);
-                ExpData::Call(id, Operation::NoOp, vec![])
+                if self.mode == ExpTranslationMode::Impl {
+                    let spec = if let Some(block) = self.spec_block_map.get(spec_id).cloned() {
+                        self.translate_spec_block(&loc, &block)
+                    } else {
+                        self.bug(&loc, "unresolved spec anchor");
+                        Spec::default()
+                    };
+                    ExpData::SpecBlock(id, spec)
+                } else {
+                    ExpData::Call(id, Operation::NoOp, vec![])
+                }
             },
             EA::Exp_::UnresolvedError => {
                 // Error reported
                 self.new_error_exp()
             },
         }
+    }
+
+    /// Translates a specification block embedded in an expression, and returns the
+    /// model representation of it.
+    fn translate_spec_block(&mut self, loc: &Loc, block: &SpecBlock) -> Spec {
+        let fun_name = if let Some(name) = &self.fun_name {
+            name.clone()
+        } else {
+            self.bug(loc, "unexpected missing function name");
+            return Spec::default();
+        };
+        // Build a map of all locals visible in the context. This is passed into the `context`
+        // for spec block building.
+        let mut locals = BTreeMap::new();
+        for scope in &self.local_table {
+            for (name, entry) in scope {
+                if !locals.contains_key(name) {
+                    locals.insert(*name, (entry.loc.clone(), entry.type_.clone()));
+                }
+            }
+        }
+        let context = SpecBlockContext::FunctionCodeV2(fun_name, locals);
+        self.parent.inline_spec_builder = Spec {
+            loc: Some(loc.clone()),
+            ..Spec::default()
+        };
+        self.parent.def_ana_code_spec_block(block, context);
+        std::mem::take(&mut self.parent.inline_spec_builder)
     }
 
     fn translate_lvalue_list(
@@ -1758,8 +1818,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.exit_scope();
                     self.new_bind_exp(loc, pat, binding, rest.into_exp())
                 },
-                Seq(exp) if matches!(exp.value, EA::Exp_::Spec(..)) => {
-                    // Skip specification blocks
+                Seq(exp)
+                    if self.mode != ExpTranslationMode::Impl
+                        && matches!(exp.value, EA::Exp_::Spec(..)) =>
+                {
+                    // Skip specification blocks if we are not in Impl translation mode.
+                    // This is specifically relevant for the TryImplAsSpec mode where the spec
+                    // blocks must be ignored.
                     self.translate_seq_recursively(loc, &items[1..], expected_type)
                 },
                 Seq(exp) if items.len() > 1 => {
@@ -2115,7 +2180,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 .expect("invalid Type::Struct");
             // Lookup the field in the struct.
             if let Some(fields) = &entry.fields {
-                if let Some((_, field_ty)) = fields.get(&field_name) {
+                if let Some((_, _, field_ty)) = fields.get(&field_name) {
                     // We must instantiate the field type by the provided type args.
                     let field_ty = field_ty.instantiate(targs);
                     Some((
@@ -2503,7 +2568,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let expected_user_count = param_count - args.len();
         if let Some(types) = user_args {
             let n = types.len();
-            args.extend(types.into_iter());
+            args.extend(types);
             if n != expected_user_count {
                 (
                     args,
@@ -2611,7 +2676,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let mut args = BTreeMap::new();
                 for (name_loc, name_, (_, value)) in fields.iter() {
                     let field_name = self.symbol_pool().make(name_);
-                    if let Some((idx, field_ty)) = field_decls.get(&field_name) {
+                    if let Some((_, idx, field_ty)) = field_decls.get(&field_name) {
                         // Translate the abstract value of the field, passing in its instantiated
                         // type.
                         let translated =

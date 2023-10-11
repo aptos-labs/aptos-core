@@ -42,8 +42,9 @@
 //!
 //! let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
 //! let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-//! trusted_peers.write().insert(client_peer_id, Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator));
-//! trusted_peers.write().insert(server_peer_id, Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator));
+//! trusted_peers.insert(client_peer_id, Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator));
+//! trusted_peers.insert(server_peer_id, Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator));
+//! peers_and_metadata.set_trusted_peers(&network_id, trusted_peers).unwrap();
 //!
 //! let client_auth = HandshakeAuthMode::mutual(peers_and_metadata.clone());
 //! let client_context = NetworkContext::new(

@@ -9,7 +9,7 @@ slug: "delegation-pool-operations"
 
 Validator operators should follow these instructions to carry out delegation pool operations for [staking](../../../concepts/staking.md). You may delegate as little as 10 APT plus a small add stake fee that will be mostly refunded as rewards at the end of the current 2-hour epoch. You might notice that some UIs might use 11 APT as the minimum for a round number. Note that your validator will become part of the *Active Validator Set* only when the delegation pool satisfies the minimum cumulative [staking requirement of 1 million APT](./staking-pool-operations.md).
 
-Once the delegation pool attains 1 million APT, the pool's owner who initiates the delegation pool should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. The operator should now [join in the active set of validators](./staking-pool-operations.md#joining-validator-set).
+The delegation pool owner should set an operator for the pool via the `set_operator` function described in the [Perform pool owner operations](#perform-pool-owner-operations) section. The operator should then start their own Aptos node, as it is a best practice to have a different account for owner and operator. Once the delegation pool attains 1 million APT, the operator can join the validator set.
 
 The operator address will receive the pool commission that was set at the initialization of the delegation pool, which is automatically distributed as stake in the delegation pool at the end of each epoch. The operator will act as a normal Delegation Pool account that is able to do all of the operations described in [Perform delegation pool operations](#perform-delegation-pool-operations).
 
@@ -19,11 +19,10 @@ The operator address will receive the pool commission that was set at the initia
 1. [Install](../../../tools/aptos-cli/install-cli/index.md) and [configure](../../../tools/aptos-cli/use-cli/use-aptos-cli.md#configuration-examples) the Aptos CLI. If you are looking to develop on the Aptos blockchain, debug apps, or perform node operations, the Aptos tool offers a command line interface for these purposes.
 2. [Initialize local configuration and create an account](../../../tools/aptos-cli/use-cli/use-aptos-cli.md#initialize-local-configuration-and-create-an-account) on the Aptos blockchain.
 
-## Connect to Aptos network
 
-To create a delegation pool and obtain information about it, [connect to the Aptos Network](./connect-to-aptos-network.md) and launch your own Aptos node.
+## Initialize a delegation pool
 
-You can use the following CLI commands to obtain the delegation pool address depending on where you are in the process:
+Before initializing a delegation pool, you need to know the delegation pool address. You can use the following CLI commands to obtain the delegation pool address depending on where you are in the process:
 - Before you create the delegation pool:  
     ```bash
     aptos account derive-resource-account-address --address <owner_address> --seed "aptos_framework::delegation_pool<SEED>" --seed-encoding utf8
@@ -33,10 +32,6 @@ You can use the following CLI commands to obtain the delegation pool address dep
     ```bash
     aptos account derive-resource-account-address
     ```
-
-## Initialize a delegation pool
-
-Now initialize a delegation pool by following these steps:
 
 1. Run the command below, substitute in the profile you previously configured during initialization:
     ```bash
@@ -56,6 +51,8 @@ Now initialize a delegation pool by following these steps:
  3. The `owner` is granted authority over assigning the `operator` and `voter` roles, which are initially held by the `owner`.
  
  4. The delegation pool can now accept a minimum amount of 10 APT from any user who wishes to delegate to it.
+
+ 5. The delegation pool can now [connect to the Aptos Network](./connect-to-aptos-network.md).
 
 ## Perform delegation pool operations
 
@@ -93,6 +90,7 @@ This section describes the available operations that can be performed on this re
   --args address:<pool_address> u64:<amount>
   ```
 
+
 ## Perform pool owner operations
  
 Delegation pool owners have access to specific methods designed for modifying the `operator` and `voter` roles of the delegation pool. Use the following Aptos CLI commands and include the relevant addresses:
@@ -105,17 +103,10 @@ Delegation pool owners have access to specific methods designed for modifying th
   --args address:<new_operator_address>
   ```
 
-* Set the delegated voter address for the delegation pool:
-
-  ```bash
-  aptos move run --profile delegation_pool_owner \
-  --function-id 0x1::delegation_pool::set_delegated_voter \
-  --args address:<new_delegated_voter_address>
-  ```
   
 ## Check delegation pool information
 
-Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View functon](../../../integration/aptos-apis.md#reading-state-with-the-view-function).
+Until the delegation pool has received 1 million APT and the validator has been added to the set of active validators, there will be no rewards to track during each cycle. In order to obtain information about a delegation pool, use the Aptos [View function](../../../integration/aptos-apis.md#reading-state-with-the-view-function).
 
 * `get_owned_pool_address(owner: address): address` -  Returns the address of the delegation pool belonging to the owner, or produces an error if there is no delegation pool associated with the owner.
 

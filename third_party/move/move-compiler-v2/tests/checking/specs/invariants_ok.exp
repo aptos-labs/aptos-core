@@ -1,0 +1,28 @@
+// ---- Model Dump
+module 0x42::M {
+    struct R {
+        s: M::S,
+    }
+    spec {
+      invariant M::less10(true, select M::S.x(select M::R.s()));
+    }
+
+    struct S {
+        x: u64,
+        y: bool,
+    }
+    spec {
+      invariant Eq<bool>(Gt(select M::S.x(), 0), select M::S.y());
+    }
+
+    spec fun less10(c: bool,x: num): bool {
+        if c {
+          M::less10a(c, x)
+        } else {
+          Lt(x, 10)
+        }
+    }
+    spec fun less10a(c: bool,x: num): bool {
+        M::less10(Not(c), x)
+    }
+} // end 0x42::M

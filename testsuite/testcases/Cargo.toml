@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
+aptos-config = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-global-constants = { workspace = true }
@@ -36,6 +37,9 @@ rand = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+assert_approx_eq = { workspace = true }
 
 [[test]]
 name = "forge-local-compatibility"

@@ -3,6 +3,7 @@
 
 use crate::dag::{
     dag_fetcher::TFetchRequester,
+    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
     rb_handler::{NodeBroadcastHandleError, NodeBroadcastHandler},
     storage::DAGStorage,
@@ -16,6 +17,7 @@ use aptos_types::{
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
+use futures::executor::block_on;
 use std::{collections::BTreeMap, sync::Arc};
 
 struct MockFetchRequester {}
@@ -37,13 +39,15 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch: 1,
         verifier: validator_verifier.clone(),
     });
+    let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
     // Scenario: Start DAG from beginning
     let storage = Arc::new(MockStorage::new());
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
-        1,
+        0,
+        DAG_WINDOW,
     )));
 
     let wellformed_node = new_node(1, 10, signers[0].author(), vec![]);
@@ -64,9 +68,12 @@ async fn test_node_broadcast_receiver_succeed() {
         wellformed_node.sign_vote(&signers[3]).unwrap(),
     );
     // expect an ack for a valid message
-    assert_ok_eq!(rb_receiver.process(wellformed_node), expected_result);
+    assert_ok_eq!(rb_receiver.process(wellformed_node).await, expected_result);
     // expect the original ack for any future message from same author
-    assert_ok_eq!(rb_receiver.process(equivocating_node), expected_result);
+    assert_ok_eq!(
+        rb_receiver.process(equivocating_node).await,
+        expected_result
+    );
 }
 
 // TODO: Unit test node broad receiver with a pruned DAG store. Possibly need a validator verifier trait.
@@ -78,6 +85,7 @@ async fn test_node_broadcast_receiver_failure() {
         epoch: 1,
         verifier: validator_verifier.clone(),
     });
+    let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
 
     let mut rb_receivers: Vec<_> = signers
         .iter()
@@ -86,7 +94,8 @@ async fn test_node_broadcast_receiver_failure() {
             let dag = Arc::new(RwLock::new(Dag::new(
                 epoch_state.clone(),
                 storage.clone(),
-                1,
+                0,
+                DAG_WINDOW,
             )));
 
             NodeBroadcastHandler::new(
@@ -101,7 +110,7 @@ async fn test_node_broadcast_receiver_failure() {
 
     // Round 1
     let node = new_node(1, 10, signers[0].author(), vec![]);
-    let vote = rb_receivers[1].process(node.clone()).unwrap();
+    let vote = rb_receivers[1].process(node.clone()).await.unwrap();
 
     // Round 2 with invalid parent
     let partial_sigs = PartialSignatures::new(BTreeMap::from([(
@@ -116,7 +125,7 @@ async fn test_node_broadcast_receiver_failure() {
     );
     let node = new_node(2, 20, signers[0].author(), vec![node_cert]);
     assert_eq!(
-        rb_receivers[1].process(node).unwrap_err().to_string(),
+        rb_receivers[1].process(node).await.unwrap_err().to_string(),
         NodeBroadcastHandleError::InvalidParent.to_string(),
     );
 
@@ -130,7 +139,7 @@ async fn test_node_broadcast_receiver_failure() {
                 .iter_mut()
                 .zip(&signers)
                 .for_each(|(rb_receiver, signer)| {
-                    let sig = rb_receiver.process(node.clone()).unwrap();
+                    let sig = block_on(rb_receiver.process(node.clone())).unwrap();
                     partial_sigs.add_signature(signer.author(), sig.signature().clone())
                 });
             NodeCertificate::new(
@@ -145,23 +154,26 @@ async fn test_node_broadcast_receiver_failure() {
     // Add Round 2 node with proper certificates
     let node = new_node(2, 20, signers[0].author(), node_certificates);
     assert_eq!(
-        rb_receivers[0].process(node).unwrap_err().to_string(),
+        rb_receivers[0].process(node).await.unwrap_err().to_string(),
         NodeBroadcastHandleError::MissingParents.to_string()
     );
 }
 
-#[test]
-fn test_node_broadcast_receiver_storage() {
+#[tokio::test]
+async fn test_node_broadcast_receiver_storage() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let signers: Vec<_> = signers.into_iter().map(Arc::new).collect();
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: validator_verifier,
     });
+
     let storage = Arc::new(MockStorage::new());
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
-        1,
+        0,
+        DAG_WINDOW,
     )));
 
     let node = new_node(1, 10, signers[0].author(), vec![]);
@@ -173,7 +185,7 @@ fn test_node_broadcast_receiver_storage() {
         storage.clone(),
         Arc::new(MockFetchRequester {}),
     );
-    let sig = rb_receiver.process(node).expect("must succeed");
+    let sig = rb_receiver.process(node).await.expect("must succeed");
 
     assert_ok_eq!(storage.get_votes(), vec![(
         NodeId::new(0, 1, signers[0].author()),

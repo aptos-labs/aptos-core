@@ -42,4 +42,17 @@ module 0x8675309::M {
           select M::B.f(select M::P.b1(p)) = comp
         }
     }
+    spec fun $t(r1: &mut u64,r2: &mut u64,s: &mut M::S);
+    spec fun $t1(p: M::P) {
+        {
+          let comp: bool = Eq<M::B>(select M::P.b1(p), select M::P.b2(p));
+          select M::B.f(select M::P.b1(p)) = comp
+        }
+    }
+    spec fun $t2(p: M::P) {
+        {
+          let comp: bool = Neq<M::B>(select M::P.b1(p), select M::P.b2(p));
+          select M::B.f(select M::P.b1(p)) = comp
+        }
+    }
 } // end 0x8675309::M

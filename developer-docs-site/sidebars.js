@@ -125,6 +125,7 @@ const sidebars = {
             "move/move-on-aptos/modules-on-aptos",
             "move/move-on-aptos/move-scripts",
             "move/move-on-aptos/cli",
+            "move/move-on-aptos/cryptography",
           ],
         },
         {
@@ -275,8 +276,21 @@ const sidebars = {
                 "tools/aptos-cli/install-cli/install-move-prover",
               ],
             },
-            "tools/aptos-cli/use-cli/use-aptos-cli",
-            "tools/aptos-cli/use-cli/use-aptos-ledger",
+            {
+              type: "category",
+              label: "Use Aptos CLI",
+              link: { type: "doc", id: "tools/aptos-cli/use-cli/use-aptos-cli" },
+              collapsible: true,
+              collapsed: true,
+              items: [
+                "tools/aptos-cli/use-cli/cli-configuration",
+                "tools/aptos-cli/use-cli/cli-account",
+                "tools/aptos-cli/use-cli/cli-key",
+                "tools/aptos-cli/use-cli/cli-node",
+                "tools/aptos-cli/use-cli/cli-genesis",
+                "tools/aptos-cli/use-cli/use-aptos-ledger",
+              ],
+            },
           ],
         },
         {

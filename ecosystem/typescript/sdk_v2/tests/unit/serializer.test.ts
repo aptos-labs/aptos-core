@@ -1,7 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-import { Serializable, Serializer } from "../../src/bcs/serializer";
+import { error } from "console";
+import {
+  MAX_U128_BIG_INT,
+  MAX_U16_NUMBER,
+  MAX_U32_NUMBER,
+  MAX_U64_BIG_INT,
+  MAX_U8_NUMBER,
+  MAX_U256_BIG_INT,
+} from "../../src/bcs/consts";
+import { Serializable, Serializer, ensureBoolean, outOfRangeErrorMessage } from "../../src/bcs/serializer";
+import { AccountAddress } from "../../src/core";
 
 describe("BCS Serializer", () => {
   let serializer: Serializer;
@@ -62,7 +72,7 @@ describe("BCS Serializer", () => {
     expect(() => {
       // @ts-ignore
       serializer.serializeBool(12);
-    }).toThrow("Value needs to be a boolean");
+    }).toThrow(`${12} is not a boolean value`);
   });
 
   it("serializes a uint8", () => {
@@ -73,12 +83,12 @@ describe("BCS Serializer", () => {
   it("throws when serializing uint8 with out of range value", () => {
     expect(() => {
       serializer.serializeU8(256);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(256, 0, MAX_U8_NUMBER));
 
     expect(() => {
       serializer = new Serializer();
       serializer.serializeU8(-1);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U8_NUMBER));
   });
 
   it("serializes a uint16", () => {
@@ -93,12 +103,12 @@ describe("BCS Serializer", () => {
   it("throws when serializing uint16 with out of range value", () => {
     expect(() => {
       serializer.serializeU16(65536);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(65536, 0, MAX_U16_NUMBER));
 
     expect(() => {
       serializer = new Serializer();
       serializer.serializeU16(-1);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U16_NUMBER));
   });
 
   it("serializes a uint32", () => {
@@ -113,12 +123,12 @@ describe("BCS Serializer", () => {
   it("throws when serializing uint32 with out of range value", () => {
     expect(() => {
       serializer.serializeU32(4294967296);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(4294967296, 0, MAX_U32_NUMBER));
 
     expect(() => {
       serializer = new Serializer();
       serializer.serializeU32(-1);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U32_NUMBER));
   });
 
   it("serializes a uint64", () => {
@@ -133,12 +143,12 @@ describe("BCS Serializer", () => {
   it("throws when serializing uint64 with out of range value", () => {
     expect(() => {
       serializer.serializeU64(BigInt("18446744073709551616"));
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(BigInt("18446744073709551616"), 0, MAX_U64_BIG_INT));
 
     expect(() => {
       serializer = new Serializer();
       serializer.serializeU64(-1);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U64_BIG_INT));
   });
 
   it("serializes a uint128", () => {
@@ -157,12 +167,42 @@ describe("BCS Serializer", () => {
   it("throws when serializing uint128 with out of range value", () => {
     expect(() => {
       serializer.serializeU128(BigInt("340282366920938463463374607431768211456"));
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(BigInt("340282366920938463463374607431768211456"), 0, MAX_U128_BIG_INT));
 
     expect(() => {
       serializer = new Serializer();
       serializer.serializeU128(-1);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U128_BIG_INT));
+  });
+
+  it("serializes a uint256", () => {
+    serializer.serializeU256(BigInt(MAX_U256_BIG_INT));
+    expect(serializer.toUint8Array()).toEqual(
+      new Uint8Array([
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+      ]),
+    );
+
+    serializer = new Serializer();
+    serializer.serializeU256(BigInt("1311768467750121216"));
+    expect(serializer.toUint8Array()).toEqual(
+      new Uint8Array([
+        0x00, 0xef, 0xcd, 0xab, 0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      ]),
+    );
+  });
+
+  it("throws when serializing uint256 with out of range value", () => {
+    expect(() => {
+      serializer.serializeU256(MAX_U256_BIG_INT + BigInt(1));
+    }).toThrow(outOfRangeErrorMessage(MAX_U256_BIG_INT + BigInt(1), 0, MAX_U256_BIG_INT));
+
+    expect(() => {
+      serializer = new Serializer();
+      serializer.serializeU256(-1);
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U256_BIG_INT));
   });
 
   it("serializes a uleb128", () => {
@@ -173,12 +213,12 @@ describe("BCS Serializer", () => {
   it("throws when serializing uleb128 with out of range value", () => {
     expect(() => {
       serializer.serializeU32AsUleb128(4294967296);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(4294967296, 0, MAX_U32_NUMBER));
 
     expect(() => {
       serializer = new Serializer();
       serializer.serializeU32AsUleb128(-1);
-    }).toThrow("Value is out of range");
+    }).toThrow(outOfRangeErrorMessage(-1, 0, MAX_U32_NUMBER));
   });
 
   it("serializes multiple types of values", () => {
@@ -222,5 +262,76 @@ describe("BCS Serializer", () => {
     expect(() => {
       const serializer = new Serializer(-1);
     }).toThrow();
+  });
+
+  it("serializes a vector of Serializable types correctly", () => {
+    const addresses = new Array<AccountAddress>(
+      AccountAddress.fromHexInputRelaxed({ input: "0x1" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0xa" }),
+      AccountAddress.fromHexInputRelaxed({ input: "0x0123456789abcdef" }),
+    );
+    const serializer = new Serializer();
+    serializer.serializeVector(addresses);
+    const serializedBytes = serializer.toUint8Array();
+    expect(serializedBytes).toEqual(
+      new Uint8Array([
+        3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0a, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+      ]),
+    );
+  });
+
+  it("serializes multiple Serializable values", () => {
+    class MoveStructA extends Serializable {
+      constructor(
+        public name: string,
+        public description: string,
+        public enabled: boolean,
+        public vectorU8: Array<number>,
+      ) {
+        super();
+      }
+
+      serialize(serializer: Serializer): void {
+        serializer.serializeStr(this.name);
+        serializer.serializeStr(this.description);
+        serializer.serializeBool(this.enabled);
+        serializer.serializeU32AsUleb128(this.vectorU8.length);
+        this.vectorU8.forEach((n) => serializer.serializeU8(n));
+      }
+    }
+    class MoveStructB extends Serializable {
+      constructor(
+        public moveStructA: MoveStructA,
+        public name: string,
+        public description: string,
+        public vectorU8: Array<number>,
+      ) {
+        super();
+      }
+
+      serialize(serializer: Serializer): void {
+        serializer.serialize(this.moveStructA);
+        serializer.serializeStr(this.name);
+        serializer.serializeStr(this.description);
+        serializer.serializeU32AsUleb128(this.vectorU8.length);
+        this.vectorU8.forEach((n) => serializer.serializeU8(n));
+      }
+    }
+
+    const moveStructA = new MoveStructA("abc", "123", false, [1, 2, 3, 4]);
+    const moveStructB = new MoveStructB(moveStructA, "def", "456", [5, 6, 7, 8]);
+
+    const serializer = new Serializer();
+    serializer.serialize(moveStructB);
+    const serializedBytes = serializer.toUint8Array();
+
+    expect(serializedBytes).toEqual(
+      new Uint8Array([
+        3, 0x61, 0x62, 0x63, 3, 0x31, 0x32, 0x33, 0x00, 4, 0x01, 0x02, 0x03, 0x04, 3, 0x64, 0x65, 0x66, 3, 0x34, 0x35,
+        0x36, 4, 0x05, 0x06, 0x07, 0x08,
+      ]),
+    );
   });
 });

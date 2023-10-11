@@ -2,22 +2,15 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    adapter_common::{PreprocessedTransaction, VMAdapter},
-    aptos_vm::AptosVM,
-    block_executor::AptosTransactionOutput,
-    data_cache::StorageAdapter,
-};
+use crate::{adapter_common::VMAdapter, aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
+use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use move_core_types::{
-    ident_str,
-    language_storage::{ModuleId, CORE_CODE_ADDRESS},
-    vm_status::VMStatus,
-};
+use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
+use move_core_types::vm_status::VMStatus;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -28,28 +21,11 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
-    type Txn = PreprocessedTransaction;
+    type Txn = SignatureVerifiedTransaction;
 
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
-        // Using adapter allows us to fetch those.
-        // TODO: with new adapter we can relax trait bounds on S and avoid
-        // creating `StorageAdapter` here.
-        let config_storage = StorageAdapter::new(argument);
-        let vm = AptosVM::new(&config_storage);
-
-        // Loading `0x1::account` and its transitive dependency into the code cache.
-        //
-        // This should give us a warm VM to avoid the overhead of VM cold start.
-        // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
-        //
-        // Loading up `0x1::account` should be sufficient as this is the most common module
-        // used for prologue, epilogue and transfer functionality.
-
-        let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &vm.as_move_resolver(argument),
-        );
+        let vm = AptosVM::new_from_state_view(&argument);
 
         Self {
             vm,
@@ -62,22 +38,24 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     // execution, or speculatively as a part of a parallel execution.
     fn execute_transaction(
         &self,
-        view: &impl StateView,
-        txn: &PreprocessedTransaction,
+        executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
+        txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
-
+        let resolver = self
+            .vm
+            .as_move_resolver_with_group_view(executor_with_group_view);
         match self
             .vm
-            .execute_single_transaction(txn, &self.vm.as_move_resolver(view), &log_context)
+            .execute_single_transaction(txn, &resolver, &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
                 if materialize_deltas {
                     // TODO: Integrate aggregator v2.
                     vm_output = vm_output
-                        .try_materialize(view)
+                        .try_materialize(&resolver)
                         .expect("Delta materialization failed");
                 }
 

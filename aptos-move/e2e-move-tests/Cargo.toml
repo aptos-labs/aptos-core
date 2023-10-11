@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -30,7 +29,6 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
-aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }

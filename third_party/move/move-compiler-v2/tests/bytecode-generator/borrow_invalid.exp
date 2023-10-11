@@ -3,20 +3,22 @@ module 0x42::borrow {
     struct S {
         f: u64,
     }
-    private fun mut_expr(x: u64) {
+    private fun mut_expr(x: u64): u64 {
         {
           let r: &mut u64 = Borrow(Mutable)(Add<u64>(x, 1));
           r = 22;
           Deref(r)
         }
     }
-    private fun mut_field(s: &borrow::S) {
+    private fun mut_field(s: &borrow::S): u64 {
         {
           let r: &mut u64 = Borrow(Mutable)(select borrow::S.f(s));
           r = 22;
           Deref(r)
         }
     }
+    spec fun $mut_expr(x: u64): u64;
+    spec fun $mut_field(s: &borrow::S): u64;
 } // end 0x42::borrow
 
 

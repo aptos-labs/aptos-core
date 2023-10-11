@@ -11,6 +11,8 @@ CompiledPackageInfo {
         test_mode: false,
         generate_docs: false,
         generate_abis: false,
+        generate_move_model: false,
+        full_model_generation: false,
         install_dir: Some(
             "ELIDED_FOR_TEST",
         ),

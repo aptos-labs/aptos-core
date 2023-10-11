@@ -7,4 +7,5 @@ module 0x8675309::M {
           Tuple()
         }
     }
+    spec fun $foo();
 } // end 0x8675309::M

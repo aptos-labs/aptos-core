@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_partitioning::BlockPartitioningStage, ledger_update_stage::LedgerUpdateStage,
+    block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
     GasMesurement, TransactionCommitter, TransactionExecutor,
 };
-use aptos_block_partitioner::PartitionerConfig;
+use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
@@ -25,7 +25,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Copy, Debug, Derivative)]
+#[derive(Debug, Derivative)]
 #[derivative(Default)]
 pub struct PipelineConfig {
     pub delay_execution_start: bool,
@@ -38,7 +38,7 @@ pub struct PipelineConfig {
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
     pub num_generator_workers: usize,
-    pub partitioner_config: PartitionerConfig,
+    pub partitioner_config: PartitionerV2Config,
 }
 
 pub struct Pipeline<V> {
@@ -54,7 +54,7 @@ where
     pub fn new(
         executor: BlockExecutor<V>,
         version: Version,
-        config: PipelineConfig,
+        config: &PipelineConfig,
         // Need to specify num blocks, to size queues correctly, when delay_execution_start, split_stages or skip_commit are used
         num_blocks: Option<usize>,
     ) -> (Self, mpsc::SyncSender<Vec<Transaction>>) {
@@ -108,7 +108,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, config.partitioner_config);
+            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 
