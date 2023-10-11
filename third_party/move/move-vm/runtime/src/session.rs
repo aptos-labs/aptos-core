@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig, data_cache::TransactionDataCache, loader::LoadedFunction, move_vm::MoveVM,
+    config::VMConfig,
+    data_cache::TransactionDataCache,
+    loader::{LoadedFunction, ModuleAdapter},
+    move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
@@ -30,6 +33,7 @@ use std::{borrow::Borrow, sync::Arc};
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
     pub(crate) data_cache: TransactionDataCache<'r>,
+    pub(crate) module_store: ModuleAdapter<'l>,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 
@@ -85,6 +89,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             args,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             &mut self.native_extensions,
             bypass_declared_entry_check,
@@ -107,6 +112,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             args,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             &mut self.native_extensions,
             bypass_declared_entry_check,
@@ -125,6 +131,7 @@ impl<'r, 'l> Session<'r, 'l> {
             instantiation,
             args,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             &mut self.native_extensions,
             true,
@@ -159,6 +166,7 @@ impl<'r, 'l> Session<'r, 'l> {
             ty_args,
             args,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             &mut self.native_extensions,
         )
@@ -211,6 +219,7 @@ impl<'r, 'l> Session<'r, 'l> {
             modules,
             sender,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             Compatibility::full_check(),
         )
@@ -228,6 +237,7 @@ impl<'r, 'l> Session<'r, 'l> {
             modules,
             sender,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             compat_config,
         )
@@ -243,6 +253,7 @@ impl<'r, 'l> Session<'r, 'l> {
             modules,
             sender,
             &mut self.data_cache,
+            &self.module_store,
             gas_meter,
             Compatibility::no_check(),
         )
@@ -308,7 +319,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty: &Type,
     ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
         self.data_cache
-            .load_resource(self.move_vm.runtime.loader(), addr, ty)
+            .load_resource(self.move_vm.runtime.loader(), addr, ty, &self.module_store)
     }
 
     /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
@@ -331,6 +342,7 @@ impl<'r, 'l> Session<'r, 'l> {
             script.borrow(),
             &ty_args,
             &self.data_cache,
+            &self.module_store,
         )?;
         Ok(instantiation)
     }
@@ -351,6 +363,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 function_name,
                 expected_return_type,
                 &self.data_cache,
+                &self.module_store,
             )?;
         Ok((func, instantiation))
     }
@@ -367,6 +380,7 @@ impl<'r, 'l> Session<'r, 'l> {
             function_name,
             type_arguments,
             &self.data_cache,
+            &self.module_store,
         )?;
         Ok(instantiation)
     }
@@ -375,21 +389,22 @@ impl<'r, 'l> Session<'r, 'l> {
         self.move_vm
             .runtime
             .loader()
-            .load_type(type_tag, &self.data_cache)
+            .load_type(type_tag, &self.data_cache, &self.module_store)
     }
 
     pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
-        self.move_vm
-            .runtime
-            .loader()
-            .get_type_layout(type_tag, &self.data_cache)
+        self.move_vm.runtime.loader().get_type_layout(
+            type_tag,
+            &self.data_cache,
+            &self.module_store,
+        )
     }
 
     pub fn get_fully_annotated_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
         self.move_vm
             .runtime
             .loader()
-            .get_fully_annotated_type_layout(type_tag, &self.data_cache)
+            .get_fully_annotated_type_layout(type_tag, &self.data_cache, &self.module_store)
     }
 
     pub fn get_type_tag(&self, ty: &Type) -> VMResult<TypeTag> {
@@ -419,10 +434,14 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     pub fn get_struct_type(&self, index: StructNameIndex) -> Option<Arc<StructType>> {
-        self.move_vm
+        let name = self
+            .move_vm
             .runtime
             .loader()
-            .get_struct_type_by_idx(index)
+            .name_cache
+            .idx_to_identifier(index);
+        self.module_store
+            .get_struct_type_by_identifier(&name.name, &name.module)
             .ok()
     }
 }

@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use super::ModuleAdapter;
 use crate::{
     loader::{Loader, Module, Resolver, ScriptHash},
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -135,17 +136,21 @@ impl Function {
         self.index
     }
 
-    pub(crate) fn get_resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
+    pub(crate) fn get_resolver<'a>(
+        &self,
+        loader: &'a Loader,
+        module_store: &'a ModuleAdapter,
+    ) -> Resolver<'a> {
         match &self.scope {
             Scope::Module(module_id) => {
-                let module = loader
-                    .get_module(module_id)
+                let module = module_store
+                    .module_at(module_id)
                     .expect("ModuleId on Function must exist");
-                Resolver::for_module(loader, module)
+                Resolver::for_module(loader, module_store, module)
             },
             Scope::Script(script_hash) => {
                 let script = loader.get_script(script_hash);
-                Resolver::for_script(loader, script)
+                Resolver::for_script(loader, module_store, script)
             },
         }
     }

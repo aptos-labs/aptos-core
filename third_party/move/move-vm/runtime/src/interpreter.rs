@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::TransactionDataCache,
-    loader::{Function, Loader, Resolver},
+    loader::{Function, Loader, ModuleAdapter, Resolver},
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     trace,
@@ -89,6 +89,7 @@ impl Interpreter {
         ty_args: Vec<Type>,
         args: Vec<Value>,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
@@ -99,7 +100,14 @@ impl Interpreter {
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
         }
         .execute_main(
-            loader, data_store, gas_meter, extensions, function, ty_args, args,
+            loader,
+            data_store,
+            module_store,
+            gas_meter,
+            extensions,
+            function,
+            ty_args,
+            args,
         )
     }
 
@@ -113,6 +121,7 @@ impl Interpreter {
         mut self,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -133,13 +142,13 @@ impl Interpreter {
         }
 
         let mut current_frame = self
-            .make_new_frame(loader, function, ty_args, locals)
+            .make_new_frame(loader, module_store, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
         loop {
-            let resolver = current_frame.resolver(loader);
+            let resolver = current_frame.resolver(loader, module_store);
             let exit_code =
                 current_frame //self
-                    .execute_code(&resolver, &mut self, data_store, gas_meter)
+                    .execute_code(&resolver, &mut self, data_store, module_store, gas_meter)
                     .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
             match exit_code {
                 ExitCode::Return => {
@@ -204,7 +213,7 @@ impl Interpreter {
                         continue;
                     }
                     let frame = self
-                        .make_call_frame(loader, func, vec![])
+                        .make_call_frame(loader, module_store, func, vec![])
                         .map_err(|e| self.set_location(e))
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
                     self.call_stack.push(current_frame).map_err(|frame| {
@@ -256,7 +265,7 @@ impl Interpreter {
                         continue;
                     }
                     let frame = self
-                        .make_call_frame(loader, func, ty_args)
+                        .make_call_frame(loader, module_store, func, ty_args)
                         .map_err(|e| self.set_location(e))
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
                     self.call_stack.push(current_frame).map_err(|frame| {
@@ -278,6 +287,7 @@ impl Interpreter {
     fn make_call_frame(
         &mut self,
         loader: &Loader,
+        module_store: &ModuleAdapter,
         func: Arc<Function>,
         ty_args: Vec<Type>,
     ) -> PartialVMResult<Frame> {
@@ -295,7 +305,7 @@ impl Interpreter {
 
             if self.paranoid_type_checks {
                 let ty = self.operand_stack.pop_ty()?;
-                let resolver = func.get_resolver(loader);
+                let resolver = func.get_resolver(loader, module_store);
                 if is_generic {
                     ty.check_eq(
                         &resolver.subst(&func.local_types()[arg_count - i - 1], &ty_args)?,
@@ -306,7 +316,7 @@ impl Interpreter {
                 }
             }
         }
-        self.make_new_frame(loader, func, ty_args, locals)
+        self.make_new_frame(loader, module_store, func, ty_args, locals)
     }
 
     /// Create a new `Frame` given a `Function` and the function `Locals`.
@@ -315,6 +325,7 @@ impl Interpreter {
     fn make_new_frame(
         &self,
         loader: &Loader,
+        module_store: &ModuleAdapter,
         function: Arc<Function>,
         ty_args: Vec<Type>,
         locals: Locals,
@@ -323,7 +334,7 @@ impl Interpreter {
             if ty_args.is_empty() {
                 function.local_types().to_vec()
             } else {
-                let resolver = function.get_resolver(loader);
+                let resolver = function.get_resolver(loader, module_store);
                 function
                     .local_types()
                     .iter()
@@ -548,11 +559,12 @@ impl Interpreter {
     fn load_resource<'c>(
         loader: &Loader,
         data_store: &'c mut TransactionDataCache,
+        module_store: &'c ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<&'c mut GlobalValue> {
-        match data_store.load_resource(loader, addr, ty) {
+        match data_store.load_resource(loader, addr, ty, module_store) {
             Ok((gv, load_res)) => {
                 if let Some(bytes_loaded) = load_res {
                     gas_meter.charge_load_resource(
@@ -575,11 +587,13 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let res = Self::load_resource(loader, data_store, gas_meter, addr, ty)?.borrow_global();
+        let res = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?
+            .borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
             is_generic,
@@ -598,11 +612,12 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, data_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, loader }, exists)?;
         self.operand_stack.push(Value::bool(exists))?;
@@ -615,27 +630,31 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<()> {
-        let resource = match Self::load_resource(loader, data_store, gas_meter, addr, ty)?
-            .move_from()
-        {
-            Ok(resource) => {
-                gas_meter.charge_move_from(
-                    is_generic,
-                    TypeWithLoader { ty, loader },
-                    Some(&resource),
-                )?;
-                resource
-            },
-            Err(err) => {
-                let val: Option<&Value> = None;
-                gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
-                return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
-            },
-        };
+        let resource =
+            match Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?
+                .move_from()
+            {
+                Ok(resource) => {
+                    gas_meter.charge_move_from(
+                        is_generic,
+                        TypeWithLoader { ty, loader },
+                        Some(&resource),
+                    )?;
+                    resource
+                },
+                Err(err) => {
+                    let val: Option<&Value> = None;
+                    gas_meter.charge_move_from(is_generic, TypeWithLoader { ty, loader }, val)?;
+                    return Err(
+                        err.with_message(format!("Failed to move resource from {:?}", addr))
+                    );
+                },
+            };
         self.operand_stack.push(resource)?;
         Ok(())
     }
@@ -646,12 +665,13 @@ impl Interpreter {
         is_generic: bool,
         loader: &Loader,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
         addr: AccountAddress,
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, data_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?;
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {
@@ -1058,7 +1078,9 @@ fn check_depth_of_type_impl(
         },
         Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx, .. } => {
-            let formula = resolver.loader().calculate_depth_of_struct(*idx)?;
+            let formula = resolver
+                .loader()
+                .calculate_depth_of_struct(*idx, resolver.module_store())?;
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
@@ -1071,7 +1093,9 @@ fn check_depth_of_type_impl(
                     check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(0))
                 })
                 .collect::<PartialVMResult<Vec<_>>>()?;
-            let formula = resolver.loader().calculate_depth_of_struct(*idx)?;
+            let formula = resolver
+                .loader()
+                .calculate_depth_of_struct(*idx, resolver.module_store())?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::TyParam(_) => {
@@ -1123,9 +1147,10 @@ impl Frame {
         resolver: &Resolver,
         interpreter: &mut Interpreter,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
     ) -> VMResult<ExitCode> {
-        self.execute_code_impl(resolver, interpreter, data_store, gas_meter)
+        self.execute_code_impl(resolver, interpreter, data_store, module_store, gas_meter)
             .map_err(|e| {
                 let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                     e.with_exec_state(interpreter.get_internal_state())
@@ -1738,6 +1763,7 @@ impl Frame {
         resolver: &Resolver,
         interpreter: &mut Interpreter,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleAdapter,
         gas_meter: &mut impl GasMeter,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
@@ -2155,6 +2181,7 @@ impl Frame {
                             false,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2170,6 +2197,7 @@ impl Frame {
                             true,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2182,6 +2210,7 @@ impl Frame {
                             false,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2194,6 +2223,7 @@ impl Frame {
                             true,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2206,6 +2236,7 @@ impl Frame {
                             false,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2218,6 +2249,7 @@ impl Frame {
                             true,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2237,6 +2269,7 @@ impl Frame {
                             false,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2256,6 +2289,7 @@ impl Frame {
                             true,
                             resolver.loader(),
                             data_store,
+                            module_store,
                             gas_meter,
                             addr,
                             &ty,
@@ -2383,8 +2417,8 @@ impl Frame {
         &self.ty_args
     }
 
-    fn resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
-        self.function.get_resolver(loader)
+    fn resolver<'a>(&self, loader: &'a Loader, module_store: &'a ModuleAdapter) -> Resolver<'a> {
+        self.function.get_resolver(loader, module_store)
     }
 
     fn location(&self) -> Location {
