@@ -46,10 +46,9 @@ module aptos_framework::version {
         }
     }
 
-    public(friend) fun on_new_epoch(account: &signer) acquires Version {
-        system_addresses::assert_vm(account);
+    public(friend) fun on_new_epoch() acquires Version {
         if (config_for_next_epoch::does_exist<Version>()) {
-            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>(account);
+            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>();
         }
     }
 

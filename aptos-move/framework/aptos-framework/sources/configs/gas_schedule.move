@@ -66,20 +66,11 @@ module aptos_framework::gas_schedule {
         }
     }
 
-    public fun on_new_epoch(account: &signer) acquires GasScheduleV2, GasSchedule {
-        system_addresses::assert_vm(account);
+    public fun on_new_epoch() acquires GasScheduleV2 {
         if (config_for_next_epoch::does_exist<GasScheduleV2>()) {
-            let new_gas_schedule: GasScheduleV2 = config_for_next_epoch::extract<GasScheduleV2>(account);
-            if (exists<GasScheduleV2>(@aptos_framework)) {
-                let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
-                *gas_schedule = new_gas_schedule;
-            }
-            else {
-                if (exists<GasSchedule>(@aptos_framework)) {
-                    _ = move_from<GasSchedule>(@aptos_framework);
-                };
-                move_to<GasScheduleV2>(account, new_gas_schedule);
-            };
+            let new_gas_schedule: GasScheduleV2 = config_for_next_epoch::extract<GasScheduleV2>();
+            let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
+            *gas_schedule = new_gas_schedule;
         }
     }
 

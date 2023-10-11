@@ -1,5 +1,6 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
+    use std::config_for_next_epoch;
     use std::error;
     use std::features;
     use std::vector;
@@ -152,7 +153,9 @@ module aptos_framework::block {
         state_storage::on_new_block(reconfiguration::current_epoch());
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
+            config_for_next_epoch::enable_extracts(&vm);
             reconfiguration::reconfigure();
+            config_for_next_epoch::disable_extracts(&vm);
         };
     }
 
@@ -215,9 +218,9 @@ module aptos_framework::block {
 
         if (reconfiguration::slow_reconfigure_in_progress()) {
             if (timestamp >= reconfiguration::current_slow_reconfigure_deadline()) {
-                reconfiguration::terminate_slow_reconfigure(&vm);
+                reconfiguration::abort_slow_reconfigure(&vm);
             } else {
-                reconfiguration::update_slow_reconfigure(slow_reconfigure_params);
+                reconfiguration::update_slow_reconfigure(&vm, slow_reconfigure_params);
             }
         } else if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::start_slow_reconfigure(&vm);

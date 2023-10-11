@@ -32,6 +32,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -412,7 +413,9 @@ The runtime always runs this before executing the transactions in a block.
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(&vm);
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(&vm);
     };
 }
 </code></pre>
@@ -494,9 +497,9 @@ The runtime always runs this before executing the transactions in a block.
 
     <b>if</b> (<a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">reconfiguration::slow_reconfigure_in_progress</a>()) {
         <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> &gt;= <a href="reconfiguration.md#0x1_reconfiguration_current_slow_reconfigure_deadline">reconfiguration::current_slow_reconfigure_deadline</a>()) {
-            <a href="reconfiguration.md#0x1_reconfiguration_terminate_slow_reconfigure">reconfiguration::terminate_slow_reconfigure</a>(&vm);
+            <a href="reconfiguration.md#0x1_reconfiguration_abort_slow_reconfigure">reconfiguration::abort_slow_reconfigure</a>(&vm);
         } <b>else</b> {
-            <a href="reconfiguration.md#0x1_reconfiguration_update_slow_reconfigure">reconfiguration::update_slow_reconfigure</a>(slow_reconfigure_params);
+            <a href="reconfiguration.md#0x1_reconfiguration_update_slow_reconfigure">reconfiguration::update_slow_reconfigure</a>(&vm, slow_reconfigure_params);
         }
     } <b>else</b> <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
         <a href="reconfiguration.md#0x1_reconfiguration_start_slow_reconfigure">reconfiguration::start_slow_reconfigure</a>(&vm);

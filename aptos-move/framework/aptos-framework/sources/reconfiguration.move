@@ -1,8 +1,10 @@
 /// Publishes configuration information for validators, and issues reconfiguration events
 /// to synchronize configuration changes for the validators.
 module aptos_framework::reconfiguration {
+    use std::config_for_next_epoch;
     use std::error;
     use std::features;
+    use std::features::Features;
     use std::signer;
 
     use aptos_framework::account;
@@ -12,6 +14,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
     use aptos_framework::consensus_config;
+    use aptos_framework::dkg;
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
     use aptos_framework::storage_gas;
@@ -138,6 +141,11 @@ module aptos_framework::reconfiguration {
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
         storage_gas::on_reconfig();
+        features::on_new_epoch();
+        consensus_config::on_new_epoch();
+        execution_config::on_new_epoch();
+        gas_schedule::on_new_epoch();
+        std::version::on_new_epoch();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
@@ -174,65 +182,29 @@ module aptos_framework::reconfiguration {
         status.in_progress = true;
         status.deadline = timestamp::now_seconds() + 999999999;
         stake::disable_validator_set_changes();
-        std::config_for_next_epoch::disable_updates(account);
+        std::config_for_next_epoch::disable_upserts(account);
         //TODO: start DKG.
     }
 
-    public(friend) fun update_slow_reconfigure(params: vector<u8>) acquires SlowReconfigureStatus {
+    public(friend) fun update_slow_reconfigure(account: &signer, params: vector<u8>) acquires SlowReconfigureStatus, Configuration {
         assert!(slow_reconfigure_in_progress(), error::invalid_state(ENO_RECONFIGURATION_IN_PROGRESS));
-        std::debug::print(&params) //TODO: consume `params`
+        let ready_to_proceed = dkg::update(params);
+        if (ready_to_proceed) {
+            config_for_next_epoch::enable_extracts(account);
+            reconfigure();
+            config_for_next_epoch::disable_extracts(account);
+            config_for_next_epoch::enable_upserts(account);
+        }
     }
 
-    public(friend) fun terminate_slow_reconfigure(account: &signer) acquires Configuration, SlowReconfigureStatus {
-        assert!(slow_reconfigure_in_progress(), error::invalid_state(ENO_RECONFIGURATION_IN_PROGRESS));
-        move_from<SlowReconfigureStatus>(@aptos_framework);
+    public(friend) fun abort_slow_reconfigure(account: &signer) acquires Configuration {
+        //TODO: potential DKG clean-up.
 
-        // Basically do what `reconfigure()` does. But here we need the signer.
-
-        if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
-            return
-        };
-
-        let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
-        let current_time = timestamp::now_microseconds();
-
-        // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
-        // explicitly so that staking can distribute them.
-        //
-        // This also handles the case when a validator is removed due to the governance proposal. In particular, removing
-        // the validator causes a reconfiguration. We explicitly process fees, i.e. we drain aggregatable coin and populate
-        // the fees table, prior to calling `on_new_epoch()`. That call, in turn, distributes transaction fees for all active
-        // and pending_inactive validators, which include any validator that is to be removed.
-        if (features::collect_and_distribute_gas_fees()) {
-            // All transactions after reconfiguration are Retry. Therefore, when the next
-            // block starts and tries to assign/burn collected fees it will be just 0 and
-            // nothing will be assigned.
-            transaction_fee::process_collected_fees();
-        };
-
-        stake::on_new_epoch();
-        storage_gas::on_reconfig();
-        consensus_config::on_new_epoch(account);
-        execution_config::on_new_epoch(account);
-        gas_schedule::on_new_epoch(account);
-        std::version::on_new_epoch(account);
-        features::on_new_epoch(account);
-        // TODO: complete the list.
-
-        assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
-        config_ref.last_reconfiguration_time = current_time;
-        spec {
-            assume config_ref.epoch + 1 <= MAX_U64;
-        };
-        config_ref.epoch = config_ref.epoch + 1;
-
-        event::emit_event<NewEpochEvent>(
-            &mut config_ref.events,
-            NewEpochEvent {
-                epoch: config_ref.epoch,
-            },
-        );
-
+        // Force-proceed to the next epoch without randomness.
+        config_for_next_epoch::enable_extracts(account);
+        reconfigure();
+        config_for_next_epoch::disable_extracts(account);
+        config_for_next_epoch::enable_upserts(account);
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

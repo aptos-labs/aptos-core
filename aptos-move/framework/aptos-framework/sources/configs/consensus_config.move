@@ -30,10 +30,9 @@ module aptos_framework::consensus_config {
         std::config_for_next_epoch::upsert<ConsensusConfig>(account, ConsensusConfig {config});
     }
 
-    public(friend) fun on_new_epoch(account: &signer) acquires ConsensusConfig {
-        system_addresses::assert_vm(account);
+    public(friend) fun on_new_epoch() acquires ConsensusConfig {
         if (config_for_next_epoch::does_exist<ConsensusConfig>()) {
-            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = std::config_for_next_epoch::extract(account);
+            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = std::config_for_next_epoch::extract();
         }
     }
 }

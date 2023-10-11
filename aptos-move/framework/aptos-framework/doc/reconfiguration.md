@@ -21,7 +21,7 @@ to synchronize configuration changes for the validators.
 -  [Function `current_slow_reconfigure_deadline`](#0x1_reconfiguration_current_slow_reconfigure_deadline)
 -  [Function `start_slow_reconfigure`](#0x1_reconfiguration_start_slow_reconfigure)
 -  [Function `update_slow_reconfigure`](#0x1_reconfiguration_update_slow_reconfigure)
--  [Function `terminate_slow_reconfigure`](#0x1_reconfiguration_terminate_slow_reconfigure)
+-  [Function `abort_slow_reconfigure`](#0x1_reconfiguration_abort_slow_reconfigure)
 -  [Function `last_reconfiguration_time`](#0x1_reconfiguration_last_reconfiguration_time)
 -  [Function `current_epoch`](#0x1_reconfiguration_current_epoch)
 -  [Function `emit_genesis_reconfiguration_event`](#0x1_reconfiguration_emit_genesis_reconfiguration_event)
@@ -40,7 +40,7 @@ to synchronize configuration changes for the validators.
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
 <b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
+<b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="execution_config.md#0x1_execution_config">0x1::execution_config</a>;
@@ -441,6 +441,11 @@ Signal validators to start using new configuration. Must be called from friend c
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards and transaction fees.
     <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
     <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_on_new_epoch">features::on_new_epoch</a>();
+    <a href="consensus_config.md#0x1_consensus_config_on_new_epoch">consensus_config::on_new_epoch</a>();
+    <a href="execution_config.md#0x1_execution_config_on_new_epoch">execution_config::on_new_epoch</a>();
+    <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">gas_schedule::on_new_epoch</a>();
+    std::version::on_new_epoch();
 
     <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
     config_ref.last_reconfiguration_time = current_time;
@@ -531,7 +536,7 @@ Signal validators to start using new configuration. Must be called from friend c
     status.in_progress = <b>true</b>;
     status.deadline = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + 999999999;
     <a href="stake.md#0x1_stake_disable_validator_set_changes">stake::disable_validator_set_changes</a>();
-    std::config_for_next_epoch::disable_updates(<a href="account.md#0x1_account">account</a>);
+    std::config_for_next_epoch::disable_upserts(<a href="account.md#0x1_account">account</a>);
     //TODO: start DKG.
 }
 </code></pre>
@@ -546,7 +551,7 @@ Signal validators to start using new configuration. Must be called from friend c
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_update_slow_reconfigure">update_slow_reconfigure</a>(params: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_update_slow_reconfigure">update_slow_reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, params: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -555,9 +560,15 @@ Signal validators to start using new configuration. Must be called from friend c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_update_slow_reconfigure">update_slow_reconfigure</a>(params: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureStatus">SlowReconfigureStatus</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_update_slow_reconfigure">update_slow_reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, params: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureStatus">SlowReconfigureStatus</a>, <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
     <b>assert</b>!(<a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ENO_RECONFIGURATION_IN_PROGRESS">ENO_RECONFIGURATION_IN_PROGRESS</a>));
-    std::debug::print(&params) //TODO: consume `params`
+    <b>let</b> ready_to_proceed = <a href="dkg.md#0x1_dkg_update">dkg::update</a>(params);
+    <b>if</b> (ready_to_proceed) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(<a href="account.md#0x1_account">account</a>);
+        <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfigure</a>();
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(<a href="account.md#0x1_account">account</a>);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_upserts">config_for_next_epoch::enable_upserts</a>(<a href="account.md#0x1_account">account</a>);
+    }
 }
 </code></pre>
 
@@ -565,13 +576,13 @@ Signal validators to start using new configuration. Must be called from friend c
 
 </details>
 
-<a name="0x1_reconfiguration_terminate_slow_reconfigure"></a>
+<a name="0x1_reconfiguration_abort_slow_reconfigure"></a>
 
-## Function `terminate_slow_reconfigure`
+## Function `abort_slow_reconfigure`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_terminate_slow_reconfigure">terminate_slow_reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_abort_slow_reconfigure">abort_slow_reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -580,56 +591,14 @@ Signal validators to start using new configuration. Must be called from friend c
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_terminate_slow_reconfigure">terminate_slow_reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>, <a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureStatus">SlowReconfigureStatus</a> {
-    <b>assert</b>!(<a href="reconfiguration.md#0x1_reconfiguration_slow_reconfigure_in_progress">slow_reconfigure_in_progress</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_ENO_RECONFIGURATION_IN_PROGRESS">ENO_RECONFIGURATION_IN_PROGRESS</a>));
-    <b>move_from</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_SlowReconfigureStatus">SlowReconfigureStatus</a>&gt;(@aptos_framework);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration.md#0x1_reconfiguration_abort_slow_reconfigure">abort_slow_reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
+    //TODO: potential DKG clean-up.
 
-    // Basically do what `<a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfigure</a>()` does. But here we need the <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>.
-
-    <b>if</b> (<a href="chain_status.md#0x1_chain_status_is_genesis">chain_status::is_genesis</a>() || <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() == 0 || !<a href="reconfiguration.md#0x1_reconfiguration_reconfiguration_enabled">reconfiguration_enabled</a>()) {
-        <b>return</b>
-    };
-
-    <b>let</b> config_ref = <b>borrow_global_mut</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(@aptos_framework);
-    <b>let</b> current_time = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
-
-    // Reconfiguration "forces the <a href="block.md#0x1_block">block</a>" <b>to</b> end, <b>as</b> mentioned above. Therefore, we must process the collected fees
-    // explicitly so that staking can distribute them.
-    //
-    // This also handles the case when a validator is removed due <b>to</b> the governance proposal. In particular, removing
-    // the validator causes a <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a>. We explicitly process fees, i.e. we drain aggregatable <a href="coin.md#0x1_coin">coin</a> and populate
-    // the fees <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, prior <b>to</b> calling `on_new_epoch()`. That call, in turn, distributes transaction fees for all active
-    // and pending_inactive validators, which <b>include</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> validator that is <b>to</b> be removed.
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
-        // All transactions after <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> are Retry. Therefore, when the next
-        // <a href="block.md#0x1_block">block</a> starts and tries <b>to</b> assign/burn collected fees it will be just 0 and
-        // nothing will be assigned.
-        <a href="transaction_fee.md#0x1_transaction_fee_process_collected_fees">transaction_fee::process_collected_fees</a>();
-    };
-
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
-    <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
-    <a href="consensus_config.md#0x1_consensus_config_on_new_epoch">consensus_config::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
-    <a href="execution_config.md#0x1_execution_config_on_new_epoch">execution_config::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
-    <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">gas_schedule::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
-    std::version::on_new_epoch(<a href="account.md#0x1_account">account</a>);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_on_new_epoch">features::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
-    // TODO: complete the list.
-
-    <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
-    config_ref.last_reconfiguration_time = current_time;
-    <b>spec</b> {
-        <b>assume</b> config_ref.epoch + 1 &lt;= MAX_U64;
-    };
-    config_ref.epoch = config_ref.epoch + 1;
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
-        &<b>mut</b> config_ref.events,
-        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
-            epoch: config_ref.epoch,
-        },
-    );
-
+    // Force-proceed <b>to</b> the next epoch without randomness.
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfigure</a>();
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_upserts">config_for_next_epoch::enable_upserts</a>(<a href="account.md#0x1_account">account</a>);
 }
 </code></pre>
 

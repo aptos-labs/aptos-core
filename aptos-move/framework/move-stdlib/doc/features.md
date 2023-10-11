@@ -1520,9 +1520,9 @@ Function to enable and disable features. Can only be called by a signer of @std.
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
     <b>if</b> (<a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>()) {
         <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
-            <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework)
+            <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_copied">config_for_next_epoch::copied</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()
         } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-            *<b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)
+            *<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)
         } <b>else</b> {
             <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] }
         };
@@ -1546,9 +1546,13 @@ Function to enable and disable features. Can only be called by a signer of @std.
 
 ## Function `on_new_epoch`
 
+Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+
+While the scope is public, it can only be usd in system transactions like <code>block_prologue</code> and governance proposals,
+who have permission to set the flag that's checked in <code>extract()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>()
 </code></pre>
 
 
@@ -1557,10 +1561,9 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account) == @vm, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
-        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(account);
+        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;();
         *<b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) = <a href="features.md#0x1_features">features</a>;
     }
 }

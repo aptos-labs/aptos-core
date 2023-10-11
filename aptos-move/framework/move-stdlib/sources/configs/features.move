@@ -287,9 +287,9 @@ module std::features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (reconfigure_with_dkg_enabled()) {
             let features = if (config_for_next_epoch::does_exist<Features>()) {
-                config_for_next_epoch::extract<Features>(framework)
+                config_for_next_epoch::copied<Features>()
             } else if (exists<Features>(@std)) {
-                *borrow_global_mut<Features>(@std)
+                *borrow_global<Features>(@std)
             } else {
                 Features { features: vector[] }
             };
@@ -304,10 +304,13 @@ module std::features {
         };
     }
 
-    public fun on_new_epoch(account: &signer) acquires Features {
-        assert!(signer::address_of(account) == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+    /// Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+    ///
+    /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
+    /// who have permission to set the flag that's checked in `extract()`.
+    public fun on_new_epoch() acquires Features {
         if (config_for_next_epoch::does_exist<Features>()) {
-            let features = config_for_next_epoch::extract<Features>(account);
+            let features = config_for_next_epoch::extract<Features>();
             *borrow_global_mut<Features>(@std) = features;
         }
     }

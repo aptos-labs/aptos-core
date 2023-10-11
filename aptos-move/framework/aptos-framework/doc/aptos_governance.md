@@ -89,6 +89,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -1475,7 +1476,9 @@ Force reconfigure. To be called at the end of a proposal that alters on-chain co
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>()) {
         <a href="reconfiguration.md#0x1_reconfiguration_start_slow_reconfigure">reconfiguration::start_slow_reconfigure</a>(aptos_framework);
     } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(aptos_framework);
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(aptos_framework);
     }
 }
 </code></pre>
@@ -1507,7 +1510,9 @@ Update feature flags and also trigger reconfiguration.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>()) {
         <a href="reconfiguration.md#0x1_reconfiguration_start_slow_reconfigure">reconfiguration::start_slow_reconfigure</a>(aptos_framework);
     } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(aptos_framework);
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(aptos_framework);
     }
 }
 </code></pre>

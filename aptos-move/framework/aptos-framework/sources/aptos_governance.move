@@ -10,6 +10,7 @@
 /// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
 /// on a proposal multiple times as long as the total voting power of these votes doesn't exceed its total voting power.
 module aptos_framework::aptos_governance {
+    use std::config_for_next_epoch;
     use std::error;
     use std::option;
     use std::signer;
@@ -542,7 +543,9 @@ module aptos_framework::aptos_governance {
         if (features::reconfigure_with_dkg_enabled()) {
             reconfiguration::start_slow_reconfigure(aptos_framework);
         } else {
+            config_for_next_epoch::enable_extracts(aptos_framework);
             reconfiguration::reconfigure();
+            config_for_next_epoch::disable_extracts(aptos_framework);
         }
     }
 
@@ -554,7 +557,9 @@ module aptos_framework::aptos_governance {
         if (features::reconfigure_with_dkg_enabled()) {
             reconfiguration::start_slow_reconfigure(aptos_framework);
         } else {
+            config_for_next_epoch::enable_extracts(aptos_framework);
             reconfiguration::reconfigure();
+            config_for_next_epoch::disable_extracts(aptos_framework);
         }
     }
 

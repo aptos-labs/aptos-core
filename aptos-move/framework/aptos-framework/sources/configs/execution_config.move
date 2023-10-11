@@ -25,10 +25,9 @@ module aptos_framework::execution_config {
     }
 
     /// Only used in reconfiguration with DKG.
-    public(friend) fun on_new_epoch(account: &signer) acquires ExecutionConfig {
-        system_addresses::assert_vm(account);
+    public(friend) fun on_new_epoch() acquires ExecutionConfig {
         if (config_for_next_epoch::does_exist<ExecutionConfig>()) {
-            let config = config_for_next_epoch::extract<ExecutionConfig>(account);
+            let config = config_for_next_epoch::extract<ExecutionConfig>();
             *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
         }
     }
