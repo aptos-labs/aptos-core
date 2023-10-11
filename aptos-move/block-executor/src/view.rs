@@ -287,6 +287,16 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) counter: &'a RefCell<u32>,
 }
 
+impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
+    fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
+        self.unsync_map.write_delayed_field(id, base_value)
+    }
+
+    fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
+        self.unsync_map.fetch_delayed_field(&id)
+    }
+}
+
 pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
     Sync(ParallelState<'a, T, X>),
     Unsync(SequentialState<'a, T, X>),
@@ -757,14 +767,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         value: Value,
     ) -> TransformationResult<Value> {
         let id = self.generate_delayed_field_id();
+        let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
         match &self.latest_view.latest_view {
-            ViewState::Sync(state) => {
-                let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
-                state.set_delayed_field_value(id, base_value)
-            },
-            ViewState::Unsync(_state) => {
-                // TODO(aggregator): Support sequential execution.
-                unimplemented!("Value to ID replacement for sequential execution is not supported")
+            ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
+            ViewState::Unsync(state) => {
+                state.set_delayed_field_value(id, base_value);
             },
         };
         self.delayed_field_keys.borrow_mut().insert(id);
@@ -789,10 +796,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 )
                 .expect("Committed value for ID must always exist")
                 .try_into_move_value(layout)?),
-            ViewState::Unsync(_state) => {
-                // TODO(aggregator): Support sequential execution.
-                unimplemented!("ID to value replacement for sequential execution is not supported")
-            },
+            ViewState::Unsync(state) => Ok(state
+                .read_delayed_field(id)
+                .expect("Delayed field value for ID must always exist in sequential execution")
+                .try_into_move_value(layout)?),
         }
     }
 }
