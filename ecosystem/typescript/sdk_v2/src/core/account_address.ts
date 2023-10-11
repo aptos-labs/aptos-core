@@ -4,6 +4,7 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { HexInput } from "../types";
 import { ParsingError, ParsingResult } from "./common";
+import { Deserializer, Serializable, Serializer } from "../bcs";
 
 /**
  * This enum is used to explain why an address was invalid.
@@ -34,7 +35,7 @@ export enum AddressInvalidReason {
  * The comments in this class make frequent reference to the LONG and SHORT formats,
  * as well as "special" addresses. To learn what these refer to see AIP-40.
  */
-export class AccountAddress {
+export class AccountAddress extends Serializable {
   /*
    * This is the internal representation of an account address.
    */
@@ -64,6 +65,7 @@ export class AccountAddress {
    * @param args.data A Uint8Array representing an account address.
    */
   constructor(args: { data: Uint8Array }) {
+    super();
     if (args.data.length !== AccountAddress.LENGTH) {
       throw new ParsingError(
         "AccountAddress data should be exactly 32 bytes long",
@@ -164,6 +166,36 @@ export class AccountAddress {
     return this.data;
   }
 
+  /**
+   * Serialize the AccountAddress to a Serializer instance's data buffer.
+   * @param serializer The serializer to serialize the AccountAddress to.
+   * @returns void
+   * @example
+   * const serializer = new Serializer();
+   * const address = AccountAddress.fromString({ input: "0x1" });
+   * address.serialize(serializer);
+   * const bytes = serializer.toUint8Array();
+   * // `bytes` is now the BCS-serialized address.
+   */
+  serialize(serializer: Serializer): void {
+    serializer.serializeFixedBytes(this.data);
+  }
+
+  /**
+   * Deserialize an AccountAddress from the byte buffer in a Deserializer instance.
+   * @param deserializer The deserializer to deserialize the AccountAddress from.
+   * @returns An instance of AccountAddress.
+   * @example
+   * const bytes = hexToBytes("0x0102030405060708091011121314151617181920212223242526272829303132");
+   * const deserializer = new Deserializer(bytes);
+   * const address = AccountAddress.deserialize(deserializer);
+   * // `address` is now an instance of AccountAddress.
+   */
+  static deserialize(deserializer: Deserializer): AccountAddress {
+    const bytes = deserializer.deserializeFixedBytes(AccountAddress.LENGTH);
+    return new AccountAddress({ data: bytes });
+  }
+
   // ===
   // Methods for creating an instance of AccountAddress from other types.
   // ===
@@ -214,7 +246,8 @@ export class AccountAddress {
       } else if (args.input.length !== 3) {
         // 0x + one hex char is the only valid SHORT form for special addresses.
         throw new ParsingError(
-          "The given hex string is a special address not in LONG form, it must be 0x0 to 0xf without padding zeroes.",
+          `The given hex string ${args.input} is a special address not in LONG form, 
+          it must be 0x0 to 0xf without padding zeroes.`,
           AddressInvalidReason.INVALID_PADDING_ZEROES,
         );
       }

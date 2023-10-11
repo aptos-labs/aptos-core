@@ -55,6 +55,7 @@ dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
+hex = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
 mirai-annotations = { workspace = true }
@@ -64,9 +65,11 @@ num-traits = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+scopeguard = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }

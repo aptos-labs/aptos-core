@@ -181,7 +181,7 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV2(32)
         ));
-        assert!(matches!(result.block_gas_limit(), None));
+        assert!(result.block_gas_limit().is_none());
     }
 
     #[test]
@@ -248,6 +248,6 @@ mod test {
             result.transaction_shuffler_type(),
             TransactionShufflerType::SenderAwareV2(32)
         ));
-        assert!(matches!(result.block_gas_limit(), None));
+        assert!(result.block_gas_limit().is_none());
     }
 }

@@ -49,7 +49,7 @@ This is the connection string to your PostgreSQL database. It should be in the f
 This is the URL for the Transaction Stream Service. If you are using the Labs-Hosted instance you can find the URLs for each network at [this page](../txn-stream/labs-hosted). Make sure to select the correct URL for the network you want to index. If you are running this service locally the value should be `127.0.0.1:50051`.
 
 ### `auth_token`
-This is the auth token used to connect to the Transaction Stream Service. If you are using the Labs-Hosted instance you can use the API Gateway to get an auth token. Learn more at [this page](../txn-stream/labs-hosted).
+This is the auth token used to connect to the Transaction Stream Service. If you are using the Labs-Hosted instance you can use the API Gateway to get an auth token. Learn more at [this page](/indexer/txn-stream/labs-hosted).
 
 ## Run with source code
 Clone the repo:
@@ -88,3 +88,5 @@ docker run -it --network host --mount type=bind,source=/tmp/config.yaml,target=/
 ```
 
 This command binds the container to the host network and mounts the config file from the host into the container. This specific invocation assumes that your config file in the host is at `/tmp/config.yaml`.
+
+See the image on DockerHub here: https://hub.docker.com/r/aptoslabs/indexer-processor-rust/tags.

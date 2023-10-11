@@ -96,7 +96,17 @@ def wipe(testnet_name: str, node_name: str):
 @click.option(
     "--storage-size",
     default=util.DEFAULT_PERSISTENT_VOLUME_CLAIM_SIZE,
-    help="The storage size to use for the PFN. Defaults to 10Gi.",
+    help=f"The storage size to use for the PFN. Defaults to {util.DEFAULT_PERSISTENT_VOLUME_CLAIM_SIZE}.",
+)
+@click.option(
+    "--cpu",
+    default=util.CPU_REQUEST,
+    help=f"The cpu request to use for the PFN. Defaults to {util.CPU_REQUEST}.",
+)
+@click.option(
+    "--memory",
+    default=util.MEMORY_REQUEST,
+    help=f"The memory request to use for the PFN. Defaults to {util.MEMORY_REQUEST}.",
 )
 def add_pfn(
     testnet_name: str,
@@ -106,6 +116,8 @@ def add_pfn(
     workspace: str,
     storage_class_name: str,
     storage_size: str,
+    cpu: str,
+    memory: str,
 ):
     """Add a pfn"""
     add_pfn_main(
@@ -117,6 +129,8 @@ def add_pfn(
             workspace,
             storage_class_name,
             storage_size,
+            cpu,
+            memory,
         ),
         SystemContext(LocalShell(), LocalFilesystem(), LiveKubernetes()),
     )

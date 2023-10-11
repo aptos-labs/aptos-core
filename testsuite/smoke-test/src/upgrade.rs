@@ -217,7 +217,7 @@ async fn test_upgrade_flow() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_release_validate_tool_multi_step() {
     let (mut env, _, _) = SwarmBuilder::new_local(1)
-        .with_init_config(Arc::new(|_, _, genesis_stake_amount| {
+        .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
             *genesis_stake_amount = 2000000000000000;
         }))

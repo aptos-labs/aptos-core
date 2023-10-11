@@ -24,6 +24,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }
+bytes = { workspace = true }
 crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 itertools = { workspace = true }
@@ -33,6 +34,7 @@ parking_lot = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+threadpool = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }

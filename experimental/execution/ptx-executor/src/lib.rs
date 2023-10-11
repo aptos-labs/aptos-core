@@ -24,16 +24,18 @@ use crate::{
 use aptos_executor::{
     block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput,
 };
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
 use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
-    transaction::{Transaction, TransactionOutput},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+    },
 };
 use aptos_vm::{
-    aptos_vm::RAYON_EXEC_POOL,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     AptosVM, VMExecutor,
 };
@@ -44,7 +46,7 @@ pub struct PtxBlockExecutor;
 
 impl VMExecutor for PtxBlockExecutor {
     fn execute_block(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
@@ -66,7 +68,7 @@ impl VMExecutor for PtxBlockExecutor {
 
         let ret = Arc::new(Mutex::new(None));
         let ret_clone = ret.clone();
-        RAYON_EXEC_POOL.scope(move |scope| {
+        THREAD_MANAGER.get_exe_cpu_pool().scope(move |scope| {
             let num_txns = transactions.len();
             let (result_tx, result_rx) = channel();
 
@@ -81,7 +83,7 @@ impl VMExecutor for PtxBlockExecutor {
 
             // Feed the transactions down the pipeline.
             for txn in transactions {
-                analyzer.analyze_transaction(txn);
+                analyzer.analyze_transaction(txn.clone());
             }
             analyzer.finish_block();
 

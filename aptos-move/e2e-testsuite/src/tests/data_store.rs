@@ -239,7 +239,7 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
             }}
         }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let framework_modules = aptos_cached_packages::head_release_bundle().compiled_modules();
@@ -280,7 +280,7 @@ fn add_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);
@@ -307,7 +307,7 @@ fn remove_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);
@@ -334,7 +334,7 @@ fn borrow_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);
@@ -361,7 +361,7 @@ fn change_resource_txn(
                 return;
             }}
         ",
-        sender.address(),
+        sender.address().to_hex(),
     );
 
     let module = compile_script(&program, extra_deps);

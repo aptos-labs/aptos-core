@@ -668,7 +668,9 @@ where
             .collect::<Vec<_>>();
 
         if kvs.is_empty() {
-            assert_eq!(self.smt.inner.usage, usage);
+            if !usage.is_untracked() {
+                assert_eq!(self.smt.inner.usage, usage);
+            }
             Ok(self.clone())
         } else {
             let current_root = self.smt.root_weak();

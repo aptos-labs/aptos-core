@@ -2,12 +2,13 @@
 
 use super::dag_test;
 use crate::{
-    dag::bootstrap::bootstrap_dag,
+    dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::StateSyncStatus},
     experimental::buffer_manager::OrderedBlocks,
-    network::{DAGNetworkSenderImpl, IncomingDAGRequest, NetworkSender},
+    network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
-    test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
+    payload_manager::PayloadManager,
+    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -26,21 +27,23 @@ use aptos_network::{
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
+    ledger_info::generate_ledger_info_with_sig,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
 use claims::assert_gt;
 use futures::{
-    stream::{select, AbortHandle, Select},
+    stream::{select, Select},
     StreamExt,
 };
 use futures_channel::mpsc::UnboundedReceiver;
 use maplit::hashmap;
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 struct DagBootstrapUnit {
-    nh_abort_handle: AbortHandle,
-    df_abort_handle: AbortHandle,
+    nh_task_handle: JoinHandle<StateSyncStatus>,
+    df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
         Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
@@ -57,33 +60,42 @@ impl DagBootstrapUnit {
         network_events: Box<
             Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>,
         >,
+        all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
         let epoch_state = EpochState {
             epoch,
             verifier: storage.get_validator_set().into(),
         };
-        let dag_storage = dag_test::MockStorage::new();
+        let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
+        let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
 
-        let network = Arc::new(DAGNetworkSenderImpl::new(Arc::new(network)));
+        let network = Arc::new(network);
 
         let payload_client = Arc::new(MockPayloadManager::new(None));
+        let payload_manager = Arc::new(PayloadManager::DirectMempool);
 
-        let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) = bootstrap_dag(
-            self_peer,
-            signer,
-            Arc::new(epoch_state),
-            storage.get_ledger_info(),
-            Arc::new(dag_storage),
-            network.clone(),
-            network.clone(),
-            time_service,
-            payload_client,
-        );
+        let state_computer = Arc::new(EmptyStateComputer {});
+
+        let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
+            bootstrap_dag_for_test(
+                self_peer,
+                signer,
+                Arc::new(epoch_state),
+                storage.get_ledger_info(),
+                Arc::new(dag_storage),
+                network.clone(),
+                network.clone(),
+                network.clone(),
+                time_service,
+                payload_manager,
+                payload_client,
+                state_computer,
+            );
 
         (
             Self {
-                nh_abort_handle,
-                df_abort_handle,
+                nh_task_handle: nh_abort_handle,
+                df_task_handle: df_abort_handle,
                 dag_rpc_tx,
                 network_events,
             },
@@ -186,6 +198,7 @@ fn bootstrap_nodes(
                 network,
                 aptos_time_service::TimeService::real(),
                 network_events,
+                signers.clone(),
             )
         })
         .unzip();

@@ -61,4 +61,47 @@ module 0x8675309::M {
           }
         }
     }
+    spec fun $t0() {
+        loop {
+          Tuple()
+        }
+    }
+    spec fun $t1() {
+        loop {
+          Tuple()
+        }
+    }
+    spec fun $t2() {
+        loop {
+          Tuple()
+        }
+    }
+    spec fun $t3();
+    spec fun $t4() {
+        loop {
+          if true {
+            Tuple()
+          } else {
+            Tuple()
+          }
+        }
+    }
+    spec fun $t5();
+    spec fun $t6() {
+        loop {
+          continue
+        }
+    }
+    spec fun $t7() {
+        loop {
+          continue
+        }
+    }
+    spec fun $t8() {
+        loop {
+          loop {
+            break
+          }
+        }
+    }
 } // end 0x8675309::M

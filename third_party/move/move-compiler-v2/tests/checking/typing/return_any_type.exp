@@ -8,11 +8,14 @@ module 0x8675309::M {
         Tuple()
     }
     private fun t0() {
-        Add(0, return Tuple());
+        Add<u64>(0, return Tuple());
         Tuple()
     }
     private fun t1() {
         M::foo(return Tuple());
         Tuple()
     }
+    spec fun $foo(c: M::Coin);
+    spec fun $t0();
+    spec fun $t1();
 } // end 0x8675309::M

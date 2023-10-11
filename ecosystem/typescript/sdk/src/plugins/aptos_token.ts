@@ -102,6 +102,7 @@ export class AptosToken {
    * @param options CreateCollectionOptions type. By default all values set to `true` or `0`
    * @returns The hash of the transaction submitted to the API
    */
+  // :!:>createCollection
   async createCollection(
     creator: AptosAccount,
     description: string,
@@ -111,6 +112,7 @@ export class AptosToken {
     options?: CreateCollectionOptions,
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
+    // <:!:createCollection
     return this.submitTransaction(
       creator,
       "create_collection",
@@ -149,6 +151,7 @@ export class AptosToken {
    * @param propertyValues the property values to be stored on-chain
    * @returns The hash of the transaction submitted to the API
    */
+  // :!:>mint
   async mint(
     account: AptosAccount,
     collection: string,
@@ -160,6 +163,7 @@ export class AptosToken {
     propertyValues: Array<string> = [],
     extraArgs?: OptionalTransactionArgs,
   ): Promise<string> {
+    // <:!:mint
     return this.submitTransaction(
       account,
       "mint",
@@ -548,5 +552,32 @@ export class AptosToken {
       token.extraArgs,
     );
     return txnHash;
+  }
+
+  /**
+   * Burn an object by the object owner
+   * @param owner The object owner account
+   * @param objectId The object address
+   * @optional objectType. The object type, default to "0x1::object::ObjectCore"
+   * @returns The hash of the transaction submitted to the API
+   */
+  async burnObject(
+    owner: AptosAccount,
+    objectId: MaybeHexString,
+    objectType?: string,
+    extraArgs?: OptionalTransactionArgs,
+  ): Promise<string> {
+    const builder = new TransactionBuilderRemoteABI(this.provider, {
+      sender: owner.address(),
+      ...extraArgs,
+    });
+    const rawTxn = await builder.build(
+      "0x1::object::burn",
+      [objectType || "0x1::object::ObjectCore"],
+      [HexString.ensure(objectId).hex()],
+    );
+    const bcsTxn = AptosClient.generateBCSTransaction(owner, rawTxn);
+    const pendingTransaction = await this.provider.submitSignedBCSTransaction(bcsTxn);
+    return pendingTransaction.hash;
   }
 }

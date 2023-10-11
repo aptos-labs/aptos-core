@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "aptos-labs/security"
+      - "aptos-labs/prod-eng"
+    labels:
+      - "CICD:run-e2e-tests"
+      - "dependencies"
+      - "rust"
+    open-pull-requests-limit: 0

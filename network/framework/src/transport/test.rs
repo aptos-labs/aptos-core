@@ -3,19 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    application::storage::PeersAndMetadata,
     protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
     testutils,
     transport::*,
 };
 use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
-use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform, x25519};
-use aptos_infallible::RwLock;
+use aptos_crypto::{test_utils::TEST_SEED, traits::Uniform, x25519, x25519::PrivateKey};
 use aptos_netcore::{
     framing::{read_u16frame, write_u16frame},
     transport::{memory, ConnectionOrigin, Transport},
 };
 use aptos_time_service::MockTimeService;
 use aptos_types::{
+    account_address::AccountAddress,
     chain_id::ChainId,
     network_address::{NetworkAddress, Protocol::*},
     PeerId,
@@ -28,14 +29,14 @@ use tokio::runtime::Runtime;
 
 /// Helper to add the trusted peer to the set
 fn add_trusted_peer(
-    trusted_peers: Arc<RwLock<PeerSet>>,
+    trusted_peers: &mut PeerSet,
     peer_id: PeerId,
     private_key: &x25519::PrivateKey,
     role: PeerRole,
 ) {
     let pubkey_set = [private_key.public_key()].iter().copied().collect();
     let peer = Peer::new(Vec::new(), pubkey_set, role);
-    trusted_peers.write().insert(peer_id, peer);
+    trusted_peers.insert(peer_id, peer);
 }
 
 enum Auth {
@@ -52,7 +53,7 @@ fn setup<TTransport>(
     MockTimeService,
     (PeerId, AptosNetTransport<TTransport>),
     (PeerId, AptosNetTransport<TTransport>),
-    Arc<RwLock<PeerSet>>,
+    Arc<PeersAndMetadata>,
     ProtocolIdSet,
 )
 where
@@ -74,7 +75,7 @@ where
         dialer_network_context,
         listener_auth_mode,
         dialer_auth_mode,
-        trusted_peers,
+        peers_and_metadata,
     ) = match auth {
         Auth::Mutual => {
             // Create the dialer and listener network contexts
@@ -83,26 +84,24 @@ where
 
             // Add the trusted peers
             let network_id = listener_network_context.network_id();
-            let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-            add_trusted_peer(
-                trusted_peers.clone(),
+            let dialer = (
                 dialer_network_context.peer_id(),
                 &dialer_key,
                 PeerRole::Validator,
             );
-            add_trusted_peer(
-                trusted_peers.clone(),
+            let listener = (
                 listener_network_context.peer_id(),
                 &listener_key,
                 PeerRole::Validator,
             );
+            insert_trusted_peers(&peers_and_metadata, network_id, vec![dialer, listener]);
 
             (
                 listener_network_context,
                 dialer_network_context,
                 HandshakeAuthMode::mutual(peers_and_metadata.clone()),
-                HandshakeAuthMode::mutual(peers_and_metadata),
-                trusted_peers,
+                HandshakeAuthMode::mutual(peers_and_metadata.clone()),
+                peers_and_metadata,
             )
         },
         Auth::MaybeMutual => {
@@ -116,26 +115,24 @@ where
 
             // Add the trusted peers
             let network_id = listener_network_context.network_id();
-            let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-            add_trusted_peer(
-                trusted_peers.clone(),
+            let dialer = (
                 dialer_network_context.peer_id(),
                 &dialer_key,
                 PeerRole::Validator,
             );
-            add_trusted_peer(
-                trusted_peers.clone(),
+            let listener = (
                 listener_network_context.peer_id(),
                 &listener_key,
                 PeerRole::Validator,
             );
+            insert_trusted_peers(&peers_and_metadata, network_id, vec![dialer, listener]);
 
             (
                 listener_network_context,
                 dialer_network_context,
                 HandshakeAuthMode::maybe_mutual(peers_and_metadata.clone()),
-                HandshakeAuthMode::maybe_mutual(peers_and_metadata),
-                trusted_peers,
+                HandshakeAuthMode::maybe_mutual(peers_and_metadata.clone()),
+                peers_and_metadata,
             )
         },
         Auth::ServerOnly => {
@@ -147,16 +144,15 @@ where
                     None,
                 );
 
-            // Get the trusted peers
+            // Get the network ID
             let network_id = listener_network_context.network_id();
-            let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
 
             (
                 listener_network_context,
                 dialer_network_context,
                 HandshakeAuthMode::server_only(&[network_id]),
                 HandshakeAuthMode::server_only(&[network_id]),
-                trusted_peers,
+                peers_and_metadata,
             )
         },
     };
@@ -193,7 +189,7 @@ where
         time_service.into_mock(),
         (listener_network_context.peer_id(), listener_transport),
         (dialer_network_context.peer_id(), dialer_transport),
-        trusted_peers,
+        peers_and_metadata,
         supported_protocols,
     )
 }
@@ -244,7 +240,7 @@ fn test_transport_success<TTransport>(
         _mock_time,
         (listener_peer_id, listener_transport),
         (dialer_peer_id, dialer_transport),
-        _peers_and_metadata,
+        _,
         supported_protocols,
     ) = setup(base_transport, auth);
 
@@ -327,12 +323,17 @@ fn test_transport_rejects_unauthed_dialer<TTransport>(
         _mock_time,
         (listener_peer_id, listener_transport),
         (dialer_peer_id, dialer_transport),
-        trusted_peers,
+        peers_and_metadata,
         _supported_protocols,
     ) = setup(base_transport, Auth::Mutual);
 
     // remove dialer from trusted_peers set
-    trusted_peers.write().remove(&dialer_peer_id).unwrap();
+    let network_id = peers_and_metadata.get_registered_networks().next().unwrap();
+    let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+    trusted_peers.remove(&dialer_peer_id).unwrap();
+    peers_and_metadata
+        .set_trusted_peers(&network_id, trusted_peers)
+        .unwrap();
 
     let _guard = rt.enter();
     let (mut inbounds, listener_addr) = listener_transport
@@ -381,7 +382,7 @@ fn test_transport_maybe_mutual<TTransport>(
         _mock_time,
         (listener_peer_id, listener_transport),
         (dialer_peer_id, dialer_transport),
-        trusted_peers,
+        peers_and_metadata,
         supported_protocols,
     ) = setup(base_transport, Auth::MaybeMutual);
 
@@ -395,6 +396,7 @@ fn test_transport_maybe_mutual<TTransport>(
     // we accept the dialer's inbound connection, check the connection metadata,
     // and verify that the upgraded socket actually works (sends and receives
     // bytes).
+    let network_id = peers_and_metadata.get_registered_networks().next().unwrap();
     let listener_task = async move {
         // accept one inbound connection from dialer
         let (inbound, _dialer_addr) = inbounds.next().await.unwrap().unwrap();
@@ -414,8 +416,9 @@ fn test_transport_maybe_mutual<TTransport>(
         );
         assert_eq!(
             conn.metadata.role,
-            trusted_peers
-                .read()
+            peers_and_metadata
+                .get_trusted_peers(&network_id)
+                .unwrap()
                 .get(&conn.metadata.remote_peer_id)
                 .unwrap()
                 .role
@@ -428,7 +431,9 @@ fn test_transport_maybe_mutual<TTransport>(
 
         // Clear the trusted peers and see that we can still connect to the remote but with it
         // being untrusted
-        trusted_peers.write().clear();
+        peers_and_metadata
+            .set_trusted_peers(&network_id, PeerSet::new())
+            .unwrap();
 
         // accept one inbound connection from dialer
         let (inbound, _dialer_addr) = inbounds.next().await.unwrap().unwrap();
@@ -580,4 +585,24 @@ fn test_tcp_transport_rejects_unauthed_dialer() {
         "/ip4/127.0.0.1/tcp/0",
         expect_ip4_tcp_noise_addr,
     );
+}
+
+/// Inserts the given peers into the trusted peer set for the specified network
+fn insert_trusted_peers(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    network_id: NetworkId,
+    peers: Vec<(AccountAddress, &PrivateKey, PeerRole)>,
+) {
+    // Get a copy of the trusted peers
+    let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+
+    // Insert the new peers
+    for (peer_address, private_key, peer_role) in peers {
+        add_trusted_peer(&mut trusted_peers, peer_address, private_key, peer_role);
+    }
+
+    // Update the trusted peers
+    peers_and_metadata
+        .set_trusted_peers(&network_id, trusted_peers)
+        .unwrap();
 }

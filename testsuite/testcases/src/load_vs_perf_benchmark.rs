@@ -13,6 +13,11 @@ use rand::SeedableRng;
 use std::{fmt::Debug, time::Duration};
 use tokio::runtime::Runtime;
 
+// add larger warmup, as when we are exceeding the max load,
+// it takes more time to fill mempool.
+const PER_TEST_WARMUP_DURATION_FRACTION: f32 = 0.2;
+const PER_TEST_COOLDOWN_DURATION_FRACTION: f32 = 0.05;
+
 pub struct SingleRunStats {
     name: String,
     stats: TxnStats,
@@ -23,8 +28,8 @@ pub struct SingleRunStats {
 
 #[derive(Debug)]
 pub enum Workloads {
-    TPS(&'static [usize]),
-    TRANSACTIONS(&'static [TransactionWorkload]),
+    TPS(Vec<usize>),
+    TRANSACTIONS(Vec<TransactionWorkload>),
 }
 
 impl Workloads {
@@ -39,6 +44,19 @@ impl Workloads {
         match self {
             Self::TPS(_) => "Load (TPS)".to_string(),
             Self::TRANSACTIONS(_) => "Workload".to_string(),
+        }
+    }
+
+    fn num_phases(&self, index: usize) -> usize {
+        match self {
+            Self::TPS(_) => 1,
+            Self::TRANSACTIONS(workloads) => {
+                if workloads[index].is_phased() {
+                    2
+                } else {
+                    1
+                }
+            },
         }
     }
 
@@ -67,9 +85,18 @@ impl Workloads {
             Self::TRANSACTIONS(workloads) => workloads[index].configure(request),
         }
     }
+
+    fn split_duration(&self, global_duration: Duration) -> (Duration, Duration) {
+        let total_phases: usize = (0..self.len()).map(|index| self.num_phases(index)).sum();
+        let phase_duration = global_duration.div_f32(
+            total_phases as f32 + PER_TEST_WARMUP_DURATION_FRACTION * (self.len() - 1) as f32,
+        );
+        let buffer = phase_duration.mul_f32(PER_TEST_WARMUP_DURATION_FRACTION);
+        (phase_duration, buffer)
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct TransactionWorkload {
     pub transaction_type: TransactionTypeArg,
     pub num_modules: usize,
@@ -150,10 +177,8 @@ impl LoadVsPerfBenchmark {
             ctx,
             emit_job_request,
             duration,
-            // add larger warmup, as when we are exceeding the max load,
-            // it takes more time to fill mempool.
-            0.2,
-            0.05,
+            PER_TEST_WARMUP_DURATION_FRACTION,
+            PER_TEST_COOLDOWN_DURATION_FRACTION,
             rng,
         )?;
 
@@ -182,12 +207,8 @@ impl NetworkTest for LoadVsPerfBenchmark {
         );
 
         let _runtime = Runtime::new().unwrap();
-        let individual_with_buffer = ctx
-            .global_duration
-            .checked_div(self.workloads.len() as u32)
-            .unwrap();
-        let individual_duration = individual_with_buffer.mul_f32(0.8);
-        let buffer = individual_with_buffer - individual_duration;
+
+        let (phase_duration, buffer) = self.workloads.split_duration(ctx.global_duration);
 
         let mut results = Vec::new();
         for index in 0..self.workloads.len() {
@@ -197,7 +218,16 @@ impl NetworkTest for LoadVsPerfBenchmark {
             }
 
             info!("Starting for {:?}", self.workloads);
-            results.push(self.evaluate_single(ctx, &self.workloads, index, individual_duration)?);
+            results.push(
+                self.evaluate_single(
+                    ctx,
+                    &self.workloads,
+                    index,
+                    phase_duration
+                        .checked_mul(self.workloads.num_phases(index) as u32)
+                        .unwrap(),
+                )?,
+            );
 
             // Note: uncomment below to perform reconfig during a test
             // let mut aptos_info = ctx.swarm().aptos_public_info();
@@ -277,4 +307,52 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
     }
 
     table
+}
+
+#[test]
+fn test_phases_duration() {
+    use assert_approx_eq::assert_approx_eq;
+    use std::ops::{Add, Mul};
+
+    let one_phase = TransactionWorkload {
+        transaction_type: TransactionTypeArg::CoinTransfer,
+        num_modules: 1,
+        unique_senders: false,
+        mempool_backlog: 20000,
+    };
+    let two_phase = TransactionWorkload {
+        transaction_type: TransactionTypeArg::ModifyGlobalResource,
+        num_modules: 1,
+        unique_senders: true,
+        mempool_backlog: 20000,
+    };
+
+    {
+        let workload = Workloads::TRANSACTIONS(vec![one_phase]);
+        let (phase, _buffer) = workload.split_duration(Duration::from_secs(1));
+        assert_approx_eq!(phase.as_secs_f32(), 1.0);
+    }
+
+    {
+        let workload = Workloads::TRANSACTIONS(vec![one_phase, one_phase]);
+        let (phase, buffer) = workload.split_duration(Duration::from_secs(1));
+        assert_approx_eq!(phase.as_secs_f32(), 1.0 / 2.2);
+        assert_approx_eq!(buffer.as_secs_f32(), 1.0 / 2.2 * 0.2);
+        assert_approx_eq!(phase.add(phase).add(buffer).as_secs_f32(), 1.0);
+    }
+
+    {
+        let workload = Workloads::TRANSACTIONS(vec![two_phase]);
+        let (phase, _buffer) = workload.split_duration(Duration::from_secs(1));
+        assert_approx_eq!(phase.as_secs_f32(), 0.5);
+    }
+
+    {
+        let workload =
+            Workloads::TRANSACTIONS(vec![one_phase, one_phase, two_phase, two_phase, two_phase]);
+        let (phase, buffer) = workload.split_duration(Duration::from_secs(1));
+        assert_approx_eq!(phase.as_secs_f32(), 1.0 / 8.8);
+        assert_approx_eq!(buffer.as_secs_f32(), 1.0 / 8.8 * 0.2);
+        assert_approx_eq!(phase.mul(8).add(buffer.mul(4)).as_secs_f32(), 1.0);
+    }
 }

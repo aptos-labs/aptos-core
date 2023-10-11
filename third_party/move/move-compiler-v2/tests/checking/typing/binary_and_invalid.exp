@@ -22,46 +22,46 @@ error: invalid call of `&&`: expected `bool` but found `address` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:11:9
    │
 11 │         @0x0 && @0x1;
-   │         ^^^^^^^^^^^^
+   │         ^^^^
 
 error: invalid call of `&&`: expected `bool` but found `u8` for argument 1
-   ┌─ tests/checking/typing/binary_and_invalid.move:12:9
+   ┌─ tests/checking/typing/binary_and_invalid.move:12:10
    │
 12 │         (0: u8) && (1: u128);
-   │         ^^^^^^^^^^^^^^^^^^^^
+   │          ^
 
 error: invalid call of `&&`: expected `bool` but found `M::R` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:13:9
    │
 13 │         r && r;
-   │         ^^^^^^
+   │         ^
 
 error: invalid call of `&&`: expected `bool` but found `M::S` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:14:9
    │
 14 │         s && s;
-   │         ^^^^^^
+   │         ^
 
 error: invalid call of `&&`: expected `bool` but found `()` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:15:9
    │
 15 │         () && ();
-   │         ^^^^^^^^
+   │         ^^
 
 error: invalid call of `&&`: expected `bool` but found `()` for argument 2
-   ┌─ tests/checking/typing/binary_and_invalid.move:16:9
+   ┌─ tests/checking/typing/binary_and_invalid.move:16:17
    │
 16 │         true && ();
-   │         ^^^^^^^^^^
+   │                 ^^
 
 error: invalid call of `&&`: expected `bool` but found `(bool, bool)` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:17:9
    │
 17 │         (true, false) && (true, false, true);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │         ^^^^^^^^^^^^^
 
 error: invalid call of `&&`: expected `bool` but found `(bool, bool)` for argument 1
    ┌─ tests/checking/typing/binary_and_invalid.move:18:9
    │
 18 │         (true, true) && (false, false);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │         ^^^^^^^^^^^^

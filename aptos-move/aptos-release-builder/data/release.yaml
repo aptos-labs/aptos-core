@@ -22,31 +22,12 @@ proposals:
       - FeatureFlag:
           enabled:
             - safer_resource_groups
+      - FeatureFlag:
+          enabled:
+            - safer_metadata
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_block_gas_limit
-    metadata:
-      title: "Enable Block Gas Limit"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132"
-    execution_mode: MultiStep
-    update_sequence:
-    - Execution:
-        V2:
-          transaction_shuffler_type:
-            deprecated_sender_aware_v1: 32
-          block_gas_limit : 35000
-  - name: enable_aggregator_snapshots
-    metadata:
-      title: "Enable Aggregator Snapshots"
-      description: "AIP-43: Aggregator snapshots can be used to postpone the read operations on aggregators to the commit phase and improve concurrency of transaction execution."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_snapshots
   - name: enable_signature_checker_v2_fix
     metadata:
       title: "Enable a fix signature checker v2"
@@ -74,7 +55,7 @@ proposals:
   - name: enable_bulletproofs
     metadata:
       title: "Enable Bulletproofs Module"
-      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255" 
+      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
     execution_mode: MultiStep
     update_sequence:

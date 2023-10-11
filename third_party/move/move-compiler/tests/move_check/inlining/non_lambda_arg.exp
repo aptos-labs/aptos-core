@@ -1,0 +1,12 @@
+error[E04024]: invalid usage of function type
+  ┌─ tests/move_check/inlining/non_lambda_arg.move:4:71
+  │
+4 │     public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T| bool) {
+  │                                                                       ^^^^^^^^^^^ function type only allowed for inline function arguments
+
+error[E04024]: invalid usage of function type
+  ┌─ tests/move_check/inlining/non_lambda_arg.move:9:102
+  │
+9 │     public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T| bool) {
+  │                                                                                                      ^^^^^^^^^^^ function type only allowed for inline function arguments
+

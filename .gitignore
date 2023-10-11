@@ -76,6 +76,10 @@ aptos-move/move-examples/scripts/minter/build/Minter/*
 # Docker incremental build temporary files and directories
 target-out-docker
 **/Dockerfile.tmp
+# Indexer grpc temporary certificates.
+docker/compose/indexer-grpc/data-service-grpc-server.crt
+docker/compose/indexer-grpc/data-service-grpc-server.key
+
 
 # Doc generation output
 *.md.old
@@ -90,8 +94,9 @@ target-out-docker
 .*\#
 \#*\#
 
-# Aptos CLI files
+# Aptos CLI / local testnet files
 .aptos
+**/*.rdb
 
 # VSCode settings
 .vscode/

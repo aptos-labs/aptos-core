@@ -19,6 +19,7 @@ aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
+rand = { workspace = true }
 rocksdb = { workspace = true }
 
 [dev-dependencies]

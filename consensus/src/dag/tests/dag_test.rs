@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
+    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
-    storage::DAGStorage,
+    storage::{CommitEvent, DAGStorage},
     tests::helpers::new_certified_node,
     types::{CertifiedNode, DagSnapshotBitmask, Node},
     NodeId, Vote,
@@ -11,8 +12,8 @@ use crate::dag::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    epoch_state::EpochState, validator_signer::ValidatorSigner,
-    validator_verifier::random_validator_verifier,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -20,6 +21,7 @@ pub struct MockStorage {
     node_data: Mutex<Option<Node>>,
     vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
+    latest_ledger_info: Option<LedgerInfoWithSignatures>,
 }
 
 impl MockStorage {
@@ -28,6 +30,16 @@ impl MockStorage {
             node_data: Mutex::new(None),
             vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
+            latest_ledger_info: None,
+        }
+    }
+
+    pub fn new_with_ledger_info(ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self {
+            node_data: Mutex::new(None),
+            vote_data: Mutex::new(HashMap::new()),
+            certified_node_data: Mutex::new(HashMap::new()),
+            latest_ledger_info: Some(ledger_info),
         }
     }
 }
@@ -86,16 +98,14 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
-    fn save_ordered_anchor_id(&self, _node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
+    fn get_latest_k_committed_events(&self, _k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         Ok(vec![])
     }
 
-    fn delete_ordered_anchor_ids(&self, _node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(())
+    fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
+        self.latest_ledger_info
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("ledger info not set"))
     }
 }
 
@@ -106,7 +116,7 @@ fn setup() -> (Vec<ValidatorSigner>, Arc<EpochState>, Dag, Arc<MockStorage>) {
         verifier: validator_verifier,
     });
     let storage = Arc::new(MockStorage::new());
-    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
+    let dag = Dag::new(epoch_state.clone(), storage.clone(), 1, DAG_WINDOW);
     (signers, epoch_state, dag, storage)
 }
 
@@ -194,7 +204,7 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 1);
+    let new_dag = Dag::new(epoch_state.clone(), storage.clone(), 0, DAG_WINDOW);
 
     for metadata in &metadatas {
         assert!(new_dag.exists(metadata));
@@ -205,7 +215,7 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 1);
+    let _new_epoch_dag = Dag::new(new_epoch_state, storage.clone(), 0, DAG_WINDOW);
     assert!(storage.certified_node_data.lock().is_empty());
 }
 

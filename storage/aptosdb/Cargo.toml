@@ -19,6 +19,7 @@ aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db-indexer = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
@@ -39,6 +40,7 @@ byteorder = { workspace = true }
 claims = { workspace = true }
 clap = { workspace = true, optional = true }
 dashmap = { workspace = true }
+either = { workspace = true }
 itertools = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }

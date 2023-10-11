@@ -37,10 +37,13 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
+        Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder, ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
         TransactionStatus, VMValidatorResult,
     },
@@ -49,13 +52,14 @@ use aptos_types::{
 };
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
-    data_cache::{AsMoveResolver, StorageAdapter},
+    data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
+use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
@@ -357,7 +361,7 @@ impl FakeExecutor {
             TStateView::get_state_value_bytes(&self.data_store, &StateKey::access_path(ap))
                 .expect("account must exist in data store")
                 .unwrap_or_else(|| panic!("Can't fetch {} resource for {}", T::STRUCT_NAME, addr));
-        bcs::from_bytes(data_blob.as_slice()).ok()
+        bcs::from_bytes(&data_blob).ok()
     }
 
     /// Reads the resource `Value` for an account under the given address from
@@ -446,7 +450,7 @@ impl FakeExecutor {
 
     pub fn execute_transaction_block_parallel(
         &self,
-        txn_block: Vec<Transaction>,
+        txn_block: &[SignatureVerifiedTransaction],
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
@@ -475,7 +479,9 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
+        let sig_verified_block = into_signature_verified_block(txn_block);
+
+        let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
 
         let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
             no_parallel
@@ -484,7 +490,7 @@ impl FakeExecutor {
         };
 
         if !no_parallel {
-            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            let parallel_output = self.execute_transaction_block_parallel(&sig_verified_block);
             assert_eq!(output, parallel_output);
         }
 
@@ -537,36 +543,39 @@ impl FakeExecutor {
 
         let log_context = AdapterLogSchema::new(self.data_store.id(), 0);
 
-        let (_status, output, gas_profiler) =
-            AptosVM::execute_user_transaction_with_custom_gas_meter(
-                &self.data_store,
-                &txn,
-                &log_context,
-                |gas_feature_version, gas_params, storage_gas_params, balance| {
-                    let gas_meter =
-                        MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                            gas_feature_version,
-                            gas_params,
-                            storage_gas_params,
-                            balance,
-                        )));
-                    let gas_profiler = match txn.payload() {
-                        TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
-                        TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
-                            gas_meter,
-                            entry_func.module().clone(),
-                            entry_func.function().to_owned(),
-                            entry_func.ty_args().to_vec(),
-                        ),
-                        TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
-                        TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
-                    };
-                    Ok(gas_profiler)
-                },
-            )?;
+        // TODO(Gas): revisit this.
+        let vm = AptosVM::new_from_state_view(&self.data_store);
+
+        let resolver = self.data_store.as_move_resolver();
+        let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
+            &resolver,
+            &txn,
+            &log_context,
+            |gas_feature_version, gas_params, storage_gas_params, balance| {
+                let gas_meter =
+                    MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                        gas_feature_version,
+                        gas_params,
+                        storage_gas_params,
+                        balance,
+                    )));
+                let gas_profiler = match txn.payload() {
+                    TransactionPayload::Script(_) => GasProfiler::new_script(gas_meter),
+                    TransactionPayload::EntryFunction(entry_func) => GasProfiler::new_function(
+                        gas_meter,
+                        entry_func.module().clone(),
+                        entry_func.function().to_owned(),
+                        entry_func.ty_args().to_vec(),
+                    ),
+                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
+                    TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+                };
+                Ok(gas_profiler)
+            },
+        )?;
 
         Ok((
-            output.try_into_transaction_output(self.get_state_view())?,
+            output.try_into_transaction_output(&resolver)?,
             gas_profiler.finish(),
         ))
     }
@@ -595,14 +604,14 @@ impl FakeExecutor {
     }
 
     /// Get the blob for the associated AccessPath
-    pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+    pub fn read_state_value_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
         TStateView::get_state_value_bytes(&self.data_store, state_key).unwrap()
     }
 
     /// Set the blob for the associated AccessPath
     pub fn write_state_value(&mut self, state_key: StateKey, data_blob: Vec<u8>) {
         self.data_store
-            .set(state_key, StateValue::new_legacy(data_blob));
+            .set(state_key, StateValue::new_legacy(data_blob.into()));
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
@@ -711,8 +720,12 @@ impl FakeExecutor {
         iterations: u64,
     ) -> u128 {
         // FIXME: should probably read the timestamp from storage.
-        let timed_features =
-            TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+        let timed_features = TimedFeaturesBuilder::enable_all()
+            .with_override_profile(TimedFeatureOverride::Testing)
+            .build();
+
+        let resolver = self.data_store.as_move_resolver();
+
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -721,15 +734,15 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             timed_features,
+            &resolver,
         )
         .unwrap();
-        let remote_view = StorageAdapter::new(&self.data_store);
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
         let mut times = Vec::new();
         while i < iterations {
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void());
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
@@ -781,8 +794,11 @@ impl FakeExecutor {
 
         let (write_set, _events) = {
             // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            let timed_features = TimedFeaturesBuilder::enable_all()
+                .with_override_profile(TimedFeatureOverride::Testing)
+                .build();
+
+            let resolver = self.data_store.as_move_resolver();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
@@ -795,10 +811,10 @@ impl FakeExecutor {
                 Some(move |expression| {
                     a2.lock().unwrap().push(expression);
                 }),
+                &resolver,
             )
             .unwrap();
-            let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void());
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -847,17 +863,21 @@ impl FakeExecutor {
             .to_vec()
     }
 
-    pub fn exec(
+    pub fn exec_module(
         &mut self,
-        module_name: &str,
+        module_id: &ModuleId,
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
         let (write_set, events) = {
             // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            let timed_features = TimedFeaturesBuilder::enable_all()
+                .with_override_profile(TimedFeatureOverride::Testing)
+                .build();
+
+            let resolver = self.data_store.as_move_resolver();
+
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -866,13 +886,13 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
+                &resolver,
             )
             .unwrap();
-            let remote_view = StorageAdapter::new(&self.data_store);
-            let mut session = vm.new_session(&remote_view, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
-                    &Self::module(module_name),
+                    module_id,
                     &Self::name(function_name),
                     type_params,
                     args,
@@ -881,7 +901,7 @@ impl FakeExecutor {
                 .unwrap_or_else(|e| {
                     panic!(
                         "Error calling {}.{}: {}",
-                        module_name,
+                        module_id,
                         function_name,
                         e.into_vm_status()
                     )
@@ -901,6 +921,16 @@ impl FakeExecutor {
         self.event_store.extend(events);
     }
 
+    pub fn exec(
+        &mut self,
+        module_name: &str,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) {
+        self.exec_module(&Self::module(module_name), function_name, type_params, args)
+    }
+
     pub fn try_exec(
         &mut self,
         module_name: &str,
@@ -908,6 +938,8 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+        let resolver = self.data_store.as_move_resolver();
+
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -916,11 +948,11 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
-            TimedFeatures::enable_all(),
+            TimedFeaturesBuilder::enable_all().build(),
+            &resolver,
         )
         .unwrap();
-        let remote_view = StorageAdapter::new(&self.data_store);
-        let mut session = vm.new_session(&remote_view, SessionId::void());
+        let mut session = vm.new_session(&resolver, SessionId::void());
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

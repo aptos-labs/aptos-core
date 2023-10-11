@@ -108,14 +108,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.TIMEOUT_MINUTES }}
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
+      - uses: actions/checkout@v3
         if: ${{ !inputs.SKIP_JOB }}
         with:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if GIT_SHA is not specified
           fetch-depth: inputs.GIT_SHA != null && 0 || 10
 
-      - uses: actions/setup-python@13ae5bb136fac2878aff31522b9efb785519f984 # pin@v4
+      - uses: actions/setup-python@v4
         if: ${{ !inputs.SKIP_JOB }}
 
       - name: Install python deps
@@ -153,7 +153,7 @@ jobs:
 
       - name: "Install GCloud SDK"
         if: ${{ !inputs.SKIP_JOB }}
-        uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
+        uses: "google-github-actions/setup-gcloud@v1"
         with:
           version: ">= 418.0.0"
           install_components: "kubectl,gke-gcloud-auth-plugin"

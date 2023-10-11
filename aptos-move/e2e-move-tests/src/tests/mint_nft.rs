@@ -116,7 +116,7 @@ fn mint_nft_e2e() {
         &nft_receiver,
         str::parse(&format!(
             "0x{}::create_nft_getting_production_ready::mint_event_ticket",
-            resource_address
+            resource_address.to_hex()
         ))
         .unwrap(),
         vec![],
