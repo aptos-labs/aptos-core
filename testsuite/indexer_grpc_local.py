@@ -127,7 +127,7 @@ def run_docker_compose(
 ) -> None:
     log.info(f"Running docker compose {compose_action.value} on {compose_file_path}")
     try:
-        context.run_docker_command(
+        res = context.run_docker_command(
             [
                 "compose",
                 "-f",
@@ -138,6 +138,10 @@ def run_docker_compose(
             + extra_args,
             stream_output=True,
         )
+        
+        if not res.succeeded():
+            error_msg = "Failed to run docker compose: \n\n{}\n\n".format(res.output_str())
+            raise DockerComposeError(error_msg)
     except Exception as e:
         if "No such file or directory" in str(e):
             raise DockerComposeError("Failed to find the compose file") from e
