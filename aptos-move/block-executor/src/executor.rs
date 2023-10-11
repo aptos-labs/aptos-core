@@ -113,9 +113,9 @@ where
             .modified_keys(idx_to_execute)
             .map_or(HashMap::new(), |keys| keys.collect());
 
-        // let mut prev_modified_aggregators = last_input_output
-        //     .delayed_field_keys(idx_to_execute)
-        //     .map_or(HashSet::new(), |keys| keys.collect());
+        let mut prev_modified_delayed_fields = last_input_output
+            .delayed_field_keys(idx_to_execute)
+            .map_or(HashSet::new(), |keys| keys.collect());
 
         let mut speculative_inconsistent = false;
 
@@ -153,9 +153,7 @@ where
             }
 
             for (id, change) in output.delayed_field_change_set().into_iter() {
-                // if !prev_modified_aggregators.remove(&id) {
-                //     updates_outside = true;
-                // }
+                prev_modified_delayed_fields.remove(&id);
 
                 // TODO: figure out if change should update updates_outside
                 if let Err(e) =
@@ -206,10 +204,14 @@ where
         // Remove entries from previous write/delta set that were not overwritten.
         for (k, is_module) in prev_modified_keys {
             if is_module {
-                versioned_cache.modules().delete(&k, idx_to_execute);
+                versioned_cache.modules().remove(&k, idx_to_execute);
             } else {
-                versioned_cache.data().delete(&k, idx_to_execute);
+                versioned_cache.data().remove(&k, idx_to_execute);
             }
+        }
+
+        for id in prev_modified_delayed_fields {
+            versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
         let mut read_set = sync_view.take_reads();
