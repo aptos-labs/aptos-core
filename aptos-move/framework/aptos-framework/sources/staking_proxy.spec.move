@@ -59,6 +59,7 @@ spec aptos_framework::staking_proxy {
         let accumulated_rewards = total_active_stake - staking_contract.principal;
         let commission_amount = accumulated_rewards * staking_contract.commission_percentage / 100;
         aborts_if staking_contract_exists && !exists<stake::StakePool>(staking_contract.pool_address);
+        // the following property caused timeout
         ensures staking_contract_exists ==>
             simple_map::spec_get(post_store.staking_contracts, new_operator).principal == total_active_stake - commission_amount;
 
