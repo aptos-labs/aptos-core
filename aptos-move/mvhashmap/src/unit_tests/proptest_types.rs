@@ -8,8 +8,9 @@ use super::{
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
-    executable::ExecutableTestType, state_store::state_value::StateValue,
-    write_set::TransactionWrite,
+    executable::ExecutableTestType,
+    state_store::state_value::StateValue,
+    write_set::{TransactionWrite, WriteOpKind},
 };
 use bytes::Bytes;
 use claims::assert_none;
@@ -64,9 +65,13 @@ impl<V: Into<Vec<u8>> + Clone> Value<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
+impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     fn bytes(&self) -> Option<&Bytes> {
         self.maybe_bytes.as_ref()
+    }
+
+    fn write_op_kind(&self) -> WriteOpKind {
+        unimplemented!("Irrelevant for the test")
     }
 
     fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {

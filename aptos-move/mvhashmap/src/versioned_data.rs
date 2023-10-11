@@ -262,7 +262,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
 
     pub fn set_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {
         let mut v = self.values.entry(key).or_default();
-        let bytes_len = data.bytes_len();
+        let bytes_len = data.bytes().map(|b| b.len());
         // For base value, incarnation is irrelevant, and is always set to 0.
 
         use btree_map::Entry::*;
@@ -275,37 +275,26 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                 )));
             },
             Occupied(o) => {
-                assert!(
-                    if let EntryCell::Write(i, v, layout) = &o.get().cell {
-                        // base value may have already been provided by another transaction
-                        // executed simultaneously and asking for the same resource.
-                        // Value from storage must be identical, but then delayed field
-                        // identifier exchange could've modiefied it.
-                        //
-                        // If maybe_layout is None, they are required to be identical
-                        // If maybe_layout is Some, there might have been an exchange
-                        // Assert the length of bytes for efficiency (instead of full equality)
-                        layout.is_some() == maybe_layout.is_some()
-                            && *i == 0
-                            && (layout.is_some() || v.bytes_len() == bytes_len)
-                    } else {
-                        true
-                    }
-                );
+                assert!(if let EntryCell::Write(i, v, layout) = &o.get().cell {
+                    // base value may have already been provided by another transaction
+                    // executed simultaneously and asking for the same resource.
+                    // Value from storage must be identical, but then delayed field
+                    // identifier exchange could've modiefied it.
+                    //
+                    // If maybe_layout is None, they are required to be identical
+                    // If maybe_layout is Some, there might have been an exchange
+                    // Assert the length of bytes for efficiency (instead of full equality)
+                    layout.is_some() == maybe_layout.is_some()
+                        && *i == 0
+                        && (layout.is_some() || v.bytes().map(|b| b.len()) == bytes_len)
+                } else {
+                    true
+                });
             },
         };
-
-        // let prev_entry = v.versioned_map.insert(
-        //     ShiftedTxnIndex::zero(),
-        //     CachePadded::new(Entry::new_write_from(0, data, maybe_layout)),
-        // );
-
-        // assert!(prev_entry.map_or(true, |entry| -> bool {
-
-        // }));
     }
 
-    /// Versioned write of data at a given key (and version).
+    /// Versioned write of data at ag given key (and version).
     pub fn write(
         &self,
         key: K,

@@ -333,7 +333,7 @@ impl VMChangeSet {
         &self.module_write_set
     }
 
-    // Called by `try_into_transaction_output_with_materialized_writes` only.
+    // Called by `into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_aggregator_v1_write_set(
         &mut self,
         additional_aggregator_writes: impl Iterator<Item = (StateKey, WriteOp)>,
@@ -342,12 +342,17 @@ impl VMChangeSet {
             .extend(additional_aggregator_writes)
     }
 
+    // Called by `into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_resource_write_set(
         &mut self,
         patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        finalized_group_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) {
-        self.resource_write_set
-            .extend(patched_resource_writes.map(|(k, v)| (k, (v, None))))
+        self.resource_write_set.extend(
+            patched_resource_writes
+                .chain(finalized_group_writes)
+                .map(|(k, v)| (k, (v, None))),
+        );
     }
 
     /// The events are set to the input events.
@@ -762,15 +767,21 @@ mod tests {
         let key_2 = StateKey::raw(vec![2]);
 
         let mut base_update = BTreeMap::new();
-        base_update.insert(key_1.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(0, 100),
-            inner_ops: BTreeMap::new(),
-        });
+        base_update.insert(
+            key_1.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(0, 100),
+                inner_ops: BTreeMap::new(),
+            },
+        );
         let mut additional_update = BTreeMap::new();
-        additional_update.insert(key_2.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(0, 200),
-            inner_ops: BTreeMap::new(),
-        });
+        additional_update.insert(
+            key_2.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(0, 200),
+                inner_ops: BTreeMap::new(),
+            },
+        );
 
         assert_ok!(VMChangeSet::squash_group_writes(
             &mut base_update,
@@ -797,14 +808,20 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
-        base_update.insert(key.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(base_type_idx, 100),
-            inner_ops: BTreeMap::new(),
-        });
-        additional_update.insert(key.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(additional_type_idx, 200),
-            inner_ops: BTreeMap::new(),
-        });
+        base_update.insert(
+            key.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(base_type_idx, 100),
+                inner_ops: BTreeMap::new(),
+            },
+        );
+        additional_update.insert(
+            key.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(additional_type_idx, 200),
+                inner_ops: BTreeMap::new(),
+            },
+        );
 
         assert_ok!(VMChangeSet::squash_group_writes(
             &mut base_update,
@@ -828,14 +845,20 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
-        base_update.insert(key.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(base_type_idx, 100),
-            inner_ops: BTreeMap::new(),
-        });
-        additional_update.insert(key.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(additional_type_idx, 200),
-            inner_ops: BTreeMap::new(),
-        });
+        base_update.insert(
+            key.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(base_type_idx, 100),
+                inner_ops: BTreeMap::new(),
+            },
+        );
+        additional_update.insert(
+            key.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(additional_type_idx, 200),
+                inner_ops: BTreeMap::new(),
+            },
+        );
 
         assert_err!(VMChangeSet::squash_group_writes(
             &mut base_update,
@@ -849,14 +872,20 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
-        base_update.insert(key.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(0, 100), // create
-            inner_ops: BTreeMap::new(),
-        });
-        additional_update.insert(key.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(2, 200), // delete
-            inner_ops: BTreeMap::new(),
-        });
+        base_update.insert(
+            key.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(0, 100), // create
+                inner_ops: BTreeMap::new(),
+            },
+        );
+        additional_update.insert(
+            key.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(2, 200), // delete
+                inner_ops: BTreeMap::new(),
+            },
+        );
 
         assert_ok!(VMChangeSet::squash_group_writes(
             &mut base_update,
@@ -873,37 +902,49 @@ mod tests {
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
         // TODO: Harcoding type layout to None. Test with layout = Some(..)
-        base_update.insert(key_1.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(1, 100),
-            inner_ops: BTreeMap::from([
-                (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
-                (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
-            ]),
-        });
-        additional_update.insert(key_1.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: BTreeMap::from([
-                (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
-                (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
-            ]),
-        });
+        base_update.insert(
+            key_1.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(1, 100),
+                inner_ops: BTreeMap::from([
+                    (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
+                    (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
+                ]),
+            },
+        );
+        additional_update.insert(
+            key_1.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(1, 200),
+                inner_ops: BTreeMap::from([
+                    (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
+                    (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
+                ]),
+            },
+        );
 
-        base_update.insert(key_2.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(1, 100),
-            inner_ops: BTreeMap::from([
-                (mock_tag_0(), (WriteOp::Deletion, None)),
-                (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
-                (mock_tag_2(), (WriteOp::Creation(vec![2].into()), None)),
-            ]),
-        });
-        additional_update.insert(key_2.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: BTreeMap::from([
-                (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
-                (mock_tag_1(), (WriteOp::Deletion, None)),
-                (mock_tag_2(), (WriteOp::Deletion, None)),
-            ]),
-        });
+        base_update.insert(
+            key_2.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(1, 100),
+                inner_ops: BTreeMap::from([
+                    (mock_tag_0(), (WriteOp::Deletion, None)),
+                    (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
+                    (mock_tag_2(), (WriteOp::Creation(vec![2].into()), None)),
+                ]),
+            },
+        );
+        additional_update.insert(
+            key_2.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(1, 200),
+                inner_ops: BTreeMap::from([
+                    (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
+                    (mock_tag_1(), (WriteOp::Deletion, None)),
+                    (mock_tag_2(), (WriteOp::Deletion, None)),
+                ]),
+            },
+        );
 
         assert_ok!(VMChangeSet::squash_group_writes(
             &mut base_update,
@@ -932,10 +973,13 @@ mod tests {
         );
         assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &(WriteOp::Deletion, None));
 
-        let additional_update = BTreeMap::from([(key_2.clone(), GroupWrite {
-            metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: BTreeMap::from([(mock_tag_1(), (WriteOp::Deletion, None))]),
-        })]);
+        let additional_update = BTreeMap::from([(
+            key_2.clone(),
+            GroupWrite {
+                metadata_op: write_op_with_metadata(1, 200),
+                inner_ops: BTreeMap::from([(mock_tag_1(), (WriteOp::Deletion, None))]),
+            },
+        )]);
         assert_err!(VMChangeSet::squash_group_writes(
             &mut base_update,
             additional_update

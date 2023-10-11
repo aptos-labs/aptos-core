@@ -134,33 +134,6 @@ impl VMOutput {
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 
-    /// Similar to `try_into_transaction_output` but deltas are materialized
-    /// externally by the caller beforehand.
-    pub fn into_transaction_output_with_materialized_deltas(
-        mut self,
-        materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
-    ) -> TransactionOutput {
-        assert_eq!(
-            materialized_aggregator_v1_deltas.len(),
-            self.change_set().aggregator_v1_delta_set().len(),
-            "Different number of materialized deltas and deltas in the output."
-        );
-        debug_assert!(
-            materialized_aggregator_v1_deltas
-                .iter()
-                .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k)),
-            "Materialized aggregator writes contain a key which does not exist in delta set."
-        );
-        self.change_set
-            .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
-
-        let (vm_change_set, gas_used, status) = self.unpack();
-        let (write_set, events) = vm_change_set
-            .into_storage_change_set_unchecked()
-            .into_inner();
-        TransactionOutput::new(write_set, events, gas_used, status)
-    }
-
     /// Updates the VMChangeSet based on the input aggregator v1 deltas, patched resource write set,
     /// patched events, and generates TransactionOutput
     pub fn into_transaction_output_with_materialized_write_set(
@@ -168,6 +141,7 @@ impl VMOutput {
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
         patched_resource_write_set: BTreeMap<StateKey, WriteOp>,
         patched_events: Vec<ContractEvent>,
+        combined_groups: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         assert_eq!(
             materialized_aggregator_v1_deltas.len(),
@@ -182,8 +156,10 @@ impl VMOutput {
         );
         self.change_set
             .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
-        self.change_set
-            .extend_resource_write_set(patched_resource_write_set.into_iter());
+        self.change_set.extend_resource_write_set(
+            patched_resource_write_set.into_iter(),
+            combined_groups.into_iter(),
+        );
 
         assert_eq!(
             patched_events.len(),
