@@ -746,7 +746,7 @@ pub enum StatusCode {
     RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2027,
 
     // Errors that can arise from binary decoding (deserialization)
-    // Deserializtion Errors: 3000-3999
+    // Deserialization Errors: 3000-3999
     UNKNOWN_BINARY_ERROR = 3000,
     MALFORMED = 3001,
     BAD_MAGIC = 3002,

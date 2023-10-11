@@ -14,7 +14,7 @@ use crate::{
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
     task::{ExecutionStatus, ExecutorTask, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
-    txn_last_input_output::TxnLastInputOutput,
+    txn_last_input_output::{KeyKind, TxnLastInputOutput},
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
@@ -122,7 +122,33 @@ where
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
         let mut apply_updates = |output: &E::Output| -> ::std::result::Result<(), PanicError> {
-            // First, apply writes.
+            for (group_key, group_metadata_op, group_ops) in
+                output.resource_group_write_set().into_iter()
+            {
+                if prev_modified_keys.remove(&group_key).is_none() {
+                    // Previously no write to the group at all.
+                    updates_outside = true;
+                }
+
+                versioned_cache.data().write(
+                    group_key.clone(),
+                    idx_to_execute,
+                    incarnation,
+                    // Group metadata op needs no layout (individual resources in groups do).
+                    (group_metadata_op, None),
+                );
+                if versioned_cache.group_data().write(
+                    group_key,
+                    idx_to_execute,
+                    incarnation,
+                    group_ops.into_iter(),
+                ) {
+                    // Should return true if writes outside.
+                    updates_outside = true;
+                }
+            }
+
+            // Then, process resource & aggregator_v1 & module writes.
             for (k, v) in output.resource_write_set().into_iter().chain(
                 output
                     .aggregator_v1_write_set()
@@ -235,12 +261,16 @@ where
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
-        for (k, is_module) in prev_modified_keys {
-            if is_module {
-                versioned_cache.modules().remove(&k, idx_to_execute);
-            } else {
-                versioned_cache.data().remove(&k, idx_to_execute);
-            }
+        for (k, kind) in prev_modified_keys {
+            use KeyKind::*;
+            match kind {
+                Resource => versioned_cache.data().remove(&k, idx_to_execute),
+                Module => versioned_cache.modules().remove(&k, idx_to_execute),
+                Group => {
+                    versioned_cache.data().remove(&k, idx_to_execute);
+                    versioned_cache.group_data().remove(&k, idx_to_execute);
+                },
+            };
         }
 
         for id in prev_modified_delayed_fields {
@@ -297,12 +327,16 @@ where
 
         // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
         if let Some(keys) = last_input_output.modified_keys(txn_idx) {
-            for (k, is_module_path) in keys {
-                if is_module_path {
-                    versioned_cache.modules().mark_estimate(&k, txn_idx);
-                } else {
-                    versioned_cache.data().mark_estimate(&k, txn_idx);
-                }
+            for (k, kind) in keys {
+                use KeyKind::*;
+                match kind {
+                    Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
+                    Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
+                    Group => {
+                        versioned_cache.data().mark_estimate(&k, txn_idx);
+                        versioned_cache.group_data().mark_estimate(&k, txn_idx);
+                    },
+                };
             }
         }
 
@@ -370,6 +404,14 @@ where
         Ok(execution_still_valid)
     }
 
+    /// This method may be executed by different threads / workers, but is guaranteed to be executed
+    /// non-concurrently by the scheduling in parallel executor. This allows to perform light logic
+    /// related to committing a transaction in a simple way and without excessive synchronization
+    /// overhead. On the other hand, materialization that happens after commit (& after this method)
+    /// is concurrent and deals with logic such as patching delayed fields / resource groups
+    /// in outputs, which is heavier (due to serialization / deserialization, copies, etc). Moreover,
+    /// since prepare_and_queue_commit_ready_txns takes care of synchronization in the flag-combining
+    /// way, the materialization can be almost embarassingly parallelizable.
     fn prepare_and_queue_commit_ready_txns(
         &self,
         maybe_block_gas_limit: Option<u64>,
@@ -388,7 +430,7 @@ where
         block: &[T],
     ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         let mut shared_commit_state_guard = shared_commit_state.acquire();
-        let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
+        let (accumulated_fee_statement, txn_fee_statements, shared_maybe_error) =
             shared_commit_state_guard.dereference_mut();
 
         let update_counters_and_log_info =
@@ -481,6 +523,45 @@ where
                 }
             }
 
+            let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
+            let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
+            let mut maybe_err = None;
+            for (group_key, metadata_op) in group_metadata_ops.into_iter() {
+                // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
+                match versioned_cache
+                    .group_data()
+                    .finalize_group(&group_key, txn_idx)
+                {
+                    Ok(finalized_group) => {
+                        // finalize_group already applies the deletions.
+                        if finalized_group.is_empty() != metadata_op.is_deletion() {
+                            error!(
+                                "Group is empty = {} but op is deletion = {} in parallel execution",
+                                finalized_group.is_empty(),
+                                metadata_op.is_deletion()
+                            );
+                            maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
+                                IntentionalFallbackToSequential::ResourceGroupError,
+                            )));
+                        }
+                        finalized_groups.push((group_key, metadata_op, finalized_group));
+                    },
+                    Err(e) => {
+                        error!("Error committing resource group {:?}", e);
+                        maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
+                            IntentionalFallbackToSequential::ResourceGroupError,
+                        )));
+                    },
+                };
+
+                if maybe_err.is_some() {
+                    break;
+                }
+            }
+            last_input_output.record_finalized_group(txn_idx, finalized_groups);
+
+            maybe_err = maybe_err.or_else(|| last_input_output.maybe_execution_error(txn_idx));
+
             // We `halt` the execution in the following 4 cases:
             // 1) We detect module read/write intersection
             // 2) A transaction triggered an Abort
@@ -488,12 +569,12 @@ where
             // 4) We skip_rest after a transaction
 
             // We cover cases 1 and 2 here
-            if let Some(err) = last_input_output.execution_error(txn_idx) {
+            if let Some(err) = maybe_err {
+                *shared_maybe_error = Some(err);
                 if scheduler.halt() {
-                    *maybe_error = Some(err);
                     info!(
                         "Block execution was aborted due to {:?}",
-                        maybe_error.as_ref().unwrap()
+                        shared_maybe_error.as_ref().unwrap()
                     );
                     update_counters_and_log_info(
                         txn_idx,
@@ -628,7 +709,7 @@ where
         delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
         write_set_keys: HashSet<T::Key>,
         read_set: RefCell<HashSet<T::Key>>,
-        unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         latest_view: &LatestView<T, S, X>,
     ) -> HashMap<T::Key, T::Value> {
         let mut patched_resource_write_set = HashMap::new();
@@ -728,6 +809,33 @@ where
         aggregator_v1_delta_writes
     }
 
+    fn serialize_groups(
+        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
+    ) -> ::std::result::Result<Vec<(T::Key, T::Value)>, PanicOr<IntentionalFallbackToSequential>>
+    {
+        finalized_groups
+            .into_iter()
+            .map(|(group_key, mut metadata_op, finalized_group)| {
+                let btree: BTreeMap<T::Tag, Bytes> = finalized_group
+                    .into_iter()
+                    .map(|(resource_tag, arc_v)| {
+                        let bytes = arc_v
+                            .extract_raw_bytes()
+                            .expect("Deletions should already be applied");
+                        (resource_tag, bytes)
+                    })
+                    .collect();
+
+                bcs::to_bytes(&btree)
+                    .map_err(|_| PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError))
+                    .map(|group_bytes| {
+                        metadata_op.set_bytes(group_bytes.into());
+                        (group_key, metadata_op)
+                    })
+            })
+            .collect()
+    }
+
     fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
@@ -737,11 +845,12 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) {
+    ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
+        let finalized_groups = last_input_output.take_finalized_group(txn_idx);
 
         let (mut patched_resource_write_set, write_set_keys) =
             Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
@@ -762,11 +871,15 @@ where
             base_view,
         );
 
+        // TODO[agg_v2]: patch group writes in finalized groups
+        let serialized_groups = Self::serialize_groups(finalized_groups)?;
+
         last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
             patched_resource_write_set,
             patched_events,
+            serialized_groups,
         );
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
@@ -807,6 +920,7 @@ where
                 panic!("Cannot be materializing with {}", msg);
             },
         };
+        Ok(())
     }
 
     fn worker_loop(
@@ -834,19 +948,21 @@ where
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
 
-        let drain_commit_queue = || {
-            while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
-                self.materialize_txn_commit(
-                    txn_idx,
-                    versioned_cache,
-                    scheduler,
-                    shared_counter,
-                    last_input_output,
-                    base_view,
-                    final_results,
-                );
-            }
-        };
+        let drain_commit_queue =
+            || -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
+                while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
+                    self.materialize_txn_commit(
+                        txn_idx,
+                        versioned_cache,
+                        scheduler,
+                        shared_counter,
+                        last_input_output,
+                        base_view,
+                        final_results,
+                    )?;
+                }
+                Ok(())
+            };
 
         loop {
             // Priorotize committing validated transactions
@@ -866,7 +982,7 @@ where
                 scheduler.queueing_commits_mark_done();
             }
 
-            drain_commit_queue();
+            drain_commit_queue()?;
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
@@ -910,7 +1026,7 @@ where
                 },
                 SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
-                    drain_commit_queue();
+                    drain_commit_queue()?;
                     break Ok(());
                 },
             }
@@ -1000,11 +1116,22 @@ where
     }
 
     fn apply_output_sequential(
-        unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         output: &E::Output,
-    ) {
+    ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         for (key, (write_op, layout)) in output.resource_write_set().into_iter() {
             unsync_map.write(key, write_op, layout);
+        }
+
+        // TODO[agg_v2](fix): provide layouts
+        for (group_key, _, group_ops) in output.resource_group_write_set().into_iter() {
+            for (value_tag, group_op) in group_ops.into_iter() {
+                unsync_map
+                    .insert_group_op(&group_key, value_tag, group_op)
+                    .map_err(|_| {
+                        PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError)
+                    })?;
+            }
         }
 
         for (key, write_op) in output
@@ -1061,6 +1188,8 @@ where
         for (id, value) in updates.into_iter() {
             unsync_map.write_delayed_field(id, value);
         }
+
+        Ok(())
     }
 
     // TODO[agg_v2][fix] Propagate code_invariant_error, to use second fallback.
@@ -1109,7 +1238,27 @@ where
                     counters::update_sequential_txn_gas_counters(&fee_statement);
 
                     // Apply the writes.
-                    Self::apply_output_sequential(&unsync_map, &output);
+                    // TODO: return code invariant error if dynamic change set optimizations disabled.
+                    Self::apply_output_sequential(&unsync_map, &output)
+                        .map_err(Error::FallbackToSequential)?;
+
+                    let group_metadata_ops = output.resource_group_metadata_ops();
+                    let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
+                    for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
+                        let finalized_group = unsync_map.finalize_group(&group_key);
+                        if finalized_group.is_empty() != group_metadata_op.is_deletion() {
+                            error!(
+                                "Group is empty = {} but op is deletion = {} in sequential execution",
+                                finalized_group.is_empty(),
+                                group_metadata_op.is_deletion()
+                            );
+                            // TODO: code invariant error if dynamic change set optimizations disabled.
+                            return Err(Error::FallbackToSequential(PanicOr::Or(
+                                IntentionalFallbackToSequential::ResourceGroupError,
+                            )));
+                        }
+                        finalized_groups.push((group_key, group_metadata_op, finalized_group));
+                    }
 
                     if dynamic_change_set_optimizations_enabled {
                         // Replace delayed field id with values in resource write set and read set.
@@ -1136,14 +1285,31 @@ where
                             &latest_view,
                         );
 
+                        // TODO[agg_v2]: patch group writes in finalized groups
+                        let serialized_groups = Self::serialize_groups(finalized_groups)
+                            .map_err(Error::FallbackToSequential)?;
+
+                        // TODO[agg_v2] patch resources in groups and provide explicitly
                         output.incorporate_materialized_txn_output(
                             // No aggregator v1 delta writes are needed for sequential execution.
                             vec![],
                             patched_resource_write_set,
                             patched_events,
+                            serialized_groups,
                         );
                     } else {
                         assert!(output.delayed_field_change_set().is_empty());
+
+                        // TODO[agg_v2]: fallback to no resource group capability instead of unwrap.
+                        let serialized_groups = Self::serialize_groups(finalized_groups)
+                            .map_err(Error::FallbackToSequential)?;
+
+                        output.incorporate_materialized_txn_output(
+                            vec![],
+                            BTreeMap::new(),
+                            vec![],
+                            serialized_groups,
+                        );
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
@@ -1251,11 +1417,10 @@ where
                 let can_use_dynamic_change_set_optimizations = match e {
                     PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
                         debug!("[Execution]: Module read & written, sequential fallback");
-                        true
-                    },
-                    PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
                         false
                     },
+                    PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction)
+                    | PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError) => false,
                     PanicOr::CodeInvariantError(msg) => {
                         error!(
                             "[Execution]: CodeInvariantError({:?}), sequential fallback",
@@ -1284,10 +1449,15 @@ where
         if let Err(Error::FallbackToSequential(e)) = &ret {
             match e {
                 PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
-                    panic!("ModulePathReadWrite shouldn't happen in sequential execution")
+                    unreachable!("ModulePathReadWrite shouldn't happen in sequential execution")
+                },
+                PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError) => {
+                    error!("[Execution]: Sequential fallback due to ResourceGroupError");
                 },
                 PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
-                    info!("[Execution]: DirectWriteSetTransaction found, during ModulePathReadWrite sequential fallback");
+                    info!(
+                        "[Execution]: DirectWriteSetTransaction found, during sequential fallback"
+                    );
                 },
                 PanicOr::CodeInvariantError(msg) => {
                     error!("[Execution]: CodeInvariantError({:?}) in sequential with dynamic_change_set_optimizations_enabled, sequential fallback", msg);

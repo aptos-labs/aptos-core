@@ -17,13 +17,15 @@ pub enum IntentionalFallbackToSequential {
     // on writes. WriteSetPayload::Direct cannot be processed to do so, as we get outputs directly.
     // We communicate to the executor to retry with capability disabled.
     DirectWriteSetTransaction,
+    /// We defensively check certain resource group related invariant violations.
+    ResourceGroupError,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error<E> {
     FallbackToSequential(PanicOr<IntentionalFallbackToSequential>),
     /// Execution of a thread yields a non-recoverable error, such error will be propagated back to
-    /// the caller.
+    /// the caller (leading to the block execution getting aborted). TODO: revisit name (UserError).
     UserError(E),
 }
 
