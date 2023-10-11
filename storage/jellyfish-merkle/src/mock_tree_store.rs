@@ -26,7 +26,7 @@ impl<K> Default for MockTreeStore<K> {
 
 impl<K> TreeReader<K> for MockTreeStore<K>
 where
-    K: crate::TestKey,
+    K: crate::Key,
 {
     fn get_node_option(&self, node_key: &NodeKey, _tag: &str) -> Result<Option<Node<K>>> {
         Ok(self.data.read().0.get(node_key).cloned())
@@ -54,7 +54,7 @@ where
 
 impl<K> TreeWriter<K> for MockTreeStore<K>
 where
-    K: crate::TestKey,
+    K: crate::Key + std::fmt::Debug + std::cmp::PartialEq,
 {
     fn write_node_batch(&self, node_batch: &NodeBatch<K>) -> Result<()> {
         let mut locked = self.data.write();
@@ -70,7 +70,7 @@ where
 
 impl<K> MockTreeStore<K>
 where
-    K: crate::TestKey,
+    K: crate::Key,
 {
     pub fn new(allow_overwrite: bool) -> Self {
         Self {
