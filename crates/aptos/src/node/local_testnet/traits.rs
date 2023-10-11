@@ -23,10 +23,10 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
     /// can use to make sure prerequisite services have started. These are also used
     /// by the "ready server", a server that exposes a unified endpoint for checking
     /// if all services are ready.
-    fn get_healthchecks(&self) -> HashSet<HealthChecker>;
+    fn get_health_checkers(&self) -> HashSet<HealthChecker>;
 
-    /// Whereas get_healthchecks returns healthchecks that other downstream services can
-    /// use, this should return health checkers for services that this service is
+    /// Whereas get_health_checkers returns healthchecks that other downstream services
+    /// can use, this should return health checkers for services that this service is
     /// waiting to start.
     //
     // Note: If we were using an object oriented language, we'd just make the

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::indexer_api::confirm_metadata_applied;
 use anyhow::{anyhow, Context, Result};
 use aptos_protos::indexer::v1::GetTransactionsRequest;
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection};
@@ -13,10 +14,12 @@ use tokio::time::Instant;
 const MAX_WAIT_S: u64 = 60;
 const WAIT_INTERVAL_MS: u64 = 200;
 
-/// This provides a single place to define a variety of different healthchecks.
+/// This provides a single place to define a variety of different healthchecks. In
+/// cases where the name of the service being checked isn't obvious, the enum will take
+/// a string arg that names it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 pub enum HealthChecker {
-    /// Check that an HTTP API is up. The second param is the name of the HTTP service.
+    /// Check that a HTTP API is up. The second param is the name of the HTTP service.
     Http(Url, String),
     /// Check that the node API is up. This is just a specific case of Http for extra
     /// guarantees around liveliness.
@@ -25,6 +28,9 @@ pub enum HealthChecker {
     DataServiceGrpc(Url),
     /// Check that a postgres instance is up.
     Postgres(String),
+    /// Check that the indexer API is up and the metadata has been applied. We only use
+    /// this one in the ready server.
+    IndexerApiMetadata(Url),
 }
 
 impl HealthChecker {
@@ -47,7 +53,7 @@ impl HealthChecker {
                     url.clone(),
                     Some(Duration::from_secs(5)),
                 )
-                .await;
+                .await?;
                 let request = tonic::Request::new(GetTransactionsRequest {
                     starting_version: Some(0),
                     ..Default::default()
@@ -68,6 +74,10 @@ impl HealthChecker {
                 AsyncPgConnection::establish(connection_string)
                     .await
                     .context("Failed to connect to postgres")?;
+                Ok(())
+            },
+            HealthChecker::IndexerApiMetadata(url) => {
+                confirm_metadata_applied(url.clone()).await?;
                 Ok(())
             },
         }
@@ -100,6 +110,7 @@ impl HealthChecker {
             HealthChecker::NodeApi(url) => url.as_str(),
             HealthChecker::DataServiceGrpc(url) => url.as_str(),
             HealthChecker::Postgres(url) => url.as_str(),
+            HealthChecker::IndexerApiMetadata(url) => url.as_str(),
         }
     }
 
@@ -119,6 +130,7 @@ impl std::fmt::Display for HealthChecker {
             HealthChecker::NodeApi(_) => write!(f, "Node API"),
             HealthChecker::DataServiceGrpc(_) => write!(f, "Transaction stream"),
             HealthChecker::Postgres(_) => write!(f, "Postgres"),
+            HealthChecker::IndexerApiMetadata(_) => write!(f, "Indexer API with metadata applied"),
         }
     }
 }

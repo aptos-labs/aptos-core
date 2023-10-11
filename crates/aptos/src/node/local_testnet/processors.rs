@@ -25,7 +25,7 @@ static RUN_MIGRATIONS_ONCE: OnceCell<bool> = OnceCell::const_new();
 pub struct ProcessorArgs {
     /// The value of this flag determines which processors we will run if
     /// --with-indexer-api is set. Note that some processors are not supported in the
-    /// local testnet (e.g. ANS). If you try to set those, an error will be thrown
+    /// local testnet (e.g. ANS). If you try to set those an error will be thrown
     /// immediately.
     #[clap(
         long,
@@ -77,7 +77,7 @@ impl ProcessorManager {
             ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor,
             ProcessorName::TokenProcessor => {
                 ProcessorConfig::TokenProcessor(TokenProcessorConfig {
-                    // This NFT points thing doesn't exist on local testnets.
+                    // This NFT points contract doesn't exist on local testnets.
                     nft_points_contract: None,
                 })
             },
@@ -150,7 +150,7 @@ impl ServiceManager for ProcessorManager {
         )
     }
 
-    fn get_healthchecks(&self) -> HashSet<HealthChecker> {
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         hashset![HealthChecker::Http(
             Url::parse(&format!(
                 "http://127.0.0.1:{}",
@@ -173,9 +173,10 @@ impl ServiceManager for ProcessorManager {
         // https://stackoverflow.com/q/54351783/3846032
         //
         // To fix this, we run the migrations ourselves here in the CLI first. We use
-        // std::sync::Once to make sure we only run the migration once even though we
-        // call all the processor service managers get to this point. This is safer
-        // than relying on coordiation outside of this manager.
+        // OnceCell to make sure we only run the migration once. When all the processor
+        // ServiceManagers reach this point, one of them will run the code and the rest
+        // will wait. Doing it at this point in the code is safer than relying on
+        // coordiation outside of this manager.
         RUN_MIGRATIONS_ONCE
             .get_or_init(|| async {
                 info!("Running DB migrations for the indexer processors");

@@ -58,7 +58,7 @@ pub fn prompt_yes(prompt: &str) -> bool {
     result.unwrap()
 }
 
-/// Convert any successful response to Success. If there is an error, show as JSON
+/// Convert any successful response to Success. If there is an error, show it as JSON
 /// unless `jsonify_error` is false.
 pub async fn to_common_success_result<T>(
     command: &str,
