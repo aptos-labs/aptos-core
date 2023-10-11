@@ -1,5 +1,12 @@
-import { getBlockByHeight, getBlockByVersion, getLedgerInfo, getTableItem, view } from "../internal/general";
-import { Block, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
+import {
+  getBlockByHeight,
+  getBlockByVersion,
+  getLedgerInfo,
+  getTableItem,
+  queryIndexer,
+  view,
+} from "../internal/general";
+import { Block, GraphqlQuery, LedgerInfo, LedgerVersion, MoveValue, TableItemRequest, ViewRequest } from "../types";
 import { AptosConfig } from "./aptos_config";
 
 /**
@@ -110,5 +117,29 @@ export class General {
   async view(args: { payload: ViewRequest; options?: LedgerVersion }): Promise<MoveValue> {
     const data = await view({ aptosConfig: this.config, ...args });
     return data[0];
+  }
+
+  /**
+   * A generic function for retrieving data from Aptos Indexer.
+   * For more detailed queries specification see
+   * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
+   *
+   * @param query A GraphQL query
+   * @example
+   * ```
+   * {
+   *  query: `query MyQuery {
+        ledger_infos {
+          chain_id
+        }
+      }`;
+   * }
+   * ```
+   *
+   * @return The provided T type
+   */
+  async queryIndexer<T>(args: { query: GraphqlQuery }): Promise<T> {
+    const response = await queryIndexer<T>({ aptosConfig: this.config, ...args });
+    return response;
   }
 }

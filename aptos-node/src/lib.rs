@@ -121,8 +121,8 @@ impl AptosNodeArgs {
                 .map(StdRng::from_seed)
                 .unwrap_or_else(StdRng::from_entropy);
             setup_test_environment_and_start_node(
-                self.config,
-                self.test_config_override,
+                &self.config,
+                &self.test_config_override,
                 None,
                 self.test_dir,
                 self.random_ports,
@@ -228,68 +228,66 @@ pub fn start(
     Ok(())
 }
 
-/// Creates a simple test environment and starts the node
-pub fn setup_test_environment_and_start_node<R>(
-    config_path: Option<PathBuf>,
-    test_config_override_path: Option<PathBuf>,
-    config: Option<NodeConfig>,
-    test_dir: Option<PathBuf>,
+/// Load a config based on a variety of different ways to provide config options. For
+/// more information about each argument and its precedence, see
+/// `setup_test_environment_and_start_node`.
+pub fn load_node_config<R>(
+    config_path: &Option<PathBuf>,
+    test_config_override_path: &Option<PathBuf>,
+    test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
-) -> anyhow::Result<()>
+) -> anyhow::Result<NodeConfig>
 where
     R: rand::RngCore + rand::CryptoRng,
 {
-    // If there wasn't a test directory specified, create a temporary one
-    let test_dir =
-        test_dir.unwrap_or_else(|| aptos_temppath::TempPath::new().as_ref().to_path_buf());
-
-    // Create the directories for the node
-    fs::DirBuilder::new().recursive(true).create(&test_dir)?;
-    let test_dir = test_dir.canonicalize()?;
-
     // The validator builder puts the first node in the 0 directory
     let validator_config_path = test_dir.join("0").join("node.yaml");
-    let aptos_root_key_path = test_dir.join("mint.key");
 
-    // If there's already a config, use it. Otherwise create a test one.
-    let config = if let Some(config) = config {
-        config
-    } else if validator_config_path.exists() {
+    let config = if validator_config_path.exists() {
         NodeConfig::load_from_path(&validator_config_path)
             .map_err(|error| anyhow!("Unable to load config: {:?}", error))?
     } else {
         // Create a test only config for a single validator node.
-        create_single_node_test_config(
-            &config_path,
-            &test_config_override_path,
-            &test_dir,
+        let config = create_single_node_test_config(
+            config_path,
+            test_config_override_path,
+            test_dir,
             random_ports,
             enable_lazy_mode,
             framework,
             rng,
-        )?
+        )?;
+        if let Some(ref test_config_override_path) = test_config_override_path {
+            println!(
+                "\tMerged default config with override from path: {:?}",
+                test_config_override_path
+            );
+        }
+        if let Some(ref config_path) = config_path {
+            println!("\tUsed user-provided config from path: {:?}", config_path);
+        }
+        config
     };
+
+    Ok(config)
+}
+
+/// Print details about a node config configured for a test environment and start it.
+pub fn start_test_environment_node(
+    config: NodeConfig,
+    test_dir: PathBuf,
+    enable_lazy_mode: bool,
+) -> anyhow::Result<()> {
+    let aptos_root_key_path = test_dir.join("mint.key");
 
     // Prepare log file since we cannot automatically route logs to stderr
     let log_file = test_dir.join("validator.log");
 
     // Print out useful information about the environment and the node
     println!("Completed generating configuration:");
-    if test_config_override_path.is_some() {
-        println!(
-            "\tMerged default config with override from path: {:?}",
-            test_config_override_path.unwrap()
-        );
-    }
-    if config_path.is_some() {
-        println!(
-            "\tUsed user-provided config from path: {:?}",
-            config_path.unwrap()
-        );
-    }
     println!("\tLog file: {:?}", log_file);
     println!("\tTest dir: {:?}", test_dir);
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
@@ -316,6 +314,57 @@ where
     println!("\nAptos is running, press ctrl-c to exit\n");
 
     start(config, Some(log_file), false)
+}
+
+/// Creates a simple test environment and starts the node.
+///
+/// You will notice many args referring to configs. Let's explain them:
+/// - `test_config_override_path` is the path to a config file that will be used as
+///   a template when building the final config. If not provided, a default template
+///   will be used. Many overrides are applied on top of this base config.
+/// - `config_path` is similar to `test_config_override_path`, but many of the
+///   overrides that are applied when using `test_config_override_path` are not
+///   applied when using `config_path`. Read the code for more info.
+/// - `config` is a complete NodeConfig. No overrides are applied on top of this if
+///    it is provided. If both `config` and `test_dir` are provided, `config` takes
+///    precedence.
+/// - `test_dir` is a directory that contains a config file. Much like `config`, the
+///   config read from this file is used without any overrides.
+pub fn setup_test_environment_and_start_node<R>(
+    config_path: &Option<PathBuf>,
+    test_config_override_path: &Option<PathBuf>,
+    config: Option<NodeConfig>,
+    test_dir: Option<PathBuf>,
+    random_ports: bool,
+    enable_lazy_mode: bool,
+    framework: &ReleaseBundle,
+    rng: R,
+) -> anyhow::Result<()>
+where
+    R: rand::RngCore + rand::CryptoRng,
+{
+    // If there wasn't a test directory specified, create a temporary one
+    let test_dir =
+        test_dir.unwrap_or_else(|| aptos_temppath::TempPath::new().as_ref().to_path_buf());
+
+    // Create the directories for the node
+    fs::DirBuilder::new().recursive(true).create(&test_dir)?;
+    let test_dir = test_dir.canonicalize()?;
+
+    let config = match config {
+        Some(config) => config,
+        None => load_node_config(
+            config_path,
+            test_config_override_path,
+            &test_dir,
+            random_ports,
+            enable_lazy_mode,
+            framework,
+            rng,
+        )?,
+    };
+
+    start_test_environment_node(config, test_dir, enable_lazy_mode)
 }
 
 /// Creates a single node test config, with a few config tweaks to reduce

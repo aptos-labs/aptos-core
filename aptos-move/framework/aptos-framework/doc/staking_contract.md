@@ -2192,6 +2192,7 @@ Initialize Store resource if this is the first time the staker has delegated to 
 Cannot create the staking contract if it already exists.
 
 
+
 <pre><code><b>pragma</b> verify_duration_estimate = 200;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_PreconditionsInCreateContract">PreconditionsInCreateContract</a>;
 <b>let</b> amount = coins.value;
@@ -2738,7 +2739,6 @@ a staking_contract exists for the staker/operator pair.
     <b>let</b> <b>post</b> post_store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
     <b>let</b> <b>post</b> post_staking_contracts = post_store.staking_contracts;
     <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_staking_contracts, operator);
-    <b>ensures</b> amount != 0 ==&gt; <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_staking_contracts, operator);
 }
 </code></pre>
 

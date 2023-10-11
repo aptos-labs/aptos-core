@@ -67,7 +67,6 @@ fn get_peer_information(peers_and_metadata: Arc<PeersAndMetadata>) -> String {
     for network in registered_networks {
         peer_information.push(format!("\t- Network: {}", network));
         if let Ok(trusted_peers) = peers_and_metadata.get_trusted_peers(&network) {
-            let trusted_peers = trusted_peers.read().clone();
             for trusted_peer in trusted_peers {
                 peer_information.push(format!("\t\t- Peer: {:?}", trusted_peer));
             }

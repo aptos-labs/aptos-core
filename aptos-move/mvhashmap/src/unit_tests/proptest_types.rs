@@ -271,10 +271,10 @@ where
                             if test_group {
                                 match map.group_data().read_from_group(
                                     &KeyType(key.clone()),
-                                    idx as TxnIndex,
                                     &5,
+                                    idx as TxnIndex,
                                 ) {
-                                    Ok((v, _)) => {
+                                    Ok((_, v)) => {
                                         assert_value(v);
                                         break;
                                     },

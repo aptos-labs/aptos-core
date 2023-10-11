@@ -157,6 +157,7 @@ impl SMRNode {
             quorum_store_storage,
             reconfig_listener,
             bounded_executor,
+            aptos_time_service::TimeService::real(),
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);

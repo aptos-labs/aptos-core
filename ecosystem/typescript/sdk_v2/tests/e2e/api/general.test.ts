@@ -1,5 +1,5 @@
 import { AptosConfig, Aptos } from "../../../src";
-import { ViewRequest } from "../../../src/types";
+import { GraphqlQuery, ViewRequest } from "../../../src/types";
 import { Network } from "../../../src/utils/api-endpoints";
 
 describe("general api", () => {
@@ -20,7 +20,7 @@ describe("general api", () => {
   test("it fetches block data by block height", async () => {
     const config = new AptosConfig({ network: Network.LOCAL });
     const aptos = new Aptos(config);
-    const blockHeight = 100;
+    const blockHeight = 1;
     const blockData = await aptos.getBlockByHeight({ blockHeight });
     expect(blockData.block_height).toBe(blockHeight.toString());
   });
@@ -77,5 +77,28 @@ describe("general api", () => {
       },
     });
     expect(parseInt(supply)).toBeGreaterThan(0);
+  });
+
+  test("it fetches data with a custom graphql query", async () => {
+    const config = new AptosConfig({ network: Network.TESTNET });
+    const aptos = new Aptos(config);
+
+    const query: GraphqlQuery = {
+      query: `query MyQuery {
+        ledger_infos {
+          chain_id
+        }
+      }`,
+    };
+
+    const chainId = await aptos.queryIndexer<{
+      ledger_infos: [
+        {
+          chain_id: number;
+        },
+      ];
+    }>({ query });
+
+    expect(chainId.ledger_infos[0].chain_id).toBe(2);
   });
 });

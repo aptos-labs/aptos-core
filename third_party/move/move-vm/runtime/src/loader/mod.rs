@@ -3,11 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::VMConfig,
-    data_cache::TransactionDataCache,
-    logging::expect_no_verification_errors,
-    native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
-    session::LoadedFunctionInstantiation,
+    config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
+    native_functions::NativeFunctions, session::LoadedFunctionInstantiation,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -15,10 +12,9 @@ use move_binary_format::{
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
         AbilitySet, Bytecode, CompiledModule, CompiledScript, Constant, ConstantPoolIndex,
-        FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex,
-        FunctionHandleIndex, FunctionInstantiationIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiationIndex, StructDefinition, StructDefinitionIndex,
-        StructFieldInformation, TableIndex, TypeParameterIndex, Visibility,
+        FieldHandleIndex, FieldInstantiationIndex, FunctionDefinitionIndex, FunctionHandleIndex,
+        FunctionInstantiationIndex, Signature, SignatureIndex, StructDefInstantiationIndex,
+        StructDefinitionIndex, StructFieldInformation, TableIndex, TypeParameterIndex,
     },
     IndexKind,
 };
@@ -29,18 +25,22 @@ use move_core_types::{
     value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{
-    CachedStructIndex, DepthFormula, StructType, Type,
-};
+use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructIdentifier, StructType, Type};
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet, HashMap},
-    fmt::Debug,
     hash::Hash,
     sync::Arc,
 };
-use tracing::error;
+
+mod function;
+mod modules;
+mod type_loader;
+
+pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
+pub(crate) use modules::{Module, ModuleCache};
+use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
 
@@ -48,7 +48,7 @@ type ScriptHash = [u8; 32];
 // Values are forced into a `Arc` so they can be used from multiple thread.
 // Access to this cache is always under a `RwLock`.
 #[derive(Clone)]
-struct BinaryCache<K, V> {
+pub(crate) struct BinaryCache<K, V> {
     id_map: HashMap<K, usize>,
     binaries: Vec<Arc<V>>,
 }
@@ -120,447 +120,6 @@ impl ScriptCache {
                 )
             },
         }
-    }
-}
-
-// A ModuleCache is the core structure in the Loader.
-// It holds all Modules, Types and Functions loaded.
-// Types and Functions are pushed globally to the ModuleCache.
-// All accesses to the ModuleCache are under lock (exclusive).
-#[derive(Clone)]
-pub struct ModuleCache {
-    modules: BinaryCache<ModuleId, Module>,
-    structs: Vec<Arc<StructType>>,
-    functions: Vec<Arc<Function>>,
-}
-
-impl ModuleCache {
-    fn new() -> Self {
-        Self {
-            modules: BinaryCache::new(),
-            structs: vec![],
-            functions: vec![],
-        }
-    }
-
-    //
-    // Common "get" operations
-    //
-
-    // Retrieve a module by `ModuleId`. The module may have not been loaded yet in which
-    // case `None` is returned
-    fn module_at(&self, id: &ModuleId) -> Option<Arc<Module>> {
-        self.modules.get(id).map(Arc::clone)
-    }
-
-    // Retrieve a function by index
-    fn function_at(&self, idx: usize) -> Arc<Function> {
-        Arc::clone(&self.functions[idx])
-    }
-
-    // Retrieve a struct by index
-    fn struct_at(&self, idx: CachedStructIndex) -> Arc<StructType> {
-        Arc::clone(&self.structs[idx.0])
-    }
-
-    //
-    // Insertion is under lock and it's a pretty heavy operation.
-    // The VM is pretty much stopped waiting for this to finish
-    //
-
-    fn insert(
-        &mut self,
-        natives: &NativeFunctions,
-        id: ModuleId,
-        module: CompiledModule,
-    ) -> VMResult<Arc<Module>> {
-        if let Some(cached) = self.module_at(&id) {
-            return Ok(cached);
-        }
-
-        // we need this operation to be transactional, if an error occurs we must
-        // leave a clean state
-        self.add_module(natives, &module)?;
-        match Module::new(module, self) {
-            Ok(module) => Ok(Arc::clone(self.modules.insert(id, module))),
-            Err((err, module)) => {
-                // remove all structs and functions that have been pushed
-                let strut_def_count = module.struct_defs().len();
-                self.structs.truncate(self.structs.len() - strut_def_count);
-                let function_count = module.function_defs().len();
-                self.functions
-                    .truncate(self.functions.len() - function_count);
-                Err(err.finish(Location::Undefined))
-            },
-        }
-    }
-
-    fn add_module(&mut self, natives: &NativeFunctions, module: &CompiledModule) -> VMResult<()> {
-        let starting_idx = self.structs.len();
-        for (idx, struct_def) in module.struct_defs().iter().enumerate() {
-            let st = self.make_struct_type(module, struct_def, StructDefinitionIndex(idx as u16));
-            self.structs.push(Arc::new(st));
-        }
-        self.load_field_types(module, starting_idx).map_err(|err| {
-            // clean up the structs that were cached
-            self.structs.truncate(starting_idx);
-            err.finish(Location::Undefined)
-        })?;
-
-        let struct_defs_len = module.struct_defs.len();
-
-        let mut depth_cache = BTreeMap::new();
-
-        for cached_idx in starting_idx..(starting_idx + struct_defs_len) {
-            self.calculate_depth_of_struct(CachedStructIndex(cached_idx), &mut depth_cache)
-                .map_err(|err| err.finish(Location::Undefined))?;
-        }
-        debug_assert!(depth_cache.len() == struct_defs_len);
-        for (cache_idx, depth) in depth_cache {
-            match Arc::get_mut(self.structs.get_mut(cache_idx.0).unwrap()) {
-                Some(struct_type) => struct_type.depth = Some(depth),
-                None => {
-                    // we have pending references to the `Arc` which is impossible,
-                    // given the code that adds the `Arc` is above and no reference to
-                    // it should exist.
-                    // So in the spirit of not crashing we just leave it as None and
-                    // log the issue.
-                    error!("Arc<StructType> cannot have any live reference while publishing");
-                },
-            }
-        }
-
-        for (idx, func) in module.function_defs().iter().enumerate() {
-            let findex = FunctionDefinitionIndex(idx as TableIndex);
-            let mut function = Function::new(natives, findex, func, module);
-            function.return_types = function
-                .return_
-                .0
-                .iter()
-                .map(|tok| self.make_type_while_loading(module, tok))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))?;
-            function.local_types = function
-                .locals
-                .0
-                .iter()
-                .map(|tok| self.make_type_while_loading(module, tok))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))?;
-            function.parameter_types = function
-                .parameters
-                .0
-                .iter()
-                .map(|tok| self.make_type_while_loading(module, tok))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))?;
-            self.functions.push(Arc::new(function));
-        }
-        Ok(())
-    }
-
-    fn make_struct_type(
-        &self,
-        module: &CompiledModule,
-        struct_def: &StructDefinition,
-        idx: StructDefinitionIndex,
-    ) -> StructType {
-        let struct_handle = module.struct_handle_at(struct_def.struct_handle);
-        let field_names = match &struct_def.field_information {
-            StructFieldInformation::Native => vec![],
-            StructFieldInformation::Declared(field_info) => field_info
-                .iter()
-                .map(|f| module.identifier_at(f.name).to_owned())
-                .collect(),
-        };
-        let abilities = struct_handle.abilities;
-        let name = module.identifier_at(struct_handle.name).to_owned();
-        let type_parameters = struct_handle.type_parameters.clone();
-        let module = module.self_id();
-        StructType {
-            fields: vec![],
-            field_names,
-            abilities,
-            type_parameters,
-            name,
-            module,
-            struct_def: idx,
-            depth: None,
-        }
-    }
-
-    fn load_field_types(
-        &mut self,
-        module: &CompiledModule,
-        starting_idx: usize,
-    ) -> PartialVMResult<()> {
-        let mut field_types = vec![];
-        for struct_def in module.struct_defs() {
-            let fields = match &struct_def.field_information {
-                StructFieldInformation::Native => unreachable!("native structs have been removed"),
-                StructFieldInformation::Declared(fields) => fields,
-            };
-
-            let mut field_tys = vec![];
-            for field in fields {
-                let ty = self.make_type_while_loading(module, &field.signature.0)?;
-                debug_assert!(field_tys.len() < usize::max_value());
-                field_tys.push(ty);
-            }
-
-            field_types.push(field_tys);
-        }
-        let mut struct_idx = starting_idx;
-        for fields in field_types {
-            match Arc::get_mut(&mut self.structs[struct_idx]) {
-                Some(struct_type) => struct_type.fields = fields,
-                None => {
-                    // we have pending references to the `Arc` which is impossible,
-                    // given the code that adds the `Arc` is above and no reference to
-                    // it should exist.
-                    // So in the spirit of not crashing we just rewrite the entire `Arc`
-                    // over and log the issue.
-                    error!("Arc<StructType> cannot have any live reference while publishing");
-                    let mut struct_type = (*self.structs[struct_idx]).clone();
-                    struct_type.fields = fields;
-                    self.structs[struct_idx] = Arc::new(struct_type);
-                },
-            }
-            struct_idx += 1;
-        }
-        Ok(())
-    }
-
-    // `make_type` is the entry point to "translate" a `SignatureToken` to a `Type`
-    fn make_type(&self, module: BinaryIndexedView, tok: &SignatureToken) -> PartialVMResult<Type> {
-        Self::make_type_internal(module, tok, &|struct_name, module_id| {
-            Ok(self.resolve_struct_by_name(struct_name, module_id)?.0)
-        })
-    }
-
-    // While in the process of loading, and before a `Module` is saved into the cache the loader
-    // needs to resolve type references to the module itself (self) "manually"; that is,
-    // looping through the types of the module itself
-    fn make_type_while_loading(
-        &self,
-        module: &CompiledModule,
-        tok: &SignatureToken,
-    ) -> PartialVMResult<Type> {
-        let self_id = module.self_id();
-        Self::make_type_internal(
-            BinaryIndexedView::Module(module),
-            tok,
-            &|struct_name, module_id| {
-                if module_id == &self_id {
-                    // module has not been published yet, loop through the types
-                    for (idx, struct_type) in self.structs.iter().enumerate().rev() {
-                        if &struct_type.module != module_id {
-                            break;
-                        }
-                        if struct_type.name.as_ident_str() == struct_name {
-                            return Ok(CachedStructIndex(idx));
-                        }
-                    }
-                    Err(
-                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
-                            format!(
-                                "Cannot find {:?}::{:?} in publishing module",
-                                module_id, struct_name
-                            ),
-                        ),
-                    )
-                } else {
-                    Ok(self.resolve_struct_by_name(struct_name, module_id)?.0)
-                }
-            },
-        )
-    }
-
-    // `make_type_internal` returns a `Type` given a signature and a resolver which
-    // is resonsible to map a local struct index to a global one
-    fn make_type_internal<F>(
-        module: BinaryIndexedView,
-        tok: &SignatureToken,
-        resolver: &F,
-    ) -> PartialVMResult<Type>
-    where
-        F: Fn(&IdentStr, &ModuleId) -> PartialVMResult<CachedStructIndex>,
-    {
-        let res = match tok {
-            SignatureToken::Bool => Type::Bool,
-            SignatureToken::U8 => Type::U8,
-            SignatureToken::U16 => Type::U16,
-            SignatureToken::U32 => Type::U32,
-            SignatureToken::U64 => Type::U64,
-            SignatureToken::U128 => Type::U128,
-            SignatureToken::U256 => Type::U256,
-            SignatureToken::Address => Type::Address,
-            SignatureToken::Signer => Type::Signer,
-            SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
-            SignatureToken::Vector(inner_tok) => {
-                let inner_type = Self::make_type_internal(module, inner_tok, resolver)?;
-                Type::Vector(Box::new(inner_type))
-            },
-            SignatureToken::Reference(inner_tok) => {
-                let inner_type = Self::make_type_internal(module, inner_tok, resolver)?;
-                Type::Reference(Box::new(inner_type))
-            },
-            SignatureToken::MutableReference(inner_tok) => {
-                let inner_type = Self::make_type_internal(module, inner_tok, resolver)?;
-                Type::MutableReference(Box::new(inner_type))
-            },
-            SignatureToken::Struct(sh_idx) => {
-                let struct_handle = module.struct_handle_at(*sh_idx);
-                let struct_name = module.identifier_at(struct_handle.name);
-                let module_handle = module.module_handle_at(struct_handle.module);
-                let module_id = ModuleId::new(
-                    *module.address_identifier_at(module_handle.address),
-                    module.identifier_at(module_handle.name).to_owned(),
-                );
-                let def_idx = resolver(struct_name, &module_id)?;
-                Type::Struct(def_idx)
-            },
-            SignatureToken::StructInstantiation(sh_idx, tys) => {
-                let type_parameters: Vec<_> = tys
-                    .iter()
-                    .map(|tok| Self::make_type_internal(module, tok, resolver))
-                    .collect::<PartialVMResult<_>>()?;
-                let struct_handle = module.struct_handle_at(*sh_idx);
-                let struct_name = module.identifier_at(struct_handle.name);
-                let module_handle = module.module_handle_at(struct_handle.module);
-                let module_id = ModuleId::new(
-                    *module.address_identifier_at(module_handle.address),
-                    module.identifier_at(module_handle.name).to_owned(),
-                );
-                let def_idx = resolver(struct_name, &module_id)?;
-                Type::StructInstantiation(def_idx, type_parameters)
-            },
-        };
-        Ok(res)
-    }
-
-    // Given a module id, returns whether the module cache has the module or not
-    fn has_module(&self, module_id: &ModuleId) -> bool {
-        self.modules.id_map.contains_key(module_id)
-    }
-
-    // Given a ModuleId::struct_name, retrieve the `StructType` and the index associated.
-    // Return and error if the type has not been loaded
-    fn resolve_struct_by_name(
-        &self,
-        struct_name: &IdentStr,
-        module_id: &ModuleId,
-    ) -> PartialVMResult<(CachedStructIndex, Arc<StructType>)> {
-        match self
-            .modules
-            .get(module_id)
-            .and_then(|module| module.struct_map.get(struct_name))
-        {
-            Some(struct_idx) => Ok((*struct_idx, Arc::clone(&self.structs[struct_idx.0]))),
-            None => Err(
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(format!(
-                    "Cannot find {:?}::{:?} in cache",
-                    module_id, struct_name
-                )),
-            ),
-        }
-    }
-
-    // Given a ModuleId::func_name, retrieve the `StructType` and the index associated.
-    // Return and error if the function has not been loaded
-    fn resolve_function_by_name(
-        &self,
-        func_name: &IdentStr,
-        module_id: &ModuleId,
-    ) -> PartialVMResult<usize> {
-        match self
-            .modules
-            .get(module_id)
-            .and_then(|module| module.function_map.get(func_name))
-        {
-            Some(func_idx) => Ok(*func_idx),
-            None => Err(
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                    "Cannot find {:?}::{:?} in cache",
-                    module_id, func_name
-                )),
-            ),
-        }
-    }
-
-    fn calculate_depth_of_struct(
-        &self,
-        def_idx: CachedStructIndex,
-        depth_cache: &mut BTreeMap<CachedStructIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        let struct_type = &self.struct_at(def_idx);
-
-        // If we've already computed this structs depth, no more work remains to be done.
-        if let Some(form) = &struct_type.depth {
-            return Ok(form.clone());
-        }
-        if let Some(form) = depth_cache.get(&def_idx) {
-            return Ok(form.clone());
-        }
-
-        let formulas = struct_type
-            .fields
-            .iter()
-            .map(|field_type| self.calculate_depth_of_type(field_type, depth_cache))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let formula = DepthFormula::normalize(formulas);
-        let prev = depth_cache.insert(def_idx, formula.clone());
-        if prev.is_some() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Recursive type?".to_owned()),
-            );
-        }
-        Ok(formula)
-    }
-
-    fn calculate_depth_of_type(
-        &self,
-        ty: &Type,
-        depth_cache: &mut BTreeMap<CachedStructIndex, DepthFormula>,
-    ) -> PartialVMResult<DepthFormula> {
-        Ok(match ty {
-            Type::Bool
-            | Type::U8
-            | Type::U64
-            | Type::U128
-            | Type::Address
-            | Type::Signer
-            | Type::U16
-            | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
-            Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, depth_cache)?;
-                inner.scale(1);
-                inner
-            },
-            Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
-            Type::Struct(cache_idx) => {
-                let mut struct_formula = self.calculate_depth_of_struct(*cache_idx, depth_cache)?;
-                debug_assert!(struct_formula.terms.is_empty());
-                struct_formula.scale(1);
-                struct_formula
-            },
-            Type::StructInstantiation(cache_idx, ty_args) => {
-                let ty_arg_map = ty_args
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, ty)| {
-                        let var = idx as TypeParameterIndex;
-                        Ok((var, self.calculate_depth_of_type(ty, depth_cache)?))
-                    })
-                    .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(*cache_idx, depth_cache)?;
-                let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
-                subst_struct_formula.scale(1);
-                subst_struct_formula
-            },
-        })
     }
 }
 
@@ -824,36 +383,15 @@ impl Loader {
         data_store: &TransactionDataCache,
     ) -> VMResult<(Arc<Module>, Arc<Function>, Vec<Type>, Vec<Type>)> {
         let module = self.load_module(module_id, data_store)?;
-        let idx = self
+        let func = self
             .module_cache
             .read()
             .resolve_function_by_name(function_name, module_id)
             .map_err(|err| err.finish(Location::Undefined))?;
-        let func = self.module_cache.read().function_at(idx);
 
-        let parameters = func
-            .parameters
-            .0
-            .iter()
-            .map(|tok| {
-                self.module_cache
-                    .read()
-                    .make_type(BinaryIndexedView::Module(module.module()), tok)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+        let parameters = func.parameter_types().to_vec();
 
-        let return_ = func
-            .return_
-            .0
-            .iter()
-            .map(|tok| {
-                self.module_cache
-                    .read()
-                    .make_type(BinaryIndexedView::Module(module.module()), tok)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
-            .map_err(|err| err.finish(Location::Undefined))?;
+        let return_ = func.return_types().to_vec();
 
         Ok((module, func, parameters, return_))
     }
@@ -881,12 +419,26 @@ impl Loader {
             | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
+            // Abilities should not contribute to the equality check as they just serve for caching computations.
             // For structs the both need to be the same struct.
-            (Type::Struct(ret_idx), Type::Struct(expected_idx)) => *ret_idx == *expected_idx,
+            (
+                Type::Struct { name: ret_idx, .. },
+                Type::Struct {
+                    name: expected_idx, ..
+                },
+            ) => *ret_idx == *expected_idx,
             // For struct instantiations we need to additionally match all type arguments
             (
-                Type::StructInstantiation(ret_idx, ret_fields),
-                Type::StructInstantiation(expected_idx, expected_fields),
+                Type::StructInstantiation {
+                    name: ret_idx,
+                    ty_args: ret_fields,
+                    ..
+                },
+                Type::StructInstantiation {
+                    name: expected_idx,
+                    ty_args: expected_fields,
+                    ..
+                },
             ) => {
                 *ret_idx == *expected_idx
                     && ret_fields.len() == expected_fields.len()
@@ -917,8 +469,8 @@ impl Loader {
             | (Type::Bool, _)
             | (Type::Address, _)
             | (Type::Signer, _)
-            | (Type::Struct(_), _)
-            | (Type::StructInstantiation(_, _), _)
+            | (Type::Struct { .. }, _)
+            | (Type::StructInstantiation { .. }, _)
             | (Type::Vector(_), _)
             | (Type::MutableReference(_), _)
             | (Type::Reference(_), _) => false,
@@ -1188,14 +740,17 @@ impl Loader {
             TypeTag::Struct(struct_tag) => {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store)?;
-                let (idx, struct_type) = self
+                let struct_type = self
                     .module_cache
                     .read()
                     // GOOD module was loaded above
                     .resolve_struct_by_name(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
-                    Type::Struct(idx)
+                    Type::Struct {
+                        name: struct_type.name.clone(),
+                        ability: struct_type.abilities,
+                    }
                 } else {
                     let mut type_params = vec![];
                     for ty_param in &struct_tag.type_params {
@@ -1203,7 +758,12 @@ impl Loader {
                     }
                     self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
                         .map_err(|e| e.finish(Location::Undefined))?;
-                    Type::StructInstantiation(idx, type_params)
+                    Type::StructInstantiation {
+                        name: struct_type.name.clone(),
+                        ty_args: Arc::new(type_params),
+                        base_ability_set: struct_type.abilities,
+                        phantom_ty_args_mask: struct_type.phantom_ty_args_mask.clone(),
+                    }
                 }
             },
         })
@@ -1522,7 +1082,10 @@ impl Loader {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
                 }
             },
-            Type::StructInstantiation(_, struct_inst) => {
+            Type::StructInstantiation {
+                ty_args: struct_inst,
+                ..
+            } => {
                 let mut sum_nodes = 1u64;
                 for ty in ty_args.iter().chain(struct_inst.iter()) {
                     sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
@@ -1534,7 +1097,7 @@ impl Loader {
             Type::Address
             | Type::Bool
             | Type::Signer
-            | Type::Struct(_)
+            | Type::Struct { .. }
             | Type::TyParam(_)
             | Type::U8
             | Type::U16
@@ -1561,7 +1124,7 @@ impl Loader {
             ));
         }
         for (ty, expected_k) in ty_args.iter().zip(constraints) {
-            if !expected_k.is_subset(self.abilities(ty)?) {
+            if !expected_k.is_subset(ty.abilities()?) {
                 return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
             }
         }
@@ -1572,8 +1135,22 @@ impl Loader {
     // Internal helpers
     //
 
-    fn function_at(&self, idx: usize) -> Arc<Function> {
-        self.module_cache.read().function_at(idx)
+    fn function_at(&self, handle: &FunctionHandle) -> PartialVMResult<Arc<Function>> {
+        match handle {
+            FunctionHandle::Local(func) => Ok(func.clone()),
+            FunctionHandle::Remote { module, name } => {
+                self.get_module(module)
+                    .and_then(|module| {
+                        let idx = module.function_map.get(name)?;
+                        module.function_defs.get(*idx).cloned()
+                    })
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE).with_message(
+                            format!("Failed to resolve function: {:?}::{:?}", module, name),
+                        )
+                    })
+            },
+        }
     }
 
     pub(crate) fn get_module(&self, idx: &ModuleId) -> Option<Arc<Module>> {
@@ -1590,52 +1167,13 @@ impl Loader {
         )
     }
 
-    pub(crate) fn get_struct_type(&self, idx: CachedStructIndex) -> Option<Arc<StructType>> {
-        self.module_cache.read().structs.get(idx.0).map(Arc::clone)
-    }
-
-    pub(crate) fn abilities(&self, ty: &Type) -> PartialVMResult<AbilitySet> {
-        match ty {
-            Type::Bool
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256
-            | Type::Address => Ok(AbilitySet::PRIMITIVES),
-
-            // Technically unreachable but, no point in erroring if we don't have to
-            Type::Reference(_) | Type::MutableReference(_) => Ok(AbilitySet::REFERENCES),
-            Type::Signer => Ok(AbilitySet::SIGNER),
-
-            Type::TyParam(_) => Err(PartialVMError::new(StatusCode::UNREACHABLE).with_message(
-                "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
-            )),
-
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    self.abilities(ty)?
-                ])
-            },
-            Type::Struct(idx) => Ok(self.module_cache.read().struct_at(*idx).abilities),
-            Type::StructInstantiation(idx, type_args) => {
-                let struct_type = self.module_cache.read().struct_at(*idx);
-                let declared_phantom_parameters = struct_type
-                    .type_parameters
-                    .iter()
-                    .map(|param| param.is_phantom);
-                let type_argument_abilities = type_args
-                    .iter()
-                    .map(|arg| self.abilities(arg))
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                AbilitySet::polymorphic_abilities(
-                    struct_type.abilities,
-                    declared_phantom_parameters,
-                    type_argument_abilities,
-                )
-            },
-        }
+    pub(crate) fn get_struct_type_by_identifier(
+        &self,
+        name: &StructIdentifier,
+    ) -> PartialVMResult<Arc<StructType>> {
+        self.module_cache
+            .read()
+            .resolve_struct_by_name(&name.name, &name.module)
     }
 }
 
@@ -1683,7 +1221,10 @@ impl<'a> Resolver<'a> {
     // Function resolution
     //
 
-    pub(crate) fn function_from_handle(&self, idx: FunctionHandleIndex) -> Arc<Function> {
+    pub(crate) fn function_from_handle(
+        &self,
+        idx: FunctionHandleIndex,
+    ) -> PartialVMResult<Arc<Function>> {
         let idx = match &self.binary {
             BinaryType::Module(module) => module.function_at(idx.0),
             BinaryType::Script(script) => script.function_at(idx.0),
@@ -1694,12 +1235,12 @@ impl<'a> Resolver<'a> {
     pub(crate) fn function_from_instantiation(
         &self,
         idx: FunctionInstantiationIndex,
-    ) -> Arc<Function> {
+    ) -> PartialVMResult<Arc<Function>> {
         let func_inst = match &self.binary {
             BinaryType::Module(module) => module.function_instantiation_at(idx.0),
             BinaryType::Script(script) => script.function_instantiation_at(idx.0),
         };
-        self.loader.function_at(func_inst.handle)
+        self.loader.function_at(&func_inst.handle)
     }
 
     pub(crate) fn instantiate_generic_function(
@@ -1740,15 +1281,18 @@ impl<'a> Resolver<'a> {
     // Type resolution
     //
 
-    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> Type {
+    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> PartialVMResult<Type> {
         let struct_def = match &self.binary {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Type::Struct(struct_def)
+        Ok(Type::Struct {
+            name: struct_def.name.clone(),
+            ability: struct_def.abilities,
+        })
     }
 
-    pub(crate) fn instantiate_generic_type(
+    pub(crate) fn get_struct_type_generic(
         &self,
         idx: StructDefInstantiationIndex,
         ty_args: &[Type],
@@ -1770,33 +1314,33 @@ impl<'a> Resolver<'a> {
             }
         }
 
-        Ok(Type::StructInstantiation(
-            struct_inst.def,
-            struct_inst
-                .instantiation
-                .iter()
-                .map(|ty| self.subst(ty, ty_args))
-                .collect::<PartialVMResult<_>>()?,
-        ))
+        let struct_ = &struct_inst.definition_struct_type;
+        Ok(Type::StructInstantiation {
+            name: struct_.name.clone(),
+            ty_args: Arc::new(
+                struct_inst
+                    .instantiation
+                    .iter()
+                    .map(|ty| self.subst(ty, ty_args))
+                    .collect::<PartialVMResult<_>>()?,
+            ),
+            base_ability_set: struct_.abilities,
+            phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
+        })
     }
 
     pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
-        let handle = match &self.binary {
-            BinaryType::Module(module) => &module.field_handles[idx.0 as usize],
+        match &self.binary {
+            BinaryType::Module(module) => {
+                let handle = &module.field_handles[idx.0 as usize];
+
+                Ok(handle.definition_struct_type.fields[handle.offset].clone())
+            },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
-        };
-        Ok(self
-            .loader
-            .get_struct_type(handle.owner)
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?
-            .fields[handle.offset]
-            .clone())
+        }
     }
 
-    pub(crate) fn instantiate_generic_field(
+    pub(crate) fn get_field_type_generic(
         &self,
         idx: FieldInstantiationIndex,
         ty_args: &[Type],
@@ -1805,34 +1349,24 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => &module.field_instantiations[idx.0 as usize],
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = self
-            .loader
-            .get_struct_type(field_instantiation.owner)
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?;
 
         let instantiation_types = field_instantiation
             .instantiation
             .iter()
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        struct_type.fields[field_instantiation.offset].subst(&instantiation_types)
+        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
+            .subst(&instantiation_types)
     }
 
     pub(crate) fn get_struct_fields(
         &self,
         idx: StructDefinitionIndex,
     ) -> PartialVMResult<Arc<StructType>> {
-        let idx = match &self.binary {
-            BinaryType::Module(module) => module.struct_at(idx),
+        match &self.binary {
+            BinaryType::Module(module) => Ok(module.struct_at(idx)),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
-        };
-        self.loader.get_struct_type(idx).ok_or_else(|| {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Struct Definition not resolved".to_string())
-        })
+        }
     }
 
     pub(crate) fn instantiate_generic_struct_fields(
@@ -1844,13 +1378,7 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        let struct_type = self
-            .loader
-            .get_struct_type(struct_inst.def)
-            .ok_or_else(|| {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Struct Definition not resolved".to_string())
-            })?;
+        let struct_type = &struct_inst.definition_struct_type;
 
         let instantiation_types = struct_inst
             .instantiation
@@ -1920,9 +1448,15 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
+    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
         match &self.binary {
-            BinaryType::Module(module) => Type::Struct(module.field_handles[idx.0 as usize].owner),
+            BinaryType::Module(module) => {
+                let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
+                Ok(Type::Struct {
+                    name: struct_.name.clone(),
+                    ability: struct_.abilities,
+                })
+            },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
     }
@@ -1933,14 +1467,21 @@ impl<'a> Resolver<'a> {
         args: &[Type],
     ) -> PartialVMResult<Type> {
         match &self.binary {
-            BinaryType::Module(module) => Ok(Type::StructInstantiation(
-                module.field_instantiations[idx.0 as usize].owner,
-                module.field_instantiations[idx.0 as usize]
-                    .instantiation
-                    .iter()
-                    .map(|ty| ty.subst(args))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            )),
+            BinaryType::Module(module) => {
+                let struct_ = &module.field_instantiations[idx.0 as usize].definition_struct_type;
+                Ok(Type::StructInstantiation {
+                    name: struct_.name.clone(),
+                    ty_args: Arc::new(
+                        module.field_instantiations[idx.0 as usize]
+                            .instantiation
+                            .iter()
+                            .map(|ty| ty.subst(args))
+                            .collect::<PartialVMResult<Vec<_>>>()?,
+                    ),
+                    base_ability_set: struct_.abilities,
+                    phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
+                })
+            },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
     }
@@ -1962,297 +1503,6 @@ impl<'a> Resolver<'a> {
     }
 }
 
-// A Module is very similar to a binary Module but data is "transformed" to a representation
-// more appropriate to execution.
-// When code executes indexes in instructions are resolved against those runtime structure
-// so that any data needed for execution is immediately available
-#[derive(Debug, Clone)]
-pub(crate) struct Module {
-    #[allow(dead_code)]
-    id: ModuleId,
-    // primitive pools
-    module: Arc<CompiledModule>,
-
-    //
-    // types as indexes into the Loader type list
-    //
-
-    // struct references carry the index into the global vector of types.
-    // That is effectively an indirection over the ref table:
-    // the instruction carries an index into this table which contains the index into the
-    // glabal table of types. No instantiation of generic types is saved into the global table.
-    #[allow(dead_code)]
-    struct_refs: Vec<CachedStructIndex>,
-    structs: Vec<StructDef>,
-    // materialized instantiations, whether partial or not
-    struct_instantiations: Vec<StructInstantiation>,
-
-    // functions as indexes into the Loader function list
-    // That is effectively an indirection over the ref table:
-    // the instruction carries an index into this table which contains the index into the
-    // glabal table of functions. No instantiation of generic functions is saved into
-    // the global table.
-    function_refs: Vec<usize>,
-    // materialized instantiations, whether partial or not
-    function_instantiations: Vec<FunctionInstantiation>,
-
-    // fields as a pair of index, first to the type, second to the field position in that type
-    field_handles: Vec<FieldHandle>,
-    // materialized instantiations, whether partial or not
-    field_instantiations: Vec<FieldInstantiation>,
-
-    // function name to index into the Loader function list.
-    // This allows a direct access from function name to `Function`
-    function_map: HashMap<Identifier, usize>,
-    // struct name to index into the Loader type list
-    // This allows a direct access from struct name to `Struct`
-    struct_map: HashMap<Identifier, CachedStructIndex>,
-
-    // a map of single-token signature indices to type.
-    // Single-token signatures are usually indexed by the `SignatureIndex` in bytecode. For example,
-    // `VecMutBorrow(SignatureIndex)`, the `SignatureIndex` maps to a single `SignatureToken`, and
-    // hence, a single type.
-    single_signature_token_map: BTreeMap<SignatureIndex, Type>,
-}
-
-impl Module {
-    fn new(
-        module: CompiledModule,
-        cache: &ModuleCache,
-    ) -> Result<Self, (PartialVMError, CompiledModule)> {
-        let id = module.self_id();
-
-        let mut struct_refs = vec![];
-        let mut structs = vec![];
-        let mut struct_instantiations = vec![];
-        let mut function_refs = vec![];
-        let mut function_instantiations = vec![];
-        let mut field_handles = vec![];
-        let mut field_instantiations: Vec<FieldInstantiation> = vec![];
-        let mut function_map = HashMap::new();
-        let mut struct_map = HashMap::new();
-        let mut single_signature_token_map = BTreeMap::new();
-
-        let mut create = || {
-            for struct_handle in module.struct_handles() {
-                let struct_name = module.identifier_at(struct_handle.name);
-                let module_handle = module.module_handle_at(struct_handle.module);
-                let module_id = module.module_id_for_handle(module_handle);
-                if module_id == id {
-                    // module has not been published yet, loop through the types in reverse order.
-                    // At this point all the types of the module are in the type list but not yet
-                    // exposed through the module cache. The implication is that any resolution
-                    // to types of the module being loaded is going to fail.
-                    // So we manually go through the types and find the proper index
-                    for (idx, struct_type) in cache.structs.iter().enumerate().rev() {
-                        if struct_type.module != module_id {
-                            return Err(PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
-                                .with_message(format!(
-                                    "Cannot find {:?}::{:?} in publishing module",
-                                    module_id, struct_name
-                                )));
-                        }
-                        if struct_type.name.as_ident_str() == struct_name {
-                            struct_refs.push(CachedStructIndex(idx));
-                            break;
-                        }
-                    }
-                } else {
-                    struct_refs.push(cache.resolve_struct_by_name(struct_name, &module_id)?.0);
-                }
-            }
-
-            for struct_def in module.struct_defs() {
-                let idx = struct_refs[struct_def.struct_handle.0 as usize];
-                let field_count = cache.structs[idx.0].fields.len() as u16;
-                structs.push(StructDef { field_count, idx });
-                let name =
-                    module.identifier_at(module.struct_handle_at(struct_def.struct_handle).name);
-                struct_map.insert(name.to_owned(), idx);
-            }
-
-            for struct_inst in module.struct_instantiations() {
-                let def = struct_inst.def.0 as usize;
-                let struct_def = &structs[def];
-                let field_count = struct_def.field_count;
-                let mut instantiation = vec![];
-                for ty in &module.signature_at(struct_inst.type_parameters).0 {
-                    instantiation.push(cache.make_type_while_loading(&module, ty)?);
-                }
-                struct_instantiations.push(StructInstantiation {
-                    field_count,
-                    def: struct_def.idx,
-                    instantiation,
-                });
-            }
-
-            for func_handle in module.function_handles() {
-                let func_name = module.identifier_at(func_handle.name);
-                let module_handle = module.module_handle_at(func_handle.module);
-                let module_id = module.module_id_for_handle(module_handle);
-                if module_id == id {
-                    // module has not been published yet, loop through the functions
-                    for (idx, function) in cache.functions.iter().enumerate().rev() {
-                        if function.module_id() != Some(&module_id) {
-                            return Err(PartialVMError::new(
-                                StatusCode::FUNCTION_RESOLUTION_FAILURE,
-                            )
-                            .with_message(format!(
-                                "Cannot find {:?}::{:?} in publishing module",
-                                module_id, func_name
-                            )));
-                        }
-                        if function.name.as_ident_str() == func_name {
-                            function_refs.push(idx);
-                            break;
-                        }
-                    }
-                } else {
-                    function_refs.push(cache.resolve_function_by_name(func_name, &module_id)?);
-                }
-            }
-
-            for func_def in module.function_defs() {
-                let idx = function_refs[func_def.function.0 as usize];
-                let name = module.identifier_at(module.function_handle_at(func_def.function).name);
-                function_map.insert(name.to_owned(), idx);
-
-                if let Some(code_unit) = &func_def.code {
-                    for bc in &code_unit.code {
-                        match bc {
-                            Bytecode::VecPack(si, _)
-                            | Bytecode::VecLen(si)
-                            | Bytecode::VecImmBorrow(si)
-                            | Bytecode::VecMutBorrow(si)
-                            | Bytecode::VecPushBack(si)
-                            | Bytecode::VecPopBack(si)
-                            | Bytecode::VecUnpack(si, _)
-                            | Bytecode::VecSwap(si) => {
-                                if !single_signature_token_map.contains_key(si) {
-                                    let ty = match module.signature_at(*si).0.get(0) {
-                                        None => {
-                                            return Err(PartialVMError::new(
-                                                StatusCode::VERIFIER_INVARIANT_VIOLATION,
-                                            )
-                                            .with_message(
-                                                "the type argument for vector-related bytecode \
-                                                expects one and only one signature token"
-                                                    .to_owned(),
-                                            ));
-                                        },
-                                        Some(sig_token) => sig_token,
-                                    };
-                                    single_signature_token_map
-                                        .insert(*si, cache.make_type_while_loading(&module, ty)?);
-                                }
-                            },
-                            _ => {},
-                        }
-                    }
-                }
-            }
-
-            for func_inst in module.function_instantiations() {
-                let handle = function_refs[func_inst.handle.0 as usize];
-                let mut instantiation = vec![];
-                for ty in &module.signature_at(func_inst.type_parameters).0 {
-                    instantiation.push(cache.make_type_while_loading(&module, ty)?);
-                }
-                function_instantiations.push(FunctionInstantiation {
-                    handle,
-                    instantiation,
-                });
-            }
-
-            for f_handle in module.field_handles() {
-                let def_idx = f_handle.owner;
-                let owner = structs[def_idx.0 as usize].idx;
-                let offset = f_handle.field as usize;
-                field_handles.push(FieldHandle { offset, owner });
-            }
-
-            for f_inst in module.field_instantiations() {
-                let fh_idx = f_inst.handle;
-                let owner = field_handles[fh_idx.0 as usize].owner;
-                let offset = field_handles[fh_idx.0 as usize].offset;
-                let mut instantiation = vec![];
-                for ty in &module.signature_at(f_inst.type_parameters).0 {
-                    instantiation.push(cache.make_type_while_loading(&module, ty)?);
-                }
-                field_instantiations.push(FieldInstantiation {
-                    offset,
-                    owner,
-                    instantiation,
-                });
-            }
-
-            Ok(())
-        };
-
-        match create() {
-            Ok(_) => Ok(Self {
-                id,
-                module: Arc::new(module),
-                struct_refs,
-                structs,
-                struct_instantiations,
-                function_refs,
-                function_instantiations,
-                field_handles,
-                field_instantiations,
-                function_map,
-                struct_map,
-                single_signature_token_map,
-            }),
-            Err(err) => Err((err, module)),
-        }
-    }
-
-    fn struct_at(&self, idx: StructDefinitionIndex) -> CachedStructIndex {
-        self.structs[idx.0 as usize].idx
-    }
-
-    fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {
-        &self.struct_instantiations[idx as usize]
-    }
-
-    fn function_at(&self, idx: u16) -> usize {
-        self.function_refs[idx as usize]
-    }
-
-    fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
-        &self.function_instantiations[idx as usize]
-    }
-
-    fn field_count(&self, idx: u16) -> u16 {
-        self.structs[idx as usize].field_count
-    }
-
-    fn field_instantiation_count(&self, idx: u16) -> u16 {
-        self.struct_instantiations[idx as usize].field_count
-    }
-
-    pub(crate) fn module(&self) -> &CompiledModule {
-        &self.module
-    }
-
-    pub(crate) fn arc_module(&self) -> Arc<CompiledModule> {
-        self.module.clone()
-    }
-
-    fn field_offset(&self, idx: FieldHandleIndex) -> usize {
-        self.field_handles[idx.0 as usize].offset
-    }
-
-    fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
-        self.field_instantiations[idx.0 as usize].offset
-    }
-
-    fn single_type_at(&self, idx: SignatureIndex) -> &Type {
-        self.single_signature_token_map.get(&idx).unwrap()
-    }
-}
-
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
 // more appropriate to execution.
 // When code executes, indexes in instructions are resolved against runtime structures
@@ -2263,13 +1513,8 @@ struct Script {
     // primitive pools
     script: CompiledScript,
 
-    // types as indexes into the Loader type list
-    // REVIEW: why is this unused?
-    #[allow(dead_code)]
-    struct_refs: Vec<CachedStructIndex>,
-
     // functions as indexes into the Loader function list
-    function_refs: Vec<usize>,
+    function_refs: Vec<FunctionHandle>,
     // materialized instantiations, whether partial or not
     function_instantiations: Vec<FunctionInstantiation>,
 
@@ -2292,20 +1537,31 @@ impl Script {
         script_hash: &ScriptHash,
         cache: &ModuleCache,
     ) -> VMResult<Self> {
-        let mut struct_refs = vec![];
+        let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
-            let module_id = ModuleId::new(
-                *script.address_identifier_at(module_handle.address),
-                script.identifier_at(module_handle.name).to_owned(),
-            );
-            struct_refs.push(
-                cache
-                    .resolve_struct_by_name(struct_name, &module_id)
-                    .map_err(|e| e.finish(Location::Script))?
-                    .0,
-            );
+            let module_id = script.module_id_for_handle(module_handle);
+            let struct_ = cache
+                .resolve_struct_by_name(struct_name, &module_id)
+                .map_err(|err| err.finish(Location::Script))?;
+            if !struct_handle.abilities.is_subset(struct_.abilities)
+                || !struct_handle
+                    .type_parameters
+                    .iter()
+                    .map(|ty| ty.is_phantom)
+                    .eq(struct_.phantom_ty_args_mask.iter().cloned())
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Ability definition of module mismatch".to_string())
+                        .finish(Location::Script),
+                );
+            }
+            struct_names.push(Arc::new(StructIdentifier {
+                module: module_id,
+                name: struct_name.to_owned(),
+            }));
         }
 
         let mut function_refs = vec![];
@@ -2316,20 +1572,19 @@ impl Script {
                 *script.address_identifier_at(module_handle.address),
                 script.identifier_at(module_handle.name).to_owned(),
             );
-            let ref_idx = cache
-                .resolve_function_by_name(func_name, &module_id)
-                .map_err(|err| err.finish(Location::Undefined))?;
-            function_refs.push(ref_idx);
+            function_refs.push(FunctionHandle::Remote {
+                module: module_id,
+                name: func_name.to_owned(),
+            });
         }
 
         let mut function_instantiations = vec![];
         for func_inst in script.function_instantiations() {
-            let handle = function_refs[func_inst.handle.0 as usize];
+            let handle = function_refs[func_inst.handle.0 as usize].clone();
             let mut instantiation = vec![];
             for ty in &script.signature_at(func_inst.type_parameters).0 {
                 instantiation.push(
-                    cache
-                        .make_type(BinaryIndexedView::Script(&script), ty)
+                    intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)
                         .map_err(|e| e.finish(Location::Script))?,
                 );
             }
@@ -2347,7 +1602,7 @@ impl Script {
         let parameter_tys = parameters
             .0
             .iter()
-            .map(|tok| cache.make_type(BinaryIndexedView::Script(&script), tok))
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let locals = Signature(
@@ -2361,14 +1616,14 @@ impl Script {
         let local_tys = locals
             .0
             .iter()
-            .map(|tok| cache.make_type(BinaryIndexedView::Script(&script), tok))
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let return_ = Signature(vec![]);
         let return_tys = return_
             .0
             .iter()
-            .map(|tok| cache.make_type(BinaryIndexedView::Script(&script), tok))
+            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let type_parameters = script.type_parameters.clone();
@@ -2379,9 +1634,6 @@ impl Script {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
-            parameters,
-            return_,
-            locals,
             type_parameters,
             native,
             def_is_native,
@@ -2421,8 +1673,7 @@ impl Script {
                         };
                         single_signature_token_map.insert(
                             *si,
-                            cache
-                                .make_type(BinaryIndexedView::Script(&script), ty)
+                            intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)
                                 .map_err(|e| e.finish(Location::Script))?,
                         );
                     }
@@ -2433,7 +1684,6 @@ impl Script {
 
         Ok(Self {
             script,
-            struct_refs,
             function_refs,
             function_instantiations,
             main,
@@ -2447,8 +1697,8 @@ impl Script {
         self.main.clone()
     }
 
-    fn function_at(&self, idx: u16) -> usize {
-        self.function_refs[idx as usize]
+    fn function_at(&self, idx: u16) -> &FunctionHandle {
+        &self.function_refs[idx as usize]
     }
 
     fn function_instantiation_at(&self, idx: u16) -> &FunctionInstantiation {
@@ -2460,259 +1710,11 @@ impl Script {
     }
 }
 
-// A simple wrapper for the "owner" of the function (Module or Script)
-#[derive(Debug, Clone)]
-enum Scope {
-    Module(ModuleId),
-    Script(ScriptHash),
-}
-
-// A runtime function
-// #[derive(Debug)]
-// https://github.com/rust-lang/rust/issues/70263
-#[derive(Clone)]
-pub(crate) struct Function {
-    #[allow(unused)]
-    file_format_version: u32,
-    index: FunctionDefinitionIndex,
-    code: Vec<Bytecode>,
-    parameters: Signature,
-    return_: Signature,
-    locals: Signature,
-    type_parameters: Vec<AbilitySet>,
-    native: Option<NativeFunction>,
-    def_is_native: bool,
-    def_is_friend_or_private: bool,
-    scope: Scope,
-    name: Identifier,
-    return_types: Vec<Type>,
-    local_types: Vec<Type>,
-    parameter_types: Vec<Type>,
-}
-
-// This struct must be treated as an identifier for a function and not somehow relying on
-// the internal implementation.
-pub struct LoadedFunction {
-    pub(crate) module: Arc<Module>,
-    pub(crate) function: Arc<Function>,
-}
-
-impl Function {
-    fn new(
-        natives: &NativeFunctions,
-        index: FunctionDefinitionIndex,
-        def: &FunctionDefinition,
-        module: &CompiledModule,
-    ) -> Self {
-        let handle = module.function_handle_at(def.function);
-        let name = module.identifier_at(handle.name).to_owned();
-        let module_id = module.self_id();
-        let def_is_friend_or_private = match def.visibility {
-            Visibility::Friend | Visibility::Private => true,
-            Visibility::Public => false,
-        };
-        let (native, def_is_native) = if def.is_native() {
-            (
-                natives.resolve(
-                    module_id.address(),
-                    module_id.name().as_str(),
-                    name.as_str(),
-                ),
-                true,
-            )
-        } else {
-            (None, false)
-        };
-        let scope = Scope::Module(module_id);
-        let parameters = module.signature_at(handle.parameters).clone();
-        // Native functions do not have a code unit
-        let (code, locals) = match &def.code {
-            Some(code) => (
-                code.code.clone(),
-                Signature(
-                    parameters
-                        .0
-                        .iter()
-                        .chain(module.signature_at(code.locals).0.iter())
-                        .cloned()
-                        .collect(),
-                ),
-            ),
-            None => (vec![], Signature(vec![])),
-        };
-        let return_ = module.signature_at(handle.return_).clone();
-        let type_parameters = handle.type_parameters.clone();
-        Self {
-            file_format_version: module.version(),
-            index,
-            code,
-            parameters,
-            return_,
-            locals,
-            type_parameters,
-            native,
-            def_is_native,
-            def_is_friend_or_private,
-            scope,
-            name,
-            local_types: vec![],
-            return_types: vec![],
-            parameter_types: vec![],
-        }
-    }
-
-    #[allow(unused)]
-    pub(crate) fn file_format_version(&self) -> u32 {
-        self.file_format_version
-    }
-
-    pub(crate) fn module_id(&self) -> Option<&ModuleId> {
-        match &self.scope {
-            Scope::Module(module_id) => Some(module_id),
-            Scope::Script(_) => None,
-        }
-    }
-
-    pub(crate) fn index(&self) -> FunctionDefinitionIndex {
-        self.index
-    }
-
-    pub(crate) fn get_resolver<'a>(&self, loader: &'a Loader) -> Resolver<'a> {
-        match &self.scope {
-            Scope::Module(module_id) => {
-                let module = loader
-                    .get_module(module_id)
-                    .expect("ModuleId on Function must exist");
-                Resolver::for_module(loader, module)
-            },
-            Scope::Script(script_hash) => {
-                let script = loader.get_script(script_hash);
-                Resolver::for_script(loader, script)
-            },
-        }
-    }
-
-    pub(crate) fn local_count(&self) -> usize {
-        self.locals.len()
-    }
-
-    pub(crate) fn arg_count(&self) -> usize {
-        self.parameters.len()
-    }
-
-    pub(crate) fn return_type_count(&self) -> usize {
-        self.return_.len()
-    }
-
-    pub(crate) fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    pub(crate) fn code(&self) -> &[Bytecode] {
-        &self.code
-    }
-
-    pub(crate) fn type_parameters(&self) -> &[AbilitySet] {
-        &self.type_parameters
-    }
-
-    pub(crate) fn local_types(&self) -> &[Type] {
-        &self.local_types
-    }
-
-    pub(crate) fn return_types(&self) -> &[Type] {
-        &self.return_types
-    }
-
-    pub(crate) fn parameter_types(&self) -> &[Type] {
-        &self.parameter_types
-    }
-
-    pub(crate) fn pretty_string(&self) -> String {
-        match &self.scope {
-            Scope::Script(_) => "Script::main".into(),
-            Scope::Module(id) => format!(
-                "0x{}::{}::{}",
-                id.address().to_hex(),
-                id.name().as_str(),
-                self.name.as_str()
-            ),
-        }
-    }
-
-    pub(crate) fn is_native(&self) -> bool {
-        self.def_is_native
-    }
-
-    pub(crate) fn is_friend_or_private(&self) -> bool {
-        self.def_is_friend_or_private
-    }
-
-    pub(crate) fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
-        self.native.as_deref().ok_or_else(|| {
-            PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
-                .with_message(format!("Missing Native Function `{}`", self.name))
-        })
-    }
-}
-
-//
-// Internal structures that are saved at the proper index in the proper tables to access
-// execution information (interpreter).
-// The following structs are internal to the loader and never exposed out.
-// The `Loader` will create those struct and the proper table when loading a module.
-// The `Resolver` uses those structs to return information to the `Interpreter`.
-//
-
-// A function instantiation.
-#[derive(Debug, Clone)]
-struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
-    handle: usize,
-    instantiation: Vec<Type>,
-}
-
-#[derive(Debug, Clone)]
-struct StructDef {
-    // struct field count
-    field_count: u16,
-    // `ModuelCache::structs` global table index
-    idx: CachedStructIndex,
-}
-
-#[derive(Debug, Clone)]
-struct StructInstantiation {
-    // struct field count
-    field_count: u16,
-    // `ModuelCache::structs` global table index. It is the generic type.
-    def: CachedStructIndex,
-    instantiation: Vec<Type>,
-}
-
-// A field handle. The offset is the only used information when operating on a field
-#[derive(Debug, Clone)]
-struct FieldHandle {
-    offset: usize,
-    // `ModuelCache::structs` global table index. It is the generic type.
-    owner: CachedStructIndex,
-}
-
-// A field instantiation. The offset is the only used information when operating on a field
-#[derive(Debug, Clone)]
-struct FieldInstantiation {
-    offset: usize,
-    // `ModuelCache::structs` global table index. It is the generic type.
-    #[allow(unused)]
-    owner: CachedStructIndex,
-    instantiation: Vec<Type>,
-}
-
 //
 // Cache for data associated to a Struct, used for de/serialization and more
 //
-
 #[derive(Clone)]
-struct StructInfo {
+struct StructInfoCache {
     struct_tag: Option<(StructTag, u64)>,
     struct_layout: Option<MoveStructLayout>,
     annotated_struct_layout: Option<MoveStructLayout>,
@@ -2720,7 +1722,7 @@ struct StructInfo {
     annotated_node_count: Option<u64>,
 }
 
-impl StructInfo {
+impl StructInfoCache {
     fn new() -> Self {
         Self {
             struct_tag: None,
@@ -2734,13 +1736,15 @@ impl StructInfo {
 
 #[derive(Clone)]
 pub(crate) struct TypeCache {
-    structs: HashMap<CachedStructIndex, HashMap<Vec<Type>, StructInfo>>,
+    structs: HashMap<StructIdentifier, HashMap<Vec<Type>, StructInfoCache>>,
+    depth_formula: HashMap<StructIdentifier, DepthFormula>,
 }
 
 impl TypeCache {
     fn new() -> Self {
         Self {
             structs: HashMap::new(),
+            depth_formula: HashMap::new(),
         }
     }
 }
@@ -2776,13 +1780,13 @@ impl PseudoGasContext {
 }
 
 impl Loader {
-    fn struct_gidx_to_type_tag(
+    fn struct_name_to_type_tag(
         &self,
-        gidx: CachedStructIndex,
+        name: &StructIdentifier,
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
-        if let Some(struct_map) = self.type_cache.read().structs.get(&gidx) {
+        if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some((struct_tag, gas)) = &struct_info.struct_tag {
                     gas_context.charge(*gas)?;
@@ -2797,11 +1801,10 @@ impl Loader {
             .iter()
             .map(|ty| self.type_to_type_tag_impl(ty, gas_context))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let struct_type = self.module_cache.read().struct_at(gidx);
         let struct_tag = StructTag {
-            address: *struct_type.module.address(),
-            module: struct_type.module.name().to_owned(),
-            name: struct_type.name.clone(),
+            address: *name.module.address(),
+            module: name.module.name().to_owned(),
+            name: name.name.clone(),
             type_params: ty_arg_tags,
         };
 
@@ -2811,10 +1814,10 @@ impl Loader {
         self.type_cache
             .write()
             .structs
-            .entry(gidx)
+            .entry(name.clone())
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
-            .or_insert_with(StructInfo::new)
+            .or_insert_with(StructInfoCache::new)
             .struct_tag = Some((struct_tag.clone(), gas_context.cost - cur_cost));
 
         Ok(struct_tag)
@@ -2836,16 +1839,14 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => {
-                TypeTag::Vector(Box::new(self.type_to_type_tag_impl(ty, gas_context)?))
-            },
-            Type::Struct(gidx) => TypeTag::Struct(Box::new(self.struct_gidx_to_type_tag(
-                *gidx,
+            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
+            Type::Struct { name, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
+                name,
                 &[],
                 gas_context,
             )?)),
-            Type::StructInstantiation(gidx, ty_args) => TypeTag::Struct(Box::new(
-                self.struct_gidx_to_type_tag(*gidx, ty_args, gas_context)?,
+            Type::StructInstantiation { name, ty_args, .. } => TypeTag::Struct(Box::new(
+                self.struct_name_to_type_tag(name, ty_args, gas_context)?,
             )),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -2865,7 +1866,7 @@ impl Loader {
                     result += 1;
                     todo.push(ty);
                 },
-                Type::StructInstantiation(_, ty_args) => {
+                Type::StructInstantiation { ty_args, .. } => {
                     result += 1;
                     todo.extend(ty_args.iter())
                 },
@@ -2877,14 +1878,14 @@ impl Loader {
         result
     }
 
-    fn struct_gidx_to_type_layout(
+    fn struct_name_to_type_layout(
         &self,
-        gidx: CachedStructIndex,
+        name: &StructIdentifier,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveStructLayout> {
-        if let Some(struct_map) = self.type_cache.read().structs.get(&gidx) {
+        if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(node_count) = &struct_info.node_count {
                     *count += *node_count
@@ -2896,7 +1897,7 @@ impl Loader {
         }
 
         let count_before = *count;
-        let struct_type = self.module_cache.read().struct_at(gidx);
+        let struct_type = self.get_struct_type_by_identifier(name)?;
         let field_tys = struct_type
             .fields
             .iter()
@@ -2913,10 +1914,10 @@ impl Loader {
         let mut cache = self.type_cache.write();
         let info = cache
             .structs
-            .entry(gidx)
+            .entry(name.clone())
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
-            .or_insert_with(StructInfo::new);
+            .or_insert_with(StructInfoCache::new);
         info.struct_layout = Some(struct_layout.clone());
         info.node_count = Some(field_node_count);
 
@@ -2980,14 +1981,14 @@ impl Loader {
                     depth + 1,
                 )?))
             },
-            Type::Struct(gidx) => {
+            Type::Struct { name, .. } => {
                 *count += 1;
-                MoveTypeLayout::Struct(self.struct_gidx_to_type_layout(*gidx, &[], count, depth)?)
+                MoveTypeLayout::Struct(self.struct_name_to_type_layout(name, &[], count, depth)?)
             },
-            Type::StructInstantiation(gidx, ty_args) => {
+            Type::StructInstantiation { name, ty_args, .. } => {
                 *count += 1;
                 MoveTypeLayout::Struct(
-                    self.struct_gidx_to_type_layout(*gidx, ty_args, count, depth)?,
+                    self.struct_name_to_type_layout(name, ty_args, count, depth)?,
                 )
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -2999,14 +2000,14 @@ impl Loader {
         })
     }
 
-    fn struct_gidx_to_fully_annotated_layout(
+    fn struct_name_to_fully_annotated_layout(
         &self,
-        gidx: CachedStructIndex,
+        name: &StructIdentifier,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveStructLayout> {
-        if let Some(struct_map) = self.type_cache.read().structs.get(&gidx) {
+        if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(annotated_node_count) = &struct_info.annotated_node_count {
                     *count += *annotated_node_count
@@ -3017,7 +2018,7 @@ impl Loader {
             }
         }
 
-        let struct_type = self.module_cache.read().struct_at(gidx);
+        let struct_type = self.get_struct_type_by_identifier(name)?;
         if struct_type.fields.len() != struct_type.field_names.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
@@ -3034,7 +2035,7 @@ impl Loader {
             cost_base: self.vm_config.type_base_cost,
             cost_per_byte: self.vm_config.type_byte_cost,
         };
-        let struct_tag = self.struct_gidx_to_type_tag(gidx, ty_args, &mut gas_context)?;
+        let struct_tag = self.struct_name_to_type_tag(name, ty_args, &mut gas_context)?;
         let field_layouts = struct_type
             .field_names
             .iter()
@@ -3051,10 +2052,10 @@ impl Loader {
         let mut cache = self.type_cache.write();
         let info = cache
             .structs
-            .entry(gidx)
+            .entry(name.clone())
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
-            .or_insert_with(StructInfo::new);
+            .or_insert_with(StructInfoCache::new);
         info.annotated_struct_layout = Some(struct_layout.clone());
         info.annotated_node_count = Some(field_node_count);
 
@@ -3086,17 +2087,87 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, count, depth + 1)?,
             )),
-            Type::Struct(gidx) => MoveTypeLayout::Struct(
-                self.struct_gidx_to_fully_annotated_layout(*gidx, &[], count, depth)?,
+            Type::Struct { name, .. } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(name, &[], count, depth)?,
             ),
-            Type::StructInstantiation(gidx, ty_args) => MoveTypeLayout::Struct(
-                self.struct_gidx_to_fully_annotated_layout(*gidx, ty_args, count, depth)?,
+            Type::StructInstantiation { name, ty_args, .. } => MoveTypeLayout::Struct(
+                self.struct_name_to_fully_annotated_layout(name, ty_args, count, depth)?,
             ),
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("no type layout for {:?}", ty)),
                 );
+            },
+        })
+    }
+
+    pub(crate) fn calculate_depth_of_struct(
+        &self,
+        name: &StructIdentifier,
+    ) -> PartialVMResult<DepthFormula> {
+        if let Some(depth_formula) = self.type_cache.read().depth_formula.get(name) {
+            return Ok(depth_formula.clone());
+        }
+
+        let struct_type = self.get_struct_type_by_identifier(name)?;
+
+        let formulas = struct_type
+            .fields
+            .iter()
+            .map(|field_type| self.calculate_depth_of_type(field_type))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        let formula = DepthFormula::normalize(formulas);
+        let prev = self
+            .type_cache
+            .write()
+            .depth_formula
+            .insert(name.clone(), formula.clone());
+        if prev.is_some() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Recursive type?".to_owned()),
+            );
+        }
+        Ok(formula)
+    }
+
+    fn calculate_depth_of_type(&self, ty: &Type) -> PartialVMResult<DepthFormula> {
+        Ok(match ty {
+            Type::Bool
+            | Type::U8
+            | Type::U64
+            | Type::U128
+            | Type::Address
+            | Type::Signer
+            | Type::U16
+            | Type::U32
+            | Type::U256 => DepthFormula::constant(1),
+            Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
+                let mut inner = self.calculate_depth_of_type(ty)?;
+                inner.scale(1);
+                inner
+            },
+            Type::TyParam(ty_idx) => DepthFormula::type_parameter(*ty_idx),
+            Type::Struct { name, .. } => {
+                let mut struct_formula = self.calculate_depth_of_struct(name)?;
+                debug_assert!(struct_formula.terms.is_empty());
+                struct_formula.scale(1);
+                struct_formula
+            },
+            Type::StructInstantiation { name, ty_args, .. } => {
+                let ty_arg_map = ty_args
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, ty)| {
+                        let var = idx as TypeParameterIndex;
+                        Ok((var, self.calculate_depth_of_type(ty)?))
+                    })
+                    .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
+                let struct_formula = self.calculate_depth_of_struct(name)?;
+                let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
+                subst_struct_formula.scale(1);
+                subst_struct_formula
             },
         })
     }

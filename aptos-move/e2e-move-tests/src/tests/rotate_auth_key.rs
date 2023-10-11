@@ -6,7 +6,6 @@ use crate::{
     tests::offer_rotation_capability::{offer_rotation_capability_v2, revoke_rotation_capability},
     MoveHarness,
 };
-use aptos::common::types::RotationProofChallenge;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -16,7 +15,7 @@ use aptos_crypto::{
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{AccountResource, CORE_CODE_ADDRESS},
+    account_config::{AccountResource, RotationProofChallenge, CORE_CODE_ADDRESS},
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{authenticator::AuthenticationKey, TransactionStatus},
 };

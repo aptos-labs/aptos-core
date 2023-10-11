@@ -53,6 +53,7 @@ log = { workspace = true }
 lru = { workspace = true }
 merlin = { workspace = true }
 move-binary-format = { workspace = true }
+move-cli = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler = { workspace = true }
 move-core-types = { workspace = true }
