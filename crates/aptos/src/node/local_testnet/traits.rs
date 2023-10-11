@@ -46,6 +46,7 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
         // We make a new function here so that each task waits for its prereqs within
         // its own run function. This way we can start each service in any order.
         let name = self.get_name();
+        let name_clone = name.to_string();
         let future = async move {
             for health_checker in self.get_prerequisite_health_checkers() {
                 health_checker
@@ -56,7 +57,10 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
             self.run_service()
                 .await
                 .context("Service ended with an error")?;
-            warn!("Service ended unexpectedly without any error");
+            warn!(
+                "Service {} ended unexpectedly without any error",
+                name_clone
+            );
             Ok(())
         };
         tokio::spawn(future.map(move |result: Result<()>| {
