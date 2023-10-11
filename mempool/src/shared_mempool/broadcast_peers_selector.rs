@@ -23,6 +23,7 @@ pub trait BroadcastPeersSelector: Send + Sync {
         updated_peers: &HashMap<PeerNetworkId, PeerMetadata>,
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>);
     fn broadcast_peers(&self, account: &AccountAddress) -> Vec<PeerNetworkId>;
+    fn num_peers_to_select(&self) -> usize;
 }
 
 #[derive(Clone, Debug)]
@@ -79,16 +80,16 @@ impl PrioritizedPeersComparator {
 }
 
 pub struct PrioritizedPeersSelector {
-    max_selected_peers: usize,
+    num_peers_to_select: usize,
     prioritized_peers: Vec<PeerNetworkId>,
     prioritized_peers_comparator: PrioritizedPeersComparator,
     peers: HashSet<PeerNetworkId>,
 }
 
 impl PrioritizedPeersSelector {
-    pub fn new(max_selected_peers: usize) -> Self {
+    pub fn new(num_peers_to_select: usize) -> Self {
         Self {
-            max_selected_peers,
+            num_peers_to_select,
             prioritized_peers: Vec::new(),
             prioritized_peers_comparator: PrioritizedPeersComparator::new(),
             peers: HashSet::new(),
@@ -119,7 +120,7 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
         let peers: Vec<_> = self
             .prioritized_peers
             .iter()
-            .take(self.max_selected_peers)
+            .take(self.num_peers_to_select)
             .cloned()
             .collect();
         info!(
@@ -128,6 +129,10 @@ impl BroadcastPeersSelector for PrioritizedPeersSelector {
             peers
         );
         peers
+    }
+
+    fn num_peers_to_select(&self) -> usize {
+        self.num_peers_to_select
     }
 }
 
@@ -284,6 +289,10 @@ impl BroadcastPeersSelector for FreshPeersSelector {
 
     fn broadcast_peers(&self, account: &PeerId) -> Vec<PeerNetworkId> {
         self.broadcast_peers_inner(account)
+    }
+
+    fn num_peers_to_select(&self) -> usize {
+        self.num_peers_to_select
     }
 }
 

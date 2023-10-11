@@ -135,7 +135,7 @@ async fn test_pfn_route_updates() {
     let version = swarm.versions().max().unwrap();
     // The PFN only forwards to a single VFN at a time. Route updates allow the txns to succeed.
     let mut pfn_config = NodeConfig::get_default_pfn_config();
-    pfn_config.mempool.broadcast_peers_selector = BroadcastPeersSelectorConfig::FreshPeers(1);
+    pfn_config.mempool.broadcast_peers_selector = BroadcastPeersSelectorConfig::FreshPeers(1, 1000);
     pfn_config
         .peer_monitoring_service
         .node_monitoring

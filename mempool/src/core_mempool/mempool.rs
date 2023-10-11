@@ -408,6 +408,7 @@ impl Mempool {
         &self,
         timeline_id: &MultiBucketTimelineIndexIds,
         count: usize,
+        // TODO: do we really need an option here?
         peer: Option<PeerNetworkId>,
     ) -> (Vec<SignedTransaction>, MultiBucketTimelineIndexIds) {
         self.transactions.read_timeline(timeline_id, count, peer)

@@ -19,10 +19,7 @@ use crate::{
         broadcast_peers_selector::BroadcastPeersSelector, types::MultiBucketTimelineIndexIds,
     },
 };
-use aptos_config::{
-    config::{BroadcastPeersSelectorConfig, MempoolConfig},
-    network_id::PeerNetworkId,
-};
+use aptos_config::{config::MempoolConfig, network_id::PeerNetworkId};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
@@ -97,11 +94,7 @@ impl TransactionStore {
         config: &MempoolConfig,
         broadcast_peers_selector: Arc<RwLock<Box<dyn BroadcastPeersSelector>>>,
     ) -> Self {
-        // TODO: this is funky, get the selector to give us this value or whether things are full or not
-        let num_peers_to_select = match config.broadcast_peers_selector {
-            BroadcastPeersSelectorConfig::FreshPeers(n) => n,
-            BroadcastPeersSelectorConfig::PrioritizedPeers(n) => n,
-        };
+        let num_peers_to_select = broadcast_peers_selector.read().num_peers_to_select();
 
         Self {
             // main DS
