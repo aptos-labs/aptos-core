@@ -139,7 +139,7 @@ impl ConfigOptimizer for MempoolConfig {
             // TODO: With quorum store, this isn't used. Used for testing, but should be removed.
             if local_mempool_config_yaml["broadcast_peers_selector"].is_null() {
                 mempool_config.broadcast_peers_selector =
-                    BroadcastPeersSelectorConfig::PrioritizedPeers(7);
+                    BroadcastPeersSelectorConfig::PrioritizedPeers(1);
                 modified_config = true;
             }
         } else {

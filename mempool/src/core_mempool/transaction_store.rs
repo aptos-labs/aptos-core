@@ -30,7 +30,7 @@ use aptos_types::{
 };
 use std::{
     cmp::max,
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     mem::size_of,
     ops::Bound,
     sync::Arc,
@@ -73,7 +73,9 @@ pub struct TransactionStore {
     size_bytes: usize,
     // keeps track of txns that were resubmitted with higher gas
     gas_upgraded_index: HashMap<TxnPointer, u64>,
-    ready_peers_needed_index: HashSet<TxnPointer>,
+    // Note: within an account, txns must be sorted by sequence number
+    // TODO: or, should this just be a vector, and entries removed lazily?
+    ready_peers_needed_index: BTreeSet<TxnPointer>,
 
     // configuration
     capacity: usize,
@@ -114,7 +116,7 @@ impl TransactionStore {
             // estimated size in bytes
             size_bytes: 0,
             gas_upgraded_index: HashMap::new(),
-            ready_peers_needed_index: HashSet::new(),
+            ready_peers_needed_index: BTreeSet::new(),
 
             // configuration
             capacity: config.capacity,
@@ -812,7 +814,7 @@ impl TransactionStore {
                 self.timeline_index.update(&mut mempool_txn.clone(), peers);
             }
         }
-        // TODO: Does it have to be a HashSet?
+        // TODO: Is this too inefficient?
         self.ready_peers_needed_index.clear();
         for txn_pointer in reinsert {
             self.ready_peers_needed_index.insert(txn_pointer);
