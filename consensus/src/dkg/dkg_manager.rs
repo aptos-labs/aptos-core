@@ -312,7 +312,12 @@ impl DKGManager {
         if let Some(dkg_store) = self.dkg_store.lock().as_ref() {
             Some(dkg_store.get_start_time())
         } else {
-            unreachable!("[DKG] DKGStore is not initialized!")
+            // Currently consensus by state sync does not trigger DKG start,
+            // so it is possible a validator skips DKG start and receives DKG payload. 
+            // dkg todo: add back this unreachable when state sync triggers DKG start
+            // unreachable!("[DKG] DKGStore is not initialized!")
+            error!("[DKG] DKGStore is not initialized!");
+            None
         }
     }
 
