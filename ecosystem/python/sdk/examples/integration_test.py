@@ -18,7 +18,9 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self._node = AptosCLIWrapper.start_node()
+        print("THERE")
         operational = await self._node.wait_until_operational()
+        print("HERE")
         if not operational:
             raise Exception("".join(self._node.errors()))
 
@@ -32,7 +34,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
             "..", "..", "..", "aptos-move", "move-examples", "hello_blockchain"
         )
         AptosCLIWrapper.test_package(
-            hello_blockchain_dir, {"hello_blockchain": AccountAddress.from_str("0x0a")}
+            hello_blockchain_dir, {"hello_blockchain": AccountAddress.from_str("0xa")}
         )
         contract_address = await hello_blockchain.publish_contract(hello_blockchain_dir)
         await hello_blockchain.main(contract_address)
@@ -88,7 +90,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
             "..", "..", "..", "aptos-move", "move-examples", "moon_coin"
         )
         AptosCLIWrapper.test_package(
-            moon_coin_path, {"MoonCoin": AccountAddress.from_str("0x0a")}
+            moon_coin_path, {"MoonCoin": AccountAddress.from_str("0xa")}
         )
         await your_coin.main(moon_coin_path)
 

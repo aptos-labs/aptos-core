@@ -4,9 +4,7 @@
 use super::health_checker::HealthChecker;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use futures::FutureExt;
 use std::{collections::HashSet, fmt::Debug};
-use tokio::task::JoinHandle;
 use tracing::warn;
 
 #[async_trait]
@@ -25,10 +23,10 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
     /// can use to make sure prerequisite services have started. These are also used
     /// by the "ready server", a server that exposes a unified endpoint for checking
     /// if all services are ready.
-    fn get_healthchecks(&self) -> HashSet<HealthChecker>;
+    fn get_health_checkers(&self) -> HashSet<HealthChecker>;
 
-    /// Whereas get_healthchecks returns healthchecks that other downstream services can
-    /// use, this should return health checkers for services that this service is
+    /// Whereas get_health_checkers returns healthchecks that other downstream services
+    /// can use, this should return health checkers for services that this service is
     /// waiting to start.
     //
     // Note: If we were using an object oriented language, we'd just make the
@@ -40,28 +38,28 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
     fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker>;
 
     /// This is the function we use from the outside to start the service. It makes
-    /// sure all the prerequisite services have started and then spawns a tokio task to
-    /// run the service. The user should never need to override this implementation.
-    fn run(self: Box<Self>) -> JoinHandle<()> {
+    /// sure all the prerequisite services have started and then calls the inner
+    /// function to run the service. The user should never need to override this
+    /// implementation.
+    async fn run(self: Box<Self>) -> Result<()> {
         // We make a new function here so that each task waits for its prereqs within
         // its own run function. This way we can start each service in any order.
         let name = self.get_name();
-        let future = async move {
-            for health_checker in self.get_prerequisite_health_checkers() {
-                health_checker
-                    .wait(Some(&self.get_name()))
-                    .await
-                    .context("Prerequisite service did not start up successfully")?;
-            }
-            self.run_service()
+        let name_clone = name.to_string();
+        for health_checker in self.get_prerequisite_health_checkers() {
+            health_checker
+                .wait(Some(&self.get_name()))
                 .await
-                .context("Service ended with an error")?;
-            warn!("Service ended unexpectedly without any error");
-            Ok(())
-        };
-        tokio::spawn(future.map(move |result: Result<()>| {
-            warn!("{} stopped unexpectedly {:#?}", name, result);
-        }))
+                .context("Prerequisite service did not start up successfully")?;
+        }
+        self.run_service()
+            .await
+            .context("Service ended with an error")?;
+        warn!(
+            "Service {} ended unexpectedly without any error",
+            name_clone
+        );
+        Ok(())
     }
 
     /// The ServiceManager may return PostHealthySteps. The tool will run these after
@@ -75,6 +73,15 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
         vec![]
     }
 
+    /// The ServiceManager may return ShutdownSteps. The tool will run these on shutdown.
+    /// This is best effort, there is nothing we can do if part of the code aborts or
+    /// the process receives something like SIGKILL.
+    ///
+    /// See `ShutdownStep` for more information.
+    fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
+        vec![]
+    }
+
     /// This function is responsible for running the service. It should return an error
     /// if the service ends unexpectedly. It gets called by `run`.
     async fn run_service(self: Box<Self>) -> Result<()>;
@@ -82,9 +89,18 @@ pub trait ServiceManager: Debug + Send + Sync + 'static {
 
 /// If a service wants to do something after it is healthy, it can define a struct,
 /// implement this trait for it, and return an instance of it.
-//
-// For more information see `get_post_healthy_steps` in `ServiceManager`.
+///
+/// For more information see `get_post_healthy_steps` in `ServiceManager`.
 #[async_trait]
 pub trait PostHealthyStep: Debug + Send + Sync + 'static {
+    async fn run(self: Box<Self>) -> Result<()>;
+}
+
+/// If a service wants to do something on shutdown, it can define a struct,
+/// implement this trait for it, and return an instance of it.
+///
+/// For more information see `get_shutdown_steps` in `ServiceManager`.
+#[async_trait]
+pub trait ShutdownStep: Debug + Send + Sync + 'static {
     async fn run(self: Box<Self>) -> Result<()>;
 }

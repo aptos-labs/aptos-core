@@ -452,6 +452,10 @@ bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
+# We use a version of bollard where it relies on a lower version of serde_with.
+# Otherwise it imposes that we use serde 1.0.157, which we can't due to this issue:
+# https://github.com/aptos-labs/aptos-core/issues/10424
+bollard = { git = "https://github.com/banool/bollard.git", rev = "0bf0b43f736040bb3d4aacb20125fd2b4021733d" }
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
@@ -478,13 +482,8 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.1.0", features = [
-    "chrono",
-    "postgres",
-    "r2d2",
-    "numeric",
-    "serde_json",
-] }
+diesel = "2.1.0"
+diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
@@ -603,7 +602,8 @@ sha2 = "0.9.3"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
-# pin to 1.0.149 because the latest version fails analyze_serde_formats
+# For more information about why we are pinned to 1.0.149, see this issue:
+# https://github.com/aptos-labs/aptos-core/issues/10424
 serde = { version = "=1.0.149", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
@@ -627,10 +627,11 @@ termcolor = "1.1.2"
 test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+threadpool = "1.8.1"
 time = { version = "0.3.24", features = ["serde"] }
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-tracing = "0.1.34"
+tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
 tokio = { version = "1.21.0", features = ["full"] }
@@ -739,3 +740,5 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
+# More context here: https://github.com/weiznich/diesel_async/pull/121.
+diesel-async = { git = "https://github.com/banool/diesel_async", rev = "7115c8668b88d56029cb1471e84d2ea0234ff035" }

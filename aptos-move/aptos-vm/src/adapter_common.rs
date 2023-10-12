@@ -28,7 +28,7 @@ pub trait VMAdapter {
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.
-    fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction>;
+    fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction>;
 
     /// Check if the transaction format is supported.
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;

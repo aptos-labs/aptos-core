@@ -78,7 +78,7 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{SchemaBatch, DB};
@@ -1060,9 +1060,10 @@ impl AptosDB {
             .with_label_values(&["commit_events"])
             .start_timer();
         let batch = SchemaBatch::new();
+        let num_txns = txns_to_commit.len();
         txns_to_commit
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_txns, 128))
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.event_store.put_events(
@@ -1148,9 +1149,10 @@ impl AptosDB {
             .with_label_values(&["commit_transaction_infos"])
             .start_timer();
         let batch = SchemaBatch::new();
+        let num_txns = txns_to_commit.len();
         txns_to_commit
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_txns, 128))
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 let version = first_version + i as u64;
@@ -1178,9 +1180,10 @@ impl AptosDB {
             .with_label_values(&["commit_write_sets"])
             .start_timer();
         let batch = SchemaBatch::new();
+        let num_txns = txns_to_commit.len();
         txns_to_commit
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_txns, 128))
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 self.transaction_store.put_write_set(
