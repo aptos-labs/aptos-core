@@ -5,7 +5,9 @@
 use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::{AbilitySet, SignatureToken, StructTypeParameter, TypeParameterIndex},
+    file_format::{
+        AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
+    },
 };
 use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
@@ -121,6 +123,27 @@ pub struct StructType {
 impl StructType {
     pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
         self.type_parameters.iter().map(|param| &param.constraints)
+    }
+
+    // Check if the local struct handle is compatible with the defined struct type.
+    pub fn check_compatibility(&self, struct_handle: &StructHandle) -> PartialVMResult<()> {
+        if !self.abilities.is_subset(struct_handle.abilities)
+            || self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+            || !self
+                .phantom_ty_args_mask
+                .iter()
+                .zip(struct_handle.type_parameters.iter())
+                .all(|(defined_is_phantom, local_type_parameter)| {
+                    !local_type_parameter.is_phantom || *defined_is_phantom
+                })
+        {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Ability definition of module mismatch".to_string()),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -366,11 +389,11 @@ impl Type {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    ty.abilities()?
-                ])
-            },
+            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![ty.abilities()?],
+            ),
             Type::Struct { ability, .. } => Ok(*ability),
             Type::StructInstantiation {
                 ty_args,
