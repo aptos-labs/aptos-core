@@ -6,7 +6,7 @@ use crate::{
         add, add_and_materialize, check, destroy, initialize, materialize, materialize_and_add,
         materialize_and_sub, new, sub, sub_add, sub_and_materialize,
     },
-    assert_abort, assert_success,
+    assert_abort, assert_abort_ref, assert_success,
     tests::common,
     MoveHarness,
 };
@@ -94,8 +94,8 @@ fn test_aggregator_lifetime() {
     ];
     let outputs = h.run_block(txns);
     // 2 materializations should have failed.
-    assert_abort!(outputs[10], 131073);
-    assert_abort!(outputs[11], 131074);
+    assert_abort_ref!(&outputs[10], 131073);
+    assert_abort_ref!(&outputs[11], 131074);
 
     // All checks must succeed.
     assert_success!(outputs[4]);
@@ -105,11 +105,10 @@ fn test_aggregator_lifetime() {
 
     // Aggregator is destroyed (abort code from `table::borrow` failure).
     assert_success!(outputs[13]);
-    assert_abort!(outputs[14], 25863);
+    assert_abort_ref!(&outputs[14], 25863);
 }
 
 #[test]
-#[should_panic]
 fn test_aggregator_underflow() {
     let (mut h, acc) = setup();
 
@@ -137,7 +136,6 @@ fn test_aggregator_materialize_underflow() {
 }
 
 #[test]
-#[should_panic]
 fn test_aggregator_overflow() {
     let (mut h, acc) = setup();
 
