@@ -111,6 +111,9 @@ impl MVDelayedFieldsError {
     ) -> PanicOr<MVDelayedFieldsError> {
         match err {
             PanicOr::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
+            PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(_)) => {
+                PanicOr::Or(MVDelayedFieldsError::NotFound)
+            },
             PanicOr::Or(_) => PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure),
         }
     }
