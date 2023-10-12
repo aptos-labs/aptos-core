@@ -4,6 +4,7 @@ use crate::remote_executor_service::ExecutorService;
 use aptos_logger::info;
 use aptos_types::block_executor::partitioner::ShardId;
 use std::net::SocketAddr;
+use aptos_vm::AptosVM;
 
 /// An implementation of the remote executor service that runs in a standalone process.
 pub struct ProcessExecutorService {
@@ -23,6 +24,7 @@ impl ProcessExecutorService {
             "Starting process remote executor service on {}; coordinator address: {}, other shard addresses: {:?}; num threads: {}",
             self_address, coordinator_address, remote_shard_addresses, num_threads
         );
+        AptosVM::set_concurrency_level_once(num_threads);
         let mut executor_service = ExecutorService::new(
             shard_id,
             num_shards,

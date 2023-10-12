@@ -34,6 +34,8 @@ impl BlockPreparationStage {
         let maybe_partitioner = if num_shards <= 1 && !force_partitioning {
             None
         } else {
+            // we can force partitioning even with num_shards == 1 to benchmark remote execution
+            // with 1 shard and a coordinator
             let partitioner = partitioner_config.build();
             Some(partitioner)
         };
