@@ -1731,7 +1731,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         // as no useful transaction reach their mempool.
         // something to potentially improve upon.
         // So having VFNs for all validators
-        .with_initial_fullnode_count(12)
+        //.with_initial_fullnode_count(12)
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 500_000,
