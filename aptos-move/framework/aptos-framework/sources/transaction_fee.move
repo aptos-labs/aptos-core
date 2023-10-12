@@ -32,6 +32,8 @@ module aptos_framework::transaction_fee {
 
     /// Stores information about the block proposer and the amount of fees
     /// collected when executing the block.
+    /// TODO needs to be modified to AggregatorV2 to be able to be used.
+    #[deprecated]
     struct CollectedFeesPerBlock has key {
         amount: AggregatableCoin<AptosCoin>,
         proposer: Option<address>,

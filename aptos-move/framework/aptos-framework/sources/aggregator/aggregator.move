@@ -1,3 +1,5 @@
+/// DEPRECATED in favor of `aptos_framework::aggregator_v2`.
+///
 /// This module provides an interface for aggregators. Aggregators are similar to
 /// unsigned integers and support addition and subtraction (aborting on underflow
 /// or on overflowing a custom upper limit). The difference from integers is that
@@ -23,6 +25,7 @@ module aptos_framework::aggregator {
 
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
+    #[deprecated]
     struct Aggregator has store {
         handle: address,
         key: address,
@@ -30,19 +33,24 @@ module aptos_framework::aggregator {
     }
 
     /// Returns `limit` exceeding which aggregator overflows.
+    #[deprecated]
     public fun limit(aggregator: &Aggregator): u128 {
         aggregator.limit
     }
 
     /// Adds `value` to aggregator. Aborts on overflowing the limit.
+    #[deprecated]
     public native fun add(aggregator: &mut Aggregator, value: u128);
 
     /// Subtracts `value` from aggregator. Aborts on going below zero.
+    #[deprecated]
     public native fun sub(aggregator: &mut Aggregator, value: u128);
 
     /// Returns a value stored in this aggregator.
+    #[deprecated]
     public native fun read(aggregator: &Aggregator): u128;
 
     /// Destroys an aggregator and removes it from its `AggregatorFactory`.
+    #[deprecated]
     public native fun destroy(aggregator: Aggregator);
 }

@@ -79,6 +79,7 @@ module aptos_framework::coin {
     /// Represents a coin with aggregator as its value. This allows to update
     /// the coin in every transaction avoiding read-modify-write conflicts. Only
     /// used for gas fees distribution by Aptos Framework (0x1).
+    #[deprecated]
     struct AggregatableCoin<phantom CoinType> has store {
         /// Amount of aggregatable coin this address has.
         value: Aggregator,
@@ -162,6 +163,7 @@ module aptos_framework::coin {
 
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
     /// only be called by Aptos Framework (0x1) account for now becuase of `create_aggregator`.
+    #[deprecated]
     public(friend) fun initialize_aggregatable_coin<CoinType>(aptos_framework: &signer): AggregatableCoin<CoinType> {
         let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
         AggregatableCoin<CoinType> {
@@ -170,12 +172,14 @@ module aptos_framework::coin {
     }
 
     /// Returns true if the value of aggregatable coin is zero.
+    #[deprecated]
     public(friend) fun is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
         let amount = aggregator::read(&coin.value);
         amount == 0
     }
 
     /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
+    #[deprecated]
     public(friend) fun drain_aggregatable_coin<CoinType>(coin: &mut AggregatableCoin<CoinType>): Coin<CoinType> {
         spec {
             // TODO: The data invariant is not properly assumed from CollectedFeesPerBlock.
@@ -196,6 +200,7 @@ module aptos_framework::coin {
     }
 
     /// Merges `coin` into aggregatable coin (`dst_coin`).
+    #[deprecated]
     public(friend) fun merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
         spec {
             update supply<CoinType> = supply<CoinType> - coin.value;
@@ -209,6 +214,7 @@ module aptos_framework::coin {
     }
 
     /// Collects a specified amount of coin form an account into aggregatable coin.
+    #[deprecated]
     public(friend) fun collect_into_aggregatable_coin<CoinType>(
         account_addr: address,
         amount: u64,

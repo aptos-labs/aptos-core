@@ -3,6 +3,8 @@
 
 # Module `0x1::aggregator`
 
+DEPRECATED in favor of <code>aptos_framework::aggregator_v2</code>.
+
 This module provides an interface for aggregators. Aggregators are similar to
 unsigned integers and support addition and subtraction (aborting on underflow
 or on overflowing a custom upper limit). The difference from integers is that
@@ -41,11 +43,10 @@ at the moment.**
 
 ## Struct `Aggregator`
 
-Represents an integer which supports parallel additions and subtractions
-across multiple transactions. See the module description for more details.
 
 
-<pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
+<pre><code>#[deprecated]
+<b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
 </code></pre>
 
 
@@ -117,10 +118,10 @@ Aggregator feature is not supported. Raised by native code.
 
 ## Function `limit`
 
-Returns <code>limit</code> exceeding which aggregator overflows.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
 </code></pre>
 
 
@@ -142,10 +143,10 @@ Returns <code>limit</code> exceeding which aggregator overflows.
 
 ## Function `add`
 
-Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
 </code></pre>
 
 
@@ -165,10 +166,10 @@ Adds <code>value</code> to aggregator. Aborts on overflowing the limit.
 
 ## Function `sub`
 
-Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
 </code></pre>
 
 
@@ -188,10 +189,10 @@ Subtracts <code>value</code> from aggregator. Aborts on going below zero.
 
 ## Function `read`
 
-Returns a value stored in this aggregator.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
 </code></pre>
 
 
@@ -211,10 +212,10 @@ Returns a value stored in this aggregator.
 
 ## Function `destroy`
 
-Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>)
 </code></pre>
 
 
@@ -240,7 +241,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Struct `Aggregator`
 
 
-<pre><code><b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
+<pre><code>#[deprecated]
+<b>struct</b> <a href="aggregator.md#0x1_aggregator_Aggregator">Aggregator</a> <b>has</b> store
 </code></pre>
 
 
@@ -278,7 +280,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `limit`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_limit">limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
 </code></pre>
 
 
@@ -350,7 +353,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `add`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_add">add</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
 </code></pre>
 
 
@@ -371,7 +375,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `sub`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_sub">sub</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>, value: u128)
 </code></pre>
 
 
@@ -391,7 +396,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `read`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_read">read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>): u128
 </code></pre>
 
 
@@ -410,7 +416,8 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 ### Function `destroy`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>)
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="aggregator.md#0x1_aggregator_destroy">destroy</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>: <a href="aggregator.md#0x1_aggregator_Aggregator">aggregator::Aggregator</a>)
 </code></pre>
 
 

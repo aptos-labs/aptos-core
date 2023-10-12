@@ -111,11 +111,10 @@ Stores mint capability to mint the refunds.
 
 ## Resource `CollectedFeesPerBlock`
 
-Stores information about the block proposer and the amount of fees
-collected when executing the block.
 
 
-<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
+<pre><code>#[deprecated]
+<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
 </code></pre>
 
 
@@ -693,7 +692,8 @@ Only called during genesis.
 ### Resource `CollectedFeesPerBlock`
 
 
-<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
+<pre><code>#[deprecated]
+<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a> <b>has</b> key
 </code></pre>
 
 
