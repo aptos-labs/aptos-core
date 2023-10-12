@@ -37,7 +37,7 @@ pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
 
 // TODO: do we want to make this configurable?
-const MAX_SERIALIZATION_QUEUE_SIZE_PER_APPLICATION: usize = 500;
+const MAX_SERIALIZATION_QUEUE_SIZE_PER_APPLICATION: usize = 5000;
 
 /// Events received by network clients in a validator
 ///
