@@ -4,17 +4,14 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    shared_mempool::{
-        broadcast_peers_selector::{BroadcastPeersSelector, PrioritizedPeersSelector},
-        start_shared_mempool,
-    },
+    shared_mempool::{broadcast_peers_selector::BroadcastPeersSelector, start_shared_mempool},
     MempoolClientSender, QuorumStoreRequest,
 };
 use anyhow::{format_err, Result};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
-    network_id::NetworkId,
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
@@ -22,6 +19,7 @@ use aptos_mempool_notifications::{self, MempoolNotifier};
 use aptos_network::{
     application::{
         interface::{NetworkClient, NetworkServiceEvents},
+        metadata::PeerMetadata,
         storage::PeersAndMetadata,
     },
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
@@ -32,6 +30,7 @@ use aptos_network::{
 };
 use aptos_storage_interface::{mock::MockDbReaderWriter, DbReaderWriter};
 use aptos_types::{
+    account_address::AccountAddress,
     mempool_status::MempoolStatusCode,
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
     transaction::SignedTransaction,
@@ -41,8 +40,40 @@ use aptos_vm_validator::{
 };
 use futures::channel::mpsc;
 use maplit::hashmap;
+use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::{Handle, Runtime};
+
+pub static MOCK_OUTBOUND_PEER_NETWORK_ID: Lazy<PeerNetworkId> = Lazy::new(PeerNetworkId::random);
+
+pub struct MockPeersSelector {
+    mock_peer: PeerNetworkId,
+}
+
+impl MockPeersSelector {
+    pub(crate) fn new() -> Self {
+        Self {
+            mock_peer: *MOCK_OUTBOUND_PEER_NETWORK_ID,
+        }
+    }
+}
+
+impl BroadcastPeersSelector for MockPeersSelector {
+    fn update_peers(
+        &mut self,
+        _: &HashMap<PeerNetworkId, PeerMetadata>,
+    ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
+        (vec![], vec![])
+    }
+
+    fn broadcast_peers(&self, _: &AccountAddress) -> Vec<PeerNetworkId> {
+        vec![self.mock_peer]
+    }
+
+    fn num_peers_to_select(&self) -> usize {
+        1
+    }
+}
 
 /// Mock of a running instance of shared mempool.
 pub struct MockSharedMempool {
@@ -108,8 +139,7 @@ impl MockSharedMempool {
         let mut config = NodeConfig::generate_random_config();
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
-        let inner_selector: Box<dyn BroadcastPeersSelector> =
-            Box::new(PrioritizedPeersSelector::new(1));
+        let inner_selector: Box<dyn BroadcastPeersSelector> = Box::new(MockPeersSelector::new());
         let broadcast_peers_selector = Arc::new(RwLock::new(inner_selector));
         let mempool = Arc::new(Mutex::new(CoreMempool::new(
             &config,

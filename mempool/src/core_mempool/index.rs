@@ -217,7 +217,7 @@ impl TimelineIndex {
         &self,
         timeline_id: u64,
         count: usize,
-        peer: Option<PeerNetworkId>,
+        peer: PeerNetworkId,
     ) -> (Vec<(AccountAddress, u64)>, u64) {
         let mut batch = vec![];
         let mut updated_timeline_id = timeline_id;
@@ -226,17 +226,14 @@ impl TimelineIndex {
             .range((Bound::Excluded(timeline_id), Bound::Unbounded))
         {
             updated_timeline_id = id;
-            match (peer, timeline_peer) {
-                (Some(peer), Some(timeline_peer)) => {
+            match timeline_peer {
+                Some(timeline_peer) => {
                     if peer == *timeline_peer {
                         batch.push((*address, *sequence_number));
                     }
                 },
-                (None, None) => {
+                None => {
                     batch.push((*address, *sequence_number));
-                },
-                _ => {
-                    panic!("mismatch: {:?}, {:?}", peer, timeline_peer);
                 },
             }
             if batch.len() == count {
@@ -381,7 +378,7 @@ impl MultiBucketTimelineIndex {
         &self,
         timeline_ids: &MultiBucketTimelineIndexIds,
         count: usize,
-        peer: Option<PeerNetworkId>,
+        peer: PeerNetworkId,
     ) -> (Vec<Vec<(AccountAddress, u64)>>, MultiBucketTimelineIndexIds) {
         assert_eq!(timeline_ids.id_per_bucket.len(), self.bucket_mins.len());
 

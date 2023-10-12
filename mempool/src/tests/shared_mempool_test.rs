@@ -4,7 +4,10 @@
 
 use crate::{
     mocks::MockSharedMempool,
-    tests::common::{batch_add_signed_txn, TestTransaction},
+    tests::{
+        common::{batch_add_signed_txn, TestTransaction},
+        mocks::MOCK_OUTBOUND_PEER_NETWORK_ID,
+    },
     QuorumStoreRequest,
 };
 use aptos_consensus_types::common::RejectedTransactionSummary;
@@ -49,7 +52,7 @@ fn test_consensus_events_rejected_txns() {
 
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
-    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10, None);
+    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10, *MOCK_OUTBOUND_PEER_NETWORK_ID);
     assert_eq!(timeline.len(), 2);
     assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
@@ -92,7 +95,7 @@ fn test_mempool_notify_committed_txns() {
 
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
-    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10, None);
+    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10, *MOCK_OUTBOUND_PEER_NETWORK_ID);
     assert_eq!(timeline.len(), 1);
     assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
