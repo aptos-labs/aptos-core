@@ -26,6 +26,7 @@ aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-fallible = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -65,9 +66,11 @@ num-traits = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
+scopeguard = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_genesis, gen_block_id, gen_ledger_info_with_sigs};
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{ensure, Result};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_consensus_types::block::Block;
@@ -24,8 +24,12 @@ use aptos_types::{
     event::EventKey,
     test_helpers::transaction_test_helpers::{block, BLOCK_GAS_LIMIT},
     transaction::{
-        Transaction, Transaction::UserTransaction, TransactionListWithProof, TransactionWithProof,
-        WriteSetPayload,
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
+        Transaction,
+        Transaction::UserTransaction,
+        TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
     waypoint::Waypoint,
@@ -124,7 +128,7 @@ pub fn test_execution_with_storage_impl_inner(
     let reconfig1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(100)));
 
-    let block1: Vec<_> = vec![
+    let block1: Vec<_> = into_signature_verified_block(vec![
         block1_meta,
         UserTransaction(tx1),
         UserTransaction(tx2),
@@ -136,7 +140,7 @@ pub fn test_execution_with_storage_impl_inner(
         UserTransaction(txn5),
         UserTransaction(txn6),
         UserTransaction(reconfig1),
-    ];
+    ]);
 
     let block2_id = gen_block_id(2);
     let block2_meta = Transaction::BlockMetadata(BlockMetadata::new(
@@ -191,55 +195,49 @@ pub fn test_execution_with_storage_impl_inner(
     let current_version = state_proof.latest_ledger_info().version();
     assert_eq!(trusted_state.version(), 11);
 
-    let t1 = db
-        .reader
-        .get_account_transaction(core_resources_account.address(), 3, false, current_version)
-        .unwrap();
-    verify_committed_txn_status(t1.as_ref(), &block1[4]).unwrap();
-
-    let t2 = db
-        .reader
-        .get_account_transaction(core_resources_account.address(), 4, false, current_version)
-        .unwrap();
-    verify_committed_txn_status(t2.as_ref(), &block1[5]).unwrap();
-
-    let t3 = db
-        .reader
-        .get_account_transaction(core_resources_account.address(), 5, false, current_version)
-        .unwrap();
-    verify_committed_txn_status(t3.as_ref(), &block1[6]).unwrap();
-
-    let reconfig1 = db
-        .reader
-        .get_account_transaction(core_resources_account.address(), 6, false, current_version)
-        .unwrap();
-    verify_committed_txn_status(reconfig1.as_ref(), &block1[10]).unwrap();
-
-    let tn = db
-        .reader
-        .get_account_transaction(core_resources_account.address(), 7, false, current_version)
-        .unwrap();
-    assert!(tn.is_none());
-
-    let t4 = db
-        .reader
-        .get_account_transaction(account1.address(), 0, true, current_version)
-        .unwrap();
-    verify_committed_txn_status(t4.as_ref(), &block1[7]).unwrap();
-    // We requested the events to come back from this one, so verify that they did
-    assert_eq!(t4.unwrap().events.unwrap().len(), 3);
-
     let t5 = db
         .reader
-        .get_account_transaction(account2.address(), 0, false, current_version)
+        .get_transaction_by_version(5, current_version, false)
         .unwrap();
-    verify_committed_txn_status(t5.as_ref(), &block1[8]).unwrap();
+    verify_committed_txn_status(&t5, &block1[4]).unwrap();
 
     let t6 = db
         .reader
-        .get_account_transaction(account1.address(), 1, true, current_version)
+        .get_transaction_by_version(6, current_version, false)
         .unwrap();
-    verify_committed_txn_status(t6.as_ref(), &block1[9]).unwrap();
+    verify_committed_txn_status(&t6, &block1[5]).unwrap();
+
+    let t7 = db
+        .reader
+        .get_transaction_by_version(7, current_version, false)
+        .unwrap();
+    verify_committed_txn_status(&t7, &block1[6]).unwrap();
+
+    let reconfig1 = db
+        .reader
+        .get_transaction_by_version(11, current_version, false)
+        .unwrap();
+    verify_committed_txn_status(&reconfig1, &block1[10]).unwrap();
+
+    let t8 = db
+        .reader
+        .get_transaction_by_version(8, current_version, true)
+        .unwrap();
+    verify_committed_txn_status(&t8, &block1[7]).unwrap();
+    // We requested the events to come back from this one, so verify that they did
+    assert_eq!(t8.events.unwrap().len(), 3);
+
+    let t9 = db
+        .reader
+        .get_transaction_by_version(9, current_version, false)
+        .unwrap();
+    verify_committed_txn_status(&t9, &block1[8]).unwrap();
+
+    let t10 = db
+        .reader
+        .get_transaction_by_version(10, current_version, true)
+        .unwrap();
+    verify_committed_txn_status(&t10, &block1[9]).unwrap();
 
     // test the initial balance.
     let db_state_view = db.reader.state_view_at_version(Some(7)).unwrap();
@@ -279,108 +277,109 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transactions(3, 12, current_version, false)
         .unwrap();
-    verify_transactions(&transaction_list_with_proof, &block1[2..]).unwrap();
+    let expected_txns: Vec<Transaction> = block1[2..]
+        .iter()
+        .map(|t| t.expect_valid().clone())
+        .collect();
+    verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
-    let account1_sent_events = db
-        .reader
-        .get_events(
-            &account1.sent_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account1_sent_events.len(), 2);
+    // With sharding enabled, we won't have indices for event, skip the checks.
+    if !force_sharding {
+        let account1_sent_events = db
+            .reader
+            .get_events(
+                &account1.sent_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account1_sent_events.len(), 2);
 
-    let account2_sent_events = db
-        .reader
-        .get_events(
-            &account2.sent_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account2_sent_events.len(), 1);
+        let account2_sent_events = db
+            .reader
+            .get_events(
+                &account2.sent_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account2_sent_events.len(), 1);
 
-    let account3_sent_events = db
-        .reader
-        .get_events(
-            &account3.sent_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account3_sent_events.len(), 0);
+        let account3_sent_events = db
+            .reader
+            .get_events(
+                &account3.sent_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account3_sent_events.len(), 0);
 
-    let account1_received_events = db
-        .reader
-        .get_events(
-            &account1.received_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    // Account1 has one deposit event since AptosCoin was minted to it.
-    assert_eq!(account1_received_events.len(), 1);
+        let account1_received_events = db
+            .reader
+            .get_events(
+                &account1.received_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        // Account1 has one deposit event since AptosCoin was minted to it.
+        assert_eq!(account1_received_events.len(), 1);
 
-    let account2_received_events = db
-        .reader
-        .get_events(
-            &account2.received_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    // Account2 has two deposit events: from being minted to and from one transfer.
-    assert_eq!(account2_received_events.len(), 2);
+        let account2_received_events = db
+            .reader
+            .get_events(
+                &account2.received_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        // Account2 has two deposit events: from being minted to and from one transfer.
+        assert_eq!(account2_received_events.len(), 2);
 
-    let account3_received_events = db
-        .reader
-        .get_events(
-            &account3.received_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    // Account3 has three deposit events: from being minted to and from two transfers.
-    assert_eq!(account3_received_events.len(), 3);
-    let account4_resource = db
-        .reader
-        .state_view_at_version(Some(current_version))
-        .unwrap()
-        .as_account_with_state_view(&account4.address())
-        .get_account_resource()
-        .unwrap();
-    assert!(account4_resource.is_none());
+        let account3_received_events = db
+            .reader
+            .get_events(
+                &account3.received_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        // Account3 has three deposit events: from being minted to and from two transfers.
+        assert_eq!(account3_received_events.len(), 3);
+        let account4_resource = db
+            .reader
+            .state_view_at_version(Some(current_version))
+            .unwrap()
+            .as_account_with_state_view(&account4.address())
+            .get_account_resource()
+            .unwrap();
+        assert!(account4_resource.is_none());
 
-    let account4_transaction = db
-        .reader
-        .get_account_transaction(account4.address(), 0, true, current_version)
-        .unwrap();
-    assert!(account4_transaction.is_none());
-
-    let account4_sent_events = db
-        .reader
-        .get_events(
-            &account4.sent_event_key(),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert!(account4_sent_events.is_empty());
+        let account4_sent_events = db
+            .reader
+            .get_events(
+                &account4.sent_event_key(),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert!(account4_sent_events.is_empty());
+    }
 
     // Execute block 2, 3, 4
     let output2 = executor
@@ -421,17 +420,17 @@ pub fn test_execution_with_storage_impl_inner(
     assert_eq!(current_version, 29);
 
     // More verification
-    let t7 = db
+    let t15 = db
         .reader
-        .get_account_transaction(account1.address(), 2, false, current_version)
+        .get_transaction_by_version(15, current_version, false)
         .unwrap();
-    verify_committed_txn_status(t7.as_ref(), &block3[1]).unwrap();
+    verify_committed_txn_status(&t15, &block3[1]).unwrap();
 
-    let t20 = db
+    let t28 = db
         .reader
-        .get_account_transaction(account1.address(), 15, false, current_version)
+        .get_transaction_by_version(28, current_version, false)
         .unwrap();
-    verify_committed_txn_status(t20.as_ref(), &block3[14]).unwrap();
+    verify_committed_txn_status(&t28, &block3[14]).unwrap();
 
     let db_state_view = db
         .reader
@@ -457,72 +456,76 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transactions(14, 15 + diff, current_version, false)
         .unwrap();
-    verify_transactions(&transaction_list_with_proof, &block3).unwrap();
+    let expected_txns: Vec<Transaction> = block3.iter().map(|t| t.expect_valid().clone()).collect();
+    verify_transactions(&transaction_list_with_proof, &expected_txns).unwrap();
 
-    let account1_sent_events_batch1 = db
-        .reader
-        .get_events(
-            &EventKey::new(3, account1.address()),
-            0,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account1_sent_events_batch1.len(), 10);
+    // With sharding enabled, we won't have indices for event, skip the checks.
+    if !force_sharding {
+        let account1_sent_events_batch1 = db
+            .reader
+            .get_events(
+                &EventKey::new(3, account1.address()),
+                0,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account1_sent_events_batch1.len(), 10);
 
-    let account1_sent_events_batch2 = db
-        .reader
-        .get_events(
-            &EventKey::new(3, account1.address()),
-            10,
-            Order::Ascending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account1_sent_events_batch2.len(), 6);
+        let account1_sent_events_batch2 = db
+            .reader
+            .get_events(
+                &EventKey::new(3, account1.address()),
+                10,
+                Order::Ascending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account1_sent_events_batch2.len(), 6);
 
-    let account3_received_events_batch1 = db
-        .reader
-        .get_events(
-            &EventKey::new(2, account3.address()),
-            u64::MAX,
-            Order::Descending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account3_received_events_batch1.len(), 10);
-    // Account3 has one extra deposit event from being minted to.
-    assert_eq!(
-        account3_received_events_batch1[0]
-            .event
-            .v1()
-            .unwrap()
-            .sequence_number(),
-        16
-    );
+        let account3_received_events_batch1 = db
+            .reader
+            .get_events(
+                &EventKey::new(2, account3.address()),
+                u64::MAX,
+                Order::Descending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account3_received_events_batch1.len(), 10);
+        // Account3 has one extra deposit event from being minted to.
+        assert_eq!(
+            account3_received_events_batch1[0]
+                .event
+                .v1()
+                .unwrap()
+                .sequence_number(),
+            16
+        );
 
-    let account3_received_events_batch2 = db
-        .reader
-        .get_events(
-            &EventKey::new(2, account3.address()),
-            6,
-            Order::Descending,
-            10,
-            current_version,
-        )
-        .unwrap();
-    assert_eq!(account3_received_events_batch2.len(), 7);
-    assert_eq!(
-        account3_received_events_batch2[0]
-            .event
-            .v1()
-            .unwrap()
-            .sequence_number(),
-        6
-    );
+        let account3_received_events_batch2 = db
+            .reader
+            .get_events(
+                &EventKey::new(2, account3.address()),
+                6,
+                Order::Descending,
+                10,
+                current_version,
+            )
+            .unwrap();
+        assert_eq!(account3_received_events_batch2.len(), 7);
+        assert_eq!(
+            account3_received_events_batch2[0]
+                .event
+                .v1()
+                .unwrap()
+                .sequence_number(),
+            6
+        );
+    }
 
     aptos_db
 }
@@ -591,15 +594,13 @@ pub fn verify_transactions(
 }
 
 pub fn verify_committed_txn_status(
-    txn_with_proof: Option<&TransactionWithProof>,
-    expected_txn: &Transaction,
+    txn_with_proof: &TransactionWithProof,
+    expected_txn: &SignatureVerifiedTransaction,
 ) -> Result<()> {
-    let txn = &txn_with_proof
-        .ok_or_else(|| anyhow!("Transaction is not committed."))?
-        .transaction;
+    let txn = &txn_with_proof.transaction;
 
     ensure!(
-        expected_txn == txn,
+        expected_txn.expect_valid() == txn,
         "The two transactions do not match. Expected txn: {:?}, returned txn: {:?}",
         expected_txn,
         txn,

@@ -6,7 +6,8 @@
 
 use crate::{
     components::{
-        chunk_output::ChunkOutput, in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
+        chunk_output::{update_counters_for_processed_chunk, ChunkOutput},
+        in_memory_state_calculator_v2::InMemoryStateCalculatorV2,
     },
     metrics::{APTOS_EXECUTOR_ERRORS, APTOS_EXECUTOR_OTHER_TIMERS_SECONDS},
 };
@@ -16,9 +17,11 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_executor_types::{
+    parsed_transaction_output::TransactionsWithParsedOutput,
     state_checkpoint_output::{StateCheckpointOutput, TransactionsByStatus},
     ExecutedChunk, LedgerUpdateOutput, ParsedTransactionOutput,
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::error;
 use aptos_storage_interface::{state_delta::StateDelta, ExecutedTrees};
 use aptos_types::{
@@ -115,10 +118,23 @@ impl ApplyChunkOutput {
 
         let (status, to_keep, to_discard, to_retry) = txns.into_inner();
 
+        update_counters_for_processed_chunk(to_keep.txns(), to_keep.parsed_outputs(), "execution");
+        update_counters_for_processed_chunk(
+            to_discard.txns(),
+            to_discard.parsed_outputs(),
+            "execution",
+        );
+        update_counters_for_processed_chunk(
+            to_retry.txns(),
+            to_retry.parsed_outputs(),
+            "execution",
+        );
+
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["assemble_ledger_diff_for_block"])
             .start_timer();
+
         let (to_commit, transaction_info_hashes, reconfig_events) =
             Self::assemble_ledger_diff(to_keep, state_updates_vec, state_checkpoint_hashes);
         let transaction_accumulator =
@@ -133,8 +149,8 @@ impl ApplyChunkOutput {
                 sharded_state_cache,
                 transaction_accumulator,
             },
-            to_discard,
-            to_retry,
+            to_discard.into_txns(),
+            to_retry.into_txns(),
         ))
     }
 
@@ -189,9 +205,9 @@ impl ApplyChunkOutput {
     ) -> Result<(
         bool,
         Vec<TransactionStatus>,
-        Vec<(Transaction, ParsedTransactionOutput)>,
-        Vec<Transaction>,
-        Vec<Transaction>,
+        TransactionsWithParsedOutput,
+        TransactionsWithParsedOutput,
+        TransactionsWithParsedOutput,
     )> {
         let mut transaction_outputs: Vec<ParsedTransactionOutput> =
             transaction_outputs.into_iter().map(Into::into).collect();
@@ -208,13 +224,17 @@ impl ApplyChunkOutput {
         // Transactions after the epoch ending txn are all to be retried.
         // Transactions after the txn that exceeded per-block gas limit are also to be retried.
         let to_retry = if let Some(pos) = new_epoch_marker {
-            transaction_outputs.drain(pos..);
-            transactions.drain(pos..).collect()
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
         } else if let Some(pos) = block_gas_limit_marker {
-            transaction_outputs.drain(pos..);
-            transactions.drain(pos..).collect()
+            TransactionsWithParsedOutput::new(
+                transactions.drain(pos..).collect(),
+                transaction_outputs.drain(pos..).collect(),
+            )
         } else {
-            vec![]
+            TransactionsWithParsedOutput::new(vec![], vec![])
         };
 
         let state_checkpoint_to_add =
@@ -269,21 +289,21 @@ impl ApplyChunkOutput {
                     );
                     APTOS_EXECUTOR_ERRORS.inc();
                 }
-                Ok(t)
+                Ok((t, o))
             })
             .collect::<Result<Vec<_>>>()?;
 
         Ok((
             new_epoch_marker.is_some(),
             status,
-            to_keep,
-            to_discard,
+            to_keep.into(),
+            to_discard.into(),
             to_retry,
         ))
     }
 
     fn assemble_ledger_diff(
-        to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
+        to_keep: TransactionsWithParsedOutput,
         state_updates_vec: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
     ) -> (Vec<TransactionToCommit>, Vec<HashValue>, Vec<ContractEvent>) {
@@ -294,7 +314,7 @@ impl ApplyChunkOutput {
         let num_txns = to_keep.len();
         let mut to_commit = Vec::with_capacity(num_txns);
         let mut txn_info_hashes = Vec::with_capacity(num_txns);
-        let hashes_vec = Self::calculate_events_and_writeset_hashes(&to_keep);
+        let hashes_vec = Self::calculate_events_and_writeset_hashes(to_keep.parsed_outputs());
         let hashes_vec: Vec<(HashValue, HashValue)> = hashes_vec
             .into_par_iter()
             .map(|(event_hashes, write_set_hash)| {
@@ -307,13 +327,16 @@ impl ApplyChunkOutput {
             .collect();
 
         let mut all_reconfig_events = Vec::new();
+        let (to_keep_txns, to_keep_outputs) = to_keep.into_inner();
         for (
-            (txn, txn_output),
+            txn,
+            txn_output,
             state_checkpoint_hash,
             state_updates,
             (event_root_hash, write_set_hash),
         ) in itertools::izip!(
-            to_keep,
+            to_keep_txns,
+            to_keep_outputs,
             state_checkpoint_hashes,
             state_updates_vec,
             hashes_vec
@@ -349,15 +372,16 @@ impl ApplyChunkOutput {
     }
 
     fn calculate_events_and_writeset_hashes(
-        to_keep: &Vec<(Transaction, ParsedTransactionOutput)>,
+        to_keep: &[ParsedTransactionOutput],
     ) -> Vec<(Vec<HashValue>, HashValue)> {
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["calculate_events_and_writeset_hashes"])
             .start_timer();
+        let num_txns = to_keep.len();
         to_keep
             .par_iter()
-            .with_min_len(16)
-            .map(|(_, txn_output)| {
+            .with_min_len(optimal_min_len(num_txns, 64))
+            .map(|txn_output| {
                 (
                     txn_output
                         .events()

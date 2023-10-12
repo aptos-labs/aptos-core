@@ -5,16 +5,15 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    resolver::{AggregatorReadMode, TAggregatorView},
-};
+use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
+#[cfg(feature = "testing")]
+use aptos_types::aggregator::AggregatorID;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},

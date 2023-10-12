@@ -10,6 +10,7 @@ pub mod bls12381;
 pub mod bulletproofs;
 pub mod compat;
 pub mod ed25519;
+pub mod encoding_type;
 pub mod error;
 pub mod hash;
 pub mod hkdf;

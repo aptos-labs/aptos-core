@@ -4,8 +4,11 @@
 use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_executor_types::{ParsedTransactionOutput, ProofReader};
+use aptos_executor_types::{
+    parsed_transaction_output::TransactionsWithParsedOutput, ParsedTransactionOutput, ProofReader,
+};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_logger::info;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
@@ -20,7 +23,7 @@ use aptos_types::{
         create_empty_sharded_state_updates, state_key::StateKey,
         state_storage_usage::StateStorageUsage, state_value::StateValue, ShardedStateUpdates,
     },
-    transaction::{Transaction, Version},
+    transaction::Version,
     write_set::TransactionWrite,
 };
 use arr_macro::arr;
@@ -68,7 +71,7 @@ impl InMemoryStateCalculatorV2 {
     pub fn calculate_for_transactions(
         base: &StateDelta,
         state_cache: StateCache,
-        to_keep: &[(Transaction, ParsedTransactionOutput)],
+        to_keep: &TransactionsWithParsedOutput,
         new_epoch: bool,
         is_block: bool,
     ) -> Result<(
@@ -104,16 +107,11 @@ impl InMemoryStateCalculatorV2 {
             ));
         }
 
-        let state_updates_vec = Self::get_sharded_state_updates(to_keep);
+        let state_updates_vec = Self::get_sharded_state_updates(to_keep.parsed_outputs());
 
         // If there are multiple checkpoints in the chunk, we only calculate the SMT (and its root
         // hash) for the last one.
-        let last_checkpoint_index = to_keep
-            .iter()
-            .enumerate()
-            .rev()
-            .find(|(_, (txn, txn_output))| Self::need_checkpoint(txn, txn_output))
-            .map(|(index, _)| index);
+        let last_checkpoint_index = to_keep.get_last_checkpoint_index();
 
         let (updates_before_last_checkpoint, updates_after_last_checkpoint) =
             if let Some(index) = last_checkpoint_index {
@@ -173,10 +171,6 @@ impl InMemoryStateCalculatorV2 {
             latest_checkpoint_version = Some(first_version + index as u64);
         }
 
-        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
-            drop(frozen_base);
-        });
-
         let current_version = first_version + num_txns as u64 - 1;
         // We need to calculate the SMT at the end of the chunk, if it is not already calculated.
         let current_tree = if last_checkpoint_index == Some(num_txns - 1) {
@@ -198,6 +192,10 @@ impl InMemoryStateCalculatorV2 {
             )?
         };
 
+        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
+            drop(frozen_base);
+        });
+
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint
         } else {
@@ -209,6 +207,14 @@ impl InMemoryStateCalculatorV2 {
             .for_each(|(base, delta)| base.extend(delta));
             updates_since_latest_checkpoint
         };
+
+        info!(
+            "last_checkpoint_index {last_checkpoint_index:?}, result_state: {latest_checkpoint_version:?} {:?} {:?} {current_version} {:?} {:?}",
+            latest_checkpoint.root_hash(),
+            latest_checkpoint.usage(),
+            current_tree.root_hash(),
+            current_tree.usage(),
+        );
 
         let result_state = StateDelta::new(
             latest_checkpoint.clone(),
@@ -228,25 +234,13 @@ impl InMemoryStateCalculatorV2 {
         ))
     }
 
-    fn need_checkpoint(txn: &Transaction, txn_output: &ParsedTransactionOutput) -> bool {
-        if txn_output.is_reconfig() {
-            return true;
-        }
-        match txn {
-            Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => false,
-            Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
-        }
-    }
-
-    fn get_sharded_state_updates(
-        to_keep: &[(Transaction, ParsedTransactionOutput)],
-    ) -> Vec<ShardedStateUpdates> {
+    fn get_sharded_state_updates(to_keep: &[ParsedTransactionOutput]) -> Vec<ShardedStateUpdates> {
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["get_sharded_state_updates"])
             .start_timer();
         to_keep
             .par_iter()
-            .map(|(_, txn_output)| {
+            .map(|txn_output| {
                 let mut updates = arr![HashMap::new(); 16];
                 txn_output
                     .write_set()
@@ -400,7 +394,7 @@ impl InMemoryStateCalculatorV2 {
 
     fn validate_input_for_block(
         base: &StateDelta,
-        to_keep: &[(Transaction, ParsedTransactionOutput)],
+        to_keep: &TransactionsWithParsedOutput,
     ) -> Result<()> {
         let num_txns = to_keep.len();
         ensure!(num_txns != 0, "Empty block is not allowed.");
@@ -421,7 +415,7 @@ impl InMemoryStateCalculatorV2 {
 
         for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
             ensure!(
-                Self::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
+                TransactionsWithParsedOutput::need_checkpoint(txn, txn_output) ^ (i != num_txns - 1),
                 "Checkpoint is allowed iff it's the last txn in the block. index: {i}, is_last: {}, txn: {txn:?}, is_reconfig: {}",
                 i == num_txns - 1,
                 txn_output.is_reconfig()

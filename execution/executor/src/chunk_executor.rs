@@ -21,6 +21,7 @@ use aptos_executor_types::{
     ChunkCommitNotification, ChunkExecutorTrait, ExecutedChunk, ParsedTransactionOutput,
     TransactionReplayer, VerifyExecutionMode,
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
@@ -32,15 +33,28 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
 use aptos_vm::VMExecutor;
 use fail::fail_point;
 use itertools::multizip;
+use once_cell::sync::Lazy;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::{iter::once, marker::PhantomData, sync::Arc};
+
+pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -207,12 +221,23 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             num_txns,
         )?;
 
+        // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
+        // as only transactions with verified signatures are committed to the storage.
+        let num_txns = transactions.len();
+        let sig_verified_txns = SIG_VERIFY_POOL.install(|| {
+            transactions
+                .into_par_iter()
+                .with_min_len(optimal_min_len(num_txns, 32))
+                .map(|t| t.into())
+                .collect::<Vec<_>>()
+        });
+
         // Execute transactions.
         let state_view = self.state_view(&latest_view)?;
         let chunk_output = {
             let _timer = APTOS_EXECUTOR_VM_EXECUTE_CHUNK_SECONDS.start_timer();
             // State sync executor shouldn't have block gas limit.
-            ChunkOutput::by_transaction_execution::<V>(transactions.into(), state_view, None)?
+            ChunkOutput::by_transaction_execution::<V>(sig_verified_txns.into(), state_view, None)?
         };
         let executed_chunk = Self::apply_chunk_output_for_state_sync(
             verified_target_li,
@@ -540,7 +565,8 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
             .iter()
             .take((end_version - begin_version) as usize)
             .cloned()
-            .collect::<Vec<Transaction>>();
+            .map(|t| t.into())
+            .collect::<Vec<SignatureVerifiedTransaction>>();
 
         // State sync executor shouldn't have block gas limit.
         let chunk_output =

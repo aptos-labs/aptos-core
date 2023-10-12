@@ -24,6 +24,7 @@
 !aptos-move/framework/
 !aptos-move/move-examples/hello_blockchain/
 !crates/aptos/src/move_tool/*.bpl
+!crates/aptos/src/node/local_testnet/hasura_metadata.json
 !crates/aptos-faucet/doc/
 !api/doc/
 !crates/indexer/migrations/**/*.sql

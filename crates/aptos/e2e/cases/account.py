@@ -62,9 +62,9 @@ def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"Account {OTHER_ACCOUNT_ONE.account_address} has balance {balance}, expected 0"
         )
-    
+
     transfer_amount = 1000
-    
+
     run_helper.run_command(
         test_name,
         [
@@ -87,7 +87,7 @@ def test_account_create_and_transfer(run_helper: RunHelper, test_name=None):
         raise TestError(
             f"Account {OTHER_ACCOUNT_ONE.account_address} has balance {balance}, expected {transfer_amount}"
         )
-    
+
 
 @test_case
 def test_account_list(run_helper: RunHelper, test_name=None):
@@ -115,6 +115,7 @@ def test_account_list(run_helper: RunHelper, test_name=None):
         raise TestError(
             "Cannot find the account in the account list after account creation"
         )
+
 
 @test_case
 def test_account_lookup_address(run_helper: RunHelper, test_name=None):
