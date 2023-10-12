@@ -692,7 +692,6 @@ impl Interpreter {
             err = new_err.finish(err.location().clone())
         }
         if err.status_type() == StatusType::InvariantViolation
-            && err.major_status() != StatusCode::STORAGE_ERROR // should we core dump on storage error, now that aggregators have their own?
             && err.major_status() != StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
         {
             let location = err.location().clone();
