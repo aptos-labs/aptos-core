@@ -288,7 +288,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     + onchain_config.max_failed_authors_to_store()
                     + PROPOSER_ROUND_BEHIND_STORAGE_BUFFER;
 
-                let backend = Box::new(AptosDBBackend::new(
+                let backend = Arc::new(AptosDBBackend::new(
                     window_size,
                     seek_len,
                     self.storage.aptos_db(),

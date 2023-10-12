@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::anchor_election::AnchorElection;
+use crate::dag::{anchor_election::AnchorElection, storage::CommitEvent};
 use aptos_consensus_types::common::{Author, Round};
 
 pub struct RoundRobinAnchorElection {
@@ -19,12 +19,5 @@ impl AnchorElection for RoundRobinAnchorElection {
         self.validators[(round / 2) as usize % self.validators.len()]
     }
 
-    fn update_reputation(
-        &mut self,
-        _round: Round,
-        _author: &Author,
-        _parents: Vec<Author>,
-        _failed_authors: Vec<Author>,
-    ) {
-    }
+    fn update_reputation(&mut self, _event: CommitEvent) {}
 }
