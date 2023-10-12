@@ -208,8 +208,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
 
-    fn shutdown(&mut self) {
-    }
+    fn shutdown(&mut self) {}
 }
 
 impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {

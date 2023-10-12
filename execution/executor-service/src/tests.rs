@@ -60,7 +60,6 @@ fn test_sharded_block_executor_no_conflict() {
     let num_shards = 8;
     let (executor_client, mut executor_services) =
         create_thread_remote_executor_shards(num_shards, Some(2));
-    //controller.start();
     let sharded_block_executor = ShardedBlockExecutor::new(executor_client);
 
     // wait for the servers to be ready before sending messages
@@ -81,7 +80,6 @@ fn test_sharded_block_executor_with_conflict() {
     let num_shards = 8;
     let (executor_client, mut executor_services) =
         create_thread_remote_executor_shards(num_shards, Some(2));
-    //controller.start();
     let sharded_block_executor = ShardedBlockExecutor::new(executor_client);
 
     // wait for the servers to be ready before sending messages
