@@ -23,6 +23,7 @@ pub struct VMConfig {
     pub type_max_cost: u64,
     pub type_base_cost: u64,
     pub type_byte_cost: u64,
+    pub aggregator_v2_type_tagging: bool,
 }
 
 impl Default for VMConfig {
@@ -37,6 +38,7 @@ impl Default for VMConfig {
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
+            aggregator_v2_type_tagging: true,
         }
     }
 }

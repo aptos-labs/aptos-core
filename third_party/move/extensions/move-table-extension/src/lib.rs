@@ -89,14 +89,14 @@ pub struct TableChange {
 /// A table resolver which needs to be provided by the environment. This allows to lookup
 /// data in remote storage, as well as retrieve cost of table operations.
 pub trait TableResolver {
-    fn resolve_table_entry_value(
+    // TODO merge these two functions into one, with optional layout
+
+    fn resolve_table_entry_bytes_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
-        #[allow(unused_variables)] layout: &MoveTypeLayout,
-    ) -> Result<Option<Bytes>, anyhow::Error> {
-        self.resolve_table_entry_bytes(handle, key)
-    }
+        layout: &MoveTypeLayout,
+    ) -> Result<Option<Bytes>, anyhow::Error>;
 
     fn resolve_table_entry_bytes(
         &self,

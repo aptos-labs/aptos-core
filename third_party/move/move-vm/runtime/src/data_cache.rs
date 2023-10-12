@@ -191,8 +191,9 @@ impl<'r> TransactionDataCache<'r> {
             // Remote, in turn ensures that all aggregator values are lifted if the resolved
             // resource comes from storage.
             let resolved_result = if has_aggregator_lifting {
-                self.remote
-                    .get_resource_value_with_metadata(&addr, &ty_tag, metadata, &ty_layout)
+                self.remote.get_resource_bytes_with_metadata_and_layout(
+                    &addr, &ty_tag, metadata, &ty_layout,
+                )
             } else {
                 self.remote
                     .get_resource_bytes_with_metadata(&addr, &ty_tag, metadata)

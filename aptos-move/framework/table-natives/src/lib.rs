@@ -220,7 +220,7 @@ impl Table {
                 let resolved_data = if self.value_layout_info.has_aggregator_lifting {
                     // There is an aggregator lifting: need to pass layout to ensure
                     // it gets recorded.
-                    context.resolver.resolve_table_entry_value(
+                    context.resolver.resolve_table_entry_bytes_with_layout(
                         &self.handle,
                         entry.key(),
                         &self.value_layout_info.layout,

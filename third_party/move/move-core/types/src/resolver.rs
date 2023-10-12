@@ -44,7 +44,7 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 pub trait ResourceResolver {
     // TODO: this can return Value, so that we can push deserialization to
     // implementations of `ResourceResolver`.
-    fn get_resource_value_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,

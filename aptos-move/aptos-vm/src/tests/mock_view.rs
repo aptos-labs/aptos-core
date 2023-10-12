@@ -137,7 +137,7 @@ macro_rules! patch_blob_from_db {
 }
 
 impl ResourceResolver for MockStateView {
-    fn get_resource_value_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
@@ -186,7 +186,7 @@ impl ResourceResolver for MockStateView {
 }
 
 impl TableResolver for MockStateView {
-    fn resolve_table_entry_value(
+    fn resolve_table_entry_bytes_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
