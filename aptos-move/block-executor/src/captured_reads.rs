@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
-use aptos_aggregator::types::{DelayedFieldValue, PanicOr, ReadPosition};
+use aptos_aggregator::types::{
+    code_invariant_error, DelayedFieldValue, PanicError, PanicOr, ReadPosition,
+};
 use aptos_mvhashmap::{
     types::{MVDataError, MVDataOutput, MVDelayedFieldsError, TxnIndex, Version},
     versioned_data::VersionedData,
@@ -283,33 +285,17 @@ impl<T: Transaction> CapturedReads<T> {
         &mut self,
         id: T::Identifier,
         value: DelayedFieldValue,
-    ) -> anyhow::Result<()> {
-        let ret = match self.delayed_field_reads.entry(id) {
+    ) -> Result<(), PanicError> {
+        match self.delayed_field_reads.entry(id) {
             Vacant(e) => {
                 e.insert(value);
-                UpdateResult::Inserted
+                // Inserted
+                Ok(())
             },
-            Occupied(mut e) => {
-                let existing_read = e.get_mut();
-                if value == *existing_read {
-                    UpdateResult::Updated
-                } else {
-                    UpdateResult::Inconsistency(format!(
-                        "Read {:?} must be consistent with the already stored read {:?}",
-                        value, existing_read
-                    ))
-                }
-            },
-        };
-
-        match ret {
-            UpdateResult::IncorrectUse(_) => unreachable!(),
-            UpdateResult::Inconsistency(m) => {
-                // Record speculative failure.
-                self.speculative_failure = true;
-                bail!(m);
-            },
-            UpdateResult::Updated | UpdateResult::Inserted => Ok(()),
+            Occupied(e) => Err(code_invariant_error(format!(
+                "We should read a single DelayedField only once within a transaction, for id {:?}",
+                e.key(),
+            ))),
         }
     }
 
@@ -410,7 +396,6 @@ impl<T: Transaction> CapturedReads<T> {
         })
     }
 
-    #[allow(dead_code)]
     pub(crate) fn validate_delayed_field_reads(
         &self,
         delayed_fields: &VersionedDelayedFields<T::Identifier>,
