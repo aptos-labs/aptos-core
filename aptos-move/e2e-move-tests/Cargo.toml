@@ -45,6 +45,7 @@ serde = { workspace = true }
 tempfile = { workspace = true }
 
 [dev-dependencies]
+claims = { workspace = true }
 test-case = { workspace = true }
 
 [lib]

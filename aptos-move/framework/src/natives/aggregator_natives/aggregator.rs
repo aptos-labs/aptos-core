@@ -8,8 +8,11 @@ use crate::natives::aggregator_natives::{
 use aptos_aggregator::types::{AggregatorVersionedID, ReadPosition};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
+use move_binary_format::errors::PartialVMError;
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -17,6 +20,18 @@ use move_vm_types::{
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+
+/// The value of aggregator overflows. Raised by native code.
+pub(crate) const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+
+/// The value of aggregator underflows (goes below zero). Raised by native code.
+pub(crate) const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
+
+pub(crate) fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
+    PartialVMError::new(StatusCode::ABORTED)
+        .with_message(message.to_string())
+        .with_sub_status(code)
+}
 
 /***************************************************************************************************
  * native fun add(aggregator: &mut Aggregator, value: u128);
@@ -34,15 +49,23 @@ fn native_add(
     context.charge(AGGREGATOR_ADD_BASE)?;
 
     // Get aggregator information and a value to add.
-    let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let input = safely_pop_arg!(args, u128);
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    aggregator.try_add(value, aggregator_context.resolver)?;
-    Ok(smallvec![])
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let result = aggregator.try_add(input, aggregator_context.resolver)?;
+
+    if result {
+        Ok(smallvec![])
+    } else {
+        Err(SafeNativeError::from(abort_error(
+            "Aggregator_v1 overflow",
+            EAGGREGATOR_OVERFLOW,
+        )))
+    }
 }
 
 /***************************************************************************************************
@@ -61,12 +84,12 @@ fn native_read(
     context.charge(AGGREGATOR_READ_BASE)?;
 
     // Extract information from aggregator struct reference.
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
+    let aggregator = aggregator_data.get_aggregator(id.clone(), max_value)?;
 
     let value = aggregator.read_aggregated_aggregator_value(
         aggregator_context.resolver,
@@ -93,15 +116,23 @@ fn native_sub(
     context.charge(AGGREGATOR_SUB_BASE)?;
 
     // Get aggregator information and a value to subtract.
-    let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let input = safely_pop_arg!(args, u128);
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
-    aggregator.try_sub(value, aggregator_context.resolver)?;
-    Ok(smallvec![])
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
+    let result = aggregator.try_sub(input, aggregator_context.resolver)?;
+
+    if result {
+        Ok(smallvec![])
+    } else {
+        Err(SafeNativeError::from(abort_error(
+            "Aggregator_v1 underflow",
+            EAGGREGATOR_UNDERFLOW,
+        )))
+    }
 }
 
 /***************************************************************************************************
