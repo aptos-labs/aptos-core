@@ -6,6 +6,7 @@ use crate::{
     partitioning::{PartitionId, StreamingGraphPartitioner},
 };
 use aptos_types::batched_stream::BatchedStream;
+use aptos_logger::info;
 
 /// The type used to represent real numbers in this implementation.
 /// For simplicity, it is a fixed type and not a generic parameter.
@@ -141,10 +142,13 @@ pub struct FennelGraphPartitioner {
 
 impl FennelGraphPartitioner {
     pub fn new(n_partitions: usize) -> Self {
+        let balance_constraint = std::env::var("FENNEL_BALANCE_CONSTRAINT").map(|v|v.parse::<f64>().unwrap_or(0.1)).unwrap_or(0.1);
+        let gamma = 1.5;
+        info!("Creating FennelGraphPartitioner with balance_constraint={}, gamma={}", balance_constraint, gamma);
         Self {
             n_partitions,
-            balance_constraint: 0.1,
-            gamma: 1.5,
+            balance_constraint,
+            gamma,
             balance_constraint_mode: BalanceConstraintMode::Prefix,
             alpha_computation_mode: AlphaComputationMode::Prefix,
         }
