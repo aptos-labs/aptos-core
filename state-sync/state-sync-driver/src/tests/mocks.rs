@@ -152,7 +152,6 @@ mock! {
         fn enqueue_chunk_by_execution<'a>(
             &self,
             txn_list_with_proof: TransactionListWithProof,
-            // Target LI that has been verified independently: the proofs are relative to this version.
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> Result<()>;
@@ -160,7 +159,6 @@ mock! {
         fn enqueue_chunk_by_transaction_outputs<'a>(
             &self,
             txn_output_list_with_proof: TransactionOutputListWithProof,
-            // Target LI that has been verified independently: the proofs are relative to this version.
             verified_target_li: &LedgerInfoWithSignatures,
             epoch_change_li: Option<&'a LedgerInfoWithSignatures>,
         ) -> Result<()>;
