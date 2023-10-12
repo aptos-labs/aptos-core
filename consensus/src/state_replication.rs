@@ -60,9 +60,9 @@ pub trait StateComputer: Send + Sync {
         block: &Block,
         // The parent block root hash.
         parent_block_id: HashValue,
-        maybe_randomness: Option<Randomness>,
+        randomness: Randomness,
     ) -> ExecutorResult<StateComputeResult> {
-        self.schedule_compute(block, parent_block_id, maybe_randomness).await.await
+        self.schedule_compute(block, parent_block_id, randomness).await.await
     }
 
     async fn schedule_compute(
@@ -71,7 +71,7 @@ pub trait StateComputer: Send + Sync {
         _block: &Block,
         // The parent block root hash.
         _parent_block_id: HashValue,
-        _maybe_randomness: Option<Randomness>,
+        _randomness: Randomness,
     ) -> StateComputeResultFut {
         unimplemented!("This state computer does not support scheduling");
     }

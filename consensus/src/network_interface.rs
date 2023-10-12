@@ -8,7 +8,7 @@ use crate::{
     dag::DAGNetworkMessage,
     experimental,
     dkg::DKGNetworkMessage,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest}, randomness::types::RandMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -73,6 +73,8 @@ pub enum ConsensusMsg {
     CommitMessage(Box<CommitMessage>),
     /// DKG protocol message
     DKGMessage(Box<DKGNetworkMessage>),
+    /// Randomness message
+    RandMessage(Box<RandMessage>),
 }
 
 /// Network type for consensus
@@ -98,6 +100,7 @@ impl ConsensusMsg {
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
             ConsensusMsg::DKGMessage(_) => "DKGMessage",
+            ConsensusMsg::RandMessage(_) => "RandMessage",
         }
     }
 }

@@ -36,6 +36,7 @@ mod payload_client;
 mod pending_votes;
 mod persistent_liveness_storage;
 mod quorum_store;
+mod randomness;
 mod recovery_manager;
 mod round_manager;
 mod state_computer;

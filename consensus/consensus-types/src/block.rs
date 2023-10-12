@@ -382,7 +382,7 @@ impl Block {
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        maybe_randomness: Option<Randomness>,
+        randomness: Randomness,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
             // After the per-block gas limit change, StateCheckpoint txn
@@ -390,7 +390,7 @@ impl Block {
             once(Transaction::BlockMetadata(self.new_block_metadata(
                 validators,
                 maybe_dkg_transcript,
-                maybe_randomness,
+                randomness,
             )))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .collect()
@@ -400,7 +400,7 @@ impl Block {
             once(Transaction::BlockMetadata(self.new_block_metadata(
                 validators,
                 maybe_dkg_transcript,
-                maybe_randomness,
+                randomness,
             )))
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .chain(once(Transaction::StateCheckpoint(self.id)))
@@ -420,7 +420,7 @@ impl Block {
         &self,
         validators: &[AccountAddress],
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        maybe_randomness: Option<Randomness>,
+        randomness: Randomness,
     ) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
@@ -436,7 +436,7 @@ impl Block {
                 }),
             self.timestamp_usecs(),
             maybe_dkg_transcript,
-            maybe_randomness,
+            randomness,
         )
     }
 

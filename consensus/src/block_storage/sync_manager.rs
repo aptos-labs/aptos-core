@@ -158,7 +158,7 @@ impl BlockStore {
         while let Some(block) = pending.pop() {
             let block_qc = block.quorum_cert().clone();
             self.insert_single_quorum_cert(block_qc)?;
-            self.execute_and_insert_block(block).await?;
+            self.execute_and_insert_block(block.clone()).await?;
         }
         self.insert_single_quorum_cert(qc)
     }

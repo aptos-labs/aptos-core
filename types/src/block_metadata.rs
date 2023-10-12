@@ -29,7 +29,7 @@ pub struct BlockMetadata {
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
     maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-    maybe_randomness: Option<Randomness>,
+    randomness: Randomness,
 }
 
 impl BlockMetadata {
@@ -42,7 +42,7 @@ impl BlockMetadata {
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        maybe_randomness: Option<Randomness>,
+        randomness: Randomness,
     ) -> Self {
         Self {
             id,
@@ -53,7 +53,7 @@ impl BlockMetadata {
             failed_proposer_indices,
             timestamp_usecs,
             maybe_dkg_transcript,
-            maybe_randomness,
+            randomness,
         }
     }
 
@@ -118,7 +118,7 @@ impl BlockMetadata {
                 .map(MoveValue::U8)
                 .collect(),
         ));
-        // dkg todo: pass in randomness
+        // rand todo: pass in randomness
         ret
     }
 
@@ -150,7 +150,7 @@ impl BlockMetadata {
         &self.maybe_dkg_transcript
     }
 
-    pub fn maybe_randomness(&self) -> &Option<Randomness> {
-        &self.maybe_randomness
+    pub fn randomness(&self) -> &Randomness {
+        &self.randomness
     }
 }

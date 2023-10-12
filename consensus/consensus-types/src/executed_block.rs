@@ -31,12 +31,17 @@ pub struct ExecutedBlock {
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
-    maybe_randomness: Option<Randomness>,
+    randomness: Option<Randomness>,
 }
 
 impl ExecutedBlock {
     pub fn replace_result(mut self, result: StateComputeResult) -> Self {
         self.state_compute_result = result;
+        self
+    }
+
+    pub fn replace_randomness(mut self, randomness: Randomness) -> Self {
+        self.randomness = Some(randomness);
         self
     }
 }
@@ -57,21 +62,17 @@ impl ExecutedBlock {
     pub fn new(
         block: Block,
         state_compute_result: StateComputeResult,
-        maybe_randomness: Option<Randomness>,
+        randomness: Option<Randomness>,
     ) -> Self {
         Self {
             block,
             state_compute_result,
-            maybe_randomness,
+            randomness,
         }
     }
 
     pub fn block(&self) -> &Block {
         &self.block
-    }
-
-    pub fn maybe_randomness(&self) -> Option<Randomness> {
-        self.maybe_randomness.clone()
     }
 
     pub fn id(&self) -> HashValue {
@@ -106,6 +107,16 @@ impl ExecutedBlock {
         &self.state_compute_result
     }
 
+    pub fn randomness(&self) -> Randomness {
+        self.randomness
+            .clone()
+            .expect("Randomness should be set when block is executed")
+    }
+
+    pub fn has_randomness(&self) -> bool {
+        self.randomness.is_some()
+    }
+
     pub fn block_info(&self) -> BlockInfo {
         self.block().gen_block_info(
             self.compute_result().root_hash(),
@@ -129,7 +140,7 @@ impl ExecutedBlock {
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        maybe_randomness: Option<Randomness>,
+        randomness: Randomness,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
 
@@ -142,7 +153,7 @@ impl ExecutedBlock {
             txns,
             block_gas_limit,
             maybe_dkg_transcript,
-            maybe_randomness,
+            randomness,
         );
         if block_gas_limit.is_some() && !self.state_compute_result.has_reconfiguration() {
             // After the per-block gas limit change,

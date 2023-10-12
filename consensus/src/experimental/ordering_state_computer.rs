@@ -6,13 +6,13 @@ use crate::{
     dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
     experimental::{
-        buffer_manager::{OrderedBlocks, ResetAck, ResetRequest},
+        buffer_manager::{ResetAck, ResetRequest},
         errors::Error,
     },
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, randomness::block_queue::OrderedBlocks,
 };
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
@@ -39,19 +39,22 @@ pub struct OrderingStateComputer {
     // the real execution phase (will be handled in ExecutionPhase).
     executor_channel: UnboundedSender<OrderedBlocks>,
     state_computer_for_sync: Arc<dyn StateComputer>,
-    reset_event_channel_tx: UnboundedSender<ResetRequest>,
+    reset_rand_manager_channel_tx: UnboundedSender<ResetRequest>,
+    reset_buffer_manager_channel_tx: UnboundedSender<ResetRequest>,
 }
 
 impl OrderingStateComputer {
     pub fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         state_computer_for_sync: Arc<dyn StateComputer>,
-        reset_event_channel_tx: UnboundedSender<ResetRequest>,
+        reset_rand_manager_channel_tx: UnboundedSender<ResetRequest>,
+        reset_buffer_manager_channel_tx: UnboundedSender<ResetRequest>,
     ) -> Self {
         Self {
             executor_channel,
             state_computer_for_sync,
-            reset_event_channel_tx,
+            reset_rand_manager_channel_tx,
+            reset_buffer_manager_channel_tx,
         }
     }
 }
@@ -64,7 +67,7 @@ impl StateComputer for OrderingStateComputer {
         _block: &Block,
         // The parent block id.
         _parent_block_id: HashValue,
-        _maybe_randomness: Option<Randomness>,
+        _randomness: Randomness,
     ) -> ExecutorResult<StateComputeResult> {
         // Return dummy block and bypass the execution phase.
         // This will break the e2e smoke test (for now because
@@ -83,9 +86,6 @@ impl StateComputer for OrderingStateComputer {
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
 
-        // dkg todo: generate randomness (from the DAG proposals) and insert to the blocks for the optimistic case
-        // I think this interface may change after the DAG
-
         if self
             .executor_channel
             .clone()
@@ -96,6 +96,8 @@ impl StateComputer for OrderingStateComputer {
                     .collect::<Vec<ExecutedBlock>>(),
                 ordered_proof: finality_proof,
                 callback,
+                maybe_randomness: None, // rand todo: pass in optimistic randomness
+                timed_drop_guard: None,
             })
             .await
             .is_err()
@@ -112,9 +114,21 @@ impl StateComputer for OrderingStateComputer {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
-        // reset execution phase and commit phase
+        // reset rand manager
         let (tx, rx) = oneshot::channel::<ResetAck>();
-        self.reset_event_channel_tx
+        self.reset_rand_manager_channel_tx
+            .clone()
+            .send(ResetRequest {
+                tx,
+                stop: false, // rand manager is responsible for sending stop request
+            })
+            .await
+            .map_err(|_| Error::ResetDropped)?;
+        rx.await.map_err(|_| Error::ResetDropped)?;
+
+        // reset buffer manager
+        let (tx, rx) = oneshot::channel::<ResetAck>();
+        self.reset_buffer_manager_channel_tx
             .clone()
             .send(ResetRequest {
                 tx,
@@ -153,7 +167,8 @@ impl DagStateSyncComputer {
     #[allow(dead_code)]
     pub fn new(
         state_computer_for_sync: Arc<dyn StateComputer>,
-        reset_event_channel_tx: UnboundedSender<ResetRequest>,
+        reset_rand_manager_channel_tx: UnboundedSender<ResetRequest>,
+        reset_buffer_manager_channel_tx: UnboundedSender<ResetRequest>,
     ) -> Self {
         // note: this channel is unused
         let (sender_tx, _) = unbounded();
@@ -161,7 +176,8 @@ impl DagStateSyncComputer {
             ordering_state_computer: OrderingStateComputer {
                 executor_channel: sender_tx,
                 state_computer_for_sync,
-                reset_event_channel_tx,
+                reset_rand_manager_channel_tx,
+                reset_buffer_manager_channel_tx,
             },
         }
     }
@@ -175,7 +191,7 @@ impl StateComputer for DagStateSyncComputer {
         _block: &Block,
         // The parent block root hash.
         _parent_block_id: HashValue,
-        _maybe_randomness: Option<Randomness>,
+        _randomness: Randomness,
     ) -> ExecutorResult<StateComputeResult> {
         unimplemented!("method not supported")
     }

@@ -4,7 +4,7 @@
 
 use crate::{
     experimental::{
-        buffer_manager::{create_channel, BufferManager, OrderedBlocks, ResetRequest},
+        buffer_manager::{create_channel, BufferManager, ResetRequest},
         execution_schedule_phase::{ExecutionRequest, ExecutionSchedulePhase},
         execution_wait_phase::{ExecutionResponse, ExecutionWaitPhase, ExecutionWaitRequest},
         persisting_phase::{PersistingPhase, PersistingRequest},
@@ -12,7 +12,7 @@ use crate::{
         signing_phase::{CommitSignerProvider, SigningPhase, SigningRequest, SigningResponse},
     },
     network::{IncomingCommitRequest, NetworkSender},
-    state_replication::StateComputer,
+    state_replication::StateComputer, randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
 };
 use aptos_channels::aptos_channel::Receiver;
 use aptos_consensus_types::common::Author;
@@ -20,16 +20,20 @@ use aptos_types::{account_address::AccountAddress, validator_verifier::Validator
 use futures::channel::mpsc::UnboundedReceiver;
 use std::sync::{atomic::AtomicU64, Arc};
 
+use super::buffer_manager::Sender;
+
 /// build channels and return phases and buffer manager
 pub fn prepare_phases_and_buffer_manager(
     author: Author,
+    epoch: u64,
     execution_proxy: Arc<dyn StateComputer>,
     safety_rules: Arc<dyn CommitSignerProvider>,
     commit_msg_tx: NetworkSender,
     commit_msg_rx: Receiver<AccountAddress, IncomingCommitRequest>,
     persisting_proxy: Arc<dyn StateComputer>,
-    block_rx: UnboundedReceiver<OrderedBlocks>,
+    block_rx: UnboundedReceiver<RandReadyBlocks>,
     sync_rx: UnboundedReceiver<ResetRequest>,
+    buffer_manager_event_tx: Sender<BufferManagerEvent>,
     verifier: ValidatorVerifier,
 ) -> (
     PipelinePhase<ExecutionSchedulePhase>,
@@ -94,6 +98,7 @@ pub fn prepare_phases_and_buffer_manager(
         persisting_phase,
         BufferManager::new(
             author,
+            epoch,
             execution_schedule_phase_request_tx,
             execution_schedule_phase_response_rx,
             execution_wait_phase_request_tx,
@@ -105,6 +110,7 @@ pub fn prepare_phases_and_buffer_manager(
             persisting_phase_request_tx,
             block_rx,
             sync_rx,
+            buffer_manager_event_tx,
             verifier,
             ongoing_tasks,
         ),

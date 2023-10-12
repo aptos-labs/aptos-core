@@ -22,10 +22,9 @@ use crate::{
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
     },
-    experimental::buffer_manager::OrderedBlocks,
     network::IncomingDAGRequest,
     payload_manager::PayloadManager,
-    state_replication::{PayloadClient, StateComputer},
+    state_replication::{PayloadClient, StateComputer}, randomness::block_queue::OrderedBlocks,
 };
 use aptos_channels::{
     aptos_channel::{self, Receiver},

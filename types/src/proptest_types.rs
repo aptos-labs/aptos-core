@@ -30,7 +30,7 @@ use crate::{
     validator_signer::ValidatorSigner,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
-    write_set::{WriteOp, WriteSet, WriteSetMut},
+    write_set::{WriteOp, WriteSet, WriteSetMut}, randomness::Randomness,
 };
 use aptos_crypto::{
     bls12381::{self, bls12381_keys},
@@ -967,7 +967,7 @@ impl Arbitrary for BlockMetadata {
                         failed_proposer_indices,
                         timestamp,
                         None,
-                        None,
+                        Randomness::new_for_test(epoch, round, id, timestamp),
                     )
                 },
             )

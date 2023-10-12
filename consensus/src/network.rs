@@ -11,7 +11,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest}, randomness::types::RandMessage,
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -106,12 +106,20 @@ pub struct IncomingDKGRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingRandRequest {
+    pub req: RandMessage,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
     CommitRequest(IncomingCommitRequest),
     DKGRequest(IncomingDKGRequest),
+    RandRequest(IncomingRandRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -759,6 +767,13 @@ impl NetworkTask {
                             IncomingRpcRequest::DKGRequest(IncomingDKGRequest {
                                 req: *request,
                                 sender: peer_id,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
+                        ConsensusMsg::RandMessage(req) => {
+                            IncomingRpcRequest::RandRequest(IncomingRandRequest {
+                                req: *req,
                                 protocol,
                                 response_sender: callback,
                             })

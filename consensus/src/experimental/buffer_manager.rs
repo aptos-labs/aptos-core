@@ -17,8 +17,7 @@ use crate::{
     },
     monitor,
     network::{IncomingCommitRequest, NetworkSender},
-    network_interface::ConsensusMsg,
-    state_replication::StateComputerCommitCallBackType,
+    network_interface::ConsensusMsg, randomness::{block_queue::RandReadyBlocks, rand_manager::BufferManagerEvent},
 };
 use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, experimental::commit_decision::CommitDecision,
@@ -28,8 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof,
-    ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
+    account_address::AccountAddress, epoch_change::EpochChangeProof, validator_verifier::ValidatorVerifier, randomness::Randomness,
 };
 use futures::{
     channel::{
@@ -59,12 +57,6 @@ pub struct ResetRequest {
     pub stop: bool,
 }
 
-pub struct OrderedBlocks {
-    pub ordered_blocks: Vec<ExecutedBlock>,
-    pub ordered_proof: LedgerInfoWithSignatures,
-    pub callback: StateComputerCommitCallBackType,
-}
-
 pub type BufferItemRootType = Cursor;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -78,6 +70,7 @@ pub fn create_channel<T>() -> (Sender<T>, Receiver<T>) {
 /// the persisting phase.
 pub struct BufferManager {
     author: Author,
+    epoch: u64,
 
     buffer: Buffer<BufferItem>,
 
@@ -102,9 +95,11 @@ pub struct BufferManager {
     // we don't hear back from the persisting phase
     persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
 
-    block_rx: UnboundedReceiver<OrderedBlocks>,
+    block_rx: UnboundedReceiver<RandReadyBlocks>,
     reset_rx: UnboundedReceiver<ResetRequest>,
     stop: bool,
+
+    rand_manager_tx: Sender<BufferManagerEvent>,
 
     verifier: ValidatorVerifier,
 
@@ -123,6 +118,7 @@ pub struct BufferManager {
 impl BufferManager {
     pub fn new(
         author: Author,
+        epoch: u64,
         execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
         execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
         execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
@@ -135,8 +131,9 @@ impl BufferManager {
             IncomingCommitRequest,
         >,
         persisting_phase_tx: Sender<CountedRequest<PersistingRequest>>,
-        block_rx: UnboundedReceiver<OrderedBlocks>,
+        block_rx: UnboundedReceiver<RandReadyBlocks>,
         reset_rx: UnboundedReceiver<ResetRequest>,
+        rand_manager_tx: Sender<BufferManagerEvent>,
         verifier: ValidatorVerifier,
         ongoing_tasks: Arc<AtomicU64>,
     ) -> Self {
@@ -147,6 +144,7 @@ impl BufferManager {
             .max_delay(Duration::from_secs(5));
         Self {
             author,
+            epoch,
 
             buffer,
 
@@ -176,6 +174,8 @@ impl BufferManager {
             block_rx,
             reset_rx,
             stop: false,
+
+            rand_manager_tx,
 
             verifier,
             ongoing_tasks,
@@ -215,12 +215,13 @@ impl BufferManager {
 
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
-    async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
-        let OrderedBlocks {
+    async fn process_execution_ready_blocks(&mut self, blocks: RandReadyBlocks) {
+        let RandReadyBlocks {
             ordered_blocks,
             ordered_proof,
             callback,
-        } = ordered_blocks;
+            randomness: _,
+        } = blocks;
 
         info!(
             "Receive ordered block {}, the queue size is {}",
@@ -228,15 +229,25 @@ impl BufferManager {
             self.buffer.len() + 1,
         );
 
+        observe_block(ordered_blocks.last().unwrap().timestamp_usecs(), BlockStage::RAND_READY);
+
+        // rand todo: replace with real randomness below
+        let rand_ready_blocks: Vec<ExecutedBlock> = ordered_blocks.into_iter()
+        .map(|block| block.replace_randomness(Randomness::dummy()))
+        .collect();
+        // let rand_ready_blocks: Vec<ExecutedBlock> = ordered_blocks.into_iter()
+        //     .map(|block| block.replace_randomness(randomness.clone()))
+        //     .collect();
+
         let request = self.create_new_request(ExecutionRequest {
-            ordered_blocks: ordered_blocks.clone(),
+            ordered_blocks: rand_ready_blocks.clone(),
         });
         self.execution_schedule_phase_tx
             .send(request)
             .await
             .expect("Failed to send execution schedule request");
 
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
+        let item = BufferItem::new_ordered(rand_ready_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
 
@@ -258,7 +269,8 @@ impl BufferManager {
             // NOTE: probably should schedule retry for all ordered blocks, but since execution error
             // is not expected nor retryable in reality, I'd rather remove retrying or do it more
             // properly than complicating it here.
-            let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
+            let ordered_item = self.buffer.get(&self.execution_root);
+            let ordered_blocks = ordered_item.get_blocks().clone();
             let request = self.create_new_request(ExecutionRequest { ordered_blocks });
             let sender = self.execution_schedule_phase_tx.clone();
             Self::spawn_retry_request(sender, request, Duration::from_millis(100));
@@ -321,6 +333,7 @@ impl BufferManager {
             if item.block_id() == target_block_id {
                 let aggregated_item = item.unwrap_aggregated();
                 let block = aggregated_item.executed_blocks.last().unwrap().block();
+                let committed_round = block.round();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
                 if block.author() == Some(self.author) {
@@ -337,6 +350,7 @@ impl BufferManager {
                             false,
                         ))
                         .await;
+
                     // the epoch ends, reset to avoid executing more blocks, execute after
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
@@ -355,8 +369,11 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                info!("Advance head to {:?}", self.buffer.head_cursor());
+                info!("Advance head to round {}, {:?}", committed_round, self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
+                if let Err(e) = self.rand_manager_tx.send(BufferManagerEvent::Commit(committed_round)).await {
+                    warn!("Failed to send commit round to rand manager: {:?}", e);
+                }
                 return;
             }
         }
@@ -415,6 +432,9 @@ impl BufferManager {
                 return;
             },
         };
+
+        assert!(executed_blocks.iter().all(|block| block.has_randomness()));
+
         info!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
@@ -689,7 +709,7 @@ impl BufferManager {
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
                     monitor!("buffer_manager_process_ordered", {
-                    self.process_ordered_blocks(blocks).await;
+                    self.process_execution_ready_blocks(blocks).await;
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
                     }});
@@ -729,6 +749,7 @@ impl BufferManager {
                     });
                 },
                 _ = interval.tick().fuse() => {
+                    self.print_buffer();
                     monitor!("buffer_manager_process_interval_tick", {
                     self.update_buffer_manager_metrics();
                     self.rebroadcast_commit_votes_if_needed().await
@@ -738,5 +759,42 @@ impl BufferManager {
             }
         }
         info!("Buffer manager stops.");
+    }
+
+    fn print_blocks(&mut self, blocks: Vec<ExecutedBlock>) {
+        for block in blocks {
+            print!(" {} ", block.round());
+        }
+    }
+
+    // helper function to prints the buffer_manager
+    fn print_buffer(&mut self) {
+        let mut current = *self.buffer.head_cursor();
+        if current.is_none() {
+            return;
+        }
+        print!("[BufferManager] printing buffer of epoch {}: ", self.epoch);
+        while current.is_some() {
+            match self.buffer.get(&current) {
+                BufferItem::Ordered(item) => {
+                    print!("Ordered ");
+                    self.print_blocks(item.ordered_blocks.clone());
+                },
+                BufferItem::Executed(item) => {
+                    print!("Executed ");
+                    self.print_blocks(item.executed_blocks.clone());
+                },
+                BufferItem::Signed(item) => {
+                    print!("Signed ");
+                    self.print_blocks(item.executed_blocks.clone());
+                },
+                BufferItem::Aggregated(item) => {
+                    print!("Aggregated ");
+                    self.print_blocks(item.executed_blocks.clone());
+                },
+            }
+            current = self.buffer.get_next(&current);
+        }
+        println!();
     }
 }

@@ -20,7 +20,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
     on_chain_config::ValidatorSet,
     validator_signer::ValidatorSigner,
-    validator_verifier::{random_validator_verifier, ValidatorVerifier},
+    validator_verifier::{random_validator_verifier, ValidatorVerifier}, randomness::Randomness,
 };
 use std::sync::Arc;
 

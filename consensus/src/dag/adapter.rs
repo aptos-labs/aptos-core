@@ -7,8 +7,7 @@ use crate::{
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
-    },
-    experimental::buffer_manager::OrderedBlocks,
+    }, randomness::block_queue::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
@@ -151,7 +150,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 node_digests,
             ),
             StateComputeResult::new_dummy(),
-            None,
+            None,   // rand todo: update
         );
         let block_info = block.block_info();
         let storage = self.storage.clone();
@@ -184,6 +183,8 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                     }
                 },
             ),
+            maybe_randomness: None,  // rand todo: optimistic commit add rand decision
+            timed_drop_guard: None,
         })?)
     }
 }

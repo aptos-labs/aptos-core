@@ -117,7 +117,7 @@ impl StateComputer for ExecutionProxy {
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
-        maybe_randomness: Option<Randomness>,
+        randomness: Randomness,
     ) -> StateComputeResultFut {
         let block_id = block.id();
         debug!(
@@ -152,7 +152,7 @@ impl StateComputer for ExecutionProxy {
             shuffled_txns.clone(),
             maybe_block_gas_limit,
             dkg_transcript,
-            maybe_randomness,
+            randomness,
         );
 
         let fut = self
@@ -231,14 +231,13 @@ impl StateComputer for ExecutionProxy {
                 has_dkg_payloads = true;
                 Some(dkg_payload.dkg_agg_node().agg_trx().clone())
             });
-            let maybe_randomness = block.maybe_randomness();
 
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
                 shuffled_txns,
                 block_gas_limit,
                 dkg_transcript,
-                maybe_randomness,
+                block.randomness(),
             ));
             reconfig_events.extend(block.reconfig_event());
             dkg_events.extend(block.dkg_event());

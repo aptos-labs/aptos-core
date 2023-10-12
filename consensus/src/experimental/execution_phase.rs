@@ -68,19 +68,20 @@ impl StatelessPipeline for ExecutionPhase {
         }
 
         let block_id = ordered_blocks.last().unwrap().id();
+        let randomness = ordered_blocks.last().unwrap().randomness().clone();
         let mut result = vec![];
 
         for b in ordered_blocks {
             match self
                 .execution_proxy
-                .compute(b.block(), b.parent_id(), b.maybe_randomness())
+                .compute(b.block(), b.parent_id(), randomness)
                 .await
             {
                 Ok(compute_result) => {
                     result.push(ExecutedBlock::new(
                         b.block().clone(),
                         compute_result,
-                        b.maybe_randomness(),
+                        Some(randomness),
                     ));
                 },
                 Err(e) => {

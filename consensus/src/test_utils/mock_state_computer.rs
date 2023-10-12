@@ -5,13 +5,12 @@
 use crate::{
     dkg::dkg_manager::DKGManagerWrapper,
     error::StateSyncError,
-    experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
     state_computer::StateComputeResultFut,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler,
+    transaction_shuffler::TransactionShuffler, randomness::block_queue::OrderedBlocks,
 };
 use anyhow::{format_err, Result};
 use aptos_consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
@@ -55,6 +54,8 @@ impl MockStateComputer {
             ordered_blocks,
             ordered_proof,
             callback,
+            maybe_randomness: _,
+            timed_drop_guard: _,
         } = blocks;
 
         self.consensus_db
@@ -88,7 +89,7 @@ impl StateComputer for MockStateComputer {
         &self,
         block: &Block,
         _parent_block_id: HashValue,
-        _maybe_randomness: Option<Randomness>,
+        _randomness: Randomness,
     ) -> ExecutorResult<StateComputeResult> {
         self.block_cache.lock().insert(
             block.id(),
@@ -119,6 +120,8 @@ impl StateComputer for MockStateComputer {
                     .collect::<Vec<ExecutedBlock>>(),
                 ordered_proof: finality_proof,
                 callback,
+                maybe_randomness: None,
+                timed_drop_guard: None,
             })
             .await
             .is_err()
@@ -161,7 +164,7 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
-        _maybe_randomness: Option<Randomness>,
+        _randomness: Randomness,
     ) -> ExecutorResult<StateComputeResult> {
         Ok(StateComputeResult::new_dummy())
     }
@@ -218,7 +221,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _block: &Block,
         parent_block_id: HashValue,
-        _maybe_randomness: Option<Randomness>,
+        _randomness: Randomness,
     ) -> StateComputeResultFut {
         // trapdoor for Execution Error
         let res = if parent_block_id == self.random_compute_result_root_hash {

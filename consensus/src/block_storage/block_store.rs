@@ -25,7 +25,7 @@ use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, randomness::Randomness};
 use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
@@ -210,6 +210,7 @@ impl BlockStore {
                     panic!("[BlockStore] failed to insert block during build {:?}", e)
                 });
         }
+
         for qc in quorum_certs {
             block_store
                 .insert_single_quorum_cert(qc)
@@ -369,7 +370,7 @@ impl BlockStore {
         // because we may inject a block prologue transaction.
         let state_compute_result = self
             .state_computer
-            .compute(&block, block.parent_id(), None)
+            .compute(&block, block.parent_id(), Randomness::dummy())
             .await?;
 
         Ok(ExecutedBlock::new(block, state_compute_result, None))

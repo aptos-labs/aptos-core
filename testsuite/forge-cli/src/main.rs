@@ -1672,7 +1672,7 @@ fn realistic_env_max_load_test(
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 60 } else { 60 }).into();
+                (if long_running { 120 } else { 120 }).into();
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(

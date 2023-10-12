@@ -706,6 +706,16 @@ pub static BUFFER_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counters(queued,dequeued,dropped) related to (fallback) randomness manager channel
+pub static RAND_MANAGER_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_rand_manager_channel_msgs_count",
+        "Counters(queued,dequeued,dropped) related to (fallback) randomness manager channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
 /// Counters for received consensus messages broken down by type
 pub static CONSENSUS_RECEIVED_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
@@ -720,7 +730,7 @@ pub static CONSENSUS_RECEIVED_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
 pub static CONSENSUS_SENT_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_sent_msgs_count",
-        "Counters for received consensus messages broken down by type",
+        "Counters for sent consensus messages broken down by type",
         &["type"]
     )
     .unwrap()
