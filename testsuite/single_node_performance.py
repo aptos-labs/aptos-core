@@ -55,7 +55,7 @@ IS_PREVIEWNET = SELECTED_FLOW in [Flow.PREVIEWNET, Flow.PREVIEWNET_LARGE_DB]
 DEFAULT_NUM_INIT_ACCOUNTS = (
     "100000000" if SELECTED_FLOW == Flow.PREVIEWNET_LARGE_DB else "2000000"
 )
-DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_PREVIEWNET else "10000"
+DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_PREVIEWNET else "32000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
@@ -135,7 +135,7 @@ CODE_PERF_VERSION = "v4"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=8)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=48)
 )
 
 if os.environ.get("DETAILED"):
