@@ -5,9 +5,9 @@
 env:
   GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
-name: "TS SDK E2E Tests YOOO"
+name: "TS SDK E2E Tests"
 on:
-  pull_request:
+  pull_request_target:
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
