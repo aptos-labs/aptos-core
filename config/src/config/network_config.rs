@@ -182,7 +182,7 @@ impl NetworkConfig {
     /// only done if the config does not specify a value.
     fn configure_num_deserialization_tasks(&mut self) {
         if self.max_parallel_deserialization_tasks.is_none() {
-            self.max_parallel_deserialization_tasks = Some(num_cpus::get());
+            self.max_parallel_deserialization_tasks = Some(1);
         }
     }
 
