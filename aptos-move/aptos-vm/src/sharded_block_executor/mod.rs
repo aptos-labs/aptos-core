@@ -9,7 +9,7 @@ use crate::sharded_block_executor::{
     },
     executor_client::ExecutorClient,
 };
-use aptos_logger::{info, trace};
+use aptos_logger::info;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{PartitionedTransactions, SubBlocksForShard},

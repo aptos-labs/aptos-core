@@ -67,7 +67,9 @@ impl GRPCNetworkMessageServiceServerWrapper {
         //           we may need to implement a healthcheck service to check if the server is up
         Server::builder()
             .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
-            .add_service(NetworkMessageServiceServer::new(self).max_decoding_message_size(MAX_MESSAGE_SIZE))
+            .add_service(
+                NetworkMessageServiceServer::new(self).max_decoding_message_size(MAX_MESSAGE_SIZE),
+            )
             .add_service(reflection_service)
             .serve_with_shutdown(server_addr, async {
                 server_shutdown_rx.await.ok();

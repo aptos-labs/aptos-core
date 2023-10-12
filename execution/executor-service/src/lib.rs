@@ -9,6 +9,7 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 
 mod error;
+mod metrics;
 pub mod process_executor_service;
 mod remote_cordinator_client;
 mod remote_cross_shard_client;
@@ -22,7 +23,6 @@ mod test_utils;
 mod tests;
 #[cfg(test)]
 mod thread_executor_service;
-mod metrics;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RemoteExecutionResult {

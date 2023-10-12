@@ -13,7 +13,7 @@ use aptos_block_partitioner::{
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
-use aptos_executor::block_executor::TransactionBlockExecutor;
+use aptos_executor::{block_executor::TransactionBlockExecutor, components::chunk_output};
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
@@ -26,11 +26,10 @@ use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{
+    net::SocketAddr,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
-use std::net::SocketAddr;
-use aptos_executor::components::chunk_output;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -441,14 +440,20 @@ fn main() {
 
     chunk_output::set_remote_sharding(opt.pipeline_opt.remote_sharding);
     if opt.pipeline_opt.remote_executor_addresses.is_some() {
-        chunk_output::set_remote_addresses(opt.pipeline_opt.remote_executor_addresses.clone().unwrap());
+        chunk_output::set_remote_addresses(
+            opt.pipeline_opt.remote_executor_addresses.clone().unwrap(),
+        );
     }
     if opt.pipeline_opt.coordinator_address.is_some() {
-        chunk_output::set_coordinator_address(opt.pipeline_opt.coordinator_address.clone().unwrap());
+        chunk_output::set_coordinator_address(opt.pipeline_opt.coordinator_address.unwrap());
     }
-    assert_eq!(execution_shards, chunk_output::get_remote_addresses().len(),
-    "Number of execution shards ({}) must be equal to the number of remote addresses ({}).",
-               execution_shards, chunk_output::get_remote_addresses().len());
+    assert_eq!(
+        execution_shards,
+        chunk_output::get_remote_addresses().len(),
+        "Number of execution shards ({}) must be equal to the number of remote addresses ({}).",
+        execution_shards,
+        chunk_output::get_remote_addresses().len()
+    );
 
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);

@@ -7,7 +7,10 @@ use crate::{
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
-use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
+use aptos_executor::{
+    block_executor::{BlockExecutor, TransactionBlockExecutor},
+    components::chunk_output,
+};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
@@ -24,7 +27,6 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
-use aptos_executor::components::chunk_output;
 
 #[derive(Debug, Derivative)]
 #[derivative(Default)]
@@ -107,7 +109,7 @@ where
         };
 
         let mut join_handles = vec![];
-
+        
         let mut partitioning_stage =
             BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config, chunk_output::get_remote_sharding());
 

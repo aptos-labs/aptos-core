@@ -1,9 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    remote_state_view::RemoteStateViewClient, ExecuteBlockCommand, RemoteExecutionRequest,
-    RemoteExecutionResult,
+    metrics::{
+        APTOS_REMOTE_EXECUTOR_CMD_RX_BCS_DESERIALIZE_SECONDS, APTOS_REMOTE_EXECUTOR_CMD_RX_SECONDS,
+        APTOS_REMOTE_EXECUTOR_INIT_PREFETCH_SECONDS,
+    },
+    remote_state_view::RemoteStateViewClient,
+    ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult,
 };
+use aptos_logger::info;
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_types::{
     block_executor::partitioner::ShardId, state_store::state_key::StateKey,
@@ -15,12 +20,6 @@ use aptos_vm::sharded_block_executor::{
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
-use std::time::Instant;
-use aptos_logger::info;
-use crate::metrics::{APTOS_REMOTE_EXECUTOR_CMD_RX_BCS_DESERIALIZE_SECONDS, APTOS_REMOTE_EXECUTOR_CMD_RX_SECONDS, APTOS_REMOTE_EXECUTOR_INIT_PREFETCH_SECONDS};
-
-//static mut init_prefetch_time: f64 = 0.0;
-//static mut cmd_rx_bcs_deser_time: f64 = 0.0;
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -43,10 +42,6 @@ impl RemoteCoordinatorClient {
         let state_view_client =
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
 
-        unsafe {
-            //cmd_rx_bcs_deser_time = 0.0;
-            //init_prefetch_time = 0.0;
-        }
         Self {
             state_view_client: Arc::new(state_view_client),
             command_rx,
@@ -89,14 +84,15 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         match self.command_rx.recv() {
             Ok(message) => {
                 let _rx_timer = APTOS_REMOTE_EXECUTOR_CMD_RX_SECONDS.start_timer();
-                let bcs_deser_timer = APTOS_REMOTE_EXECUTOR_CMD_RX_BCS_DESERIALIZE_SECONDS.start_timer();
+                let bcs_deser_timer =
+                    APTOS_REMOTE_EXECUTOR_CMD_RX_BCS_DESERIALIZE_SECONDS.start_timer();
                 let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
                 bcs_deser_timer.stop_and_record();
 
                 match request {
                     RemoteExecutionRequest::ExecuteBlock(command) => {
-                        info!("&&&&&&&&&&&& Cmd rx ");
-                        let init_prefetch_timer = APTOS_REMOTE_EXECUTOR_INIT_PREFETCH_SECONDS.start_timer();
+                        let init_prefetch_timer =
+                            APTOS_REMOTE_EXECUTOR_INIT_PREFETCH_SECONDS.start_timer();
                         let state_keys = Self::extract_state_keys(&command);
                         self.state_view_client.init_for_block(state_keys);
                         init_prefetch_timer.stop_and_record();
@@ -111,15 +107,18 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 }
             },
             Err(_) => {
-                /*unsafe {
-                    info!("&&&&&&&&&&&& Total cmd rx bcs deser time is {} ", cmd_rx_bcs_deser_time);
-                    info!("&&&&&&&&&&&& Total init prefetch time is {} ", init_prefetch_time);
-                    init_prefetch_time = 0.0;
-                    cmd_rx_bcs_deser_time = 0.0;
-                }*/
-                info!("&&&&&&&&&&&& cmd rx time is {} s", APTOS_REMOTE_EXECUTOR_CMD_RX_SECONDS.get_sample_sum());
-                info!("&&&&&&&&&&&& cmd rx bcs deser time is {} s", APTOS_REMOTE_EXECUTOR_CMD_RX_BCS_DESERIALIZE_SECONDS.get_sample_sum());
-                info!("&&&&&&&&&&&& init prefetch time is {} s", APTOS_REMOTE_EXECUTOR_INIT_PREFETCH_SECONDS.get_sample_sum());
+                info!(
+                    "REMOTE_EXECUTOR: cmd rx time is {} s",
+                    APTOS_REMOTE_EXECUTOR_CMD_RX_SECONDS.get_sample_sum()
+                );
+                info!(
+                    "REMOTE_EXECUTOR: cmd rx bcs deser time is {} s",
+                    APTOS_REMOTE_EXECUTOR_CMD_RX_BCS_DESERIALIZE_SECONDS.get_sample_sum()
+                );
+                info!(
+                    "REMOTE_EXECUTOR: init prefetch time is {} s",
+                    APTOS_REMOTE_EXECUTOR_INIT_PREFETCH_SECONDS.get_sample_sum()
+                );
                 self.state_view_client.print_info();
                 ExecutorShardCommand::Stop
             },
