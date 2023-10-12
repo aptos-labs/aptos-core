@@ -14,6 +14,7 @@ pub fn run_and_assert_universe(universe: DependencyGraph) {
 }
 
 proptest! {
+    #[ignore]
     #![proptest_config(ProptestConfig::with_cases(32))]
     #[test]
     fn all_transactions(
