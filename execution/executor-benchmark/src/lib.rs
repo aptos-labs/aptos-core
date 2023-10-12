@@ -252,7 +252,7 @@ pub fn run_benchmark<V>(
 
     let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
     info!(
-        "VM execution TPS {} txn/s; {} / {}",
+        "VM execution TPS {} txn/s; ({} / {})",
         (delta_v / delta_vm_time) as usize, delta_v, delta_vm_time
     );
     info!(
