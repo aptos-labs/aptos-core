@@ -1217,6 +1217,19 @@ impl AptosDB {
         self.ledger_db.write_set_db().write_schemas(batch)
     }
 
+    pub fn commit_genesis_ledger_info(&self, genesis_li: &LedgerInfoWithSignatures) -> Result<()> {
+        let ledger_batch = SchemaBatch::new();
+        let current_epoch = self
+            .ledger_store
+            .get_latest_ledger_info_option()
+            .map_or(0, |li| li.ledger_info().next_block_epoch());
+        ensure!(genesis_li.ledger_info().epoch() == current_epoch && current_epoch == 0);
+        self.ledger_store
+            .put_ledger_info(genesis_li, &ledger_batch)?;
+
+        self.ledger_db.metadata_db().write_schemas(ledger_batch)
+    }
+
     fn commit_ledger_info(
         &self,
         last_version: Version,
