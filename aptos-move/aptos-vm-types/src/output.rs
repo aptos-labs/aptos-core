@@ -146,6 +146,8 @@ impl VMOutput {
         TransactionOutput::new(write_set, events, gas_used, status)
     }
 
+    /// Updates the VMChangeSet based on the input aggregator v1 deltas, patched resource write set,
+    /// patched events, and generates TransactionOutput
     pub fn into_transaction_output_with_materialized_write_set(
         mut self,
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,

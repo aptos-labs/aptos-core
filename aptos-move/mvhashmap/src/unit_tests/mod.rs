@@ -39,11 +39,12 @@ fn unsync_map_data_basic() {
     // Reads that should go the DB return None
     assert_none!(map.fetch_data(&ap));
     // Ensure write registers the new value.
-    map.write(ap.clone(), value_for(10, 1));
-    assert_some_eq!(map.fetch_data(&ap), Arc::new(value_for(10, 1)));
+    //TODO: Hardocoding layout to None. Test when layout is Some(.) as well.
+    map.write(ap.clone(), value_for(10, 1), None);
+    assert_some_eq!(map.fetch_data(&ap), (Arc::new(value_for(10, 1)), None));
     // Ensure the next write overwrites the value.
-    map.write(ap.clone(), value_for(14, 1));
-    assert_some_eq!(map.fetch_data(&ap), Arc::new(value_for(14, 1)));
+    map.write(ap.clone(), value_for(14, 1), None);
+    assert_some_eq!(map.fetch_data(&ap), (Arc::new(value_for(14, 1)), None));
 }
 
 #[test]
