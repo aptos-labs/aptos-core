@@ -2,7 +2,6 @@ module 0x1::aggregator_v2_test {
     use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
     use aptos_std::debug;
     use aptos_std::table::{Self, Table};
-    use std::signer;
     use std::vector;
     use std::string::String;
     use std::option::{Self, Option};
@@ -152,8 +151,7 @@ module 0x1::aggregator_v2_test {
         f(value)
     }
 
-    public entry fun new<Element: drop + copy + store>(account: &signer, use_type: u32, i: u64, limit: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun new<Element: drop + copy + store>(_account: &signer, addr: address, use_type: u32, i: u64, limit: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         insert<Aggregator<Element>>(addr, use_type, i, aggregator_v2::create_aggregator(limit));
     }
 
@@ -161,52 +159,45 @@ module 0x1::aggregator_v2_test {
         for_element_ref<Aggregator<Element>, Element>(addr, use_type, i, |aggregator| aggregator_v2::read(aggregator))
     }
 
-    public entry fun try_add<Element: store>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun try_add<Element: store>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, bool>(addr, use_type, i, |aggregator| aggregator_v2::try_add(aggregator, value));
     }
 
-    public entry fun add<Element: store>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun add<Element: store>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, bool>(addr, use_type, i, |aggregator| {
             aggregator_v2::add(aggregator, value);
             true
         });
     }
 
-    public entry fun try_sub<Element: store>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun try_sub<Element: store>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, bool>(addr, use_type, i, |aggregator| aggregator_v2::try_sub(aggregator, value));
     }
 
-    public entry fun sub<Element: store>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun sub<Element: store>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, bool>(addr, use_type, i, |aggregator| {
             aggregator_v2::sub(aggregator, value);
             true
         });
     }
 
-    public entry fun materialize<Element: store + drop>(account: &signer, use_type: u32, i: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun materialize<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         call_read<Element>(addr, use_type, i);
     }
 
     /// Checks that the ith aggregator has expected value. Useful to inject into
     /// transaction block to verify successful and correct execution.
-    public entry fun check<Element: store + drop>(account: &signer, use_type: u32, i: u64, expected: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun check<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, expected: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         let actual = call_read<Element>(addr, use_type, i);
         assert!(actual == expected, ENOT_EQUAL)
     }
 
-    public entry fun new_add<Element: drop + copy + store>(account: &signer, use_type: u32, i: u64, limit: Element, a: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        new(account, use_type, i, limit);
-        add(account, use_type, i, a);
+    public entry fun new_add<Element: drop + copy + store>(account: &signer, addr: address, use_type: u32, i: u64, limit: Element, a: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
+        new(account, addr, use_type, i, limit);
+        add(account, addr, use_type, i, a);
     }
 
-    public entry fun sub_add<Element: store>(account: &signer, use_type: u32, i: u64, a: Element, b: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun sub_add<Element: store>(_account: &signer, addr: address, use_type: u32, i: u64, a: Element, b: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, bool>(addr, use_type, i, |aggregator| {
             aggregator_v2::sub(aggregator, a);
             aggregator_v2::add(aggregator, b);
@@ -214,8 +205,7 @@ module 0x1::aggregator_v2_test {
         });
     }
 
-    public entry fun add_sub<Element: store>(account: &signer, use_type: u32, i: u64, a: Element, b: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun add_sub<Element: store>(_account: &signer, addr: address, use_type: u32, i: u64, a: Element, b: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, bool>(addr, use_type, i, |aggregator| {
             aggregator_v2::add(aggregator, b);
             aggregator_v2::sub(aggregator, a);
@@ -223,10 +213,9 @@ module 0x1::aggregator_v2_test {
         });
     }
 
-    public entry fun materialize_and_add<Element: store + drop>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun materialize_and_add<Element: store + drop>(account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         call_read<Element>(addr, use_type, i);
-        add<Element>(account, use_type, i, value);
+        add<Element>(account, addr, use_type, i, value);
 
         // issue with type inference of lambda?
         // for_element_mut<Aggregator<u128>, bool>(account, use_type, i, |aggregator| {
@@ -235,10 +224,9 @@ module 0x1::aggregator_v2_test {
         // });
     }
 
-    public entry fun materialize_and_sub<Element: store + drop>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun materialize_and_sub<Element: store + drop>(account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         call_read<Element>(addr, use_type, i);
-        sub<Element>(account, use_type, i, value);
+        sub<Element>(account, addr, use_type, i, value);
 
         // issue with type inference of lambda?
         // for_element_mut<Aggregator<u128>, bool>(account, use_type, i, |aggregator| {
@@ -247,59 +235,49 @@ module 0x1::aggregator_v2_test {
         // });
     }
 
-    public entry fun add_and_materialize<Element: store + drop>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun add_and_materialize<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, Element>(addr, use_type, i, |aggregator| {
             aggregator_v2::add(aggregator, value);
             aggregator_v2::read(aggregator)
         });
     }
 
-    public entry fun sub_and_materialize<Element: store + drop>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun sub_and_materialize<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, Element>(addr, use_type, i, |aggregator| {
             aggregator_v2::sub(aggregator, value);
             aggregator_v2::read(aggregator)
         });
     }
 
-    public entry fun add_2<A: store, B: store>(account_a: &signer, use_type_a: u32, i_a: u64, a: A, addr_b: address, use_type_b: u32, i_b: u64, b: B) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        add<A>(account_a, use_type_a, i_a, a);
-        for_element_mut<Aggregator<B>, bool>(addr_b, use_type_b, i_b, |aggregator| {
-            aggregator_v2::add(aggregator, b);
-            true
-        });
+    public entry fun add_2<A: store, B: store>(account: &signer, addr_a: address, use_type_a: u32, i_a: u64, a: A, addr_b: address, use_type_b: u32, i_b: u64, b: B) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
+        add<A>(account, addr_a, use_type_a, i_a, a);
+        add<B>(account, addr_b, use_type_b, i_b, b);
     }
 
-    public entry fun snapshot<Element: store>(account_i: &signer, use_type_i: u32, i: u64, addr_j: address, use_type_j: u32, j: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr_i = signer::address_of(account_i);
+    public entry fun snapshot<Element: store>(_account: &signer, addr_i: address, use_type_i: u32, i: u64, addr_j: address, use_type_j: u32, j: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         let snapshot = for_element_ref<Aggregator<Element>, AggregatorSnapshot<Element>>(addr_i, use_type_i, i, |aggregator| {
             aggregator_v2::snapshot<Element>(aggregator)
         });
         insert<AggregatorSnapshot<Element>>(addr_j, use_type_j, j, snapshot);
     }
 
-    public entry fun concat<Element: store>(account_i: &signer, use_type_i: u32, i: u64, addr_j: address, use_type_j: u32, j: u64, prefix: String, suffix: String) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr_i = signer::address_of(account_i);
+    public entry fun concat<Element: store>(_account: &signer, addr_i: address, use_type_i: u32, i: u64, addr_j: address, use_type_j: u32, j: u64, prefix: String, suffix: String) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         let snapshot = for_element_ref<AggregatorSnapshot<Element>, AggregatorSnapshot<String>>(addr_i, use_type_i, i, |snapshot| {
             aggregator_v2::string_concat<Element>(prefix, snapshot, suffix)
         });
         insert<AggregatorSnapshot<String>>(addr_j, use_type_j, j, snapshot);
     }
 
-    public entry fun read_snapshot<Element: store + drop>(account: &signer, use_type: u32, i: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun read_snapshot<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_ref<AggregatorSnapshot<Element>, Element>(addr, use_type, i, |snapshot| aggregator_v2::read_snapshot(snapshot));
     }
 
-    public entry fun check_snapshot<Element: store + drop>(account: &signer, use_type: u32, i: u64, expected: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun check_snapshot<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, expected: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         let actual = for_element_ref<AggregatorSnapshot<Element>, Element>(addr, use_type, i, |snapshot| aggregator_v2::read_snapshot(snapshot));
         assert!(actual == expected, ENOT_EQUAL)
     }
 
-    public entry fun add_and_read_snapshot<Element: copy + store + drop>(account: &signer, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let addr = signer::address_of(account);
+    public entry fun add_and_read_snapshot<Element: copy + store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, value: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         for_element_mut<Aggregator<Element>, Element>(addr, use_type, i, |aggregator| {
             aggregator_v2::add(aggregator, value);
             aggregator_v2::sub(aggregator, value);
