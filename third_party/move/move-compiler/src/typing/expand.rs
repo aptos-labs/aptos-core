@@ -362,8 +362,10 @@ fn lvalue(context: &mut Context, b: &mut T::LValue) {
             type_(context, ty);
             core::check_non_fun(context, ty.as_ref())
         },
-        L::BorrowUnpack(_, _, _, bts, fields) | L::Unpack(_, _, bts, fields) => {
-            types(context, bts);
+        L::BorrowUnpack(_, mod_id, struct_name, bts, fields) | L::Unpack(mod_id, struct_name, bts, fields) => {
+            for (i, b) in bts.iter_mut().enumerate() {
+                type_struct_ty_param(context, b, i, &TypeName_::ModuleType(*mod_id, *struct_name))
+            }
             for (_, _, (_, (bt, innerb))) in fields.iter_mut() {
                 type_(context, bt);
                 lvalue(context, innerb)
