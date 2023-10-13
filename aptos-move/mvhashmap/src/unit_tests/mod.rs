@@ -199,9 +199,9 @@ fn materialize_delta_shortcut() {
             max_underflow_negative_delta: None,
         })
     );
-    vd.provide_base_value(ap.clone(), TestValue::from_u128(5));
+    vd.provide_base_value(ap.clone(), TestValue::from_u128(5), None);
     // Multiple calls are idempotent.
-    vd.provide_base_value(ap.clone(), TestValue::from_u128(5));
+    vd.provide_base_value(ap.clone(), TestValue::from_u128(5), None);
 
     // With base set, commit delta should now succeed.
     assert_ok_eq!(vd.materialize_delta(&ap, 8), 35);
@@ -223,10 +223,10 @@ fn aggregator_base_mismatch() {
     let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
     let ap = KeyType(b"/foo/b".to_vec());
 
-    vd.provide_base_value(ap.clone(), TestValue::with_len(1));
+    vd.provide_base_value(ap.clone(), TestValue::with_len(1), None);
     // This call must panic, because it provides a mismatching base value:
     // However, only base value length is compared in assert.
-    vd.provide_base_value(ap, TestValue::with_len(2));
+    vd.provide_base_value(ap, TestValue::with_len(2), None);
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn commit_without_entry() {
     let ap = KeyType(b"/foo/b".to_vec());
 
     vd.add_delta(ap.clone(), 8, delta_add(20, 1000));
-    vd.provide_base_value(ap.clone(), TestValue::from_u128(10));
+    vd.provide_base_value(ap.clone(), TestValue::from_u128(10), None);
 
     // Must panic as there is no delta at provided index.
     let _ = vd.materialize_delta(&ap, 9);
