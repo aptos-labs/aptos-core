@@ -3,6 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## [2.2.1] - 2023/10/13
 ### Fixed
 - Fixed postgres data persistence between restarts when using `aptos node run-local-testnet --with-indexer-api`.
 
