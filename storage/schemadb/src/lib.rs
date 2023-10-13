@@ -133,7 +133,7 @@ impl DB {
         name: &str,
         cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path, cfds)?;
+        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), cfds)?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -147,7 +147,8 @@ impl DB {
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
-        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, cfs, error_if_log_file_exists)?;
+        let inner =
+            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)?;
 
         Ok(Self::log_construct(name, inner))
     }
@@ -159,7 +160,12 @@ impl DB {
         name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, cfs)?;
+        let inner = rocksdb::DB::open_cf_as_secondary(
+            opts,
+            primary_path.de_unc(),
+            secondary_path.de_unc(),
+            cfs,
+        )?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -327,3 +333,12 @@ fn default_write_options() -> rocksdb::WriteOptions {
     opts.set_sync(true);
     opts
 }
+
+trait DeUnc: AsRef<Path> {
+    fn de_unc(&self) -> &Path {
+        // `dunce` is needed to "de-UNC" because rocksdb doesn't take Windows UNC paths like `\\?\C:\`
+        dunce::simplified(self.as_ref())
+    }
+}
+
+impl<T> DeUnc for T where T: AsRef<Path> {}

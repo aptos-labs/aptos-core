@@ -84,7 +84,8 @@ jobs:
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') ||
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
       github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
+      contains(github.event.pull_request.body, '#e2e') ||
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow

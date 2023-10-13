@@ -1,0 +1,18 @@
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_address.move:25:9
+   │
+ 1 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+25 │     use 0x42::M;
+   │         ^^^^^^^ Use of deprecated module '0x42::M'
+
+warning[W03013]: Use of deprecated module
+   ┌─ tests/move_check/deprecated/deprecated_placement_address.move:29:15
+   │
+ 1 │ #[deprecated]
+   │   ---------- Module '0x42::M' deprecated here
+   ·
+29 │     let foo: S = M::foo();
+   │                  ^ Use of deprecated module '0x42::M'
+

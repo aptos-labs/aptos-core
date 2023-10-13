@@ -92,7 +92,7 @@ pub trait TransactionGenerator: Sync + Send {
 
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator>;
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
 }
 
 pub struct CounterState {
