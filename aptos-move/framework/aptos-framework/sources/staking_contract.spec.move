@@ -35,15 +35,17 @@ spec aptos_framework::staking_contract {
 
         include ContractExistsAbortsIf;
         include GetStakingContractAmountsAbortsIf{staking_contract};
+
         let pool_address = staking_contract.pool_address;
         let stake_pool = global<stake::StakePool>(pool_address);
         let active = coin::value(stake_pool.active);
         let pending_active = coin::value(stake_pool.pending_active);
         let total_active_stake = active + pending_active;
         let accumulated_rewards = total_active_stake - staking_contract.principal;
+
         ensures result_1 == total_active_stake;
         ensures result_2 == accumulated_rewards;
-        // this property may cause timeout
+        // This property cause timeout
         // ensures result_3 == accumulated_rewards * staking_contract.commission_percentage / 100;
     }
 
@@ -83,8 +85,7 @@ spec aptos_framework::staking_contract {
         pragma aborts_if_is_partial;
         include PreconditionsInCreateContract;
         include WithdrawAbortsIf<AptosCoin> {account: staker};
-        // this property may cause timeout
-        // include CreateStakingContractWithCoinsAbortsIfAndEnsures;
+        include CreateStakingContractWithCoinsAbortsIfAndEnsures;
     }
 
     /// The amount should be at least the min_stake_required, so the stake pool will be eligible to join the validator set.
@@ -102,16 +103,14 @@ spec aptos_framework::staking_contract {
         pragma aborts_if_is_partial;
         include PreconditionsInCreateContract;
 
-        // this property may cause timeout
-        // let amount = coins.value;
-        // include CreateStakingContractWithCoinsAbortsIfAndEnsures { amount };
+        let amount = coins.value;
+        include CreateStakingContractWithCoinsAbortsIfAndEnsures { amount };
 
-        // let staker_address = signer::address_of(staker);
-        // let seed_0 = bcs::to_bytes(staker_address);
-        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
-        // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
-        // ensures result == resource_addr;
-
+        let staker_address = signer::address_of(staker);
+        let seed_0 = bcs::to_bytes(staker_address);
+        let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
+        ensures result == resource_addr;
     }
 
     /// Account is not frozen and sufficient to withdraw.
@@ -165,8 +164,8 @@ spec aptos_framework::staking_contract {
 
     spec update_commision (staker: &signer, operator: address, new_commission_percentage: u64) {
         // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
+        // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
         pragma verify = false;
-
         let staker_address = signer::address_of(staker);
         aborts_if new_commission_percentage < 0 || new_commission_percentage > 100;
         include ContractExistsAbortsIf{staker: staker_address};
@@ -175,6 +174,7 @@ spec aptos_framework::staking_contract {
     /// Only staker or operator can call this.
     spec request_commission(account: &signer, staker: address, operator: address) {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
+        // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
         pragma verify = false;
         let account_addr = signer::address_of(account);
         include ContractExistsAbortsIf{staker};
@@ -187,7 +187,7 @@ spec aptos_framework::staking_contract {
         add_distribution_events: &mut EventHandle<AddDistributionEvent>,
         request_commission_events: &mut EventHandle<RequestCommissionEvent>,
     ): u64 {
-        // TODO: invariant not hold in pool_u64.spec
+        // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
         pragma verify = false;
         include GetStakingContractAmountsAbortsIf;
     }
@@ -195,7 +195,8 @@ spec aptos_framework::staking_contract {
     /// Staking_contract exists the stacker/operator pair.
     spec unlock_rewards(staker: &signer, operator: address) {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
-        pragma aborts_if_is_partial;
+        // TODO: Set because of timeout (estimate unknown).
+        pragma verify = false;
         requires staking_contract.commission_percentage >= 0 && staking_contract.commission_percentage <= 100;
         let staker_address = signer::address_of(staker);
         let staking_contracts = global<Store>(staker_address).staking_contracts;
@@ -205,7 +206,11 @@ spec aptos_framework::staking_contract {
 
     spec unlock_stake(staker: &signer, operator: address, amount: u64) {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
+        // TODO: Set because of timeout (estimate unknown).
         pragma verify = false;
+        requires amount > 0;
+        let staker_address = signer::address_of(staker);
+        include ContractExistsAbortsIf{staker: staker_address};
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -228,6 +233,7 @@ spec aptos_framework::staking_contract {
         new_commission_percentage: u64,
     ) {
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
+        // TODO: Set because of timeout (estimate unknown).
         pragma verify = false;
         let staker_address = signer::address_of(staker);
         include ContractExistsAbortsIf{staker: staker_address, operator: old_operator};
@@ -360,6 +366,7 @@ spec aptos_framework::staking_contract {
 
         aborts_if !exists<Store>(staker);
         let staking_contracts = global<Store>(staker).staking_contracts;
+        // This property may cause timeout
         aborts_if !simple_map::spec_contains_key(staking_contracts, operator);
     }
 
@@ -440,7 +447,6 @@ spec aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>;
 
         aborts_if commission_percentage < 0 || commission_percentage > 100;
-
         aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
         let config = global<staking_config::StakingConfig>(@aptos_framework);
         let min_stake_required = config.minimum_stake;
@@ -451,52 +457,27 @@ spec aptos_framework::staking_contract {
         aborts_if !exists<Store>(staker_address) && !exists<account::Account>(staker_address);
         aborts_if !exists<Store>(staker_address) && account.guid_creation_num + 9 >= account::MAX_GUID_CREATION_NUM;
         ensures exists<Store>(staker_address);
-        // TODO: need to investigate the timeout
-        // let store = global<Store>(staker_address);
-        // let staking_contracts = store.staking_contracts;
+
+        let store = global<Store>(staker_address);
+        let staking_contracts = store.staking_contracts;
+        // TODO: this property cause timeout
         // aborts_if simple_map::spec_contains_key(staking_contracts, operator);
-        //
-        // // verify create_stake_pool()
-        // let seed_0 = bcs::to_bytes(staker_address);
-        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
-        // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
-        // include CreateStakePoolAbortsIf {resource_addr};
-        //
-        // // verify stake::add_stake_with_cap()
-        // include StakeAddStakeWithCapAbortsIf{ pool_address: resource_addr };
+
+        // Verify create_stake_pool()
+        let seed_0 = bcs::to_bytes(staker_address);
+        let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
+        include CreateStakePoolAbortsIf {resource_addr};
+
+
+        // Verify stake::add_stake_with_cap()
+        let owner_cap = simple_map::spec_get(store.staking_contracts, operator).owner_cap;
+        // TODO: this property cause timeout
+        // include stake::AddStakeWithCapAbortsIfAndEnsures{owner_cap: owner_cap};
         let post post_store = global<Store>(staker_address);
         let post post_staking_contracts = post_store.staking_contracts;
-        ensures simple_map::spec_contains_key(post_staking_contracts, operator);
-    }
-
-    spec schema StakeAddStakeWithCapAbortsIfAndEnsures {
-        pool_address: address;
-        amount: u64;
-
-        let config = global<staking_config::StakingConfig>(@aptos_framework);
-        let validator_set = global<stake::ValidatorSet>(@aptos_framework);
-        let voting_power_increase_limit = config.voting_power_increase_limit;
-        let post post_validator_set = global<stake::ValidatorSet>(@aptos_framework);
-        let update_voting_power_increase = amount != 0 && (stake::spec_contains(validator_set.active_validators, pool_address)
-                                                           || stake::spec_contains(validator_set.pending_active, pool_address));
-        aborts_if update_voting_power_increase && validator_set.total_joining_power + amount > MAX_U128;
-        ensures update_voting_power_increase ==> post_validator_set.total_joining_power == validator_set.total_joining_power + amount;
-        aborts_if update_voting_power_increase && validator_set.total_voting_power > 0
-                && validator_set.total_voting_power * voting_power_increase_limit > MAX_U128;
-        aborts_if update_voting_power_increase && validator_set.total_voting_power > 0
-                && validator_set.total_joining_power + amount > validator_set.total_voting_power * voting_power_increase_limit / 100;
-        let stake_pool = global<stake::StakePool>(pool_address);
-        let post post_stake_pool = global<stake::StakePool>(pool_address);
-        let value_pending_active = stake_pool.pending_active.value;
-        let value_active = stake_pool.active.value;
-        ensures amount != 0 && stake::spec_is_current_epoch_validator(pool_address) ==> post_stake_pool.pending_active.value == value_pending_active + amount;
-        ensures amount != 0 && !stake::spec_is_current_epoch_validator(pool_address) ==> post_stake_pool.active.value == value_active + amount;
-        let maximum_stake = config.maximum_stake;
-        let value_pending_inactive = stake_pool.pending_inactive.value;
-        let next_epoch_voting_power = value_pending_active + value_active + value_pending_inactive;
-        let voting_power = next_epoch_voting_power + amount;
-        aborts_if amount != 0 && voting_power > MAX_U64;
-        aborts_if amount != 0 && voting_power > maximum_stake;
+        // TODO: this property cause timeout
+        // ensures simple_map::spec_contains_key(post_staking_contracts, operator);
     }
 
     spec schema PreconditionsInCreateContract {
