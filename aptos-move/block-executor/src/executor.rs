@@ -877,7 +877,7 @@ where
         }
     }
 
-    fn apply_delayed_field_writes_sequential(
+    fn apply_output_sequential(
         unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
         output: &E::Output,
     ) {
@@ -986,7 +986,7 @@ where
                     counters::update_sequential_txn_gas_counters(&fee_statement);
 
                     // Apply the writes.
-                    Self::apply_delayed_field_writes_sequential(&unsync_map, &output);
+                    Self::apply_output_sequential(&unsync_map, &output);
 
                     // Replace delayed field id with values in resource write set and read set.
                     let delayed_field_keys = Some(output.delayed_field_change_set().into_keys());
