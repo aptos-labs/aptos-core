@@ -59,7 +59,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            features: vec![0b00100000, 0b00100000, 0b00001100, 0b01100000, 0b00100000],
+            features: vec![0b00100000, 0b00100000, 0b10001100, 0b01100000, 0b00100000],
         }
     }
 }

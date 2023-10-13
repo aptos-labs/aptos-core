@@ -375,7 +375,7 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </dd>
 <dt>
-<code>index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;</code>
+<code>index: u64</code>
 </dt>
 <dd>
 
@@ -1036,7 +1036,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
             <a href="collection.md#0x4_collection_ConcurrentBurnEvent">ConcurrentBurnEvent</a> {
                 collection_addr,
-                index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(*<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index)),
+                index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
                 <a href="token.md#0x4_token">token</a>,
             },
         );
