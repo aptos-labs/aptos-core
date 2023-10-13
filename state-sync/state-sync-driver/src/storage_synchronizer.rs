@@ -203,7 +203,7 @@ impl<
         let (committer_notifier, committer_listener) = mpsc::channel(max_pending_data_chunks);
 
         // Create a shared pending data chunk counter
-        let pending_transaction_chunks = Arc::new(AtomicU64::new(0));
+        let pending_data_chunks = Arc::new(AtomicU64::new(0));
 
         // Spawn the executor that executes/applies storage data chunks
         let runtime = runtime.map(|runtime| runtime.handle().clone());
@@ -212,7 +212,7 @@ impl<
             error_notification_sender.clone(),
             executor_listener,
             ledger_updater_notifier,
-            pending_transaction_chunks.clone(),
+            pending_data_chunks.clone(),
             runtime.clone(),
         );
 
@@ -222,7 +222,7 @@ impl<
             error_notification_sender.clone(),
             ledger_updater_listener,
             committer_notifier,
-            pending_transaction_chunks.clone(),
+            pending_data_chunks.clone(),
             runtime.clone(),
         );
 
@@ -234,7 +234,7 @@ impl<
             event_subscription_service,
             mempool_notification_handler,
             storage_service_notification_handler,
-            pending_transaction_chunks.clone(),
+            pending_data_chunks.clone(),
             runtime.clone(),
             storage.reader.clone(),
         );
@@ -249,7 +249,7 @@ impl<
             driver_config,
             error_notification_sender,
             executor_notifier,
-            pending_data_chunks: pending_transaction_chunks,
+            pending_data_chunks,
             metadata_storage,
             runtime,
             state_snapshot_notifier: None,
@@ -410,8 +410,8 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
-    mut committer_notifier: mpsc::Sender<NotificationId>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    mut ledger_updater_notifier: mpsc::Sender<NotificationId>,
+    pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create an executor
@@ -425,7 +425,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     target_ledger_info,
                     end_of_epoch_ledger_info,
                 ) => {
-                    let timer = metrics::start_timer(
+                    let _timer = metrics::start_timer(
                         &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                         metrics::STORAGE_SYNCHRONIZER_EXECUTE_CHUNK,
                     );
@@ -459,7 +459,6 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             num_transactions as u64,
                         );
                     }
-                    drop(timer);
                     (notification_id, result, true)
                 },
                 StorageDataChunk::TransactionOutputs(
@@ -468,7 +467,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     target_ledger_info,
                     end_of_epoch_ledger_info,
                 ) => {
-                    let timer = metrics::start_timer(
+                    let _timer = metrics::start_timer(
                         &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                         metrics::STORAGE_SYNCHRONIZER_APPLY_CHUNK,
                     );
@@ -502,7 +501,6 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             num_outputs as u64,
                         );
                     }
-                    drop(timer);
                     (notification_id, result, false)
                 },
                 storage_data_chunk => {
@@ -519,7 +517,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
             // Notify the ledger updater of the new executed/applied chunks
             match result {
                 Ok(()) => {
-                    if let Err(error) = committer_notifier.send(notification_id).await {
+                    if let Err(error) = ledger_updater_notifier.send(notification_id).await {
                         let error =
                             format!("Failed to notify the ledger updater! Error: {:?}", error);
                         send_storage_synchronizer_error(
@@ -528,7 +526,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             error,
                         )
                         .await;
-                        decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
                     }
                 },
                 Err(error) => {
@@ -543,7 +541,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         error,
                     )
                     .await;
-                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    decrement_pending_data_chunks(pending_data_chunks.clone());
                 },
             }
         }
@@ -559,14 +557,14 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     mut ledger_updater_listener: mpsc::Receiver<NotificationId>,
     mut committer_notifier: mpsc::Sender<NotificationId>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a ledger updater
     let ledger_updater = async move {
         while let Some(notification_id) = ledger_updater_listener.next().await {
             // Update the storage ledger
-            let timer = metrics::start_timer(
+            let _timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_UPDATE_LEDGER,
             );
@@ -592,7 +590,7 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             error,
                         )
                         .await;
-                        decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
                     }
                 },
                 Err(error) => {
@@ -603,10 +601,9 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         error,
                     )
                     .await;
-                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    decrement_pending_data_chunks(pending_data_chunks.clone());
                 },
             };
-            drop(timer);
         }
     };
 
@@ -626,7 +623,7 @@ fn spawn_committer<
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
     storage_service_notification_handler: StorageServiceNotificationHandler<StorageServiceNotifier>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
     storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
@@ -634,7 +631,7 @@ fn spawn_committer<
     let committer = async move {
         while let Some(notification_id) = committer_listener.next().await {
             // Commit the executed chunk
-            let timer = metrics::start_timer(
+            let _timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_COMMIT_CHUNK,
             );
@@ -685,8 +682,7 @@ fn spawn_committer<
                     .await;
                 },
             };
-            drop(timer);
-            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+            decrement_pending_data_chunks(pending_data_chunks.clone());
         }
     };
 
@@ -703,7 +699,7 @@ fn spawn_state_snapshot_receiver<
     mut state_snapshot_listener: mpsc::Receiver<StorageDataChunk>,
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    pending_data_chunks: Arc<AtomicU64>,
     metadata_storage: MetadataStorage,
     storage: DbReaderWriter,
     epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
@@ -786,7 +782,7 @@ fn spawn_state_snapshot_receiver<
                                     )
                                     .await;
                                 }
-                                decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                                decrement_pending_data_chunks(pending_data_chunks.clone());
                                 continue; // Wait for the next chunk
                             }
 
@@ -812,7 +808,7 @@ fn spawn_state_snapshot_receiver<
                                 )
                                 .await;
                             }
-                            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                            decrement_pending_data_chunks(pending_data_chunks.clone());
                             return; // There's nothing left to do!
                         },
                         Err(error) => {
@@ -836,7 +832,7 @@ fn spawn_state_snapshot_receiver<
                     );
                 },
             }
-            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+            decrement_pending_data_chunks(pending_data_chunks.clone());
         }
     };
 
