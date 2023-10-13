@@ -277,7 +277,18 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X, T::Identifier>,
+    pub(crate) read_set: RefCell<HashSet<T::Key>>,
     pub(crate) counter: &'a RefCell<u32>,
+}
+
+impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
+    fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
+        self.unsync_map.write_delayed_field(id, base_value)
+    }
+
+    fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
+        self.unsync_map.fetch_delayed_field(&id)
+    }
 }
 
 pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
@@ -316,6 +327,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             ViewState::Unsync(_) => {
                 unreachable!("Take reads called in sequential setting (not captured)")
             },
+        }
+    }
+
+    pub(crate) fn read_set_sequential_execution(&self) -> RefCell<HashSet<T::Key>> {
+        match &self.latest_view {
+            ViewState::Sync(_) => unreachable!(
+                "Read set for sequential execution while running in parallel execution mode"
+            ),
+            ViewState::Unsync(state) => state.read_set.clone(),
         }
     }
 
@@ -466,10 +486,48 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 }
             },
             ViewState::Unsync(state) => {
-                let ret = state.unsync_map.fetch_data(state_key).map_or_else(
-                    || self.get_base_value(state_key),
-                    |v| Ok(v.as_state_value()),
-                );
+                let ret = match state.unsync_map.fetch_data(state_key) {
+                    // TODO: Should we ignore the layout from fetch_data?
+                    // What if it doesn't match with the maybe_layout given as input to this function?
+                    Some((v, _)) => Ok(v.as_state_value()),
+                    None => {
+                        self.get_base_value(state_key).map(
+                            |maybe_state_value| {
+                                match (kind.clone(), maybe_state_value, maybe_layout) {
+                                    (ReadKind::Value, Some(state_value), Some(layout)) => {
+                                        let res = self.replace_values_with_identifiers(state_value, layout);
+                                        let patched_state_value = match res {
+                                            Ok((patched_state_value, _)) => {
+                                                state.read_set
+                                                    .borrow_mut()
+                                                    .insert(state_key.clone());
+                                                state.unsync_map.write(state_key.clone(),
+                                                    TransactionWrite::from_state_value(Some(patched_state_value.clone())),
+                                                    maybe_layout.map(|layout| Arc::new(layout.clone())));
+                                                Some(patched_state_value)
+                                            }
+                                            Err(err) => {
+                                                let log_context = AdapterLogSchema::new(
+                                                    self.base_view.id(),
+                                                    self.txn_idx as usize,
+                                                );
+                                                alert!(
+                                                    log_context,
+                                                    "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
+                                                    state_key,
+                                                    err
+                                                );
+                                                None
+                                            }
+                                        };
+                                        patched_state_value
+                                    },
+                                    (_, maybe_state_value, _) => {maybe_state_value}
+                                }
+                            }
+                        )
+                    },
+                };
                 ret.map(|maybe_state_value| match kind {
                     // TODO: check if we need to track layout for unsync
                     ReadKind::Value => ReadResult::Value(maybe_state_value, None),
@@ -598,7 +656,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             },
             ViewState::Unsync(state) => state.unsync_map.fetch_data(state_key).map_or_else(
                 || self.get_base_value(state_key),
-                |v| Ok(v.as_state_value()),
+                |(v, _)| Ok(v.as_state_value()),
             ),
         }
     }
@@ -738,14 +796,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         value: Value,
     ) -> TransformationResult<Value> {
         let id = self.generate_delayed_field_id();
+        let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
         match &self.latest_view.latest_view {
-            ViewState::Sync(state) => {
-                let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
-                state.set_delayed_field_value(id, base_value)
-            },
-            ViewState::Unsync(_state) => {
-                // TODO(aggregator): Support sequential execution.
-                unimplemented!("Value to ID replacement for sequential execution is not supported")
+            ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
+            ViewState::Unsync(state) => {
+                state.set_delayed_field_value(id, base_value);
             },
         };
         self.delayed_field_keys.borrow_mut().insert(id);
@@ -770,10 +825,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 )
                 .expect("Committed value for ID must always exist")
                 .try_into_move_value(layout)?),
-            ViewState::Unsync(_state) => {
-                // TODO(aggregator): Support sequential execution.
-                unimplemented!("ID to value replacement for sequential execution is not supported")
-            },
+            ViewState::Unsync(state) => Ok(state
+                .read_delayed_field(id)
+                .expect("Delayed field value for ID must always exist in sequential execution")
+                .try_into_move_value(layout)?),
         }
     }
 }
