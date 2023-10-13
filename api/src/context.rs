@@ -670,7 +670,7 @@ impl Context {
 
         transactions_and_outputs
             .into_iter()
-            .zip(infos.into_iter())
+            .zip(infos)
             .enumerate()
             .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;

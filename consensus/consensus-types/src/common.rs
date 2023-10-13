@@ -71,7 +71,7 @@ pub enum DataStatus {
 impl DataStatus {
     pub fn extend(&mut self, other: DataStatus) {
         match (self, other) {
-            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2.into_iter()),
+            (DataStatus::Requested(v1), DataStatus::Requested(v2)) => v1.extend(v2),
             (_, _) => unreachable!(),
         }
     }

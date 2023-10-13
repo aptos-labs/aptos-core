@@ -9,42 +9,60 @@ use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError,
     ExecutorResult, StateComputeResult,
 };
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::{debug, error};
-use aptos_types::block_executor::partitioner::ExecutableBlock;
+use aptos_types::{
+    block_executor::partitioner::ExecutableBlock,
+    transaction::{signature_verified_transaction::SignatureVerifiedTransaction, Transaction},
+};
 use fail::fail_point;
+use once_cell::sync::Lazy;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
+pub static SIG_VERIFY_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+    Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(8) // More than 8 threads doesn't seem to help much
+            .thread_name(|index| format!("signature-checker-{}", index))
+            .build()
+            .unwrap(),
+    )
+});
 
 pub struct ExecutionPipeline {
-    block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
+    prepare_block_tx: mpsc::UnboundedSender<PrepareBlockCommand>,
 }
 
 impl ExecutionPipeline {
     pub fn spawn(executor: Arc<dyn BlockExecutorTrait>, runtime: &tokio::runtime::Handle) -> Self {
-        let (block_tx, block_rx) = mpsc::unbounded_channel();
+        let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
+        let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
+        runtime.spawn(Self::prepare_block(prepare_block_rx, execute_block_tx));
         runtime.spawn(Self::execute_stage(
-            block_rx,
+            execute_block_rx,
             ledger_apply_tx,
             executor.clone(),
         ));
         runtime.spawn(Self::ledger_apply_stage(ledger_apply_rx, executor));
-        Self { block_tx }
+        Self { prepare_block_tx }
     }
 
     pub async fn queue(
         &self,
-        block: ExecutableBlock,
+        block_id: HashValue,
         parent_block_id: HashValue,
+        txns_to_execute: Vec<Transaction>,
         maybe_block_gas_limit: Option<u64>,
     ) -> StateComputeResultFut {
         let (result_tx, result_rx) = oneshot::channel();
-        let block_id = block.block_id;
-        self.block_tx
-            .send(ExecuteBlockCommand {
-                block,
-                parent_block_id,
+        self.prepare_block_tx
+            .send(PrepareBlockCommand {
+                block_id,
+                txns_to_execute,
                 maybe_block_gas_limit,
+                parent_block_id,
                 result_tx,
             })
             .expect("Failed to send block to execution pipeline.");
@@ -59,6 +77,49 @@ impl ExecutionPipeline {
                     ),
                 })?
         })
+    }
+
+    async fn prepare_block(
+        mut prepare_block_rx: mpsc::UnboundedReceiver<PrepareBlockCommand>,
+        execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
+    ) {
+        while let Some(PrepareBlockCommand {
+            block_id,
+            txns_to_execute,
+            maybe_block_gas_limit,
+            parent_block_id,
+            result_tx,
+        }) = prepare_block_rx.recv().await
+        {
+            debug!("prepare_block received block {}.", block_id);
+            let execute_block_tx = execute_block_tx.clone();
+            let sig_verified_txns = monitor!(
+                "prepare_block",
+                tokio::task::spawn_blocking(move || {
+                    let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL
+                        .install(|| {
+                            let num_txns = txns_to_execute.len();
+                            txns_to_execute
+                                .into_par_iter()
+                                .with_min_len(optimal_min_len(num_txns, 32))
+                                .map(|t| t.into())
+                                .collect::<Vec<_>>()
+                        });
+                    sig_verified_txns
+                })
+                .await
+            )
+            .expect("Failed to spawn_blocking.");
+
+            execute_block_tx
+                .send(ExecuteBlockCommand {
+                    block: (block_id, sig_verified_txns).into(),
+                    parent_block_id,
+                    maybe_block_gas_limit,
+                    result_tx,
+                })
+                .expect("Failed to send block to execution pipeline.");
+        }
     }
 
     async fn execute_stage(
@@ -139,6 +200,15 @@ impl ExecutionPipeline {
         }
         debug!("ledger_apply stage quitting.");
     }
+}
+
+struct PrepareBlockCommand {
+    block_id: HashValue,
+    txns_to_execute: Vec<Transaction>,
+    maybe_block_gas_limit: Option<u64>,
+    // The parent block id.
+    parent_block_id: HashValue,
+    result_tx: oneshot::Sender<ExecutorResult<StateComputeResult>>,
 }
 
 struct ExecuteBlockCommand {

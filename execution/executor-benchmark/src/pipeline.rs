@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_partitioning::BlockPartitioningStage, ledger_update_stage::LedgerUpdateStage,
-    GasMesurement, TransactionCommitter, TransactionExecutor,
+    block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
+    metrics::NUM_TXNS, GasMesurement, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
@@ -108,7 +108,7 @@ where
         let mut join_handles = vec![];
 
         let mut partitioning_stage =
-            BlockPartitioningStage::new(num_partitioner_shards, &config.partitioner_config);
+            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 
@@ -127,6 +127,9 @@ where
             .name("block_partitioning".to_string())
             .spawn(move || {
                 while let Ok(txns) = raw_block_receiver.recv() {
+                    NUM_TXNS
+                        .with_label_values(&["partition"])
+                        .inc_by(txns.len() as u64);
                     let exe_block_msg = partitioning_stage.process(txns);
                     executable_block_sender.send(exe_block_msg).unwrap();
                 }
@@ -148,6 +151,9 @@ where
                         block,
                     } = msg;
                     let block_size = block.transactions.num_transactions();
+                    NUM_TXNS
+                        .with_label_values(&["execution"])
+                        .inc_by(block_size as u64);
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     exe.execute_block(current_block_start_time, partition_time, block);
@@ -182,6 +188,13 @@ where
             .name("ledger_update".to_string())
             .spawn(move || {
                 while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
+                    let block_size = ledger_update_msg
+                        .state_checkpoint_output
+                        .txn_statuses()
+                        .len();
+                    NUM_TXNS
+                        .with_label_values(&["ledger_update"])
+                        .inc_by(block_size as u64);
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
             })

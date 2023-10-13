@@ -2,6 +2,7 @@
 
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},
+    signature_verified_transaction::{into_signature_verified_block, SignatureVerifiedTransaction},
     Transaction,
 };
 use aptos_crypto::HashValue;
@@ -96,7 +97,7 @@ impl CrossShardEdges {
         self.edges
             .entry(txn_idx)
             .or_insert_with(Vec::new)
-            .extend(storage_locations.into_iter());
+            .extend(storage_locations);
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&ShardedTxnIndex, &Vec<StorageLocation>)> {
@@ -442,9 +443,18 @@ impl ExecutableBlock {
     }
 }
 
+impl From<(HashValue, Vec<SignatureVerifiedTransaction>)> for ExecutableBlock {
+    fn from((block_id, transactions): (HashValue, Vec<SignatureVerifiedTransaction>)) -> Self {
+        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+    }
+}
+
 impl From<(HashValue, Vec<Transaction>)> for ExecutableBlock {
     fn from((block_id, transactions): (HashValue, Vec<Transaction>)) -> Self {
-        Self::new(block_id, ExecutableTransactions::Unsharded(transactions))
+        Self::new(
+            block_id,
+            ExecutableTransactions::Unsharded(into_signature_verified_block(transactions)),
+        )
     }
 }
 
@@ -500,8 +510,11 @@ impl PartitionedTransactions {
         self.num_sharded_txns() + self.global_txns.len()
     }
 
-    pub fn add_checkpoint_txn(&mut self, last_txn: Transaction) {
-        assert!(matches!(last_txn, Transaction::StateCheckpoint(_)));
+    pub fn add_checkpoint_txn(&mut self, last_txn: SignatureVerifiedTransaction) {
+        assert!(matches!(
+            last_txn.expect_valid(),
+            Transaction::StateCheckpoint(_)
+        ));
         let txn_with_deps =
             TransactionWithDependencies::new(last_txn.into(), CrossShardDependencies::default());
         if !self.global_txns.is_empty() {
@@ -533,7 +546,7 @@ impl PartitionedTransactions {
 
 // Represents the transactions in a block that are ready to be executed.
 pub enum ExecutableTransactions {
-    Unsharded(Vec<Transaction>),
+    Unsharded(Vec<SignatureVerifiedTransaction>),
     Sharded(PartitionedTransactions),
 }
 
@@ -546,8 +559,8 @@ impl ExecutableTransactions {
     }
 }
 
-impl From<Vec<Transaction>> for ExecutableTransactions {
-    fn from(txns: Vec<Transaction>) -> Self {
+impl From<Vec<SignatureVerifiedTransaction>> for ExecutableTransactions {
+    fn from(txns: Vec<SignatureVerifiedTransaction>) -> Self {
         Self::Unsharded(txns)
     }
 }

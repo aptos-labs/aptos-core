@@ -11,3 +11,4 @@ updates:
       - "CICD:run-e2e-tests"
       - "dependencies"
       - "rust"
+    open-pull-requests-limit: 0

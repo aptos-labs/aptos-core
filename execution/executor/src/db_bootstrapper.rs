@@ -101,12 +101,21 @@ impl GenesisCommitter {
 
     pub fn commit(self) -> Result<()> {
         self.db.save_transactions(
-            &self.output.transactions_to_commit()?,
-            self.output.result_view.txn_accumulator().version(),
+            self.output.transactions_to_commit(),
+            self.output
+                .ledger_update_output
+                .transaction_accumulator
+                .num_leaves()
+                - 1,
             self.base_state_version,
             self.output.ledger_info.as_ref(),
             true, /* sync_commit */
-            self.output.result_view.state().clone(),
+            self.output.result_state.clone(),
+            self.output
+                .ledger_update_output
+                .state_updates_until_last_checkpoint
+                .clone(),
+            Some(&self.output.ledger_update_output.sharded_state_cache),
         )?;
         info!("Genesis commited.");
         // DB bootstrapped, avoid anything that could fail after this.
@@ -137,13 +146,13 @@ pub fn calculate_genesis<V: VMExecutor>(
     };
 
     let (mut output, _, _) = ChunkOutput::by_transaction_execution::<V>(
-        vec![genesis_txn.clone()].into(),
+        vec![genesis_txn.clone().into()].into(),
         base_state_view,
         None,
     )?
-    .apply_to_ledger(&executed_trees, None)?;
+    .apply_to_ledger(&executed_trees, None, None)?;
     ensure!(
-        !output.to_commit.is_empty(),
+        !output.transactions_to_commit().is_empty(),
         "Genesis txn execution failed."
     );
 
@@ -151,7 +160,7 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output.result_view.verified_state_view(
+        let state_view = output.result_view().verified_state_view(
             StateViewId::Miscellaneous,
             Arc::clone(&db.reader),
             Arc::new(AsyncProofFetcher::new(db.reader.clone())),
@@ -176,7 +185,10 @@ pub fn calculate_genesis<V: VMExecutor>(
                 epoch,
                 GENESIS_ROUND,
                 genesis_block_id(),
-                output.result_view.txn_accumulator().root_hash(),
+                output
+                    .ledger_update_output
+                    .transaction_accumulator
+                    .root_hash(),
                 genesis_version,
                 timestamp_usecs,
                 output.next_epoch_state.clone(),

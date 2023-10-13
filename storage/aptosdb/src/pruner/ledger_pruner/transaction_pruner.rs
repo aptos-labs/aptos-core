@@ -22,6 +22,10 @@ pub struct TransactionPruner {
 }
 
 impl DBSubPruner for TransactionPruner {
+    fn name(&self) -> &str {
+        "TransactionPruner"
+    }
+
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
         let candidate_transactions =

@@ -38,7 +38,7 @@ use aptos_types::{
     },
     vm_status::StatusCode,
 };
-use aptos_vm::{data_cache::AsMoveResolver, storage_adapter::AsExecutorView, AptosVM};
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use poem_openapi::{
     param::{Path, Query},
     payload::Json,
@@ -1187,8 +1187,7 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let (_, output) =
-            AptosVM::simulate_signed_transaction(&txn, &state_view.as_executor_view());
+        let (_, output) = AptosVM::simulate_signed_transaction(&txn, &state_view);
         let version = ledger_info.version();
 
         // Ensure that all known statuses return their values in the output (even if they aren't supposed to)

@@ -132,6 +132,26 @@ pub static SYNC_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(histogram_opts, &["label"]).unwrap()
 });
 
+/// Gauge for tracking the number of sent requests by peer buckets
+pub static SENT_REQUESTS_BY_PEER_BUCKET: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_sent_requests_by_peer_bucket",
+        "Gauge related to the sent requests by peer buckets",
+        &["peer_bucket_id", "request_label"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the number of received responses by peer buckets
+pub static RECEIVED_RESPONSES_BY_PEER_BUCKET: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_received_responses_by_peer_bucket",
+        "Gauge related to the received responses by peer buckets",
+        &["peer_bucket_id", "request_label"]
+    )
+    .unwrap()
+});
+
 /// An enum representing the various types of data that can be
 /// fetched via the data client.
 pub enum DataType {
@@ -182,6 +202,13 @@ pub fn observe_value_with_label(histogram: &Lazy<HistogramVec>, label: &str, val
 /// Sets the gauge with the specific label and value
 pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: &str, value: u64) {
     counter.with_label_values(&[label]).set(value as i64);
+}
+
+/// Sets the gauge with the specific label and value for the specified bucket
+pub fn set_gauge_for_bucket(counter: &Lazy<IntGaugeVec>, bucket: &str, label: &str, value: u64) {
+    counter
+        .with_label_values(&[bucket, label])
+        .set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.

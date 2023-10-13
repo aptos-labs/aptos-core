@@ -174,7 +174,7 @@ Events and transactions pruning can be disabled via setting the [`enable_ledger_
 The REST API offers querying transactions and events in these ways:
 
 * [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
-* [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
+* [Transaction by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
 * [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 
 ## Exchanging and tracking coins
@@ -252,7 +252,7 @@ A transfer transaction would appear as follows:
             "guid": {
               "id": {
                 "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
-                "creaton_num": "2",
+                "creation_num": "2",
               }
             }
           },
@@ -321,7 +321,7 @@ Here is a breakdown of the information in a transaction:
 * `success` and `vm_status` indicate whether or not the transaction successfully executed and any reasons why it might not have
 * `changes` include the final values for any state resources that have been modified during the execution of the transaction
 * `events` contain all the events emitted during the transaction execution
-* `timetstamp` is the near real-time timestamp of the transaction's execution
+* `timestamp` is the near real-time timestamp of the transaction's execution
 
 If `success` is false, then `vm_status` will contain an error code or message that resulted in the transaction failing to succeed. When `success` is false, `changes` will be limited to gas deducted from the account and the sequence number incrementing. There will be no `events`.
 
@@ -393,7 +393,7 @@ Consider the transaction from the earlier section, but now with an arbitrary coi
             "guid": {
               "id": {
                 "addr": "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
-                "creaton_num": "2",
+                "creation_num": "2",
               }
             }
           },
