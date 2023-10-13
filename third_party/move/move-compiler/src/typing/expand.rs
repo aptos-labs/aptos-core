@@ -57,7 +57,19 @@ fn types(context: &mut Context, ss: &mut Vec<Type>) {
     }
 }
 
-pub fn type_(context: &mut Context, ty: &mut Type) {
+// type_ for expanding the `i`-th type param of struct `ty_name`
+fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name: &TypeName_) {
+    match ty_name {
+        TypeName_::ModuleType(mod_id, struct_name) => {
+            let param_name = &context.struct_definition(mod_id, struct_name).type_parameters[i].param.user_specified_name.value;
+            let msg = format!("Cannot infer a type parameter {param_name} for generic struct {ty_name}. Try providing a type parameter.");
+            type_msg_(context, ty, &msg);
+        },
+        _ => type_(context, ty),
+    }
+}
+
+pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
     use Type_::*;
     match &mut ty.value {
         Anything | UnresolvedError | Param(_) | Unit => (),
@@ -84,10 +96,9 @@ pub fn type_(context: &mut Context, ty: &mut Type) {
             let replacement = match replacement {
                 sp!(_, Var(_)) => panic!("ICE unfold_type_base failed to expand"),
                 sp!(loc, Anything) => {
-                    let msg = "Could not infer this type. Try adding an annotation";
                     context
                         .env
-                        .add_diag(diag!(TypeSafety::UninferredType, (ty.loc, msg)));
+                        .add_diag(diag!(TypeSafety::UninferredType, (ty.loc, msg_uninferred)));
                     sp(loc, UnresolvedError)
                 },
                 t => t,
@@ -95,19 +106,28 @@ pub fn type_(context: &mut Context, ty: &mut Type) {
             *ty = replacement;
             type_(context, ty);
         },
-        Apply(Some(_), sp!(_, TypeName_::Builtin(_)), tys) => types(context, tys),
+        Apply(Some(_), sp!(_, TypeName_::Builtin(_)), tys) => {
+            types(context, tys)
+        },
         Apply(Some(_), _, _) => panic!("ICE expanding pre expanded type"),
-        Apply(None, _, _) => {
+        Apply(None, ty_name, _) => {
+            let ty_name = ty_name.clone();
             let abilities = core::infer_abilities(context, &context.subst, ty.clone());
             match &mut ty.value {
                 Apply(abilities_opt, _, tys) => {
                     *abilities_opt = Some(abilities);
-                    types(context, tys);
+                    for (i, ty) in tys.iter_mut().enumerate() {
+                        type_struct_ty_param(context, ty, i, &ty_name.value)
+                    }
                 },
                 _ => panic!("ICE impossible. tapply switched to nontapply"),
             }
         },
     }
+}
+
+pub fn type_(context: &mut Context, ty: &mut Type) {
+   type_msg_(context, ty, "Could not infer this type. Try adding an annotation")
 }
 
 //**************************************************************************************************
@@ -311,10 +331,12 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
             type_(context, operand_ty);
         },
 
-        E::Pack(_, _, bs, fields) => {
-            types(context, bs);
-            for (_, _, (_, (bt, fe))) in fields.iter_mut() {
-                type_(context, bt);
+        E::Pack(mod_id, struct_name, bs, fields) => {
+            for (i, b) in bs.iter_mut().enumerate() {
+                type_struct_ty_param(context, b, i, &TypeName_::ModuleType(*mod_id, *struct_name));
+            }
+            for (_, s, (_, (bt, fe))) in fields.iter_mut() {
+                type_msg_(context, bt,&format!("Could not infer the type of field {s}"));
                 exp(context, fe)
             }
         },
