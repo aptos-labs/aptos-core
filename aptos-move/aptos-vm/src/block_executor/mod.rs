@@ -150,23 +150,6 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .to_vec()
     }
 
-    /// Can be called (at most) once after transaction is committed to internally
-    /// include the delta outputs with the transaction outputs.
-    fn incorporate_delta_writes(&self, delta_writes: Vec<(StateKey, WriteOp)>) {
-        assert!(
-            self.committed_output
-                .set(
-                    self.vm_output
-                        .lock()
-                        .take()
-                        .expect("Output must be set to combine with deltas")
-                        .into_transaction_output_with_materialized_deltas(delta_writes),
-                )
-                .is_ok(),
-            "Could not combine VMOutput with deltas"
-        );
-    }
-
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
