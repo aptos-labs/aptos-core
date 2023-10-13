@@ -118,6 +118,9 @@ impl<'r> ResourceGroupAdapter<'r> {
     }
 }
 
+// TODO: Once R-before-W semantics is relaxed in the Move-VM, implement by forwarding
+// to maybe_resource_group_view resource_size_in_group and resource_exists_in_group APIs
+// (and provide corresponding implementation in the Block Executor).
 impl TResourceGroupView for ResourceGroupAdapter<'_> {
     type GroupKey = StateKey;
     type Layout = MoveTypeLayout;
