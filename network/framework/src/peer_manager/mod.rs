@@ -367,7 +367,6 @@ where
                     .filter(|(peer_id, (metadata, _))| {
                         metadata.origin == ConnectionOrigin::Inbound
                             && trusted_peers
-                                .read()
                                 .get(peer_id)
                                 .map_or(true, |peer| peer.role == PeerRole::Unknown)
                     })

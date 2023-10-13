@@ -317,6 +317,7 @@ export class IndexerClient {
    * @param token token address (v2) or token data id (v1)
    * @returns GetTokenDataQuery response type
    */
+  // :!:>getTokenData
   async getTokenData(
     token: string,
     extraArgs?: {
@@ -345,7 +346,7 @@ export class IndexerClient {
       },
     };
     return this.queryIndexer(graphqlQuery);
-  }
+  } // <:!:getTokenData
 
   /**
    * Queries token owners data by token address (v2) or token data id (v1).

@@ -2,6 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 //! Binary format for transactions and modules.
 //!
 //! This module provides a simple Rust abstraction over the binary format. That is the format of
