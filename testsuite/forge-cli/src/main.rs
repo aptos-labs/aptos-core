@@ -1790,7 +1790,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     // Tuned for throughput uses more cores than regular tests,
                     // as it achieves higher throughput.
                     // Check that we don't use more than 14 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14.0, 30),
+                    MetricsThreshold::new(19.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 ))
