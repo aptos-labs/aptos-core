@@ -692,10 +692,6 @@ where
         }
     }
 
-    fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
-        assert_ok!(self.materialized_delta_writes.set(delta_writes));
-    }
-
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
