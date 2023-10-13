@@ -34,13 +34,13 @@ use aptos_types::{
     vm_status::AbortLocation,
     write_set::WriteOp,
 };
-use aptos_vm::move_vm_ext::MoveResolverExt;
 use move_binary_format::file_format::FunctionHandleIndex;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
+    resolver::MoveResolver,
     value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
@@ -64,7 +64,7 @@ pub struct MoveConverter<'a, R: ?Sized> {
     db: Arc<dyn DbReader>,
 }
 
-impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
+impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
@@ -734,7 +734,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         );
         arg_types
             .into_iter()
-            .zip(args.into_iter())
+            .zip(args)
             .enumerate()
             .map(|(i, (arg_type, arg))| {
                 self.try_into_vm_value(&arg_type.clone().try_into()?, arg)
@@ -919,7 +919,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     }
 }
 
-impl<'a, R: MoveResolverExt + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
+impl<'a, R: MoveResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
         self.inner
             .get_module(module_id)
@@ -930,7 +930,7 @@ pub trait AsConverter<R> {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
 }
 
-impl<R: MoveResolverExt> AsConverter<R> for R {
+impl<R: MoveResolver> AsConverter<R> for R {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
         MoveConverter::new(self, db)
     }

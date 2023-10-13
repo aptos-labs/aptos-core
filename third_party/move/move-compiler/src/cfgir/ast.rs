@@ -152,10 +152,10 @@ pub fn remap_labels(
         .into_iter()
         .map(|(lbl, mut block)| {
             remap_labels_block(remapping, &mut block);
-            (remapping[&lbl], block)
+            (remap_label_ref(remapping, &lbl), block)
         })
         .collect();
-    (remapping[&start], blocks)
+    (remap_label_ref(remapping, &start), blocks)
 }
 
 fn remap_labels_block(remapping: &BTreeMap<Label, Label>, block: &mut BasicBlock) {
@@ -169,13 +169,30 @@ fn remap_labels_cmd(remapping: &BTreeMap<Label, Label>, sp!(_, cmd_): &mut Comma
     match cmd_ {
         Break | Continue => panic!("ICE break/continue not translated to jumps"),
         Mutate(_, _) | Assign(_, _) | IgnoreAndPop { .. } | Abort(_) | Return { .. } => (),
-        Jump { target, .. } => *target = remapping[target],
+        Jump { target, .. } => {
+            remap_label_in_place(remapping, target);
+        },
         JumpIf {
             if_true, if_false, ..
         } => {
-            *if_true = remapping[if_true];
-            *if_false = remapping[if_false];
+            remap_label_in_place(remapping, if_true);
+            remap_label_in_place(remapping, if_false);
         },
+    }
+}
+
+fn remap_label_in_place(remapping: &BTreeMap<Label, Label>, label: &mut Label) {
+    if let Some(new_label) = remapping.get(label) {
+        if new_label != label {
+            *label = *new_label;
+        }
+    };
+}
+
+fn remap_label_ref(remapping: &BTreeMap<Label, Label>, label: &Label) -> Label {
+    match remapping.get(label) {
+        Some(new_label) => *new_label,
+        None => *label,
     }
 }
 

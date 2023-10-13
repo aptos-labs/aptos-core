@@ -1,7 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::TConsensusMsg, network_interface::ConsensusMsg};
+use crate::{
+    dag::observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
+    network::TConsensusMsg,
+    network_interface::ConsensusMsg,
+};
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
@@ -12,6 +19,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_enum_conversion_derive::EnumConversion;
+use aptos_logger::debug;
 use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{
     aggregate_signature::{AggregateSignature, PartialSignatures},
@@ -21,23 +29,13 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::{cmp::min, collections::HashSet, ops::Deref, sync::Arc};
-
-pub trait TDAGMessage: Into<DAGMessage> + TryFrom<DAGMessage> {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()>;
-}
-
-impl TDAGMessage for Vote {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        todo!()
-    }
-}
-
-impl TDAGMessage for CertifiedAck {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        todo!()
-    }
-}
+use std::{
+    cmp::min,
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    ops::Deref,
+    sync::Arc,
+};
 
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub enum Extensions {
@@ -250,6 +248,10 @@ impl Node {
         &self.parents
     }
 
+    pub fn timestamp(&self) -> u64 {
+        self.metadata.timestamp
+    }
+
     pub fn parents_metadata(&self) -> impl Iterator<Item = &NodeMetadata> {
         self.parents().iter().map(|cert| &cert.metadata)
     }
@@ -277,23 +279,27 @@ impl Node {
     pub fn payload(&self) -> &Payload {
         &self.payload
     }
-}
 
-impl TDAGMessage for Node {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            sender == *self.author(),
+            "Author {} doesn't match sender {}",
+            self.author(),
+            sender
+        );
         // TODO: move this check to rpc process logic to delay it as much as possible for performance
         ensure!(self.digest() == self.calculate_digest(), "invalid digest");
 
-        let current_round = self.metadata().round();
+        let node_round = self.metadata().round();
 
-        ensure!(current_round > 0, "current round cannot be zero");
+        ensure!(node_round > 0, "current round cannot be zero");
 
-        if current_round == 1 {
+        if node_round == 1 {
             ensure!(self.parents().is_empty(), "invalid parents for round 1");
             return Ok(());
         }
 
-        let prev_round = current_round - 1;
+        let prev_round = node_round - 1;
         // check if the parents' round is the node's round - 1
         ensure!(
             self.parents()
@@ -302,6 +308,7 @@ impl TDAGMessage for Node {
             "invalid parent round"
         );
 
+        // Verification of the certificate is delayed until we need to fetch it
         ensure!(
             verifier
                 .check_voting_power(
@@ -346,6 +353,16 @@ impl NodeId {
 
     pub fn author(&self) -> &Author {
         &self.author
+    }
+}
+
+impl Display for NodeId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NodeId: [epoch: {}, round: {}, author: {}]",
+            self.epoch, self.round, self.author
+        )
     }
 }
 
@@ -403,9 +420,7 @@ impl CertifiedNode {
     pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(self.digest() == self.calculate_digest(), "invalid digest");
 
-        verifier
-            .verify_multi_signatures(self.metadata(), self.certificate().signatures())
-            .map_err(|e| anyhow::anyhow!("unable to verify: {}", e))
+        Ok(verifier.verify_multi_signatures(self.metadata(), self.signatures())?)
     }
 }
 
@@ -419,24 +434,45 @@ impl Deref for CertifiedNode {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CertifiedNodeMessage {
-    inner: CertifiedNode,
+    certified_node: CertifiedNode,
     ledger_info: LedgerInfoWithSignatures,
 }
 
 impl CertifiedNodeMessage {
-    pub fn new(node: CertifiedNode, ledger_info: LedgerInfoWithSignatures) -> Self {
+    pub fn new(certified_node: CertifiedNode, ledger_info: LedgerInfoWithSignatures) -> Self {
         Self {
-            inner: node,
+            certified_node,
             ledger_info,
         }
+    }
+
+    pub fn certified_node(self) -> CertifiedNode {
+        self.certified_node
     }
 
     pub fn ledger_info(&self) -> &LedgerInfoWithSignatures {
         &self.ledger_info
     }
 
-    pub fn certified_node(self) -> CertifiedNode {
-        self.inner
+    pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            *self.certified_node.author() == sender,
+            "Author {} doesn't match sender {}",
+            self.certified_node.author(),
+            sender
+        );
+        ensure!(
+            self.certified_node.epoch() == self.ledger_info.commit_info().epoch(),
+            "Epoch {} from node doesn't match epoch {} from ledger info",
+            self.certified_node.epoch(),
+            self.ledger_info().commit_info().epoch()
+        );
+        self.certified_node.verify(verifier)?;
+        if self.ledger_info.commit_info().round() > 0 {
+            Ok(self.ledger_info.verify_signatures(verifier)?)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -444,17 +480,7 @@ impl Deref for CertifiedNodeMessage {
     type Target = CertifiedNode;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl TDAGMessage for CertifiedNodeMessage {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        self.inner.verify(verifier)?;
-
-        self.ledger_info
-            .verify_signatures(verifier)
-            .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))
+        &self.certified_node
     }
 }
 
@@ -474,6 +500,10 @@ impl Vote {
 
     pub fn signature(&self) -> &bls12381::Signature {
         &self.signature
+    }
+
+    pub fn verify(&self, author: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        Ok(verifier.verify(author, &self.metadata, self.signature())?)
     }
 }
 
@@ -500,6 +530,10 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
+        ack.verify(peer, &self.epoch_state.verifier)?;
+        debug!(LogSchema::new(LogEvent::ReceiveVote)
+            .remote_peer(peer)
+            .round(self.metadata.round()));
         self.partial_signatures.add_signature(peer, ack.signature);
         Ok(self
             .epoch_state
@@ -512,6 +546,7 @@ impl BroadcastStatus<DAGMessage> for SignatureBuilder {
                     .verifier
                     .aggregate_signatures(&self.partial_signatures)
                     .expect("Signature aggregation should succeed");
+                observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
                 NodeCertificate::new(self.metadata.clone(), aggregated_signature)
             }))
     }
@@ -548,6 +583,7 @@ impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Message = CertifiedNodeMessage;
 
     fn add(&mut self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+        debug!(LogSchema::new(LogEvent::ReceiveAck).remote_peer(peer));
         self.received.insert(peer);
         if self.received.len() == self.num_validators {
             Ok(Some(()))
@@ -580,23 +616,43 @@ impl RemoteFetchRequest {
         self.epoch
     }
 
-    pub fn targets(&self) -> &[NodeMetadata] {
-        &self.targets
+    pub fn targets(&self) -> impl Iterator<Item = &NodeMetadata> + Clone {
+        self.targets.iter()
     }
 
     pub fn exists_bitmask(&self) -> &DagSnapshotBitmask {
         &self.exists_bitmask
     }
-}
 
-impl TDAGMessage for RemoteFetchRequest {
-    fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+    pub fn start_round(&self) -> Round {
+        self.exists_bitmask.first_round()
+    }
+
+    pub fn target_round(&self) -> Round {
+        self.targets[0].round
+    }
+
+    pub fn verify(&self, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         ensure!(
             self.exists_bitmask
                 .bitmask
                 .iter()
                 .all(|round| round.len() == verifier.len()),
             "invalid bitmask: each round length is not equal to validator count"
+        );
+        ensure!(!self.targets.is_empty(), "Targets is empty");
+        let target_round = self.targets[0].round();
+        ensure!(
+            self.targets().all(|node| node.round() == target_round),
+            "Target round is not consistent"
+        );
+        ensure!(
+            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64
+                == target_round,
+            "Bitmask length doesn't match, first_round {}, length {}, target {}",
+            self.exists_bitmask.first_round(),
+            self.exists_bitmask.bitmask.len(),
+            target_round
         );
 
         Ok(())
@@ -625,9 +681,23 @@ impl FetchResponse {
 
     pub fn verify(
         self,
-        _request: &RemoteFetchRequest,
+        request: &RemoteFetchRequest,
         validator_verifier: &ValidatorVerifier,
     ) -> anyhow::Result<Self> {
+        ensure!(
+            self.certified_nodes.iter().all(|node| {
+                let round = node.round();
+                let author = node.author();
+                if let Some(author_idx) =
+                    validator_verifier.address_to_validator_index().get(author)
+                {
+                    !request.exists_bitmask.has(round, *author_idx)
+                } else {
+                    false
+                }
+            }),
+            "nodes don't match requested bitmask"
+        );
         ensure!(
             self.certified_nodes
                 .iter()
@@ -693,6 +763,23 @@ impl DAGMessage {
             _ => bail!("message does not support author field"),
         }
     }
+
+    pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        match self {
+            DAGMessage::NodeMsg(node) => node.verify(sender, verifier),
+            DAGMessage::CertifiedNodeMsg(certified_node) => certified_node.verify(sender, verifier),
+            DAGMessage::FetchRequest(fetch_request) => fetch_request.verify(verifier),
+            DAGMessage::VoteMsg(_)
+            | DAGMessage::CertifiedAckMsg(_)
+            | DAGMessage::FetchResponse(_) => {
+                bail!("Unexpected to verify {} in rpc handler", self.name())
+            },
+            #[cfg(test)]
+            DAGMessage::TestMessage(_) | DAGMessage::TestAck(_) => {
+                bail!("Unexpected to verify {}", self.name())
+            },
+        }
+    }
 }
 
 impl RBMessage for DAGMessage {}
@@ -742,22 +829,8 @@ impl TryFrom<ConsensusMsg> for DAGMessage {
 pub struct TestMessage(pub Vec<u8>);
 
 #[cfg(test)]
-impl TDAGMessage for TestMessage {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        todo!()
-    }
-}
-
-#[cfg(test)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TestAck(pub Vec<u8>);
-
-#[cfg(test)]
-impl TDAGMessage for TestAck {
-    fn verify(&self, _verifier: &ValidatorVerifier) -> anyhow::Result<()> {
-        todo!()
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct DagSnapshotBitmask {
@@ -782,6 +855,13 @@ impl DagSnapshotBitmask {
             .get(round_idx)
             .and_then(|round| round.get(author_idx).cloned())
             .unwrap_or(false)
+    }
+
+    pub fn num_missing(&self) -> usize {
+        self.bitmask
+            .iter()
+            .map(|round| round.iter().map(|exist| !*exist as usize).sum::<usize>())
+            .sum::<usize>()
     }
 
     pub fn first_round(&self) -> Round {

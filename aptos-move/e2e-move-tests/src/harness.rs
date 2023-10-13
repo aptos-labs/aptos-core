@@ -3,7 +3,6 @@
 
 use crate::{assert_success, AptosPackageHooks};
 use anyhow::Error;
-use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
@@ -20,6 +19,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
+    move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
     state_store::{
         state_key::StateKey,
@@ -37,15 +37,23 @@ use move_core_types::{
     value::MoveValue,
 };
 use move_package::package_hooks::register_package_hooks;
+use once_cell::sync::Lazy;
 use project_root::get_project_root;
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
+
+static CACHED_BUILT_PACKAGES: Lazy<Mutex<HashMap<PathBuf, Arc<anyhow::Result<BuiltPackage>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -330,19 +338,16 @@ impl MoveHarness {
         output.gas_used()
     }
 
-    /// Creates a transaction which publishes the Move Package found at the given path on behalf
+    /// Creates a transaction which publishes the passed already-built Move Package on behalf
     /// of the given account.
     ///
     /// The passed function allows to manipulate the generated metadata for testing purposes.
-    pub fn create_publish_package(
+    pub fn create_publish_built_package(
         &mut self,
         account: &Account,
-        path: &Path,
-        options: Option<BuildOptions>,
+        package: &BuiltPackage,
         mut patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
-            .expect("building package must succeed");
         let code = package.extract_code();
         let mut metadata = package
             .extract_metadata()
@@ -355,6 +360,55 @@ impl MoveHarness {
                 code,
             ),
         )
+    }
+
+    /// Creates a transaction which publishes the Move Package found at the given path on behalf
+    /// of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn create_publish_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: Option<BuildOptions>,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
+            .expect("building package must succeed");
+        self.create_publish_built_package(account, &package, patch_metadata)
+    }
+
+    pub fn create_publish_package_cache_building(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package_arc = {
+            let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
+
+            Arc::clone(cache.entry(path.to_owned()).or_insert_with(|| {
+                Arc::new(BuiltPackage::build(
+                    path.to_owned(),
+                    BuildOptions::default(),
+                ))
+            }))
+        };
+        let package_ref = package_arc
+            .as_ref()
+            .as_ref()
+            .expect("building package must succeed");
+        self.create_publish_built_package(account, package_ref, patch_metadata)
+    }
+
+    /// Runs transaction which publishes the Move Package.
+    pub fn publish_package_cache_building(
+        &mut self,
+        account: &Account,
+        path: &Path,
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package_cache_building(account, path, |_| {});
+        self.run(txn)
     }
 
     /// Runs transaction which publishes the Move Package.
@@ -680,16 +734,37 @@ impl MoveHarness {
 /// Helper to assert transaction is successful
 #[macro_export]
 macro_rules! assert_success {
-    ($s:expr) => {{
-        use aptos_types::transaction::*;
-        assert_eq!($s, TransactionStatus::Keep(ExecutionStatus::Success))
+    ($s:expr $(,)?) => {{
+        assert_eq!($s, aptos_types::transaction::TransactionStatus::Keep(
+            aptos_types::transaction::ExecutionStatus::Success))
+    }};
+    ($s:expr, $($arg:tt)+) => {{
+        assert_eq!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::Success),
+            $($arg)+
+        )
     }};
 }
 
 /// Helper to assert transaction aborts.
 #[macro_export]
 macro_rules! assert_abort {
-    ($s:expr, $c:pat) => {{
+    // identity needs to be before pattern (both with and without message),
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
+    // would fail
+    ($s:expr, $c:ident $(,)?) => {{
+        assert!(matches!(
+            $s,
+            aptos_types::transaction::TransactionStatus::Keep(
+                aptos_types::transaction::ExecutionStatus::MoveAbort { code, .. }
+            )
+            if code == $c,
+        ));
+    }};
+    ($s:expr, $c:pat $(,)?) => {{
         assert!(matches!(
             $s,
             aptos_types::transaction::TransactionStatus::Keep(
@@ -697,23 +772,54 @@ macro_rules! assert_abort {
             ),
         ));
     }};
+    ($s:expr, $c:ident, $($arg:tt)+) => {{
+        assert!(
+            matches!(
+                $s,
+                aptos_types::transaction::TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::MoveAbort { code, .. }
+                )
+                if code == $c,
+            ),
+            $($arg)+
+        );
+    }};
+    ($s:expr, $c:pat, $($arg:tt)+) => {{
+        assert!(
+            matches!(
+                $s,
+                aptos_types::transaction::TransactionStatus::Keep(
+                    aptos_types::transaction::ExecutionStatus::MoveAbort { code: $c, .. }
+                ),
+            ),
+            $($arg)+
+        );
+    }};
 }
 
 /// Helper to assert vm status code.
 #[macro_export]
 macro_rules! assert_vm_status {
-    ($s:expr, $c:expr) => {{
+    ($s:expr, $c:expr $(,)?) => {{
         use aptos_types::transaction::*;
         assert_eq!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c)))
         );
     }};
+    ($s:expr, $c:expr, $($arg:tt)+) => {{
+        use aptos_types::transaction::*;
+        assert_eq!(
+            $s,
+            TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c))),
+            $($arg)+,
+        );
+    }};
 }
 
 #[macro_export]
 macro_rules! assert_move_abort {
-    ($s:expr, $c:ident) => {{
+    ($s:expr, $c:ident $(,)?) => {{
         use aptos_types::transaction::*;
         assert!(match $s {
             TransactionStatus::Keep(ExecutionStatus::MoveAbort {
@@ -724,4 +830,81 @@ macro_rules! assert_move_abort {
             _ => false,
         });
     }};
+    ($s:expr, $c:ident, $($arg:tt)+) => {{
+        use aptos_types::transaction::*;
+        assert!(
+            match $s {
+                TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+                    location: _,
+                    code: _,
+                    info,
+                }) => info == $c,
+                _ => false,
+            },
+            $($arg)+
+        );
+    }};
+}
+
+#[cfg(test)]
+mod tests {
+    use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+    use move_core_types::vm_status::AbortLocation;
+
+    #[test]
+    fn test_asserts() {
+        let success = TransactionStatus::Keep(ExecutionStatus::Success);
+
+        let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code: 13,
+            location: AbortLocation::Script,
+            info: None,
+        });
+
+        assert_success!(success);
+        assert_success!(success,);
+        assert_success!(success, "success");
+        assert_success!(success, "message {}", 0);
+        assert_success!(success, "message {}", 0,);
+
+        let x = 13;
+        assert_abort!(abort_13, 13);
+        assert_abort!(abort_13, 13,);
+        assert_abort!(abort_13, x);
+        assert_abort!(abort_13, _);
+        assert_abort!(abort_13, 13 | 14);
+        assert_abort!(abort_13, 13, "abort");
+        assert_abort!(abort_13, 13, "abort {}", 0);
+        assert_abort!(abort_13, x, "abort");
+        assert_abort!(abort_13, x, "abort {}", 0);
+        assert_abort!(abort_13, _, "abort");
+        assert_abort!(abort_13, 13 | 14, "abort");
+        assert_abort!(abort_13, 13 | 14, "abort",);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_asserts_variable_used() {
+        let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code: 13,
+            location: AbortLocation::Script,
+            info: None,
+        });
+
+        let x = 14;
+        assert_abort!(abort_13, x);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_asserts_variable_used_with_message() {
+        let abort_13 = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            code: 13,
+            location: AbortLocation::Script,
+            info: None,
+        });
+
+        let x = 14;
+        assert_abort!(abort_13, x, "abort");
+    }
 }

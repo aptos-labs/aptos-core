@@ -30,7 +30,8 @@ import shutil
 import sys
 
 from cases.account import (
-    test_account_create,
+    test_account_create_and_transfer,
+    test_account_list,
     test_account_fund_with_faucet,
     test_account_lookup_address,
     test_account_resource_account,
@@ -55,6 +56,7 @@ from cases.stake import (
     test_stake_create_staking_contract,
     test_stake_increase_lockup,
     test_stake_initialize_stake_owner,
+    test_stake_request_commission,
     test_stake_set_operator,
     test_stake_set_voter,
     test_stake_unlock_stake,
@@ -121,6 +123,11 @@ def parse_args():
         default="/tmp/aptos-cli-tests",
         help="Where we'll run CLI commands from (in the host system). Default: %(default)s",
     )
+    parser.add_argument(
+        "--no-pull-always",
+        action="store_true",
+        help='If set, do not set "--pull always" when running the local testnet. Necessary for using local images.',
+    )
     args = parser.parse_args()
     return args
 
@@ -137,7 +144,8 @@ def run_tests(run_helper):
 
     # Run account tests.
     test_account_fund_with_faucet(run_helper)
-    test_account_create(run_helper)
+    test_account_create_and_transfer(run_helper)
+    test_account_list(run_helper)
     test_account_lookup_address(run_helper)
     test_account_resource_account(run_helper)
 
@@ -161,6 +169,7 @@ def run_tests(run_helper):
     test_stake_set_operator(run_helper)
     test_stake_set_voter(run_helper)
     test_stake_create_staking_contract(run_helper)
+    test_stake_request_commission(run_helper)
 
     # Run node subcommand group tests.
     test_node_show_validator_set(run_helper)
@@ -185,7 +194,9 @@ def main():
     pathlib.Path(args.working_directory).mkdir(parents=True, exist_ok=True)
 
     # Run a node + faucet and wait for them to start up.
-    container_name = run_node(args.base_network, args.image_repo_with_project)
+    container_name = run_node(
+        args.base_network, args.image_repo_with_project, not args.no_pull_always
+    )
 
     # We run these in a try finally so that if something goes wrong, such as the
     # local testnet not starting up correctly or some unexpected error in the

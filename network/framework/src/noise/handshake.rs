@@ -278,7 +278,7 @@ impl NoiseUpgrader {
         // Determine the peer role
         match peers_and_metadata.get_trusted_peers(&self.network_context.network_id()) {
             Ok(trusted_peers) => {
-                match trusted_peers.read().get(&remote_peer_id) {
+                match trusted_peers.get(&remote_peer_id) {
                     Some(trusted_peer) => {
                         return trusted_peer.role; // We've found the peer!
                     },
@@ -369,7 +369,7 @@ impl NoiseUpgrader {
                 peers_and_metadata, ..
             } => {
                 let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id)?;
-                let trusted_peer = trusted_peers.read().get(&remote_peer_id).cloned();
+                let trusted_peer = trusted_peers.get(&remote_peer_id).cloned();
                 match trusted_peer {
                     Some(peer) => {
                         Self::authenticate_inbound(remote_peer_short, &peer, &remote_public_key)
@@ -382,7 +382,7 @@ impl NoiseUpgrader {
             },
             HandshakeAuthMode::MaybeMutual(peers_and_metadata) => {
                 let trusted_peers = peers_and_metadata.get_trusted_peers(&network_id)?;
-                let trusted_peer = trusted_peers.read().get(&remote_peer_id).cloned();
+                let trusted_peer = trusted_peers.get(&remote_peer_id).cloned();
                 match trusted_peer {
                     Some(peer) => {
                         Self::authenticate_inbound(remote_peer_short, &peer, &remote_public_key)
@@ -515,6 +515,7 @@ mod test {
         x25519::{PrivateKey, PublicKey},
     };
     use aptos_memsocket::MemorySocket;
+    use aptos_types::account_address::AccountAddress;
     use futures::{executor::block_on, future::join};
     use rand::{prelude::StdRng, SeedableRng as _};
 
@@ -544,16 +545,18 @@ mod test {
                 // iff we're not using a provided peers_and_metadata struct.
                 if insert_trusted_peers {
                     let peer_role = PeerRole::Validator;
-                    let trusted_peers = peers_and_metadata
-                        .get_trusted_peers(&client_network_context.network_id())
-                        .unwrap();
-                    trusted_peers.write().insert(
+                    let client = (
                         client_network_context.peer_id(),
                         Peer::new(vec![], [client_public_key].into_iter().collect(), peer_role),
                     );
-                    trusted_peers.write().insert(
+                    let server = (
                         server_network_context.peer_id(),
                         Peer::new(vec![], [server_public_key].into_iter().collect(), peer_role),
+                    );
+                    insert_new_trusted_peers(
+                        &peers_and_metadata,
+                        client_network_context.network_id(),
+                        vec![client, server],
                     );
                 }
 
@@ -832,10 +835,7 @@ mod test {
         server.network_context = server_network_context;
 
         // Add the VFN to the trusted peers set
-        let trusted_peers = peers_and_metadata
-            .get_trusted_peers(&NetworkId::Public)
-            .unwrap();
-        trusted_peers.write().insert(
+        let server_peer = (
             server_peer_id,
             Peer::new(
                 vec![],
@@ -843,6 +843,7 @@ mod test {
                 PeerRole::ValidatorFullNode,
             ),
         );
+        insert_new_trusted_peers(&peers_and_metadata, NetworkId::Public, vec![server_peer]);
 
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
@@ -936,10 +937,7 @@ mod test {
         server.network_context = server_network_context;
 
         // Add the validator to the trusted peers set
-        let trusted_peers = peers_and_metadata
-            .get_trusted_peers(&NetworkId::Vfn)
-            .unwrap();
-        trusted_peers.write().insert(
+        let server_peer = (
             server_peer_id,
             Peer::new(
                 vec![],
@@ -947,6 +945,7 @@ mod test {
                 PeerRole::Validator,
             ),
         );
+        insert_new_trusted_peers(&peers_and_metadata, NetworkId::Vfn, vec![server_peer]);
 
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
@@ -1002,10 +1001,7 @@ mod test {
         server.network_context = server_network_context;
 
         // Add the client VFN and server VFN to the trusted peers set
-        let trusted_peers = peers_and_metadata
-            .get_trusted_peers(&NetworkId::Public)
-            .unwrap();
-        trusted_peers.write().insert(
+        let client_peer = (
             client_peer_id,
             Peer::new(
                 vec![],
@@ -1013,7 +1009,7 @@ mod test {
                 PeerRole::ValidatorFullNode,
             ),
         );
-        trusted_peers.write().insert(
+        let server_peer = (
             server_peer_id,
             Peer::new(
                 vec![],
@@ -1021,6 +1017,10 @@ mod test {
                 PeerRole::ValidatorFullNode,
             ),
         );
+        insert_new_trusted_peers(&peers_and_metadata, NetworkId::Public, vec![
+            client_peer,
+            server_peer,
+        ]);
 
         // Create an in-memory socket for testing
         let (dialer_socket, listener_socket) = MemorySocket::new_pair();
@@ -1048,5 +1048,25 @@ mod test {
 
         // Perform the handshake
         block_on(join(client_connection_task, server_connection_task));
+    }
+
+    /// Inserts the given peers into the trusted peer set for the specified network
+    fn insert_new_trusted_peers(
+        peers_and_metadata: &Arc<PeersAndMetadata>,
+        network_id: NetworkId,
+        peers: Vec<(AccountAddress, Peer)>,
+    ) {
+        // Get a copy of the trusted peers
+        let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
+
+        // Insert the new peers
+        for (peer_address, peer) in peers {
+            trusted_peers.insert(peer_address, peer);
+        }
+
+        // Update the trusted peers
+        peers_and_metadata
+            .set_trusted_peers(&network_id, trusted_peers)
+            .unwrap();
     }
 }

@@ -4,6 +4,24 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [2.2.1] - 2023/10/13
+### Fixed
+- Fixed postgres data persistence between restarts when using `aptos node run-local-testnet --with-indexer-api`.
+
+## [2.2.0] - 2023/10/11
+### Added
+- Added `--with-indexer-api` to `aptos node run-local-testnet`. With this flag you can run a full processor + indexer API stack as part of your local testnet. You must have Docker installed to use this feature. For more information, see https://aptos.dev/nodes/local-testnet/local-testnet-index.
+### Updated
+- Updated CLI source compilation to use rust toolchain version 1.72.1 (from 1.71.1).
+
+## [2.1.1] - 2023/09/27
+### Added
+- Added an option `--print-metadata` to the command `aptos move download` to print out the metadata of the package to be downloaded.
+  - Example: `aptos move download  --account 0x1 --package AptosFramework --url https://mainnet.aptoslabs.com/v1 --print-metadata`
+### Updated
+- The `--with-faucet` flag has been removed from `aptos node run-local-testnet`, we now run a faucet by default. To disable the faucet use the `--no-faucet` flag.
+- **Breaking change**: When using `aptos node run-local-testnet` we now expose a transaction stream. Learn more about the transaction stream service here: https://aptos.dev/indexer/txn-stream/. Opt out of this with `--no-txn-stream`. This is marked as a breaking change since the CLI now uses a port (50051 by default) that it didn't used to. If you need this port, you can tell the CLI to use a different port with `--txn-stream-port`.
+
 ## [2.1.0] - 2023/08/24
 ### Updated
 - Updated CLI source compilation to use rust toolchain version 1.71.1 (from 1.71.0).

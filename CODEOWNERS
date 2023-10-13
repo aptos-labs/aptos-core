@@ -53,6 +53,10 @@
 /crates/aptos-logger @gregnazario @joshlind
 
 /crates/aptos-open-api @banool @gregnazario
+
+# Owners for the aptos-protos crate
+/crates/aptos-protos @banool @bowenyang007 @jillxuu @larry-aptos @rtso
+
 /crates/aptos-rest-client @banool @gregnazario
 
 # Owners for the `/aptos-rosetta` directory and related crates.

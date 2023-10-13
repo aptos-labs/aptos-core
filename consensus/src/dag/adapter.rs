@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensusdb::{
-        CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema, OrderedAnchorIdSchema,
-    },
+    consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
+    counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
@@ -17,59 +16,104 @@ use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
     executed_block::ExecutedBlock,
+    quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
+use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_storage_interface::{DbReader, Order};
 use aptos_types::{
     account_config::{new_block_event_key, NewBlockEvent},
     aggregate_signature::AggregateSignature,
+    block_info::BlockInfo,
     epoch_change::EpochChangeProof,
+    epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::{collections::HashMap, sync::Arc};
 
-#[async_trait]
-pub trait Notifier: Send {
+pub trait OrderedNotifier: Send + Sync {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()>;
+}
 
+#[async_trait]
+pub trait ProofNotifier: Send + Sync {
     async fn send_epoch_change(&self, proof: EpochChangeProof);
 
     async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures);
 }
-pub struct NotifierAdapter {
-    executor_channel: UnboundedSender<OrderedBlocks>,
-    storage: Arc<dyn DAGStorage>,
+
+pub(crate) fn compute_initial_block_and_ledger_info(
+    ledger_info_from_storage: LedgerInfoWithSignatures,
+) -> (BlockInfo, LedgerInfoWithSignatures) {
+    // We start from the block that storage's latest ledger info, if storage has end-epoch
+    // LedgerInfo, we generate the virtual genesis block
+    if ledger_info_from_storage.ledger_info().ends_epoch() {
+        let genesis =
+            Block::make_genesis_block_from_ledger_info(ledger_info_from_storage.ledger_info());
+
+        let ledger_info = ledger_info_from_storage.ledger_info();
+        let genesis_qc = QuorumCert::certificate_for_genesis_from_ledger_info(
+            ledger_info_from_storage.ledger_info(),
+            genesis.id(),
+        );
+        let genesis_ledger_info = genesis_qc.ledger_info().clone();
+        (
+            genesis.gen_block_info(
+                ledger_info.transaction_accumulator_hash(),
+                ledger_info.version(),
+                ledger_info.next_epoch_state().cloned(),
+            ),
+            genesis_ledger_info,
+        )
+    } else {
+        (
+            ledger_info_from_storage.ledger_info().commit_info().clone(),
+            ledger_info_from_storage,
+        )
+    }
 }
 
-impl NotifierAdapter {
-    pub fn new(
+pub(super) struct OrderedNotifierAdapter {
+    executor_channel: UnboundedSender<OrderedBlocks>,
+    storage: Arc<dyn DAGStorage>,
+    parent_block_info: Arc<RwLock<BlockInfo>>,
+    epoch_state: Arc<EpochState>,
+    ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+}
+
+impl OrderedNotifierAdapter {
+    pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         storage: Arc<dyn DAGStorage>,
+        epoch_state: Arc<EpochState>,
+        parent_block_info: BlockInfo,
+        ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     ) -> Self {
         Self {
             executor_channel,
             storage,
+            parent_block_info: Arc::new(RwLock::new(parent_block_info)),
+            epoch_state,
+            ledger_info_provider,
         }
     }
 }
 
-#[async_trait]
-impl Notifier for NotifierAdapter {
+impl OrderedNotifier for OrderedNotifierAdapter {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
         let anchor = ordered_nodes.last().unwrap();
-        let anchor_id = anchor.id();
         let epoch = anchor.epoch();
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
@@ -80,13 +124,38 @@ impl Notifier for NotifierAdapter {
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
-        // TODO: we may want to split payload into multiple blocks
+        let parent_block_id = self.parent_block_info.read().id();
+        // construct the bitvec that indicates which nodes present in the previous round in CommitEvent
+        let mut parents_bitvec = BitVec::with_num_bits(self.epoch_state.verifier.len() as u16);
+        for parent in anchor.parents().iter() {
+            if let Some(idx) = self
+                .epoch_state
+                .verifier
+                .address_to_validator_index()
+                .get(parent.metadata().author())
+            {
+                parents_bitvec.set(*idx as u16);
+            }
+        }
+
         let block = ExecutedBlock::new(
-            Block::new_for_dag(epoch, round, timestamp, payload, author, failed_author)?,
+            Block::new_for_dag(
+                epoch,
+                round,
+                timestamp,
+                payload,
+                author,
+                failed_author,
+                parent_block_id,
+                parents_bitvec,
+                node_digests,
+            ),
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();
         let storage = self.storage.clone();
+        let ledger_info_provider = self.ledger_info_provider.clone();
+        *self.parent_block_info.write() = block_info.clone();
         Ok(self.executor_channel.unbounded_send(OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -94,30 +163,27 @@ impl Notifier for NotifierAdapter {
                 AggregateSignature::empty(),
             ),
             callback: Box::new(
-                move |_committed_blocks: &[Arc<ExecutedBlock>],
-                      _commit_decision: LedgerInfoWithSignatures| {
-                    // TODO: this doesn't really work since not every block will trigger a callback,
-                    // we need to update the buffer manager to invoke all callbacks instead of only last one
-                    if let Err(e) = storage
-                        .delete_certified_nodes(node_digests)
-                        .and_then(|_| storage.delete_ordered_anchor_ids(vec![anchor_id]))
-                    {
-                        error!(
-                            "Failed to garbage collect committed nodes and anchor: {:?}",
-                            e
-                        );
+                move |committed_blocks: &[Arc<ExecutedBlock>],
+                      commit_decision: LedgerInfoWithSignatures| {
+                    ledger_info_provider
+                        .write()
+                        .notify_commit_proof(commit_decision);
+                    update_counters_for_committed_blocks(committed_blocks);
+                    for executed_block in committed_blocks {
+                        if let Some(node_digests) = executed_block.block().block_data().dag_nodes()
+                        {
+                            if let Err(e) = storage.delete_certified_nodes(node_digests.clone()) {
+                                error!(
+                                    "Failed to garbage collect committed for block {}: {:?}",
+                                    executed_block.block(),
+                                    e
+                                );
+                            }
+                        }
                     }
                 },
             ),
         })?)
-    }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
-        todo!()
-    }
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
-        todo!()
     }
 }
 
@@ -244,22 +310,6 @@ impl DAGStorage for StorageAdapter {
         Ok(self.consensus_db.delete::<CertifiedNodeSchema>(digests)?)
     }
 
-    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .put::<OrderedAnchorIdSchema>(node_id, &())?)
-    }
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>> {
-        Ok(self.consensus_db.get_all::<OrderedAnchorIdSchema>()?)
-    }
-
-    fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .delete::<OrderedAnchorIdSchema>(node_ids)?)
-    }
-
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
         let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         let mut commit_events = vec![];
@@ -278,11 +328,42 @@ impl DAGStorage for StorageAdapter {
                 commit_events.push(self.convert(new_block_event)?);
             }
         }
+        commit_events.reverse();
         Ok(commit_events)
     }
 
     fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
         // TODO: use callback from notifier to cache the latest ledger info
         self.aptos_db.get_latest_ledger_info()
+    }
+}
+
+pub(crate) trait TLedgerInfoProvider: Send + Sync {
+    fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures;
+
+    fn get_highest_committed_anchor_round(&self) -> Round;
+}
+
+pub(super) struct LedgerInfoProvider {
+    latest_ledger_info: LedgerInfoWithSignatures,
+}
+
+impl LedgerInfoProvider {
+    pub(super) fn new(latest_ledger_info: LedgerInfoWithSignatures) -> Self {
+        Self { latest_ledger_info }
+    }
+
+    pub(super) fn notify_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
+        self.latest_ledger_info = ledger_info;
+    }
+}
+
+impl TLedgerInfoProvider for RwLock<LedgerInfoProvider> {
+    fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures {
+        self.read().latest_ledger_info.clone()
+    }
+
+    fn get_highest_committed_anchor_round(&self) -> Round {
+        self.read().latest_ledger_info.ledger_info().round()
     }
 }

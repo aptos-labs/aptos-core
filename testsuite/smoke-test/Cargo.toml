@@ -40,7 +40,13 @@ aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-diesel = { workspace = true }
+diesel = { workspace = true, features = [
+    "chrono",
+    "postgres",
+    "r2d2",
+    "numeric",
+    "serde_json",
+] }
 hex = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
@@ -58,7 +64,6 @@ aptos-logger = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-vault-client = { workspace = true }
-aptos-writeset-generator = { workspace = true }
 base64 = { workspace = true }
 futures = { workspace = true }
 num_cpus = { workspace = true }

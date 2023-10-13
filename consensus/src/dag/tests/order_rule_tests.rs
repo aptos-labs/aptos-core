@@ -3,7 +3,7 @@
 
 use crate::{
     dag::{
-        adapter::Notifier,
+        adapter::OrderedNotifier,
         anchor_election::RoundRobinAnchorElection,
         dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
@@ -16,10 +16,7 @@ use crate::{
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_types::{
-    epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    validator_verifier::random_validator_verifier,
-};
+use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;
@@ -85,21 +82,13 @@ pub struct TestNotifier {
 }
 
 #[async_trait]
-impl Notifier for TestNotifier {
+impl OrderedNotifier for TestNotifier {
     fn send_ordered_nodes(
-        &mut self,
+        &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         _failed_authors: Vec<(Round, Author)>,
     ) -> anyhow::Result<()> {
         Ok(self.tx.unbounded_send(ordered_nodes)?)
-    }
-
-    async fn send_epoch_change(&self, _proof: EpochChangeProof) {
-        unimplemented!()
-    }
-
-    async fn send_commit_proof(&self, _ledger_info: LedgerInfoWithSignatures) {
-        unimplemented!()
     }
 }
 
@@ -118,7 +107,7 @@ fn create_order_rule(
             ledger_info,
             dag,
             anchor_election,
-            Box::new(TestNotifier { tx }),
+            Arc::new(TestNotifier { tx }),
             Arc::new(MockStorage::new()),
         ),
         rx,
@@ -256,7 +245,7 @@ fn test_order_rule_basic() {
         // anchor (2, 1) has 3 votes
         vec![(1, 2), (1, 1), (2, 1)],
         // anchor (3, 1) has 2 votes
-        vec![(1, 3), (2, 2), (2, 0), (3, 1)],
+        vec![(2, 2), (2, 0), (3, 1)],
         // anchor (4, 2) has 3 votes
         vec![(3, 3), (3, 2), (3, 0), (4, 2)],
         // anchor (5, 2) has 3 votes

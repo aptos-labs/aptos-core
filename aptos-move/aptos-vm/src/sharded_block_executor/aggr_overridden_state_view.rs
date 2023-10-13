@@ -26,8 +26,10 @@ impl<'a, S: StateView + Sync + Send> AggregatorOverriddenStateView<'a, S> {
     }
 
     fn total_supply_base_view_override(&self) -> Result<Option<StateValue>> {
-        Ok(Some(StateValue::from(
-            bcs::to_bytes(&self.total_supply_aggr_base_val).unwrap(),
+        Ok(Some(StateValue::new_legacy(
+            bcs::to_bytes(&self.total_supply_aggr_base_val)
+                .unwrap()
+                .into(),
         )))
     }
 }

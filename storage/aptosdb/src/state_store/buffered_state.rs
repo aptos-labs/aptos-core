@@ -10,10 +10,11 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::{state_store::ShardedStateUpdates, transaction::Version};
-use itertools::zip_eq;
+use aptos_types::{
+    state_store::{combine_sharded_state_updates, ShardedStateUpdates},
+    transaction::Version,
+};
 use std::{
-    mem::swap,
     sync::{
         mpsc,
         mpsc::{Sender, SyncSender},
@@ -23,7 +24,7 @@ use std::{
 };
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
-pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 20_000;
+pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 
 /// The in-memory buffered state that consists of two pieces:
 /// `state_until_checkpoint`: The ready-to-commit data in range (last snapshot, latest checkpoint].
@@ -148,7 +149,7 @@ impl BufferedState {
     pub fn update(
         &mut self,
         updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
-        mut new_state_after_checkpoint: StateDelta,
+        new_state_after_checkpoint: StateDelta,
         sync_commit: bool,
     ) -> Result<()> {
         ensure!(
@@ -157,27 +158,28 @@ impl BufferedState {
         if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
-            zip_eq(
-                self.state_after_checkpoint.updates_since_base.iter_mut(),
-                updates_until_next_checkpoint_since_current.into_iter(),
-            )
-            .for_each(|(base, delta)| {
-                base.extend(delta);
-            });
+            ensure!(
+                new_state_after_checkpoint.base_version > self.state_after_checkpoint.base_version,
+                "Diff between base and latest checkpoints provided, while they are the same.",
+            );
+            combine_sharded_state_updates(
+                &mut self.state_after_checkpoint.updates_since_base,
+                updates_until_next_checkpoint_since_current,
+            );
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
-            swap(
-                &mut self.state_after_checkpoint,
-                &mut new_state_after_checkpoint,
-            );
+            let state_after_checkpoint = self
+                .state_after_checkpoint
+                .replace_with(new_state_after_checkpoint);
             if let Some(ref mut delta) = self.state_until_checkpoint {
-                delta.merge(new_state_after_checkpoint);
+                delta.merge(state_after_checkpoint);
             } else {
-                self.state_until_checkpoint = Some(Box::new(new_state_after_checkpoint));
+                self.state_until_checkpoint = Some(Box::new(state_after_checkpoint));
             }
         } else {
             ensure!(
-                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version
+                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version,
+                "Diff between base and latest checkpoints not provided.",
             );
             self.state_after_checkpoint = new_state_after_checkpoint;
         }

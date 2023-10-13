@@ -5,7 +5,7 @@ use crate::{
     client::AptosDataClient,
     error::Result,
     global_summary::GlobalDataSummary,
-    interface::{AptosDataClientInterface, Response},
+    interface::{AptosDataClientInterface, Response, SubscriptionRequestMetadata},
     poller::DataSummaryPoller,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -23,6 +23,7 @@ use aptos_network::{
     },
     transport::ConnectionMetadata,
 };
+use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
@@ -38,14 +39,14 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use futures::StreamExt;
-use maplit::hashmap;
 use mockall::mock;
-use std::sync::Arc;
+use rand::{rngs::OsRng, Rng};
+use std::{collections::HashMap, sync::Arc};
 
 /// A simple mock network for testing the data client
 pub struct MockNetwork {
-    network_id: NetworkId,
-    peer_mgr_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    peer_mgr_reqs_rxs:
+        HashMap<NetworkId, aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
@@ -55,25 +56,39 @@ impl MockNetwork {
         data_client_config: Option<AptosDataClientConfig>,
         networks: Option<Vec<NetworkId>>,
     ) -> (Self, MockTimeService, AptosDataClient, DataSummaryPoller) {
-        // Setup the request managers
-        let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
-        let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = queue_cfg.build();
-        let (connection_reqs_tx, _connection_reqs_rx) = queue_cfg.build();
+        // Initialize the logger for testing
+        ::aptos_logger::Logger::init_for_testing();
 
-        // Setup the network client
-        let network_sender = NetworkSender::new(
-            PeerManagerRequestSender::new(peer_mgr_reqs_tx),
-            ConnectionRequestSender::new(connection_reqs_tx),
-        );
+        // Setup the network IDs
         let networks = networks
             .unwrap_or_else(|| vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public]);
+
+        // Create the network senders and receivers for each network
+        let mut network_senders = HashMap::new();
+        let mut peer_mgr_reqs_rxs = HashMap::new();
+        for network in &networks {
+            // Setup the request managers
+            let queue_cfg = aptos_channel::Config::new(10).queue_style(QueueStyle::FIFO);
+            let (peer_mgr_reqs_tx, peer_mgr_reqs_rx) = queue_cfg.build();
+            let (connection_reqs_tx, _connection_reqs_rx) = queue_cfg.build();
+
+            // Create the network sender
+            let network_sender = NetworkSender::new(
+                PeerManagerRequestSender::new(peer_mgr_reqs_tx),
+                ConnectionRequestSender::new(connection_reqs_tx),
+            );
+
+            // Save the network sender and the request receiver
+            network_senders.insert(*network, network_sender);
+            peer_mgr_reqs_rxs.insert(*network, peer_mgr_reqs_rx);
+        }
+
+        // Create the network client
         let peers_and_metadata = PeersAndMetadata::new(&networks);
-        let client_network_id = NetworkId::Validator;
         let network_client = NetworkClient::new(
             vec![],
             vec![ProtocolId::StorageServiceRpc],
-            hashmap! {
-            client_network_id => network_sender},
+            network_senders,
             peers_and_metadata.clone(),
         );
 
@@ -95,8 +110,7 @@ impl MockNetwork {
 
         // Create the mock network
         let mock_network = Self {
-            network_id: client_network_id,
-            peer_mgr_reqs_rx,
+            peer_mgr_reqs_rxs,
             peers_and_metadata,
         };
 
@@ -138,8 +152,20 @@ impl MockNetwork {
             .insert_connection_metadata(peer_network_id, connection_metadata)
             .unwrap();
 
+        // Insert peer monitoring metadata for the peer
+        let peer_monitoring_metadata =
+            PeerMonitoringMetadata::new(Some(OsRng.gen()), None, None, None);
+        self.peers_and_metadata
+            .update_peer_monitoring_metadata(peer_network_id, peer_monitoring_metadata)
+            .unwrap();
+
         // Return the new peer
         peer_network_id
+    }
+
+    /// Returns the peers and metadata
+    pub fn get_peers_and_metadata(&self) -> Arc<PeersAndMetadata> {
+        self.peers_and_metadata.clone()
     }
 
     /// Disconnects the peer in the network peer DB
@@ -160,10 +186,11 @@ impl MockNetwork {
     }
 
     /// Get the next request sent from the client
-    pub async fn next_request(&mut self) -> Option<NetworkRequest> {
-        match self.peer_mgr_reqs_rx.next().await {
+    pub async fn next_request(&mut self, network_id: NetworkId) -> Option<NetworkRequest> {
+        let peer_mgr_reqs_rx = self.peer_mgr_reqs_rxs.get_mut(&network_id).unwrap();
+        match peer_mgr_reqs_rx.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
-                let peer_network_id = PeerNetworkId::new(self.network_id, peer_id);
+                let peer_network_id = PeerNetworkId::new(network_id, peer_id);
                 let protocol_id = network_request.protocol_id;
                 let data = network_request.data;
                 let res_tx = network_request.res_tx;
@@ -270,6 +297,26 @@ mock! {
             include_events: bool,
             request_timeout_ms: u64,
         ) -> Result<Response<TransactionOrOutputListWithProof>>;
+
+        async fn subscribe_to_transaction_outputs_with_proof(
+            &self,
+            subscription_request_metadata: SubscriptionRequestMetadata,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOutputListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn subscribe_to_transactions_with_proof(
+            &self,
+            subscription_request_metadata: SubscriptionRequestMetadata,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionListWithProof, LedgerInfoWithSignatures)>>;
+
+        async fn subscribe_to_transactions_or_outputs_with_proof(
+            &self,
+            subscription_request_metadata: SubscriptionRequestMetadata,
+            include_events: bool,
+            request_timeout_ms: u64,
+        ) -> Result<Response<(TransactionOrOutputListWithProof, LedgerInfoWithSignatures)>>;
     }
 }
 

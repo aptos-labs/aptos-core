@@ -40,7 +40,8 @@ impl StateKvDb {
         readonly: bool,
         ledger_db: Arc<DB>,
     ) -> Result<Self> {
-        if !rocksdb_configs.split_ledger_db {
+        let sharding = rocksdb_configs.enable_storage_sharding;
+        if !sharding {
             info!("State K/V DB is not enabled!");
             return Ok(Self {
                 state_kv_metadata_db: Arc::clone(&ledger_db),
@@ -108,7 +109,7 @@ impl StateKvDb {
                 s.spawn(move |_| {
                     // TODO(grao): Consider propagating the error instead of panic, if necessary.
                     self.commit_single_shard(version, shard_id as u8, state_kv_batch)
-                        .unwrap_or_else(|_| panic!("Failed to commit shard {shard_id}."));
+                        .unwrap_or_else(|err| panic!("Failed to commit shard {shard_id}: {err}."));
                 });
             }
         });

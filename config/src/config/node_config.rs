@@ -246,6 +246,7 @@ pub fn merge_node_config(
         ))
     })
 }
+
 #[cfg(test)]
 mod test {
     use crate::config::{merge_node_config, Error, NodeConfig, SafetyRulesConfig};

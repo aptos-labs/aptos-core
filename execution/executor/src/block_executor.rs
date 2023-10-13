@@ -276,6 +276,10 @@ where
         state_checkpoint_output: StateCheckpointOutput,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "ledger_update"
+        );
         let committed_block_id = self.committed_block_id();
         let mut block_vec = self
             .block_tree
@@ -394,19 +398,14 @@ where
         });
 
         for (i, block) in blocks.iter().enumerate() {
-            let txns_to_commit: Vec<_> = {
-                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&["get_txns_to_commit"])
-                    .start_timer();
-                block.output.get_ledger_update().transactions_to_commit()
-            };
+            let txns_to_commit = block.output.get_ledger_update().transactions_to_commit();
 
             let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
             APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
             let result_in_memory_state = block.output.state().clone();
-            self.db.writer.save_transaction_block(
-                &txns_to_commit,
+            self.db.writer.save_transactions(
+                txns_to_commit,
                 first_version,
                 committed_block.output.state().base_version,
                 if i == blocks.len() - 1 {
@@ -417,8 +416,12 @@ where
                 sync_commit,
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
-                block.output.get_ledger_update().block_state_updates.clone(),
-                &block.output.get_ledger_update().sharded_state_cache,
+                block
+                    .output
+                    .get_ledger_update()
+                    .state_updates_until_last_checkpoint
+                    .clone(),
+                Some(&block.output.get_ledger_update().sharded_state_cache),
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();
