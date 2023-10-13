@@ -13,8 +13,8 @@ module aptos_token_objects::token {
     use std::vector;
     use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot};
     use aptos_framework::event;
-    use aptos_framework::object::{Self, ConstructorRef, Object};
-    use aptos_std::string_utils;
+    use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
+    use aptos_std::string_utils::{to_string};
     use aptos_token_objects::collection::{Self, Collection};
     use aptos_token_objects::royalty::{Self, Royalty};
 
@@ -62,7 +62,7 @@ module aptos_token_objects::token {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents first addition to the common fields for all tokens
-    /// Starts being populated once aggregator_snapshots_enabled is enabled.
+    /// Starts being populated once aggregator_v2_api_enabled is enabled.
     struct TokenConcurrentFieldsAppendix has key {
         /// Unique identifier within the collection, optional, 0 means unassigned
         index: AggregatorSnapshot<u64>,
@@ -117,7 +117,7 @@ module aptos_token_objects::token {
         let collection = object::address_to_object<Collection>(collection_addr);
 
         // once this flag is enabled, cleanup code for aggregator_api_enabled = false.
-        let aggregator_api_enabled = features::aggregator_snapshots_enabled();
+        let aggregator_api_enabled = features::aggregator_v2_api_enabled();
         let concurrent_assets_enabled = aggregator_api_enabled && features::concurrent_assets_enabled();
 
         let (deprecated_index, deprecated_name) = if (aggregator_api_enabled) {
@@ -161,7 +161,10 @@ module aptos_token_objects::token {
             let index = option::get_with_default(&mut id, 0);
 
             let name = if (option::is_some(&name_with_index_suffix)) {
-                string_utils::format3(&b"{}{}{}", name_prefix, index, option::extract(&mut name_with_index_suffix))
+                let name = name_prefix;
+                string::append(&mut name, to_string<u64>(&index));
+                string::append(&mut name, option::extract(&mut name_with_index_suffix));
+                name
             } else {
                 name_prefix
             };
@@ -456,18 +459,30 @@ module aptos_token_objects::token {
         token.description = description;
     }
 
-    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token {
+    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token, TokenConcurrentFieldsAppendix {
         assert!(string::length(&name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+
         let token = borrow_mut(mutator_ref);
+
+        let old_name = if (exists<TokenConcurrentFieldsAppendix>(mutator_ref.self)) {
+            let token_concurrent = borrow_global_mut<TokenConcurrentFieldsAppendix>(mutator_ref.self);
+            let old_name = aggregator_v2::read_snapshot(&token_concurrent.name);
+            token_concurrent.name = aggregator_v2::create_snapshot(name);
+            old_name
+        } else {
+            let old_name = token.name;
+            token.name = name;
+            old_name
+        };
+
         event::emit_event(
             &mut token.mutation_events,
             MutationEvent {
                 mutated_field_name: string::utf8(b"name"),
-                old_value: token.name,
+                old_value: old_name,
                 new_value: name
             },
         );
-        token.name = name;
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
@@ -601,7 +616,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_set_name(creator: &signer) acquires Token {
+    fun test_set_name(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -635,7 +650,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_burn_without_royalty(creator: &signer) acquires Token {
+    fun test_burn_without_royalty(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -658,7 +673,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_burn_with_royalty(creator: &signer) acquires Token {
+    fun test_burn_with_royalty(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -682,7 +697,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token {
+    fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
         use aptos_framework::account;
 
         let collection_name = string::utf8(b"collection name");
@@ -707,7 +722,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123,fx = @std)]
-    fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token {
+    fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token, TokenConcurrentFieldsAppendix {
         use aptos_framework::account;
         use std::features;
 
@@ -735,9 +750,34 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
+    #[test(fx = @aptos_framework, creator = @0x123, trader = @0x456)]
+    fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
+        use std::debug;
+
+        let feature = features::get_concurrent_assets_feature();
+        let auid_feature = features::get_auids();
+        let module_event_feature = features::get_module_event_feature();
+        features::change_feature_flags(fx, vector[auid_feature, module_event_feature], vector[feature]);
+
+        let collection_name = string::utf8(b"collection name");
+        let token_name = string::utf8(b"token name");
+
+        let extend_ref = create_collection_helper(creator, collection_name, 2);
+        let token_1_ref = create_numbered_token_helper(creator, collection_name, token_name);
+        let token_1_name = name(object::object_from_constructor_ref<Token>(&token_1_ref));
+        debug::print(&token_1_name);
+        assert!(token_1_name == std::string::utf8(b"token name1"), 1);
+
+        features::change_feature_flags(fx, vector[feature], vector[]);
+        collection::upgrade_to_concurrent(&extend_ref);
+
+        let token_2_ref = create_numbered_token_helper(creator, collection_name, token_name);
+        assert!(name(object::object_from_constructor_ref<Token>(&token_2_ref)) == std::string::utf8(b"token name2"), 1);
+    }
+
     #[test_only]
-    fun create_collection_helper(creator: &signer, collection_name: String, max_supply: u64) {
-        collection::create_fixed_collection(
+    fun create_collection_helper(creator: &signer, collection_name: String, max_supply: u64): ExtendRef {
+        let constructor_ref = collection::create_fixed_collection(
             creator,
             string::utf8(b"collection description"),
             max_supply,
@@ -745,6 +785,7 @@ module aptos_token_objects::token {
             option::none(),
             string::utf8(b"collection uri"),
         );
+        object::generate_extend_ref(&constructor_ref)
     }
 
     #[test_only]
@@ -754,6 +795,19 @@ module aptos_token_objects::token {
             collection_name,
             string::utf8(b"token description"),
             token_name,
+            option::some(royalty::create(25, 10000, signer::address_of(creator))),
+            string::utf8(b"uri"),
+        )
+    }
+
+    #[test_only]
+    fun create_numbered_token_helper(creator: &signer, collection_name: String, token_prefix: String): ConstructorRef {
+        create_numbered_token(
+            creator,
+            collection_name,
+            string::utf8(b"token description"),
+            token_prefix,
+            string::utf8(b""),
             option::some(royalty::create(25, 10000, signer::address_of(creator))),
             string::utf8(b"uri"),
         )

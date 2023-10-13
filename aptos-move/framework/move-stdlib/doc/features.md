@@ -75,6 +75,7 @@ return true.
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
 -  [Function `get_concurrent_assets_feature`](#0x1_features_get_concurrent_assets_feature)
+-  [Function `concurrent_assets_enabled`](#0x1_features_concurrent_assets_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -129,25 +130,7 @@ The enabled features, represented by a bitset stored on chain.
 ## Constants
 
 
-<<<<<<< HEAD
 <a name="0x1_features_AGGREGATOR_V2_API"></a>
-=======
-<a name="0x1_features_AGGREGATOR_EXECUTION"></a>
-
-Whether the efficient and concurrent execution of aggregators is enabled.
-Without this flag, aggregators are executed sequentially, creating
-read/write conflicts.
-After this flag is enabled, aggregators modifications stop creating conflicts,
-when possible to optimize out.
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_EXECUTION">AGGREGATOR_EXECUTION</a>: u64 = 33;
-</code></pre>
-
-
-
-<a name="0x1_features_AGGREGATOR_SNAPSHOTS"></a>
->>>>>>> a6ef3c411f ([agg_v2] Adding aggregator_v2.move and fallback logic)
 
 Whether the Aggregator V2 API feature is enabled.
 Once enabled, the functions from aggregator_v2.move will be available for use.
@@ -264,22 +247,14 @@ Lifetime: transient
 
 
 
-<<<<<<< HEAD
 <a name="0x1_features_CONCURRENT_ASSETS"></a>
-=======
-<a name="0x1_features_CONCURRENT_ASSETS_ENABLED"></a>
->>>>>>> a6ef3c411f ([agg_v2] Adding aggregator_v2.move and fallback logic)
 
 Whether enable TokenV2 collection creation and Fungible Asset creation
 to create higher throughput concurrent variants.
 Lifetime: transient
 
 
-<<<<<<< HEAD
 <pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>: u64 = 37;
-=======
-<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_ASSETS_ENABLED">CONCURRENT_ASSETS_ENABLED</a>: u64 = 34;
->>>>>>> a6ef3c411f ([agg_v2] Adding aggregator_v2.move and fallback logic)
 </code></pre>
 
 
@@ -444,7 +419,6 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 
-<<<<<<< HEAD
 <a name="0x1_features_SECP256K1_ECDSA_AUTHENTICATOR"></a>
 
 
@@ -454,8 +428,6 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 
-=======
->>>>>>> a6ef3c411f ([agg_v2] Adding aggregator_v2.move and fallback logic)
 <a name="0x1_features_SHA_512_AND_RIPEMD_160_NATIVES"></a>
 
 Whether the new SHA2-512, SHA3-512 and RIPEMD-160 hash function natives are enabled.
@@ -1482,7 +1454,6 @@ Lifetime: transient
 
 </details>
 
-<<<<<<< HEAD
 <a name="0x1_features_get_sponsored_automatic_account_creation"></a>
 
 ## Function `get_sponsored_automatic_account_creation`
@@ -1490,15 +1461,6 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_sponsored_automatic_account_creation">get_sponsored_automatic_account_creation</a>(): u64
-=======
-<a name="0x1_features_concurrent_assets_enabled"></a>
-
-## Function `concurrent_assets_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool
->>>>>>> 82e9a821c6 ([agg_v2] Adding aggregator_v2.move and fallback logic)
 </code></pre>
 
 
@@ -1507,7 +1469,6 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<<<<<<< HEAD
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_sponsored_automatic_account_creation">get_sponsored_automatic_account_creation</a>(): u64 { <a href="features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a> }
 </code></pre>
 
@@ -1532,10 +1493,6 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_sponsored_automatic_account_creation_enabled">sponsored_automatic_account_creation_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
-=======
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_ASSETS_ENABLED">CONCURRENT_ASSETS_ENABLED</a>)
->>>>>>> 82e9a821c6 ([agg_v2] Adding aggregator_v2.move and fallback logic)
 }
 </code></pre>
 
