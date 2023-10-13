@@ -532,17 +532,15 @@ where
     fn map_id_to_values_in_read_set_sequential(
         delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
         write_set_keys: HashSet<T::Key>,
-        read_set: RefCell<HashMap<T::Key, HashSet<T::Identifier>>>,
+        read_set: RefCell<HashSet<T::Key>>,
         unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
         latest_view: &LatestView<T, S, X>,
     ) -> HashMap<T::Key, T::Value> {
         let mut patched_resource_write_set = HashMap::new();
         if let Some(delayed_field_keys) = delayed_field_keys {
             let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
-            for (key, delayed_field_keys_in_resource) in read_set.borrow().iter() {
-                if write_set_keys.contains(key)
-                    || delayed_field_keys.is_disjoint(delayed_field_keys_in_resource)
-                {
+            for key in read_set.borrow().iter() {
+                if write_set_keys.contains(key) {
                     continue;
                 }
                 // layout is Some(_) if it contains an delayed field
@@ -965,7 +963,7 @@ where
                 ViewState::Unsync(SequentialState {
                     unsync_map: &unsync_map,
                     counter: &counter,
-                    delayed_field_keys_in_resources: RefCell::new(HashMap::new()),
+                    read_set: RefCell::new(HashSet::new()),
                 }),
                 idx as TxnIndex,
             );
