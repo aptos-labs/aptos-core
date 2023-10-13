@@ -78,7 +78,7 @@ impl PublishPackageCreator {
 }
 
 impl TransactionGeneratorCreator for PublishPackageCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(PublishPackageGenerator::new(
             StdRng::from_entropy(),
             self.package_handler.clone(),
