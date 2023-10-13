@@ -16,6 +16,9 @@ spec aptos_framework::execution_config {
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
 
+        // It caused timeout in the github CI
+        // Loaclly passed
+        pragma verify_duration_estimate = 120;
         let addr = signer::address_of(account);
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
