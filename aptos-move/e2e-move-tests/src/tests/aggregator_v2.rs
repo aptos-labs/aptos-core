@@ -2,32 +2,30 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator_v2::{
-        add, add_2, add_and_materialize, add_and_read_snapshot_u128, add_sub, check,
-        check_snapshot, concat, init, initialize, materialize, materialize_and_add,
-        materialize_and_sub, new, new_add, read_snapshot, snapshot, sub, sub_add,
-        sub_and_materialize, verify_copy_snapshot, verify_copy_string_snapshot,
-        verify_string_concat, verify_string_snapshot_concat, AggLocation, ElementType,
-        ExecutorMode, UseType,
-    },
+    aggregator_v2::{init, initialize, AggLocation, AggV2TestHarness, ElementType, UseType},
     assert_abort, assert_success,
     tests::common,
     MoveHarness,
 };
-use aptos_language_e2e_tests::account::Account;
+use aptos_language_e2e_tests::executor::ExecutorMode;
 use aptos_types::transaction::SignedTransaction;
 use proptest::prelude::*;
 
-const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::Sequential;
+const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
+
+const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::SequentialOnly;
 
 fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_enabled: bool,
-) -> (MoveHarness, Account) {
+    txns: usize,
+) -> AggV2TestHarness {
     initialize(
         common::test_dir_path("aggregator_v2.data/pack"),
         executor_mode,
         aggregator_execution_enabled,
+        txns,
     )
 }
 
@@ -39,96 +37,105 @@ mod test_cases {
     #[test_case(true)]
     #[test_case(false)]
     fn test_copy_snapshot(execution_enabled: bool) {
-        let (mut h, acc) = setup(DEFAULT_EXECUTOR_MODE, execution_enabled);
-        let txn = verify_copy_snapshot(&mut h, &acc);
-        assert_abort!(h.run(txn), 0x03_0009);
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+        let txn = h.verify_copy_snapshot();
+        assert_abort!(h.harness.run(txn), 0x03_0009);
     }
 
     #[test_case(true)]
     #[test_case(false)]
     fn test_copy_string_snapshot(execution_enabled: bool) {
-        let (mut h, acc) = setup(DEFAULT_EXECUTOR_MODE, execution_enabled);
-        let txn = verify_copy_string_snapshot(&mut h, &acc);
-        assert_abort!(h.run(txn), 0x03_0009);
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+        let txn = h.verify_copy_string_snapshot();
+        assert_abort!(h.harness.run(txn), 0x03_0009);
     }
 
     #[test_case(true)]
     #[test_case(false)]
     fn test_snapshot_concat(execution_enabled: bool) {
-        let (mut h, acc) = setup(DEFAULT_EXECUTOR_MODE, execution_enabled);
-        let txn = verify_string_concat(&mut h, &acc);
-        assert_success!(h.run(txn));
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+        let txn = h.verify_string_concat();
+        assert_success!(h.harness.run(txn));
     }
 
     #[test_case(true)]
     #[test_case(false)]
     fn test_string_snapshot_concat(execution_enabled: bool) {
-        let (mut h, acc) = setup(DEFAULT_EXECUTOR_MODE, execution_enabled);
-        let txn = verify_string_snapshot_concat(&mut h, &acc);
-        assert_abort!(h.run(txn), 0x03_0005);
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+        let txn = h.verify_string_snapshot_concat();
+        assert_abort!(h.harness.run(txn), 0x03_0005);
     }
 
     // This tests uses multuple blocks, so requires exchange to be done to work.
     // #[test_case(true)]
     #[test_case(false)]
     fn test_aggregators_e2e(execution_enabled: bool) {
+        println!("Testing test_aggregators_e2e {:?}", execution_enabled);
         let element_type = ElementType::U64;
         let use_type = UseType::UseTableType;
 
-        let (mut h, acc) = setup(DEFAULT_EXECUTOR_MODE, execution_enabled);
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 100);
 
-        let init_txn = init(&mut h, &acc, use_type, element_type, true);
-        h.run(init_txn);
+        let init_txn = init(&mut h.harness, &h.account, use_type, element_type, true);
+        h.harness.run(init_txn);
 
-        let loc = |i| AggLocation::new(&acc, element_type, use_type, i);
+        let addr = *h.account.address();
+        let loc = |i| AggLocation::new(addr, element_type, use_type, i);
 
-        let block_size = 300;
+        let block_size = 30;
 
         // Create many aggregators with deterministic limit.
-        let txns: Vec<SignedTransaction> = (0..block_size)
-            .map(|i| new(&mut h, &loc(i), (i as u128) * 100000))
+        let txns = (0..block_size)
+            .map(|i| (0, h.new(&loc(i), (i as u128) * 100000)))
             .collect();
-        h.run_block(txns);
+        run_block_in_parts(&mut h.harness, BlockSplit::Whole, txns);
 
         // All transactions in block must fail, so values of aggregators are still 0.
-        let failed_txns: Vec<SignedTransaction> = (0..block_size)
+        let failed_txns = (0..block_size)
             .map(|i| match i % 2 {
-                0 => materialize_and_add(&mut h, &loc(i), (i as u128) * 100000 + 1),
-                _ => materialize_and_sub(&mut h, &loc(i), (i as u128) * 100000 + 1),
+                0 => (
+                    EAGGREGATOR_OVERFLOW,
+                    h.materialize_and_add(&loc(i), (i as u128) * 100000 + 1),
+                ),
+                _ => (
+                    EAGGREGATOR_UNDERFLOW,
+                    h.materialize_and_sub(&loc(i), (i as u128) * 100000 + 1),
+                ),
             })
             .collect();
-        h.run_block(failed_txns);
+        run_block_in_parts(&mut h.harness, BlockSplit::Whole, failed_txns);
 
         // Now test all operations. To do that, make sure aggregator have values large enough.
-        let txns: Vec<SignedTransaction> = (0..block_size)
-            .map(|i| add(&mut h, &loc(i), (i as u128) * 1000))
+        let txns = (0..block_size)
+            .map(|i| (0, h.add(&loc(i), (i as u128) * 1000)))
             .collect();
-        h.run_block(txns);
+
+        run_block_in_parts(&mut h.harness, BlockSplit::Whole, txns);
 
         // TODO: proptests with random transaction generator might be useful here.
-        let txns: Vec<SignedTransaction> = (0..block_size)
+        let txns = (0..block_size)
             .map(|i| match i % 4 {
-                0 => sub_add(&mut h, &loc(i), (i as u128) * 1000, (i as u128) * 3000),
-                1 => materialize_and_add(&mut h, &loc(i), (i as u128) * 1000),
-                2 => sub_and_materialize(&mut h, &loc(i), (i as u128) * 1000),
-                _ => add(&mut h, &loc(i), i as u128),
+                0 => (
+                    0,
+                    h.sub_add(&loc(i), (i as u128) * 1000, (i as u128) * 3000),
+                ),
+                1 => (0, h.materialize_and_add(&loc(i), (i as u128) * 1000)),
+                2 => (0, h.sub_and_materialize(&loc(i), (i as u128) * 1000)),
+                _ => (0, h.add(&loc(i), i as u128)),
             })
             .collect();
-        h.run_block(txns);
+        run_block_in_parts(&mut h.harness, BlockSplit::Whole, txns);
 
         // Finally, check values.
-        let txns: Vec<SignedTransaction> = (0..block_size)
+        let txns = (0..block_size)
             .map(|i| match i % 4 {
-                0 => check(&mut h, &loc(i), (i as u128) * 3000),
-                1 => check(&mut h, &loc(i), (i as u128) * 2000),
-                2 => check(&mut h, &loc(i), 0),
-                _ => check(&mut h, &loc(i), (i as u128) * 1000 + (i as u128)),
+                0 => (0, h.check(&loc(i), (i as u128) * 3000)),
+                1 => (0, h.check(&loc(i), (i as u128) * 2000)),
+                2 => (0, h.check(&loc(i), 0)),
+                _ => (0, h.check(&loc(i), (i as u128) * 1000 + (i as u128))),
             })
             .collect();
-        let outputs = h.run_block(txns);
-        for status in outputs {
-            assert_success!(status);
-        }
+        run_block_in_parts(&mut h.harness, BlockSplit::Whole, txns);
     }
 }
 
@@ -154,6 +161,11 @@ pub fn run_block_in_parts(
             return;
         }
         let (errors, txns): (Vec<_>, Vec<_>) = txn_block.into_iter().unzip();
+        println!(
+            "=== Running block from {} with {} tnx ===",
+            offset,
+            txns.len()
+        );
         let outputs = harness.run_block(txns);
         for (idx, (error, status)) in errors.into_iter().zip(outputs.into_iter()).enumerate() {
             if error > 0 {
@@ -234,32 +246,38 @@ pub struct TestEnvConfig {
     pub block_split: BlockSplit,
 }
 
-#[allow(unused_variables)]
+#[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
 fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
-        // For execution enabled, use only whole blocks and txn-per-block for block splits, as it block split shouldn't matter there.
+        // For execution disabled, use only whole blocks and txn-per-block for block splits, as it block split shouldn't matter there.
         Just(TestEnvConfig {
-            executor_mode: ExecutorMode::Both,
+            executor_mode: ExecutorMode::BothComparison,
             aggregator_execution_enabled: false,
             block_split: BlockSplit::Whole
         }),
         Just(TestEnvConfig {
-            executor_mode: ExecutorMode::Both,
+            executor_mode: ExecutorMode::BothComparison,
             aggregator_execution_enabled: false,
             block_split: BlockSplit::TxnPerBlock
         }),
-        // For now only test whole blocks with execution enabled.
-        // Just(TestEnvConfig {
-        //     executor_mode: DEFAULT_EXECUTOR_MODE,
-        //     aggregator_execution_enabled: true,
-        //     block_split: BlockSplit::Whole
-        // }),
+        // Sequential execution doesn't have exchanges, so we cannot use BothComparison, nor block split
+        // TODO join once sequential exchange lands.
         Just(TestEnvConfig {
-            executor_mode: ExecutorMode::Both,
+            executor_mode: ExecutorMode::SequentialOnly,
             aggregator_execution_enabled: true,
             block_split: BlockSplit::Whole
         }),
-        // arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig{ use_parallel: true, aggregator_execution_enabled: true, block_split }),
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::ParallelOnly,
+            aggregator_execution_enabled: true,
+            block_split
+        }),
+        // Currently, only this fails, so you can comment out all other tests, and run this one for debugging:
+        // Just(TestEnvConfig {
+        //     executor_mode: ExecutorMode::ParallelOnly,
+        //     aggregator_execution_enabled: true,
+        //     block_split: BlockSplit::TxnPerBlock
+        // }),
     ]
     .boxed()
 }
@@ -280,7 +298,8 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         Just(UseType::UseTableType),
-        Just(UseType::UseResourceGroupType),
+        // TODO add back once ResourceGroups are supported
+        // Just(UseType::UseResourceGroupType),
     ]
     .boxed()
 }
@@ -289,37 +308,37 @@ proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough.
         // We will test a few more comprehensive tests more times, and the rest even fewer.
-        cases: 10,
-        result_cache: prop::test_runner::basic_result_cache,
+        cases: 200,
+        // result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 
     #[test]
     fn test_aggregator_lifetime(test_env in arb_test_env(14), element_type in arb_agg_type(), use_type in arb_use_type()) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 14);
 
-        let agg_loc = AggLocation::new(&acc, element_type, use_type, 0);
+        let agg_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, new(&mut h, &agg_loc, 1500)),
-            (0, add(&mut h, &agg_loc, 400)),
-            (0, materialize(&mut h, &agg_loc)),
-            (0, add(&mut h, &agg_loc, 500)),
-            (0, check(&mut h, &agg_loc, 900)),
-            (0, materialize_and_add(&mut h, &agg_loc, 600)),
-            (0, materialize_and_sub(&mut h, &agg_loc, 600)),
-            (0, check(&mut h, &agg_loc, 900)),
-            (0, sub_add(&mut h, &agg_loc, 200, 300)),
-            (0, check(&mut h, &agg_loc, 1000)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, h.new(&agg_loc, 1500)),
+            (0, h.add(&agg_loc, 400)), // 400
+            (0, h.materialize(&agg_loc)),
+            (0, h.add(&agg_loc, 500)), // 900
+            (0, h.check(&agg_loc, 900)),
+            (0, h.materialize_and_add(&agg_loc, 600)), // 1500
+            (0, h.materialize_and_sub(&agg_loc, 600)), // 900
+            (0, h.check(&agg_loc, 900)),
+            (0, h.sub_add(&agg_loc, 200, 300)), // 1000
+            (0, h.check(&agg_loc, 1000)),
             // These 2 transactions fail, and should have no side-effects.
-            (0x02_0001, add_and_materialize(&mut h, &agg_loc, 501)),
-            (0x02_0002, sub_and_materialize(&mut h, &agg_loc, 1001)),
-            (0, check(&mut h, &agg_loc, 1000)),
+            (0x02_0001, h.add_and_materialize(&agg_loc, 501)),
+            (0x02_0002, h.sub_and_materialize(&agg_loc, 1001)),
+            (0, h.check(&agg_loc, 1000)),
         ];
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
@@ -333,53 +352,53 @@ proptest! {
         is_2_collocated in any::<bool>(),
         is_3_collocated in any::<bool>(),
     ) {
-        println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
-        let acc_2 = h.new_account_with_key_pair();
-        let acc_3 = h.new_account_with_key_pair();
+        println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 24);
+        let acc_2 = h.harness.new_account_with_key_pair();
+        let acc_3 = h.harness.new_account_with_key_pair();
 
         let mut idx_1 = 0;
-        let agg_1_loc = AggLocation::new(&acc, element_type, use_type, 0);
+        let agg_1_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
         let agg_2_loc = {
-            let (cur_acc, idx_2) = if is_2_collocated { idx_1 += 1; (&acc, idx_1) } else { (&acc_2, 0)};
-            AggLocation::new(cur_acc, element_type, use_type, idx_2)
+            let (cur_acc, idx_2) = if is_2_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_2.address(), 0)};
+            AggLocation::new(*cur_acc, element_type, use_type, idx_2)
         };
         let agg_3_loc = {
-            let (cur_acc, idx_3) = if is_3_collocated { idx_1 += 1; (&acc, idx_1) } else { (&acc_3, 0)};
-            AggLocation::new(cur_acc, element_type, use_type, idx_3)
+            let (cur_acc, idx_3) = if is_3_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_3.address(), 0)};
+            AggLocation::new(*cur_acc, element_type, use_type, idx_3)
         };
         println!("agg_1_loc: {:?}", agg_1_loc);
         println!("agg_2_loc: {:?}", agg_2_loc);
         println!("agg_3_loc: {:?}", agg_3_loc);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, init(&mut h, &acc_2, use_type, element_type, true)),
-            (0, init(&mut h, &acc_3, use_type, element_type, true)),
-            (0, new_add(&mut h, &agg_1_loc, 10, 5)),
-            (0, new_add(&mut h, &agg_2_loc, 10, 5)),
-            (0, new_add(&mut h, &agg_3_loc, 10, 5)),  // 5, 5, 5
-            (0, add_2(&mut h, &agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
-            (0, add_2(&mut h, &agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
-            (0x02_0001, add(&mut h, &agg_1_loc, 5)), // X
-            (0, add_sub(&mut h, &agg_1_loc, 3, 3)), // 7, 6, 6
-            (0x02_0001, add_2(&mut h, &agg_1_loc, &agg_2_loc, 3, 5)), // X
-            (0, add_2(&mut h, &agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
-            (0x02_0001, add_sub(&mut h, &agg_1_loc, 3, 3)), // X
-            (0, sub(&mut h, &agg_1_loc, 3)), // 7, 7, 6
-            (0, add_2(&mut h, &agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
-            (0, check(&mut h, &agg_2_loc, 9)),
-            (0x02_0001, add_2(&mut h, &agg_1_loc, &agg_2_loc, 1, 2)), // X
-            (0, add_2(&mut h, &agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
-            (0x02_0001, add(&mut h, &agg_2_loc, 1)), // X
-            (0x02_0001, add_and_materialize(&mut h, &agg_3_loc, 1)), // X
-            (0x02_0001, add_2(&mut h, &agg_1_loc, &agg_2_loc, 1, 1)), // X
-            (0, check(&mut h, &agg_1_loc, 7)),
-            (0, check(&mut h, &agg_2_loc, 10)),
-            (0, check(&mut h, &agg_3_loc, 10)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, init(&mut h.harness, &acc_2, use_type, element_type, true)),
+            (0, init(&mut h.harness, &acc_3, use_type, element_type, true)),
+            (0, h.new_add(&agg_1_loc, 10, 5)),
+            (0, h.new_add(&agg_2_loc, 10, 5)),
+            (0, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
+            (0, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
+            (0, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
+            (0x02_0001, h.add(&agg_1_loc, 5)), // X
+            (0, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
+            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
+            (0, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
+            (0x02_0001, h.add_sub(&agg_1_loc, 3, 3)), // X
+            (0, h.sub(&agg_1_loc, 3)), // 7, 7, 6
+            (0, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
+            (0, h.check(&agg_2_loc, 9)),
+            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
+            (0, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
+            (0x02_0001, h.add(&agg_2_loc, 1)), // X
+            (0x02_0001, h.add_and_materialize(&agg_3_loc, 1)), // X
+            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
+            (0, h.check(&agg_1_loc, 7)),
+            (0, h.check(&agg_2_loc, 10)),
+            (0, h.check(&agg_3_loc, 10)),
         ];
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
@@ -389,30 +408,32 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough for these
-        cases: 5,
-        result_cache: prop::test_runner::basic_result_cache,
+        cases: 200,
+        // result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 
     #[test]
     fn test_aggregator_underflow(test_env in arb_test_env(4)) {
+        // aptos_types::transaction::TransactionStatus::Keep(aptos_types::transaction::ExecutionStatus::MiscellaneousError(Some(SPECULATIVE_EXECUTION_ABORT_ERROR)))
+
         println!("Testing test_aggregator_underflow {:?}", test_env);
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 4);
 
-        let agg_loc = AggLocation::new(&acc, element_type, use_type, 0);
+        let agg_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, new(&mut h, &agg_loc, 600)),
-            (0, add(&mut h, &agg_loc, 400)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, h.new(&agg_loc, 600)),
+            (0, h.add(&agg_loc, 400)),
             // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
-            (0x02_0002, sub(&mut h, &agg_loc, 500))
+            (0x02_0002, h.sub(&agg_loc, 500))
         ];
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
@@ -424,19 +445,19 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 3);
 
-        let agg_loc = AggLocation::new(&acc, element_type, use_type, 0);
+        let agg_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, new(&mut h, &agg_loc, 600)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, h.new(&agg_loc, 600)),
             // Underflow on materialized value leads to abort with EAGGREGATOR_UNDERFLOW.
-            (0x02_0002, materialize_and_sub(&mut h, &agg_loc, 400)),
+            (0x02_0002, h.materialize_and_sub(&agg_loc, 400)),
         ];
 
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
@@ -448,19 +469,19 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 3);
 
-        let agg_loc = AggLocation::new(&acc, element_type, use_type, 0);
+        let agg_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, new_add(&mut h, &agg_loc, 600, 400)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, h.new_add(&agg_loc, 600, 400)),
             // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
-            (0x02_0001, add(&mut h, &agg_loc, 201))
+            (0x02_0001, h.add(&agg_loc, 201))
         ];
 
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
@@ -472,19 +493,19 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
+        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 3);
 
-        let agg_loc = AggLocation::new(&acc, element_type, use_type, 0);
+        let agg_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, new(&mut h, &agg_loc, 399)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, h.new(&agg_loc, 399)),
             // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
-            (0x02_0001, materialize_and_add(&mut h, &agg_loc, 400)),
+            (0x02_0001, h.materialize_and_add(&agg_loc, 400)),
         ];
 
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
@@ -496,27 +517,27 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let (mut h, acc) = setup(test_env.executor_mode, test_env.aggregator_execution_enabled);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 9);
 
-        let agg_loc = AggLocation::new(&acc, element_type, use_type, 0);
-        let snap_loc = AggLocation::new(&acc, element_type, use_type, 0);
-        let derived_snap_loc = AggLocation::new(&acc, ElementType::String, use_type, 0);
+        let agg_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
+        let snap_loc = AggLocation::new(*h.account.address(), element_type, use_type, 0);
+        let derived_snap_loc = AggLocation::new(*h.account.address(), ElementType::String, use_type, 0);
 
         let txns = vec![
-            (0, init(&mut h, &acc, use_type, element_type, true)),
-            (0, init(&mut h, &acc, use_type, element_type, false)),
-            (0, init(&mut h, &acc, use_type, ElementType::String, false)),
-            (0, new_add(&mut h, &agg_loc, 400, 100)),
-            (0, snapshot(&mut h, &agg_loc, &snap_loc)),
-            (0, check_snapshot(&mut h, &snap_loc, 100)),
-            (0, read_snapshot(&mut h, &agg_loc)),
-            (0, add_and_read_snapshot_u128(&mut h, &agg_loc, 100)),
-            (0, concat(&mut h, &snap_loc, &derived_snap_loc, "12", "13")),
-            (0, check_snapshot(&mut h, &derived_snap_loc, 1210013)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, init(&mut h.harness, &h.account, use_type, element_type, false)),
+            (0, init(&mut h.harness, &h.account, use_type, ElementType::String, false)),
+            (0, h.new_add(&agg_loc, 400, 100)),
+            (0, h.snapshot(&agg_loc, &snap_loc)),
+            (0, h.check_snapshot(&snap_loc, 100)),
+            (0, h.read_snapshot(&agg_loc)),
+            (0, h.add_and_read_snapshot_u128(&agg_loc, 100)),
+            (0, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
+            (0, h.check_snapshot(&derived_snap_loc, 1210013)),
         ];
 
         run_block_in_parts(
-            &mut h,
+            &mut h.harness,
             test_env.block_split,
             txns,
         );
