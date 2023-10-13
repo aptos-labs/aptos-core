@@ -5,9 +5,9 @@
 use super::core::{self, Context, Subst, forward_tvar};
 use crate::{
     diag,
-    expansion::ast::Value_,
+    expansion::ast::{Value_, ModuleIdent},
     naming::ast::{BuiltinTypeName_, FunctionSignature, Type, TypeName_, Type_},
-    parser::ast::Ability_,
+    parser::ast::{Ability_, FunctionName},
     typing::ast as T,
 };
 use move_core_types::u256::U256;
@@ -67,6 +67,11 @@ fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name:
         },
         _ => type_(context, ty),
     }
+}
+
+fn type_fun_ty_param(context: &mut Context, ty: &mut Type, i: usize, m: &ModuleIdent, n: &FunctionName) {
+   let param_name = context.function_info(m, n).signature.type_parameters[i].user_specified_name;
+   type_msg_(context, ty, &format!("Cannot infer the type parameter {param_name} for generic function {m}::{n}. Try providing a type parameter."));
 }
 
 pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
@@ -375,7 +380,9 @@ fn lvalue(context: &mut Context, b: &mut T::LValue) {
 }
 
 fn module_call(context: &mut Context, call: &mut T::ModuleCall) {
-    types(context, &mut call.type_arguments);
+    for (i, t) in call.type_arguments.iter_mut().enumerate() {
+        type_fun_ty_param(context, t, i, &call.module, &call.name);
+    }
     exp(context, &mut call.arguments);
     types(context, &mut call.parameter_types)
 }
