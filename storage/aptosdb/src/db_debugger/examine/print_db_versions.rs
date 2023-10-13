@@ -40,8 +40,7 @@ pub struct Cmd {
 impl Cmd {
     pub fn run(self) -> Result<()> {
         let rocksdb_config = RocksdbConfigs {
-            split_ledger_db: self.sharding_config.split_ledger_db,
-            use_sharded_state_merkle_db: self.sharding_config.use_sharded_state_merkle_db,
+            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(

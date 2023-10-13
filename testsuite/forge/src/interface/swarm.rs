@@ -351,7 +351,7 @@ pub trait SwarmExt: Swarm {
         .await;
         ledger_infos
             .into_iter()
-            .zip(clients.into_iter())
+            .zip(clients)
             .flat_map(|(resp, (_, client))| resp.map(|r| (r.into_inner().version, client)))
             .max_by_key(|(v, _c)| *v)
     }

@@ -16,7 +16,7 @@ use crate::{
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_jellyfish_merkle::{
     node_type::{NodeKey, NodeType},
     JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
@@ -69,6 +69,7 @@ impl StateMerkleDb {
         readonly: bool,
         max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
+        let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
@@ -79,7 +80,7 @@ impl StateMerkleDb {
             version_caches.insert(Some(i as u8), VersionedNodeCache::new());
         }
         let lru_cache = LruNodeCache::new(max_nodes_per_lru_cache_shard);
-        if !rocksdb_configs.use_sharded_state_merkle_db {
+        if !sharding {
             info!("Sharded state merkle DB is not enabled!");
             let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
             let db = Arc::new(Self::open_db(
@@ -160,7 +161,7 @@ impl StateMerkleDb {
         sharding: bool,
     ) -> Result<()> {
         let rocksdb_configs = RocksdbConfigs {
-            use_sharded_state_merkle_db: sharding,
+            enable_storage_sharding: sharding,
             ..Default::default()
         };
         let state_merkle_db = Self::new(
@@ -320,25 +321,29 @@ impl StateMerkleDb {
 
         let batch = SchemaBatch::new();
 
-        tree_update_batch
+        let node_batch = tree_update_batch
             .node_batch
             .iter()
             .flatten()
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        let num_nodes = node_batch.len();
+        node_batch
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_nodes, 128))
             .try_for_each(|(node_key, node)| {
                 ensure!(node_key.get_shard_id() == shard_id);
                 batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
             })?;
 
-        tree_update_batch
+        let stale_node_index_batch = tree_update_batch
             .stale_node_index_batch
             .iter()
             .flatten()
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        let num_stale_nodes = stale_node_index_batch.len();
+        stale_node_index_batch
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_stale_nodes, 128))
             .try_for_each(|row| {
                 ensure!(row.node_key.get_shard_id() == shard_id);
                 if previous_epoch_ending_version.is_some()

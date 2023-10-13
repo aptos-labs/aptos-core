@@ -70,7 +70,7 @@ impl Display for Block {
             author,
             self.epoch(),
             self.round(),
-            self.quorum_cert().certified_block().id(),
+            self.parent_id(),
             self.timestamp_usecs(),
         )
     }

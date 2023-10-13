@@ -37,10 +37,13 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        Features, OnChainConfig, TimedFeatureOverride, TimedFeatures, ValidatorSet, Version,
+        Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder, ValidatorSet, Version,
     },
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
+        signature_verified_transaction::{
+            into_signature_verified_block, SignatureVerifiedTransaction,
+        },
         ExecutionStatus, SignedTransaction, Transaction, TransactionOutput, TransactionPayload,
         TransactionStatus, VMValidatorResult,
     },
@@ -73,6 +76,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
+
 static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
@@ -446,7 +450,7 @@ impl FakeExecutor {
 
     pub fn execute_transaction_block_parallel(
         &self,
-        txn_block: Vec<Transaction>,
+        txn_block: &[SignatureVerifiedTransaction],
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
@@ -475,7 +479,9 @@ impl FakeExecutor {
             }
         }
 
-        let output = AptosVM::execute_block(txn_block.clone(), &self.data_store, None);
+        let sig_verified_block = into_signature_verified_block(txn_block);
+
+        let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
 
         let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
             no_parallel
@@ -484,7 +490,7 @@ impl FakeExecutor {
         };
 
         if !no_parallel {
-            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            let parallel_output = self.execute_transaction_block_parallel(&sig_verified_block);
             assert_eq!(output, parallel_output);
         }
 
@@ -714,8 +720,12 @@ impl FakeExecutor {
         iterations: u64,
     ) -> u128 {
         // FIXME: should probably read the timestamp from storage.
-        let timed_features =
-            TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+        let timed_features = TimedFeaturesBuilder::enable_all()
+            .with_override_profile(TimedFeatureOverride::Testing)
+            .build();
+
+        let resolver = self.data_store.as_move_resolver();
+
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -724,9 +734,9 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             timed_features,
+            &resolver,
         )
         .unwrap();
-        let resolver = self.data_store.as_move_resolver();
 
         // start measuring here to reduce measurement errors (i.e., the time taken to load vm, module, etc.)
         let mut i = 0;
@@ -784,8 +794,11 @@ impl FakeExecutor {
 
         let (write_set, _events) = {
             // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            let timed_features = TimedFeaturesBuilder::enable_all()
+                .with_override_profile(TimedFeatureOverride::Testing)
+                .build();
+
+            let resolver = self.data_store.as_move_resolver();
 
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new_with_gas_hook(
@@ -798,9 +811,9 @@ impl FakeExecutor {
                 Some(move |expression| {
                     a2.lock().unwrap().push(expression);
                 }),
+                &resolver,
             )
             .unwrap();
-            let resolver = self.data_store.as_move_resolver();
             let mut session = vm.new_session(&resolver, SessionId::void());
 
             let fun_name = Self::name(function_name);
@@ -850,17 +863,21 @@ impl FakeExecutor {
             .to_vec()
     }
 
-    pub fn exec(
+    pub fn exec_module(
         &mut self,
-        module_name: &str,
+        module_id: &ModuleId,
         function_name: &str,
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) {
         let (write_set, events) = {
             // FIXME: should probably read the timestamp from storage.
-            let timed_features =
-                TimedFeatures::enable_all().with_override_profile(TimedFeatureOverride::Testing);
+            let timed_features = TimedFeaturesBuilder::enable_all()
+                .with_override_profile(TimedFeatureOverride::Testing)
+                .build();
+
+            let resolver = self.data_store.as_move_resolver();
+
             // TODO(Gas): we probably want to switch to non-zero costs in the future
             let vm = MoveVmExt::new(
                 NativeGasParameters::zeros(),
@@ -869,13 +886,13 @@ impl FakeExecutor {
                 self.chain_id,
                 self.features.clone(),
                 timed_features,
+                &resolver,
             )
             .unwrap();
-            let resolver = self.data_store.as_move_resolver();
             let mut session = vm.new_session(&resolver, SessionId::void());
             session
                 .execute_function_bypass_visibility(
-                    &Self::module(module_name),
+                    module_id,
                     &Self::name(function_name),
                     type_params,
                     args,
@@ -884,7 +901,7 @@ impl FakeExecutor {
                 .unwrap_or_else(|e| {
                     panic!(
                         "Error calling {}.{}: {}",
-                        module_name,
+                        module_id,
                         function_name,
                         e.into_vm_status()
                     )
@@ -904,6 +921,16 @@ impl FakeExecutor {
         self.event_store.extend(events);
     }
 
+    pub fn exec(
+        &mut self,
+        module_name: &str,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) {
+        self.exec_module(&Self::module(module_name), function_name, type_params, args)
+    }
+
     pub fn try_exec(
         &mut self,
         module_name: &str,
@@ -911,6 +938,8 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+        let resolver = self.data_store.as_move_resolver();
+
         // TODO(Gas): we probably want to switch to non-zero costs in the future
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -919,10 +948,10 @@ impl FakeExecutor {
             self.chain_id,
             self.features.clone(),
             // FIXME: should probably read the timestamp from storage.
-            TimedFeatures::enable_all(),
+            TimedFeaturesBuilder::enable_all().build(),
+            &resolver,
         )
         .unwrap();
-        let resolver = self.data_store.as_move_resolver();
         let mut session = vm.new_session(&resolver, SessionId::void());
         session
             .execute_function_bypass_visibility(

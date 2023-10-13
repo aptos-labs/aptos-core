@@ -7,6 +7,7 @@ pub mod constants;
 pub mod file_store_operator;
 pub mod types;
 
+use anyhow::{Context, Result};
 use aptos_protos::{
     indexer::v1::raw_data_client::RawDataClient,
     internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, transaction::v1::Transaction,
@@ -50,12 +51,12 @@ pub type GrpcDataServiceClientType = RawDataClient<tonic::transport::Channel>;
 pub async fn create_data_service_grpc_client(
     address: Url,
     max_elapsed_time: Option<Duration>,
-) -> GrpcDataServiceClientType {
+) -> Result<GrpcDataServiceClientType> {
     let mut backoff = backoff::ExponentialBackoff::default();
     if let Some(max_elapsed_time) = max_elapsed_time {
         backoff.max_elapsed_time = Some(max_elapsed_time);
     }
-    backoff::future::retry(backoff, || async {
+    let client = backoff::future::retry(backoff, || async {
         match RawDataClient::connect(address.to_string()).await {
             Ok(client) => {
                 tracing::info!(
@@ -75,7 +76,8 @@ pub async fn create_data_service_grpc_client(
         }
     })
     .await
-    .unwrap()
+    .context("Failed to create data service GRPC client")?;
+    Ok(client)
 }
 
 // (Protobuf encoded transaction, version)

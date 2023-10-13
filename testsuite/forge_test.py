@@ -33,8 +33,8 @@ from forge import (
     format_report,
     get_all_forge_jobs,
     get_dashboard_link,
-    get_humio_forge_link,
-    get_humio_logs_link,
+    get_humio_link_for_test_runner_logs,
+    get_humio_link_for_node_logs,
     get_testsuite_images,
     main,
     sanitize_forge_resource_name,
@@ -543,23 +543,23 @@ class ForgeFormattingTests(unittest.TestCase, AssertFixtureMixin):
         filesystem.assert_writes(self)
 
     def testGetHumioLogsLinkRelative(self) -> None:
-        link = get_humio_logs_link("forge-pr-2983", True)
+        link = get_humio_link_for_node_logs("forge-pr-2983", True)
         self.assertIn("forge-pr-2983", link)
         self.assertFixture(link, "testGetHumioLogsLinkRelative.fixture")
 
     def testGetHumioLogsLinkAbsolute(self) -> None:
         time = FakeTime()
-        link = get_humio_logs_link("forge-pr-2984", (time.now(), time.now()))
+        link = get_humio_link_for_node_logs("forge-pr-2984", (time.now(), time.now()))
         self.assertIn("forge-pr-2984", link)
         self.assertFixture(link, "testGetHumioLogsLinkAbsolute.fixture")
 
     def testGetHumioForgeLinkRelative(self) -> None:
-        link = get_humio_forge_link("forge-pr-2985", True)
+        link = get_humio_link_for_test_runner_logs("forge-pr-2985", True)
         self.assertIn("forge-pr-2985", link)
         self.assertFixture(link, "testGetHumioForgeLinkRelative.fixture")
 
     def testGetHumioForgeLinkAbsolute(self) -> None:
-        link = get_humio_forge_link("forge-pr-2986", True)
+        link = get_humio_link_for_test_runner_logs("forge-pr-2986", True)
         self.assertIn("forge-pr-2986", link)
         self.assertFixture(link, "testGetHumioForgeLinkAbsolute.fixture")
 

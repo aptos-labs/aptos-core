@@ -1,18 +1,28 @@
 module drand::lottery_test {
+    #[test_only]
     use drand::lottery;
+    #[test_only]
     use aptos_framework::timestamp;
+    #[test_only]
     use std::signer;
+    #[test_only]
     use aptos_framework::account;
+    #[test_only]
     use aptos_framework::coin;
+    #[test_only]
     use aptos_framework::aptos_coin::{Self, AptosCoin};
-    use std::option;
-    use aptos_std::debug;
-    use std::string;
+    #[test_only]
     use aptos_framework::coin::MintCapability;
+    #[test_only]
     use std::vector;
+    #[test_only]
+    use std::string;
+    #[test_only]
+    use std::debug;
     #[test_only]
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
 
+    #[test_only]
     fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
         let to_addr = signer::address_of(to);
         if (!account::exists_at(to_addr)) {
@@ -33,7 +43,7 @@ module drand::lottery_test {
         timestamp::set_time_has_started_for_testing(&fx);
 
         // Deploy the lottery smart contract
-        lottery::init_module(&myself);
+        lottery::init_module_for_testing(&myself);
 
         // Needed to mint coins out of thin air for testing
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&fx);
@@ -119,9 +129,10 @@ module drand::lottery_test {
         //
         // Send a TXN with `drand_signed_bytes` to close the lottery and determine the winner
         //
-        let winner_addr = option::extract(&mut lottery::close_lottery(drand_signed_bytes));
-
+        lottery::close_lottery(drand_signed_bytes);
+        let winner_addr = lottery::get_lottery_winner();
         debug::print(&string::utf8(b"The winner is: "));
         debug::print(&winner_addr)
+
     }
 }

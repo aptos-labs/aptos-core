@@ -22,9 +22,9 @@ pub mod iterator;
 use crate::{
     metrics::{
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES, APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS,
-        APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS, APTOS_SCHEMADB_DELETES, APTOS_SCHEMADB_GET_BYTES,
+        APTOS_SCHEMADB_DELETES_SAMPLED, APTOS_SCHEMADB_GET_BYTES,
         APTOS_SCHEMADB_GET_LATENCY_SECONDS, APTOS_SCHEMADB_ITER_BYTES,
-        APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES,
+        APTOS_SCHEMADB_ITER_LATENCY_SECONDS, APTOS_SCHEMADB_PUT_BYTES_SAMPLED,
         APTOS_SCHEMADB_SEEK_LATENCY_SECONDS,
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
@@ -33,6 +33,7 @@ use anyhow::{format_err, Result};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use iterator::{ScanDirection, SchemaIterator};
+use rand::Rng;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     BlockBasedOptions, Cache, ColumnFamilyDescriptor, DBCompressionType, Options, ReadOptions,
@@ -71,9 +72,6 @@ impl SchemaBatch {
 
     /// Adds an insert/update operation to the batch.
     pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
-        let _timer = APTOS_SCHEMADB_BATCH_PUT_LATENCY_SECONDS
-            .with_label_values(&["unknown"])
-            .start_timer();
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows
@@ -135,7 +133,7 @@ impl DB {
         name: &str,
         cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path, cfds)?;
+        let inner = rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), cfds)?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -149,7 +147,8 @@ impl DB {
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
         let error_if_log_file_exists = false;
-        let inner = rocksdb::DB::open_cf_for_read_only(opts, path, cfs, error_if_log_file_exists)?;
+        let inner =
+            rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)?;
 
         Ok(Self::log_construct(name, inner))
     }
@@ -161,7 +160,12 @@ impl DB {
         name: &str,
         cfs: Vec<ColumnFamilyName>,
     ) -> Result<DB> {
-        let inner = rocksdb::DB::open_cf_as_secondary(opts, primary_path, secondary_path, cfs)?;
+        let inner = rocksdb::DB::open_cf_as_secondary(
+            opts,
+            primary_path.de_unc(),
+            secondary_path.de_unc(),
+            cfs,
+        )?;
         Ok(Self::log_construct(name, inner))
     }
 
@@ -224,10 +228,21 @@ impl DB {
 
     /// Writes a group of records wrapped in a [`SchemaBatch`].
     pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
+        // Function to determine if the counter should be sampled based on a sampling percentage
+        fn should_sample(sampling_percentage: usize) -> bool {
+            // Generate a random number between 0 and 100
+            let random_value = rand::thread_rng().gen_range(0, 100);
+
+            // Sample the counter if the random value is less than the sampling percentage
+            random_value <= sampling_percentage
+        }
+
         let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS
             .with_label_values(&[&self.name])
             .start_timer();
         let rows_locked = batch.rows.lock();
+        let sampling_rate_pct = 1;
+        let sampled_kv_bytes = should_sample(sampling_rate_pct);
 
         let mut db_batch = rocksdb::WriteBatch::default();
         for (cf_name, rows) in rows_locked.iter() {
@@ -244,20 +259,25 @@ impl DB {
         self.inner.write_opt(db_batch, &default_write_options())?;
 
         // Bump counters only after DB write succeeds.
-        for (cf_name, rows) in rows_locked.iter() {
-            for write_op in rows {
-                match write_op {
-                    WriteOp::Value { key, value } => {
-                        APTOS_SCHEMADB_PUT_BYTES
-                            .with_label_values(&[cf_name])
-                            .observe((key.len() + value.len()) as f64);
-                    },
-                    WriteOp::Deletion { key: _ } => {
-                        APTOS_SCHEMADB_DELETES.with_label_values(&[cf_name]).inc();
-                    },
+        if sampled_kv_bytes {
+            for (cf_name, rows) in rows_locked.iter() {
+                for write_op in rows {
+                    match write_op {
+                        WriteOp::Value { key, value } => {
+                            APTOS_SCHEMADB_PUT_BYTES_SAMPLED
+                                .with_label_values(&[cf_name])
+                                .observe((key.len() + value.len()) as f64);
+                        },
+                        WriteOp::Deletion { key: _ } => {
+                            APTOS_SCHEMADB_DELETES_SAMPLED
+                                .with_label_values(&[cf_name])
+                                .inc();
+                        },
+                    }
                 }
             }
         }
+
         APTOS_SCHEMADB_BATCH_COMMIT_BYTES
             .with_label_values(&[&self.name])
             .observe(serialized_size as f64);
@@ -313,3 +333,12 @@ fn default_write_options() -> rocksdb::WriteOptions {
     opts.set_sync(true);
     opts
 }
+
+trait DeUnc: AsRef<Path> {
+    fn de_unc(&self) -> &Path {
+        // `dunce` is needed to "de-UNC" because rocksdb doesn't take Windows UNC paths like `\\?\C:\`
+        dunce::simplified(self.as_ref())
+    }
+}
+
+impl<T> DeUnc for T where T: AsRef<Path> {}

@@ -259,7 +259,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.71.1"
+rust-version = "1.72.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -446,6 +446,10 @@ bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
+# We use a version of bollard where it relies on a lower version of serde_with.
+# Otherwise it imposes that we use serde 1.0.157, which we can't due to this issue:
+# https://github.com/aptos-labs/aptos-core/issues/10424
+bollard = { git = "https://github.com/banool/bollard.git", rev = "0bf0b43f736040bb3d4aacb20125fd2b4021733d" }
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
@@ -457,6 +461,7 @@ clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
 codespan-reporting = "0.11.1"
+concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
@@ -471,21 +476,17 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = { version = "2.1.0", features = [
-    "chrono",
-    "postgres",
-    "r2d2",
-    "numeric",
-    "serde_json",
-] }
+diesel = "2.1.0"
+diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "5.0.1"
+dunce = "1.0.4"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
-enum_dispatch = "0.3.8"
+enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 erased-serde = "0.3.13"
 event-listener = "2.5.3"
@@ -543,6 +544,7 @@ num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 once_cell = "1.10.0"
+ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 parking_lot = "0.12.0"
@@ -587,12 +589,15 @@ ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
+scopeguard = "1.2.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
-serde = { version = "1.0.137", features = ["derive", "rc"] }
+# For more information about why we are pinned to 1.0.149, see this issue:
+# https://github.com/aptos-labs/aptos-core/issues/10424
+serde = { version = "=1.0.149", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
@@ -615,10 +620,12 @@ termcolor = "1.1.2"
 test-case = "3.1.0"
 textwrap = "0.15.0"
 thiserror = "1.0.37"
+threadpool = "1.8.1"
+thread_local = "1.1.7"
 time = { version = "0.3.24", features = ["serde"] }
 tiny-bip39 = "0.8.2"
 tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
-tracing = "0.1.34"
+tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
 tokio = { version = "1.21.0", features = ["full"] }
@@ -727,3 +734,5 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
+# More context here: https://github.com/weiznich/diesel_async/pull/121.
+diesel-async = { git = "https://github.com/banool/diesel_async", rev = "7115c8668b88d56029cb1471e84d2ea0234ff035" }

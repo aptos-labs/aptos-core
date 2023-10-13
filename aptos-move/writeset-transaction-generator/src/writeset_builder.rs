@@ -9,7 +9,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
-    on_chain_config::{Features, TimedFeatures},
+    on_chain_config::{Features, TimedFeaturesBuilder},
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
@@ -109,16 +109,17 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F, chain_id: 
 where
     F: FnOnce(&mut GenesisSession),
 {
+    let resolver = state_view.as_move_resolver();
     let move_vm = MoveVmExt::new(
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         LATEST_GAS_FEATURE_VERSION,
         chain_id,
         Features::default(),
-        TimedFeatures::enable_all(),
+        TimedFeaturesBuilder::enable_all().build(),
+        &resolver,
     )
     .unwrap();
-    let resolver = state_view.as_move_resolver();
     let change_set = {
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();

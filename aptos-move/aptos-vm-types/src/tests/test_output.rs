@@ -10,7 +10,6 @@ use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput, write_set::WriteOp,
 };
-use aptos_vm::storage_adapter::AsExecutorView;
 use claims::{assert_err, assert_matches, assert_ok};
 use move_core_types::vm_status::{AbortLocation, VMStatus};
 use std::collections::{BTreeMap, HashMap};
@@ -34,9 +33,9 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
 #[test]
 fn test_ok_output_equality_no_deltas() {
     let state_view = FakeDataStore::default();
-    let executor_view = state_view.as_executor_view();
     let vm_output = build_vm_output(
         vec![mock_create("0", 0)],
+        vec![],
         vec![mock_modify("1", 1)],
         vec![mock_modify("2", 2)],
         vec![],
@@ -47,10 +46,8 @@ fn test_ok_output_equality_no_deltas() {
     //   2. `try_into_transaction_output` changes the type and returns a result.
     //   3. `into_transaction_output_with_materialized_deltas` changes the type and
     //       simply merges materialized deltas.
-    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&executor_view));
-    let txn_output_1 = assert_ok!(vm_output
-        .clone()
-        .try_into_transaction_output(&executor_view));
+    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
+    let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
     let txn_output_2 = vm_output
         .clone()
         .into_transaction_output_with_materialized_deltas(vec![]);
@@ -67,19 +64,17 @@ fn test_ok_output_equality_with_deltas() {
     let delta_key = "3";
     let mut state_view = FakeDataStore::default();
     state_view.set_legacy(as_state_key!(delta_key), serialize(&100));
-    let executor_view = state_view.as_executor_view();
 
     let vm_output = build_vm_output(
         vec![mock_create("0", 0)],
+        vec![],
         vec![mock_modify("1", 1)],
         vec![mock_modify("2", 2)],
         vec![mock_add(delta_key, 300)],
     );
 
-    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&executor_view));
-    let txn_output_1 = assert_ok!(vm_output
-        .clone()
-        .try_into_transaction_output(&executor_view));
+    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
+    let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
     let txn_output_2 = vm_output
         .clone()
         .into_transaction_output_with_materialized_deltas(vec![mock_modify("3", 400)]);
@@ -117,12 +112,13 @@ fn test_err_output_equality_with_deltas() {
     let delta_key = "3";
     let mut state_view = FakeDataStore::default();
     state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
-    let executor_view = state_view.as_executor_view();
 
-    let vm_output = build_vm_output(vec![], vec![], vec![], vec![mock_add(delta_key, 300)]);
+    let vm_output = build_vm_output(vec![], vec![], vec![], vec![], vec![mock_add(
+        delta_key, 300,
+    )]);
 
-    let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&executor_view));
-    let vm_status_2 = assert_err!(vm_output.try_into_transaction_output(&executor_view));
+    let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&state_view));
+    let vm_status_2 = assert_err!(vm_output.try_into_transaction_output(&state_view));
 
     // Error should be consistent.
     assert_eq!(vm_status_1, vm_status_2);
