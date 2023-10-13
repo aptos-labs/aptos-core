@@ -116,10 +116,15 @@ impl DKGManager {
         }
     }
 
-    // dkg todo: spawn thread to make this function non-blocking
+    // dkg todo: spawn thread to make this function non-blocking if necessary
     pub fn start_dkg(&self, dkg_events: Vec<ContractEvent>) {
         let event = StartDKGEvent::try_from(dkg_events
             .first().unwrap()).unwrap();
+
+        if event.target_epoch <= self.epoch_state.epoch {
+            // do DKG only for future epochs
+            return;
+        }
         debug!("[DKG] start_dkg with current_epoch={} target_epoch={} at node {}", self.epoch_state.epoch, event.target_epoch, self.author);
 
         let dkg_pvss_config = build_dkg_pvss_config(self.epoch_state.epoch, &event.target_validator_set);
@@ -312,12 +317,7 @@ impl DKGManager {
         if let Some(dkg_store) = self.dkg_store.lock().as_ref() {
             Some(dkg_store.get_start_time())
         } else {
-            // Currently consensus by state sync does not trigger DKG start,
-            // so it is possible a validator skips DKG start and receives DKG payload. 
-            // dkg todo: add back this unreachable when state sync triggers DKG start
-            // unreachable!("[DKG] DKGStore is not initialized!")
-            error!("[DKG] DKGStore is not initialized!");
-            None
+            unreachable!("[DKG] DKGStore is not initialized!")
         }
     }
 

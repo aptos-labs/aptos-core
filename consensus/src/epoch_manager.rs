@@ -66,7 +66,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
     proposal_msg::ProposalMsg,
 };
-use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_event_notifications::{ReconfigNotificationListener, EventNotificationListener};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
@@ -84,7 +84,7 @@ use aptos_types::{
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet, DKGState,
     },
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, randomness::RandConfig,
+    validator_verifier::ValidatorVerifier, randomness::RandConfig, contract_event::ContractEvent,
 };
 use fail::fail_point;
 use futures::{
@@ -139,6 +139,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     reconfig_events: ReconfigNotificationListener<P>,
+    dkg_events: EventNotificationListener,
     dkg_manager_wrapper: Arc<DKGManagerWrapper>,
     // channels to rand manager
     rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandRequest>>,
@@ -182,6 +183,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         storage: Arc<dyn PersistentLivenessStorage>,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener<P>,
+        dkg_events: EventNotificationListener,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
     ) -> Self {
@@ -203,6 +205,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             storage,
             safety_rules_manager,
             reconfig_events,
+            dkg_events,
             rand_manager_msg_tx: None,
             rand_manager_reset_tx: None,
             buffer_manager_msg_tx: None,
@@ -1561,6 +1564,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .await;
     }
 
+    async fn process_dkg_events(&mut self, dkg_events: Vec<ContractEvent>) {
+        debug!("[EpochManager][DKG] Received {} DKG events from state sync", dkg_events.len());
+        self.dkg_manager_wrapper.start_dkg(dkg_events).await;
+    }
+
     pub async fn start(
         mut self,
         mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
@@ -1570,6 +1578,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.await_reconfig_notification().await;
         loop {
             tokio::select! {
+                dkg_events = self.dkg_events.select_next_some() => {
+                    monitor!("epoch_manager_process_dkg_events",
+                    self.process_dkg_events(dkg_events.subscribed_events).await);
+                },
                 (peer, msg) = network_receivers.consensus_messages.select_next_some() => {
                     monitor!("epoch_manager_process_consensus_messages",
                     if let Err(e) = self.process_message(peer, msg).await {

@@ -563,6 +563,7 @@ pub fn setup_environment_and_start_node(
         mut event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
+        consensus_dkg_subscription,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
@@ -624,6 +625,7 @@ pub fn setup_environment_and_start_node(
             &mut node_config,
             db_rw,
             consensus_reconfig_subscription,
+            consensus_dkg_subscription,
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,

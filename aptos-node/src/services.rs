@@ -6,7 +6,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
-use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
+use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener, EventNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
@@ -81,6 +81,7 @@ pub fn start_consensus_runtime(
     node_config: &mut NodeConfig,
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+    consensus_dkg_subscription: Option<EventNotificationListener>,
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -95,6 +96,9 @@ pub fn start_consensus_runtime(
         db_rw,
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
+        consensus_dkg_subscription
+            .expect("Consensus requires a DKG subscription!"),
+        
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     consensus_runtime

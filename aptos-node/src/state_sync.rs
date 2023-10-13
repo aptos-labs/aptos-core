@@ -10,7 +10,7 @@ use aptos_data_streaming_service::{
     streaming_service::DataStreamingService,
 };
 use aptos_event_notifications::{
-    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
+    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener, EventNotificationListener,
 };
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
@@ -31,7 +31,7 @@ use aptos_storage_service_server::{
 };
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{waypoint::Waypoint, on_chain_config};
 use aptos_vm::AptosVM;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -45,6 +45,7 @@ pub fn create_event_subscription_service(
     EventSubscriptionService,
     ReconfigNotificationListener<DbBackedOnChainConfig>,
     Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+    Option<EventNotificationListener>,
 ) {
     // Create the event subscription service
     let mut event_subscription_service =
@@ -66,10 +67,22 @@ pub fn create_event_subscription_service(
         None
     };
 
+    let consensus_dkg_subscription = 
+    if node_config.base.role.is_validator() {
+        Some(
+            event_subscription_service
+                .subscribe_to_events(vec![on_chain_config::start_dkg_event_key()])
+                .expect("Consensus must subscribe to DKG events")
+        )
+    } else {
+        None
+    };
+
     (
         event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
+        consensus_dkg_subscription,
     )
 }
 
