@@ -12,16 +12,9 @@ use std::{
 };
 
 extern crate itertools;
-use crate::metrics::{
-    APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT,
-    APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS,
-    APTOS_REMOTE_EXECUTOR_PREFETCH_WAIT_TIME_SECONDS,
-    APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_COUNT,
-    APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_DESER_TIME_SECONDS,
-    APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_PROCESSING_TIME_SECONDS,
-};
+use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
 use anyhow::Result;
-use aptos_logger::{info, trace};
+use aptos_logger::trace;
 use aptos_state_view::TStateView;
 use aptos_types::{
     block_executor::partitioner::ShardId,
@@ -123,10 +116,9 @@ impl RemoteStateViewClient {
 
     pub fn init_for_block(&self, state_keys: Vec<StateKey>) {
         *self.state_view.write().unwrap() = RemoteStateView::new();
-        info!(
-            "REMOTE_EXECUTOR: Prefetching {} state keys",
-            state_keys.len()
-        );
+        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+            .with_label_values(&[&self.shard_id.to_string(), "prefetch_kv"])
+            .inc_by(state_keys.len() as u64);
         self.pre_fetch_state_values(state_keys, false);
     }
 
@@ -145,19 +137,19 @@ impl RemoteStateViewClient {
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
-                thread_pool.clone().spawn(move || {
+                thread_pool.spawn(move || {
                     Self::send_state_value_request(shard_id, sender, state_keys);
                 });
             });
     }
 
-    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_fetch: bool) {
+    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool) {
         let state_view_clone = self.state_view.clone();
         let thread_pool_clone = self.thread_pool.clone();
         let kv_tx_clone = self.kv_tx.clone();
         let shard_id = self.shard_id;
 
-        if sync_fetch {
+        let insert_and_fetch = move || {
             Self::insert_keys_and_fetch_values(
                 state_view_clone,
                 thread_pool_clone,
@@ -165,16 +157,14 @@ impl RemoteStateViewClient {
                 shard_id,
                 state_keys,
             );
+        };
+        if sync_insert_keys {
+            // we want to insert keys synchronously here because when called from get_state_value()
+            // it expects the key to be in the table while waiting for the value to be fetched from
+            // remote state view.
+            insert_and_fetch();
         } else {
-            self.thread_pool.spawn(move || {
-                Self::insert_keys_and_fetch_values(
-                    state_view_clone,
-                    thread_pool_clone,
-                    kv_tx_clone,
-                    shard_id,
-                    state_keys,
-                );
-            });
+            self.thread_pool.spawn(insert_and_fetch);
         }
     }
 
@@ -187,27 +177,6 @@ impl RemoteStateViewClient {
         let request_message = bcs::to_bytes(&request).unwrap();
         sender.send(Message::new(request_message)).unwrap();
     }
-
-    pub fn print_info(&self) {
-        info!(
-            "REMOTE_EXECUTOR: Total approx get prefetched val time is {} s",
-            APTOS_REMOTE_EXECUTOR_PREFETCH_WAIT_TIME_SECONDS.get_sample_sum()
-        );
-        info!(
-            "REMOTE_EXECUTOR: Total kv response process time is {} for {} calls",
-            APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_PROCESSING_TIME_SECONDS.get_sample_sum(),
-            APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_COUNT.get()
-        );
-        info!(
-            "REMOTE_EXECUTOR: Total kv response deser time is {}",
-            APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_DESER_TIME_SECONDS.get_sample_sum()
-        );
-        info!(
-            "REMOTE_EXECUTOR: Total non prefetch get remote val time is {} for {} calls",
-            APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS.get_sample_sum(),
-            APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT.get()
-        );
-    }
 }
 
 impl TStateView for RemoteStateViewClient {
@@ -217,12 +186,18 @@ impl TStateView for RemoteStateViewClient {
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
-            let _timer = APTOS_REMOTE_EXECUTOR_PREFETCH_WAIT_TIME_SECONDS.start_timer();
+            let _timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&[&self.shard_id.to_string(), "prefetch_wait"])
+                .start_timer();
             return state_view_reader.get_state_value(state_key);
         }
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
-        let _timer = APTOS_REMOTE_EXECUTOR_NON_PREFETCH_WAIT_TIME_SECONDS.start_timer();
-        APTOS_REMOTE_EXECUTOR_NON_PREFETCH_KV_COUNT.inc();
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_wait"])
+            .start_timer();
+        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_kv"])
+            .inc();
         self.pre_fetch_state_values(vec![state_key.clone()], true);
         state_view_reader.get_state_value(state_key)
     }
@@ -269,13 +244,19 @@ impl RemoteStateValueReceiver {
         message: Message,
         state_view: Arc<RwLock<RemoteStateView>>,
     ) {
-        let _timer =
-            APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_PROCESSING_TIME_SECONDS.start_timer();
-        let bcs_deser_timer =
-            APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_DESER_TIME_SECONDS.start_timer();
-        let response: RemoteKVResponse = bcs::from_bytes(&message.data).unwrap();
-        bcs_deser_timer.stop_and_record();
-        APTOS_REMOTE_EXECUTOR_REMOTE_KV_RESPONSES_COUNT.inc();
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&shard_id.to_string(), "kv_responses"])
+            .start_timer();
+        let response: RemoteKVResponse;
+        {
+            let _bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&[&shard_id.to_string(), "kv_deser"])
+                .start_timer();
+            response = bcs::from_bytes(&message.data).unwrap();
+        }
+        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+            .with_label_values(&[&shard_id.to_string(), "kv_responses"])
+            .inc();
         let state_view_lock = state_view.read().unwrap();
         trace!(
             "Received state values for shard {} with size {}",

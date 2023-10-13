@@ -12,7 +12,10 @@ use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
     vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::executor_client::{ExecutorClient, ShardedExecutionOutput};
+use aptos_vm::sharded_block_executor::{
+    executor_client::{ExecutorClient, ShardedExecutionOutput},
+    ShardedBlockExecutor,
+};
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,
@@ -93,6 +96,22 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             thread_pool,
             phantom: std::marker::PhantomData,
         }
+    }
+
+    pub fn create_remote_sharded_block_executor(
+        coordinator_address: SocketAddr,
+        remote_shard_addresses: Vec<SocketAddr>,
+        num_threads: Option<usize>,
+    ) -> ShardedBlockExecutor<S, RemoteExecutorClient<S>> {
+        ShardedBlockExecutor::new(RemoteExecutorClient::new(
+            remote_shard_addresses,
+            NetworkController::new(
+                "remote-executor-coordinator".to_string(),
+                coordinator_address,
+                5000,
+            ),
+            num_threads,
+        ))
     }
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {

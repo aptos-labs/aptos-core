@@ -25,7 +25,6 @@ struct Args {
 }
 
 fn main() {
-    // TODO (skedia): Uncomment this once the executor service is implemented.
     let args = Args::parse();
     aptos_logger::Logger::new().init();
 
@@ -35,7 +34,7 @@ fn main() {
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut exe_service = ProcessExecutorService::new(
+    let _exe_service = ProcessExecutorService::new(
         args.shard_id,
         args.num_shards,
         args.num_executor_threads,
@@ -45,7 +44,6 @@ fn main() {
 
     rx.recv()
         .expect("Could not receive Ctrl-C msg from channel.");
-    exe_service.shutdown();
     info!("Process executor service shutdown successfully.");
 }
 

@@ -30,12 +30,10 @@ pub(crate) struct BlockPreparationStage {
 }
 
 impl BlockPreparationStage {
-    pub fn new(num_shards: usize, partitioner_config: &dyn PartitionerConfig, force_partitioning: bool) -> Self {
-        let maybe_partitioner = if num_shards <= 1 && !force_partitioning {
+    pub fn new(num_shards: usize, partitioner_config: &dyn PartitionerConfig) -> Self {
+        let maybe_partitioner = if num_shards == 0 {
             None
         } else {
-            // we can force partitioning even with num_shards == 1 to benchmark remote execution
-            // with 1 shard and a coordinator
             let partitioner = partitioner_config.build();
             Some(partitioner)
         };
