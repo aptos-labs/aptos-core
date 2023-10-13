@@ -380,13 +380,14 @@ fn module_call(context: &mut Context, call: &mut T::ModuleCall) {
 
 fn builtin_function(context: &mut Context, b: &mut T::BuiltinFunction) {
     use T::BuiltinFunction_ as B;
+    let f_name = b.value.display_name();
     match &mut b.value {
         B::MoveTo(bt)
         | B::MoveFrom(bt)
         | B::BorrowGlobal(_, bt)
         | B::Exists(bt)
         | B::Freeze(bt) => {
-            type_(context, bt);
+            type_msg_(context, bt, &format!("Cannot infer a type parameter for built-in function '{f_name}'"));
         },
         B::Assert(_) => (),
     }
