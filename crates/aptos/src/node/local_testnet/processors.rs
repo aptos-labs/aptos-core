@@ -116,7 +116,11 @@ impl ProcessorManager {
             bail!("Must specify at least one processor to run");
         }
         let mut managers = Vec::new();
-        let mut health_check_port = 43234;
+        // We use this port as the start of the range of ports we use for the health
+        // check servers in each processor because it is not known to be used by any
+        // other service and it is outside of the ephemeral or private port range used
+        // by any OS.
+        let mut health_check_port = 23480;
         for processor_name in &args.processor_args.processors {
             managers.push(Self::new(
                 processor_name,

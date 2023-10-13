@@ -125,12 +125,20 @@ impl RunLocalTestnet {
             };
             if !silent {
                 eprintln!("{} is starting, please wait...", health_checker);
+            } else {
+                info!("[silent] {} is starting, please wait...", health_checker);
             }
             let fut = async move {
                 health_checker.wait(None).await?;
                 if !silent {
                     eprintln!(
                         "{} is ready. Endpoint: {}",
+                        health_checker,
+                        health_checker.address_str()
+                    );
+                } else {
+                    info!(
+                        "[silent] {} is ready. Endpoint: {}",
                         health_checker,
                         health_checker.address_str()
                     );
@@ -247,12 +255,10 @@ impl CliCommand<()> for RunLocalTestnet {
             )
             .context("Failed to build processor service managers")?;
 
-            // All processors return the same health checkers so we only need to call
-            // `get_health_checkers` for one of them. This is a bit of a leaky abstraction
-            // but it works well enough for now. Note: We have already ensured that at
-            // least one processor is used when building the processor managers with
-            // `many_new`.
-            let processor_health_checkers = processor_managers[0].get_health_checkers();
+            let processor_health_checkers = processor_managers
+                .iter()
+                .flat_map(|m| m.get_health_checkers())
+                .collect();
 
             let mut processor_managers = processor_managers
                 .into_iter()
@@ -367,7 +373,7 @@ impl CliCommand<()> for RunLocalTestnet {
         if was_ctrl_c {
             eprintln!("\nReceived ctrl-c, running shutdown steps...");
         } else {
-            eprintln!("\nOne of the futures exited unexpectedly, running shutdown steps...");
+            eprintln!("\nOne of the services exited unexpectedly, running shutdown steps...");
         }
 
         // At this point register another ctrl-c handler so the user can kill the CLI
@@ -393,9 +399,10 @@ impl CliCommand<()> for RunLocalTestnet {
 
         match was_ctrl_c {
             true => Ok(()),
-            false => Err(CliError::UnexpectedError(
-                "One of the services stopped unexpectedly".to_string(),
-            )),
+            false => Err(CliError::UnexpectedError(format!(
+                "One of the services stopped unexpectedly.\nPlease check the logs in {}",
+                test_dir.display()
+            ))),
         }
     }
 }
