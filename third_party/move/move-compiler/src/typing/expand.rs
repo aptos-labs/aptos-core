@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::core::{self, Context};
+use super::core::{self, Context, Subst, forward_tvar};
 use crate::{
     diag,
     expansion::ast::Value_,
@@ -64,7 +64,23 @@ pub fn type_(context: &mut Context, ty: &mut Type) {
         Ref(_, b) => type_(context, b),
         Var(tvar) => {
             let ty_tvar = sp(ty.loc, Var(*tvar));
-            let replacement = core::unfold_type(&context.subst, ty_tvar);
+            fn unfold_type_mut(subst: &mut Subst, sp!(loc, t_): Type) -> Type {
+                match t_ {
+                    Type_::Var(i) => {
+                        let last_tvar = forward_tvar(subst, i);
+                        match subst.get(last_tvar) {
+                            Some(sp!(_, Type_::Var(_))) => unreachable!(),
+                            None => {
+                                subst.insert(last_tvar, sp(loc, Type_::UnresolvedError));
+                                sp(loc, Type_::Anything)
+                            },
+                            Some(inner) => inner.clone(),
+                        }
+                    },
+                    x => sp(loc, x),
+                }
+            }
+            let replacement = unfold_type_mut(&mut context.subst, ty_tvar);
             let replacement = match replacement {
                 sp!(_, Var(_)) => panic!("ICE unfold_type_base failed to expand"),
                 sp!(loc, Anything) => {

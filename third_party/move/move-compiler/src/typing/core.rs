@@ -1574,7 +1574,7 @@ fn join_tvar(
     }
 }
 
-fn forward_tvar(subst: &Subst, id: TVar) -> TVar {
+pub fn forward_tvar(subst: &Subst, id: TVar) -> TVar {
     let mut cur = id;
     loop {
         match subst.get(cur) {
