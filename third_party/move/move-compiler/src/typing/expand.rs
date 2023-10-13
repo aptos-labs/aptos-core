@@ -62,7 +62,7 @@ fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name:
     match ty_name {
         TypeName_::ModuleType(mod_id, struct_name) => {
             let param_name = &context.struct_definition(mod_id, struct_name).type_parameters[i].param.user_specified_name.value;
-            let msg = format!("Cannot infer a type parameter {param_name} for generic struct {ty_name}. Try providing a type parameter.");
+            let msg = format!("Cannot infer the type parameter {param_name} for generic struct {ty_name}. Try providing a type parameter.");
             type_msg_(context, ty, &msg);
         },
         _ => type_(context, ty),
