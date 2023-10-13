@@ -122,7 +122,7 @@ module aptos_token_objects::collection {
     #[event]
     struct ConcurrentBurnEvent has drop, store {
         collection_addr: address,
-        index: AggregatorSnapshot<u64>,
+        index: u64,
         token: address,
     }
 
@@ -414,7 +414,7 @@ module aptos_token_objects::collection {
             event::emit(
                 ConcurrentBurnEvent {
                     collection_addr,
-                    index: aggregator_v2::create_snapshot(*option::borrow(&index)),
+                    index: *option::borrow(&index),
                     token,
                 },
             );
@@ -569,7 +569,7 @@ module aptos_token_objects::collection {
     // Tests
 
     #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_unlimited(creator: &signer) acquires FixedSupply, UnlimitedSupply {
+    fun test_create_mint_burn_for_unlimited(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_unlimited_collection(creator, string::utf8(b""), name, option::none(), string::utf8(b""));
@@ -585,7 +585,7 @@ module aptos_token_objects::collection {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_fixed(creator: &signer) acquires FixedSupply, UnlimitedSupply {
+    fun test_create_mint_burn_for_fixed(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
