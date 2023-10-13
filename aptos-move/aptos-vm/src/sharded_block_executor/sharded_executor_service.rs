@@ -5,7 +5,10 @@ use crate::{
     sharded_block_executor::{
         aggr_overridden_state_view::{AggregatorOverriddenStateView, TOTAL_SUPPLY_AGGR_BASE_VAL},
         coordinator_client::CoordinatorClient,
-        counters::{SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT},
+        counters::{
+            SHARDED_BLOCK_EXECUTION_BY_ROUNDS_SECONDS, SHARDED_BLOCK_EXECUTOR_TXN_COUNT,
+            SHARDED_EXECUTOR_SERVICE_SECONDS,
+        },
         cross_shard_client::{CrossShardClient, CrossShardCommitReceiver, CrossShardCommitSender},
         cross_shard_state_view::CrossShardStateView,
         messages::CrossShardMsg,
@@ -13,7 +16,6 @@ use crate::{
     },
 };
 use aptos_logger::{info, trace};
-use aptos_metrics_core::{exponential_buckets, register_histogram, Histogram};
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{
@@ -27,28 +29,7 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use once_cell::sync::Lazy;
 use std::sync::Arc;
-
-pub static APTOS_SHARDED_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_sharded_executor_execute_block_seconds",
-        // metric description
-        "The time spent in seconds on executing a block on a shard, including time spent in fetching state values and cross-shard communications",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    ).unwrap()
-});
-
-pub static APTOS_SHARDED_EXECUTOR_RESULT_TX_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_remote_executor_result_tx_seconds",
-        // metric description
-        "The time spent in seconds on sending the execution result of a block on a shard to the coordinator",
-        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    ).unwrap()
-});
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -233,6 +214,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             self.shard_id,
             self.num_shards
         );
+        let mut num_txns = 0;
         loop {
             let command = self.coordinator_client.receive_execute_command();
             match command {
@@ -242,22 +224,28 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     concurrency_level_per_shard,
                     maybe_block_gas_limit,
                 ) => {
+                    num_txns += transactions.num_txns();
                     trace!(
                         "Shard {} received ExecuteBlock command of block size {} ",
                         self.shard_id,
-                        transactions.num_txns()
+                        num_txns
                     );
-                    let execute_block_timer =
-                        APTOS_SHARDED_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
-                    let ret = self.execute_block(
-                        transactions,
-                        state_view.as_ref(),
-                        concurrency_level_per_shard,
-                        maybe_block_gas_limit,
-                    );
-                    drop(state_view);
-                    execute_block_timer.stop_and_record();
-                    let _timer = APTOS_SHARDED_EXECUTOR_RESULT_TX_SECONDS.start_timer();
+                    let ret;
+                    {
+                        let _timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                            .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+                            .start_timer();
+                        ret = self.execute_block(
+                            transactions,
+                            state_view.as_ref(),
+                            concurrency_level_per_shard,
+                            maybe_block_gas_limit,
+                        );
+                        drop(state_view);
+                    }
+                    let _timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                        .with_label_values(&[&self.shard_id.to_string(), "result_tx"])
+                        .start_timer();
                     self.coordinator_client.send_execution_result(ret);
                 },
                 ExecutorShardCommand::Stop => {
@@ -265,11 +253,16 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                 },
             }
         }
+        let exe_time = SHARDED_EXECUTOR_SERVICE_SECONDS
+            .get_metric_with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+            .unwrap()
+            .get_sample_sum();
         info!(
-            "SHARDED_EXECUTOR: execute block time is {} s",
-            APTOS_SHARDED_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum()
+            "Shard {} is shutting down; On shard execution tps {} txns/s ({} txns / {} s)",
+            self.shard_id,
+            (num_txns as f64 / exe_time),
+            num_txns,
+            exe_time
         );
-        info!("SHARDED_EXECUTOR: result tx time (shard tx only, doesn't account for result rx) is {} s", APTOS_SHARDED_EXECUTOR_RESULT_TX_SECONDS.get_sample_sum());
-        trace!("Shard {} is shutting down", self.shard_id);
     }
 }

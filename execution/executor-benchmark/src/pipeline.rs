@@ -7,10 +7,7 @@ use crate::{
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
-use aptos_executor::{
-    block_executor::{BlockExecutor, TransactionBlockExecutor},
-    components::chunk_output,
-};
+use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
@@ -36,7 +33,7 @@ pub struct PipelineConfig {
     pub skip_commit: bool,
     pub allow_discards: bool,
     pub allow_aborts: bool,
-    #[derivative(Default(value = "1"))]
+    #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
@@ -109,9 +106,9 @@ where
         };
 
         let mut join_handles = vec![];
-        
+
         let mut partitioning_stage =
-            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config, chunk_output::get_remote_sharding());
+            BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
 
         let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
 
