@@ -127,8 +127,14 @@ impl StructType {
 
     // Check if the local struct handle is compatible with the defined struct type.
     pub fn check_compatibility(&self, struct_handle: &StructHandle) -> PartialVMResult<()> {
-        if !self.abilities.is_subset(struct_handle.abilities)
-            || self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+        if !self.abilities.is_subset(struct_handle.abilities) {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Ability definition of module mismatch".to_string()),
+            );
+        }
+
+        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
             || !self
                 .phantom_ty_args_mask
                 .iter()
@@ -138,8 +144,9 @@ impl StructType {
                 })
         {
             return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("Ability definition of module mismatch".to_string()),
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    "Phantom type parameter definition of module mismatch".to_string(),
+                ),
             );
         }
 
@@ -389,11 +396,11 @@ impl Type {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
-                AbilitySet::VECTOR,
-                vec![false],
-                vec![ty.abilities()?],
-            ),
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    ty.abilities()?
+                ])
+            },
             Type::Struct { ability, .. } => Ok(*ability),
             Type::StructInstantiation {
                 ty_args,
