@@ -8,8 +8,10 @@ mod file_format_generator;
 mod options;
 pub mod pipeline;
 
-use crate::pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor;
-use anyhow::anyhow;
+use crate::pipeline::{
+    livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
+};
+use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
 use move_compiler::{
@@ -65,6 +67,7 @@ pub fn run_move_compiler(
     } else {
         pipeline.run(&env, &mut targets)
     }
+    check_errors(&env, error_writer, "stackless-bytecode analysis errors")?;
     let modules_and_scripts = run_file_format_gen(&env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
     let annotated = annotate_units(&env, modules_and_scripts);
@@ -143,6 +146,7 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 pub fn bytecode_pipeline(_env: &GlobalEnv) -> FunctionTargetPipeline {
     let mut pipeline = FunctionTargetPipeline::default();
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
+    pipeline.add_processor(Box::new(VisibilityChecker()));
     pipeline
 }
 
@@ -155,7 +159,7 @@ pub fn check_errors<W: WriteColor>(
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
     if env.has_errors() {
-        Err(anyhow!(format!("exiting with {}", msg)))
+        bail!("exiting with {}", msg);
     } else {
         Ok(())
     }

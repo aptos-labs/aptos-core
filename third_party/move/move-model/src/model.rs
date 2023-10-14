@@ -18,7 +18,7 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
-        GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec,
+        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec,
         SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
@@ -522,7 +522,7 @@ pub struct GlobalEnv {
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
     pub(crate) extensions: RefCell<BTreeMap<TypeId, Box<dyn Any>>>,
-    /// The address of the standard and extension libaries.
+    /// The address of the standard and extension libraries.
     pub(crate) stdlib_address: Option<Address>,
     pub(crate) extlib_address: Option<Address>,
     /// Address alias map
@@ -1174,6 +1174,7 @@ impl GlobalEnv {
         name: ModuleName,
         attributes: Vec<Attribute>,
         use_decls: Vec<UseDecl>,
+        friend_decls: Vec<FriendDecl>,
         named_constants: BTreeMap<NamedConstantId, NamedConstantData>,
         mut struct_data: BTreeMap<StructId, StructData>,
         function_data: BTreeMap<FunId, FunctionData>,
@@ -1222,10 +1223,11 @@ impl GlobalEnv {
             loc,
             attributes,
             use_decls,
+            friend_decls,
             spec_block_infos,
             used_modules,
             used_modules_including_specs: Default::default(),
-            friend_modules: Default::default(), // TODO: friend declarations
+            friend_modules: Default::default(),
         });
         id
     }
@@ -2052,6 +2054,9 @@ pub struct ModuleData {
     /// Use declarations
     use_decls: Vec<UseDecl>,
 
+    /// Friend declarations
+    pub(crate) friend_decls: Vec<FriendDecl>,
+
     /// Module byte code, if available.
     pub(crate) compiled_module: Option<CompiledModule>,
 
@@ -2107,7 +2112,7 @@ pub struct ModuleEnv<'env> {
     pub env: &'env GlobalEnv,
 
     /// Reference to the data of the module.
-    data: &'env ModuleData,
+    pub data: &'env ModuleData,
 }
 
 impl<'env> ModuleEnv<'env> {
@@ -2160,6 +2165,11 @@ impl<'env> ModuleEnv<'env> {
     /// Returns the use declarations of this module.
     pub fn get_use_decls(&self) -> &[UseDecl] {
         &self.data.use_decls
+    }
+
+    /// Does this module have a friend with `module_id`?
+    pub fn has_friend(&self, module_id: &ModuleId) -> bool {
+        self.data.friend_modules.contains(module_id)
     }
 
     /// Returns full name as a string.
@@ -3201,7 +3211,7 @@ pub struct FunctionData {
     /// is attached to the parent module data.
     pub(crate) def_idx: Option<FunctionDefinitionIndex>,
 
-    /// The handle index of this function in its modul, if a bytecode module
+    /// The handle index of this function in its module, if a bytecode module
     /// is attached to the parent module data.
     pub(crate) handle_idx: Option<FunctionHandleIndex>,
 

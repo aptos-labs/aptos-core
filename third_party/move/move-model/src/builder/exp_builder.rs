@@ -2079,7 +2079,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let builtin_sym = self.parent.parent.builtin_qualified_symbol(&name.value);
                 if let Some(entry) = self.parent.parent.const_table.get(&builtin_sym).cloned() {
                     if self.is_visible(entry.visibility) {
-                        return self.translate_constant(loc, entry, expected_type);
+                        return self.translate_constant(loc, entry, expected_type, &builtin_sym);
                     }
                 }
                 // If not found, treat as global var in this module.
@@ -2087,7 +2087,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             },
         };
         if let Some(entry) = self.parent.parent.const_table.get(&global_var_sym).cloned() {
-            return self.translate_constant(loc, entry, expected_type);
+            return self.translate_constant(loc, entry, expected_type, &global_var_sym);
         }
 
         if let Some(entry) = self.parent.parent.spec_var_table.get(&global_var_sym) {
@@ -2149,16 +2149,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Creates an expression for a constant, checking the expected type.
+    /// Reports an error if the constant is not visible.
     fn translate_constant(
         &mut self,
         loc: &Loc,
         entry: ConstEntry,
         expected_type: &Type,
+        sym: &QualifiedSymbol,
     ) -> ExpData {
-        let ConstEntry { ty, value, .. } = entry;
-        let ty = self.check_type(loc, &ty, expected_type, "");
-        let id = self.new_node_id_with_type_loc(&ty, loc);
-        ExpData::Value(id, value)
+        // Constants are always visible in specs.
+        if self.mode != ExpTranslationMode::Spec && sym.module_name != self.parent.module_name {
+            self.error(
+                loc,
+                &format!(
+                    "constant `{}` cannot be used here because it is private to the module `{}`",
+                    sym.display_full(self.parent.parent.env),
+                    sym.module_name.display_full(self.parent.parent.env)
+                ),
+            );
+            self.new_error_exp()
+        } else {
+            let ConstEntry { ty, value, .. } = entry;
+            let ty = self.check_type(loc, &ty, expected_type, "");
+            let id = self.new_node_id_with_type_loc(&ty, loc);
+            ExpData::Value(id, value)
+        }
     }
 
     fn resolve_local(
