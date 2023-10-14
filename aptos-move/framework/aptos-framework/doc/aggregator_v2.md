@@ -3,7 +3,17 @@
 
 # Module `0x1::aggregator_v2`
 
-This module provides an interface for aggregators (version 2).
+This module provides an interface for aggregators (version 2). Aggregators are
+similar to unsigned integers and support addition and subtraction (aborting on
+underflow or on overflowing a custom upper limit). The difference from integers
+is that aggregators allow to perform both additions and subtractions in parallel
+across multiple transactions, enabling parallel execution. For example, if the
+first transaction is doing <code><a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(X, 1)</code> for aggregator <code>X</code>, and the second is
+doing <code><a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
+dependency.
+However, reading the aggregator value (i.e. calling <code><a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(X)</code>) is an expensive
+operation and should be avoided as much as possible because it reduces the
+parallelism.
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
@@ -11,6 +21,7 @@ This module provides an interface for aggregators (version 2).
 -  [Constants](#@Constants_0)
 -  [Function `max_value`](#0x1_aggregator_v2_max_value)
 -  [Function `create_aggregator`](#0x1_aggregator_v2_create_aggregator)
+-  [Function `create_unbounded_aggregator`](#0x1_aggregator_v2_create_unbounded_aggregator)
 -  [Function `try_add`](#0x1_aggregator_v2_try_add)
 -  [Function `add`](#0x1_aggregator_v2_add)
 -  [Function `try_sub`](#0x1_aggregator_v2_try_sub)
@@ -79,6 +90,9 @@ Currently supported types for Element are u64 and u128.
 
 ## Struct `AggregatorSnapshot`
 
+Represents a constant value, that was derived from an aggregator at given instant in time.
+Unlike read() and storing the value directly, this enables parallel execution of transactions,
+while storing snapshot of aggregator state elsewhere.
 
 
 <pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;Element&gt; <b>has</b> drop, store
@@ -127,12 +141,33 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 
 
 
+<a name="0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED"></a>
+
+The native aggregator function, that is in the move file, is not yet supported.
+and any calls will raise this error.
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED">EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED</a>: u64 = 9;
+</code></pre>
+
+
+
 <a name="0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED"></a>
 
 The aggregator snapshots feature flag is not enabled.
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED">EAGGREGATOR_SNAPSHOTS_NOT_ENABLED</a>: u64 = 6;
+</code></pre>
+
+
+
+<a name="0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE"></a>
+
+Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together)
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE">ECONCAT_STRING_LENGTH_TOO_LARGE</a>: u64 = 8;
 </code></pre>
 
 
@@ -202,6 +237,33 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b> + drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aggregator_v2_create_unbounded_aggregator"></a>
+
+## Function `create_unbounded_aggregator`
+
+Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
+due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
+
+Currently supported types for Element are u64 and u128.
+EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b> + drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt;;
 </code></pre>
 
 
@@ -309,6 +371,7 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 ## Function `read`
 
 Returns a value stored in this aggregator.
+Note: This operation prevents parallelism of the transaction that calls it.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement
@@ -331,6 +394,8 @@ Returns a value stored in this aggregator.
 
 ## Function `snapshot`
 
+Returns a wrapper of a current value of an aggregator
+Unlike read(), this enables parallel execution of transactions.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;
@@ -353,6 +418,8 @@ Returns a value stored in this aggregator.
 
 ## Function `create_snapshot`
 
+Creates a snapshot of a given value.
+Useful for when object is sometimes created via snapshot() or string_concat(), and sometimes directly.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>&lt;Element: <b>copy</b>, drop&gt;(value: Element): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;
@@ -375,6 +442,7 @@ Returns a value stored in this aggregator.
 
 ## Function `copy_snapshot`
 
+NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">copy_snapshot</a>&lt;Element: <b>copy</b>, drop&gt;(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;
@@ -397,6 +465,8 @@ Returns a value stored in this aggregator.
 
 ## Function `read_snapshot`
 
+Returns a value stored in this snapshot.
+Note: This operation prevents parallelism of the transaction that calls it.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_snapshot">read_snapshot</a>&lt;Element&gt;(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;): Element
@@ -421,7 +491,8 @@ Returns a value stored in this aggregator.
 
 Concatenates <code>before</code>, <code>snapshot</code> and <code>after</code> into a single string.
 snapshot passed needs to have integer type - currently supported types are u64 and u128.
-raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
+Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
+If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;

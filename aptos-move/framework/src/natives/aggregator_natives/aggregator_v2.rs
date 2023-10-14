@@ -229,6 +229,52 @@ fn native_create_aggregator(
     ]))])
 }
 
+
+/***************************************************************************************************
+ * native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
+ **************************************************************************************************/
+
+ fn native_create_unbounded_aggregator(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    if !context.aggregator_v2_api_enabled() {
+        return Err(SafeNativeError::Abort {
+            abort_code: EAGGREGATOR_API_NOT_ENABLED,
+        });
+    }
+
+    debug_assert_eq!(args.len(), 0);
+
+    context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
+    let max_value = {
+        match &ty_args[0] {
+            Type::U128 => u128::MAX,
+            Type::U64 => u64::MAX as u128,
+            _ => {
+                return Err(SafeNativeError::Abort {
+                    abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+                })
+            },
+        }
+    };
+
+    let value_field_value = if context.aggregator_v2_delayed_fields_enabled() {
+        let (resolver, mut delayed_field_data) = get_context_data(context);
+        let id = resolver.generate_delayed_field_id();
+        delayed_field_data.create_new_aggregator(id);
+        id.as_u64() as u128
+    } else {
+        0
+    };
+
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        create_value_by_type(&ty_args[0], value_field_value)?,
+        create_value_by_type(&ty_args[0], max_value)?,
+    ]))])
+}
+
 /***************************************************************************************************
  * native fun try_add<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
  **************************************************************************************************/
@@ -542,6 +588,7 @@ pub fn make_all(
             "create_aggregator",
             native_create_aggregator as RawSafeNative,
         ),
+        ("create_unbounded_aggregator", native_create_unbounded_aggregator),
         ("try_add", native_try_add),
         ("read", native_read),
         ("try_sub", native_try_sub),
