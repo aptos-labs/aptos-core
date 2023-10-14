@@ -28,11 +28,12 @@ use aptos_types::{
     transaction::{AtomicVersion, Version},
     write_set::{WriteOp, WriteSet},
 };
-use aptos_vm::data_cache::{AsMoveResolver, StorageAdapter};
+use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
+    resolver::MoveResolver,
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
@@ -86,9 +87,9 @@ impl Indexer {
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
-    pub fn index_with_annotator(
+    pub fn index_with_annotator<R: MoveResolver>(
         &self,
-        annotator: &MoveValueAnnotator<StorageAdapter<DbStateView>>,
+        annotator: &MoveValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
@@ -150,18 +151,15 @@ impl Indexer {
     }
 }
 
-struct TableInfoParser<'a> {
+struct TableInfoParser<'a, R> {
     indexer: &'a Indexer,
-    annotator: &'a MoveValueAnnotator<'a, StorageAdapter<'a, DbStateView>>,
+    annotator: &'a MoveValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
-impl<'a> TableInfoParser<'a> {
-    pub fn new(
-        indexer: &'a Indexer,
-        annotator: &'a MoveValueAnnotator<StorageAdapter<DbStateView>>,
-    ) -> Self {
+impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
+    pub fn new(indexer: &'a Indexer, annotator: &'a MoveValueAnnotator<R>) -> Self {
         Self {
             indexer,
             annotator,

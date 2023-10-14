@@ -1,0 +1,107 @@
+error[E02001]: duplicate declaration, item, or annotation
+  ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:5:11
+  │
+4 │     struct C { }
+  │            - Alias previously defined here
+5 │     const C: u64 = 0;
+  │           ^ Duplicate module member or alias 'C'. Top level names in a namespace must be unique
+
+warning[W09001]: unused alias
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:12:15
+   │
+12 │     use 0x42::mod1;
+   │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
+
+error[E04001]: restricted visibility
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:19:2
+   │
+ 5 │     const C: u64 = 0;
+   │           - Constants are internal to their module, and cannot can be accessed outside of their module
+   ·
+19 │     C;
+   │     ^ Invalid access of '0x42::mod1::C'
+
+error[E04001]: restricted visibility
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:22:6
+   │
+ 5 │     const C: u64 = 0;
+   │           - Constants are internal to their module, and cannot can be accessed outside of their module
+   ·
+22 │         C
+   │         ^ Invalid access of '0x42::mod1::C'
+
+error[E04001]: restricted visibility
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:24:2
+   │
+ 5 │     const C: u64 = 0;
+   │           - Constants are internal to their module, and cannot can be accessed outside of their module
+   ·
+24 │     D
+   │     ^ Invalid access of '0x42::mod1::C'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:24:2
+   │
+ 5 │     const C: u64 = 0;
+   │              --- Given: 'u64'
+   ·
+17 │     fun f1(): 0x42::mod1::C {
+   │               ------------- Expected: '0x42::mod1::C'
+   ·
+24 │     D
+   │     ^ Invalid return expression
+
+warning[W09001]: unused alias
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:31:15
+   │
+31 │     use 0x42::mod1;
+   │               ^^^^ Unused 'use' of alias 'mod1'. Consider removing it
+
+error[E02010]: invalid name
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:32:26
+   │
+32 │     use 0x42::mod1::C as mod1;
+   │                          ^^^^ Invalid constant alias name 'mod1'. Constant alias names must start with 'A'..'Z'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:36:9
+   │
+36 │     fun f1(): 0x42::mod1::C {
+   │         ^^    ------------- Given: '0x42::mod1::C'
+   │         │      
+   │         Invalid 'script' function return type. The function entry point to a 'script' must have the return type '()'
+   │         Expected: '()'
+
+error[E04001]: restricted visibility
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:38:2
+   │
+ 5 │     const C: u64 = 0;
+   │           - Constants are internal to their module, and cannot can be accessed outside of their module
+   ·
+38 │     C;
+   │     ^ Invalid access of '0x42::mod1::C'
+
+error[E04007]: incompatible types
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:39:2
+   │  
+ 5 │       const C: u64 = 0;
+   │                --- Given: 'u64'
+   ·  
+36 │       fun f1(): 0x42::mod1::C {
+   │                 ------------- Expected: '0x42::mod1::C'
+   ·  
+39 │ ╭     {
+40 │ │         use 0x42::mod1::C;
+41 │ │         C
+42 │ │     }
+   │ ╰─────^ Invalid return expression
+
+error[E04001]: restricted visibility
+   ┌─ tests/move_check/deprecated/deprecated_constant_duplicated_struct.move:41:6
+   │
+ 5 │     const C: u64 = 0;
+   │           - Constants are internal to their module, and cannot can be accessed outside of their module
+   ·
+41 │         C
+   │         ^ Invalid access of '0x42::mod1::C'
+

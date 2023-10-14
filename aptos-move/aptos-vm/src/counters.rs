@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    exponential_buckets, register_histogram, register_int_counter, register_int_counter_vec,
-    register_int_gauge, Histogram, IntCounter, IntCounterVec, IntGauge,
+    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
+    register_int_counter_vec, register_int_gauge, Histogram, HistogramVec, IntCounter,
+    IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -134,6 +135,16 @@ pub static TXN_GAS_USAGE: Lazy<Histogram> = Lazy::new(|| {
         "aptos_vm_txn_gas_usage",
         "Gas used per transaction",
         TXN_GAS_USAGE_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
+pub static TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_vm_timer_seconds",
+        "Various timers for performance analysis.",
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap(),
     )
     .unwrap()
 });

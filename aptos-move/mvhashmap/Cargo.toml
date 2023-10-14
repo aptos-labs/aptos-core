@@ -20,11 +20,14 @@ aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
+claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
-claims = { workspace = true }
+aptos-aggregator = { workspace = true, features = ["testing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rayon = { workspace = true }
+test-case = { workspace = true }

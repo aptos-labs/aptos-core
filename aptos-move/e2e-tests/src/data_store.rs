@@ -35,10 +35,10 @@ pub static GENESIS_CHANGE_SET_TESTNET: Lazy<ChangeSet> =
 pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Mainnet));
 
-/// An in-memory implementation of `StateView` and `RemoteCache` for the VM.
+/// An in-memory implementation of `StateView` and `ExecutorView` for the VM.
 ///
 /// Tests use this to set up state, and pass in a reference to the cache whenever a `StateView` or
-/// `RemoteCache` is needed.
+/// `ExecutorView` is needed.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct FakeDataStore {
     state_data: HashMap<StateKey, StateValue>,

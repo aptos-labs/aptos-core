@@ -3,7 +3,7 @@
 
 use super::{types::Vote, NodeId};
 use crate::dag::{CertifiedNode, Node};
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
@@ -20,6 +20,26 @@ impl CommitEvent {
             parents,
             failed_authors,
         }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.node_id.epoch()
+    }
+
+    pub fn round(&self) -> Round {
+        self.node_id.round()
+    }
+
+    pub fn author(&self) -> &Author {
+        self.node_id.author()
+    }
+
+    pub fn parents(&self) -> Vec<Author> {
+        self.parents.clone()
+    }
+
+    pub fn failed_authors(&self) -> Vec<Author> {
+        self.failed_authors.clone()
     }
 }
 
@@ -41,12 +61,6 @@ pub trait DAGStorage: Send + Sync {
     fn get_certified_nodes(&self) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>>;
 
     fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()>;
-
-    fn save_ordered_anchor_id(&self, node_id: &NodeId) -> anyhow::Result<()>;
-
-    fn get_ordered_anchor_ids(&self) -> anyhow::Result<Vec<(NodeId, ())>>;
-
-    fn delete_ordered_anchor_ids(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()>;
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>>;
 

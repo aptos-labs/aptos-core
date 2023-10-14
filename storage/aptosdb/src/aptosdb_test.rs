@@ -14,7 +14,7 @@ use aptos_config::config::{
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -90,7 +90,7 @@ fn test_pruner_config() {
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
         let state_merkle_pruner = StateMerklePrunerManager::<StaleNodeIndexSchema>::new(
-            Arc::clone(&aptos_db.state_merkle_db),
+            Arc::clone(&aptos_db.state_merkle_db()),
             StateMerklePrunerConfig {
                 enable,
                 prune_window: 20,
@@ -218,7 +218,7 @@ pub fn test_state_merkle_pruning_impl(
     let mut snapshot_versions = vec![];
     for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
         test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-        db.save_transactions(
+        db.save_transactions_for_test(
             txns_to_commit,
             next_ver,                /* first_version */
             next_ver.checked_sub(1), /* base_state_version */

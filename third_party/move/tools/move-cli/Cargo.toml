@@ -41,10 +41,11 @@ move-disassembler = { path = "../move-disassembler" }
 move-docgen = { path = "../../move-prover/move-docgen" }
 move-errmapgen = { path = "../../move-prover/move-errmapgen" }
 move-ir-types = { path = "../../move-ir/types" }
+move-model = { path = "../../move-model" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
 move-resource-viewer = { path = "../move-resource-viewer" }
-move-stdlib = { path = "../../move-stdlib", features = ["testing"] }
+move-stdlib = { path = "../../move-stdlib" }
 move-symbol-pool = { path = "../../move-symbol-pool" }
 move-table-extension = { path = "../../extensions/move-table-extension", optional = true }
 move-unit-test = { path = "../move-unit-test" }

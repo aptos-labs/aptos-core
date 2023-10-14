@@ -5,22 +5,23 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
-use aptos_aggregator::resolver::AggregatorReadMode;
+use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
 #[cfg(feature = "testing")]
-use aptos_aggregator::{aggregator_extension::AggregatorID, resolver::AggregatorResolver};
-#[cfg(feature = "testing")]
-use aptos_framework::natives::cryptography::algebra::AlgebraContext;
-#[cfg(feature = "testing")]
-use aptos_framework::natives::event::NativeEventContext;
+use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
 use aptos_table_natives::{TableHandle, TableResolver};
 #[cfg(feature = "testing")]
-use aptos_types::chain_id::ChainId;
+use aptos_types::aggregator::AggregatorID;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{Features, TimedFeatures},
+    on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
+};
+#[cfg(feature = "testing")]
+use aptos_types::{
+    chain_id::ChainId,
+    state_store::{state_key::StateKey, state_value::StateValue},
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
@@ -40,19 +41,16 @@ use {
 struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
-impl AggregatorResolver for AptosBlankStorage {
-    fn resolve_aggregator_value(
-        &self,
-        _id: &AggregatorID,
-        _mode: AggregatorReadMode,
-    ) -> Result<u128, Error> {
-        // All Move tests have aggregator in Data state, and so the resolver should
-        // not be called.
-        unreachable!("Aggregator cannot be resolved for blank storage")
-    }
+impl TAggregatorView for AptosBlankStorage {
+    type IdentifierV1 = StateKey;
+    type IdentifierV2 = AggregatorID;
 
-    fn generate_aggregator_id(&self) -> AggregatorID {
-        unimplemented!("Aggregator id generation will be implemented for V2 aggregators.")
+    fn get_aggregator_v1_state_value(
+        &self,
+        _id: &Self::IdentifierV1,
+        _mode: AggregatorReadMode,
+    ) -> anyhow::Result<Option<StateValue>> {
+        Ok(None)
     }
 }
 
@@ -110,7 +108,7 @@ pub fn assert_no_test_natives(err_msg: &str) {
             LATEST_GAS_FEATURE_VERSION,
             NativeGasParameters::zeros(),
             MiscGasParameters::zeros(),
-            TimedFeatures::enable_all(),
+            TimedFeaturesBuilder::enable_all().build(),
             Features::default()
         )
         .into_iter()

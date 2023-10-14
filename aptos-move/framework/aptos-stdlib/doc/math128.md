@@ -40,18 +40,9 @@ Standard math utilities missing in the Move Language.
 ## Constants
 
 
-<a name="0x1_math128_EDIVISION_BY_ZERO"></a>
-
-
-
-<pre><code><b>const</b> <a href="math128.md#0x1_math128_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>: u64 = 2;
-</code></pre>
-
-
-
 <a name="0x1_math128_EINVALID_ARG_FLOOR_LOG2"></a>
 
-Abort value when an invalid argument is provided.
+Cannot log2 the value 0
 
 
 <pre><code><b>const</b> <a href="math128.md#0x1_math128_EINVALID_ARG_FLOOR_LOG2">EINVALID_ARG_FLOOR_LOG2</a>: u64 = 1;
@@ -142,7 +133,7 @@ Return the average of two.
 
 ## Function `mul_div`
 
-Returns a * b / c going through u128 to prevent intermediate overflow
+Returns a * b / c going through u256 to prevent intermediate overflow
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_mul_div">mul_div</a>(a: u128, b: u128, c: u128): u128
@@ -155,6 +146,8 @@ Returns a * b / c going through u128 to prevent intermediate overflow
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="math128.md#0x1_math128_mul_div">mul_div</a>(a: u128, b: u128, c: u128): u128 {
+    // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
+    <b>assert</b>!(c != 0, std::error::invalid_argument(4));
     (((a <b>as</b> u256) * (b <b>as</b> u256) / (c <b>as</b> u256)) <b>as</b> u128)
 }
 </code></pre>
@@ -404,7 +397,8 @@ Returns square root of x, precisely floor(sqrt(x))
     // <a href="math128.md#0x1_math128_ceil_div">ceil_div</a>(x, y) = floor((x + y - 1) / y) = floor((x - 1) / y) + 1
     // (x + y - 1) could spuriously overflow. so we <b>use</b> the later version
     <b>if</b> (x == 0) {
-        <b>assert</b>!(y != 0, <a href="math128.md#0x1_math128_EDIVISION_BY_ZERO">EDIVISION_BY_ZERO</a>);
+        // Inline functions cannot take constants, <b>as</b> then every <b>module</b> using it needs the constant
+        <b>assert</b>!(y != 0, std::error::invalid_argument(4));
         0
     }
     <b>else</b> (x - 1) / y + 1

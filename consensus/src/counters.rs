@@ -2,6 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
+    quorum_store,
+};
+use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_counter,
     register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
@@ -9,7 +14,10 @@ use aptos_metrics_core::{
     Counter, Gauge, GaugeVec, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
     IntGaugeVec,
 };
+use aptos_types::transaction::TransactionStatus;
+use move_core_types::vm_status::DiscardedVMStatus;
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 
 /// Transaction commit was successful
 pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
@@ -806,3 +814,47 @@ pub static BUFFER_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(
     )
     .unwrap()
 });
+
+/// Update various counters for committed blocks
+pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
+    for block in blocks_to_commit {
+        observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
+        let txn_status = block.compute_result().compute_status();
+        NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
+        COMMITTED_BLOCKS_COUNT.inc();
+        LAST_COMMITTED_ROUND.set(block.round() as i64);
+        LAST_COMMITTED_VERSION.set(block.compute_result().num_leaves() as i64);
+
+        let failed_rounds = block
+            .block()
+            .block_data()
+            .failed_authors()
+            .map(|v| v.len())
+            .unwrap_or(0);
+        if failed_rounds > 0 {
+            COMMITTED_FAILED_ROUNDS_COUNT.inc_by(failed_rounds as u64);
+        }
+
+        // Quorum store metrics
+        quorum_store::counters::NUM_BATCH_PER_BLOCK.observe(block.block().payload_size() as f64);
+
+        for status in txn_status.iter() {
+            let commit_status = match status {
+                TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
+                TransactionStatus::Discard(reason) => {
+                    if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
+                        TXN_COMMIT_RETRY_LABEL
+                    } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
+                        TXN_COMMIT_FAILED_DUPLICATE_LABEL
+                    } else {
+                        TXN_COMMIT_FAILED_LABEL
+                    }
+                },
+                TransactionStatus::Retry => TXN_COMMIT_RETRY_LABEL,
+            };
+            COMMITTED_TXNS_COUNT
+                .with_label_values(&[commit_status])
+                .inc();
+        }
+    }
+}

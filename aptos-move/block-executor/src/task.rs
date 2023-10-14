@@ -4,35 +4,25 @@
 
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::TStateView;
 use aptos_types::{
-    contract_event::ReadWriteEvent,
-    executable::ModulePath,
-    fee_statement::FeeStatement,
-    write_set::{TransactionWrite, WriteOp},
+    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
-use bytes::Bytes;
-use std::{collections::HashMap, fmt::Debug, hash::Hash};
+use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
+use move_core_types::value::MoveTypeLayout;
+use std::{collections::HashMap, fmt::Debug};
 
 /// The execution result of a transaction
 #[derive(Debug)]
-pub enum ExecutionStatus<T, E> {
+pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully.
-    Success(T),
+    Success(O),
     /// Transaction hit a none recoverable error during execution, halt the execution and propagate
     /// the error back to the caller.
     Abort(E),
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
-    SkipRest(T),
-}
-
-/// Trait that defines a transaction type that can be executed by the block executor. A transaction
-/// transaction will write to a key value storage as their side effect.
-pub trait Transaction: Sync + Send + Clone + 'static {
-    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
-    type Value: Send + Sync + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
+    SkipRest(O),
 }
 
 /// Inference result of a transaction.
@@ -63,20 +53,20 @@ pub trait ExecutorTask: Sync {
     /// Execute a single transaction given the view of the current state.
     fn execute_transaction(
         &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        view: &(impl TExecutorView<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Tag,
+            MoveTypeLayout,
+            <Self::Txn as Transaction>::Identifier,
+        > + TResourceGroupView<
+            GroupKey = <Self::Txn as Transaction>::Key,
+            ResourceTag = <Self::Txn as Transaction>::Tag,
+            Layout = MoveTypeLayout,
+        >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
-
-    /// Trait that allows converting blobs to proper values.
-    fn convert_to_value(
-        &self,
-        view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
-        key: &<Self::Txn as Transaction>::Key,
-        maybe_blob: Option<Bytes>,
-        creation: bool,
-    ) -> anyhow::Result<<Self::Txn as Transaction>::Value>;
 }
 
 /// Trait for execution result of a single transaction.

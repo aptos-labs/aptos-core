@@ -23,10 +23,6 @@ on:
   pull_request:
     paths:
       - ".github/workflows/forge-state-sync.yaml"
-      - "testsuite/find_latest_image.py"
-  push:
-    branches:
-      - aptos-release-v* # The aptos release branches
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}

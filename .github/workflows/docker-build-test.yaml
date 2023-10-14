@@ -84,7 +84,8 @@ jobs:
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') ||
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
       github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e')
+      contains(github.event.pull_request.body, '#e2e') ||
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -130,22 +131,6 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       PROFILE: release
-      BUILD_ADDL_TESTING_IMAGES: true
-      TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
-
-  rust-images-indexer:
-    needs: [permission-check, determine-docker-build-metadata]
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
-    if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.pull_request.labels.*.name, 'CICD:build-indexer-images')
-    secrets: inherit
-    with:
-      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
-      TARGET_CACHE_ID: ${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
-      PROFILE: release
-      FEATURES: indexer
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
 
@@ -229,6 +214,22 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
 
+  faucet-tests-main:
+    needs: [permission-check, rust-images, determine-docker-build-metadata, file_change_determinator] # runs with the default release docker build variant "rust-images"
+    if: |
+      (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null) ||
+        contains(github.event.pull_request.body, '#e2e'
+      )
+    uses: ./.github/workflows/faucet-tests-main.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
+      SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}
+
   indexer-grpc-e2e-tests:
     needs: [permission-check, rust-images, determine-docker-build-metadata] # runs with the default release docker build variant "rust-images"
     if: |
@@ -246,7 +247,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -279,7 +279,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -309,7 +308,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -338,7 +336,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test
@@ -361,7 +358,6 @@ jobs:
       - permission-check
       - determine-docker-build-metadata
       - rust-images
-      - rust-images-indexer
       - rust-images-failpoints
       - rust-images-performance
       - rust-images-consensus-only-perf-test

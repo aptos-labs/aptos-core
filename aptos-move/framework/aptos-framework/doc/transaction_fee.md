@@ -152,7 +152,23 @@ collected when executing the block.
 
 ## Struct `FeeStatement`
 
-Summary of the fees charged and refunds issued for a transaction.
+Breakdown of fee charge and refund for a transaction.
+The structure is:
+
+- Net charge or refund (not in the statement)
+- total charge: total_charge_gas_units, matches <code>gas_used</code> in the on-chain <code>TransactionInfo</code>.
+This is the sum of the sub-items below. Notice that there's potential precision loss when
+the conversion between internal and external gas units and between native token and gas
+units, so it's possible that the numbers don't add up exactly. -- This number is the final
+charge, while the break down is merely informational.
+- gas charge for execution (CPU time): <code>execution_gas_units</code>
+- gas charge for IO (storage random access): <code>io_gas_units</code>
+- storage fee charge (storage space): <code>storage_fee_octas</code>, to be included in
+<code>total_charge_gas_unit</code>, this number is converted to gas units according to the user
+specified <code>gas_unit_price</code> on the transaction.
+- storage deletion refund: <code>storage_fee_refund_octas</code>, this is not included in <code>gas_used</code> or
+<code>total_charge_gas_units</code>, the net charge / refund is calculated by
+<code>total_charge_gas_units</code> * <code>gas_unit_price</code> - <code>storage_fee_refund_octas</code>.
 
 This is meant to emitted as a module event.
 

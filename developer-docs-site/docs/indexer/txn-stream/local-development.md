@@ -31,6 +31,7 @@ In order to use the local development script you must have the following install
 docker-compose version --short
 ```
 - grpcurl: [Installation Guide](https://github.com/fullstorydev/grpcurl#installation)
+- OpenSSL
 
 ## Preparation
 Clone the aptos-core repo:
@@ -108,3 +109,11 @@ Try setting the following environment variable before running the script:
 ```bash
 export REDIS_IMAGE_REPO=arm64v8/redis
 ```
+
+### Cache worker is crashlooping or `Redis latest version update failed.` in log
+Wipe the data:
+```bash
+poetry run python indexer_grpc_local.py wipe
+```
+
+This means historical data will be lost.

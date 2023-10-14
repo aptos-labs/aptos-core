@@ -7,7 +7,7 @@
 
 use crate::state_store::{
     state_key::StateKey,
-    state_value::{StateValue, StateValueMetadata},
+    state_value::{StateValue, StateValueMetadata, StateValueMetadataKind},
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -168,14 +168,52 @@ impl WriteOp {
 }
 
 pub trait TransactionWrite {
-    fn extract_raw_bytes(&self) -> Option<Bytes>;
+    fn bytes(&self) -> Option<&Bytes>;
 
+    // Returns state value that would be observed by a read following the 'self' write.
     fn as_state_value(&self) -> Option<StateValue>;
+
+    // Returns metadata that would be observed by a read following the 'self' write.
+    // Provided as a separate method to avoid the clone in as_state_value method
+    // (although default implementation below does just that).
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
+        self.as_state_value()
+            .map(|state_value| state_value.into_metadata())
+    }
+
+    // Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
+    // to emulate reading from storage after W has been applied. However, in some contexts,
+    // it is also helpful to convert a StateValue to a potential instance of W that would
+    // have the desired effect. This allows e.g. to store certain sentinel elements of
+    // type W in data-structures (happens in MVHashMap). If there are several instances of
+    // W that correspond to maybe_state_value, an arbitrary one may be provided.
+    fn from_state_value(maybe_state_value: Option<StateValue>) -> Self;
+
+    fn extract_raw_bytes(&self) -> Option<Bytes> {
+        self.bytes().cloned()
+    }
+
+    fn bytes_len(&self) -> usize {
+        self.bytes().map(|bytes| bytes.len()).unwrap_or(0)
+    }
+
+    fn as_u128(&self) -> anyhow::Result<Option<u128>> {
+        match self.bytes() {
+            Some(bytes) => Ok(Some(bcs::from_bytes(bytes)?)),
+            None => Ok(None),
+        }
+    }
+
+    fn is_deletion(&self) -> bool {
+        self.bytes().is_none()
+    }
+
+    fn set_bytes(&mut self, bytes: Bytes);
 }
 
 impl TransactionWrite for WriteOp {
-    fn extract_raw_bytes(&self) -> Option<Bytes> {
-        self.bytes().cloned()
+    fn bytes(&self) -> Option<&Bytes> {
+        self.bytes()
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
@@ -183,6 +221,33 @@ impl TransactionWrite for WriteOp {
             None => StateValue::new_legacy(bytes.clone()),
             Some(metadata) => StateValue::new_with_metadata(bytes.clone(), metadata.clone()),
         })
+    }
+
+    // Note that even if WriteOp is DeletionWithMetadata, the method returns None, as a later
+    // read would not read the metadata of the deletion op.
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
+        self.bytes().map(|_| self.metadata().cloned())
+    }
+
+    fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {
+        match maybe_state_value.map(|state_value| state_value.into()) {
+            None => WriteOp::Deletion,
+            Some((None, bytes)) => WriteOp::Creation(bytes),
+            Some((Some(metadata), bytes)) => WriteOp::CreationWithMetadata {
+                data: bytes,
+                metadata,
+            },
+        }
+    }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        use WriteOp::*;
+
+        match self {
+            Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
+            Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
+            Deletion | DeletionWithMetadata { .. } => (),
+        }
     }
 }
 

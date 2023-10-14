@@ -6,6 +6,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
+use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
@@ -135,9 +136,14 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
 /// Spawns a new thread for the node inspection service
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,
+    aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) {
-    aptos_inspection_service::start_inspection_service(node_config.clone(), peers_and_metadata)
+    aptos_inspection_service::start_inspection_service(
+        node_config.clone(),
+        aptos_data_client,
+        peers_and_metadata,
+    )
 }
 
 /// Starts the peer monitoring service and returns the runtime

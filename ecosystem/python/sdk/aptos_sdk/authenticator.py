@@ -6,7 +6,7 @@ from __future__ import annotations
 import typing
 from typing import List
 
-from . import ed25519
+from . import asymmetric_crypto, ed25519
 from .account_address import AccountAddress
 from .bcs import Deserializer, Serializer
 
@@ -15,9 +15,8 @@ class Authenticator:
     """
     Each transaction submitted to the Aptos blockchain contains a `TransactionAuthenticator`.
     During transaction execution, the executor will check if every `AccountAuthenticator`'s
-    signature on the transaction hash is well-formed and whether the sha3 hash of the
-    `AccountAuthenticator`'s `AuthenticationKeyPreimage` matches the `AuthenticationKey` stored
-    under the participating signer's account address.
+    signature on the transaction hash is well-formed and whether `AccountAuthenticator`'s  matches
+    the `AuthenticationKey` stored under the participating signer's account address.
     """
 
     ED25519: int = 0
@@ -37,6 +36,14 @@ class Authenticator:
         else:
             raise Exception("Invalid type")
         self.authenticator = authenticator
+
+    def from_key(key: asymmetric_crypto.PublicKey) -> int:
+        if isinstance(key, ed25519.PublicKey):
+            return Authenticator.ED25519
+        elif isinstance(key, ed25519.MultiPublicKey):
+            return Authenticator.MULTI_ED25519
+        else:
+            raise NotImplementedError()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Authenticator):

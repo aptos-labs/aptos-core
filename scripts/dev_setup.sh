@@ -296,6 +296,50 @@ function install_awscli {
   fi
 }
 
+function install_s5cmd {
+  if command -v s5cmd &> /dev/null; then
+    echo "s5cmd exists, remove before reinstalling."
+    return
+  fi
+
+  if [[ $(uname -s) == "Darwin" ]]; then
+    install_pkg peak/tap/s5cmd brew
+    return
+  fi
+
+  if [[ $(uname -s) == "Linux" ]]; then
+    MACHINE=$(uname -m | tr '[:upper:]' '[:lower]');
+    SUFFIX=""
+    if [[ "$MACHINE" == "x86_64" ]]; then
+      SUFFIX="64bit"
+    elif [[ "$MACHINE" == "i386" ]] || [[ "$MACHINE" == "i686" ]]; then
+      SUFFIX="32bit"
+    elif \
+         [[ "$MACHINE" == "aarch64_be" ]] || \
+         [[ "$MACHINE" == "aarch64" ]] || \
+         [[ "$MACHINE" == "armv8b" ]] || \
+         [[ "$MACHINE" == "armv8l" ]] \
+         ; then
+      SUFFIX="arm64"
+    elif [[ "$MACHINE" == "arm" ]]; then
+      SUFFIX="armv6"
+    fi
+
+    if [[ $SUFFIX != "" ]]; then
+      TMPFILE=$(mktemp)
+      rm "$TMPFILE"
+      mkdir -p "$TMPFILE"/work/
+      curl -sL -o "$TMPFILE"/s5cmd.tar.gz https://github.com/peak/s5cmd/releases/download/v2.2.2/s5cmd_2.2.2_Linux-$SUFFIX.tar.gz
+      tar -C "$TMPFILE"/work -xzvf "$TMPFILE"/s5cmd.tar.gz
+      mv "$TMPFILE"/work/s5cmd "${INSTALL_DIR}"/
+      "${INSTALL_DIR}"s5cmd version
+      return
+    fi
+  fi
+
+  echo No good way to install s5cmd 'install_s5cmd '"$PACKAGE_MANAGER"
+}
+
 function install_pkg {
   package=$1
   PACKAGE_MANAGER=$2
@@ -713,6 +757,7 @@ Operation tools (since -o was provided):
   * kubectl
   * helm
   * aws cli
+  * s5cmd
   * allure
 EOF
   fi
@@ -863,7 +908,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    INSTALL_BUILD_TOOLS="true"
 fi
 
-if [ ! -f rust-toolchain ]; then
+if [ ! -f rust-toolchain.toml ]; then
 	echo "Unknown location. Please run this from the aptos-core repository. Abort."
 	exit 1
 fi
@@ -947,7 +992,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_lld
 
   install_rustup "$BATCH_MODE"
-  install_toolchain "$(cat ./rust-toolchain)"
+  install_toolchain "$(grep channel ./rust-toolchain.toml | grep -o '"[^"]\+"' | sed 's/"//g')" # TODO: Fix me. This feels hacky.
   install_rustup_components_and_nightly
 
   install_cargo_sort
@@ -984,6 +1029,7 @@ if [[ "$OPERATIONS" == "true" ]]; then
   install_terraform
   install_kubectl
   install_awscli "$PACKAGE_MANAGER"
+  install_s5cmd "$PACKAGE_MANAGER"
   install_allure
 fi
 

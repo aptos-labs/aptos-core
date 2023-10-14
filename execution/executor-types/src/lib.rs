@@ -6,7 +6,7 @@
 use crate::state_checkpoint_output::StateCheckpointOutput;
 use anyhow::Result;
 use aptos_crypto::{
-    hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
+    hash::{TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
@@ -15,7 +15,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    proof::{accumulator::InMemoryAccumulator, AccumulatorExtensionProof, SparseMerkleProofExt},
+    proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         Transaction, TransactionInfo, TransactionListWithProof, TransactionOutputListWithProof,
@@ -43,13 +43,53 @@ mod executed_chunk;
 pub mod execution_output;
 pub mod in_memory_state_calculator;
 mod ledger_update_output;
-mod parsed_transaction_output;
+pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
 
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
     /// are valid, executes them and returns the executed result for commit.
+    ///
+    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
+    ///       and pipe them up.
     fn execute_chunk(
+        &self,
+        txn_list_with_proof: TransactionListWithProof,
+        // Target LI that has been verified independently: the proofs are relative to this version.
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.enqueue_chunk_by_execution(txn_list_with_proof, verified_target_li, epoch_change_li)?;
+
+        self.update_ledger()
+    }
+
+    /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
+    /// outputs directly to get the executed result.
+    ///
+    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
+    ///       and pipe them up.
+    fn apply_chunk(
+        &self,
+        txn_output_list_with_proof: TransactionOutputListWithProof,
+        // Target LI that has been verified independently: the proofs are relative to this version.
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.enqueue_chunk_by_transaction_outputs(
+            txn_output_list_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        )?;
+
+        self.update_ledger()
+    }
+
+    /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
+    /// are valid, executes them and make state checkpoint, so that a later chunk of transaction can
+    /// be applied on top of it. This stage calculates the state checkpoint, but not the top level
+    /// transaction accumulator.
+    fn enqueue_chunk_by_execution(
         &self,
         txn_list_with_proof: TransactionListWithProof,
         // Target LI that has been verified independently: the proofs are relative to this version.
@@ -57,15 +97,18 @@ pub trait ChunkExecutorTrait: Send + Sync {
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()>;
 
-    /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
-    /// outputs directly to get the executed result.
-    fn apply_chunk(
+    /// Similar to `enqueue_chunk_by_execution`, but instead of executing transactions, apply the
+    /// transaction outputs directly to get the executed result.
+    fn enqueue_chunk_by_transaction_outputs(
         &self,
         txn_output_list_with_proof: TransactionOutputListWithProof,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()>;
+
+    /// As a separate stage, calculate the transaction accumulator changes, prepare for db commission.
+    fn update_ledger(&self) -> Result<()>;
 
     /// Commit a previously executed chunk. Returns a chunk commit notification.
     fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
@@ -233,7 +276,7 @@ pub trait TransactionReplayer: Send {
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 
-    fn commit(&self) -> Result<Arc<ExecutedChunk>>;
+    fn commit(&self) -> Result<ExecutedChunk>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.
@@ -406,96 +449,5 @@ impl ProofReader {
 impl ProofRead for ProofReader {
     fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.get(&key)
-    }
-}
-
-/// The entire set of data associated with a transaction. In addition to the output generated by VM
-/// which includes the write set and events, this also has the in-memory trees.
-#[derive(Clone, Debug)]
-pub struct TransactionData {
-    /// Each entry in this map represents the new value of a store store object touched by this
-    /// transaction.
-    state_updates: HashMap<StateKey, Option<StateValue>>,
-
-    /// The writeset generated from this transaction.
-    write_set: WriteSet,
-
-    /// The list of events emitted during this transaction.
-    events: Vec<ContractEvent>,
-
-    /// List of reconfiguration events emitted during this transaction.
-    reconfig_events: Vec<ContractEvent>,
-
-    /// The execution status set by the VM.
-    status: TransactionStatus,
-
-    /// The in-memory Merkle Accumulator that has all events emitted by this transaction.
-    event_tree: Arc<InMemoryAccumulator<EventAccumulatorHasher>>,
-
-    /// The amount of gas used.
-    gas_used: u64,
-
-    /// TransactionInfo
-    txn_info: TransactionInfo,
-
-    /// TransactionInfo.hash()
-    txn_info_hash: HashValue,
-}
-
-impl TransactionData {
-    pub fn new(
-        state_updates: HashMap<StateKey, Option<StateValue>>,
-        write_set: WriteSet,
-        events: Vec<ContractEvent>,
-        reconfig_events: Vec<ContractEvent>,
-        status: TransactionStatus,
-        event_tree: Arc<InMemoryAccumulator<EventAccumulatorHasher>>,
-        gas_used: u64,
-        txn_info: TransactionInfo,
-        txn_info_hash: HashValue,
-    ) -> Self {
-        TransactionData {
-            state_updates,
-            write_set,
-            events,
-            reconfig_events,
-            status,
-            event_tree,
-            gas_used,
-            txn_info,
-            txn_info_hash,
-        }
-    }
-
-    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
-        &self.state_updates
-    }
-
-    pub fn write_set(&self) -> &WriteSet {
-        &self.write_set
-    }
-
-    pub fn events(&self) -> &[ContractEvent] {
-        &self.events
-    }
-
-    pub fn status(&self) -> &TransactionStatus {
-        &self.status
-    }
-
-    pub fn event_root_hash(&self) -> HashValue {
-        self.event_tree.root_hash()
-    }
-
-    pub fn gas_used(&self) -> u64 {
-        self.gas_used
-    }
-
-    pub fn txn_info_hash(&self) -> HashValue {
-        self.txn_info_hash
-    }
-
-    pub fn is_reconfig(&self) -> bool {
-        !self.reconfig_events.is_empty()
     }
 }

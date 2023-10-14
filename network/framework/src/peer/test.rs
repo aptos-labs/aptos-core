@@ -628,7 +628,7 @@ fn peer_send_rpc() {
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
         }
-        assert!(matches!(server_stream.next().await, None));
+        assert!(server_stream.next().await.is_none());
     };
     rt.block_on(future::join3(peer.start(), server, client));
 }
@@ -697,7 +697,7 @@ fn peer_send_rpc_concurrent() {
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
         }
-        assert!(matches!(server_stream.next().await, None));
+        assert!(server_stream.next().await.is_none());
     };
     rt.block_on(future::join3(peer.start(), server, client));
 }
