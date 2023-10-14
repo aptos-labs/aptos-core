@@ -658,9 +658,11 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
+        AptosVM::set_num_shards_once(1);
         AptosVM::set_concurrency_level_once(4);
-        AptosVM::set_processed_transactions_detailed_counters();
-        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::TokenV2AmbassadorMint), true);
+        NativeExecutor::set_concurrency_level_once(4);
+
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::ModifyGlobalFlagAggV2), true);
     }
 
     #[test]

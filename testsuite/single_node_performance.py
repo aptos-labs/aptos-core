@@ -26,6 +26,8 @@ class Flow(Flag):
     PREVIEWNET = auto()
     # Tests used for previewnet evaluation
     PREVIEWNET_LARGE_DB = auto()
+    # Tests for Agg V2 performance
+    AGG_V2 = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -110,6 +112,13 @@ TESTS = [
     RunGroupConfig(expected_tps=12, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
+
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
 
     RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),

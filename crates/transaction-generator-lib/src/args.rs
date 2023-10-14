@@ -25,6 +25,9 @@ pub enum TransactionTypeArg {
     AccountResource1KB,
     AccountResource10KB,
     ModifyGlobalResource,
+    ModifyGlobalResourceAggV2,
+    ModifyGlobalFlagAggV2,
+    ModifyGlobalBoundedAggV2,
     Loop100k,
     Loop10kArithmetic,
     Loop1kBcs1k,
@@ -117,6 +120,22 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::ModifyGlobalResource => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::StepDst,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalResourceAggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::StepDstAggV2,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalFlagAggV2 => TransactionType::CallCustomModules {
+                // 100 is max, so equivalent to flag
+                entry_point: EntryPoints::ModifyBoundedAggV2 { step: 100 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::ModifyGlobalBoundedAggV2 => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::ModifyBoundedAggV2 { step : 10 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
