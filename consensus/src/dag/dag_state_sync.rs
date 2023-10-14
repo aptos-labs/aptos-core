@@ -133,7 +133,7 @@ impl StateSyncTrigger {
 
         // fetch can't work since nodes are garbage collected
         dag_reader.is_empty()
-            || dag_reader.highest_round() + 1 + DAG_WINDOW < li.commit_info().round()
+            || dag_reader.highest_round() + 1 + self.dag_window_size_config < li.commit_info().round()
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round()
@@ -202,7 +202,7 @@ impl DagStateSynchronizer {
             self.epoch_state.clone(),
             self.storage.clone(),
             start_round,
-            DAG_WINDOW,
+            self.dag_window_size_config,
         )));
         let bitmask = { sync_dag_store.read().bitmask(target_round) };
         let request = RemoteFetchRequest::new(

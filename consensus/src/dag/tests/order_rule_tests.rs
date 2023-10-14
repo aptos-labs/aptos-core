@@ -225,7 +225,7 @@ fn test_order_rule_basic() {
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         0,
-        1,
+        TEST_DAG_WINDOW,
     );
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {

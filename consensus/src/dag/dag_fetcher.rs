@@ -10,7 +10,7 @@ use crate::dag::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_config::config::DagFetcherConfig;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_time_service::TimeService;

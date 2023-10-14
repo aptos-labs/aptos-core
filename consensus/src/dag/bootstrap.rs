@@ -37,7 +37,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, on_chain_config::DagConsensusConfigV1,
+    block_info::BlockInfo, epoch_state::EpochState, on_chain_config::DagConsensusConfigV1,
     validator_signer::ValidatorSigner,
 };
 use futures_channel::{
@@ -261,7 +261,7 @@ impl DagBootstrapper {
                 ledger_info_provider.clone(),
                 parent_block_info,
                 ordered_nodes_tx.clone(),
-                self.onchain_config.dag_ordering_causal_history_window,
+                self.onchain_config.dag_ordering_causal_history_window as u64,
             );
 
             let state_sync_trigger = StateSyncTrigger::new(
@@ -395,7 +395,7 @@ pub(super) fn bootstrap_dag_for_test(
         ordered_nodes_tx,
         bootstraper
             .onchain_config
-            .dag_ordering_causal_history_window,
+            .dag_ordering_causal_history_window as u64,
     );
 
     let state_sync_trigger = StateSyncTrigger::new(
