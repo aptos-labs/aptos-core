@@ -94,11 +94,11 @@ pub trait Transport {
     /// connection, hence further connection setup proceeds asynchronously.
     /// Once a `Inbound` future resolves it yields the [`Output`](Transport::Output)
     /// of the connection setup process.
-    type Inbound: Future<Output = Result<Self::Output, Self::Error>> + Send;
+    type Inbound: Future<Output = Result<MultiSocket<Self::Output>, Self::Error>> + Send;
 
     /// A pending [`Output`](Transport::Output) for an outbound connection,
     /// obtained from [dialing](Transport::dial) stream.
-    type Outbound: Future<Output = Result<Self::Output, Self::Error>> + Send;
+    type Outbound: Future<Output = Result<MultiSocket<Self::Output>, Self::Error>> + Send;
 
     /// Listens on the given [`NetworkAddress`], returning a stream of incoming connections.
     ///

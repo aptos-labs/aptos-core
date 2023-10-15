@@ -74,6 +74,7 @@ use futures::{
     sink::SinkExt,
     stream::{FuturesUnordered, StreamExt},
 };
+use rand::prelude::SliceRandom;
 use serde::Serialize;
 use std::{cmp::PartialEq, collections::HashMap, fmt::Debug, time::Duration};
 
@@ -326,7 +327,7 @@ impl InboundRpcs {
     /// the outbound write queue.
     pub async fn send_outbound_response(
         &mut self,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_requests_senders: &mut Vec<aptos_channels::Sender<NetworkMessage>>,
         maybe_response: Result<(RpcResponse, ProtocolId), RpcError>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
@@ -354,6 +355,12 @@ impl InboundRpcs {
             response.request_id,
         );
         let message = NetworkMessage::RpcResponse(response);
+
+        // Choose a random channel to send the response message along.
+        // This should distribute errors across all the sockets.
+        let write_reqs_tx = write_requests_senders
+            .choose_mut(&mut rand::thread_rng())
+            .unwrap();
         write_reqs_tx.send(message).await?;
 
         // Update the outbound RPC response metrics

@@ -48,7 +48,8 @@ use futures::{
     stream::StreamExt,
     SinkExt,
 };
-use futures_util::stream::select;
+use futures_util::stream::{select, select_all};
+use rand::prelude::SliceRandom;
 use serde::Serialize;
 use std::{fmt, panic, time::Duration};
 use tokio::runtime::Handle;
@@ -208,29 +209,56 @@ where
             remote_peer_id.short_str()
         );
 
-        // Split the connection into a ReadHalf and a WriteHalf.
-        // TODO: fix this!
-        let mut connection = self.connection.take().unwrap();
-        let socket = connection.remove(0);
-        let (read_socket, write_socket) = tokio::io::split(socket.compat());
+        // Get all the sockets and split them into read and write halves
+        let mut connections = self.connection.take().unwrap();
+        if connections.is_empty() {
+            panic!("Peer must have at least one socket");
+        }
+        let mut read_sockets = Vec::new();
+        let mut write_sockets = Vec::new();
+        for socket in connections.drain(..) {
+            let (read_socket, write_socket) = tokio::io::split(socket.compat());
+            read_sockets.push(read_socket);
+            write_sockets.push(write_socket);
+        }
 
-        let mut reader =
-            MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse();
-        let writer = MultiplexMessageSink::new(write_socket.compat_write(), self.max_frame_size);
+        // Create read streams for all sockets
+        let mut read_streams = Vec::new();
+        for read_socket in read_sockets.drain(..) {
+            read_streams.push(
+                MultiplexMessageStream::new(read_socket.compat(), self.max_frame_size).fuse(),
+            );
+        }
+        let mut readers = select_all(read_streams).fuse();
 
-        // Start writer "process" as a separate task. We receive two handles to
+        // Create write sinks for all sockets
+        let mut write_sinks = Vec::new();
+        for write_socket in write_sockets.drain(..) {
+            write_sinks.push(MultiplexMessageSink::new(
+                write_socket.compat_write(),
+                self.max_frame_size,
+            ));
+        }
+
+        // Start writer "processes" as separate tasks. We receive two handles to
         // communicate with the task:
         //   1. `write_reqs_tx`: Queue of pending NetworkMessages to write.
         //   2. `close_tx`: Handle to close the task and underlying connection.
-        let (mut write_reqs_tx, writer_close_tx) = Self::start_writer_task(
-            &self.executor,
-            self.time_service.clone(),
-            self.connection_metadata.clone(),
-            self.network_context,
-            writer,
-            self.max_frame_size,
-            self.max_message_size,
-        );
+        let mut write_requests_senders = Vec::new();
+        let mut write_close_senders = Vec::new();
+        for write_sink in write_sinks.drain(..) {
+            let (write_reqs_tx, write_close_tx) = Self::start_writer_task(
+                &self.executor,
+                self.time_service.clone(),
+                self.connection_metadata.clone(),
+                self.network_context,
+                write_sink,
+                self.max_frame_size,
+                self.max_message_size,
+            );
+            write_requests_senders.push(write_reqs_tx);
+            write_close_senders.push(write_close_tx);
+        }
 
         // Start main Peer event loop.
         let reason = loop {
@@ -242,7 +270,7 @@ where
                 // Handle a new outbound request from the PeerManager.
                 maybe_request = self.peer_reqs_rx.next() => {
                     match maybe_request {
-                        Some(request) => self.handle_outbound_request(request, &mut write_reqs_tx).await,
+                        Some(request) => self.handle_outbound_request(request, &mut write_requests_senders).await,
                         // The PeerManager is requesting this connection to close
                         // by dropping the corresponding peer_reqs_tx handle.
                         None => self.shutdown(DisconnectReason::Requested),
@@ -250,10 +278,10 @@ where
                 },
                 // Handle a new inbound MultiplexMessage that we've just read off
                 // the wire from the remote peer.
-                maybe_message = reader.next() => {
+                maybe_message = readers.next() => {
                     match maybe_message {
                         Some(message) =>  {
-                            if let Err(err) = self.handle_inbound_message(message, &mut write_reqs_tx).await {
+                            if let Err(err) = self.handle_inbound_message(message, &mut write_requests_senders).await {
                                 warn!(
                                     NetworkSchema::new(&self.network_context)
                                         .connection_metadata(&self.connection_metadata),
@@ -272,7 +300,7 @@ where
                 // Drive the queue of pending inbound rpcs. When one is fulfilled
                 // by an upstream protocol, send the response to the remote peer.
                 maybe_response = self.inbound_rpcs.next_completed_response() => {
-                    if let Err(err) = self.inbound_rpcs.send_outbound_response(&mut write_reqs_tx, maybe_response).await {
+                    if let Err(err) = self.inbound_rpcs.send_outbound_response(&mut write_requests_senders, maybe_response).await {
                         warn!(
                             NetworkSchema::new(&self.network_context).connection_metadata(&self.connection_metadata),
                             error = %err,
@@ -290,7 +318,7 @@ where
 
         // Finish shutting down the connection. Close the writer task and notify
         // PeerManager that this connection has shutdown.
-        self.do_shutdown(writer_close_tx, reason).await;
+        self.do_shutdown(write_close_senders, reason).await;
     }
 
     // Start a new task on the given executor which is responsible for writing outbound messages on
@@ -468,7 +496,7 @@ where
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_requests_senders: &mut Vec<aptos_channels::Sender<NetworkMessage>>,
     ) -> Result<(), PeerManagerError> {
         trace!(
             NetworkSchema::new(&self.network_context)
@@ -489,6 +517,12 @@ where
                     let protocol_id = frame_prefix.as_ref().get(1).unwrap_or(&0);
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);
+
+                    // Choose a random channel to send the error message along.
+                    // This should distribute errors across all the sockets.
+                    let write_reqs_tx = write_requests_senders
+                        .choose_mut(&mut rand::thread_rng())
+                        .unwrap();
 
                     write_reqs_tx.send(message).await?;
                     return Err(err.into());
@@ -556,13 +590,20 @@ where
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
-        write_reqs_tx: &mut aptos_channels::Sender<NetworkMessage>,
+        write_requests_senders: &mut Vec<aptos_channels::Sender<NetworkMessage>>,
     ) {
         trace!(
             "Peer {} PeerRequest::{:?}",
             self.remote_peer_id().short_str(),
             request
         );
+
+        // Select a channel to send the request along randomly.
+        // This should distribute requests across all the sockets.
+        let write_reqs_tx = write_requests_senders
+            .choose_mut(&mut rand::thread_rng())
+            .unwrap();
+
         match request {
             // To send an outbound DirectSendMsg, we just bump some counters and
             // push it onto our outbound writer queue.
@@ -631,7 +672,11 @@ where
         self.state = State::ShuttingDown(reason);
     }
 
-    async fn do_shutdown(mut self, writer_close_tx: oneshot::Sender<()>, reason: DisconnectReason) {
+    async fn do_shutdown(
+        mut self,
+        writer_close_tx: Vec<oneshot::Sender<()>>,
+        reason: DisconnectReason,
+    ) {
         let remote_peer_id = self.remote_peer_id();
 
         // Send a PeerDisconnected event to PeerManager.
@@ -654,18 +699,20 @@ where
             );
         }
 
-        // Send a close instruction to the writer task. On receipt of this
+        // Send a close instruction to the writer tasks. On receipt of this
         // instruction, the writer task drops all pending outbound messages and
         // closes the connection.
-        if let Err(e) = writer_close_tx.send(()) {
-            info!(
-                NetworkSchema::new(&self.network_context)
-                    .connection_metadata(&self.connection_metadata),
-                error = ?e,
-                "{} Failed to send close instruction to writer task. It must already be terminating/terminated. Error: {:?}",
-                self.network_context,
-                e
-            );
+        for writer_close_tx in writer_close_tx {
+            if let Err(e) = writer_close_tx.send(()) {
+                info!(
+                    NetworkSchema::new(&self.network_context)
+                        .connection_metadata(&self.connection_metadata),
+                    error = ?e,
+                    "{} Failed to send close instruction to writer task. It must already be terminating/terminated. Error: {:?}",
+                    self.network_context,
+                    e
+                );
+            }
         }
 
         trace!(

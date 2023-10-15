@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transport::{ConnectionOrigin, Transport};
+use crate::transport::{ConnectionOrigin, MultiSocket, Transport};
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{future::Future, stream::Stream};
 use pin_project::pin_project;

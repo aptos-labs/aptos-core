@@ -19,7 +19,7 @@ use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_logger::prelude::*;
 // Re-exposed for aptos-network-checker
 pub use aptos_netcore::transport::tcp::{resolve_and_connect, TCPBufferCfg, TcpSocket};
-use aptos_netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, Transport};
+use aptos_netcore::transport::{proxy_protocol, tcp, ConnectionOrigin, MultiSocket, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{timeout, TimeService, TimeServiceTrait};
 use aptos_types::{
@@ -209,6 +209,7 @@ impl<TSocket> Connection<TSocket> {
     }
 
     /// Returns a reference to the first socket in the connection
+    #[cfg(test)]
     pub fn get_first_socket(&mut self) -> &mut TSocket {
         &mut self.sockets[0]
     }
@@ -272,90 +273,111 @@ fn add_pp_addr(proxy_protocol_enabled: bool, error: io::Error, addr: &NetworkAdd
 /// set. Otherwise, we will allow inbound connections from any pubkey.
 async fn upgrade_inbound<T: TSocket>(
     ctxt: Arc<UpgradeContext>,
-    fut_socket: impl Future<Output = io::Result<T>>,
+    fut_socket: impl Future<Output = io::Result<MultiSocket<T>>>,
     addr: NetworkAddress,
     proxy_protocol_enabled: bool,
 ) -> io::Result<Connection<NoiseStream<T>>> {
     let origin = ConnectionOrigin::Inbound;
-    let mut socket = fut_socket.await?;
+    let multi_socket = fut_socket.await?;
 
-    // If we have proxy protocol enabled, process the event, otherwise skip it
-    // TODO: This would make more sense to build this in at instantiation so we don't need to put the if statement here
-    let addr = if proxy_protocol_enabled {
-        proxy_protocol::read_header(&addr, &mut socket)
+    // TODO: fix me!
+    let mut addrs = Vec::new();
+    let mut remote_peer_ids = Vec::new();
+    let mut messaging_protocol_set = Vec::new();
+    let mut application_protocols_set = Vec::new();
+    let mut peer_roles = Vec::new();
+
+    // Collect all the upgraded sockets
+    let mut upgraded_sockets = Vec::new();
+    for mut socket in multi_socket.into_sockets() {
+        // If we have proxy protocol enabled, process the event, otherwise skip it
+        // TODO: This would make more sense to build this in at instantiation so we don't need to put the if statement here
+        let addr = if proxy_protocol_enabled {
+            proxy_protocol::read_header(&addr, &mut socket)
+                .await
+                .map_err(|err| {
+                    debug!(
+                        network_address = addr,
+                        error = %err,
+                        "ProxyProtocol: Failed to read header: {}",
+                        err
+                    );
+                    err
+                })?
+        } else {
+            addr.clone()
+        };
+
+        // try authenticating via noise handshake
+        let (mut socket, remote_peer_id, peer_role) =
+            ctxt.noise.upgrade_inbound(socket).await.map_err(|err| {
+                if err.should_security_log() {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(15)),
+                        error!(
+                            SecurityEvent::NoiseHandshake,
+                            NetworkSchema::new(&ctxt.noise.network_context)
+                                .network_address(&addr)
+                                .connection_origin(&origin),
+                            error = %err,
+                        )
+                    );
+                }
+                let err = io::Error::new(io::ErrorKind::Other, err);
+                add_pp_addr(proxy_protocol_enabled, err, &addr)
+            })?;
+        let remote_pubkey = socket.get_remote_static();
+        let addr = addr.append_prod_protos(remote_pubkey, HANDSHAKE_VERSION);
+
+        // exchange HandshakeMsg
+        let handshake_msg = HandshakeMsg {
+            supported_protocols: ctxt.supported_protocols.clone(),
+            chain_id: ctxt.chain_id,
+            network_id: ctxt.network_id,
+        };
+        let remote_handshake = exchange_handshake(&handshake_msg, &mut socket)
             .await
+            .map_err(|err| add_pp_addr(proxy_protocol_enabled, err, &addr))?;
+
+        // try to negotiate common aptosnet version and supported application protocols
+        let (messaging_protocol, application_protocols) = handshake_msg
+            .perform_handshake(&remote_handshake)
             .map_err(|err| {
-                debug!(
-                    network_address = addr,
-                    error = %err,
-                    "ProxyProtocol: Failed to read header: {}",
+                let err = format!(
+                    "handshake negotiation with peer {} failed: {}",
+                    remote_peer_id.short_str(),
                     err
                 );
-                err
-            })?
-    } else {
-        addr
-    };
+                add_pp_addr(
+                    proxy_protocol_enabled,
+                    io::Error::new(io::ErrorKind::Other, err),
+                    &addr,
+                )
+            })?;
 
-    // try authenticating via noise handshake
-    let (mut socket, remote_peer_id, peer_role) =
-        ctxt.noise.upgrade_inbound(socket).await.map_err(|err| {
-            if err.should_security_log() {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(15)),
-                    error!(
-                        SecurityEvent::NoiseHandshake,
-                        NetworkSchema::new(&ctxt.noise.network_context)
-                            .network_address(&addr)
-                            .connection_origin(&origin),
-                        error = %err,
-                    )
-                );
-            }
-            let err = io::Error::new(io::ErrorKind::Other, err);
-            add_pp_addr(proxy_protocol_enabled, err, &addr)
-        })?;
-    let remote_pubkey = socket.get_remote_static();
-    let addr = addr.append_prod_protos(remote_pubkey, HANDSHAKE_VERSION);
+        // Collect the connection metadata
+        addrs.push(addr);
+        remote_peer_ids.push(remote_peer_id);
+        messaging_protocol_set.push(messaging_protocol);
+        application_protocols_set.push(application_protocols);
+        peer_roles.push(peer_role);
 
-    // exchange HandshakeMsg
-    let handshake_msg = HandshakeMsg {
-        supported_protocols: ctxt.supported_protocols.clone(),
-        chain_id: ctxt.chain_id,
-        network_id: ctxt.network_id,
-    };
-    let remote_handshake = exchange_handshake(&handshake_msg, &mut socket)
-        .await
-        .map_err(|err| add_pp_addr(proxy_protocol_enabled, err, &addr))?;
-
-    // try to negotiate common aptosnet version and supported application protocols
-    let (messaging_protocol, application_protocols) = handshake_msg
-        .perform_handshake(&remote_handshake)
-        .map_err(|err| {
-            let err = format!(
-                "handshake negotiation with peer {} failed: {}",
-                remote_peer_id.short_str(),
-                err
-            );
-            add_pp_addr(
-                proxy_protocol_enabled,
-                io::Error::new(io::ErrorKind::Other, err),
-                &addr,
-            )
-        })?;
+        // Add the upgraded socket to the list
+        upgraded_sockets.push(socket);
+    }
 
     // return successful connection
     let connection_metadata = ConnectionMetadata::new(
-        remote_peer_id,
+        remote_peer_ids.remove(0),
         CONNECTION_ID_GENERATOR.next(),
-        addr,
+        addrs.remove(0),
         origin,
-        messaging_protocol,
-        application_protocols,
-        peer_role,
+        messaging_protocol_set.remove(0),
+        application_protocols_set.remove(0),
+        peer_roles[0],
     );
-    Ok(Connection::new_with_single_socket(
-        socket,
+    Ok(Connection::new_with_multiple_sockets(
+        upgraded_sockets,
         connection_metadata,
     ))
 }
@@ -364,74 +386,95 @@ async fn upgrade_inbound<T: TSocket>(
 /// authentication and then negotiate common supported protocols.
 pub async fn upgrade_outbound<T: TSocket>(
     ctxt: Arc<UpgradeContext>,
-    fut_socket: impl Future<Output = io::Result<T>>,
+    fut_socket: impl Future<Output = io::Result<MultiSocket<T>>>,
     addr: NetworkAddress,
     remote_peer_id: PeerId,
     remote_pubkey: x25519::PublicKey,
 ) -> io::Result<Connection<NoiseStream<T>>> {
     let origin = ConnectionOrigin::Outbound;
-    let socket = fut_socket.await?;
+    let multi_socket = fut_socket.await?;
 
-    // noise handshake
-    let (mut socket, peer_role) = ctxt
-        .noise
-        .upgrade_outbound(
-            socket,
-            remote_peer_id,
-            remote_pubkey,
-            AntiReplayTimestamps::now,
-        )
-        .await
-        .map_err(|err| {
-            if err.should_security_log() {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(15)),
-                    error!(
-                        SecurityEvent::NoiseHandshake,
-                        NetworkSchema::new(&ctxt.noise.network_context)
-                            .network_address(&addr)
-                            .connection_origin(&origin),
-                        error = %err,
-                    )
+    // TODO: fix me!
+    let mut addrs = Vec::new();
+    let mut remote_peer_ids = Vec::new();
+    let mut messaging_protocol_set = Vec::new();
+    let mut application_protocols_set = Vec::new();
+    let mut peer_roles = Vec::new();
+
+    // Collect all the upgraded sockets
+    let mut upgraded_sockets = Vec::new();
+    for socket in multi_socket.into_sockets() {
+        // noise handshake
+        let (mut socket, peer_role) = ctxt
+            .noise
+            .upgrade_outbound(
+                socket,
+                remote_peer_id,
+                remote_pubkey,
+                AntiReplayTimestamps::now,
+            )
+            .await
+            .map_err(|err| {
+                if err.should_security_log() {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(15)),
+                        error!(
+                            SecurityEvent::NoiseHandshake,
+                            NetworkSchema::new(&ctxt.noise.network_context)
+                                .network_address(&addr)
+                                .connection_origin(&origin),
+                            error = %err,
+                        )
+                    );
+                }
+                io::Error::new(io::ErrorKind::Other, err)
+            })?;
+
+        // sanity check: Noise IK should always guarantee this is true
+        debug_assert_eq!(remote_pubkey, socket.get_remote_static());
+
+        // exchange HandshakeMsg
+        let handshake_msg = HandshakeMsg {
+            supported_protocols: ctxt.supported_protocols.clone(),
+            chain_id: ctxt.chain_id,
+            network_id: ctxt.network_id,
+        };
+        let remote_handshake = exchange_handshake(&handshake_msg, &mut socket).await?;
+
+        // try to negotiate common aptosnet version and supported application protocols
+        let (messaging_protocol, application_protocols) = handshake_msg
+            .perform_handshake(&remote_handshake)
+            .map_err(|e| {
+                let e = format!(
+                    "handshake negotiation with peer {} failed: {}",
+                    remote_peer_id, e
                 );
-            }
-            io::Error::new(io::ErrorKind::Other, err)
-        })?;
+                io::Error::new(io::ErrorKind::Other, e)
+            })?;
 
-    // sanity check: Noise IK should always guarantee this is true
-    debug_assert_eq!(remote_pubkey, socket.get_remote_static());
+        // Collect the connection metadata
+        addrs.push(addr.clone());
+        remote_peer_ids.push(remote_peer_id);
+        messaging_protocol_set.push(messaging_protocol);
+        application_protocols_set.push(application_protocols);
+        peer_roles.push(peer_role);
 
-    // exchange HandshakeMsg
-    let handshake_msg = HandshakeMsg {
-        supported_protocols: ctxt.supported_protocols.clone(),
-        chain_id: ctxt.chain_id,
-        network_id: ctxt.network_id,
-    };
-    let remote_handshake = exchange_handshake(&handshake_msg, &mut socket).await?;
-
-    // try to negotiate common aptosnet version and supported application protocols
-    let (messaging_protocol, application_protocols) = handshake_msg
-        .perform_handshake(&remote_handshake)
-        .map_err(|e| {
-            let e = format!(
-                "handshake negotiation with peer {} failed: {}",
-                remote_peer_id, e
-            );
-            io::Error::new(io::ErrorKind::Other, e)
-        })?;
+        // Add the upgraded socket to the list
+        upgraded_sockets.push(socket);
+    }
 
     // return successful connection
     let connection_metadata = ConnectionMetadata::new(
-        remote_peer_id,
+        remote_peer_ids.remove(0),
         CONNECTION_ID_GENERATOR.next(),
-        addr,
+        addrs.remove(0),
         origin,
-        messaging_protocol,
-        application_protocols,
-        peer_role,
+        messaging_protocol_set.remove(0),
+        application_protocols_set.remove(0),
+        peer_roles.remove(0),
     );
-    Ok(Connection::new_with_single_socket(
-        socket,
+    Ok(Connection::new_with_multiple_sockets(
+        upgraded_sockets,
         connection_metadata,
     ))
 }
