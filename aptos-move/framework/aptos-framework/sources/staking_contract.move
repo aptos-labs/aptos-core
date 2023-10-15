@@ -34,6 +34,7 @@ module aptos_framework::staking_contract {
     use aptos_std::simple_map::{Self, SimpleMap};
 
     use aptos_framework::account::{Self, SignerCapability};
+    use aptos_framework::aptos_account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::event::{EventHandle, emit_event};
@@ -612,7 +613,7 @@ module aptos_framework::staking_contract {
             let recipient = *vector::borrow(&mut recipients, 0);
             let current_shares = pool_u64::shares(distribution_pool, recipient);
             let amount_to_distribute = pool_u64::redeem_shares(distribution_pool, recipient, current_shares);
-            coin::deposit(recipient, coin::extract(&mut coins, amount_to_distribute));
+            aptos_account::deposit_coins(recipient, coin::extract(&mut coins, amount_to_distribute));
 
             emit_event(
                 distribute_events,
@@ -622,7 +623,7 @@ module aptos_framework::staking_contract {
 
         // In case there's any dust left, send them all to the staker.
         if (coin::value(&coins) > 0) {
-            coin::deposit(staker, coins);
+            aptos_account::deposit_coins(staker, coins);
             pool_u64::update_total_coins(distribution_pool, 0);
         } else {
             coin::destroy_zero(coins);
