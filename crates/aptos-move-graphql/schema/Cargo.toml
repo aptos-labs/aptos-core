@@ -1,0 +1,27 @@
+[package]
+name = "aptos-move-graphql-schema"
+description = "Build GraphQL schemas from Move modules"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-api-types = { workspace = true }
+aptos-move-graphql-scalars = { workspace = true }
+async-graphql = { workspace = true }
+clap = { workspace = true }
+move-core-types = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+aptos-framework = { workspace = true }
+aptos-move-graphql-test-helpers = { workspace = true }
+tokio = { workspace = true }

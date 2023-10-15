@@ -348,7 +348,7 @@ impl Serialize for MoveValue {
 }
 
 /// A Move struct tag for referencing an onchain struct type
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct MoveStructTag {
     pub address: Address,
     pub module: IdentifierWrapper,
@@ -479,7 +479,7 @@ impl TryFrom<MoveStructTag> for StructTag {
 }
 
 /// An enum of Move's possible types on-chain
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MoveType {
     /// A bool type
     Bool,
