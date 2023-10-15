@@ -2,7 +2,7 @@ module no_code_mint::mint_machine {
     use std::error;
     use std::signer;
     use std::object::{Self, Object, ExtendRef, DeleteRef};
-    use std::string::{Self, String, utf8 as str};
+    use std::string::{Self, String};
     use aptos_std::string_utils::{Self};
     use std::timestamp;
     use std::vector;
@@ -324,7 +324,7 @@ module no_code_mint::mint_machine {
         // Build token name and token uri from base versions + popped token metadata
         // "token_base_name#{n}" is the name where n = (max supply - the # of tokens left)
         // that is: 0, 1, 2, ... max_supply - 1
-        let full_token_name = concat_u64(mint_configuration.token_base_name, mint_configuration.max_supply - tokens_left);
+        let full_token_name = concat_any<u64>(mint_configuration.token_base_name, mint_configuration.max_supply - tokens_left);
 
         // mint token to the receiver
         let token_object = aptos_token::mint_token_object(
@@ -534,23 +534,9 @@ module no_code_mint::mint_machine {
         assert!(table_length == borrow_config(admin_addr).max_supply, error::invalid_argument(EINSUFFICIENT_METADATA));
     }
 
-    public inline fun u64_to_string(value: u64): String {
-        if (value == 0) {
-            str(b"0")
-        } else {
-            let buffer = vector::empty<u8>();
-            while (value != 0) {
-                vector::push_back(&mut buffer, ((48 + value % 10) as u8));
-                value = value / 10;
-            };
-            vector::reverse(&mut buffer);
-            str(buffer)
-        }
-    }
-
-    public inline fun concat_u64(s: String, n: u64): String {
-        let n_str = u64_to_string(n);
-        string::append(&mut s, n_str);
+    public inline fun concat_any<T: copy + drop>(s: String, any_value: T): String {
+        let any_value_as_string = string_utils::to_string<T>(&any_value);
+        string::append(&mut s, any_value_as_string);
         s
     }
 }
@@ -683,7 +669,7 @@ module no_code_mint::unit_tests {
         vector::enumerate_ref(&aptos_token_objects, |i, aptos_token_object| {
             assert!(object::is_owner(*aptos_token_object, minter_1_addr), i);
             let token_object = object::convert<AptosToken, Token>(*aptos_token_object);
-            assert!(token::name(token_object) == mint_machine::concat_u64(str(TOKEN_BASE_NAME), i), i);
+            assert!(token::name(token_object) == mint_machine::concat_any<u64>(str(TOKEN_BASE_NAME), i), i);
         });
 
         // destroy the allowlist, only possible if all tokens have been minted
@@ -702,9 +688,9 @@ module no_code_mint::unit_tests {
         let property_types = vector<vector<String>> [];
         let base_token_uri = str(TOKEN_BASE_URI);
 
-        let i = 0;
+        let i: u64 = 0;
         while (i < n) {
-            vector::push_back(&mut uris, mint_machine::concat_u64(base_token_uri, i));
+            vector::push_back(&mut uris, mint_machine::concat_any<u64>(base_token_uri, i));
             vector::push_back(&mut descriptions, str(TOKEN_DESCRIPTION));
             vector::push_back(&mut property_keys, vector<String> [
                 str(b"key 1"),
