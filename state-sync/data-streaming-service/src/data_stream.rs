@@ -172,6 +172,24 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         self.sent_data_requests.is_some()
     }
 
+    /// Resets the subscription stream lag on the data stream
+    fn reset_subscription_stream_lag(&mut self) {
+        // Reset the subscription stream lag metrics
+        metrics::set_subscription_stream_lag(0);
+
+        // Reset the stream lag
+        self.subscription_stream_lag = None;
+    }
+
+    /// Sets the subscription stream lag on the data stream
+    fn set_subscription_stream_lag(&mut self, subscription_stream_lag: SubscriptionStreamLag) {
+        // Update the subscription stream lag metrics
+        metrics::set_subscription_stream_lag(subscription_stream_lag.version_lag);
+
+        // Set the stream lag
+        self.subscription_stream_lag = Some(subscription_stream_lag)
+    }
+
     /// Initializes the data client requests by sending out the first batch
     pub fn initialize_data_requests(
         &mut self,
@@ -552,7 +570,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // If the stream is not lagging behind, reset the lag and return
         if highest_response_version >= highest_advertised_version {
-            self.subscription_stream_lag = None;
+            self.reset_subscription_stream_lag();
             return Ok(());
         }
 
@@ -574,12 +592,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             }
 
             // The stream is lagging, but it's not yet beyond recovery
-            self.subscription_stream_lag = Some(subscription_stream_lag);
+            self.set_subscription_stream_lag(subscription_stream_lag);
         } else {
             // The stream was not previously lagging, but it is now!
             let subscription_stream_lag =
                 SubscriptionStreamLag::new(current_stream_lag, self.time_service.clone());
-            self.subscription_stream_lag = Some(subscription_stream_lag);
+            self.set_subscription_stream_lag(subscription_stream_lag);
         }
 
         Ok(())
