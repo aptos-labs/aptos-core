@@ -264,14 +264,8 @@ fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
             block_split: BlockSplit::TxnPerBlock
         }),
         // Sequential execution doesn't have exchanges, so we cannot use BothComparison, nor block split
-        // TODO join once sequential exchange lands.
-        Just(TestEnvConfig {
-            executor_mode: ExecutorMode::SequentialOnly,
-            aggregator_execution_enabled: true,
-            block_split: BlockSplit::Whole
-        }),
         arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
-            executor_mode: ExecutorMode::ParallelOnly,
+            executor_mode: ExecutorMode::BothComparison,
             aggregator_execution_enabled: true,
             block_split
         }),
