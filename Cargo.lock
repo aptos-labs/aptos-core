@@ -2168,8 +2168,8 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-protos"
-version = "1.0.9"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=757cf367eceebba546ed96927d46a9b1323e91c5#757cf367eceebba546ed96927d46a9b1323e91c5"
+version = "1.1.0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d6f55d4baba32960ea7be60878552e73ffbe8b7e#d6f55d4baba32960ea7be60878552e73ffbe8b7e"
 dependencies = [
  "pbjson",
  "prost 0.11.9",
@@ -2491,7 +2491,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=757cf367eceebba546ed96927d46a9b1323e91c5#757cf367eceebba546ed96927d46a9b1323e91c5"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d6f55d4baba32960ea7be60878552e73ffbe8b7e#d6f55d4baba32960ea7be60878552e73ffbe8b7e"
 dependencies = [
  "chrono",
 ]
@@ -11473,11 +11473,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=757cf367eceebba546ed96927d46a9b1323e91c5#757cf367eceebba546ed96927d46a9b1323e91c5"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d6f55d4baba32960ea7be60878552e73ffbe8b7e#d6f55d4baba32960ea7be60878552e73ffbe8b7e"
 dependencies = [
  "anyhow",
  "aptos-indexer-protos",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=757cf367eceebba546ed96927d46a9b1323e91c5)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d6f55d4baba32960ea7be60878552e73ffbe8b7e)",
  "async-trait",
  "base64 0.13.0",
  "bcs 0.1.4",
@@ -12893,7 +12893,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=757cf367eceebba546ed96927d46a9b1323e91c5#757cf367eceebba546ed96927d46a9b1323e91c5"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d6f55d4baba32960ea7be60878552e73ffbe8b7e#d6f55d4baba32960ea7be60878552e73ffbe8b7e"
 dependencies = [
  "anyhow",
  "async-trait",
