@@ -541,7 +541,8 @@ impl MoveHarness {
         self.read_state_value(&StateKey::access_path(
             AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
         ))
-        .map(StateValue::into_metadata)
+        .as_ref()
+        .map(StateValue::metadata)
     }
 
     pub fn read_resource_group(

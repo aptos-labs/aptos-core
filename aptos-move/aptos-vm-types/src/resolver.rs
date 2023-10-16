@@ -8,7 +8,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadataExtKind},
     },
 };
 use bytes::Bytes;
@@ -42,10 +42,10 @@ pub trait TResourceView {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         // For metadata, layouts are not important.
         self.get_resource_state_value(state_key, None)
-            .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
+            .map(|maybe_state_value| maybe_state_value.as_ref().map(StateValue::metadata_ext))
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
@@ -150,9 +150,9 @@ pub trait TModuleView {
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
+        Ok(maybe_state_value.as_ref().map(StateValue::metadata_ext))
     }
 
     fn module_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
@@ -266,15 +266,15 @@ pub trait StateValueMetadataResolver {
     fn get_module_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>>;
 
     fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>>;
 
     fn get_resource_group_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>>;
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>>;
 }

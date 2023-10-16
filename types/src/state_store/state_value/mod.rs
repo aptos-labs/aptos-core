@@ -11,7 +11,9 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use bytes::Bytes;
 use inner::StateValueInner;
-pub use metadata::{StateValueMetadata, StateValueMetadataKind};
+pub use metadata::{
+    StateValueMetadata, StateValueMetadataExt, StateValueMetadataExtKind, StateValueMetadataKind,
+};
 use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
@@ -90,11 +92,12 @@ impl StateValue {
         }
     }
 
-    pub fn into_metadata(self) -> Option<StateValueMetadata> {
-        match self.inner {
-            StateValueInner::V0(_) => None,
-            StateValueInner::WithMetadata { metadata, .. } => Some(metadata),
-        }
+    pub fn metadata(&self) -> Option<StateValueMetadata> {
+        self.inner.metadata()
+    }
+
+    pub fn metadata_ext(&self) -> Option<StateValueMetadataExt> {
+        self.inner.metadata_ext()
     }
 
     pub fn into(self) -> (Option<StateValueMetadata>, Bytes) {

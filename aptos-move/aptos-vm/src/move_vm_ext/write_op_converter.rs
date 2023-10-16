@@ -7,7 +7,7 @@ use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     state_store::{
         state_key::StateKey,
-        state_value::{StateValueMetadata, StateValueMetadataKind},
+        state_value::{StateValueMetadata, StateValueMetadataExtKind},
     },
     write_set::WriteOp,
 };
@@ -172,7 +172,7 @@ impl<'r> WriteOpConverter<'r> {
 
     fn convert(
         &self,
-        state_value_metadata_result: anyhow::Result<Option<StateValueMetadataKind>>,
+        state_value_metadata_result: anyhow::Result<Option<StateValueMetadataExtKind>>,
         move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> Result<WriteOp, VMStatus> {
@@ -218,14 +218,19 @@ impl<'r> WriteOpConverter<'r> {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
                 match existing_metadata {
                     None => Modification(data),
-                    Some(metadata) => ModificationWithMetadata { data, metadata },
+                    Some(metadata) => ModificationWithMetadata {
+                        data,
+                        metadata: metadata.inner,
+                    },
                 }
             },
             (Some(existing_metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
                 match existing_metadata {
                     None => Deletion,
-                    Some(metadata) => DeletionWithMetadata { metadata },
+                    Some(metadata) => DeletionWithMetadata {
+                        metadata: metadata.inner,
+                    },
                 }
             },
         };
@@ -256,7 +261,10 @@ impl<'r> WriteOpConverter<'r> {
             },
             Some(existing_metadata) => match existing_metadata {
                 None => WriteOp::Modification(data),
-                Some(metadata) => WriteOp::ModificationWithMetadata { data, metadata },
+                Some(metadata) => WriteOp::ModificationWithMetadata {
+                    data,
+                    metadata: metadata.inner,
+                },
             },
         };
 

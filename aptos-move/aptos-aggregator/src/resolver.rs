@@ -10,7 +10,7 @@ use aptos_types::{
     aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadataExtKind},
     },
     write_set::WriteOp,
 };
@@ -67,12 +67,12 @@ pub trait TAggregatorView {
     fn get_aggregator_v1_state_value_metadata(
         &self,
         id: &Self::IdentifierV1,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
         let maybe_state_value =
             self.get_aggregator_v1_state_value(id, AggregatorReadMode::Precise)?;
-        Ok(maybe_state_value.map(StateValue::into_metadata))
+        Ok(maybe_state_value.as_ref().map(StateValue::metadata_ext))
     }
 
     fn get_aggregator_v2_value(

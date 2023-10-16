@@ -7,7 +7,9 @@
 
 use crate::state_store::{
     state_key::StateKey,
-    state_value::{StateValue, StateValueMetadata, StateValueMetadataKind},
+    state_value::{
+        StateValue, StateValueMetadata, StateValueMetadataExt, StateValueMetadataExtKind,
+    },
 };
 use anyhow::{bail, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -165,6 +167,23 @@ impl WriteOp {
             | DeletionWithMetadata { metadata, .. } => Some(metadata),
         }
     }
+
+    pub fn metadata_ext(&self) -> Option<StateValueMetadataExt> {
+        use WriteOp::*;
+
+        match self {
+            Creation(_) | Modification(_) | Deletion => None,
+            CreationWithMetadata { metadata, data }
+            | ModificationWithMetadata { metadata, data } => Some(StateValueMetadataExt {
+                inner: metadata.clone(),
+                num_bytes: data.len(),
+            }),
+            DeletionWithMetadata { metadata } => Some(StateValueMetadataExt {
+                inner: metadata.clone(),
+                num_bytes: 0,
+            }),
+        }
+    }
 }
 
 pub trait TransactionWrite {
@@ -176,9 +195,9 @@ pub trait TransactionWrite {
     // Returns metadata that would be observed by a read following the 'self' write.
     // Provided as a separate method to avoid the clone in as_state_value method
     // (although default implementation below does just that).
-    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadataExtKind> {
         self.as_state_value()
-            .map(|state_value| state_value.into_metadata())
+            .map(|state_value| state_value.metadata_ext())
     }
 
     // Often, the contents of W:TransactionWrite are converted to Option<StateValue>, e.g.
@@ -225,8 +244,8 @@ impl TransactionWrite for WriteOp {
 
     // Note that even if WriteOp is DeletionWithMetadata, the method returns None, as a later
     // read would not read the metadata of the deletion op.
-    fn as_state_value_metadata(&self) -> Option<StateValueMetadataKind> {
-        self.bytes().map(|_| self.metadata().cloned())
+    fn as_state_value_metadata(&self) -> Option<StateValueMetadataExtKind> {
+        self.bytes().map(|_| self.metadata_ext())
     }
 
     fn from_state_value(maybe_state_value: Option<StateValue>) -> Self {

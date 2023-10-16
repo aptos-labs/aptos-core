@@ -8,7 +8,7 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    state_store::state_value::StateValueMetadataKind,
+    state_store::state_value::StateValueMetadataExtKind,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use derivative::Derivative;
@@ -48,7 +48,7 @@ pub(crate) enum DataRead<V> {
         // comparing the instances of V is cheaper, compare those instead.
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
     ),
-    Metadata(Option<StateValueMetadataKind>),
+    Metadata(Option<StateValueMetadataExtKind>),
     Exists(bool),
     /// Read resolved an aggregatorV1 delta to a value. TODO: deprecate.
     Resolved(u128),
@@ -361,7 +361,11 @@ mod test {
     use crate::proptest_types::types::{KeyType, MockEvent, ValueType};
     use aptos_mvhashmap::types::StorageVersion;
     use aptos_types::{
-        on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
+        on_chain_config::CurrentTimeMicroseconds,
+        state_store::state_value::{
+            StateValueMetadata, StateValueMetadataExt, StateValueMetadataExtKind,
+            StateValueMetadataKind,
+        },
         transaction::BlockExecutableTransaction,
     };
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
@@ -455,7 +459,7 @@ mod test {
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(None));
-        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
+        let metadata = DataRead::Metadata(Some(metadata_ext(1)));
         let exists = DataRead::Exists(true);
         let not_exists = DataRead::Exists(false);
 
@@ -579,6 +583,13 @@ mod test {
         }))
     }
 
+    fn metadata_ext(v: u64) -> StateValueMetadataExtKind {
+        Some(StateValueMetadataExt {
+            inner: StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v }),
+            num_bytes: v as usize,
+        })
+    }
+
     #[test]
     fn test_update_entry() {
         // Legacy state values do not have metadata.
@@ -597,7 +608,7 @@ mod test {
         let resolved = DataRead::Resolved::<ValueType>(200);
         let deletion_metadata = DataRead::Metadata(None);
         let legacy_metadata = DataRead::Metadata(Some(None));
-        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
+        let metadata = DataRead::Metadata(Some(metadata_ext(1)));
         let exists = DataRead::Exists(true);
         let not_exists = DataRead::Exists(false);
 
@@ -687,7 +698,7 @@ mod test {
             Ok((7, 0)),
             Arc::new(ValueType::with_len_and_metadata(2, raw_metadata(1))),
         );
-        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
+        let metadata = DataRead::Metadata(Some(metadata_ext(1)));
         let exists = DataRead::Exists(true);
         vec![exists, metadata, versioned_with_metadata]
     }
@@ -833,7 +844,7 @@ mod test {
             Arc::new(ValueType::with_len_and_metadata(1, None)),
         );
         let resolved = DataRead::Resolved::<ValueType>(200);
-        let metadata = DataRead::Metadata(Some(raw_metadata(1)));
+        let metadata = DataRead::Metadata(Some(metadata_ext(1)));
         let deletion_metadata = DataRead::Metadata(None);
         let exists = DataRead::Exists(true);
 

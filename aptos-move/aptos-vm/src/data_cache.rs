@@ -22,7 +22,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadataExtKind},
     },
 };
 use aptos_vm_types::{
@@ -305,7 +305,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     fn get_module_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         self.executor_view
             .get_module_state_value_metadata(state_key)
     }
@@ -313,7 +313,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         self.executor_view
             .get_resource_state_value_metadata(state_key)
     }
@@ -321,8 +321,9 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     fn get_resource_group_state_value_metadata(
         &self,
         _state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         // TODO: forward to self.executor_view.
+        // TODO: contemplate on what's a proper value for `StateValueMetadataExt::num_bytes`.
         unimplemented!("Resource group metadata handling not yet implemented");
     }
 }

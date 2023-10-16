@@ -46,5 +46,12 @@ impl StateValueMetadata {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StateValueMetadataExt {
+    pub inner: StateValueMetadata,
+    pub num_bytes: usize,
+}
+
 // To avoid nested options when fetching a resource and its metadata.
 pub type StateValueMetadataKind = Option<StateValueMetadata>;
+pub type StateValueMetadataExtKind = Option<StateValueMetadataExt>;

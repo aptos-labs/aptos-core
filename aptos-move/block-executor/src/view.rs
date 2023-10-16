@@ -21,7 +21,7 @@ use aptos_types::{
     executable::{Executable, ModulePath},
     state_store::{
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadataExtKind},
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -40,7 +40,7 @@ use std::{cell::RefCell, fmt::Debug, sync::atomic::AtomicU32};
 #[derive(Debug)]
 pub(crate) enum ReadResult {
     Value(Option<StateValue>),
-    Metadata(Option<StateValueMetadataKind>),
+    Metadata(Option<StateValueMetadataExtKind>),
     Exists(bool),
     Uninitialized,
     // Must halt the execution of the calling transaction. This might be because
@@ -325,11 +325,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     || self.get_base_value(state_key),
                     |v| Ok(v.as_state_value()),
                 );
-                ret.map(|maybe_state_value| match kind {
+                ret.map(|maybe_state_value| match &kind {
                     ReadKind::Value => ReadResult::Value(maybe_state_value),
-                    ReadKind::Metadata => {
-                        ReadResult::Metadata(maybe_state_value.map(StateValue::into_metadata))
-                    },
+                    ReadKind::Metadata => ReadResult::Metadata(
+                        maybe_state_value.as_ref().map(StateValue::metadata_ext),
+                    ),
                     ReadKind::Exists => ReadResult::Exists(maybe_state_value.is_some()),
                 })
             },
@@ -361,7 +361,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadataExtKind>> {
         self.get_resource_state_value_impl(state_key, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
