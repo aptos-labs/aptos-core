@@ -451,7 +451,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
             }),
         }),
     )];
-    let mut change_set_1 = build_change_set(vec![], vec![], vec![], vec![], agg_changes_1);
+    let mut change_set_1 = build_change_set(vec![], vec![], vec![], vec![], vec![], agg_changes_1);
 
     let agg_changes_2 = vec![
         (
@@ -488,7 +488,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
             }),
         ),
     ];
-    let change_set_2 = build_change_set(vec![], vec![], vec![], vec![], agg_changes_2);
+    let change_set_2 = build_change_set(vec![], vec![], vec![], vec![], vec![], agg_changes_2);
 
     assert_ok!(change_set_1.squash_additional_change_set(change_set_2, &MockChangeSetChecker));
 

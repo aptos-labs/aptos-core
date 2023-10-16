@@ -149,7 +149,11 @@ Once enabled, Aggregator V2 functions become parallel.
 Lifetime: transient
 
 
+<<<<<<< HEAD
 <pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_DELAYED_FIELDS">AGGREGATOR_V2_DELAYED_FIELDS</a>: u64 = 36;
+=======
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_EXECUTION">AGGREGATOR_EXECUTION</a>: u64 = 36;
+>>>>>>> 956cb6b199 (rebase artifacts)
 </code></pre>
 
 
