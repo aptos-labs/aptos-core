@@ -70,12 +70,10 @@ return true.
 -  [Function `signer_native_format_fix_enabled`](#0x1_features_signer_native_format_fix_enabled)
 -  [Function `get_module_event_feature`](#0x1_features_get_module_event_feature)
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
--  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
--  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
--  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
--  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
 -  [Function `get_aggregator_api_feature`](#0x1_features_get_aggregator_api_feature)
 -  [Function `aggregator_api_enabled`](#0x1_features_aggregator_api_enabled)
+-  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
+-  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -152,7 +150,7 @@ After this flag is enabled, aggregators modifications stop creating conflicts,
 when possible to optimize out.
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_EXECUTION">AGGREGATOR_EXECUTION</a>: u64 = 33;
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_EXECUTION">AGGREGATOR_EXECUTION</a>: u64 = 36;
 </code></pre>
 
 

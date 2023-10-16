@@ -198,9 +198,12 @@ impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, MoveTypeLayout, DelayedFieldID> {}
+pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID> {}
 
-impl<T> ExecutorView for T where T: TExecutorView<StateKey, MoveTypeLayout, DelayedFieldID> {}
+impl<T> ExecutorView for T where
+    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID>
+{
+}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
