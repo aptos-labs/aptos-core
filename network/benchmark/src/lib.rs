@@ -295,8 +295,8 @@ pub async fn run_netbench_service(
     }
 }
 
-// Once every Xs log a message for something that may be happening
-const BLAB_SECS: u64 = 1;
+// Once every X milliseconds log a message
+const BLAB_MILLIS: u64 = 1000; // 1 second
 
 pub async fn direct_sender(
     node_config: NodeConfig,
@@ -359,7 +359,7 @@ pub async fn direct_sender(
         }
 
         sample!(
-            SampleRate::Duration(Duration::from_secs(BLAB_SECS)),
+            SampleRate::Duration(Duration::from_millis(BLAB_MILLIS)),
             info!("netbench ds counter={}", counter)
         );
     }
@@ -422,7 +422,7 @@ pub async fn rpc_sender(
                 rpc_messages("sent");
                 open_rpcs.push(result);
 
-                sample!(SampleRate::Duration(Duration::from_secs(BLAB_SECS)), info!("netbench rpc counter={}", counter));
+                sample!(SampleRate::Duration(Duration::from_millis(BLAB_MILLIS)), info!("netbench rpc counter={}", counter));
             }
             result = open_rpcs.next() => {
                 let result = match result {

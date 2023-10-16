@@ -70,8 +70,8 @@ use tokio::{runtime::Runtime, select};
 use url::Url;
 
 // Useful constants
-const KILOBYTE: usize = 1024;
-const MEGABYTE: usize = 1024 * 1024;
+const KILOBYTE: usize = 1000;
+const MEGABYTE: usize = KILOBYTE * 1000;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -529,32 +529,27 @@ fn single_test_suite(
     duration: Duration,
     test_cmd: &TestCommand,
 ) -> Result<ForgeConfig> {
+    // Check the test name against grouped test suites
+    if let Some(forge_config) = get_land_blocking_test(test_name, duration, test_cmd) {
+        return Ok(forge_config);
+    } else if let Some(forge_config) = get_multi_region_test(test_name) {
+        return Ok(forge_config);
+    } else if let Some(forge_config) = get_netbench_test(test_name) {
+        return Ok(forge_config);
+    } else if let Some(forge_config) = get_pfn_test(test_name, duration) {
+        return Ok(forge_config);
+    } else if let Some(forge_config) = get_realistic_env_test(test_name, duration, test_cmd) {
+        return Ok(forge_config);
+    } else if let Some(forge_config) = get_state_sync_test(test_name) {
+        return Ok(forge_config);
+    }
+
+    // Otherwise match the test name against single test suite instances
     let single_test_suite = match test_name {
-        // Land-blocking tests to be run on every PR:
-        "land_blocking" => land_blocking_test_suite(duration), // to remove land_blocking, superseeded by the below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
-        "compat" => compat(),
-        "framework_upgrade" => framework_upgrade(),
-        // Rest of the tests:
-        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
-        "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
-        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
-        "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
-        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         "epoch_changer_performance" => epoch_changer_performance(),
-        "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
-        "state_sync_perf_fullnodes_execute_transactions" => {
-            state_sync_perf_fullnodes_execute_transactions()
-        },
-        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(),
-        "state_sync_perf_validators" => state_sync_perf_validators(),
         "validators_join_and_leave" => validators_join_and_leave(),
         "config" => ForgeConfig::default().add_network_test(ReconfigurationTest),
         "network_partition" => network_partition(),
-        "three_region_simulation" => three_region_simulation(),
-        "three_region_simulation_with_different_node_speed" => {
-            three_region_simulation_with_different_node_speed()
-        },
         "network_bandwidth" => network_bandwidth(),
         "setup_test" => setup_test(),
         "single_vfn_perf" => single_vfn_perf(),
@@ -583,36 +578,135 @@ fn single_test_suite(
         "consensus_only_realistic_env_max_tps" => run_consensus_only_realistic_env_max_tps(),
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
-        "multiregion_benchmark_test" => multiregion_benchmark_test(),
-        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
-        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
-        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
-        "pfn_performance" => pfn_performance(duration, false, false, true),
-        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
-        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
         "gather_metrics" => gather_metrics(),
-        // Network benchmark tests
+        _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
+    };
+
+    Ok(single_test_suite)
+}
+
+/// Attempts to match the test name to a land-blocking test,
+/// and returns the corresponding ForgeConfig if one is found.
+fn get_land_blocking_test(
+    test_name: &str,
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
+        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "compat" => compat(),
+        "framework_upgrade" => framework_upgrade(),
+        _ => return None, // The test name does not match a land-blocking test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a network benchmark test,
+/// and returns the corresponding ForgeConfig if one is found.
+fn get_netbench_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        // Network tests without chaos
+        "net_bench_no_chaos_1000" => net_bench_no_chaos(MEGABYTE, 1000),
+        "net_bench_no_chaos_900" => net_bench_no_chaos(MEGABYTE, 900),
+        "net_bench_no_chaos_800" => net_bench_no_chaos(MEGABYTE, 800),
+        "net_bench_no_chaos_700" => net_bench_no_chaos(MEGABYTE, 700),
+        "net_bench_no_chaos_600" => net_bench_no_chaos(MEGABYTE, 600),
         "net_bench_no_chaos_500" => net_bench_no_chaos(MEGABYTE, 500),
+        "net_bench_no_chaos_300" => net_bench_no_chaos(MEGABYTE, 300),
+        "net_bench_no_chaos_200" => net_bench_no_chaos(MEGABYTE, 200),
         "net_bench_no_chaos_100" => net_bench_no_chaos(MEGABYTE, 100),
         "net_bench_no_chaos_50" => net_bench_no_chaos(MEGABYTE, 50),
         "net_bench_no_chaos_20" => net_bench_no_chaos(MEGABYTE, 20),
         "net_bench_no_chaos_10" => net_bench_no_chaos(MEGABYTE, 10),
         "net_bench_no_chaos_1" => net_bench_no_chaos(MEGABYTE, 1),
+
+        // Network tests with chaos
+        "net_bench_two_region_chaos_1000" => net_bench_two_region_chaos(MEGABYTE, 1000),
         "net_bench_two_region_chaos_500" => net_bench_two_region_chaos(MEGABYTE, 500),
+        "net_bench_two_region_chaos_300" => net_bench_two_region_chaos(MEGABYTE, 300),
+        "net_bench_two_region_chaos_200" => net_bench_two_region_chaos(MEGABYTE, 200),
         "net_bench_two_region_chaos_100" => net_bench_two_region_chaos(MEGABYTE, 100),
         "net_bench_two_region_chaos_50" => net_bench_two_region_chaos(MEGABYTE, 50),
+        "net_bench_two_region_chaos_30" => net_bench_two_region_chaos(MEGABYTE, 30),
         "net_bench_two_region_chaos_20" => net_bench_two_region_chaos(MEGABYTE, 20),
+        "net_bench_two_region_chaos_15" => net_bench_two_region_chaos(MEGABYTE, 15),
         "net_bench_two_region_chaos_10" => net_bench_two_region_chaos(MEGABYTE, 10),
         "net_bench_two_region_chaos_1" => net_bench_two_region_chaos(MEGABYTE, 1),
+
+        // Network tests with small messages
         "net_bench_two_region_chaos_small_messages_5" => {
             net_bench_two_region_chaos(100 * KILOBYTE, 50)
         },
         "net_bench_two_region_chaos_small_messages_1" => {
             net_bench_two_region_chaos(100 * KILOBYTE, 10)
         },
-        _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
+
+        _ => return None, // The test name does not match a network benchmark test
     };
-    Ok(single_test_suite)
+    Some(test)
+}
+
+/// Attempts to match the test name to a PFN test,
+/// and returns the corresponding ForgeConfig if one is found.
+fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
+        "pfn_const_tps_with_network_chaos" => pfn_const_tps(duration, false, true, false),
+        "pfn_const_tps_with_realistic_env" => pfn_const_tps(duration, true, true, false),
+        "pfn_performance" => pfn_performance(duration, false, false, true),
+        "pfn_performance_with_network_chaos" => pfn_performance(duration, false, true, false),
+        "pfn_performance_with_realistic_env" => pfn_performance(duration, true, true, false),
+        _ => return None, // The test name does not match a PFN test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a realistic-env test,
+/// and returns the corresponding ForgeConfig if one is found.
+fn get_realistic_env_test(
+    test_name: &str,
+    duration: Duration,
+    test_cmd: &TestCommand,
+) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
+        "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
+        "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
+        "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
+        "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
+        _ => return None, // The test name does not match a realistic-env test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a state sync test,
+/// and returns the corresponding ForgeConfig if one is found.
+fn get_state_sync_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
+        "state_sync_perf_fullnodes_execute_transactions" => {
+            state_sync_perf_fullnodes_execute_transactions()
+        },
+        "state_sync_perf_fullnodes_fast_sync" => state_sync_perf_fullnodes_fast_sync(),
+        "state_sync_perf_validators" => state_sync_perf_validators(),
+        _ => return None, // The test name does not match a state sync test
+    };
+    Some(test)
+}
+
+/// Attempts to match the test name to a multi-region test,
+/// and returns the corresponding ForgeConfig if one is found.
+fn get_multi_region_test(test_name: &str) -> Option<ForgeConfig> {
+    let test = match test_name {
+        "multiregion_benchmark_test" => multiregion_benchmark_test(),
+        "three_region_simulation" => three_region_simulation(),
+        "three_region_simulation_with_different_node_speed" => {
+            three_region_simulation_with_different_node_speed()
+        },
+        _ => return None, // The test name does not match a multi-region test
+    };
+    Some(test)
 }
 
 fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
