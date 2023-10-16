@@ -19,8 +19,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::collections::{BTreeMap, HashMap};
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
@@ -94,7 +93,7 @@ impl<'r> WriteOpConverter<'r> {
     pub(crate) fn convert_resource_group_v1(
         &self,
         state_key: &StateKey,
-        group_changes: HashMap<StructTag, MoveStorageOp<Bytes>>,
+        group_changes: HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
     ) -> Result<GroupWrite, VMStatus> {
         // Resource group metadata is stored at the group StateKey, and can be obtained via the
         // same interfaces at for a resource at a given StateKey.
@@ -158,13 +157,13 @@ impl<'r> WriteOpConverter<'r> {
 
                     let (new_size, legacy_op) = match current_op {
                         MoveStorageOp::Delete => (cur_size, WriteOp::Deletion),
-                        MoveStorageOp::Modify(new_data) => (
+                        MoveStorageOp::Modify((new_data, _)) => (
                             cur_size
                                 .checked_add(new_data.len() as u64 + tag_size)
                                 .ok_or_else(group_size_arithmetics_error)?,
                             WriteOp::Modification(new_data),
                         ),
-                        MoveStorageOp::New(data) => (
+                        MoveStorageOp::New((data, _)) => (
                             cur_size
                                 .checked_add(data.len() as u64 + tag_size)
                                 .ok_or_else(group_size_arithmetics_error)?,
@@ -179,12 +178,13 @@ impl<'r> WriteOpConverter<'r> {
         // except it encodes the (speculative) size of the group after applying the updates
         // which is used for charging storage fees. Moreover, the metadata computation occurs
         // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
+        // TODO fix layoud for RG
         let metadata_op = if post_group_size == 0 {
             MoveStorageOp::Delete
         } else if pre_group_size == 0 {
-            MoveStorageOp::New(Bytes::new())
+            MoveStorageOp::New((Bytes::new(), None))
         } else {
-            MoveStorageOp::Modify(Bytes::new())
+            MoveStorageOp::Modify((Bytes::new(), None))
         };
         Ok(GroupWrite::new(
             self.convert(state_value_metadata_result, metadata_op, false)?,
@@ -393,7 +393,7 @@ mod tests {
             (mock_tag_0(), MoveStorageOp::Delete),
             (
                 mock_tag_2(),
-                MoveStorageOp::Modify(vec![5, 5, 5, 5, 5].into()),
+                MoveStorageOp::Modify((vec![5, 5, 5, 5, 5].into(), None)),
             ),
         ]);
         let converter = WriteOpConverter::new(&resolver, false);
@@ -437,8 +437,10 @@ mod tests {
         let s = MockStateView::new(data);
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
-        let group_changes =
-            HashMap::from([(mock_tag_2(), MoveStorageOp::New(vec![3, 3, 3].into()))]);
+        let group_changes = HashMap::from([(
+            mock_tag_2(),
+            MoveStorageOp::New((vec![3, 3, 3].into(), None)),
+        )]);
         let converter = WriteOpConverter::new(&resolver, true);
         let group_write = converter
             .convert_resource_group_v1(&key, group_changes)
@@ -465,7 +467,8 @@ mod tests {
         let s = MockStateView::new(HashMap::new());
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
-        let group_changes = HashMap::from([(mock_tag_1(), MoveStorageOp::New(vec![2, 2].into()))]);
+        let group_changes =
+            HashMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
         let key = StateKey::raw(vec![0]);
         let converter = WriteOpConverter::new(&resolver, true);
         let group_write = converter

@@ -23,6 +23,7 @@ use move_core_types::{
 };
 use std::{
     collections::BTreeMap,
+    hash::Hash,
     sync::Arc,
 };
 
@@ -390,7 +391,10 @@ impl VMChangeSet {
         additional_aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         additional_aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
+<<<<<<< HEAD
         use std::collections::btree_map::Entry::{Occupied, Vacant};
+=======
+>>>>>>> ef1c13d590 (rebase artifacts)
         use WriteOp::*;
 
         // First, squash deltas.
@@ -518,8 +522,11 @@ impl VMChangeSet {
         write_set: &mut BTreeMap<StateKey, WriteOp>,
         additional_write_set: BTreeMap<StateKey, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
+<<<<<<< HEAD
         use std::collections::btree_map::Entry::{Occupied, Vacant};
 
+=======
+>>>>>>> ef1c13d590 (rebase artifacts)
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
@@ -537,8 +544,11 @@ impl VMChangeSet {
         write_set: &mut BTreeMap<StateKey, GroupWrite>,
         additional_write_set: BTreeMap<StateKey, GroupWrite>,
     ) -> anyhow::Result<(), VMStatus> {
+<<<<<<< HEAD
         use std::collections::btree_map::Entry::{Occupied, Vacant};
 
+=======
+>>>>>>> ef1c13d590 (rebase artifacts)
         for (key, additional_update) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut group_entry) => {
@@ -565,7 +575,8 @@ impl VMChangeSet {
                     if noop {
                         group_entry.remove();
                     } else {
-                        Self::squash_additional_resource_writes(
+                        // TODO change to squash_additional_resource_writes
+                        Self::squash_additional_writes(
                             &mut group_entry.get_mut().inner_ops,
                             additional_inner_ops,
                         )?;
@@ -579,7 +590,25 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_resource_writes<K: Hash + Eq + PartialEq + Ord>(
+    // TODO remove in favor of squash_additional_resource_writes
+    fn squash_additional_writes<K: Hash + Eq + PartialEq>(
+        write_set: &mut BTreeMap<K, WriteOp>,
+        additional_write_set: BTreeMap<K, WriteOp>,
+    ) -> anyhow::Result<(), VMStatus> {
+        for (key, additional_write_op) in additional_write_set.into_iter() {
+            match write_set.entry(key) {
+                Occupied(mut entry) => {
+                    squash_writes_pair!(entry, additional_write_op);
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_write_op);
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn squash_additional_resource_writes<K: Hash + Eq + PartialEq + Clone + std::fmt::Debug>(
         write_set: &mut BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         additional_write_set: BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     ) -> anyhow::Result<(), VMStatus> {
