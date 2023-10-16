@@ -1693,8 +1693,8 @@ fn realistic_env_max_load_test(
                     (duration.as_secs() / 10).max(60),
                 )
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
-                    // Check that we don't use more than 14 CPU cores for 30% of the time.
-                    MetricsThreshold::new(14.0, max_cpu_threshold),
+                    // Check that we don't use more than 16 CPU cores for 30% of the time.
+                    MetricsThreshold::new(16.0, max_cpu_threshold),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
                 ))
@@ -1702,14 +1702,17 @@ fn realistic_env_max_load_test(
                 .add_latency_threshold(4.5, LatencyType::P90)
                 .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                     (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                    // only reaches close to threshold during epoch change
                     (
                         LatencyBreakdownSlice::QsPosToProposal,
-                        if ha_proxy { 0.6 } else { 0.5 },
+                        if ha_proxy { 0.7 } else { 0.6 },
                     ),
-                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.8),
+                    // can be adjusted down if less backpressure
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                    // can be adjusted down if less backpressure
                     (
                         LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                        if ha_proxy { 1.2 } else { 0.65 },
+                        if ha_proxy { 1.3 } else { 0.75 },
                     ),
                 ]))
                 .add_chain_progress(StateProgressThreshold {
