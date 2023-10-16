@@ -9,7 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    types::DelayedFieldID,
+    types::DelayedFieldID, delayed_field_extension,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -303,8 +303,13 @@ impl TransactionWrite for ValueType {
 pub(crate) struct TransactionGenParams {
     /// Each transaction's read-set consists of between 1 and read_size-1 many reads.
     read_size: usize,
+    /// Each type layout used in the transaction contains between 0 and
+    /// type_layout_size-1 many delayed field keys.
+    type_layout_size: usize,
     /// Each mock execution will produce between 1 and output_size-1 many writes and deltas.
     output_size: usize,
+    /// Each transaction contains between 1 to event_size-1 many events.
+    event_size: usize,
     /// The number of different incarnation behaviors that a mock execution of the transaction
     /// may exhibit. For instance, incarnation_alternatives = 1 corresponds to a "static"
     /// mock execution behavior regardless of the incarnation, while value > 1 may lead to "dynamic",
@@ -327,15 +332,67 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
 		    params.incarnation_alternatives)"
     )]
     modifications: Vec<Vec<(Index, V)>>,
+
+    /// Genereate mock type layouts based on above transaction gen parameters.
+    #[proptest(
+        strategy = "vec(vec(vec(any::<Index>(), 0..params.type_layout_size), 1..params.output_size),  params.incarnation_alternatives)"
+    )]
+    modification_type_layouts: Vec<Vec<Vec<Index>>>,
+
+    /// Genereate mock type layouts based on above transaction gen parameters.
+    #[proptest(
+        strategy = "vec(vec(any::<E>(), 1..params.event_size), params.incarnation_alternatives)"
+    )]
+    events: Vec<Vec<E>>,
+
+    /// Genereate mock type layouts based on above transaction gen parameters.
+    #[proptest(
+        strategy = "vec(vec(vec(any::<Index>(), 0..params.type_layout_size), 1..params.event_size),  params.incarnation_alternatives)"
+    )]
+    event_event_layouts: Vec<Vec<Vec<Index>>>,
+    
     /// Generate gas for different incarnations of the transactions.
     #[proptest(strategy = "vec(any::<Index>(), params.incarnation_alternatives)")]
     gas: Vec<Index>,
+    
     /// Generate indices to derive random behavior for querying resource group sizes.
     /// For now hardcoding 3 resource groups.
     #[proptest(
         strategy = "vec((any::<Index>(), any::<Index>(), any::<Index>()), params.incarnation_alternatives)"
     )]
     group_size_indicators: Vec<(Index, Index, Index)>,
+}
+
+/// Mock implementation for MoveTypeLayout.
+/// Instead of describing an entire type layout, the mock implementation specifies only the
+/// list of delayed field identifiers present in the resource/event.
+#[derive(Clone, Debug)]
+pub(crate) struct MockTypeLayout {
+    pub(crate) delayed_field_keys: Vec<DelayedFieldID>
+}
+
+impl MockTypeLayout {
+    pub fn new(delayed_field_keys: Vec<DelayedFieldID>) -> Self {
+        Self {
+            delayed_field_keys
+        }
+    }
+}
+
+/// Mock implementation for MoveTypeLayout.
+/// Instead of describing an entire type layout, the mock implementation specifies only the
+/// list of delayed field identifiers present in the resource/event.
+#[derive(Clone, Debug)]
+pub(crate) struct MockTypeLayout {
+    pub(crate) delayed_field_keys: Vec<DelayedFieldID>
+}
+
+impl MockTypeLayout {
+    pub fn new(delayed_field_keys: Vec<DelayedFieldID>) -> Self {
+        Self {
+            delayed_field_keys
+        }
+    }
 }
 
 /// Describes behavior of a particular incarnation of a mock transaction, as keys to be read,
@@ -352,7 +409,7 @@ pub(crate) struct MockIncarnation<K, E> {
     /// A vector of keys to be read during mock incarnation execution.
     pub(crate) reads: Vec<K>,
     /// A vector of keys and corresponding values to be written during mock incarnation execution.
-    pub(crate) writes: Vec<(K, ValueType)>,
+    pub(crate) writes: Vec<(K, ValueType, MockTypeLayout)>,
     pub(crate) group_reads: Vec<(K, u32)>,
     pub(crate) group_writes: Vec<(K, HashMap<u32, ValueType>)>,
     /// Keys to query group size for
@@ -360,7 +417,7 @@ pub(crate) struct MockIncarnation<K, E> {
     /// A vector of keys and corresponding deltas to be produced during mock incarnation execution.
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     /// A vector of events.
-    pub(crate) events: Vec<E>,
+    pub(crate) events: Vec<(E, MockTypeLayout)>,
     /// total execution gas to be charged for mock incarnation execution.
     pub(crate) gas: u64,
 }
@@ -455,6 +512,8 @@ impl TransactionGenParams {
     pub fn new_dynamic() -> Self {
         TransactionGenParams {
             read_size: 10,
+            type_layout_size: 5,
+            event_size: 5,
             output_size: 5,
             incarnation_alternatives: 5,
         }
@@ -465,6 +524,8 @@ impl Default for TransactionGenParams {
     fn default() -> Self {
         TransactionGenParams {
             read_size: 10,
+            type_layout_size: 5,
+            event_size: 5,
             output_size: 5,
             incarnation_alternatives: 1,
         }
@@ -475,47 +536,93 @@ impl Default for TransactionGenParams {
 // TODO: consider adding writes to reads (read-before-write). Similar behavior to the Move-VM
 // and may force more testing (since we check read results).
 impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
-    fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
-        // TODO: disentangle writes and deltas.
+    
+    fn writes_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+        key_universe: &[K],
+        gen: Vec<Vec<(Index, V)>>,
+        layout_universe: Vec<Vec<Vec<DelayedFieldID>>>,
+        module_write_fn: &dyn Fn(usize) -> bool,
+        delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
+        allow_deletes: bool,
+    ) -> Vec<
+        /* writes = */ Vec<(KeyType<K>, ValueType, MockTypeLayout)>
+    > {
+        let mut ret = vec![];
+        for (incarnation, write_gen) in gen.iter().enumerate() {
+            let mut keys_modified = BTreeSet::new();
+            let mut incarnation_writes = vec![];
+            for (idx, value) in write_gen.into_iter() {
+                let i = idx.index(key_universe.len());
+                let key = key_universe[i].clone();
+                let layout = MockTypeLayout::new(layout_universe[incarnation][idx].clone());
+                if !keys_modified.contains(&key) {
+                    keys_modified.insert(key.clone());
+                    if let None = delta_fn(i, &value) {
+                        // One out of 23 writes will be a deletion
+                        let is_deletion = allow_deletes
+                            && ValueType::from_value(value.clone(), true)
+                                .as_u128()
+                                .unwrap()
+                                .unwrap()
+                                % 23
+                                == 0;
+                        incarnation_writes.push((
+                            KeyType(key, module_write_fn(i)),
+                            ValueType::from_value(value.clone(), !is_deletion),
+                            layout
+                        ));
+                    }
+                }
+            }
+            ret.push(incarnation_writes);
+        }
+        ret
+    }
+
+    fn deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
-    ) -> Vec<(
-        /* writes = */ Vec<(KeyType<K>, ValueType)>,
+    ) -> Vec<
         /* deltas = */ Vec<(KeyType<K>, DeltaOp)>,
-    )> {
+    > {
         let mut ret = vec![];
         for write_gen in gen.into_iter() {
             let mut keys_modified = BTreeSet::new();
-            let mut incarnation_writes = vec![];
             let mut incarnation_deltas = vec![];
             for (idx, value) in write_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
-                    match delta_fn(i, &value) {
-                        Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
-                        None => {
-                            // One out of 23 writes will be a deletion
-                            let is_deletion = allow_deletes
-                                && ValueType::from_value(value.clone(), true)
-                                    .as_u128()
-                                    .unwrap()
-                                    .unwrap()
-                                    % 23
-                                    == 0;
-                            incarnation_writes.push((
-                                KeyType(key, module_write_fn(i)),
-                                ValueType::from_value(value.clone(), !is_deletion),
-                            ));
-                        },
+                    if let Some(delta) = delta_fn(i, &value) {
+                        incarnation_deltas.push((KeyType(key, false), delta));
                     }
                 }
             }
-            ret.push((incarnation_writes, incarnation_deltas));
+            ret.push(incarnation_deltas);
+        }
+        ret
+    }
+
+    fn events_from_gen(
+        num_incarnations: usize,
+        layout_universe: Vec<Vec<Vec<DelayedFieldID>>>,
+        event_universe: Vec<Vec<Vec<E>>>,
+    ) -> Vec<
+        /* events = */ Vec<(E, MockTypeLayout)>,
+    > {
+        let mut ret = vec![];
+        for incarnation in 0..num_incarnations {
+            let mut incarnation_events = vec![];
+            let layout = MockTypeLayout::new(layout_universe.get(incarnation).unwrap_or(&Vec::<DelayedFieldID>::new()).clone());
+            let events = event_universe[incarnation];
+            for (idx, event) in events.enumerate() {
+                incarnation_events.push((event, layout_universe[incarnation][idx]));
+            }
+            ret.push(incarnation_events);
         }
         ret
     }
@@ -563,33 +670,50 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord, E: Debug + Clone + ReadWriteEvent>(
         self,
-        universe: &[K],
+        key_universe: &[K],
         module_read_fn: &dyn Fn(usize) -> bool,
         module_write_fn: &dyn Fn(usize) -> bool,
         delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
         allow_deletes: bool,
     ) -> MockTransaction<KeyType<K>, E> {
-        let reads = Self::reads_from_gen(universe, self.reads, &module_read_fn);
+        let reads = Self::reads_from_gen(key_universe, self.reads, &module_read_fn);
         let gas = Self::gas_from_gen(self.gas);
-
-        let behaviors = Self::writes_and_deltas_from_gen(
-            universe,
+        let modification_type_layouts = self.modification_type_layouts.iter().map(|incarnation_layout| incarnation_layout.iter().map(|layout| layout.iter().map(|idx| DelayedFieldID::new(idx.index(u64::MAX as usize) as u64)).collect()).collect()).collect();
+        let event_type_layouts = self.event_type_layouts.iter().map(|incarnation_layout| incarnation_layout.iter().map(|layout| layout.iter().map(|idx| DelayedFieldID::new(idx.index(u64::MAX as usize) as u64)).collect()).collect()).collect();
+        let num_incarnations = self.modifications.len();
+        let writes = Self::writes_from_gen(
+            key_universe,
+            self.modifications,
+            modification_type_layouts,
+            &module_write_fn,
+            &delta_fn,
+            allow_deletes,
+        );
+        let deltas = Self::deltas_from_gen(
+            key_universe,
             self.modifications,
             &module_write_fn,
             &delta_fn,
             allow_deletes,
-        )
+        );
+        // let events = Self::events_from_gen(
+        //     num_incarnations,
+        //     event_type_layouts,
+        //     self.events
+        // );
+        let events = vec![];
+        let behaviors = writes
         .into_iter()
+        .zip(deltas)
         .zip(reads)
         .zip(gas)
-        .map(|(((writes, deltas), reads), gas)| {
-            MockIncarnation::new(
-                reads,
-                writes,
-                deltas,
-                vec![], // events
-                gas,
-            )
+        .zip(events)
+        .map(|((((writes, deltas), reads), gas), events)| MockIncarnation {
+            reads,
+            writes,
+            deltas,
+            events,
+            gas,
         })
         .collect();
 
