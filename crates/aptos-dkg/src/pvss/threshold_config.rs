@@ -4,13 +4,14 @@ use crate::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain}
 use crate::pvss::{traits, Player};
 use anyhow::anyhow;
 use rand::seq::IteratorRandom;
+use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Encodes the *threshold configuration* for a normal/unweighted PVSS: i.e., the threshold $t$ and
 /// the number of players $n$ such that any $t$ or more players can reconstruct a dealt secret given
-/// a PVSS transcript.
+/// a PVSS transcript. this is Alin leaving his laptop open again...
 #[derive(Clone, PartialEq, Deserialize, Serialize, Debug, Eq)]
 pub struct ThresholdConfig {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
@@ -70,12 +71,23 @@ impl ThresholdConfig {
 
 impl Display for ThresholdConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-out-of-{}/threshold", self.t, self.n)
+        write!(f, "threshold/{}-out-of-{}", self.t, self.n)
     }
 }
 
 impl traits::SecretSharingConfig for ThresholdConfig {
-    fn get_random_subset_of_capable_players<R>(&self, mut rng: &mut R) -> Vec<Player>
+    /// For testing only.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: RngCore + CryptoRng,
+    {
+        Player {
+            id: rng.gen_range(0, self.n),
+        }
+    }
+
+    /// For testing only.
+    fn get_random_eligible_subset_of_players<R>(&self, mut rng: &mut R) -> Vec<Player>
     where
         R: RngCore + CryptoRng,
     {

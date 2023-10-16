@@ -2,7 +2,7 @@
 
 use crate::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain};
 use crate::algebra::fft;
-use crate::pvss::das::InputSecret;
+use crate::pvss::input_secret::InputSecret;
 use crate::pvss::ThresholdConfig;
 use crate::utils::is_power_of_two;
 use crate::utils::random::random_scalars;
@@ -10,6 +10,21 @@ use blstrs::Scalar;
 use ff::Field;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
+
+/// Returns $\[1, \tau, \tau^2, \tau^3, \ldots, \tau^{n-1}\]$.
+pub fn get_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
+    let mut taus = Vec::with_capacity(n);
+
+    taus.push(Scalar::ONE);
+
+    // Compute \tau^i, for all i \in [0, n]
+    for _ in 0..n - 1 {
+        taus.push(taus.last().unwrap().mul(tau));
+    }
+    debug_assert_eq!(taus.len(), n);
+
+    taus
+}
 
 /// Returns the size of the evaluation domain needed to multiply these two polynomials via FFT.
 pub fn get_evaluation_dom_size_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scalar>) -> usize {

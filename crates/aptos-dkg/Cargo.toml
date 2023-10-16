@@ -47,7 +47,7 @@ name = "crypto"
 harness = false
 
 [[bench]]
-name = "vrf"
+name = "weighted_vuf"
 harness = false
 
 [[bench]]

@@ -32,7 +32,7 @@ pub struct DKGPvssConfig {
     pub epoch: u64,
     pub wc_1: <WT as Transcript>::SecretSharingConfig,
     pub wc_2: <WT as Transcript>::SecretSharingConfig,
-    pub pp: <WT as Transcript>::PvssPublicParameters,
+    pub pp: <WT as Transcript>::PublicParameters,
     pub eks: Vec<<DT as Transcript>::EncryptPubKey>,
 }
 
@@ -41,7 +41,7 @@ impl DKGPvssConfig {
         epoch: u64,
         wc_1: <WT as Transcript>::SecretSharingConfig,
         wc_2: <WT as Transcript>::SecretSharingConfig,
-        pp: <das::Transcript as Transcript>::PvssPublicParameters,
+        pp: <das::Transcript as Transcript>::PublicParameters,
         eks: Vec<<das::Transcript as Transcript>::EncryptPubKey>,
     ) -> Self {
         Self {

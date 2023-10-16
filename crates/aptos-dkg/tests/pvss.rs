@@ -133,8 +133,8 @@ fn transcript_size() {
 }
 
 #[test]
-fn sok_of_input_secret_test() {
-    panic!("This test is just a reminder that all implemented PVSS schemes are not safe for a PVSS-based DKG without a SoK of the dealt input secret. Consult [GJM+21e] in README.md.")
+fn scrape_sok_of_input_secret_test() {
+    panic!("This test is just a reminder that SCRAPE PVSS is not safe to use in a DKG without a SoK of the dealt input secret. Currently, only Das PVSS has this SoK implemented.")
 }
 
 fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t: usize, n: usize) {
@@ -197,7 +197,7 @@ fn assert_dsk_reconstructs<T: Transcript + CryptoHash>(
 ) {
     // Test reconstruction from t random shares
     let players_and_shares = sc
-        .get_random_subset_of_capable_players(&mut rng)
+        .get_random_eligible_subset_of_players(&mut rng)
         .into_iter()
         .map(|p| {
             let (sk, _) = trx.decrypt_own_share(&sc, &p, &dks[p.get_id()]);

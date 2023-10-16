@@ -6,7 +6,7 @@ use aptos_dkg::pvss::{
     das::{DealtSecretKey, InputSecret, PublicParameters},
     encryption_dlog::g1::DecryptPrivKey,
     traits::{Convert, Reconstructable, Transcript},
-    weighted::weighting::WeightedKey,
+    weighted::weighted_transcript::WeightedKey,
     Player, WeightedConfig, WeightedTranscript,
 };
 use aptos_forge::LocalSwarm;

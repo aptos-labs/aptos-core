@@ -19,7 +19,7 @@ macro_rules! dealt_pub_key_impl {
         pub(crate) const DEALT_PK_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
 
         /// The *dealt public key* associated with the the secret key that was dealt via the PVSS transcript.
-        #[derive(DeserializeKey, Clone, SerializeKey)]
+        #[derive(DeserializeKey, Clone, Debug, SerializeKey, PartialEq, Eq)]
         pub struct DealtPubKey {
             /// A group element $g_1^a \in G$, where $G$ is $G_1$, $G_2$ or $G_T$
             g_a: $GTProjective,
@@ -36,6 +36,10 @@ macro_rules! dealt_pub_key_impl {
 
             pub fn to_bytes(&self) -> [u8; DEALT_PK_NUM_BYTES] {
                 self.g_a.to_compressed()
+            }
+
+            pub fn as_group_element(&self) -> &$GTProjective {
+                &self.g_a
             }
         }
 

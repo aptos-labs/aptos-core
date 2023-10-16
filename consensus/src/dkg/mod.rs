@@ -57,7 +57,7 @@ pub fn build_dkg_pvss_config(
     let wc_1 = dkg_rounding.config_fallback.clone();
     let wc_2 = dkg_rounding.config_optimistic.clone();
 
-    let pp = <WeightedTranscript<das::Transcript> as Transcript>::PvssPublicParameters::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
+    let pp = <WeightedTranscript<das::Transcript> as Transcript>::PublicParameters::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
 
     let dkg_pvss_config =
         DKGPvssConfig::new(cur_epoch, wc_1.clone(), wc_2.clone(), pp, consensus_keys);

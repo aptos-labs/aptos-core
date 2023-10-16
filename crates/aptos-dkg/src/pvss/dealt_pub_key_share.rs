@@ -2,10 +2,12 @@
 
 macro_rules! dealt_pub_key_share_impl {
     (
+        $GTProjective:ident,
         $gt:ident
     ) => {
         use crate::pvss::dealt_pub_key::$gt::DealtPubKey;
         use crate::pvss::dealt_pub_key::$gt::DEALT_PK_NUM_BYTES;
+        use blstrs::$GTProjective;
 
         use aptos_crypto::{
             CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
@@ -16,7 +18,7 @@ macro_rules! dealt_pub_key_share_impl {
         pub(crate) const DEALT_PK_SHARE_NUM_BYTES: usize = DEALT_PK_NUM_BYTES;
 
         /// A player's *share* of the *dealt public key* from above.
-        #[derive(DeserializeKey, Clone, SerializeKey)]
+        #[derive(DeserializeKey, Clone, Debug, SerializeKey, PartialEq, Eq)]
         pub struct DealtPubKeyShare(pub(crate) DealtPubKey);
 
         //
@@ -24,8 +26,16 @@ macro_rules! dealt_pub_key_share_impl {
         //
 
         impl DealtPubKeyShare {
+            pub fn new(dealt_pk: DealtPubKey) -> Self {
+                DealtPubKeyShare(dealt_pk)
+            }
+
             pub fn to_bytes(&self) -> [u8; DEALT_PK_SHARE_NUM_BYTES] {
                 self.0.to_bytes()
+            }
+
+            pub fn as_group_element(&self) -> &$GTProjective {
+                self.0.as_group_element()
             }
         }
 
@@ -47,9 +57,9 @@ macro_rules! dealt_pub_key_share_impl {
 }
 
 pub mod g1 {
-    dealt_pub_key_share_impl!(g1);
+    dealt_pub_key_share_impl!(G1Projective, g1);
 }
 
 pub mod g2 {
-    dealt_pub_key_share_impl!(g2);
+    dealt_pub_key_share_impl!(G2Projective, g2);
 }

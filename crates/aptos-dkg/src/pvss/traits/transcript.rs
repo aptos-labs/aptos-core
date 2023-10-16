@@ -47,7 +47,7 @@
 //! does not hold.
 
 use crate::pvss::traits::{
-    Convert, HasEncryptionPublicParams, IsSecretShareable, Reconstructable, SecretSharingConfig,
+    Convert, HasEncryptionPublicParams, Reconstructable, SecretSharingConfig,
 };
 use crate::pvss::Player;
 use anyhow::bail;
@@ -64,7 +64,6 @@ use std::ops::AddAssign;
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
-/// TODO: rename to AuthenticatedTranscript?
 pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type SecretSharingConfig: SecretSharingConfig
         + DeserializeOwned
@@ -73,7 +72,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + PartialEq
         + Eq;
 
-    type PvssPublicParameters: HasEncryptionPublicParams
+    type PublicParameters: HasEncryptionPublicParams
         + Default
         + ValidCryptoMaterial
         + DeserializeOwned
@@ -86,18 +85,17 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
 
     type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKeyShare;
-    type DealtSecretKey: Debug
+    type DealtPubKeyShare: Clone;
+    type DealtSecretKey: Debug // TODO(Security): Kind of unsafe to have this...
         + PartialEq
-        + IsSecretShareable<Share = Self::DealtSecretKeyShare>
-        + Reconstructable<SecretSharingConfig = Self::SecretSharingConfig>;
+        + Reconstructable<Self::SecretSharingConfig, Share = Self::DealtSecretKeyShare>;
     type DealtPubKey;
 
     type InputSecret: Uniform
         + Zero
         + for<'a> AddAssign<&'a Self::InputSecret>
-        + Convert<Self::DealtSecretKey, Self::PvssPublicParameters>
-        + Convert<Self::DealtPubKey, Self::PvssPublicParameters>;
+        + Convert<Self::DealtSecretKey, Self::PublicParameters>
+        + Convert<Self::DealtPubKey, Self::PublicParameters>;
 
     type EncryptPubKey: Debug
         + Clone
@@ -106,11 +104,11 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Serialize
         + PartialEq
         + Eq;
-    type DecryptPrivKey: Debug
+    type DecryptPrivKey: Debug // TODO(Security): Kind of unsafe to have this...
         + Uniform
         + Convert<
             Self::EncryptPubKey,
-            <Self::PvssPublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
+            <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
 
     /// Return a developer-friendly name of the PVSS scheme (e.g., "vanilla_scrape") that can be
@@ -125,7 +123,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// be needed for the security of higher-level protocols; e.g., replay protection).
     fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
@@ -144,7 +142,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
         aux: &Vec<A>,

@@ -7,4 +7,4 @@ pub mod algebra;
 pub mod constants;
 pub mod pvss;
 pub mod utils;
-pub mod vrf;
+pub mod weighted_vuf;

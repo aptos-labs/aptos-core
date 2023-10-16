@@ -8,9 +8,9 @@ use std::fmt::Display;
 
 pub use transcript::Transcript;
 
-/// Converts a type `Self` to `D` using auxiliary data from type `W`.
-pub trait Convert<D, W> {
-    fn to(&self, with: &W) -> D;
+/// Converts a type `Self` to `ToType` using auxiliary data from type `AuxType`.
+pub trait Convert<ToType, AuxType> {
+    fn to(&self, with: &AuxType) -> ToType;
 }
 
 /// All PVSS public parameters must give access to the encryption public params.
@@ -18,11 +18,6 @@ pub trait HasEncryptionPublicParams {
     type EncryptionPublicParameters;
 
     fn get_encryption_public_params(&self) -> &Self::EncryptionPublicParameters;
-}
-
-/// A trait for keys that are secret-shareable and have an associated `Share` type.
-pub trait IsSecretShareable {
-    type Share: Clone;
 }
 
 pub trait SecretSharingConfig: Display {
@@ -34,9 +29,14 @@ pub trait SecretSharingConfig: Display {
         Player { id: i }
     }
 
+    /// Useful during testing.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng;
+
     /// Returns a random subset of players who are capable of reconstructing the secret.
     /// Useful during testing.
-    fn get_random_subset_of_capable_players<R>(&self, rng: &mut R) -> Vec<Player>
+    fn get_random_eligible_subset_of_players<R>(&self, rng: &mut R) -> Vec<Player>
     where
         R: rand_core::RngCore + rand_core::CryptoRng;
 
@@ -46,8 +46,8 @@ pub trait SecretSharingConfig: Display {
 }
 
 /// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
-pub trait Reconstructable: IsSecretShareable {
-    type SecretSharingConfig: SecretSharingConfig;
+pub trait Reconstructable<SSC: SecretSharingConfig> {
+    type Share: Clone;
 
-    fn reconstruct(sc: &Self::SecretSharingConfig, shares: &Vec<(Player, Self::Share)>) -> Self;
+    fn reconstruct(sc: &SSC, shares: &Vec<(Player, Self::Share)>) -> Self;
 }

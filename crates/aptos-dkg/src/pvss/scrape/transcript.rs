@@ -60,7 +60,7 @@ impl TryFrom<&[u8]> for Transcript {
 
 impl traits::Transcript for Transcript {
     type SecretSharingConfig = ThresholdConfig;
-    type PvssPublicParameters = scrape::PublicParameters;
+    type PublicParameters = scrape::PublicParameters;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
     type DealtSecretKeyShare = scrape::DealtSecretKeyShare;
@@ -77,7 +77,7 @@ impl traits::Transcript for Transcript {
 
     fn deal<A: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
@@ -108,7 +108,7 @@ impl traits::Transcript for Transcript {
     fn verify<A: Serialize>(
         &self,
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         _spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
         _aux: &Vec<A>,

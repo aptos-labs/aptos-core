@@ -1,11 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::pvss::traits::{
-    Convert, IsSecretShareable, Reconstructable, SecretSharingConfig, Transcript,
-};
+use crate::pvss::traits::{Reconstructable, SecretSharingConfig, Transcript};
 use crate::pvss::{Player, ThresholdConfig, WeightedConfig};
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher, SilentDebug, SilentDisplay};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -17,63 +15,12 @@ pub struct WeightedTranscript<T> {
     trx: T,
 }
 
-#[derive(SilentDisplay, SilentDebug, PartialEq)]
-/// Wrapper around a key, whether a `Transcript::DealtSecretKey` or a `Transcript::DealtSecretKeyShare`.
-/// Helps us override the `Reconstructable` trait for a weighted dealt secret key, which is
-/// implemented as a `Wrapper<Transcript::DealtSecretKey>` and has a
-/// `Vec<Transcript::DealtSecretKeyShare>` as its associated `Share` type (via the `IsSecretShareable`
-/// trait).
-pub struct WeightedKey<Key> {
-    key: Key,
-}
-
-// impl<Key> fmt::Debug for WeightedKey<Key>
-// where
-//     Key: Debug,
-// {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-//         write!(f, "{:?}", self.key)
-//     }
-// }
-
-impl<Key> WeightedKey<Key> {
-    /// Helpful for debugging in tests by calling `WeightedKey<Key>::sub_key().to_bytes()` since I could
-    /// not implement the `ValidCryptoMaterial` trait here due to the non-generic `DeserializeKey`
-    /// procedural macro, which I could not fix up.
-    pub fn sub_key(&self) -> &Key {
-        &self.key
-    }
-}
-
-/// Implements conversion from `T::InputSecret` to `WeightedKey<T::DealtSecretKey>` and
-/// `WeightedKey<T::DealtPubKey>` where `T` is an unweighted `Transcript`.
-impl<InputSecret, Key, PublicParameters> Convert<WeightedKey<Key>, PublicParameters> for InputSecret
-where
-    InputSecret: Convert<Key, PublicParameters>,
-{
-    fn to(&self, with: &PublicParameters) -> WeightedKey<Key> {
-        WeightedKey { key: self.to(with) }
-    }
-}
-
-/// In a weighted PVSS transcript, each player gets a number of shares proportional to that player's
-/// weight. As a result, the typing of a *weighted* dealt secret key share needs to now be a vector
-/// of *unweighted* dealt secret key shares.
-///
-/// Associates `Vec<SK::Share>` as the dealt secret key share type of a `WeightedKey<T::SK>`, where `T`
-/// is in an unweighted `Transcript`.
-impl<SK: IsSecretShareable> IsSecretShareable for WeightedKey<SK> {
+/// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
+/// implementation of `SK`.
+impl<SK: Reconstructable<ThresholdConfig>> Reconstructable<WeightedConfig> for SK {
     type Share = Vec<SK::Share>;
-}
 
-/// Implements weighted reconstruction of a secret `WeightedKey<SK>` through the existing unweighted
-/// reconstruction implementation of `SK`.
-impl<SK: IsSecretShareable + Reconstructable<SecretSharingConfig = ThresholdConfig>> Reconstructable
-    for WeightedKey<SK>
-{
-    type SecretSharingConfig = WeightedConfig;
-
-    fn reconstruct(sc: &Self::SecretSharingConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
+    fn reconstruct(sc: &WeightedConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
 
         // println!();
@@ -82,7 +29,7 @@ impl<SK: IsSecretShareable + Reconstructable<SecretSharingConfig = ThresholdConf
             //     "Flattening {} share(s) for player {player}",
             //     sub_shares.len()
             // );
-            for (pos, share) in (*sub_shares).iter().enumerate() {
+            for (pos, share) in sub_shares.iter().enumerate() {
                 let virtual_player = sc.get_virtual_player(player, pos);
 
                 // println!(
@@ -90,13 +37,12 @@ impl<SK: IsSecretShareable + Reconstructable<SecretSharingConfig = ThresholdConf
                 //     share
                 // );
                 // TODO(Performance): Avoiding the cloning here might be nice
-                flattened_shares.push((virtual_player, share.clone()));
+                let tuple = (virtual_player, share.clone());
+                flattened_shares.push(tuple);
             }
         }
 
-        WeightedKey {
-            key: SK::reconstruct(sc.get_threshold_config(), &flattened_shares),
-        }
+        SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
     }
 }
 
@@ -137,7 +83,7 @@ impl<T: Transcript> WeightedTranscript<T> {
 
 impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for WeightedTranscript<T> {
     type SecretSharingConfig = WeightedConfig;
-    type PvssPublicParameters = T::PvssPublicParameters;
+    type PublicParameters = T::PublicParameters;
 
     type SigningSecretKey = T::SigningSecretKey;
     type SigningPubKey = T::SigningPubKey;
@@ -146,8 +92,8 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
     /// PVSS, whose size is proportional to the weight of the owning player.
     type DealtSecretKeyShare = Vec<T::DealtSecretKeyShare>;
     type DealtPubKeyShare = Vec<T::DealtPubKeyShare>;
-    type DealtSecretKey = WeightedKey<T::DealtSecretKey>;
-    type DealtPubKey = WeightedKey<T::DealtPubKey>;
+    type DealtSecretKey = T::DealtSecretKey;
+    type DealtPubKey = T::DealtPubKey;
     type InputSecret = T::InputSecret;
     type EncryptPubKey = T::EncryptPubKey;
     type DecryptPrivKey = T::DecryptPrivKey;
@@ -158,7 +104,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
 
     fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
@@ -186,7 +132,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         spk: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
         aux: &Vec<A>,
@@ -212,9 +158,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        WeightedKey {
-            key: T::get_dealt_public_key(&self.trx),
-        }
+        T::get_dealt_public_key(&self.trx)
     }
 
     fn decrypt_own_share(

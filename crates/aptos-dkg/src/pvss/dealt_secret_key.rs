@@ -58,6 +58,10 @@ macro_rules! dealt_secret_key_impl {
             pub fn to_bytes(&self) -> [u8; DEALT_SK_NUM_BYTES] {
                 self.h_hat.to_compressed()
             }
+
+            pub fn as_group_element(&self) -> &$GTProjective {
+                &self.h_hat
+            }
         }
 
         // impl fmt::Debug for DealtSecretKey {
@@ -74,12 +78,8 @@ macro_rules! dealt_secret_key_impl {
             }
         }
 
-        impl traits::IsSecretShareable for DealtSecretKey {
+        impl traits::Reconstructable<ThresholdConfig> for DealtSecretKey {
             type Share = DealtSecretKeyShare;
-        }
-
-        impl traits::Reconstructable for DealtSecretKey {
-            type SecretSharingConfig = ThresholdConfig;
 
             /// Reconstructs the `DealtSecretKey` given a sufficiently-large subset of shares from players.
             /// Mainly used for testing the PVSS transcript dealing and decryption.

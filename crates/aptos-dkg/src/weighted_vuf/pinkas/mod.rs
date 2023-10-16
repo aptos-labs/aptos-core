@@ -1,0 +1,239 @@
+use crate::algebra::lagrange::lagrange_coefficients;
+use crate::algebra::polynomials::get_powers_of_tau;
+use crate::pvss;
+use crate::pvss::traits::HasEncryptionPublicParams;
+use crate::pvss::{Player, WeightedConfig};
+use crate::utils::random::random_scalar;
+use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
+use crate::weighted_vuf::traits::{VerifiableWUF, WeightedUF};
+use anyhow::bail;
+use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
+use ff::Field;
+use group::{Curve, Group};
+use rand::thread_rng;
+use serde::{Deserialize, Serialize};
+use std::ops::{Mul, Neg};
+
+pub struct PinkasWUF;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RandomizedPKs {
+    g_to_r: G1Projective,   // \hat{g}^{r}
+    rks: Vec<G1Projective>, // g^{r \sk_i}, for all shares i
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PublicParameters {
+    g: G1Projective,
+    g_hat: G2Projective,
+}
+
+impl From<&pvss::das::PublicParameters> for PublicParameters {
+    fn from(pp: &pvss::das::PublicParameters) -> Self {
+        PublicParameters {
+            g: pp.get_encryption_public_params().message_base().clone(),
+            g_hat: pp.get_commitment_base().clone(),
+        }
+    }
+}
+
+/// Implements the Pinkas weighted VUF scheme, compatible with *any* PVSS scheme with the right kind
+/// of secret key and public key.
+impl WeightedUF for PinkasWUF {
+    type PublicParameters = PublicParameters;
+    type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
+    type PubKeyShare = Vec<pvss::dealt_pub_key_share::g2::DealtPubKeyShare>;
+    type SecretKeyShare = Vec<pvss::dealt_secret_key_share::g1::DealtSecretKeyShare>;
+
+    // /// Note: Our BLS PKs are currently in G_1.
+    // type BlsPubKey = bls12381::PublicKey;
+    // type BlsSecretKey = bls12381::PrivateKey;
+
+    type Delta = RandomizedPKs;
+
+    type AugmentedPubKeyShare = (RandomizedPKs, Self::PubKeyShare);
+    type AugmentedSecretKeyShare = (Scalar, Self::SecretKeyShare);
+
+    type ProofShare = G2Projective;
+    type Proof = Self::Evaluation;
+
+    /// Note: The aggregated VUF proof is not verifiable.
+    type Evaluation = Gt;
+
+    fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
+        pp: &Self::PublicParameters,
+        sk: Self::SecretKeyShare,
+        pk: Self::PubKeyShare,
+        // lsk: &Self::BlsSecretKey,
+        rng: &mut R,
+    ) -> (Self::AugmentedSecretKeyShare, Self::AugmentedPubKeyShare) {
+        // TODO: ensure r is not zero, in case of bad RNG (should probably panic).
+        let r = random_scalar(rng);
+
+        let rpks = RandomizedPKs {
+            g_to_r: pp.g.mul(&r),
+            rks: sk
+                .iter()
+                .map(|sk| sk.as_group_element().mul(&r))
+                .collect::<Vec<G1Projective>>(),
+        };
+
+        ((r, sk), (rpks, pk))
+    }
+
+    fn get_public_delta(apk: &Self::AugmentedPubKeyShare) -> &Self::Delta {
+        let (rpks, _) = apk;
+
+        rpks
+    }
+
+    fn augment_pubkey(
+        pp: &Self::PublicParameters,
+        pk: Self::PubKeyShare,
+        // lpk: &Self::BlsPubKey,
+        delta: Self::Delta,
+    ) -> anyhow::Result<Self::AugmentedPubKeyShare> {
+        if delta.rks.len() != pk.len() {
+            bail!(
+                "Expected PKs and RKs to be of the same length. Got {} and {}, respectively.",
+                delta.rks.len(),
+                pk.len()
+            );
+        }
+
+        // TODO: Fiat-Shamir transform instead of RNG
+        let tau = random_scalar(&mut thread_rng());
+
+        let pks = pk
+            .iter()
+            .map(|pk| *pk.as_group_element())
+            .collect::<Vec<G2Projective>>();
+        let taus = get_powers_of_tau(&tau, pks.len());
+
+        let pks_combined = g2_multi_exp(&pks[..], &taus[..]);
+        let rks_combined = g1_multi_exp(&delta.rks[..], &taus[..]);
+
+        let result = multi_pairing(
+            [&delta.g_to_r, &rks_combined].into_iter(),
+            [&pks_combined, &pp.g_hat.neg()].into_iter(),
+        );
+
+        if (!result.is_identity()).into() {
+            bail!("RPKs were not correctly randomized.");
+        }
+
+        Ok((delta, pk))
+    }
+
+    fn create_share(ask: &Self::AugmentedSecretKeyShare, msg: &[u8]) -> Self::ProofShare {
+        let (r, _) = ask;
+
+        let hash = Self::hash_to_curve(msg);
+
+        // TODO(Performance): store inverted in ask
+        hash.mul(r.invert().unwrap())
+    }
+
+    fn verify_share(
+        pp: &Self::PublicParameters,
+        apk: &Self::AugmentedPubKeyShare,
+        msg: &[u8],
+        proof: &Self::ProofShare,
+    ) -> anyhow::Result<()> {
+        let delta = Self::get_public_delta(apk);
+
+        let h = Self::hash_to_curve(msg);
+
+        // TODO(Performance): Avoid negation here.
+        let result = multi_pairing(
+            [&delta.g_to_r, &pp.g.neg()].into_iter(),
+            [proof, &h].into_iter(),
+        );
+
+        if (!result.is_identity()).into() {
+            bail!("PinkasWVUF ProofShare failed to verify.");
+        }
+
+        Ok(())
+    }
+
+    fn aggregate_shares(
+        wc: &WeightedConfig,
+        apks_and_proofs: &[(Player, Self::AugmentedPubKeyShare, Self::ProofShare)],
+    ) -> Self::Proof {
+        // Collect all the evaluation points associated with each player's augmented pubkey sub shares.
+        let mut sub_player_ids = Vec::with_capacity(wc.get_total_weight());
+
+        for (i, apk_share, _) in apks_and_proofs {
+            for j in 0..apk_share.1.len() {
+                sub_player_ids.push(wc.get_virtual_player(i, j).id);
+            }
+        }
+
+        // Compute the Lagrange coefficients associated with those evaluation points
+        let batch_dom = wc.get_batch_evaluation_domain();
+        let lagr = lagrange_coefficients(batch_dom, &sub_player_ids[..], &Scalar::ZERO);
+
+        // Interpolate the WVUF Proof
+        let mut k = 0;
+        let mut lhs = Vec::with_capacity(apks_and_proofs.len());
+        let mut rhs = Vec::with_capacity(apks_and_proofs.len());
+        for (_, apk_share, proof) in apks_and_proofs {
+            // println!(
+            //     "Flattening {} share(s) for player {player}",
+            //     sub_shares.len()
+            // );
+            let rks = &apk_share.0.rks;
+            let num_shares = rks.len();
+
+            rhs.push(proof);
+            lhs.push(g1_multi_exp(&rks[..], &lagr[k..k + num_shares]));
+
+            k += num_shares;
+        }
+
+        multi_pairing(lhs.iter().map(|r| r), rhs.into_iter())
+    }
+
+    fn eval(sk: &Self::SecretKey, msg: &[u8]) -> Self::Evaluation {
+        let h = Self::hash_to_curve(msg).to_affine();
+
+        pairing(&sk.as_group_element().to_affine(), &h)
+    }
+
+    // NOTE: This VUF has the same evaluation as its proof
+    fn derive_eval(_msg: &[u8], proof: &Self::Proof) -> Self::Evaluation {
+        *proof
+    }
+}
+
+// TODO: remove
+impl VerifiableWUF for PinkasWUF {
+    type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
+    type PubKey = pvss::dealt_pub_key::g2::DealtPubKey;
+    type Proof = Self::Evaluation;
+    type Evaluation = Gt;
+
+    fn create_proof(_sk: &Self::SecretKey, _msg: &[u8]) -> Self::Proof {
+        Gt::identity()
+    }
+
+    fn verify_eval(
+        _pk: &Self::PubKey,
+        _msg: &[u8],
+        _proof: &Self::Proof,
+        _eval: &Self::Evaluation,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+impl PinkasWUF {
+    fn hash_to_curve(msg: &[u8]) -> G2Projective {
+        // TODO: add DST and aug
+        let dst = b"none";
+        let aug = b"none";
+        let hash = blstrs::G2Projective::hash_to_curve(msg, &dst[..], &aug[..]);
+        hash
+    }
+}

@@ -17,9 +17,9 @@ const NUM_BYTES: usize = encryption_dlog::g2::PUBLIC_PARAMS_NUM_BYTES + 2 * G2_P
 #[derive(DeserializeKey, Clone, SerializeKey, Debug, PartialEq, Eq)]
 pub struct PublicParameters {
     enc: encryption_dlog::g2::PublicParameters,
-    /// Base for the dealt public key, which will be a group element $\hat{u}_1^a \in G_2$, where $a \in F$.
+    /// Base for committing to the secret $a \in F$ as a group element $\hat{u}_1^a \in G_2$.
     u1_hat: G2Projective,
-    /// Base for the Feldman commitment to the polynomial (and for the dealt public key shares)
+    /// Base for the Feldman commitment to the polynomial (and for the dealt public key [shares])
     g1: G1Projective,
 }
 

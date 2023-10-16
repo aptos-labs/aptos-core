@@ -19,7 +19,7 @@ pub struct WeightedConfig {
     /// needed to reconstruct the secret and $W$ is the total weight.
     tc: ThresholdConfig,
     /// The total number of players in the protocol.
-    n: usize,
+    num_players: usize,
     /// Each player's weight
     weight: Vec<usize>,
     /// Player's starting index `a` in a vector of all `W` shares, such that this player owns shares
@@ -66,7 +66,7 @@ impl WeightedConfig {
         let tc = ThresholdConfig::new(threshold_weight, W)?;
         Ok(WeightedConfig {
             tc,
-            n,
+            num_players: n,
             weight: weights,
             starting_index,
         })
@@ -115,14 +115,24 @@ impl Display for WeightedConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}-out-of-{}/{}-players/weighted",
-            self.tc.t, self.tc.n, self.n
+            "weighted/{}-out-of-{}/{}-players",
+            self.tc.t, self.tc.n, self.num_players
         )
     }
 }
 
 impl traits::SecretSharingConfig for WeightedConfig {
-    fn get_random_subset_of_capable_players<R>(&self, rng: &mut R) -> Vec<Player>
+    /// For testing only.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: RngCore + CryptoRng,
+    {
+        Player {
+            id: rng.gen_range(0, self.get_total_num_players()),
+        }
+    }
+
+    fn get_random_eligible_subset_of_players<R>(&self, rng: &mut R) -> Vec<Player>
     where
         R: RngCore + CryptoRng,
     {
@@ -163,7 +173,7 @@ impl traits::SecretSharingConfig for WeightedConfig {
     }
 
     fn get_total_num_players(&self) -> usize {
-        self.n
+        self.num_players
     }
 
     fn get_total_num_shares(&self) -> usize {

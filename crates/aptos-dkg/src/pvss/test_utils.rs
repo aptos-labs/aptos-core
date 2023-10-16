@@ -28,7 +28,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     sc: &T::SecretSharingConfig,
     mut rng: &mut R,
 ) -> (
-    T::PvssPublicParameters,
+    T::PublicParameters,
     Vec<T::SigningSecretKey>,
     Vec<T::SigningPubKey>,
     Vec<T::DecryptPrivKey>,
@@ -37,7 +37,13 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     T::InputSecret,
     T::DealtSecretKey,
 ) {
-    let pp = T::PvssPublicParameters::default();
+    println!(
+        "Setting up dealing for {} PVSS, with {}",
+        T::scheme_name(),
+        sc
+    );
+
+    let pp = T::PublicParameters::default();
 
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(&mut rng))
@@ -94,6 +100,7 @@ macro_rules! vec_to_str {
     };
 }
 
+use crate::constants::{BEST_CASE_N, BEST_CASE_THRESHOLD, WORST_CASE_N, WORST_CASE_THRESHOLD};
 #[allow(unused)]
 pub(crate) use vec_to_str;
 
@@ -136,6 +143,43 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
     wcs.push(WeightedConfig::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
+
+    wcs
+}
+
+pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfig> {
+    let best_case_tc = ThresholdConfig::new(BEST_CASE_THRESHOLD, BEST_CASE_N).unwrap();
+    let worst_case_tc = ThresholdConfig::new(WORST_CASE_THRESHOLD, WORST_CASE_N).unwrap();
+
+    vec![best_case_tc, worst_case_tc]
+}
+
+pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
+    let mut wcs = vec![];
+
+    // TODO: uncomment
+
+    // Total weight is 9230
+    let weights = vec![
+        17, 17, 11, 11, 11, 74, 40, 11, 11, 11, 11, 11, 218, 218, 218, 218, 218, 218, 218, 170, 11,
+        11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 18, 11, 11, 11, 192, 218, 11, 11, 52, 11,
+        161, 24, 11, 11, 11, 11, 218, 218, 161, 175, 80, 13, 103, 11, 11, 11, 11, 40, 40, 40, 14,
+        218, 218, 11, 218, 11, 11, 218, 11, 218, 71, 55, 218, 184, 170, 11, 218, 218, 164, 177,
+        171, 18, 209, 11, 20, 12, 147, 18, 169, 13, 35, 208, 13, 218, 218, 218, 218, 218, 218, 163,
+        73, 26,
+    ];
+    wcs.push(WeightedConfig::new(3087, weights.clone()).unwrap());
+    wcs.push(WeightedConfig::new(6162, weights).unwrap());
+
+    // Total weight is 850
+    let weights = vec![
+        2, 2, 1, 1, 1, 7, 4, 1, 1, 1, 1, 1, 20, 20, 20, 20, 20, 20, 20, 16, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 2, 1, 1, 1, 18, 20, 1, 1, 5, 1, 15, 2, 1, 1, 1, 1, 20, 20, 15, 16, 7, 1, 9,
+        1, 1, 1, 1, 4, 4, 4, 1, 20, 20, 1, 20, 1, 1, 20, 1, 20, 7, 5, 20, 17, 16, 1, 20, 20, 15,
+        16, 16, 2, 19, 1, 2, 1, 13, 2, 16, 1, 3, 19, 1, 20, 20, 20, 20, 20, 20, 15, 7, 2,
+    ];
+    wcs.push(WeightedConfig::new(290, weights.clone()).unwrap());
+    wcs.push(WeightedConfig::new(573, weights).unwrap());
 
     wcs
 }

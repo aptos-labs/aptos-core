@@ -23,7 +23,7 @@ pub trait FiatShamirProtocol<T: Transcript> {
     fn pvss_domain_sep(&mut self, sc: &ThresholdConfig);
 
     /// Append the public parameters `pp`.
-    fn append_public_parameters(&mut self, pp: &T::PvssPublicParameters);
+    fn append_public_parameters(&mut self, pp: &T::PublicParameters);
 
     /// Append the encryption keys `eks`.
     fn append_encryption_keys(&mut self, eks: &Vec<T::EncryptPubKey>);
@@ -49,7 +49,7 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
         self.append_u64(b"n", sc.n as u64);
     }
 
-    fn append_public_parameters(&mut self, pp: &T::PvssPublicParameters) {
+    fn append_public_parameters(&mut self, pp: &T::PublicParameters) {
         self.append_message(b"pp", pp.to_bytes().as_slice());
     }
 
@@ -114,7 +114,7 @@ impl<T: Transcript> FiatShamirProtocol<T> for merlin::Transcript {
 pub(crate) fn fiat_shamir<T: traits::Transcript>(
     trx: &T,
     sc: &ThresholdConfig,
-    pp: &T::PvssPublicParameters,
+    pp: &T::PublicParameters,
     eks: &Vec<T::EncryptPubKey>,
     dst: &'static [u8],
     num_scalars: usize,

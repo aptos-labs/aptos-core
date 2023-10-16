@@ -2,8 +2,10 @@
 
 macro_rules! dealt_secret_key_share_impl {
     (
+        $GTProjective:ident,
         $gt:ident
     ) => {
+        use blstrs::$GTProjective;
         use crate::pvss::dealt_secret_key::$gt::DealtSecretKey;
         use crate::pvss::dealt_secret_key::$gt::DEALT_SK_NUM_BYTES;
         use aptos_crypto::{
@@ -26,8 +28,16 @@ macro_rules! dealt_secret_key_share_impl {
         //
 
         impl DealtSecretKeyShare {
+            pub fn new(dealt_sk: DealtSecretKey) -> Self {
+                DealtSecretKeyShare(dealt_sk)
+            }
+
             pub fn to_bytes(&self) -> [u8; DEALT_SK_SHARE_NUM_BYTES] {
                 self.0.to_bytes()
+            }
+
+            pub fn as_group_element(&self) -> &$GTProjective {
+                self.0.as_group_element()
             }
         }
 
@@ -54,9 +64,9 @@ macro_rules! dealt_secret_key_share_impl {
 }
 
 pub mod g1 {
-    dealt_secret_key_share_impl!(g1);
+    dealt_secret_key_share_impl!(G1Projective, g1);
 }
 
 pub mod g2 {
-    dealt_secret_key_share_impl!(g2);
+    dealt_secret_key_share_impl!(G2Projective, g2);
 }

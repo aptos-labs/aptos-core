@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
-use crate::algebra::polynomials::shamir_secret_share;
+use crate::algebra::polynomials::{get_powers_of_tau, shamir_secret_share};
+use crate::pvss;
 use crate::pvss::das::DAS_SK_IN_G1;
 use crate::pvss::scrape::LowDegreeTest;
 use crate::pvss::traits::{HasEncryptionPublicParams, SecretSharingConfig};
@@ -10,8 +11,7 @@ use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
 use anyhow::bail;
 use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use blstrs::{G1Projective, G2Projective, Gt, Scalar};
-use ff::Field;
+use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, AddAssign, Mul, Neg, Sub};
@@ -76,14 +76,14 @@ impl TryFrom<&[u8]> for Transcript {
 
 impl traits::Transcript for Transcript {
     type SecretSharingConfig = ThresholdConfig;
-    type PvssPublicParameters = das::PublicParameters;
-    type SigningPubKey = bls12381::PublicKey;
+    type PublicParameters = das::PublicParameters;
     type SigningSecretKey = bls12381::PrivateKey;
-    type DealtSecretKeyShare = das::DealtSecretKeyShare;
-    type DealtPubKeyShare = das::DealtPubKeyShare;
-    type DealtSecretKey = das::DealtSecretKey;
-    type DealtPubKey = das::DealtPubKey;
-    type InputSecret = das::InputSecret;
+    type SigningPubKey = bls12381::PublicKey;
+    type DealtSecretKeyShare = pvss::dealt_secret_key_share::g1::DealtSecretKeyShare;
+    type DealtPubKeyShare = pvss::dealt_pub_key_share::g2::DealtPubKeyShare;
+    type DealtSecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
+    type DealtPubKey = pvss::dealt_pub_key::g2::DealtPubKey;
+    type InputSecret = pvss::input_secret::InputSecret;
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type DecryptPrivKey = encryption_dlog::g1::DecryptPrivKey;
 
@@ -94,7 +94,7 @@ impl traits::Transcript for Transcript {
     #[allow(non_snake_case)]
     fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
@@ -153,7 +153,7 @@ impl traits::Transcript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
-        pp: &Self::PvssPublicParameters,
+        pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
         aux: &Vec<A>,
@@ -278,15 +278,7 @@ impl traits::Transcript for Transcript {
         //   e(C[0] c^{-1}, g_2^\alpha) = 1
 
         // TODO(Performance): Would storing elements in affine representation after deserializing help?
-        let mut r_i = Vec::with_capacity(sc.n);
-        r_i.push(Scalar::ONE);
-
-        // First, compute r_i = r^i, for all i \in [0, n]
-        let r = extra[0];
-        for _ in 0..sc.n - 1 {
-            r_i.push(r_i.last().unwrap().mul(&r));
-        }
-        debug_assert_eq!(r_i.len(), sc.n);
+        let r_i = get_powers_of_tau(&extra[0], sc.n);
 
         // Compute the multiexps from above.
         // Note: |V| = |r_i| + 1, so the multiexp will be of size |r_i|.
@@ -318,6 +310,13 @@ impl traits::Transcript for Transcript {
         return Ok(());
     }
 
+    fn get_dealers(&self) -> Vec<Player> {
+        self.soks
+            .iter()
+            .map(|(p, _, _, _)| *p)
+            .collect::<Vec<Player>>()
+    }
+
     fn aggregate_with(&mut self, sc: &ThresholdConfig, other: &Transcript) {
         debug_assert_eq!(self.C.len(), sc.n);
         debug_assert_eq!(self.V.len(), sc.n + 1);
@@ -339,8 +338,8 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(self.V.len(), other.V.len());
     }
 
-    fn get_dealt_public_key(&self) -> das::DealtPubKey {
-        das::DealtPubKey::new(*self.V.last().unwrap())
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V.last().unwrap())
     }
 
     fn decrypt_own_share(
@@ -356,8 +355,8 @@ impl traits::Transcript for Transcript {
         let dealt_pub_key_share = self.V[player.id]; // g_2^{f(\omega^i})
 
         (
-            das::DealtSecretKeyShare(Self::DealtSecretKey::new(dealt_secret_key_share)),
-            das::DealtPubKeyShare(Self::DealtPubKey::new(dealt_pub_key_share)),
+            Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
+            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)),
         )
     }
 
@@ -408,12 +407,5 @@ impl traits::Transcript for Transcript {
             C: C.iter().map(|p1| p1 + r1).collect(),
             C_0: random_g1_point(rng),
         }
-    }
-
-    fn get_dealers(&self) -> Vec<Player> {
-        self.soks
-            .iter()
-            .map(|(p, _, _, _)| *p)
-            .collect::<Vec<Player>>()
     }
 }
