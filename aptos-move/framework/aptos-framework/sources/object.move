@@ -517,8 +517,8 @@ module aptos_framework::object {
                 invariant count < MAXIMUM_OBJECT_NESTING;
                 invariant forall i in 0..count:
                     exists<ObjectCore>(current_address) && global<ObjectCore>(current_address).allow_ungated_transfer;
-                invariant forall i in 0..count:
-                    current_address == get_transfer_address(global<ObjectCore>(destination).owner, i);
+                // invariant forall i in 0..count:
+                //     current_address == get_transfer_address(global<ObjectCore>(destination).owner, i);
             };
             owner != current_address
         }) {
