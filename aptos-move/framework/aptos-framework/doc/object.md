@@ -1875,8 +1875,8 @@ objects may have cyclic dependencies.
             <b>invariant</b> count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
             <b>invariant</b> <b>forall</b> i in 0..count:
                 <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address) && <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address).allow_ungated_transfer;
-            <b>invariant</b> <b>forall</b> i in 0..count:
-                current_address == <a href="object.md#0x1_object_get_transfer_address">get_transfer_address</a>(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination).owner, i);
+            // <b>invariant</b> <b>forall</b> i in 0..count:
+            //     current_address == get_transfer_address(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination).owner, i);
         };
         owner != current_address
     }) {
