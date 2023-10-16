@@ -41,18 +41,15 @@ use std::{
     sync::Arc,
 };
 
-<<<<<<< HEAD
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
-    V0(HashMap<StateKey, MoveStorageOp<Bytes>>),
+    V0(HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>),
     // Granular ops to individual resources within a group.
-    V1(HashMap<StateKey, HashMap<StructTag, MoveStorageOp<Bytes>>>),
+    V1(HashMap<StateKey, HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
 }
-=======
 type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
 type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
->>>>>>> b1ec463b87 (Propagate MoveTypeLayout to BlockSTM (#10127))
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -222,10 +219,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     }
 
     fn populate_v0_resource_group_change_set(
-        change_set: &mut HashMap<StateKey, MoveStorageOp<Bytes>>,
+        change_set: &mut HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
         state_key: StateKey,
-        mut source_data: BTreeMap<StructTag, Bytes>,
-        resources: HashMap<StructTag, MoveStorageOp<Bytes>>,
+        mut source_data: BTreeMap<StructTag, BytesWithResourceLayout>,
+        resources: HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
     ) -> VMResult<()> {
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -256,17 +253,19 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let op = if source_data.is_empty() {
             MoveStorageOp::Delete
         } else if create {
-            MoveStorageOp::New(
+            MoveStorageOp::New((
                 bcs::to_bytes(&source_data)
                     .map_err(|_| common_error())?
                     .into(),
-            )
+                None,
+            ))
         } else {
-            MoveStorageOp::Modify(
+            MoveStorageOp::Modify((
                 bcs::to_bytes(&source_data)
                     .map_err(|_| common_error())?
                     .into(),
-            )
+                None,
+            ))
         };
         change_set.insert(state_key, op);
         Ok(())
@@ -290,26 +289,16 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///   * If group or data does't exist, Unreachable
     ///   * If elements remain, Modify
     ///   * Otherwise delete
-<<<<<<< HEAD
     ///
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into the a single op corresponding to the whole resource group (V0).
-=======
     /// TODO: Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
->>>>>>> b1ec463b87 (Propagate MoveTypeLayout to BlockSTM (#10127))
     fn split_and_merge_resource_groups<C: AccessPathCache>(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
         change_set: ChangeSet,
         ap_cache: &mut C,
-<<<<<<< HEAD
-    ) -> VMResult<(MoveChangeSet, ResourceGroupChangeSet)> {
-=======
-    ) -> VMResult<(
-        ChangeSet,
-        HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
-    )> {
->>>>>>> b1ec463b87 (Propagate MoveTypeLayout to BlockSTM (#10127))
+    ) -> VMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -319,15 +308,28 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         };
         let mut change_set_filtered = ChangeSet::new();
 
-        let mut maybe_resource_group_cache = remote.release_resource_group_cache();
+        let mut maybe_resource_group_cache = remote.release_resource_group_cache().map(|v| {
+            v.into_iter()
+                .map(|(k, v)| {
+                    (
+                        k,
+                        v.into_iter()
+                            .map(|(k2, b)| (k2, (b, None)))
+                            .collect::<BTreeMap<_, _>>(),
+                    )
+                })
+                .collect::<HashMap<_, _>>()
+        });
         let mut resource_group_change_set = if maybe_resource_group_cache.is_some() {
             ResourceGroupChangeSet::V0(HashMap::new())
         } else {
             ResourceGroupChangeSet::V1(HashMap::new())
         };
         for (addr, account_changeset) in change_set.into_inner() {
-            let mut resource_groups: BTreeMap<StructTag, HashMap<StructTag, MoveStorageOp<Bytes>>> =
-                BTreeMap::new();
+            let mut resource_groups: BTreeMap<
+                StructTag,
+                HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+            > = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
@@ -362,7 +364,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key = StateKey::access_path(
                     ap_cache.get_resource_group_path(addr, resource_group_tag),
                 );
-<<<<<<< HEAD
                 match &mut resource_group_change_set {
                     ResourceGroupChangeSet::V0(v0_changes) => {
                         let source_data = maybe_resource_group_cache
@@ -387,52 +388,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                             if matches!(current_op, MoveStorageOp::New(_)) == exists {
                                 // Deletion and Modification require resource to exist,
                                 // while creation requires the resource to not exist.
-=======
-
-                let mut source_data = resource_group_cache.remove(&state_key).unwrap_or_default();
-                let create = source_data.is_empty();
-
-                for (struct_tag, current_op) in resources.into_resources() {
-                    match current_op {
-                        MoveStorageOp::Delete => {
-                            source_data.remove(&struct_tag).ok_or_else(common_error)?;
-                        },
-                        MoveStorageOp::Modify((new_data, _)) => {
-                            let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
-                            *data = new_data;
-                        },
-                        MoveStorageOp::New((data, _)) => {
-                            let data = source_data.insert(struct_tag, data);
-                            if data.is_some() {
->>>>>>> b1ec463b87 (Propagate MoveTypeLayout to BlockSTM (#10127))
                                 return Err(common_error());
                             }
                         }
                         v1_changes.insert(state_key, resources);
                     },
                 }
-<<<<<<< HEAD
-=======
-
-                let op = if source_data.is_empty() {
-                    MoveStorageOp::Delete
-                } else if create {
-                    MoveStorageOp::New((
-                        bcs::to_bytes(&source_data)
-                            .map_err(|_| common_error())?
-                            .into(),
-                        None,
-                    ))
-                } else {
-                    MoveStorageOp::Modify((
-                        bcs::to_bytes(&source_data)
-                            .map_err(|_| common_error())?
-                            .into(),
-                        None,
-                    ))
-                };
-                resource_group_change_set.insert(state_key, op);
->>>>>>> b1ec463b87 (Propagate MoveTypeLayout to BlockSTM (#10127))
             }
         }
 
@@ -441,15 +402,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
-<<<<<<< HEAD
-        change_set: MoveChangeSet,
-        resource_group_change_set: ResourceGroupChangeSet,
-        events: Vec<ContractEvent>,
-=======
         change_set: ChangeSet,
-        resource_group_change_set: HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
+        resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
->>>>>>> b1ec463b87 (Propagate MoveTypeLayout to BlockSTM (#10127))
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,

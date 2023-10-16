@@ -13,7 +13,6 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    aggregator::AggregatorID,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
@@ -21,9 +20,9 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_core_types::{
-    value::MoveTypeLayout,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
+    value::MoveTypeLayout,
     vm_status::VMStatus,
 };
 use std::{collections::HashMap, sync::Arc};
