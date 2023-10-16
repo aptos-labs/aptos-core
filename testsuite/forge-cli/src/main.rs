@@ -479,73 +479,41 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
     }
 }
 
+// TODO: can we clean this function up?
+/// Returns the test suite for the given test name
 fn get_test_suite(
-    suite_name: &str,
-    duration: Duration,
-    test_cmd: &TestCommand,
-) -> Result<ForgeConfig> {
-    match suite_name {
-        "local_test_suite" => Ok(local_test_suite()),
-        "pre_release" => Ok(pre_release_suite()),
-        "run_forever" => Ok(run_forever()),
-        // TODO(rustielin): verify each test suite
-        "k8s_suite" => Ok(k8s_test_suite()),
-        "chaos" => Ok(chaos_test_suite(duration)),
-        single_test => single_test_suite(single_test, duration, test_cmd),
-    }
-}
-
-/// Provides a forge config that runs the swarm forever (unless killed)
-fn run_forever() -> ForgeConfig {
-    ForgeConfig::default()
-        .add_admin_test(GetMetadata)
-        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
-        .add_aptos_test(RunForever)
-}
-
-fn local_test_suite() -> ForgeConfig {
-    ForgeConfig::default()
-        .add_aptos_test(FundAccount)
-        .add_aptos_test(TransferCoins)
-        .add_admin_test(GetMetadata)
-        .add_network_test(RestartValidator)
-        .add_network_test(EmitTransaction)
-        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
-}
-
-fn k8s_test_suite() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .add_aptos_test(FundAccount)
-        .add_aptos_test(TransferCoins)
-        .add_admin_test(GetMetadata)
-        .add_network_test(EmitTransaction)
-        .add_network_test(SimpleValidatorUpgrade)
-        .add_network_test(PerformanceBenchmark)
-}
-
-fn single_test_suite(
     test_name: &str,
     duration: Duration,
     test_cmd: &TestCommand,
 ) -> Result<ForgeConfig> {
-    // Check the test name against grouped test suites
-    if let Some(forge_config) = get_land_blocking_test(test_name, duration, test_cmd) {
-        return Ok(forge_config);
-    } else if let Some(forge_config) = get_multi_region_test(test_name) {
-        return Ok(forge_config);
-    } else if let Some(forge_config) = get_netbench_test(test_name) {
-        return Ok(forge_config);
-    } else if let Some(forge_config) = get_pfn_test(test_name, duration) {
-        return Ok(forge_config);
-    } else if let Some(forge_config) = get_realistic_env_test(test_name, duration, test_cmd) {
-        return Ok(forge_config);
-    } else if let Some(forge_config) = get_state_sync_test(test_name) {
-        return Ok(forge_config);
+    // Check the test name against the multi-test suites
+    match test_name {
+        "local_test_suite" => return Ok(local_test_suite()),
+        "pre_release" => return Ok(pre_release_suite()),
+        "run_forever" => return Ok(run_forever()),
+        // TODO(rustielin): verify each test suite
+        "k8s_suite" => return Ok(k8s_test_suite()),
+        "chaos" => return Ok(chaos_test_suite(duration)),
+        _ => {}, // No multi-test suite matches!
+    };
+
+    // Otherwise, check the test name against the grouped test suites
+    if let Some(test_suite) = get_land_blocking_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_multi_region_test(test_name) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_netbench_test(test_name) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_pfn_test(test_name, duration) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_realistic_env_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
+    } else if let Some(test_suite) = get_state_sync_test(test_name) {
+        return Ok(test_suite);
     }
 
-    // Otherwise match the test name against single test suite instances
-    let single_test_suite = match test_name {
+    // Otherwise, check the test name against the ungrouped test suites
+    let ungrouped_test_suite = match test_name {
         "epoch_changer_performance" => epoch_changer_performance(),
         "validators_join_and_leave" => validators_join_and_leave(),
         "config" => ForgeConfig::default().add_network_test(ReconfigurationTest),
@@ -582,11 +550,39 @@ fn single_test_suite(
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
 
-    Ok(single_test_suite)
+    Ok(ungrouped_test_suite)
 }
 
-/// Attempts to match the test name to a land-blocking test,
-/// and returns the corresponding ForgeConfig if one is found.
+/// Provides a forge config that runs the swarm forever (unless killed)
+fn run_forever() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_admin_test(GetMetadata)
+        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
+        .add_aptos_test(RunForever)
+}
+
+fn local_test_suite() -> ForgeConfig {
+    ForgeConfig::default()
+        .add_aptos_test(FundAccount)
+        .add_aptos_test(TransferCoins)
+        .add_admin_test(GetMetadata)
+        .add_network_test(RestartValidator)
+        .add_network_test(EmitTransaction)
+        .with_genesis_module_bundle(aptos_cached_packages::head_release_bundle().clone())
+}
+
+fn k8s_test_suite() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .add_aptos_test(FundAccount)
+        .add_aptos_test(TransferCoins)
+        .add_admin_test(GetMetadata)
+        .add_network_test(EmitTransaction)
+        .add_network_test(SimpleValidatorUpgrade)
+        .add_network_test(PerformanceBenchmark)
+}
+
+/// Attempts to match the test name to a land-blocking test
 fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
@@ -602,8 +598,7 @@ fn get_land_blocking_test(
     Some(test)
 }
 
-/// Attempts to match the test name to a network benchmark test,
-/// and returns the corresponding ForgeConfig if one is found.
+/// Attempts to match the test name to a network benchmark test
 fn get_netbench_test(test_name: &str) -> Option<ForgeConfig> {
     let test = match test_name {
         // Network tests without chaos
@@ -647,8 +642,7 @@ fn get_netbench_test(test_name: &str) -> Option<ForgeConfig> {
     Some(test)
 }
 
-/// Attempts to match the test name to a PFN test,
-/// and returns the corresponding ForgeConfig if one is found.
+/// Attempts to match the test name to a PFN test
 fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
     let test = match test_name {
         "pfn_const_tps" => pfn_const_tps(duration, false, false, true),
@@ -662,8 +656,7 @@ fn get_pfn_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
     Some(test)
 }
 
-/// Attempts to match the test name to a realistic-env test,
-/// and returns the corresponding ForgeConfig if one is found.
+/// Attempts to match the test name to a realistic-env test
 fn get_realistic_env_test(
     test_name: &str,
     duration: Duration,
@@ -680,8 +673,7 @@ fn get_realistic_env_test(
     Some(test)
 }
 
-/// Attempts to match the test name to a state sync test,
-/// and returns the corresponding ForgeConfig if one is found.
+/// Attempts to match the test name to a state sync test
 fn get_state_sync_test(test_name: &str) -> Option<ForgeConfig> {
     let test = match test_name {
         "state_sync_perf_fullnodes_apply_outputs" => state_sync_perf_fullnodes_apply_outputs(),
@@ -695,8 +687,7 @@ fn get_state_sync_test(test_name: &str) -> Option<ForgeConfig> {
     Some(test)
 }
 
-/// Attempts to match the test name to a multi-region test,
-/// and returns the corresponding ForgeConfig if one is found.
+/// Attempts to match the test name to a multi-region test
 fn get_multi_region_test(test_name: &str) -> Option<ForgeConfig> {
     let test = match test_name {
         "multiregion_benchmark_test" => multiregion_benchmark_test(),
