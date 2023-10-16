@@ -2,62 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    on_chain_config::CurrentTimeMicroseconds, proof::SparseMerkleRangeProof,
-    state_store::state_key::StateKey, transaction::Version,
+    proof::SparseMerkleRangeProof, state_store::state_key::StateKey, transaction::Version,
 };
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_crypto_derive::CryptoHasher;
 use bytes::Bytes;
+use inner::StateValueInner;
+pub use metadata::{StateValueMetadata, StateValueMetadataKind};
 use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-#[derive(
-    BCSCryptoHash,
-    Clone,
-    CryptoHasher,
-    Debug,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Serialize,
-    Ord,
-    PartialOrd,
-    Hash,
-)]
-pub enum StateValueMetadata {
-    V0 {
-        deposit: u64,
-        creation_time_usecs: u64,
-    },
-}
 
-// To avoid nested options when fetching a resource and its metadata.
-pub type StateValueMetadataKind = Option<StateValueMetadata>;
-
-impl StateValueMetadata {
-    pub fn new(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
-        Self::V0 {
-            deposit,
-            creation_time_usecs: creation_time_usecs.microseconds,
-        }
-    }
-
-    pub fn deposit(&self) -> u64 {
-        match self {
-            StateValueMetadata::V0 { deposit, .. } => *deposit,
-        }
-    }
-
-    pub fn set_deposit(&mut self, amount: u64) {
-        match self {
-            StateValueMetadata::V0 { deposit, .. } => *deposit = amount,
-        }
-    }
-}
+mod inner;
+mod metadata;
 
 #[derive(Clone, Debug, CryptoHasher)]
 pub struct StateValue {
@@ -72,28 +33,6 @@ impl PartialEq for StateValue {
 }
 
 impl Eq for StateValue {}
-
-#[derive(
-    BCSCryptoHash,
-    Clone,
-    CryptoHasher,
-    Debug,
-    Deserialize,
-    Eq,
-    PartialEq,
-    Serialize,
-    Ord,
-    PartialOrd,
-    Hash,
-)]
-#[serde(rename = "StateValue")]
-pub enum StateValueInner {
-    V0(Bytes),
-    WithMetadata {
-        data: Bytes,
-        metadata: StateValueMetadata,
-    },
-}
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl Arbitrary for StateValue {
