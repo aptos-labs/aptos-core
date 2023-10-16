@@ -62,7 +62,7 @@ pub fn report_diagnostics(files: &FilesSourceText, diags: Diagnostics) -> ! {
 }
 
 // report diagnostics, but do not exit if diags are all warnings
-pub fn report_diagnostics_maynot_exit(files: &FilesSourceText, diags: Diagnostics) {
+pub fn report_diagnostics_exit_on_error(files: &FilesSourceText, diags: Diagnostics) {
     let should_exit = diags
         .diagnostics
         .iter()
