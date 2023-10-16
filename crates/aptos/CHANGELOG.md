@@ -3,6 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## [2.2.2] - 2023/10/16
 ### Updated
 - Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to d6f55d4baba32960ea7be60878552e73ffbe8b7e.
 
