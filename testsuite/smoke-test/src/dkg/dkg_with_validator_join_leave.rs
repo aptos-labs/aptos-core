@@ -4,6 +4,7 @@ use crate::{dkg, dkg::decrypt_key_map, smoke_test_environment::SwarmBuilder};
 use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
 use std::sync::Arc;
+use aptos::common::types::GasOptions;
 
 #[tokio::test]
 async fn dkg_with_validator_join_leave() {
@@ -82,7 +83,8 @@ async fn dkg_with_validator_join_leave() {
     )
     .await;
     let idx = cli.add_account_to_cli(victim_validator_sk);
-    let txn_result = cli.leave_validator_set(idx, None).await.unwrap();
+    let gas_options = Some(GasOptions::default().with_gas_unit_price(Some(1)));
+    let txn_result = cli.leave_validator_set_with_gas_options(idx, None, gas_options).await.unwrap();
     println!("Txn result: {:?}", txn_result);
 
     println!(

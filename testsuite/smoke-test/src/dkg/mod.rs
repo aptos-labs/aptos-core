@@ -3,10 +3,9 @@
 use aptos_consensus::dkg::build_dkg_pvss_config;
 use aptos_crypto::Uniform;
 use aptos_dkg::pvss::{
-    das::{DealtSecretKey, InputSecret, PublicParameters},
+    das::PublicParameters,
     encryption_dlog::g1::DecryptPrivKey,
     traits::{Convert, Reconstructable, Transcript},
-    weighted::weighted_transcript::WeightedKey,
     Player, WeightedConfig, WeightedTranscript,
 };
 use aptos_forge::LocalSwarm;
@@ -21,6 +20,8 @@ use num_traits::Zero;
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
+use aptos_dkg::pvss::dealt_secret_key::g1::DealtSecretKey;
+use aptos_dkg::pvss::input_secret::InputSecret;
 
 type WT = WeightedTranscript<aptos_dkg::pvss::das::Transcript>;
 
@@ -116,15 +117,13 @@ fn verify_dkg_transcript(
     // println!("dealt_secret_2_from_shares={}", hex::encode(dealt_secret_2_from_shares.sub_key().to_bytes()));
     // println!("dealt_secret_1_from_inputs={}", hex::encode(dealt_secret_1_from_inputs.to_bytes()));
     // println!("dealt_secret_2_from_inputs={}", hex::encode(dealt_secret_2_from_inputs.to_bytes()));
-    if dealt_secret_1_from_shares.sub_key().to_bytes() != dealt_secret_1_from_inputs.to_bytes() {
+    if dealt_secret_1_from_shares != dealt_secret_1_from_inputs {
         return false;
     }
-    if dealt_secret_2_from_shares.sub_key().to_bytes() != dealt_secret_2_from_inputs.to_bytes() {
+    if dealt_secret_2_from_shares != dealt_secret_2_from_inputs {
         return false;
     }
-    if dealt_secret_1_from_shares.sub_key().to_bytes()
-        != dealt_secret_2_from_shares.sub_key().to_bytes()
-    {
+    if dealt_secret_1_from_shares != dealt_secret_2_from_shares {
         return false;
     }
     true
@@ -135,7 +134,7 @@ fn dealt_secret_from_shares(
     decrypt_key_map: &HashMap<AccountAddress, DecryptPrivKey>,
     pvss_config: &WeightedConfig,
     trx: &WT,
-) -> WeightedKey<DealtSecretKey> {
+) -> DealtSecretKey {
     let x = ValidatorVerifier::from(target_validator_set);
     let player_share_pairs = x
         .get_ordered_account_addresses()
@@ -145,12 +144,12 @@ fn dealt_secret_from_shares(
             let player = Player { id };
             let dk = decrypt_key_map.get(validator_addr).unwrap();
             let (secret_key_share, _pub_key_share) =
-                trx.decrypt_own_share(&pvss_config, &player, dk);
+                trx.decrypt_own_share(pvss_config, &player, dk);
             (player, secret_key_share)
         })
         .collect();
 
-    <WT as Transcript>::DealtSecretKey::reconstruct(&pvss_config, &player_share_pairs)
+    <WT as Transcript>::DealtSecretKey::reconstruct(pvss_config, &player_share_pairs)
 }
 
 fn dealt_secret_from_input(
@@ -170,6 +169,7 @@ fn dealt_secret_from_input(
         agg_secret += &s;
     }
 
+    // <InputSecret as Convert<aptos_dkg::pvss::dealt_secret_key::g::DealtSecretKey, PublicParameters>>::to(&agg_secret, pp)
     let dealt_secret_from_inputs: DealtSecretKey = agg_secret.to(pp);
     dealt_secret_from_inputs
 }

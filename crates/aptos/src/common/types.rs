@@ -1484,6 +1484,13 @@ pub struct GasOptions {
     pub expiration_secs: u64,
 }
 
+impl GasOptions {
+    pub fn with_gas_unit_price(mut self, gas_unit_price: Option<u64>) -> Self {
+        self.gas_unit_price = gas_unit_price;
+        self
+    }
+}
+
 impl Default for GasOptions {
     fn default() -> Self {
         GasOptions {

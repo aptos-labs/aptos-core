@@ -464,12 +464,21 @@ impl CliTestFramework {
         operator_index: usize,
         pool_index: Option<usize>,
     ) -> CliTypedResult<TransactionSummary> {
+        self.leave_validator_set_with_gas_options(operator_index, pool_index, None).await
+    }
+
+    pub async fn leave_validator_set_with_gas_options(
+        &self,
+        operator_index: usize,
+        pool_index: Option<usize>,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<TransactionSummary> {
         LeaveValidatorSet {
-            txn_options: self.transaction_options(operator_index, None),
+            txn_options: self.transaction_options(operator_index, gas_options),
             operator_args: self.operator_args(pool_index),
         }
-        .execute()
-        .await
+            .execute()
+            .await
     }
 
     pub async fn update_validator_network_addresses(

@@ -232,7 +232,7 @@ impl DKGManager {
 
     pub fn add_node(&self, node: DKGNode) -> anyhow::Result<()> {
         let mut guard = self.dkg_store.lock();
-        if guard.is_none() { 
+        if guard.is_none() {
             return Err(DKGRpcHandleError::DKGStoreNotInitialized.into());
         }
         if guard.as_mut().unwrap().get_agg_node().is_some() {
@@ -261,7 +261,7 @@ impl DKGManager {
 
     pub fn add_agg_node(&self, agg_node: DKGAggNode) -> anyhow::Result<()> {
         let mut guard = self.dkg_store.lock();
-        if guard.is_none() { 
+        if guard.is_none() {
             return Err(DKGRpcHandleError::DKGStoreNotInitialized.into());
         }
 
