@@ -29,7 +29,7 @@ use std::{
 use tokio_util::compat::{Compat, TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 // Useful constants
-const NUM_STREAMS_PER_CONNECTION: u64 = 1000;
+const NUM_STREAMS_PER_CONNECTION: u64 = 100;
 const SERVER_STRING: &str = "aptos-node";
 const STREAM_START_MESSAGE: &str = "start-stream";
 const STREAM_START_MESSSAGE_LENGTH: usize = 12; // Update this if the stream start message changes!
@@ -600,10 +600,10 @@ fn create_transport_config() -> Arc<quinn::TransportConfig> {
 
     // Optimize the send and receiver buffer sizes according to estimated
     // RTT and bandwidth. This was taken from the QUINN source code...
-    let expected_rtt: u32 = 100; // 100 ms
-    let max_stream_bandwidth = 50 * 1000 * 1000; // 50 MB
+    let expected_rtt: u32 = 250; // 250 ms
+    let max_stream_bandwidth = 10 * 1000 * 1000; // 10 MB
     let stream_receive_window = (max_stream_bandwidth / 1000) * expected_rtt;
-    let stream_send_window = 8 * stream_receive_window;
+    let stream_send_window = (NUM_STREAMS_PER_CONNECTION as u32) * stream_receive_window;
     transport_config.stream_receive_window(VarInt::from_u32(stream_receive_window));
     transport_config.send_window(stream_send_window as u64);
 
