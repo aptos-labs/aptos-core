@@ -124,19 +124,32 @@ impl<T> DelayedFieldResolver for T where
 {
 }
 
-impl<S> TAggregatorView for S
+impl<S> TDelayedFieldView for S
 where
     S: StateView,
 {
     type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+    type IdentifierV2 = DelayedFieldID;
 
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
-        // Reading from StateView can be in precise mode only.
-        _mode: AggregatorReadMode,
+        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         self.get_state_value(state_key)
+    }
+
+    fn get_delayed_field_value(
+        &self,
+        _id: &Self::IdentifierV2,
+        _mode: DelayedFieldReadMode,
+    ) -> anyhow::Result<DelayedFieldValue> {
+        unimplemented!()
+    }
+
+    /// Returns a unique per-block identifier that can be used when creating a
+    /// new aggregator V2.
+    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+        unimplemented!()
     }
 }

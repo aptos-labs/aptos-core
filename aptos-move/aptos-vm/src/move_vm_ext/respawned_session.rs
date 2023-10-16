@@ -171,7 +171,9 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
             Some(Apply(apply)) => {
                 let base_value = match apply.get_apply_base_id(id) {
                     ApplyBase::Previous(base_id) => {
-                        self.base.get_delayed_field_value(&base_id, mode)?
+                        // TODO do we need to deal with self.base_resource_group_view ?
+                        self.base_executor_view
+                            .get_delayed_field_value(&base_id, mode)?
                     },
                     // For Current, call on self to include current change!
                     ApplyBase::Current(base_id) => self.get_delayed_field_value(&base_id, mode)?,
@@ -180,12 +182,12 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
                     .apply_to_base(base_value)
                     .map_err(PartialVMError::from)?)
             },
-            None => self.base.get_delayed_field_value(id, mode),
+            None => self.base_executor_view.get_delayed_field_value(id, mode),
         }
     }
 
     fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
-        self.base.generate_delayed_field_id()
+        self.base_executor_view.generate_delayed_field_id()
     }
 }
 
