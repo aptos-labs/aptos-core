@@ -2,10 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::core::{self, Context, Subst, forward_tvar};
+use super::core::{self, forward_tvar, Context, Subst};
 use crate::{
     diag,
-    expansion::ast::{Value_, ModuleIdent},
+    expansion::ast::{ModuleIdent, Value_},
     naming::ast::{BuiltinTypeName_, FunctionSignature, Type, TypeName_, Type_},
     parser::ast::{Ability_, FunctionName},
     typing::ast as T,
@@ -61,7 +61,12 @@ fn types(context: &mut Context, ss: &mut Vec<Type>) {
 fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name: &TypeName_) {
     match ty_name {
         TypeName_::ModuleType(mod_id, struct_name) => {
-            let param_name = &context.struct_definition(mod_id, struct_name).type_parameters[i].param.user_specified_name.value;
+            let param_name = &context
+                .struct_definition(mod_id, struct_name)
+                .type_parameters[i]
+                .param
+                .user_specified_name
+                .value;
             let msg = format!("Cannot infer the type parameter {param_name} for generic struct {ty_name}. Try providing a type parameter.");
             type_msg_(context, ty, &msg);
         },
@@ -69,9 +74,15 @@ fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name:
     }
 }
 
-fn type_fun_ty_param(context: &mut Context, ty: &mut Type, i: usize, m: &ModuleIdent, n: &FunctionName) {
-   let param_name = context.function_info(m, n).signature.type_parameters[i].user_specified_name;
-   type_msg_(context, ty, &format!("Cannot infer the type parameter {param_name} for generic function {m}::{n}. Try providing a type parameter."));
+fn type_fun_ty_param(
+    context: &mut Context,
+    ty: &mut Type,
+    i: usize,
+    m: &ModuleIdent,
+    n: &FunctionName,
+) {
+    let param_name = context.function_info(m, n).signature.type_parameters[i].user_specified_name;
+    type_msg_(context, ty, &format!("Cannot infer the type parameter {param_name} for generic function {m}::{n}. Try providing a type parameter."));
 }
 
 pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
@@ -111,9 +122,7 @@ pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
             *ty = replacement;
             type_(context, ty);
         },
-        Apply(Some(_), sp!(_, TypeName_::Builtin(_)), tys) => {
-            types(context, tys)
-        },
+        Apply(Some(_), sp!(_, TypeName_::Builtin(_)), tys) => types(context, tys),
         Apply(Some(_), _, _) => panic!("ICE expanding pre expanded type"),
         Apply(None, ty_name, _) => {
             let ty_name = ty_name.clone();
@@ -132,7 +141,11 @@ pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
 }
 
 pub fn type_(context: &mut Context, ty: &mut Type) {
-   type_msg_(context, ty, "Could not infer this type. Try adding an annotation")
+    type_msg_(
+        context,
+        ty,
+        "Could not infer this type. Try adding an annotation",
+    )
 }
 
 //**************************************************************************************************
@@ -341,7 +354,11 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
                 type_struct_ty_param(context, b, i, &TypeName_::ModuleType(*mod_id, *struct_name));
             }
             for (_, s, (_, (bt, fe))) in fields.iter_mut() {
-                type_msg_(context, bt,&format!("Could not infer the type of field {s}"));
+                type_msg_(
+                    context,
+                    bt,
+                    &format!("Could not infer the type of field {s}"),
+                );
                 exp(context, fe)
             }
         },
@@ -367,7 +384,8 @@ fn lvalue(context: &mut Context, b: &mut T::LValue) {
             type_(context, ty);
             core::check_non_fun(context, ty.as_ref())
         },
-        L::BorrowUnpack(_, mod_id, struct_name, bts, fields) | L::Unpack(mod_id, struct_name, bts, fields) => {
+        L::BorrowUnpack(_, mod_id, struct_name, bts, fields)
+        | L::Unpack(mod_id, struct_name, bts, fields) => {
             for (i, b) in bts.iter_mut().enumerate() {
                 type_struct_ty_param(context, b, i, &TypeName_::ModuleType(*mod_id, *struct_name))
             }
@@ -396,7 +414,11 @@ fn builtin_function(context: &mut Context, b: &mut T::BuiltinFunction) {
         | B::BorrowGlobal(_, bt)
         | B::Exists(bt)
         | B::Freeze(bt) => {
-            type_msg_(context, bt, &format!("Cannot infer a type parameter for built-in function '{f_name}'"));
+            type_msg_(
+                context,
+                bt,
+                &format!("Cannot infer a type parameter for built-in function '{f_name}'"),
+            );
         },
         B::Assert(_) => (),
     }
