@@ -269,7 +269,9 @@ impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + Transacti
                 assert_eq!(*idx, self.read_values.len());
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
-            Err(BlockExecutorError::ModulePathReadWrite) => unimplemented!("not tested here"),
+            Err(BlockExecutorError::FallbackToSequential(e)) => {
+                unimplemented!("not tested here {:?}", e)
+            },
         }
     }
 }
