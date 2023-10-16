@@ -18,6 +18,8 @@ use aptos_types::{
 };
 use either::Either;
 use std::sync::Arc;
+use aptos_types::block_info::{BlockInfo, GENESIS_EPOCH, GENESIS_ROUND};
+use aptos_types::ledger_info::LedgerInfo;
 
 pub const SECONDARY_DB_DIR: &str = "fast_sync_secondary";
 
@@ -73,6 +75,26 @@ impl FastSyncStorageWrapper {
                 config.storage.max_num_nodes_per_lru_cache_shard,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
+
+            // To keep the full history from genesis epoch_ledger_info in fast synced DB, we manually write the ledger info at epoch 0 to DB
+            let ledger_info_with_sigs = LedgerInfoWithSignatures::new(
+                LedgerInfo::new(
+                    BlockInfo::new(
+                        GENESIS_EPOCH,
+                        GENESIS_ROUND,
+                        HashValue::zero(),
+                        output
+                            .ledger_update_output
+                            .transaction_accumulator
+                            .root_hash(),
+                        genesis_version,
+                        timestamp_usecs,
+                        output.next_epoch_state.clone(),
+                    ),
+                    HashValue::zero(), /* consensus_data_hash */
+                ),
+                AggregateSignature::empty(), /* signatures */
+            );
 
             Ok(Either::Right(FastSyncStorageWrapper {
                 temporary_db_with_genesis: Arc::new(secondary_db),
