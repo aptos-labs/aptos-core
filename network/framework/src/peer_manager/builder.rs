@@ -24,7 +24,7 @@ use aptos_logger::prelude::*;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
 use aptos_netcore::transport::{
-    quic::{QuicConnection, QuicTransport},
+    quic::{QuicStream, QuicTransport},
     tcp::{TCPBufferCfg, TcpSocket, TcpTransport},
     Transport,
 };
@@ -143,7 +143,7 @@ impl PeerManagerContext {
 type MemoryPeerManager =
     PeerManager<AptosNetTransport<MemoryTransport>, NoiseStream<aptos_memsocket::MemorySocket>>;
 type TcpPeerManager = PeerManager<AptosNetTransport<TcpTransport>, NoiseStream<TcpSocket>>;
-type QuicPeerManager = PeerManager<AptosNetTransport<QuicTransport>, NoiseStream<QuicConnection>>;
+type QuicPeerManager = PeerManager<AptosNetTransport<QuicTransport>, NoiseStream<QuicStream>>;
 
 enum TransportPeerManager {
     #[cfg(any(test, feature = "testing", feature = "fuzzing"))]

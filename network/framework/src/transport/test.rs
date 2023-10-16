@@ -257,7 +257,8 @@ fn test_transport_success<TTransport>(
     let listener_task = async move {
         // accept one inbound connection from dialer
         let (inbound, _dialer_addr) = inbounds.next().await.unwrap().unwrap();
-        let mut conn = inbound.await.unwrap();
+        let multi_conn = inbound.await.unwrap();
+        let mut conn = multi_conn.get_one_and_only();
 
         // check connection metadata
         assert_eq!(conn.metadata.remote_peer_id, dialer_peer_id);
@@ -283,11 +284,12 @@ fn test_transport_success<TTransport>(
     // upgraded socket actually works (sends and receives bytes).
     let dialer_task = async move {
         // dial listener
-        let mut conn = dialer_transport
+        let multi_conn = dialer_transport
             .dial(listener_peer_id, listener_addr.clone())
             .unwrap()
             .await
             .unwrap();
+        let mut conn = multi_conn.get_one_and_only();
 
         // check connection metadata
         assert_eq!(conn.metadata.remote_peer_id, listener_peer_id);
@@ -402,7 +404,8 @@ fn test_transport_maybe_mutual<TTransport>(
     let listener_task = async move {
         // accept one inbound connection from dialer
         let (inbound, _dialer_addr) = inbounds.next().await.unwrap().unwrap();
-        let mut conn = inbound.await.unwrap();
+        let multi_conn = inbound.await.unwrap();
+        let mut conn = multi_conn.get_one_and_only();
 
         // check connection metadata
         assert_eq!(conn.metadata.remote_peer_id, dialer_peer_id);
@@ -440,7 +443,8 @@ fn test_transport_maybe_mutual<TTransport>(
 
         // accept one inbound connection from dialer
         let (inbound, _dialer_addr) = inbounds.next().await.unwrap().unwrap();
-        let mut conn = inbound.await.unwrap();
+        let multi_conn = inbound.await.unwrap();
+        let mut conn = multi_conn.get_one_and_only();
 
         // check connection metadata
         assert_eq!(conn.metadata.remote_peer_id, dialer_peer_id);
@@ -467,11 +471,12 @@ fn test_transport_maybe_mutual<TTransport>(
     // upgraded socket actually works (sends and receives bytes).
     let dialer_task = async move {
         // dial listener
-        let mut conn = dialer_transport
+        let multi_conn = dialer_transport
             .dial(listener_peer_id, listener_addr.clone())
             .unwrap()
             .await
             .unwrap();
+        let mut conn = multi_conn.get_one_and_only();
 
         // check connection metadata
         assert_eq!(conn.metadata.remote_peer_id, listener_peer_id);
@@ -492,11 +497,12 @@ fn test_transport_maybe_mutual<TTransport>(
         // Dial again as an "untrusted" dialer
 
         // dial listener
-        let mut conn = dialer_transport
+        let multi_conn = dialer_transport
             .dial(listener_peer_id, listener_addr.clone())
             .unwrap()
             .await
             .unwrap();
+        let mut conn = multi_conn.get_one_and_only();
 
         // check connection metadata
         assert_eq!(conn.metadata.remote_peer_id, listener_peer_id);

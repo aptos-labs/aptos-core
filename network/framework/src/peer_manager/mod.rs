@@ -44,8 +44,6 @@ pub mod builder;
 pub mod conn_notifs_channel;
 mod error;
 mod senders;
-#[cfg(test)]
-mod tests;
 mod transport;
 mod types;
 

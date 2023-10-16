@@ -276,7 +276,7 @@ async fn upgrade_inbound<T: TSocket>(
     fut_socket: impl Future<Output = io::Result<MultiSocket<T>>>,
     addr: NetworkAddress,
     proxy_protocol_enabled: bool,
-) -> io::Result<Connection<NoiseStream<T>>> {
+) -> io::Result<MultiSocket<Connection<NoiseStream<T>>>> {
     let origin = ConnectionOrigin::Inbound;
     let multi_socket = fut_socket.await?;
 
@@ -366,7 +366,7 @@ async fn upgrade_inbound<T: TSocket>(
         upgraded_sockets.push(socket);
     }
 
-    // return successful connection
+    // Create the successful connection
     let connection_metadata = ConnectionMetadata::new(
         remote_peer_ids.remove(0),
         CONNECTION_ID_GENERATOR.next(),
@@ -376,10 +376,10 @@ async fn upgrade_inbound<T: TSocket>(
         application_protocols_set.remove(0),
         peer_roles[0],
     );
-    Ok(Connection::new_with_multiple_sockets(
-        upgraded_sockets,
-        connection_metadata,
-    ))
+    let connection = Connection::new_with_multiple_sockets(upgraded_sockets, connection_metadata);
+
+    // Wrap the connection in a MultiSocket
+    Ok(MultiSocket::new_with_single_socket(connection))
 }
 
 /// Upgrade an outbound connection. This means we run a Noise IK handshake for
@@ -390,7 +390,7 @@ pub async fn upgrade_outbound<T: TSocket>(
     addr: NetworkAddress,
     remote_peer_id: PeerId,
     remote_pubkey: x25519::PublicKey,
-) -> io::Result<Connection<NoiseStream<T>>> {
+) -> io::Result<MultiSocket<Connection<NoiseStream<T>>>> {
     let origin = ConnectionOrigin::Outbound;
     let multi_socket = fut_socket.await?;
 
@@ -463,7 +463,7 @@ pub async fn upgrade_outbound<T: TSocket>(
         upgraded_sockets.push(socket);
     }
 
-    // return successful connection
+    // Create the successful connection
     let connection_metadata = ConnectionMetadata::new(
         remote_peer_ids.remove(0),
         CONNECTION_ID_GENERATOR.next(),
@@ -473,10 +473,10 @@ pub async fn upgrade_outbound<T: TSocket>(
         application_protocols_set.remove(0),
         peer_roles.remove(0),
     );
-    Ok(Connection::new_with_multiple_sockets(
-        upgraded_sockets,
-        connection_metadata,
-    ))
+    let connection = Connection::new_with_multiple_sockets(upgraded_sockets, connection_metadata);
+
+    // Wrap the connection in a MultiSocket
+    Ok(MultiSocket::new_with_single_socket(connection))
 }
 
 /// The common AptosNet Transport.
@@ -614,7 +614,9 @@ where
         peer_id: PeerId,
         addr: NetworkAddress,
     ) -> io::Result<
-        impl Future<Output = io::Result<Connection<NoiseStream<TTransport::Output>>>> + Send + 'static,
+        impl Future<Output = io::Result<MultiSocket<Connection<NoiseStream<TTransport::Output>>>>>
+            + Send
+            + 'static,
     > {
         // parse aptosnet protocols
         // TODO(philiphayes): `Transport` trait should include parsing in `dial`?
@@ -661,8 +663,11 @@ where
     ) -> io::Result<(
         impl Stream<
                 Item = io::Result<(
-                    impl Future<Output = io::Result<Connection<NoiseStream<TTransport::Output>>>>
-                        + Send
+                    impl Future<
+                            Output = io::Result<
+                                MultiSocket<Connection<NoiseStream<TTransport::Output>>>,
+                            >,
+                        > + Send
                         + 'static,
                     NetworkAddress,
                 )>,
@@ -717,10 +722,12 @@ where
     TTransport::Listener: Send + 'static,
 {
     type Error = io::Error;
-    type Inbound = Pin<Box<dyn Future<Output = io::Result<Self::Output>> + Send + 'static>>;
+    type Inbound =
+        Pin<Box<dyn Future<Output = io::Result<MultiSocket<Self::Output>>> + Send + 'static>>;
     type Listener =
         Pin<Box<dyn Stream<Item = io::Result<(Self::Inbound, NetworkAddress)>> + Send + 'static>>;
-    type Outbound = Pin<Box<dyn Future<Output = io::Result<Self::Output>> + Send + 'static>>;
+    type Outbound =
+        Pin<Box<dyn Future<Output = io::Result<MultiSocket<Self::Output>>> + Send + 'static>>;
     type Output = Connection<NoiseStream<TTransport::Output>>;
 
     fn dial(&self, peer_id: PeerId, addr: NetworkAddress) -> io::Result<Self::Outbound> {

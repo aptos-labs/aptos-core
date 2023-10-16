@@ -49,7 +49,6 @@ use futures::{
     SinkExt,
 };
 use futures_util::stream::{select, select_all};
-use rand::prelude::SliceRandom;
 use serde::Serialize;
 use std::{fmt, panic, time::Duration};
 use tokio::runtime::Handle;
@@ -139,6 +138,8 @@ pub struct Peer<TSocket> {
     max_message_size: usize,
     /// Inbound stream buffer
     inbound_stream: InboundStreamBuffer,
+    /// Counter for the next write stream index
+    write_stream_index: usize,
 }
 
 impl<TSocket> Peer<TSocket>
@@ -192,6 +193,7 @@ where
             max_frame_size,
             max_message_size,
             inbound_stream: InboundStreamBuffer::new(max_fragments),
+            write_stream_index: 0,
         }
     }
 
@@ -493,6 +495,11 @@ where
         Ok(())
     }
 
+    /// Increment the write stream index and wrap around if necessary
+    fn increment_write_stream_index(&mut self, num_streams: usize) {
+        self.write_stream_index = (self.write_stream_index + 1) % num_streams;
+    }
+
     async fn handle_inbound_message(
         &mut self,
         message: Result<MultiplexMessage, ReadError>,
@@ -518,11 +525,12 @@ where
                     let error_code = ErrorCode::parsing_error(*message_type, *protocol_id);
                     let message = NetworkMessage::Error(error_code);
 
-                    // Choose a random channel to send the error message along.
-                    // This should distribute errors across all the sockets.
+                    // Choose a channel to send the error message along
+                    let num_streams = write_requests_senders.len();
                     let write_reqs_tx = write_requests_senders
-                        .choose_mut(&mut rand::thread_rng())
+                        .get_mut(self.write_stream_index)
                         .unwrap();
+                    self.increment_write_stream_index(num_streams);
 
                     write_reqs_tx.send(message).await?;
                     return Err(err.into());
@@ -598,11 +606,12 @@ where
             request
         );
 
-        // Select a channel to send the request along randomly.
-        // This should distribute requests across all the sockets.
+        // Choose a channel to send the request along
+        let num_streams = write_requests_senders.len();
         let write_reqs_tx = write_requests_senders
-            .choose_mut(&mut rand::thread_rng())
+            .get_mut(self.write_stream_index)
             .unwrap();
+        self.increment_write_stream_index(num_streams);
 
         match request {
             // To send an outbound DirectSendMsg, we just bump some counters and

@@ -2,22 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::args::CheckEndpointArgs;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use aptos_config::{
-    config::{Error, RoleType, HANDSHAKE_VERSION},
+    config::{RoleType, HANDSHAKE_VERSION},
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
 use aptos_network::{
     noise::{HandshakeAuthMode, NoiseUpgrader},
     protocols::wire::handshake::v1::ProtocolIdSet,
-    transport::{
-        resolve_and_connect, upgrade_outbound, TCPBufferCfg, TcpSocket, UpgradeContext,
-        SUPPORTED_MESSAGING_PROTOCOL,
-    },
+    transport::{UpgradeContext, SUPPORTED_MESSAGING_PROTOCOL},
 };
 use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use futures::{AsyncReadExt, AsyncWriteExt};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 
@@ -81,79 +77,15 @@ async fn check_endpoint_wrapper(
 
 /// Connects via Noise, then drops the connection.
 async fn check_endpoint_with_handshake(
-    upgrade_context: Arc<UpgradeContext>,
-    address: NetworkAddress,
-    remote_pubkey: x25519::PublicKey,
+    _upgrade_context: Arc<UpgradeContext>,
+    _address: NetworkAddress,
+    _remote_pubkey: x25519::PublicKey,
 ) -> Result<String> {
-    // Connect to the address, this should handle DNS resolution if necessary.
-    let fut_socket = async {
-        resolve_and_connect(address.clone(), TCPBufferCfg::new())
-            .await
-            .map(TcpSocket::new)
-    };
-
-    // The peer id doesn't matter because we don't validate it.
-    let remote_peer_id = account_address::from_identity_public_key(remote_pubkey);
-    let conn = upgrade_outbound(
-        upgrade_context,
-        fut_socket,
-        address.clone(),
-        remote_peer_id,
-        remote_pubkey,
-    )
-    .await
-    .map_err(|error| {
-        Error::Unexpected(format!(
-            "Failed to connect to {}. Error: {}",
-            address, error
-        ))
-    })?;
-    let msg = format!("Successfully connected to {}", conn.metadata.addr);
-
-    // Disconnect.
-    drop(conn);
-    Ok(msg)
+    unimplemented!()
 }
 
-const INVALID_NOISE_HEADER: &[u8; 152] = &[7; 152];
-
-async fn check_endpoint_no_handshake(address: NetworkAddress) -> Result<String> {
-    let mut socket = resolve_and_connect(address.clone(), TCPBufferCfg::new())
-        .await
-        .map(TcpSocket::new)
-        .map_err(|error| {
-            Error::Unexpected(format!(
-                "Failed to connect to {}. Error: {}",
-                address, error
-            ))
-        })?;
-
-    socket
-        .write_all(INVALID_NOISE_HEADER)
-        .await
-        .map_err(|error| {
-            Error::Unexpected(format!("Failed to write to {}. Error: {}", address, error))
-        })?;
-
-    let buf = &mut [0; 1];
-    match socket.read(buf).await {
-        Ok(size) => {
-            // We should be able to write to the socket dummy data.
-            if size == 0 {
-                // Connection is open, and doesn't return anything.
-                // This is the closest we can get to working.
-                Ok(format!(
-                    "Accepted write and responded with nothing at {}",
-                    address
-                ))
-            } else {
-                bail!("Endpoint {} responded with data when it shouldn't", address);
-            }
-        },
-        Err(error) => {
-            bail!("Failed to read from {} due to error: {:#}", address, error);
-        },
-    }
+async fn check_endpoint_no_handshake(_address: NetworkAddress) -> Result<String> {
+    unimplemented!()
 }
 
 /// Builds a listener free noise connector

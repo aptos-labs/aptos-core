@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transport::Transport;
+use crate::transport::{MultiSocket, Transport};
 use aptos_memsocket::{MemoryListener, MemorySocket};
 use aptos_types::{
     network_address::{parse_memory, NetworkAddress, Protocol},
@@ -21,9 +21,9 @@ pub struct MemoryTransport;
 
 impl Transport for MemoryTransport {
     type Error = io::Error;
-    type Inbound = future::Ready<Result<Self::Output, Self::Error>>;
+    type Inbound = future::Ready<Result<MultiSocket<Self::Output>, Self::Error>>;
     type Listener = Listener;
-    type Outbound = future::Ready<Result<Self::Output, Self::Error>>;
+    type Outbound = future::Ready<Result<MultiSocket<Self::Output>, Self::Error>>;
     type Output = MemorySocket;
 
     fn listen_on(
@@ -63,7 +63,7 @@ impl Transport for MemoryTransport {
             )
         })?;
         // TODO(philiphayes): base memory transport should not allow trailing protocols
-        let socket = MemorySocket::connect(port)?;
+        let socket = MultiSocket::new_with_single_socket(MemorySocket::connect(port)?);
         Ok(future::ready(Ok(socket)))
     }
 }
@@ -81,7 +81,10 @@ impl Listener {
 }
 
 impl Stream for Listener {
-    type Item = io::Result<(future::Ready<io::Result<MemorySocket>>, NetworkAddress)>;
+    type Item = io::Result<(
+        future::Ready<io::Result<MultiSocket<MemorySocket>>>,
+        NetworkAddress,
+    )>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context) -> Poll<Option<Self::Item>> {
         let mut incoming = self.inner.incoming();
@@ -90,7 +93,10 @@ impl Stream for Listener {
                 // Dialer addresses for MemoryTransport don't make a ton of sense,
                 // so use port 0 to ensure they aren't used as an address to dial.
                 let dialer_addr = NetworkAddress::from(Protocol::Memory(0));
-                Poll::Ready(Some(Ok((future::ready(Ok(socket)), dialer_addr))))
+                Poll::Ready(Some(Ok((
+                    future::ready(Ok(MultiSocket::new_with_single_socket(socket))),
+                    dialer_addr,
+                ))))
             },
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
             Poll::Ready(None) => Poll::Ready(None),
@@ -119,7 +125,8 @@ mod test {
         let listener = async move {
             let (item, _listener) = listener.into_future().await;
             let (inbound, _addr) = item.unwrap().unwrap();
-            let mut socket = inbound.await.unwrap();
+            let multi_socket = inbound.await.unwrap();
+            let mut socket = multi_socket.get_one_and_only();
 
             let mut buf = Vec::new();
             socket.read_to_end(&mut buf).await.unwrap();
@@ -129,7 +136,8 @@ mod test {
         let outbound = t.dial(peer_id, addr)?;
 
         let dialer = async move {
-            let mut socket = outbound.await.unwrap();
+            let multi_socket = outbound.await.unwrap();
+            let mut socket = multi_socket.get_one_and_only();
             socket.write_all(b"hello world").await.unwrap();
             socket.flush().await.unwrap();
         };

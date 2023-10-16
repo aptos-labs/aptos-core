@@ -5,20 +5,15 @@
 //! Low-level module for establishing connections with peers
 //!
 //! The main component of this module is the [`Transport`] trait, which provides an interface for
-//! establishing both inbound and outbound connections with remote peers. The [`TransportExt`]
-//! trait contains a variety of combinators for modifying a transport allowing composability and
-//! layering of additional transports or protocols.
+//! establishing both inbound and outbound connections with remote peers.
 //!
 //! [`Transport`]: crate::transport::Transport
-//! [`TransportExt`]: crate::transport::TransportExt
 
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use futures::{future::Future, stream::Stream};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub mod and_then;
-pub mod boxed;
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 pub mod memory;
 pub mod proxy_protocol;
@@ -56,15 +51,48 @@ impl fmt::Display for ConnectionOrigin {
     }
 }
 
+#[derive(Debug)]
+/// A simple wrapper around a vector of sockets
+pub struct MultiSocket<TSocket> {
+    sockets: Vec<TSocket>,
+}
+
+impl<TSocket> MultiSocket<TSocket> {
+    /// Creates a new MultiSocket with a single socket
+    pub fn new_with_single_socket(socket: TSocket) -> Self {
+        Self {
+            sockets: vec![socket],
+        }
+    }
+
+    /// Creates a new MultiSocket with multiple sockets
+    pub fn new_with_multiple_sockets(sockets: Vec<TSocket>) -> Self {
+        Self { sockets }
+    }
+
+    /// Consumes the MultiSocket and returns the underlying sockets
+    pub fn into_sockets(self) -> Vec<TSocket> {
+        self.sockets
+    }
+
+    /// Consumes the MultiSocket and returns the underlying single socket
+    pub fn get_one_and_only(mut self) -> TSocket {
+        if self.sockets.len() != 1 {
+            panic!(
+                "MultiSocket::get_one_and_only() called on a MultiSocket with {} sockets",
+                self.sockets.len()
+            );
+        }
+        self.sockets.remove(0)
+    }
+}
+
 /// A Transport is responsible for establishing connections with remote Peers.
 ///
 /// Connections are established either by [listening](Transport::listen_on)
 /// or [dialing](Transport::dial) on a [`Transport`]. A peer that
 /// obtains a connection by listening is often referred to as the *listener* and the
 /// peer that initiated the connection through dialing as the *dialer*.
-///
-/// Additional protocols can be layered on top of the connections established
-/// by a [`Transport`] through utilizing the combinators in the [`TransportExt`] trait.
 pub trait Transport {
     /// The result of establishing a connection.
     ///
@@ -115,48 +143,4 @@ pub trait Transport {
     fn dial(&self, peer_id: PeerId, addr: NetworkAddress) -> Result<Self::Outbound, Self::Error>
     where
         Self: Sized;
-}
-
-impl<T: ?Sized> TransportExt for T where T: Transport {}
-
-/// An extension trait for [`Transport`]s that provides a variety of convenient
-/// combinators.
-///
-/// Additional protocols or functionality can be layered on top of an existing
-/// [`Transport`] by using this extension trait. For example, one might want to
-/// take a raw connection and upgrade it to a secure transport followed by
-/// version handshake by chaining calls to [`and_then`](TransportExt::and_then).
-/// Each method yields a new [`Transport`] whose connection setup incorporates
-/// all earlier upgrades followed by the new upgrade, i.e. the order of the
-/// upgrades is significant.
-pub trait TransportExt: Transport {
-    /// Turns a [`Transport`] into an abstract boxed transport.
-    fn boxed(self) -> boxed::BoxedTransport<Self::Output, Self::Error>
-    where
-        Self: Sized + Send + 'static,
-        Self::Listener: Send + 'static,
-        Self::Inbound: Send + 'static,
-        Self::Outbound: Send + 'static,
-    {
-        boxed::BoxedTransport::new(self)
-    }
-
-    /// Applies a function producing an asynchronous result to every connection
-    /// created by this transport.
-    ///
-    /// This function can be used for ad-hoc protocol upgrades on a transport
-    /// or for processing or adapting the output of an earlier upgrade.  The
-    /// provided function must take as input the output from the existing
-    /// transport and a [`ConnectionOrigin`] which can be used to identify the
-    /// origin of the connection (inbound vs outbound).
-    fn and_then<F, Fut, O>(self, f: F) -> and_then::AndThen<Self, F>
-    where
-        Self: Sized,
-        F: FnOnce(Self::Output, NetworkAddress, ConnectionOrigin) -> Fut + Clone,
-        // Pin the error types to be the same for now
-        // TODO don't require the error types to be the same
-        Fut: Future<Output = Result<O, Self::Error>>,
-    {
-        and_then::AndThen::new(self, f)
-    }
 }

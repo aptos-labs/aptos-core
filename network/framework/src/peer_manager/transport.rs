@@ -11,7 +11,7 @@ use anyhow::format_err;
 use aptos_channels::{self};
 use aptos_config::network_id::NetworkContext;
 use aptos_logger::prelude::*;
-use aptos_netcore::transport::{ConnectionOrigin, Transport};
+use aptos_netcore::transport::{ConnectionOrigin, MultiSocket, Transport};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{network_address::NetworkAddress, PeerId};
@@ -133,7 +133,7 @@ where
         BoxFuture<
             'static,
             (
-                Result<Connection<TSocket>, TTransport::Error>,
+                Result<MultiSocket<Connection<TSocket>>, TTransport::Error>,
                 NetworkAddress,
                 Instant,
             ),
@@ -176,7 +176,7 @@ where
         BoxFuture<
             'static,
             (
-                Result<Connection<TSocket>, TTransport::Error>,
+                Result<MultiSocket<Connection<TSocket>>, TTransport::Error>,
                 NetworkAddress,
                 PeerId,
                 Instant,
@@ -223,7 +223,7 @@ where
     /// Notifies `PeerManager` of a completed or failed outbound connection
     async fn handle_completed_outbound_upgrade(
         &mut self,
-        upgrade: Result<Connection<TSocket>, TTransport::Error>,
+        upgrade: Result<MultiSocket<Connection<TSocket>>, TTransport::Error>,
         addr: NetworkAddress,
         peer_id: PeerId,
         start_time: Instant,
@@ -235,7 +235,8 @@ where
         // Ensure that the connection matches the expected `PeerId`
         let elapsed_time = (self.time_service.now() - start_time).as_secs_f64();
         let upgrade = match upgrade {
-            Ok(connection) => {
+            Ok(multi_connection) => {
+                let connection = multi_connection.get_one_and_only();
                 let dialed_peer_id = connection.metadata.remote_peer_id;
                 if dialed_peer_id == peer_id {
                     Ok(connection)
@@ -294,7 +295,7 @@ where
     /// Notifies `PeerManager` of a completed or failed inbound connection
     async fn handle_completed_inbound_upgrade(
         &mut self,
-        upgrade: Result<Connection<TSocket>, TTransport::Error>,
+        upgrade: Result<MultiSocket<Connection<TSocket>>, TTransport::Error>,
         addr: NetworkAddress,
         start_time: Instant,
     ) {
@@ -303,7 +304,8 @@ where
 
         let elapsed_time = (self.time_service.now() - start_time).as_secs_f64();
         match upgrade {
-            Ok(connection) => {
+            Ok(multi_connection) => {
+                let connection = multi_connection.get_one_and_only();
                 self.send_connection_to_peer_manager(connection, &addr, elapsed_time)
                     .await;
             },
