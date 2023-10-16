@@ -29,7 +29,8 @@ impl Default for FakeAggregatorView {
         Self {
             v1_store: HashMap::new(),
             v2_store: HashMap::new(),
-            counter: RefCell::new(0),
+            // Put some recognizable number, to easily spot missed exchanges
+            counter: RefCell::new(87654321),
         }
     }
 }
