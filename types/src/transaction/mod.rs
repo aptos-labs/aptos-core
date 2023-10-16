@@ -679,6 +679,17 @@ impl SignedTransaction {
         }
     }
 
+    pub fn new_single_sender(
+        raw_txn: RawTransaction,
+        authenticator: AccountAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::single_sender(authenticator),
+            size: OnceCell::new(),
+        }
+    }
+
     pub fn new_with_authenticator(
         raw_txn: RawTransaction,
         authenticator: TransactionAuthenticator,
