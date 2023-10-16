@@ -44,6 +44,43 @@ AccountAuthenticator:
               TYPENAME: Secp256k1EcdsaPublicKey
           - signature:
               TYPENAME: Secp256k1EcdsaSignature
+    3:
+      SingleKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: SingleKeyAuthenticator
+    4:
+      MultiKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: MultiKeyAuthenticator
+AnyKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256k1EcdsaPublicKey
+AnySignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - signature:
+              TYPENAME: Secp256k1EcdsaSignature
+BitVec:
+  STRUCT:
+    - inner: BYTES
 BlockMetadata:
   STRUCT:
     - id:
@@ -176,6 +213,21 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+MultiKey:
+  STRUCT:
+    - public_keys:
+        SEQ:
+          TYPENAME: AnyKey
+    - signatures_required: U8
+MultiKeyAuthenticator:
+  STRUCT:
+    - public_keys:
+        TYPENAME: MultiKey
+    - signatures:
+        SEQ:
+          TYPENAME: AnySignature
+    - signatures_bitmap:
+        TYPENAME: BitVec
 Multisig:
   STRUCT:
     - multisig_address:
@@ -236,6 +288,12 @@ SignedTransaction:
         TYPENAME: RawTransaction
     - authenticator:
         TYPENAME: TransactionAuthenticator
+SingleKeyAuthenticator:
+  STRUCT:
+    - public_key:
+        TYPENAME: AnyKey
+    - signature:
+        TYPENAME: AnySignature
 StateKey:
   ENUM:
     0:
@@ -372,6 +430,11 @@ TransactionAuthenticator:
               TYPENAME: Secp256k1EcdsaPublicKey
           - signature:
               TYPENAME: Secp256k1EcdsaSignature
+    5:
+      SingleSender:
+        STRUCT:
+          - sender:
+              TYPENAME: AccountAuthenticator
 TransactionData:
   ENUM:
     0:
