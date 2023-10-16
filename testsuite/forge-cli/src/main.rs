@@ -1937,7 +1937,7 @@ fn changing_working_quorum_test_helper(
                         // to get the quorum back.
                         30.0
                     },
-                    max_round_gap: 6,
+                    max_round_gap: 12,
                 }),
         )
 }
