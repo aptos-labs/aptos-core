@@ -704,7 +704,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 let ret = match state.unsync_map.fetch_data(state_key) {
                     // TODO: Should we ignore the layout from fetch_data?
                     // What if it doesn't match with the maybe_layout given as input to this function?
-                    Some((v, _)) => Ok(v.as_state_value()),
+                    Some((v, _)) => {
+                        state.read_set.borrow_mut().insert(state_key.clone());
+                        Ok(v.as_state_value())
+                    },
                     None => {
                         self.get_base_value(state_key).map(
                             |maybe_state_value| {
