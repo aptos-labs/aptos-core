@@ -61,6 +61,15 @@ pub fn report_diagnostics(files: &FilesSourceText, diags: Diagnostics) -> ! {
     std::process::exit(1)
 }
 
+// report diagnostics, but do not exit if diags are all warnings
+pub fn report_diagnostics_maynot_exit(files: &FilesSourceText, diags: Diagnostics) {
+    let should_exit = diags
+        .diagnostics
+        .iter()
+        .any(|diag| diag.info.severity() > Severity::Warning);
+    report_diagnostics_impl(files, diags, should_exit);
+}
+
 pub fn report_warnings(files: &FilesSourceText, warnings: Diagnostics) {
     if warnings.is_empty() {
         return;
