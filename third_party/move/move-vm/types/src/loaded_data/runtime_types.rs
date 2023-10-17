@@ -127,7 +127,7 @@ impl StructType {
 
     // Check if the local struct handle is compatible with the defined struct type.
     pub fn check_compatibility(&self, struct_handle: &StructHandle) -> PartialVMResult<()> {
-        if !self.abilities.is_subset(struct_handle.abilities) {
+        if !struct_handle.abilities.is_subset(self.abilities) {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("Ability definition of module mismatch".to_string()),

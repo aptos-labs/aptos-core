@@ -174,5 +174,9 @@ address 0x2 {
         struct S<phantom T> {
             f1: u64,
         }
+
+        struct F<phantom T> has copy{
+            f1: u64,
+        }
     }
 }
