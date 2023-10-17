@@ -442,7 +442,7 @@ message FeePayerSignature {
   AccountSignature fee_payer_signer = 5;
 }
 
-message AnyKey {
+message AnyPublicKey {
   enum Type {
     TYPE_UNSPECIFIED = 0;
     TYPE_ED25519 = 1;
@@ -465,7 +465,7 @@ message AnySignature {
 }
 
 message SingleKeySignature {
-  AnyKey public_key = 1;
+  AnyPublicKey public_key = 1;
   AnySignature signature = 2;
 }
 
@@ -475,7 +475,7 @@ message IndexedSignature {
 }
 
 message MultiKeySignature {
-  repeated AnyKey public_keys = 1;
+  repeated AnyPublicKey public_keys = 1;
   repeated IndexedSignature signatures = 2;
   uint32 signatures_required = 3;
 }

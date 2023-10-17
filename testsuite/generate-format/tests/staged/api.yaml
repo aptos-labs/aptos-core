@@ -38,23 +38,16 @@ AccountAuthenticator:
           - signature:
               TYPENAME: MultiEd25519Signature
     2:
-      Secp256k1Ecdsa:
-        STRUCT:
-          - public_key:
-              TYPENAME: Secp256k1EcdsaPublicKey
-          - signature:
-              TYPENAME: Secp256k1EcdsaSignature
-    3:
       SingleKey:
         STRUCT:
           - authenticator:
               TYPENAME: SingleKeyAuthenticator
-    4:
+    3:
       MultiKey:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
-AnyKey:
+AnyPublicKey:
   ENUM:
     0:
       Ed25519:
@@ -217,7 +210,7 @@ MultiKey:
   STRUCT:
     - public_keys:
         SEQ:
-          TYPENAME: AnyKey
+          TYPENAME: AnyPublicKey
     - signatures_required: U8
 MultiKeyAuthenticator:
   STRUCT:
@@ -291,7 +284,7 @@ SignedTransaction:
 SingleKeyAuthenticator:
   STRUCT:
     - public_key:
-        TYPENAME: AnyKey
+        TYPENAME: AnyPublicKey
     - signature:
         TYPENAME: AnySignature
 StateKey:
@@ -424,13 +417,6 @@ TransactionAuthenticator:
           - fee_payer_signer:
               TYPENAME: AccountAuthenticator
     4:
-      Secp256k1Ecdsa:
-        STRUCT:
-          - public_key:
-              TYPENAME: Secp256k1EcdsaPublicKey
-          - signature:
-              TYPENAME: Secp256k1EcdsaSignature
-    5:
       SingleSender:
         STRUCT:
           - sender:

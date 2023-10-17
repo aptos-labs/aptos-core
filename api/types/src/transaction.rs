@@ -19,7 +19,7 @@ use aptos_types::{
     contract_event::{ContractEvent, EventWithVersion},
     transaction::{
         authenticator::{
-            AccountAuthenticator, AnyKey, AnySignature, MultiKey, MultiKeyAuthenticator,
+            AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
             SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
         },
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
@@ -1164,24 +1164,24 @@ pub enum PublicKey {
     Secp256k1Ecdsa(HexEncodedBytes),
 }
 
-impl TryFrom<PublicKey> for AnyKey {
+impl TryFrom<PublicKey> for AnyPublicKey {
     type Error = anyhow::Error;
 
     fn try_from(public_key: PublicKey) -> Result<Self, Self::Error> {
         Ok(match public_key {
-            PublicKey::Ed25519(p) => AnyKey::ed25519(p.inner().try_into()?),
-            PublicKey::Secp256k1Ecdsa(p) => AnyKey::secp256k1_ecdsa(p.inner().try_into()?),
+            PublicKey::Ed25519(p) => AnyPublicKey::ed25519(p.inner().try_into()?),
+            PublicKey::Secp256k1Ecdsa(p) => AnyPublicKey::secp256k1_ecdsa(p.inner().try_into()?),
         })
     }
 }
 
-impl From<AnyKey> for PublicKey {
-    fn from(key: AnyKey) -> Self {
+impl From<AnyPublicKey> for PublicKey {
+    fn from(key: AnyPublicKey) -> Self {
         match key {
-            AnyKey::Ed25519 { public_key } => {
+            AnyPublicKey::Ed25519 { public_key } => {
                 PublicKey::Ed25519(public_key.to_bytes().to_vec().into())
             },
-            AnyKey::Secp256k1Ecdsa { public_key } => {
+            AnyPublicKey::Secp256k1Ecdsa { public_key } => {
                 PublicKey::Secp256k1Ecdsa(public_key.to_bytes().to_vec().into())
             },
         }
@@ -1234,14 +1234,14 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
                     .inner()
                     .try_into()
                     .context("Failed to parse given public_key bytes as Ed25519PublicKey")?;
-                AnyKey::ed25519(key)
+                AnyPublicKey::ed25519(key)
             },
             PublicKey::Secp256k1Ecdsa(p) => {
                 let key = p
                     .inner()
                     .try_into()
                     .context("Failed to parse given public_key bytes as Secp256k1EcdsaPublicKey")?;
-                AnyKey::secp256k1_ecdsa(key)
+                AnyPublicKey::secp256k1_ecdsa(key)
             },
         };
 
@@ -1309,13 +1309,13 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
                         .inner()
                         .try_into()
                         .context("Failed to parse given public_key bytes as Ed25519PublicKey")?;
-                    AnyKey::ed25519(key)
+                    AnyPublicKey::ed25519(key)
                 },
                 PublicKey::Secp256k1Ecdsa(p) => {
                     let key = p.inner().try_into().context(
                         "Failed to parse given public_key bytes as Secp256k1EcdsaPublicKey",
                     )?;
-                    AnyKey::secp256k1_ecdsa(key)
+                    AnyPublicKey::secp256k1_ecdsa(key)
                 },
             };
             public_keys.push(key);
