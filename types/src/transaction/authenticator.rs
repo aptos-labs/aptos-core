@@ -740,7 +740,8 @@ impl MultiKeyAuthenticator {
     pub fn new(public_keys: MultiKey, signatures: Vec<(u8, AnySignature)>) -> Result<Self> {
         ensure!(
             public_keys.len() < (u8::MAX as usize),
-            "Too many public keys in MultiKeyAuthenticator."
+            "Too many public keys, {}, in MultiKeyAuthenticator.",
+            public_keys.len(),
         );
 
         let mut signatures_bitmap = aptos_bitvec::BitVec::with_num_bits(public_keys.len() as u16);
@@ -749,11 +750,14 @@ impl MultiKeyAuthenticator {
         for (idx, signature) in signatures {
             ensure!(
                 (idx as usize) < public_keys.len(),
-                "Signature index is out of public key range."
+                "Signature index is out of public key range, {} < {}.",
+                idx,
+                public_keys.len(),
             );
             ensure!(
                 !signatures_bitmap.is_set(idx as u16),
-                "Duplicate signature index."
+                "Duplicate signature index, {}.",
+                idx
             );
             signatures_bitmap.set(idx as u16);
             any_signatures.push(signature);
@@ -783,11 +787,13 @@ impl MultiKeyAuthenticator {
     pub fn verify<T: Serialize + CryptoHash>(&self, message: &T) -> Result<()> {
         ensure!(
             self.signatures_bitmap.count_ones() as usize == self.signatures.len(),
-            "Mismatch in signatures and signatures_bitmap"
+            "Mismatch in number of signatures and the number of bits set in the signatures_bitmap, {} != {}.", self.signatures_bitmap.count_ones(), self.signatures.len(),
         );
         ensure!(
             self.signatures.len() >= self.public_keys.signatures_required() as usize,
-            "Not enough signatures for verification"
+            "Not enough signatures for verification, {} < {}.",
+            self.signatures.len(),
+            self.public_keys.signatures_required(),
         );
         for (idx, signature) in
             std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
