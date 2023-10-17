@@ -50,6 +50,11 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
+struct InternalExecuteResult {
+    record_succeeded: bool,
+    updates_outside: bool,
+}
+
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
@@ -97,12 +102,10 @@ where
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-        maybe_error: &mut Option<Error<E::Error>>,
-    ) -> SchedulerTask {
+    ) -> InternalExecuteResult {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -222,24 +225,18 @@ where
             ));
         }
 
-        if !last_input_output.record(idx_to_execute, sync_view.take_reads(), result) {
-            if scheduler.halt() {
-                *maybe_error = Some(Error::ModulePathReadWrite);
-            }
-            SchedulerTask::NoTask
-        } else {
-            scheduler.finish_execution(idx_to_execute, incarnation, updates_outside)
+        let record_succeeded = last_input_output.record(idx_to_execute, read_set, result);
+        InternalExecuteResult {
+            record_succeeded,
+            updates_outside,
         }
     }
 
     fn validate(
         idx_to_validate: TxnIndex,
-        incarnation: Incarnation,
-        validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        scheduler: &Scheduler,
-    ) -> SchedulerTask {
+    ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
             .read_set(idx_to_validate)
@@ -258,39 +255,54 @@ where
         // until commit, but mark as estimates).
 
         // TODO: validate modules when there is no r/w fallback.
-        let valid = read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
-            && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate);
+        read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
+            && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
+    }
 
-        let aborted = !valid && scheduler.try_abort(idx_to_validate, incarnation);
+    fn update_transaction_on_abort(
+        txn_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+    ) {
+        counters::SPECULATIVE_ABORT_COUNT.inc();
+
+        // Any logs from the aborted execution should be cleared and not reported.
+        clear_speculative_txn_logs(txn_idx as usize);
+
+        // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
+        if let Some(keys) = last_input_output.modified_keys(txn_idx) {
+            for (k, is_module_path) in keys {
+                if is_module_path {
+                    versioned_cache.modules().mark_estimate(&k, txn_idx);
+                } else {
+                    versioned_cache.data().mark_estimate(&k, txn_idx);
+                }
+            }
+        }
+
+        if let Some(keys) = last_input_output.delayed_field_keys(txn_idx) {
+            for k in keys {
+                versioned_cache.delayed_fields().mark_estimate(&k, txn_idx);
+            }
+        }
+    }
+
+    fn update_on_validation(
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        valid: bool,
+        validation_wave: Wave,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        scheduler: &Scheduler,
+    ) -> SchedulerTask {
+        let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
-            counters::SPECULATIVE_ABORT_COUNT.inc();
-
-            // Any logs from the aborted execution should be cleared and not reported.
-            clear_speculative_txn_logs(idx_to_validate as usize);
-
-            // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-            if let Some(keys) = last_input_output.modified_keys(idx_to_validate) {
-                for (k, is_module_path) in keys {
-                    if is_module_path {
-                        versioned_cache.modules().mark_estimate(&k, idx_to_validate);
-                    } else {
-                        versioned_cache.data().mark_estimate(&k, idx_to_validate);
-                    }
-                }
-            }
-
-            if let Some(keys) = last_input_output.delayed_field_keys(idx_to_validate) {
-                for k in keys {
-                    versioned_cache
-                        .delayed_fields()
-                        .mark_estimate(&k, idx_to_validate);
-                }
-            }
-
-            scheduler.finish_abort(idx_to_validate, incarnation)
+            Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+            scheduler.finish_abort(txn_idx, incarnation)
         } else {
-            scheduler.finish_validation(idx_to_validate, validation_wave);
+            scheduler.finish_validation(txn_idx, validation_wave);
 
             if valid {
                 scheduler.queueing_commits_arm();
@@ -298,6 +310,49 @@ where
 
             SchedulerTask::NoTask
         }
+    }
+
+    fn validate_commit_ready(
+        txn_idx: TxnIndex,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+    ) -> bool {
+        let read_set = last_input_output
+            .read_set(txn_idx)
+            .expect("Read set must be recorded");
+        let mut execution_still_valid =
+            read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx);
+
+        match last_input_output.output_category(txn_idx) {
+            Some(ErrorCategory::SpeculativeExecutionError) => {
+                assert!(!execution_still_valid);
+            },
+            Some(ErrorCategory::CodeInvariantError) => {
+                // TODO: fallback to sequential execution
+                panic!();
+            },
+            _ => (),
+        };
+
+        if execution_still_valid {
+            if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
+                if let Err(e) = versioned_cache
+                    .delayed_fields()
+                    .try_commit(txn_idx, delayed_field_ids.collect())
+                {
+                    match e {
+                        CommitError::ReExecutionNeeded(_) => {
+                            execution_still_valid = false;
+                        },
+                        CommitError::CodeInvariantError(_) => {
+                            // TODO: fallback to sequential execution
+                            panic!();
+                        },
+                    }
+                }
+            }
+        }
+        execution_still_valid
     }
 
     fn prepare_and_queue_commit_ready_txns(
@@ -312,45 +367,49 @@ where
             Vec<FeeStatement>,
             Option<Error<E::Error>>,
         )>,
+        base_view: &S,
+        shared_counter: &AtomicU32,
+        executor: &E,
+        block: &[T],
     ) {
-        while let Some(txn_idx) = scheduler.try_commit() {
-            let read_set = last_input_output
-                .read_set(txn_idx)
-                .expect("Read set must be recorded");
-            let mut execution_still_valid =
-                read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx);
+        while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
+            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output) {
+                // Transaction needs to be re-executed, one final time.
 
-            match last_input_output.output_category(txn_idx) {
-                Some(ErrorCategory::SpeculativeExecutionError) => {
-                    assert!(!execution_still_valid);
-                },
-                Some(ErrorCategory::CodeInvariantError) => {
-                    panic!();
-                },
-                _ => (),
-            };
+                Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
+                // we are going to skip reducing validation index here, as we
+                // are executing immediately, and will reduce it unconditionally
+                // after execution, inside finish_execution_during_commit
 
-            if execution_still_valid {
-                if let Some(delayed_field_ids) = last_input_output.delayed_field_keys(txn_idx) {
-                    if let Err(e) = versioned_cache
-                        .delayed_fields()
-                        .try_commit(txn_idx, delayed_field_ids.collect())
-                    {
-                        match e {
-                            CommitError::ReExecutionNeeded(_) => {
-                                execution_still_valid = false;
-                            },
-                            CommitError::CodeInvariantError(_) => {
-                                // TODO: fallback to sequential execution
-                                panic!();
-                            },
-                        }
-                    }
+                let InternalExecuteResult {
+                    record_succeeded, ..
+                } = Self::execute(
+                    txn_idx,
+                    incarnation + 1,
+                    block,
+                    last_input_output,
+                    versioned_cache,
+                    executor,
+                    base_view,
+                    ParallelState::new(versioned_cache, scheduler, shared_counter),
+                );
+                if record_succeeded {
+                    scheduler.finish_execution_during_commit(txn_idx);
+                } else {
+                    // TODO add support
+                    panic!("module re-validation in commit retry");
+                    // if scheduler.halt() {
+                    //     *maybe_error = Some(Error::ModulePathReadWrite);
+                    // }
+                    // SchedulerTask::NoTask
                 }
-            }
-            if !execution_still_valid {
-                // TODO call to re-execute transaction
-                panic!();
+
+                if !Self::validate(txn_idx, last_input_output, versioned_cache)
+                    || Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
+                {
+                    // TODO should never happen, fallback to sequential
+                    panic!("Validation after commit-ready re-execution still failed");
+                }
             }
 
             defer! {
@@ -747,6 +806,10 @@ where
                     &mut scheduler_task,
                     last_input_output,
                     shared_commit_state,
+                    base_view,
+                    shared_counter,
+                    &executor,
+                    block,
                 );
                 scheduler.queueing_commits_mark_done();
             }
@@ -754,14 +817,18 @@ where
             drain_commit_queue();
 
             scheduler_task = match scheduler_task {
-                SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => Self::validate(
-                    txn_idx,
-                    incarnation,
-                    wave,
-                    last_input_output,
-                    versioned_cache,
-                    scheduler,
-                ),
+                SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
+                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache);
+                    Self::update_on_validation(
+                        txn_idx,
+                        incarnation,
+                        valid,
+                        wave,
+                        last_input_output,
+                        versioned_cache,
+                        scheduler,
+                    )
+                },
                 SchedulerTask::ExecutionTask(
                     txn_idx,
                     incarnation,
@@ -769,18 +836,27 @@ where
                 ) => {
                     let mut shared_commit_state_guard = shared_commit_state.acquire();
                     let (_, _, maybe_error) = shared_commit_state_guard.dereference_mut();
-                    Self::execute(
+                    let InternalExecuteResult {
+                        record_succeeded,
+                        updates_outside,
+                    } = Self::execute(
                         txn_idx,
                         incarnation,
                         block,
                         last_input_output,
                         versioned_cache,
-                        scheduler,
                         &executor,
                         base_view,
                         ParallelState::new(versioned_cache, scheduler, shared_counter),
-                        maybe_error,
-                    )
+                    );
+                    if record_succeeded {
+                        scheduler.finish_execution(txn_idx, incarnation, updates_outside)
+                    } else {
+                        if scheduler.halt() {
+                            *maybe_error = Some(Error::ModulePathReadWrite);
+                        }
+                        SchedulerTask::NoTask
+                    }
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
