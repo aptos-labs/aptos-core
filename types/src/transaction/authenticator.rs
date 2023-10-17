@@ -629,12 +629,12 @@ impl AuthenticationKey {
         Self::from_preimage(public_key.to_bytes(), Scheme::MultiEd25519)
     }
 
-    /// Create an authentication key from an AnyKey
-    pub fn any_key(public_key: AnyKey) -> AuthenticationKey {
+    /// Create an authentication key from an AnyPublicKey
+    pub fn any_key(public_key: AnyPublicKey) -> AuthenticationKey {
         Self::from_preimage(public_key.to_bytes(), Scheme::SingleKey)
     }
 
-    /// Create an authentication key from multiple AnyKeys
+    /// Create an authentication key from multiple AnyPublicKeys
     pub fn multi_key(public_keys: MultiKey) -> AuthenticationKey {
         Self::from_preimage(public_keys.to_bytes(), Scheme::MultiKey)
     }
@@ -809,12 +809,12 @@ impl MultiKeyAuthenticator {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MultiKey {
-    public_keys: Vec<AnyKey>,
+    public_keys: Vec<AnyPublicKey>,
     signatures_required: u8,
 }
 
 impl MultiKey {
-    pub fn new(public_keys: Vec<AnyKey>, signatures_required: u8) -> Self {
+    pub fn new(public_keys: Vec<AnyPublicKey>, signatures_required: u8) -> Self {
         Self {
             public_keys,
             signatures_required,
@@ -829,7 +829,7 @@ impl MultiKey {
         self.public_keys.len()
     }
 
-    pub fn public_keys(&self) -> &[AnyKey] {
+    pub fn public_keys(&self) -> &[AnyPublicKey] {
         &self.public_keys
     }
 
@@ -844,19 +844,19 @@ impl MultiKey {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SingleKeyAuthenticator {
-    public_key: AnyKey,
+    public_key: AnyPublicKey,
     signature: AnySignature,
 }
 
 impl SingleKeyAuthenticator {
-    pub fn new(public_key: AnyKey, signature: AnySignature) -> Self {
+    pub fn new(public_key: AnyPublicKey, signature: AnySignature) -> Self {
         Self {
             public_key,
             signature,
         }
     }
 
-    pub fn public_key(&self) -> &AnyKey {
+    pub fn public_key(&self) -> &AnyPublicKey {
         &self.public_key
     }
 
@@ -898,14 +898,14 @@ impl AnySignature {
 
     pub fn verify<T: Serialize + CryptoHash>(
         &self,
-        public_key: &AnyKey,
+        public_key: &AnyPublicKey,
         message: &T,
     ) -> Result<()> {
         match (self, public_key) {
-            (Self::Ed25519 { signature }, AnyKey::Ed25519 { public_key }) => {
+            (Self::Ed25519 { signature }, AnyPublicKey::Ed25519 { public_key }) => {
                 signature.verify(message, public_key)
             },
-            (Self::Secp256k1Ecdsa { signature }, AnyKey::Secp256k1Ecdsa { public_key }) => {
+            (Self::Secp256k1Ecdsa { signature }, AnyPublicKey::Secp256k1Ecdsa { public_key }) => {
                 signature.verify(message, public_key)
             },
             _ => bail!("Invalid key, signature pairing"),
@@ -914,7 +914,7 @@ impl AnySignature {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub enum AnyKey {
+pub enum AnyPublicKey {
     Ed25519 {
         public_key: Ed25519PublicKey,
     },
@@ -923,7 +923,7 @@ pub enum AnyKey {
     },
 }
 
-impl AnyKey {
+impl AnyPublicKey {
     pub fn ed25519(public_key: Ed25519PublicKey) -> Self {
         Self::Ed25519 { public_key }
     }
@@ -958,7 +958,8 @@ mod tests {
         let ed_sender_auth = AuthenticationKey::ed25519(&sender_pub);
         let ed_sender_addr = ed_sender_auth.account_address();
 
-        let single_sender_auth = AuthenticationKey::any_key(AnyKey::ed25519(sender_pub.clone()));
+        let single_sender_auth =
+            AuthenticationKey::any_key(AnyPublicKey::ed25519(sender_pub.clone()));
         let single_sender_addr = single_sender_auth.account_address();
         assert!(ed_sender_addr != single_sender_addr);
 
@@ -976,7 +977,7 @@ mod tests {
 
         let signature = sender.sign(&raw_txn).unwrap();
         let sk_auth = SingleKeyAuthenticator::new(
-            AnyKey::ed25519(sender_pub),
+            AnyPublicKey::ed25519(sender_pub),
             AnySignature::ed25519(signature),
         );
         let account_auth = AccountAuthenticator::single_key(sk_auth);
@@ -993,7 +994,7 @@ mod tests {
         let sender_pub = sender.public_key();
 
         let single_sender_auth =
-            AuthenticationKey::any_key(AnyKey::secp256k1_ecdsa(sender_pub.clone()));
+            AuthenticationKey::any_key(AnyPublicKey::secp256k1_ecdsa(sender_pub.clone()));
         let single_sender_addr = single_sender_auth.account_address();
 
         let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
@@ -1010,7 +1011,7 @@ mod tests {
 
         let signature = sender.sign(&raw_txn).unwrap();
         let sk_auth = SingleKeyAuthenticator::new(
-            AnyKey::secp256k1_ecdsa(sender_pub),
+            AnyPublicKey::secp256k1_ecdsa(sender_pub),
             AnySignature::secp256k1_ecdsa(signature),
         );
         let account_auth = AccountAuthenticator::single_key(sk_auth);
@@ -1022,10 +1023,10 @@ mod tests {
     fn verify_multi_key_auth() {
         let sender0 = Ed25519PrivateKey::generate_for_testing();
         let sender0_pub = sender0.public_key();
-        let any_sender0_pub = AnyKey::ed25519(sender0_pub.clone());
+        let any_sender0_pub = AnyPublicKey::ed25519(sender0_pub.clone());
         let sender1 = secp256k1_ecdsa::PrivateKey::generate_for_testing();
         let sender1_pub = sender1.public_key();
-        let any_sender1_pub = AnyKey::secp256k1_ecdsa(sender1_pub);
+        let any_sender1_pub = AnyPublicKey::secp256k1_ecdsa(sender1_pub);
 
         let keys = vec![
             any_sender0_pub.clone(),

@@ -240,7 +240,7 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
         deserializer.deserialize_any(GeneratedVisitor)
     }
 }
-impl serde::Serialize for AnyKey {
+impl serde::Serialize for AnyPublicKey {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -254,9 +254,9 @@ impl serde::Serialize for AnyKey {
         if !self.public_key.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AnyKey", len)?;
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AnyPublicKey", len)?;
         if self.r#type != 0 {
-            let v = any_key::Type::from_i32(self.r#type)
+            let v = any_public_key::Type::from_i32(self.r#type)
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
             struct_ser.serialize_field("type", &v)?;
         }
@@ -266,7 +266,7 @@ impl serde::Serialize for AnyKey {
         struct_ser.end()
     }
 }
-impl<'de> serde::Deserialize<'de> for AnyKey {
+impl<'de> serde::Deserialize<'de> for AnyPublicKey {
     #[allow(deprecated)]
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -314,13 +314,13 @@ impl<'de> serde::Deserialize<'de> for AnyKey {
         }
         struct GeneratedVisitor;
         impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = AnyKey;
+            type Value = AnyPublicKey;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.AnyKey")
+                formatter.write_str("struct aptos.transaction.v1.AnyPublicKey")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<AnyKey, V::Error>
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<AnyPublicKey, V::Error>
                 where
                     V: serde::de::MapAccess<'de>,
             {
@@ -332,7 +332,7 @@ impl<'de> serde::Deserialize<'de> for AnyKey {
                             if r#type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
-                            r#type__ = Some(map.next_value::<any_key::Type>()? as i32);
+                            r#type__ = Some(map.next_value::<any_public_key::Type>()? as i32);
                         }
                         GeneratedField::PublicKey => {
                             if public_key__.is_some() {
@@ -344,16 +344,16 @@ impl<'de> serde::Deserialize<'de> for AnyKey {
                         }
                     }
                 }
-                Ok(AnyKey {
+                Ok(AnyPublicKey {
                     r#type: r#type__.unwrap_or_default(),
                     public_key: public_key__.unwrap_or_default(),
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.transaction.v1.AnyKey", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct("aptos.transaction.v1.AnyPublicKey", FIELDS, GeneratedVisitor)
     }
 }
-impl serde::Serialize for any_key::Type {
+impl serde::Serialize for any_public_key::Type {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -367,7 +367,7 @@ impl serde::Serialize for any_key::Type {
         serializer.serialize_str(variant)
     }
 }
-impl<'de> serde::Deserialize<'de> for any_key::Type {
+impl<'de> serde::Deserialize<'de> for any_public_key::Type {
     #[allow(deprecated)]
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -382,7 +382,7 @@ impl<'de> serde::Deserialize<'de> for any_key::Type {
         struct GeneratedVisitor;
 
         impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = any_key::Type;
+            type Value = any_public_key::Type;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(formatter, "expected one of: {:?}", &FIELDS)
@@ -395,7 +395,7 @@ impl<'de> serde::Deserialize<'de> for any_key::Type {
                 use std::convert::TryFrom;
                 i32::try_from(v)
                     .ok()
-                    .and_then(any_key::Type::from_i32)
+                    .and_then(any_public_key::Type::from_i32)
                     .ok_or_else(|| {
                         serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
                     })
@@ -408,7 +408,7 @@ impl<'de> serde::Deserialize<'de> for any_key::Type {
                 use std::convert::TryFrom;
                 i32::try_from(v)
                     .ok()
-                    .and_then(any_key::Type::from_i32)
+                    .and_then(any_public_key::Type::from_i32)
                     .ok_or_else(|| {
                         serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
                     })
@@ -419,9 +419,9 @@ impl<'de> serde::Deserialize<'de> for any_key::Type {
                 E: serde::de::Error,
             {
                 match value {
-                    "TYPE_UNSPECIFIED" => Ok(any_key::Type::Unspecified),
-                    "TYPE_ED25519" => Ok(any_key::Type::Ed25519),
-                    "TYPE_SECP256K1_ECDSA" => Ok(any_key::Type::Secp256k1Ecdsa),
+                    "TYPE_UNSPECIFIED" => Ok(any_public_key::Type::Unspecified),
+                    "TYPE_ED25519" => Ok(any_public_key::Type::Ed25519),
+                    "TYPE_SECP256K1_ECDSA" => Ok(any_public_key::Type::Secp256k1Ecdsa),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
