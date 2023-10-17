@@ -687,9 +687,7 @@ where
                         .expect("Aggregator base value deserialization error")
                         .expect("Aggregator base value must exist");
 
-                    versioned_cache
-                        .data()
-                        .provide_base_value(k.clone(), w, None);
+                    versioned_cache.data().set_base_value(k.clone(), w, None);
                     op.apply_to(value_u128)
                         .expect("Materializing delta w. base value set must succeed")
                 });
