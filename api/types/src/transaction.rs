@@ -20,7 +20,7 @@ use aptos_types::{
     transaction::{
         authenticator::{
             AccountAuthenticator, AnyKey, AnySignature, MultiKey, MultiKeyAuthenticator,
-            TransactionAuthenticator, MAX_NUM_OF_SIGS,
+            SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
         },
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
@@ -873,7 +873,6 @@ pub enum TransactionSignature {
     MultiEd25519Signature(MultiEd25519Signature),
     MultiAgentSignature(MultiAgentSignature),
     FeePayerSignature(FeePayerSignature),
-    Secp256k1EcdsaSignature(Secp256k1EcdsaSignature),
     SingleSender(AccountSignature),
 }
 
@@ -884,7 +883,6 @@ impl VerifyInput for TransactionSignature {
             TransactionSignature::MultiEd25519Signature(inner) => inner.verify(),
             TransactionSignature::MultiAgentSignature(inner) => inner.verify(),
             TransactionSignature::FeePayerSignature(inner) => inner.verify(),
-            TransactionSignature::Secp256k1EcdsaSignature(inner) => inner.verify(),
             TransactionSignature::SingleSender(inner) => inner.verify(),
         }
     }
@@ -899,7 +897,6 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
             TransactionSignature::MultiEd25519Signature(sig) => sig.try_into()?,
             TransactionSignature::MultiAgentSignature(sig) => sig.try_into()?,
             TransactionSignature::FeePayerSignature(sig) => sig.try_into()?,
-            TransactionSignature::Secp256k1EcdsaSignature(sig) => sig.try_into()?,
             TransactionSignature::SingleSender(sig) => {
                 TransactionAuthenticator::single_sender(sig.try_into()?)
             },
@@ -1127,48 +1124,6 @@ impl VerifyInput for Secp256k1EcdsaSignature {
     }
 }
 
-impl TryFrom<Secp256k1EcdsaSignature> for TransactionAuthenticator {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Secp256k1EcdsaSignature) -> Result<Self, Self::Error> {
-        let Secp256k1EcdsaSignature {
-            public_key,
-            signature,
-        } = value;
-        Ok(TransactionAuthenticator::secp256k1_ecdsa(
-            public_key
-                .inner()
-                .try_into()
-                .context("Failed to parse given public_key bytes as a Secp256k1EcdsaPublicKey")?,
-            signature
-                .inner()
-                .try_into()
-                .context("Failed to parse given signature as a Secp256k1EcdsaSignature")?,
-        ))
-    }
-}
-
-impl TryFrom<Secp256k1EcdsaSignature> for AccountAuthenticator {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Secp256k1EcdsaSignature) -> Result<Self, Self::Error> {
-        let Secp256k1EcdsaSignature {
-            public_key,
-            signature,
-        } = value;
-        Ok(AccountAuthenticator::secp256k1_ecdsa(
-            public_key
-                .inner()
-                .try_into()
-                .context("Failed to parse given public_key bytes as a Secp256k1EcdsaPublicKey")?,
-            signature
-                .inner()
-                .try_into()
-                .context("Failed to parse given signature as a Secp256k1EcdsaSignature")?,
-        ))
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
@@ -1273,21 +1228,42 @@ impl TryFrom<SingleKeySignature> for AccountAuthenticator {
     type Error = anyhow::Error;
 
     fn try_from(value: SingleKeySignature) -> Result<Self, Self::Error> {
-        match (value.public_key, value.signature) {
-            (PublicKey::Ed25519(p), Signature::Ed25519(s)) => Ed25519Signature {
-                public_key: p,
-                signature: s,
-            }
-            .try_into(),
-            (PublicKey::Secp256k1Ecdsa(p), Signature::Secp256k1Ecdsa(s)) => {
-                Secp256k1EcdsaSignature {
-                    public_key: p,
-                    signature: s,
-                }
-                .try_into()
+        let key = match value.public_key {
+            PublicKey::Ed25519(p) => {
+                let key = p
+                    .inner()
+                    .try_into()
+                    .context("Failed to parse given public_key bytes as Ed25519PublicKey")?;
+                AnyKey::ed25519(key)
             },
-            _ => bail!("Invalid public key, signature match."),
-        }
+            PublicKey::Secp256k1Ecdsa(p) => {
+                let key = p
+                    .inner()
+                    .try_into()
+                    .context("Failed to parse given public_key bytes as Secp256k1EcdsaPublicKey")?;
+                AnyKey::secp256k1_ecdsa(key)
+            },
+        };
+
+        let signature = match value.signature {
+            Signature::Ed25519(s) => {
+                let signature = s
+                    .inner()
+                    .try_into()
+                    .context("Failed to parse given public_key bytes as Ed25519Signature")?;
+                AnySignature::ed25519(signature)
+            },
+            Signature::Secp256k1Ecdsa(s) => {
+                let signature = s
+                    .inner()
+                    .try_into()
+                    .context("Failed to parse given public_key bytes as Secp256k1EcdsaSignature")?;
+                AnySignature::secp256k1_ecdsa(signature)
+            },
+        };
+
+        let auth = SingleKeyAuthenticator::new(key, signature);
+        Ok(AccountAuthenticator::single_key(auth))
     }
 }
 
@@ -1384,7 +1360,6 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
 pub enum AccountSignature {
     Ed25519Signature(Ed25519Signature),
     MultiEd25519Signature(MultiEd25519Signature),
-    Secp256k1EcdsaSignature(Secp256k1EcdsaSignature),
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
 }
@@ -1394,7 +1369,6 @@ impl VerifyInput for AccountSignature {
         match self {
             AccountSignature::Ed25519Signature(inner) => inner.verify(),
             AccountSignature::MultiEd25519Signature(inner) => inner.verify(),
-            AccountSignature::Secp256k1EcdsaSignature(inner) => inner.verify(),
             AccountSignature::SingleKeySignature(inner) => inner.verify(),
             AccountSignature::MultiKeySignature(inner) => inner.verify(),
         }
@@ -1408,7 +1382,6 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
         Ok(match sig {
             AccountSignature::Ed25519Signature(s) => s.try_into()?,
             AccountSignature::MultiEd25519Signature(s) => s.try_into()?,
-            AccountSignature::Secp256k1EcdsaSignature(s) => s.try_into()?,
             AccountSignature::SingleKeySignature(s) => s.try_into()?,
             AccountSignature::MultiKeySignature(s) => s.try_into()?,
         })
@@ -1528,10 +1501,6 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 public_key,
                 signature,
             } => Self::MultiEd25519Signature((public_key, signature).into()),
-            Secp256k1Ecdsa {
-                public_key,
-                signature,
-            } => Self::Secp256k1EcdsaSignature((public_key, signature).into()),
             SingleKey { authenticator } => Self::SingleKeySignature(SingleKeySignature {
                 public_key: authenticator.public_key().clone().into(),
                 signature: authenticator.signature().clone().into(),
@@ -1700,10 +1669,6 @@ impl From<TransactionAuthenticator> for TransactionSignature {
                 )
                     .into(),
             ),
-            Secp256k1Ecdsa {
-                public_key,
-                signature,
-            } => Self::Secp256k1EcdsaSignature((public_key, signature).into()),
             SingleSender { sender } => Self::SingleSender(sender.into()),
         }
     }
