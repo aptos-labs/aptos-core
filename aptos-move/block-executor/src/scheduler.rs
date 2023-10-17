@@ -138,6 +138,7 @@ enum ExecutionStatus {
     Executing(Incarnation),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
+    // TODO: rename to Finalized or ReadyToCommit / CommitReady? it gets committed later, without scheduler tracking.
     Committed(Incarnation),
     Aborting(Incarnation),
     ExecutionHalted,
@@ -326,7 +327,7 @@ impl Scheduler {
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
-    pub fn try_commit(&self) -> Option<TxnIndex> {
+    pub fn try_commit(&self) -> Option<(TxnIndex, Incarnation)> {
         let mut commit_state = self.commit_state.acquire();
         let (commit_idx, commit_wave) = commit_state.dereference_mut();
 
@@ -362,7 +363,7 @@ impl Scheduler {
                             // All txns have been committed, the parallel execution can finish.
                             self.done_marker.store(true, Ordering::SeqCst);
                         }
-                        return Some(*commit_idx - 1);
+                        return Some((*commit_idx - 1, incarnation));
                     }
                 }
             }
@@ -505,26 +506,7 @@ impl Scheduler {
         );
     }
 
-    /// After txn is executed, schedule its dependencies for re-execution.
-    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
-    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
-    /// return a validation task of the transaction to the caller (otherwise NoTask).
-    pub fn finish_execution(
-        &self,
-        txn_idx: TxnIndex,
-        incarnation: Incarnation,
-        revalidate_suffix: bool,
-    ) -> SchedulerTask {
-        // Note: It is preferable to hold the validation lock throughout the finish_execution,
-        // in particular before updating execution status. The point was that we don't want
-        // any validation to come before the validation status is correspondingly updated.
-        // It may be possible to make work more granular, but shouldn't make performance
-        // difference and like this correctness argument is much easier to see, in fact also
-        // the reason why we grab write lock directly, and never release it during the whole function.
-        // So even validation status readers have to wait if they somehow end up at the same index.
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        self.set_executed_status(txn_idx, incarnation);
-
+    fn wake_dependencies_after_execution(&self, txn_idx: TxnIndex) {
         let txn_deps: Vec<TxnIndex> = {
             let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
             // Holding the lock, take dependency vector.
@@ -548,6 +530,29 @@ impl Scheduler {
             self.execution_idx
                 .fetch_min(execution_target_idx, Ordering::SeqCst);
         }
+    }
+
+    /// After txn is executed, schedule its dependencies for re-execution.
+    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
+    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
+    /// return a validation task of the transaction to the caller (otherwise NoTask).
+    pub fn finish_execution(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        revalidate_suffix: bool,
+    ) -> SchedulerTask {
+        // Note: It is preferable to hold the validation lock throughout the finish_execution,
+        // in particular before updating execution status. The point was that we don't want
+        // any validation to come before the validation status is correspondingly updated.
+        // It may be possible to make work more granular, but shouldn't make performance
+        // difference and like this correctness argument is much easier to see, in fact also
+        // the reason why we grab write lock directly, and never release it during the whole function.
+        // So even validation status readers have to wait if they somehow end up at the same index.
+        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        self.set_executed_status(txn_idx, incarnation);
+
+        self.wake_dependencies_after_execution(txn_idx);
 
         let (cur_val_idx, mut cur_wave) =
             Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
@@ -568,6 +573,16 @@ impl Scheduler {
         }
 
         SchedulerTask::NoTask
+    }
+
+    pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) {
+        // we have exclusivity on this transaction
+
+        self.wake_dependencies_after_execution(txn_idx);
+
+        // we skipped decreasing validation index when invalidating,
+        // as we were executing it immediately, and are doing so now. (unconditionally)
+        self.decrease_validation_idx(txn_idx + 1);
     }
 
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
