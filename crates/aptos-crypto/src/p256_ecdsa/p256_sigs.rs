@@ -3,20 +3,19 @@
 
 //! This file implements traits for ECDSA signatures over NIST-P256.
 
+use super::P256_SIGNATURE_LENGTH;
 use crate::{
-    p256_ecdsa::{P256PrivateKey, P256PublicKey, ORDER_HALF},
     hash::CryptoHash,
+    p256_ecdsa::{P256PrivateKey, P256PublicKey, ORDER_HALF},
     traits::*,
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use core::convert::TryFrom;
-use serde::Serialize;
-use std::{cmp::Ordering, fmt};
-use signature::Verifier;
 use p256::NonZeroScalar;
-
-use super::P256_SIGNATURE_LENGTH;
+use serde::Serialize;
+use signature::Verifier;
+use std::{cmp::Ordering, fmt};
 
 /// A P256 signature
 #[derive(DeserializeKey, Clone, SerializeKey)]
@@ -26,14 +25,14 @@ impl P256Signature {
     /// The length of the P256Signature
     pub const LENGTH: usize = P256_SIGNATURE_LENGTH;
 
-    /// Serialize an P256Signature. Uses the SEC1 serialization format. 
+    /// Serialize an P256Signature. Uses the SEC1 serialization format.
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
         self.0.to_bytes().try_into().unwrap()
     }
 
     /// Deserialize an P256Signature, without checking for malleability
-    /// Uses the SEC1 serialization format. 
+    /// Uses the SEC1 serialization format.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256Signature, CryptoMaterialError> {
@@ -85,21 +84,16 @@ impl P256Signature {
 
     /// If the signature {R,S} does not have S < n/2 where n is the Ristretto255 order, return
     /// {R,n-S} as the canonical encoding of this signature to prevent malleability attacks. See
-    /// `check_s_malleability` for more detail 
+    /// `check_s_malleability` for more detail
     pub fn make_canonical(&self) -> P256Signature {
         if P256Signature::check_s_malleability(&self.to_bytes()[..]).is_ok() {
-            return self.clone()
+            return self.clone();
         };
         let s = self.0.s();
         let r = self.0.r();
-        // NonZeroScalar::try_from throws an error on being passed the curve order, so we use the
-        // order minus one, then add one later to compute (n-1) - s + 1 = n-s
-        //let order_minus_one = NonZeroScalar::try_from(&ORDER_MINUS_ONE[..]).unwrap();
-        //let one = NonZeroScalar::from_uint(<NistP256 as Curve>::Uint::ONE).unwrap();
-        // Dereferencing a NonZeroScalar makes it a Scalar, which implements subtraction
-        let new_s = -*s; //*order_minus_one - *s + *one;
+        let new_s = -*s;
         let new_s_nonzero = NonZeroScalar::new(new_s).unwrap();
-        let new_sig = p256::ecdsa::Signature::from_scalars(&r, &new_s_nonzero).unwrap();
+        let new_sig = p256::ecdsa::Signature::from_scalars(r, new_s_nonzero).unwrap();
         P256Signature(new_sig)
     }
 }
@@ -131,7 +125,11 @@ impl Signature for P256Signature {
     fn verify_arbitrary_msg(&self, message: &[u8], public_key: &P256PublicKey) -> Result<()> {
         P256Signature::check_s_malleability(&self.to_bytes())?;
 
-        public_key.0.verify(message, &self.0).map_err(|e| anyhow!("{}", e)).and(Ok(()))
+        public_key
+            .0
+            .verify(message, &self.0)
+            .map_err(|e| anyhow!("{}", e))
+            .and(Ok(()))
     }
 
     fn to_bytes(&self) -> Vec<u8> {

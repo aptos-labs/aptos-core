@@ -5,19 +5,19 @@
 
 use crate as aptos_crypto;
 use crate::{
-    p256_ecdsa::{P256_SIGNATURE_LENGTH, P256PublicKey, P256_PUBLIC_KEY_LENGTH, P256_PRIVATE_KEY_LENGTH, P256PrivateKey, P256Signature, ORDER_HALF}, 
-    test_utils::{
-        random_serializable_struct,
-        uniform_keypair_strategy,
+    p256_ecdsa::{
+        P256PrivateKey, P256PublicKey, P256Signature, ORDER_HALF, P256_PRIVATE_KEY_LENGTH,
+        P256_PUBLIC_KEY_LENGTH, P256_SIGNATURE_LENGTH,
     },
+    test_utils::{random_serializable_struct, uniform_keypair_strategy},
     traits::*,
 };
-use signature::Verifier;
-use p256::{EncodedPoint, NonZeroScalar};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use core::convert::TryFrom;
+use p256::{EncodedPoint, NonZeroScalar};
 use proptest::{collection::vec, prelude::*};
 use serde::{Deserialize, Serialize};
+use signature::Verifier;
 
 #[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct CryptoHashable(pub usize);

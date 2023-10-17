@@ -6,14 +6,13 @@
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
 use crate::{
-    p256_ecdsa::{P256Signature, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
     hash::CryptoHash,
+    p256_ecdsa::{P256Signature, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
     traits::*,
 };
-use p256::ecdsa::signature::Signer;
-use p256;
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
+use p256::{self, ecdsa::signature::Signer};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use serde::Serialize;
@@ -42,13 +41,13 @@ impl P256PrivateKey {
     /// The length of the P256PrivateKey
     pub const LENGTH: usize = P256_PRIVATE_KEY_LENGTH;
 
-    /// Serialize a P256PrivateKey. Uses the SEC1 serialization format. 
+    /// Serialize a P256PrivateKey. Uses the SEC1 serialization format.
     pub fn to_bytes(&self) -> [u8; P256_PRIVATE_KEY_LENGTH] {
         self.0.to_bytes().into()
     }
 
     /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
-    /// Uses the SEC1 serialization format. 
+    /// Uses the SEC1 serialization format.
     fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
@@ -65,9 +64,7 @@ impl P256PrivateKey {
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
         let secret_key = &self.0;
         let sig = P256Signature(secret_key.sign(message.as_ref()));
-        let canonical_sig = P256Signature::make_canonical(&sig);
-
-        canonical_sig
+        P256Signature::make_canonical(&sig)
     }
 }
 
@@ -80,7 +77,7 @@ impl P256PublicKey {
 
     /// Deserialize a P256PublicKey, checking expected key size
     /// and that it is a valid curve point.
-    /// Uses the SEC1 serialization format. 
+    /// Uses the SEC1 serialization format.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
@@ -122,7 +119,7 @@ impl SigningKey for P256PrivateKey {
 impl Uniform for P256PrivateKey {
     fn generate<R>(rng: &mut R) -> Self
     where
-       R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+        R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
         let mut bytes = [0u8; P256_PRIVATE_KEY_LENGTH];
         rng.fill_bytes(&mut bytes);
