@@ -1323,21 +1323,21 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
 
         let mut signatures = vec![];
         for indexed_signature in value.signatures {
-            let signature = match indexed_signature.signature {
-                Signature::Ed25519(s) => {
-                    let signature = s
-                        .inner()
-                        .try_into()
-                        .context("Failed to parse given public_key bytes as Ed25519Signature")?;
-                    AnySignature::ed25519(signature)
-                },
-                Signature::Secp256k1Ecdsa(s) => {
-                    let signature = s.inner().try_into().context(
-                        "Failed to parse given public_key bytes as Secp256k1EcdsaSignature",
-                    )?;
-                    AnySignature::secp256k1_ecdsa(signature)
-                },
-            };
+            let signature =
+                match indexed_signature.signature {
+                    Signature::Ed25519(s) => {
+                        let signature = s.inner().try_into().context(
+                            "Failed to parse given public_key bytes as Ed25519Signature",
+                        )?;
+                        AnySignature::ed25519(signature)
+                    },
+                    Signature::Secp256k1Ecdsa(s) => {
+                        let signature = s.inner().try_into().context(
+                            "Failed to parse given signature as Secp256k1EcdsaSignature",
+                        )?;
+                        AnySignature::secp256k1_ecdsa(signature)
+                    },
+                };
             signatures.push((indexed_signature.index, signature));
         }
 
