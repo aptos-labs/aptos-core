@@ -100,7 +100,7 @@ Follow the below instructions **twice**, i.e., first on one machine to run a val
 
     Modify the config files to update the data directory, key path, genesis file path, waypoint path. User must have write access to data directory.
 
-11. <span id="source-code-vfn">To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:</span>
+11. To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:
 
     - `config` folder containing:
       - `validator.yaml` validator config file
