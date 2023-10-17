@@ -13,6 +13,7 @@ use futures::TryStreamExt;
 use reqwest::Url;
 use std::{fs::create_dir_all, net::SocketAddr, path::Path};
 use tracing::info;
+use version_compare::Version;
 
 pub fn socket_addr_to_url(socket_addr: &SocketAddr, scheme: &str) -> Result<Url> {
     let host = match socket_addr {
@@ -31,10 +32,51 @@ pub fn get_docker() -> Result<Docker> {
 
 pub async fn confirm_docker_available() -> Result<()> {
     let docker = get_docker()?;
-    docker
+    let info = docker
         .info()
         .await
         .context("Docker is not available, confirm it is installed and running. On Linux you may need to use sudo.")?;
+
+    info!("Docker Info: {:?}", info);
+
+    let version = docker
+        .version()
+        .await
+        .context("Failed to get Docker version")?;
+
+    info!("Docker Version: {:?}", version);
+
+    // Try to warn the user about their Docker version being too old. We don't error
+    // out if the version is too old in case we're wrong about the minimum version
+    // for their particular system. We just print a warning.
+    match version.api_version {
+        Some(current_api_version) => match Version::from(&current_api_version) {
+            Some(current_api_version) => {
+                let minimum_api_version = Version::from("1.42").unwrap();
+                if current_api_version < minimum_api_version {
+                    eprintln!(
+                            "WARNING: Docker API version {} is too old, minimum required version is {}. Please update Docker!",
+                            current_api_version,
+                            minimum_api_version,
+                        );
+                } else {
+                    eprintln!("Docker version is sufficient: {}", current_api_version);
+                }
+            },
+            None => {
+                eprintln!(
+                    "WARNING: Failed to parse Docker API version: {}",
+                    current_api_version
+                );
+            },
+        },
+        None => {
+            eprintln!(
+                "WARNING: Failed to determine Docker version, confirm your Docker is up to date!"
+            );
+        },
+    }
+
     Ok(())
 }
 

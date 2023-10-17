@@ -144,8 +144,8 @@ impl HealthChecker {
         .await
     }
 
-    /// This is only ever used for display purposes. Ideally the endpoint if this
-    /// HealthChecker is for a service.
+    /// This is only ever used for display purposes. If possible, this should be the
+    /// endpoint of the service that this HealthChecker is checking.
     pub fn address_str(&self) -> &str {
         match self {
             HealthChecker::Http(url, _) => url.as_str(),
