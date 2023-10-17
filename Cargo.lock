@@ -15516,7 +15516,7 @@ dependencies = [
 [[package]]
 name = "x25519-dalek"
 version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek#b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e"
+source = "git+https://github.com/aptos-labs/x25519-dalek?rev=b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e#b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e"
 dependencies = [
  "curve25519-dalek",
  "rand_core 0.5.1",

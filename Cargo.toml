@@ -548,8 +548,7 @@ once_cell = "1.10.0"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"
-# TODO: Do we actually use serde?
-p256 = { version = "0.13.2" } #, features = ["serde"] }
+p256 = { version = "0.13.2" }
 signature = "2.1.0"
 sec1 = "0.7.0"
 parking_lot = "0.12.0"
@@ -659,7 +658,7 @@ walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
-x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek" }
+x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }

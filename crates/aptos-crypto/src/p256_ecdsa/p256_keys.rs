@@ -59,6 +59,8 @@ impl P256PrivateKey {
 
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
+    /// This function uses the `RustCrypto` P256 signing library, which uses,
+    /// as of version 0.13.2, SHA2-256 as its hashing algorithm
     fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
         let secret_key = &self.0;
         let sig = P256Signature(secret_key.sign(message.as_ref()));
