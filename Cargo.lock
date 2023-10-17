@@ -890,6 +890,7 @@ dependencies = [
  "libsecp256k1",
  "merlin",
  "more-asserts",
+ "num-bigint 0.3.3",
  "once_cell",
  "p256",
  "proptest",
@@ -10446,6 +10447,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "rand 0.7.3",
 ]
 
 [[package]]

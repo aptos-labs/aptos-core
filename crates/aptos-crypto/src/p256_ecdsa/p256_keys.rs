@@ -17,6 +17,7 @@ use p256::{self, ecdsa::signature::Signer};
 use proptest::prelude::*;
 use serde::Serialize;
 use std::fmt;
+use num_bigint::BigUint;
 
 /// A P256 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
@@ -116,13 +117,16 @@ impl SigningKey for P256PrivateKey {
     }
 }
 
+// TODO: This is broken and will panic if the random bytes are greater than the field modulus
 impl Uniform for P256PrivateKey {
     fn generate<R>(rng: &mut R) -> Self
     where
         R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
-        let mut bytes = [0u8; P256_PRIVATE_KEY_LENGTH];
+        let mut bytes = [0u8; P256_PRIVATE_KEY_LENGTH * 2];
         rng.fill_bytes(&mut bytes);
+        let bignum = BigUint::from_bytes_le(&bytes[..]);
+        let remainder = bignum.mod_floor(&SCALAR_FIELD_ORDER);
         P256PrivateKey(p256::ecdsa::SigningKey::from_slice(&bytes[..]).unwrap())
     }
 }

@@ -540,6 +540,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
+num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
