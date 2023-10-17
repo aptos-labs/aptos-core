@@ -25,7 +25,7 @@ use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
     write_set::TransactionWrite,
 };
-use claims::{assert_matches, assert_some_eq};
+use claims::assert_matches;
 use rand::{prelude::*, random};
 use std::{
     cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
@@ -420,7 +420,7 @@ fn scheduler_tasks() {
 
     // Make sure everything can be committed.
     for i in 0..5 {
-        assert_some_eq!(s.try_commit(), i);
+        assert_matches!(s.try_commit(), Some((v, _)) if v == i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -686,7 +686,7 @@ fn scheduler_basic() {
 
     // make sure everything can be committed.
     for i in 0..3 {
-        assert_some_eq!(s.try_commit(), i);
+        assert_matches!(s.try_commit(), Some((v, _)) if v == i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -736,7 +736,7 @@ fn scheduler_drain_idx() {
 
     // make sure everything can be committed.
     for i in 0..3 {
-        assert_some_eq!(s.try_commit(), i);
+        assert_matches!(s.try_commit(), Some((v, _)) if v == i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -780,7 +780,7 @@ fn rolling_commit_wave() {
     // finish validating txn 0 with proper wave
     s.finish_validation(0, 1);
     // txn 0 can be committed
-    assert_some_eq!(s.try_commit(), 0);
+    assert_matches!(s.try_commit(), Some((0, _)));
     assert_eq!(s.commit_state(), (1, 0));
 
     // This increases the wave, but only sets max_triggered_wave for transaction 2.
@@ -799,7 +799,7 @@ fn rolling_commit_wave() {
     // finish validating txn 1 with proper wave
     s.finish_validation(1, 1);
     // txn 1 can be committed
-    assert_some_eq!(s.try_commit(), 1);
+    assert_matches!(s.try_commit(), Some((1, _)));
     assert_eq!(s.commit_state(), (2, 0));
 
     // No validation task because index is already 2.
@@ -813,7 +813,7 @@ fn rolling_commit_wave() {
     assert_eq!(s.commit_state(), (2, 1));
     // Finish validation with appropriate wave.
     s.finish_validation(2, 1);
-    assert_some_eq!(s.try_commit(), 2);
+    assert_matches!(s.try_commit(), Some((2, _)));
     assert_eq!(s.commit_state(), (3, 1));
 
     // All txns have been committed.
@@ -899,7 +899,7 @@ fn no_conflict_task_count() {
         assert_eq!(num_val_tasks, num_txns);
 
         for i in 0..num_txns {
-            assert_some_eq!(s.try_commit(), i);
+            assert_matches!(s.try_commit(), Some((v, _)) if v == i);
             assert_eq!(s.commit_state(), (i + 1, 0));
         }
         assert!(matches!(s.next_task(), SchedulerTask::Done));
