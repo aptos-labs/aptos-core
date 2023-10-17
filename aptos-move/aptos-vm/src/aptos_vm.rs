@@ -1918,8 +1918,13 @@ impl VMSimulator for AptosVM {
     ) -> Result<TransactionOutput, VMStatus> {
         // The caller must ensure that the signature is not invalid, as otherwise
         // this can be an attack.
-        let txn = SignatureVerifiedTransaction::valid_for_simulation(transaction)
-            .expect("Simulated transaction should not have a valid signature");
+        let txn =
+            SignatureVerifiedTransaction::valid_for_simulation(transaction).ok_or_else(|| {
+                VMStatus::error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    Some("Simulated transaction should not have a valid signature".to_string()),
+                )
+            })?;
         Ok(BlockAptosVM::simulate_block::<
             _,
             NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
