@@ -679,6 +679,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         maybe_layout.cloned().map(Arc::new),
                     );
 
+                    // In case of concurrent storage fetches, we cannot use our value,
+                    // but need to fetch it from versioned_map again.
                     ret = state.read_data_by_kind(state_key, self.txn_idx, kind);
                 }
 

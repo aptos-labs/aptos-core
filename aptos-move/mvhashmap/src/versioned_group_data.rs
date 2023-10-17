@@ -77,6 +77,30 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> Default
 }
 
 impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGroupValue<T, V> {
+    fn set_base_values(
+        &mut self,
+        shifted_idx: ShiftedTxnIndex,
+        incarnation: Incarnation,
+        // TODO add layout to values
+        values: impl IntoIterator<Item = (T, V)>,
+    ) {
+        match self.idx_to_update.get(&shifted_idx) {
+            Some(previous) => {
+                // base value may have already been provided due to a concurrency race.
+                // If maybe_layout is None, they are required to be identical.
+                // If maybe_layout is Some, there might have been an exchange
+                // Assert the length of bytes for efficiency (instead of full equality)
+                for (tag, v) in values.into_iter() {
+                    let prev_v = previous
+                        .get(&tag)
+                        .expect("Reading twice from storage must be consistent");
+                    assert!(v.bytes_len() == prev_v.bytes_len());
+                }
+            },
+            None => self.write(shifted_idx, incarnation, values),
+        }
+    }
+
     fn write(
         &mut self,
         shifted_idx: ShiftedTxnIndex,
@@ -253,10 +277,11 @@ impl<
 
     pub fn provide_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
         // Incarnation is irrelevant for storage version, set to 0.
-        self.group_values
-            .entry(key)
-            .or_default()
-            .write(ShiftedTxnIndex::zero(), 0, base_values);
+        self.group_values.entry(key).or_default().set_base_values(
+            ShiftedTxnIndex::zero(),
+            0,
+            base_values,
+        );
     }
 
     pub fn write(

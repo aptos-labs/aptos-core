@@ -25,8 +25,8 @@ pub fn bytes_to_string(bytes: Vec<u8>) -> Value {
 }
 
 pub fn string_to_bytes(value: Struct) -> PartialVMResult<Vec<u8>> {
-    value.unpack()?.collect::<Vec<Value>>().pop().map_or(
-        Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+    value.unpack()?.collect::<Vec<Value>>().pop().map_or_else(
+        || Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
             .with_message("Unable to extract bytes from String".to_string())),
         |v| v.value_as::<Vec<u8>>(),
     )
