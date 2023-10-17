@@ -11,9 +11,8 @@ across multiple transactions, enabling parallel execution. For example, if the
 first transaction is doing <code><a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>(X, 1)</code> for aggregator <code>X</code>, and the second is
 doing <code><a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>(X,3)</code>, they can be executed in parallel avoiding a read-modify-write
 dependency.
-However, reading the aggregator value (i.e. calling <code><a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(X)</code>) is an expensive
-operation and should be avoided as much as possible because it reduces the
-parallelism.
+However, reading the aggregator value (i.e. calling <code><a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>(X)</code>) is a resource-intensive
+operation that also reduced parallelism, and should be avoided as much as possible.
 
 
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
@@ -32,6 +31,7 @@ parallelism.
 -  [Function `copy_snapshot`](#0x1_aggregator_v2_copy_snapshot)
 -  [Function `read_snapshot`](#0x1_aggregator_v2_read_snapshot)
 -  [Function `string_concat`](#0x1_aggregator_v2_string_concat)
+-  [Function `test_aggregator_valid_type`](#0x1_aggregator_v2_test_aggregator_valid_type)
 -  [Specification](#@Specification_1)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
     -  [Function `try_add`](#@Specification_1_try_add)
@@ -59,7 +59,7 @@ across multiple transactions. See the module description for more details.
 Currently supported types for Element are u64 and u128.
 
 
-<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; <b>has</b> store
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; <b>has</b> drop, store
 </code></pre>
 
 
@@ -141,6 +141,16 @@ The value of aggregator underflows (goes below zero). Raised by uncoditional sub
 
 
 
+<a name="0x1_aggregator_v2_EAGGREGATOR_API_V2_NOT_ENABLED"></a>
+
+The aggregator api v2 feature flag is not enabled.
+
+
+<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_API_V2_NOT_ENABLED">EAGGREGATOR_API_V2_NOT_ENABLED</a>: u64 = 6;
+</code></pre>
+
+
+
 <a name="0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED"></a>
 
 The native aggregator function, that is in the move file, is not yet supported.
@@ -148,16 +158,6 @@ and any calls will raise this error.
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED">EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED</a>: u64 = 9;
-</code></pre>
-
-
-
-<a name="0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED"></a>
-
-The aggregator snapshots feature flag is not enabled.
-
-
-<pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_EAGGREGATOR_SNAPSHOTS_NOT_ENABLED">EAGGREGATOR_SNAPSHOTS_NOT_ENABLED</a>: u64 = 6;
 </code></pre>
 
 
@@ -371,7 +371,9 @@ If subtraction would result in a negative value, <code><b>false</b></code> is re
 ## Function `read`
 
 Returns a value stored in this aggregator.
-Note: This operation prevents parallelism of the transaction that calls it.
+Note: This operation is resource-intensive, and reduces parallelism.
+(Especially if called in a transaction that also modifies the aggregator,
+or has other read/write conflicts)
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement
@@ -395,7 +397,7 @@ Note: This operation prevents parallelism of the transaction that calls it.
 ## Function `snapshot`
 
 Returns a wrapper of a current value of an aggregator
-Unlike read(), this enables parallel execution of transactions.
+Unlike read(), it is fast and avoids sequential dependencies.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;
@@ -466,7 +468,9 @@ NOT YET IMPLEMENTED, always raises EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED.
 ## Function `read_snapshot`
 
 Returns a value stored in this snapshot.
-Note: This operation prevents parallelism of the transaction that calls it.
+Note: This operation is resource-intensive, and reduces parallelism.
+(Especially if called in a transaction that also modifies the aggregator,
+or has other read/write conflicts)
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_snapshot">read_snapshot</a>&lt;Element&gt;(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;): Element
@@ -505,6 +509,33 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: String, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;, after: String): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;String&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aggregator_v2_test_aggregator_valid_type"></a>
+
+## Function `test_aggregator_valid_type`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>() {
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u64&gt;();
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u128&gt;();
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u64&gt;(5);
+    <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u128&gt;(5);
+}
 </code></pre>
 
 

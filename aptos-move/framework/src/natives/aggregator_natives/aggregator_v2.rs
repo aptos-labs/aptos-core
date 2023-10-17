@@ -244,6 +244,16 @@ impl BoundedMath {
 
 // ================= END TEMPORARY CODE =================
 
+macro_rules! abort_if_not_enabled {
+    ($context:expr) => {
+        if !$context.aggregator_v2_api_enabled() {
+            return Err(SafeNativeError::Abort {
+                abort_code: EAGGREGATOR_API_NOT_ENABLED,
+            });
+        }
+    };
+}
+
 /***************************************************************************************************
  * native fun create_aggregator<Element>(max_value: Element): Aggregator<Element>;
  **************************************************************************************************/
@@ -253,11 +263,7 @@ fn native_create_aggregator(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context.aggregator_v2_api_enabled() {
-        return Err(SafeNativeError::Abort {
-            abort_code: EAGGREGATOR_API_NOT_ENABLED,
-        });
-    }
+    abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
 
@@ -281,11 +287,7 @@ fn native_create_unbounded_aggregator(
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context.aggregator_v2_api_enabled() {
-        return Err(SafeNativeError::Abort {
-            abort_code: EAGGREGATOR_API_NOT_ENABLED,
-        });
-    }
+    abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 0);
 
@@ -318,6 +320,8 @@ fn native_try_add(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
     debug_assert_eq!(args.len(), 2);
     context.charge(AGGREGATOR_V2_TRY_ADD_BASE)?;
 
@@ -347,6 +351,8 @@ fn native_try_sub(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
     debug_assert_eq!(args.len(), 2);
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
 
@@ -376,6 +382,8 @@ fn native_read(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_BASE)?;
 
@@ -401,6 +409,8 @@ fn native_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_SNAPSHOT_BASE)?;
 
@@ -423,11 +433,7 @@ fn native_create_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context.aggregator_v2_api_enabled() {
-        return Err(SafeNativeError::Abort {
-            abort_code: EAGGREGATOR_API_NOT_ENABLED,
-        });
-    }
+    abort_if_not_enabled!(context);
 
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
@@ -448,10 +454,11 @@ fn native_create_snapshot(
  **************************************************************************************************/
 
 fn native_copy_snapshot(
-    _context: &mut SafeNativeContext,
+    context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
     Err(SafeNativeError::Abort {
         abort_code: EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
     })
@@ -479,6 +486,8 @@ fn native_read_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
@@ -502,6 +511,8 @@ fn native_string_concat(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 3);
     context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
