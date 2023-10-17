@@ -264,7 +264,7 @@ dependencies = [
  "dirs",
  "futures",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "jemallocator",
  "maplit",
  "move-binary-format",
@@ -376,7 +376,7 @@ dependencies = [
  "futures",
  "hex",
  "hyper",
- "itertools",
+ "itertools 0.10.5",
  "mime",
  "move-core-types",
  "move-package",
@@ -520,7 +520,7 @@ dependencies = [
  "clap 4.3.21",
  "csv",
  "futures",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-bytecode-verifier",
  "num_cpus",
@@ -600,7 +600,7 @@ dependencies = [
  "crossbeam",
  "dashmap",
  "derivative",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-core-types",
  "num_cpus",
@@ -628,7 +628,7 @@ dependencies = [
  "clap 4.3.21",
  "criterion",
  "dashmap",
- "itertools",
+ "itertools 0.10.5",
  "jemallocator",
  "move-core-types",
  "once_cell",
@@ -716,6 +716,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-temppath",
  "aptos-types",
+ "arr_macro",
  "bcs 0.1.4",
  "byteorder",
  "cfg-if",
@@ -724,6 +725,7 @@ dependencies = [
  "maplit",
  "mirai-annotations",
  "num_cpus",
+ "number_range",
  "poem-openapi",
  "rand 0.7.3",
  "serde",
@@ -785,7 +787,7 @@ dependencies = [
  "futures",
  "futures-channel",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "maplit",
  "mirai-annotations",
  "move-core-types",
@@ -837,7 +839,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "futures",
- "itertools",
+ "itertools 0.10.5",
  "mirai-annotations",
  "proptest",
  "rand 0.7.3",
@@ -945,7 +947,7 @@ dependencies = [
  "claims",
  "dashmap",
  "futures",
- "itertools",
+ "itertools 0.10.5",
  "maplit",
  "mockall",
  "ordered-float 3.9.1",
@@ -1015,7 +1017,7 @@ dependencies = [
  "clap 4.3.21",
  "dashmap",
  "either",
- "itertools",
+ "itertools 0.10.5",
  "lru 0.7.8",
  "move-core-types",
  "move-resource-viewer",
@@ -1100,7 +1102,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "clap 4.3.21",
- "itertools",
+ "itertools 0.10.5",
  "owo-colors",
  "tokio",
 ]
@@ -1222,7 +1224,7 @@ dependencies = [
  "bytes",
  "dashmap",
  "fail 0.5.0",
- "itertools",
+ "itertools 0.10.5",
  "move-core-types",
  "num_cpus",
  "once_cell",
@@ -1266,7 +1268,7 @@ dependencies = [
  "clap 4.3.21",
  "derivative",
  "indicatif 0.15.0",
- "itertools",
+ "itertools 0.10.5",
  "jemallocator",
  "move-core-types",
  "num_cpus",
@@ -1300,7 +1302,7 @@ dependencies = [
  "clap 4.3.21",
  "crossbeam-channel",
  "dashmap",
- "itertools",
+ "itertools 0.10.5",
  "num_cpus",
  "rand 0.7.3",
  "rayon",
@@ -1347,7 +1349,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "dashmap",
- "itertools",
+ "itertools 0.10.5",
  "once_cell",
  "serde",
  "thiserror",
@@ -1537,7 +1539,7 @@ dependencies = [
  "hex",
  "hyper",
  "hyper-tls",
- "itertools",
+ "itertools 0.10.5",
  "json-patch",
  "k8s-openapi",
  "kube",
@@ -1623,7 +1625,7 @@ dependencies = [
  "flate2",
  "hex",
  "include_dir 0.7.2",
- "itertools",
+ "itertools 0.10.5",
  "libsecp256k1",
  "log",
  "lru 0.7.8",
@@ -2063,7 +2065,7 @@ dependencies = [
  "futures",
  "futures-core",
  "futures-util",
- "itertools",
+ "itertools 0.10.5",
  "once_cell",
  "prometheus",
  "prost 0.12.1",
@@ -2148,7 +2150,7 @@ dependencies = [
  "futures",
  "futures-core",
  "futures-util",
- "itertools",
+ "itertools 0.10.5",
  "once_cell",
  "prometheus",
  "prost 0.12.1",
@@ -2228,7 +2230,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4",
  "byteorder",
- "itertools",
+ "itertools 0.10.5",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -2386,7 +2388,7 @@ dependencies = [
  "enum_dispatch",
  "fail 0.5.0",
  "futures",
- "itertools",
+ "itertools 0.10.5",
  "maplit",
  "once_cell",
  "proptest",
@@ -2580,7 +2582,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "maplit",
  "once_cell",
  "pin-project 1.0.12",
@@ -2882,7 +2884,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-framework",
- "itertools",
+ "itertools 0.10.5",
  "move-command-line-common",
  "move-package",
  "tempfile",
@@ -3154,7 +3156,7 @@ dependencies = [
  "clap 4.3.21",
  "futures",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "move-core-types",
  "once_cell",
  "percent-encoding",
@@ -3247,7 +3249,7 @@ dependencies = [
  "aptos-types",
  "bitvec 1.0.1",
  "criterion",
- "itertools",
+ "itertools 0.10.5",
  "jemallocator",
  "once_cell",
  "proptest",
@@ -3453,7 +3455,7 @@ dependencies = [
  "bytes",
  "crossbeam-channel",
  "dashmap",
- "itertools",
+ "itertools 0.10.5",
  "move-core-types",
  "once_cell",
  "parking_lot 0.12.1",
@@ -3679,7 +3681,7 @@ dependencies = [
  "csv",
  "futures",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "rand 0.7.3",
  "reqwest",
  "serde_json",
@@ -3758,7 +3760,7 @@ dependencies = [
  "async-trait",
  "clap 4.3.21",
  "futures",
- "itertools",
+ "itertools 0.10.5",
  "once_cell",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -3802,7 +3804,7 @@ dependencies = [
  "claims",
  "derivative",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "move-core-types",
  "move-table-extension",
  "num-derive",
@@ -3841,7 +3843,7 @@ dependencies = [
  "aptos-types",
  "async-trait",
  "bcs 0.1.4",
- "itertools",
+ "itertools 0.10.5",
  "lru 0.7.8",
  "move-binary-format",
  "tokio",
@@ -4130,7 +4132,7 @@ dependencies = [
  "ark-std",
  "derivative",
  "hashbrown 0.13.2",
- "itertools",
+ "itertools 0.10.5",
  "num-traits",
  "zeroize",
 ]
@@ -4147,7 +4149,7 @@ dependencies = [
  "ark-std",
  "derivative",
  "digest 0.10.5",
- "itertools",
+ "itertools 0.10.5",
  "num-bigint 0.4.3",
  "num-traits",
  "paste",
@@ -5647,7 +5649,7 @@ dependencies = [
  "clap 2.34.0",
  "criterion-plot",
  "csv",
- "itertools",
+ "itertools 0.10.5",
  "lazy_static",
  "num-traits",
  "oorandom",
@@ -5679,7 +5681,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2673cc8207403546f45f5fd319a974b1e6983ad1a3ee7e6041650013be041876"
 dependencies = [
  "cast",
- "itertools",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -6332,7 +6334,7 @@ dependencies = [
  "aptos-vm-genesis",
  "bcs 0.1.4",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-core-types",
  "move-package",
@@ -8259,9 +8261,18 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.10.3"
+version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9a9d19fa1e79b6215ff29b9d6880b706147f16e9b1dbb1e4e5947b5b02bc5e3"
+checksum = "b0fd2260e829bddf4cb6ea802289de2f86d6a7a690192fbe91b3f46e0f2c8473"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
 dependencies = [
  "either",
 ]
@@ -8472,7 +8483,7 @@ dependencies = [
  "bit-set",
  "diff",
  "ena",
- "itertools",
+ "itertools 0.10.5",
  "lalrpop-util",
  "petgraph 0.6.2",
  "pico-args",
@@ -8516,7 +8527,7 @@ dependencies = [
  "aptos-vm-types",
  "bcs 0.1.4",
  "fail 0.5.0",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",
@@ -9188,7 +9199,7 @@ dependencies = [
  "better_any",
  "bytes",
  "datatest-stable",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
@@ -9295,7 +9306,7 @@ dependencies = [
  "datatest-stable",
  "difference",
  "httpmock",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-bytecode-utils",
@@ -9395,7 +9406,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "ethnum",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
@@ -9490,7 +9501,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "datatest-stable",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-compiler",
  "move-core-types",
@@ -9620,7 +9631,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "internment",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -9651,7 +9662,7 @@ dependencies = [
  "dirs-next",
  "evm-exec-utils",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "move-abigen",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -9692,7 +9703,7 @@ dependencies = [
  "datatest-stable",
  "futures",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-abigen",
  "move-binary-format",
@@ -9730,7 +9741,7 @@ dependencies = [
  "codespan",
  "codespan-reporting",
  "futures",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-binary-format",
  "move-command-line-common",
@@ -9763,7 +9774,7 @@ dependencies = [
  "datatest-stable",
  "futures",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-binary-format",
  "move-core-types",
@@ -9818,7 +9829,7 @@ dependencies = [
  "datatest-stable",
  "ethnum",
  "im",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-binary-format",
  "move-borrow-graph",
@@ -9923,7 +9934,7 @@ dependencies = [
  "evm 0.33.1",
  "evm-exec-utils",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "maplit",
  "move-binary-format",
@@ -9999,7 +10010,7 @@ dependencies = [
  "difference",
  "evm 0.36.0",
  "evm-exec-utils",
- "itertools",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-bytecode-utils",
  "move-command-line-common",
@@ -10495,6 +10506,17 @@ name = "number_prefix"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
+name = "number_range"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60080faccd4ca50ad0b801b2be686136376b13f691f6eac84817e40973b2e1bb"
+dependencies = [
+ "anyhow",
+ "itertools 0.10.5",
+ "num 0.4.0",
+]
 
 [[package]]
 name = "object"
@@ -11314,7 +11336,7 @@ checksum = "a5aab5be6e4732b473071984b3164dbbfb7a3674d30ea5ff44410b6bcd960c3c"
 dependencies = [
  "difflib",
  "float-cmp",
- "itertools",
+ "itertools 0.10.5",
  "normalize-line-endings",
  "predicates-core",
  "regex",
@@ -11569,7 +11591,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2aa5feb83bf4b2c8919eaf563f51dbab41183de73ba2353c0e03cd7b6bd892"
 dependencies = [
  "chrono",
- "itertools",
+ "itertools 0.10.5",
  "once_cell",
  "regex",
 ]
@@ -11632,7 +11654,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5d2d8d10f3c6ded6da8b05b5fb3b8a5082514344d56c9f871412d29b4e075b4"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.10.5",
  "proc-macro2 1.0.64",
  "quote 1.0.29",
  "syn 1.0.105",
@@ -11645,7 +11667,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "265baba7fabd416cf5078179f7d2cbeca4ce7a9041111900675ea7c4cb8a4c32"
 dependencies = [
  "anyhow",
- "itertools",
+ "itertools 0.11.0",
  "proc-macro2 1.0.64",
  "quote 1.0.29",
  "syn 2.0.32",
@@ -11678,7 +11700,7 @@ dependencies = [
  "clap 4.3.21",
  "codespan-reporting",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "move-compiler",
  "move-model",
@@ -13679,7 +13701,7 @@ dependencies = [
  "crossbeam-channel",
  "getrandom 0.2.7",
  "hex",
- "itertools",
+ "itertools 0.10.5",
  "module-generation",
  "move-binary-format",
  "move-bytecode-verifier",
@@ -14100,7 +14122,7 @@ checksum = "5376256e44f2443f8896ac012507c19a012df0fe8758b55246ae51a2279db51f"
 dependencies = [
  "combine",
  "indexmap",
- "itertools",
+ "itertools 0.10.5",
  "serde",
 ]
 
@@ -15345,7 +15367,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-rustls",
- "itertools",
+ "itertools 0.10.5",
  "log",
  "percent-encoding",
  "rustls 0.20.6",
