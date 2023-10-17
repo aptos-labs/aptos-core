@@ -85,7 +85,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
 
     type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKeyShare: Clone;
+    type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKey: Debug // TODO(Security): Kind of unsafe to have this...
         + PartialEq
         + Reconstructable<Self::SecretSharingConfig, Share = Self::DealtSecretKeyShare>;
@@ -175,6 +175,13 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         assert_eq!(trx.get_dealers().len(), n);
         Ok(trx)
     }
+
+    /// Returns the dealt pubkey shore of `player`.
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare;
 
     /// Given a valid transcript, returns the `DealtPublicKey` of that transcript: i.e., the public
     /// key associated with the secret key dealt in the transcript.

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::algebra::polynomials::shamir_secret_share;
+use crate::pvss;
 use crate::pvss::player::Player;
 use crate::pvss::scrape;
 use crate::pvss::scrape::{LowDegreeTest, SCRAPE_SK_IN_G2};
@@ -63,11 +64,11 @@ impl traits::Transcript for Transcript {
     type PublicParameters = scrape::PublicParameters;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
-    type DealtSecretKeyShare = scrape::DealtSecretKeyShare;
-    type DealtPubKeyShare = scrape::DealtPubKeyShare;
-    type DealtSecretKey = scrape::DealtSecretKey;
-    type DealtPubKey = scrape::DealtPubKey;
-    type InputSecret = scrape::InputSecret;
+    type DealtSecretKeyShare = pvss::dealt_secret_key_share::g2::DealtSecretKeyShare;
+    type DealtPubKeyShare = pvss::dealt_pub_key_share::g1::DealtPubKeyShare;
+    type DealtSecretKey = pvss::dealt_secret_key::g2::DealtSecretKey;
+    type DealtPubKey = pvss::dealt_pub_key::g1::DealtPubKey;
+    type InputSecret = pvss::input_secret::InputSecret;
     type EncryptPubKey = encryption_dlog::g2::EncryptPubKey;
     type DecryptPrivKey = encryption_dlog::g2::DecryptPrivKey;
 
@@ -225,8 +226,16 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(self.Y_hat.len(), other.Y_hat.len());
     }
 
-    fn get_dealt_public_key(&self) -> scrape::DealtPubKey {
-        scrape::DealtPubKey::new(*self.A.last().unwrap())
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.A[player.id]))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.A.last().unwrap())
     }
 
     fn decrypt_own_share(
@@ -241,8 +250,8 @@ impl traits::Transcript for Transcript {
         let dealt_pub_key_share = self.A[player.id]; // g_1^{f(\omega^i})
 
         (
-            scrape::DealtSecretKeyShare(Self::DealtSecretKey::new(dealt_secret_key_share)),
-            scrape::DealtPubKeyShare(Self::DealtPubKey::new(dealt_pub_key_share)),
+            Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
+            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)),
         )
     }
 

@@ -184,12 +184,12 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
 
     assert_eq!(trx, trx_deserialized);
 
-    assert_dsk_reconstructs(&sc, &mut rng, &dks, sk, trx);
+    assert_dsk_reconstructs(sc, &mut rng, &dks, sk, trx);
     // println!("Reconstructed {:?}", sk_reconstructed);
 }
 
 fn assert_dsk_reconstructs<T: Transcript + CryptoHash>(
-    sc: &&<T as Transcript>::SecretSharingConfig,
+    sc: &<T as Transcript>::SecretSharingConfig,
     mut rng: &mut StdRng,
     dks: &Vec<<T as Transcript>::DecryptPrivKey>,
     sk: <T as Transcript>::DealtSecretKey,
@@ -200,13 +200,15 @@ fn assert_dsk_reconstructs<T: Transcript + CryptoHash>(
         .get_random_eligible_subset_of_players(&mut rng)
         .into_iter()
         .map(|p| {
-            let (sk, _) = trx.decrypt_own_share(&sc, &p, &dks[p.get_id()]);
+            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()]);
+
+            assert_eq!(pk, trx.get_public_key_share(sc, &p));
 
             (p, sk)
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    let sk_reconstructed = T::DealtSecretKey::reconstruct(&sc, &players_and_shares);
+    let sk_reconstructed = T::DealtSecretKey::reconstruct(sc, &players_and_shares);
 
     // println!();
     assert_eq!(sk, sk_reconstructed);
@@ -251,7 +253,7 @@ fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, see
     )
     .expect("aggregated PVSS transcript failed verification");
 
-    assert_dsk_reconstructs(&sc, &mut rng, &dks, sk, trx);
+    assert_dsk_reconstructs(sc, &mut rng, &dks, sk, trx);
 }
 
 fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(

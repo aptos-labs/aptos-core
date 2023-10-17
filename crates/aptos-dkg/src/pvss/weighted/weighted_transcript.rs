@@ -157,6 +157,28 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)
     }
 
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        let weight = sc.get_player_weight(player);
+
+        let mut dpk_share = Vec::with_capacity(weight);
+
+        for i in 0..weight {
+            // println!("Decrypting share {i} for player {player} with DK {:?}", dk);
+            let virtual_player = sc.get_virtual_player(player, i);
+            dpk_share.push(T::get_public_key_share(
+                &self.trx,
+                sc.get_threshold_config(),
+                &virtual_player,
+            ));
+        }
+
+        dpk_share
+    }
+
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
         T::get_dealt_public_key(&self.trx)
     }

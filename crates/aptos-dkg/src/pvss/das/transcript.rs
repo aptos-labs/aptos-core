@@ -338,6 +338,14 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(self.V.len(), other.V.len());
     }
 
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+    }
+
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
         Self::DealtPubKey::new(*self.V.last().unwrap())
     }
