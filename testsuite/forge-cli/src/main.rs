@@ -1880,11 +1880,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_success_criteria(
                 SuccessCriteria::new(25000)
                     .add_no_restarts()
-                    .add_wait_for_catchup_s(60)
-                    .add_chain_progress(StateProgressThreshold {
-                        max_no_progress_secs: 10.0,
-                        max_round_gap: 4,
-                    }),
+                    .add_wait_for_catchup_s(60), /* Doesn't work with out event indices
+                                                 .add_chain_progress(StateProgressThreshold {
+                                                     max_no_progress_secs: 10.0,
+                                                     max_round_gap: 4,
+                                                 }),
+                                                  */
             );
     } else {
         forge_config = forge_config.with_success_criteria(
@@ -1898,11 +1899,12 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     MetricsThreshold::new(14.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
-                ))
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
+                )), /* Doens't work without event indices
+                    .add_chain_progress(StateProgressThreshold {
+                        max_no_progress_secs: 10.0,
+                        max_round_gap: 4,
+                    }),
+                    */
         );
     }
 
