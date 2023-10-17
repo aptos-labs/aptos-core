@@ -788,7 +788,7 @@ impl SignedTransaction {
     }
 
     pub fn contains_duplicate_signers(&self) -> bool {
-        let mut all_signer_addresses = self.authenticator.secondary_signer_addreses();
+        let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
         all_signer_addresses.push(self.sender());
         let mut s = BTreeSet::new();
         all_signer_addresses.iter().any(|a| !s.insert(*a))
