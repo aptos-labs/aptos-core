@@ -12,7 +12,10 @@ use crate::{
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
-    transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    transaction::authenticator::{
+        AccountAuthenticator, AnyKey, AnySignature, SingleKeyAuthenticator,
+        TransactionAuthenticator,
+    },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
@@ -672,7 +675,12 @@ impl SignedTransaction {
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::secp256k1_ecdsa(public_key, signature);
+        let authenticator = TransactionAuthenticator::single_sender(
+            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+                AnyKey::secp256k1_ecdsa(public_key),
+                AnySignature::secp256k1_ecdsa(signature),
+            )),
+        );
         SignedTransaction {
             raw_txn,
             authenticator,

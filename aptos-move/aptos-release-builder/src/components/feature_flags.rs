@@ -83,7 +83,7 @@ pub enum FeatureFlag {
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
-    Secp256k1ECDSAAuthenticator,
+    SingleSenderAuthenticator,
     SponsoredAutomaticAccountCreation,
     FeePayerAccountOptional,
 }
@@ -219,9 +219,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
-            FeatureFlag::Secp256k1ECDSAAuthenticator => {
-                AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR
-            },
+            FeatureFlag::SingleSenderAuthenticator => AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
             FeatureFlag::SponsoredAutomaticAccountCreation => {
                 AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
             },
@@ -282,9 +280,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
-            AptosFeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR => {
-                FeatureFlag::Secp256k1ECDSAAuthenticator
-            },
+            AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR => FeatureFlag::SingleSenderAuthenticator,
             AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
                 FeatureFlag::SponsoredAutomaticAccountCreation
             },

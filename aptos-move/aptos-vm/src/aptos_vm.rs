@@ -1650,9 +1650,9 @@ impl VMValidator for AptosVM {
         if !self
             .0
             .get_features()
-            .is_enabled(FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR)
+            .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
         {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::Secp256k1Ecdsa{ .. } = transaction.authenticator_ref() {
+            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
                 return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
             }
         }

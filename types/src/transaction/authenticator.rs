@@ -66,11 +66,6 @@ pub enum TransactionAuthenticator {
         fee_payer_address: AccountAddress,
         fee_payer_signer: AccountAuthenticator,
     },
-    /// Single Secp256k1 Ecdsa signature
-    Secp256k1Ecdsa {
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    },
     SingleSender {
         sender: AccountAuthenticator,
     },
@@ -123,17 +118,6 @@ impl TransactionAuthenticator {
             sender,
             secondary_signer_addresses,
             secondary_signers,
-        }
-    }
-
-    /// Create a single-signature Secp256k1Ecdsa authenticator
-    pub fn secp256k1_ecdsa(
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    ) -> Self {
-        Self::Secp256k1Ecdsa {
-            public_key,
-            signature,
         }
     }
 
@@ -196,10 +180,6 @@ impl TransactionAuthenticator {
                 }
                 Ok(())
             },
-            Self::Secp256k1Ecdsa {
-                public_key,
-                signature,
-            } => signature.verify(raw_txn, public_key),
             Self::SingleSender { sender } => sender.verify(raw_txn),
         }
     }
@@ -285,23 +265,13 @@ impl TransactionAuthenticator {
                 signature,
             } => AccountAuthenticator::multi_ed25519(public_key.clone(), signature.clone()),
             Self::MultiAgent { sender, .. } => sender.clone(),
-            Self::Secp256k1Ecdsa {
-                public_key,
-                signature,
-            } => AccountAuthenticator::Secp256k1Ecdsa {
-                public_key: public_key.clone(),
-                signature: signature.clone(),
-            },
             Self::SingleSender { sender } => sender.clone(),
         }
     }
 
     pub fn secondary_signer_addreses(&self) -> Vec<AccountAddress> {
         match self {
-            Self::Ed25519 { .. }
-            | Self::MultiEd25519 { .. }
-            | Self::Secp256k1Ecdsa { .. }
-            | Self::SingleSender { .. } => {
+            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::SingleSender { .. } => {
                 vec![]
             },
             Self::FeePayer {
@@ -319,10 +289,7 @@ impl TransactionAuthenticator {
 
     pub fn secondary_signers(&self) -> Vec<AccountAuthenticator> {
         match self {
-            Self::Ed25519 { .. }
-            | Self::MultiEd25519 { .. }
-            | Self::Secp256k1Ecdsa { .. }
-            | Self::SingleSender { .. } => {
+            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } | Self::SingleSender { .. } => {
                 vec![]
             },
             Self::FeePayer {
@@ -344,7 +311,6 @@ impl TransactionAuthenticator {
             Self::Ed25519 { .. }
             | Self::MultiEd25519 { .. }
             | Self::MultiAgent { .. }
-            | Self::Secp256k1Ecdsa { .. }
             | Self::SingleSender { .. } => None,
             Self::FeePayer {
                 sender: _,
@@ -361,7 +327,6 @@ impl TransactionAuthenticator {
             Self::Ed25519 { .. }
             | Self::MultiEd25519 { .. }
             | Self::MultiAgent { .. }
-            | Self::Secp256k1Ecdsa { .. }
             | Self::SingleSender { .. } => None,
             Self::FeePayer {
                 sender: _,
@@ -441,13 +406,6 @@ impl fmt::Display for TransactionAuthenticator {
                     sender, sec_addrs, sec_signers,
                 )
             },
-            Self::Secp256k1Ecdsa { .. } => {
-                write!(
-                    f,
-                    "TransactionAuthenticator[scheme: Secp256k1Ecdsa, sender: {}]",
-                    self.sender()
-                )
-            },
             Self::SingleSender { sender } => {
                 write!(
                     f,
@@ -464,9 +422,8 @@ impl fmt::Display for TransactionAuthenticator {
 pub enum Scheme {
     Ed25519 = 0,
     MultiEd25519 = 1,
-    Secp256k1Ecdsa = 2,
-    SingleKey = 3,
-    MultiKey = 4,
+    SingleKey = 2,
+    MultiKey = 3,
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
     /// separation, an adversary could create (and get a signer for) a these accounts
@@ -484,7 +441,6 @@ impl fmt::Display for Scheme {
         let display = match self {
             Scheme::Ed25519 => "Ed25519",
             Scheme::MultiEd25519 => "MultiEd25519",
-            Scheme::Secp256k1Ecdsa => "Secp256k1Ecdsa",
             Scheme::SingleKey => "SingleKey",
             Scheme::MultiKey => "MultiKey",
             Scheme::DeriveAuid => "DeriveAuid",
@@ -515,11 +471,6 @@ pub enum AccountAuthenticator {
         public_key: MultiEd25519PublicKey,
         signature: MultiEd25519Signature,
     },
-    /// Secp256k1 Ecdsa Single signature
-    Secp256k1Ecdsa {
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    },
     SingleKey {
         authenticator: SingleKeyAuthenticator,
     },
@@ -535,7 +486,6 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { .. } => Scheme::Ed25519,
             Self::MultiEd25519 { .. } => Scheme::MultiEd25519,
-            Self::Secp256k1Ecdsa { .. } => Scheme::Secp256k1Ecdsa,
             Self::SingleKey { .. } => Scheme::SingleKey,
             Self::MultiKey { .. } => Scheme::MultiKey,
         }
@@ -555,17 +505,6 @@ impl AccountAuthenticator {
         signature: MultiEd25519Signature,
     ) -> Self {
         Self::MultiEd25519 {
-            public_key,
-            signature,
-        }
-    }
-
-    /// Create a single-signature secp256k1_ecdsa authenticator
-    pub fn secp256k1_ecdsa(
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    ) -> Self {
-        Self::Secp256k1Ecdsa {
             public_key,
             signature,
         }
@@ -592,10 +531,6 @@ impl AccountAuthenticator {
                 public_key,
                 signature,
             } => signature.verify(message, public_key),
-            Self::Secp256k1Ecdsa {
-                public_key,
-                signature,
-            } => signature.verify(message, public_key),
             Self::SingleKey { authenticator } => authenticator.verify(message),
             Self::MultiKey { authenticator } => authenticator.verify(message),
         }
@@ -606,7 +541,6 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { public_key, .. } => public_key.to_bytes().to_vec(),
             Self::MultiEd25519 { public_key, .. } => public_key.to_bytes().to_vec(),
-            Self::Secp256k1Ecdsa { public_key, .. } => public_key.to_bytes().to_vec(),
             Self::SingleKey { authenticator } => authenticator.public_key_bytes(),
             Self::MultiKey { authenticator } => authenticator.public_key_bytes(),
         }
@@ -617,7 +551,6 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { signature, .. } => signature.to_bytes().to_vec(),
             Self::MultiEd25519 { signature, .. } => signature.to_bytes().to_vec(),
-            Self::Secp256k1Ecdsa { signature, .. } => Signature::to_bytes(signature).to_vec(),
             Self::SingleKey { authenticator } => authenticator.signature_bytes(),
             Self::MultiKey { authenticator } => authenticator.signature_bytes(),
         }
@@ -633,7 +566,6 @@ impl AccountAuthenticator {
         match self {
             Self::Ed25519 { .. } => 1,
             Self::MultiEd25519 { signature, .. } => signature.signatures().len(),
-            Self::Secp256k1Ecdsa { .. } => 1,
             Self::SingleKey { .. } => 1,
             Self::MultiKey { authenticator } => authenticator.signatures.len(),
         }
@@ -695,11 +627,6 @@ impl AuthenticationKey {
     /// Create an authentication key from a MultiEd25519 public key
     pub fn multi_ed25519(public_key: &MultiEd25519PublicKey) -> Self {
         Self::from_preimage(public_key.to_bytes(), Scheme::MultiEd25519)
-    }
-
-    /// Create an authentication key from a Secp256k1Ecdsa public key
-    pub fn secp256k1_ecdsa(public_key: &secp256k1_ecdsa::PublicKey) -> AuthenticationKey {
-        Self::from_preimage(public_key.to_bytes().to_vec(), Scheme::Secp256k1Ecdsa)
     }
 
     /// Create an authentication key from an AnyKey
@@ -1065,13 +992,9 @@ mod tests {
         let sender = secp256k1_ecdsa::PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();
 
-        let ed_sender_auth = AuthenticationKey::secp256k1_ecdsa(&sender_pub);
-        let ed_sender_addr = ed_sender_auth.account_address();
-
         let single_sender_auth =
             AuthenticationKey::any_key(AnyKey::secp256k1_ecdsa(sender_pub.clone()));
         let single_sender_addr = single_sender_auth.account_address();
-        assert!(ed_sender_addr != single_sender_addr);
 
         let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
             single_sender_addr,
