@@ -26,13 +26,14 @@ impl P256Signature {
     /// The length of the P256Signature
     pub const LENGTH: usize = P256_SIGNATURE_LENGTH;
 
-    /// Serialize an P256Signature.
+    /// Serialize an P256Signature. Uses the SEC1 serialization format. 
     pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
         self.0.to_bytes().try_into().unwrap()
     }
 
     /// Deserialize an P256Signature, without checking for malleability
+    /// Uses the SEC1 serialization format. 
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256Signature, CryptoMaterialError> {

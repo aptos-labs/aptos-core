@@ -42,12 +42,13 @@ impl P256PrivateKey {
     /// The length of the P256PrivateKey
     pub const LENGTH: usize = P256_PRIVATE_KEY_LENGTH;
 
-    /// Serialize a P256PrivateKey.
+    /// Serialize a P256PrivateKey. Uses the SEC1 serialization format. 
     pub fn to_bytes(&self) -> [u8; P256_PRIVATE_KEY_LENGTH] {
         self.0.to_bytes().into()
     }
 
     /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
+    /// Uses the SEC1 serialization format. 
     fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
@@ -71,7 +72,7 @@ impl P256PrivateKey {
 }
 
 impl P256PublicKey {
-    /// Serialize a P256PublicKey.
+    /// Serialize a P256PublicKey. Uses the SEC1 serialization format.
     pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
         // The RustCrypto P256 `to_sec1_bytes` call here should never return an array of the wrong length and cause a panic
         (*self.0.to_sec1_bytes()).try_into().unwrap()
@@ -79,6 +80,7 @@ impl P256PublicKey {
 
     /// Deserialize a P256PublicKey, checking expected key size
     /// and that it is a valid curve point.
+    /// Uses the SEC1 serialization format. 
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
