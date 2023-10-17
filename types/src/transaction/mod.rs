@@ -13,7 +13,7 @@ use crate::{
     },
     state_store::ShardedStateUpdates,
     transaction::authenticator::{
-        AccountAuthenticator, AnyKey, AnySignature, SingleKeyAuthenticator,
+        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
         TransactionAuthenticator,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
@@ -676,7 +676,7 @@ impl SignedTransaction {
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::single_sender(
             AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyKey::secp256k1_ecdsa(public_key),
+                AnyPublicKey::secp256k1_ecdsa(public_key),
                 AnySignature::secp256k1_ecdsa(signature),
             )),
         );

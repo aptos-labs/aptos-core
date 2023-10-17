@@ -592,14 +592,14 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
     }
 }
 
-fn convert_public_key(public_key: &PublicKey) -> transaction::AnyKey {
+fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
     match public_key {
-        PublicKey::Ed25519(p) => transaction::AnyKey {
-            r#type: transaction::any_key::Type::Ed25519 as i32,
+        PublicKey::Ed25519(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::Ed25519 as i32,
             public_key: p.0.clone(),
         },
-        PublicKey::Secp256k1Ecdsa(p) => transaction::AnyKey {
-            r#type: transaction::any_key::Type::Secp256k1Ecdsa as i32,
+        PublicKey::Secp256k1Ecdsa(p) => transaction::AnyPublicKey {
+            r#type: transaction::any_public_key::Type::Secp256k1Ecdsa as i32,
             public_key: p.0.clone(),
         },
     }
