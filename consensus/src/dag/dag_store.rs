@@ -9,7 +9,7 @@ use crate::dag::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -59,12 +59,14 @@ impl Dag {
         let mut expired = vec![];
         let mut nodes_by_round = BTreeMap::new();
         for (digest, certified_node) in all_nodes {
-            if certified_node.metadata().epoch() == epoch {
+            if certified_node.metadata().epoch() == epoch && certified_node.round() >= initial_round
+            {
                 let arc_node = Arc::new(certified_node);
                 let index = *author_to_index
                     .get(arc_node.metadata().author())
                     .expect("Author from certified node should exist");
                 let round = arc_node.metadata().round();
+                debug!("Recovered node {} from storage", arc_node.id());
                 nodes_by_round
                     .entry(round)
                     .or_insert_with(|| vec![None; num_validators])[index] =
@@ -117,6 +119,14 @@ impl Dag {
             .unwrap_or(&self.initial_round)
     }
 
+    /// The highest strong links round is either the highest round or the highest round - 1
+    /// because we ensure all parents (strong links) exist for any nodes in the store
+    pub fn highest_strong_links_round(&self, validator_verifier: &ValidatorVerifier) -> Round {
+        let highest_round = self.highest_round();
+        self.get_strong_links_for_round(highest_round, validator_verifier)
+            .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round)
+    }
+
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let node = Arc::new(node);
         let author = node.metadata().author();
@@ -140,6 +150,7 @@ impl Dag {
 
         // mutate after all checks pass
         self.storage.save_certified_node(&node)?;
+        debug!("Added node {}", node.id());
         round_ref[index] = Some(NodeStatus::Unordered(node.clone()));
         Ok(())
     }

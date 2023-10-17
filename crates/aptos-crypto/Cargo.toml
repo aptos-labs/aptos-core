@@ -18,6 +18,7 @@ aptos-crypto-derive = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-std = { workspace = true }
+base64 = { workspace = true }
 bcs = { workspace = true }
 blst = { workspace = true }
 bulletproofs = { workspace = true }

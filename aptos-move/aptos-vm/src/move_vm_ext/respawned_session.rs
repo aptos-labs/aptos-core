@@ -6,13 +6,11 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::{
-    aggregator_extension::AggregatorID,
-    resolver::{AggregatorReadMode, TAggregatorView},
-};
+use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
+    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -20,10 +18,15 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
-    resolver::{ExecutorView, StateStorageView, TModuleView, TResourceView},
+    resolver::{
+        ExecutorView, ResourceGroupView, StateStorageView, TModuleView, TResourceGroupView,
+        TResourceView,
+    },
     storage::ChangeSetConfigs,
 };
+use bytes::Bytes;
 use move_core_types::{
+    language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
@@ -52,8 +55,11 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
-        let executor_view =
-            ExecutorViewWithChangeSet::new(base.as_executor_view(), previous_session_change_set);
+        let executor_view = ExecutorViewWithChangeSet::new(
+            base.as_executor_view(),
+            base.as_resource_group_view(),
+            previous_session_change_set,
+        );
 
         Ok(RespawnedSessionBuilder {
             executor_view,
@@ -107,13 +113,22 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
 pub struct ExecutorViewWithChangeSet<'r> {
-    base: &'r dyn ExecutorView,
+    base_executor_view: &'r dyn ExecutorView,
+    base_resource_group_view: &'r dyn ResourceGroupView,
     change_set: VMChangeSet,
 }
 
 impl<'r> ExecutorViewWithChangeSet<'r> {
-    pub(crate) fn new(base: &'r dyn ExecutorView, change_set: VMChangeSet) -> Self {
-        Self { base, change_set }
+    pub(crate) fn new(
+        base_executor_view: &'r dyn ExecutorView,
+        base_resource_group_view: &'r dyn ResourceGroupView,
+        change_set: VMChangeSet,
+    ) -> Self {
+        Self {
+            base_executor_view,
+            base_resource_group_view,
+            change_set,
+        }
     }
 }
 
@@ -128,12 +143,14 @@ impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
-                .base
+                .base_executor_view
                 .try_convert_aggregator_v1_delta_into_write_op(id, delta_op, mode)?
                 .as_state_value()),
             None => match self.change_set.aggregator_v1_write_set().get(id) {
                 Some(write_op) => Ok(write_op.as_state_value()),
-                None => self.base.get_aggregator_v1_state_value(id, mode),
+                None => self
+                    .base_executor_view
+                    .get_aggregator_v1_state_value(id, mode),
             },
         }
     }
@@ -150,7 +167,42 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base.get_resource_state_value(state_key, maybe_layout),
+            None => self
+                .base_executor_view
+                .get_resource_state_value(state_key, maybe_layout),
+        }
+    }
+}
+
+impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
+    type GroupKey = StateKey;
+    type Layout = MoveTypeLayout;
+    type ResourceTag = StructTag;
+
+    fn resource_group_size(&self, _group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+        // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
+        Ok(0)
+    }
+
+    fn get_resource_from_group(
+        &self,
+        group_key: &Self::GroupKey,
+        resource_tag: &Self::ResourceTag,
+        maybe_layout: Option<&Self::Layout>,
+    ) -> anyhow::Result<Option<Bytes>> {
+        if let Some(write_op) = self
+            .change_set
+            .resource_group_write_set()
+            .get(group_key)
+            .and_then(|g| g.inner_ops().get(resource_tag))
+        {
+            Ok(write_op.extract_raw_bytes())
+        } else {
+            self.base_resource_group_view.get_resource_from_group(
+                group_key,
+                resource_tag,
+                maybe_layout,
+            )
         }
     }
 }
@@ -161,14 +213,14 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.module_write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
-            None => self.base.get_module_state_value(state_key),
+            None => self.base_executor_view.get_module_state_value(state_key),
         }
     }
 }
 
 impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
     fn id(&self) -> StateViewId {
-        self.base.id()
+        self.base_executor_view.id()
     }
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
@@ -179,12 +231,19 @@ impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::storage_adapter::AsExecutorView;
+    use crate::{
+        data_cache::AsMoveResolver,
+        move_vm_ext::resolver::{AsExecutorView, AsResourceGroupView},
+    };
     use aptos_aggregator::delta_change_set::{delta_add, serialize};
     use aptos_language_e2e_tests::data_store::FakeDataStore;
-    use aptos_types::write_set::WriteOp;
-    use aptos_vm_types::check_change_set::CheckChangeSet;
-    use std::collections::HashMap;
+    use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
+    use aptos_vm_types::{change_set::GroupWrite, check_change_set::CheckChangeSet};
+    use move_core_types::{
+        identifier::Identifier,
+        language_storage::{StructTag, TypeTag},
+    };
+    use std::collections::{BTreeMap, HashMap};
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -217,6 +276,47 @@ mod test {
             .unwrap()
     }
 
+    fn read_resource_from_group(
+        view: &ExecutorViewWithChangeSet,
+        s: impl ToString,
+        tag: &StructTag,
+    ) -> u128 {
+        bcs::from_bytes(
+            &view
+                .get_resource_from_group(&key(s), tag, None)
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn mock_tag_0() -> StructTag {
+        StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("a").unwrap(),
+            name: Identifier::new("a").unwrap(),
+            type_params: vec![TypeTag::U8],
+        }
+    }
+
+    fn mock_tag_1() -> StructTag {
+        StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("abcde").unwrap(),
+            name: Identifier::new("fgh").unwrap(),
+            type_params: vec![TypeTag::U64],
+        }
+    }
+
+    fn mock_tag_2() -> StructTag {
+        StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new("abcdex").unwrap(),
+            name: Identifier::new("fghx").unwrap(),
+            type_params: vec![TypeTag::U128],
+        }
+    }
+
     #[test]
     fn test_change_set_state_view() {
         let mut state_view = FakeDataStore::default();
@@ -229,6 +329,13 @@ mod test {
         state_view.set_legacy(key("aggregator_base"), serialize(&50));
         state_view.set_legacy(key("aggregator_both"), serialize(&60));
         state_view.set_legacy(key("aggregator_delta_set"), serialize(&70));
+
+        let tree: BTreeMap<StructTag, Bytes> = BTreeMap::from([
+            (mock_tag_0(), serialize(&100).into()),
+            (mock_tag_1(), serialize(&200).into()),
+        ]);
+        state_view.set_legacy(key("resource_group_base"), bcs::to_bytes(&tree).unwrap());
+        state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
 
         let resource_write_set = HashMap::from([
             (key("resource_both"), write(80)),
@@ -248,8 +355,31 @@ mod test {
         let aggregator_delta_set =
             HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
+        let resource_group_write_set = HashMap::from([
+            (
+                key("resource_group_both"),
+                GroupWrite::new(
+                    WriteOp::Deletion,
+                    0,
+                    HashMap::from([
+                        (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
+                        (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
+                    ]),
+                ),
+            ),
+            (
+                key("resource_group_write_set"),
+                GroupWrite::new(
+                    WriteOp::Deletion,
+                    0,
+                    HashMap::from([(mock_tag_1(), WriteOp::Modification(serialize(&5000).into()))]),
+                ),
+            ),
+        ]);
+
         let change_set = VMChangeSet::new(
             resource_write_set,
+            resource_group_write_set,
             module_write_set,
             aggregator_write_set,
             aggregator_delta_set,
@@ -258,8 +388,12 @@ mod test {
         )
         .unwrap();
 
-        let executor_view = state_view.as_executor_view();
-        let view = ExecutorViewWithChangeSet::new(&executor_view, change_set);
+        let resolver = state_view.as_move_resolver();
+        let view = ExecutorViewWithChangeSet::new(
+            resolver.as_executor_view(),
+            resolver.as_resource_group_view(),
+            change_set,
+        );
 
         assert_eq!(read_module(&view, "module_base"), 10);
         assert_eq!(read_module(&view, "module_both"), 100);
@@ -273,5 +407,30 @@ mod test {
         assert_eq!(read_aggregator(&view, "aggregator_both"), 120);
         assert_eq!(read_aggregator(&view, "aggregator_write_set"), 130);
         assert_eq!(read_aggregator(&view, "aggregator_delta_set"), 71);
+
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_base", &mock_tag_0()),
+            100
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_base", &mock_tag_1()),
+            200
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_both", &mock_tag_0()),
+            1000
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_both", &mock_tag_1()),
+            200
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_both", &mock_tag_2()),
+            300
+        );
+        assert_eq!(
+            read_resource_from_group(&view, "resource_group_write_set", &mock_tag_1()),
+            5000
+        );
     }
 }

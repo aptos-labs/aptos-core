@@ -14,9 +14,9 @@ use crate::{
     NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, Result};
-use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
+use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
+use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_jellyfish_merkle::{
     node_type::{NodeKey, NodeType},
     JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
@@ -63,12 +63,13 @@ pub struct StateMerkleDb {
 }
 
 impl StateMerkleDb {
-    pub(crate) fn new<P: AsRef<Path>>(
-        db_root_path: P,
+    pub(crate) fn new(
+        db_paths: &StorageDirPaths,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
         max_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
+        let sharding = rocksdb_configs.enable_storage_sharding;
         let state_merkle_db_config = rocksdb_configs.state_merkle_db_config;
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
@@ -79,9 +80,9 @@ impl StateMerkleDb {
             version_caches.insert(Some(i as u8), VersionedNodeCache::new());
         }
         let lru_cache = LruNodeCache::new(max_nodes_per_lru_cache_shard);
-        if !rocksdb_configs.use_sharded_state_merkle_db {
+        if !sharding {
             info!("Sharded state merkle DB is not enabled!");
-            let state_merkle_db_path = db_root_path.as_ref().join(STATE_MERKLE_DB_NAME);
+            let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
             let db = Arc::new(Self::open_db(
                 state_merkle_db_path,
                 STATE_MERKLE_DB_NAME,
@@ -99,7 +100,7 @@ impl StateMerkleDb {
         }
 
         Self::open(
-            db_root_path,
+            db_paths,
             state_merkle_db_config,
             readonly,
             enable_cache,
@@ -160,11 +161,12 @@ impl StateMerkleDb {
         sharding: bool,
     ) -> Result<()> {
         let rocksdb_configs = RocksdbConfigs {
-            use_sharded_state_merkle_db: sharding,
+            enable_storage_sharding: sharding,
             ..Default::default()
         };
+        // TODO(grao): Support path override here.
         let state_merkle_db = Self::new(
-            db_root_path,
+            &StorageDirPaths::from_path(db_root_path),
             rocksdb_configs,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
@@ -320,25 +322,29 @@ impl StateMerkleDb {
 
         let batch = SchemaBatch::new();
 
-        tree_update_batch
+        let node_batch = tree_update_batch
             .node_batch
             .iter()
             .flatten()
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        let num_nodes = node_batch.len();
+        node_batch
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_nodes, 128))
             .try_for_each(|(node_key, node)| {
                 ensure!(node_key.get_shard_id() == shard_id);
                 batch.put::<JellyfishMerkleNodeSchema>(node_key, node)
             })?;
 
-        tree_update_batch
+        let stale_node_index_batch = tree_update_batch
             .stale_node_index_batch
             .iter()
             .flatten()
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        let num_stale_nodes = stale_node_index_batch.len();
+        stale_node_index_batch
             .par_iter()
-            .with_min_len(128)
+            .with_min_len(optimal_min_len(num_stale_nodes, 128))
             .try_for_each(|row| {
                 ensure!(row.node_key.get_shard_id() == shard_id);
                 if previous_epoch_ending_version.is_some()
@@ -532,16 +538,18 @@ impl StateMerkleDb {
         }
     }
 
-    fn open<P: AsRef<Path>>(
-        db_root_path: P,
+    fn open(
+        db_paths: &StorageDirPaths,
         state_merkle_db_config: RocksdbConfig,
         readonly: bool,
         enable_cache: bool,
         version_caches: HashMap<Option<u8>, VersionedNodeCache>,
         lru_cache: LruNodeCache,
     ) -> Result<Self> {
-        let state_merkle_metadata_db_path =
-            Self::metadata_db_path(db_root_path.as_ref(), /*sharding=*/ true);
+        let state_merkle_metadata_db_path = Self::metadata_db_path(
+            db_paths.state_merkle_db_metadata_root_path(),
+            /*sharding=*/ true,
+        );
 
         let state_merkle_metadata_db = Arc::new(Self::open_db(
             state_merkle_metadata_db_path.clone(),
@@ -557,7 +565,8 @@ impl StateMerkleDb {
 
         let mut shard_id: usize = 0;
         let state_merkle_db_shards = arr![{
-            let db = Self::open_shard(db_root_path.as_ref(), shard_id as u8, &state_merkle_db_config, readonly)?;
+            let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id as u8);
+            let db = Self::open_shard(shard_root_path, shard_id as u8, &state_merkle_db_config, readonly)?;
             shard_id += 1;
             Arc::new(db)
         }; 16];

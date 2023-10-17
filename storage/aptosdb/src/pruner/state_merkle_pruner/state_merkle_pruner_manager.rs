@@ -65,8 +65,8 @@ where
 
     /// Sets pruner target version when necessary.
     fn maybe_set_pruner_target_db_version(&self, latest_version: Version) {
-        // Always wake up the state pruner.
-        if self.is_pruner_enabled() {
+        let min_readable_version = self.get_min_readable_version();
+        if self.is_pruner_enabled() && latest_version >= min_readable_version + self.prune_window {
             self.set_pruner_target_db_version(latest_version);
         }
     }
@@ -158,9 +158,18 @@ where
 
     fn set_pruner_target_db_version(&self, latest_version: Version) {
         assert!(self.pruner_worker.is_some());
+
+        let min_readable_version = latest_version.saturating_sub(self.prune_window);
+        self.min_readable_version
+            .store(min_readable_version, Ordering::SeqCst);
+
+        PRUNER_VERSIONS
+            .with_label_values(&[S::name(), "min_readable"])
+            .set(min_readable_version as i64);
+
         self.pruner_worker
             .as_ref()
             .unwrap()
-            .set_target_db_version(latest_version.saturating_sub(self.prune_window));
+            .set_target_db_version(min_readable_version);
     }
 }

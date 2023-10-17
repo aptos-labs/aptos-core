@@ -29,7 +29,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::{
         ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
-        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, Version,
+        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, TimedFeaturesBuilder, Version,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -146,10 +146,11 @@ impl AptosVMImpl {
             .map(|config| config.last_reconfiguration_time())
             .unwrap_or(0);
 
-        let mut timed_features = TimedFeatures::new(chain_id, timestamp);
+        let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
         if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
-            timed_features = timed_features.with_override_profile(profile)
+            timed_features_builder = timed_features_builder.with_override_profile(profile)
         }
+        let timed_features = timed_features_builder.build();
 
         let move_vm = MoveVmExt::new(
             native_gas_params,
@@ -377,6 +378,7 @@ impl AptosVMImpl {
             .iter()
             .map(|auth_key| MoveValue::vector_u8(auth_key.to_vec()))
             .collect();
+
         let (prologue_function_name, args) = if let (Some(fee_payer), Some(fee_payer_auth_key)) = (
             txn_data.fee_payer(),
             txn_data.fee_payer_authentication_key.as_ref(),
@@ -428,7 +430,6 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
                 prologue_function_name,
-                // TODO: Deprecate this once we remove gas currency on the Move side.
                 vec![],
                 serialize_values(&args),
                 &mut gas_meter,
@@ -457,7 +458,6 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
                 &APTOS_TRANSACTION_VALIDATION.module_prologue_name,
-                // TODO: Deprecate this once we remove gas currency on the Move side.
                 vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),

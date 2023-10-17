@@ -3,30 +3,27 @@
 
 #![forbid(unsafe_code)]
 
-use crate::ParsedTransactionOutput;
+use crate::parsed_transaction_output::TransactionsWithParsedOutput;
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_storage_interface::cached_state_view::ShardedStateCache;
-use aptos_types::{
-    state_store::ShardedStateUpdates,
-    transaction::{Transaction, TransactionStatus},
-};
+use aptos_types::{state_store::ShardedStateUpdates, transaction::TransactionStatus};
 use itertools::zip_eq;
 
 #[derive(Default)]
 pub struct TransactionsByStatus {
     statuses: Vec<TransactionStatus>,
-    to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-    to_discard: Vec<Transaction>,
-    to_retry: Vec<Transaction>,
+    to_keep: TransactionsWithParsedOutput,
+    to_discard: TransactionsWithParsedOutput,
+    to_retry: TransactionsWithParsedOutput,
 }
 
 impl TransactionsByStatus {
     pub fn new(
         status: Vec<TransactionStatus>,
-        to_keep: Vec<(Transaction, ParsedTransactionOutput)>,
-        to_discard: Vec<Transaction>,
-        to_retry: Vec<Transaction>,
+        to_keep: TransactionsWithParsedOutput,
+        to_discard: TransactionsWithParsedOutput,
+        to_retry: TransactionsWithParsedOutput,
     ) -> Self {
         Self {
             statuses: status,
@@ -48,9 +45,9 @@ impl TransactionsByStatus {
         self,
     ) -> (
         Vec<TransactionStatus>,
-        Vec<(Transaction, ParsedTransactionOutput)>,
-        Vec<Transaction>,
-        Vec<Transaction>,
+        TransactionsWithParsedOutput,
+        TransactionsWithParsedOutput,
+        TransactionsWithParsedOutput,
     ) {
         (self.statuses, self.to_keep, self.to_discard, self.to_retry)
     }
@@ -61,7 +58,7 @@ pub struct StateCheckpointOutput {
     txns: TransactionsByStatus,
     per_version_state_updates: Vec<ShardedStateUpdates>,
     state_checkpoint_hashes: Vec<Option<HashValue>>,
-    state_updates_before_last_checkpoint: ShardedStateUpdates,
+    state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
     sharded_state_cache: ShardedStateCache,
 }
 
@@ -70,7 +67,7 @@ impl StateCheckpointOutput {
         txns: TransactionsByStatus,
         per_version_state_updates: Vec<ShardedStateUpdates>,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
-        state_updates_before_last_checkpoint: ShardedStateUpdates,
+        state_updates_before_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: ShardedStateCache,
     ) -> Self {
         Self {
@@ -92,7 +89,7 @@ impl StateCheckpointOutput {
         TransactionsByStatus,
         Vec<ShardedStateUpdates>,
         Vec<Option<HashValue>>,
-        ShardedStateUpdates,
+        Option<ShardedStateUpdates>,
         ShardedStateCache,
     ) {
         (

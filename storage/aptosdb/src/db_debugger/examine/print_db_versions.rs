@@ -21,7 +21,7 @@ use crate::{
     AptosDB,
 };
 use anyhow::Result;
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, ReadOptions, DB};
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -40,12 +40,11 @@ pub struct Cmd {
 impl Cmd {
     pub fn run(self) -> Result<()> {
         let rocksdb_config = RocksdbConfigs {
-            split_ledger_db: self.sharding_config.split_ledger_db,
-            use_sharded_state_merkle_db: self.sharding_config.use_sharded_state_merkle_db,
+            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &self.db_dir,
+            &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,

@@ -10,12 +10,14 @@ use crate::{
         dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         order_rule::OrderRule,
+        round_state::{OptimisticResponsive, RoundState},
         tests::{
             dag_test::MockStorage, helpers::new_certified_node, order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
     },
+    payload_manager::PayloadManager,
     test_utils::MockPayloadManager,
 };
 use aptos_consensus_types::common::{Author, Round};
@@ -134,11 +136,17 @@ async fn test_certified_node_handler() {
     let ledger_info_provider = Arc::new(MockLedgerInfoProvider {
         latest_ledger_info: mock_ledger_info,
     });
+    let (round_tx, _round_rx) = tokio::sync::mpsc::channel(10);
+    let round_state = RoundState::new(
+        round_tx.clone(),
+        Box::new(OptimisticResponsive::new(round_tx)),
+    );
 
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
         dag,
+        Arc::new(PayloadManager::DirectMempool),
         Arc::new(MockPayloadManager::new(None)),
         rb,
         time_service,
@@ -146,6 +154,7 @@ async fn test_certified_node_handler() {
         order_rule,
         fetch_requester,
         ledger_info_provider,
+        round_state,
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);

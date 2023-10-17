@@ -532,10 +532,6 @@ pub fn setup_environment_and_start_node(
     // Log the node config at node startup
     info!("Using node config {:?}", &node_config);
 
-    // Start the node inspection service
-    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
-    services::start_node_inspection_service(&node_config, peers_and_metadata.clone());
-
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
@@ -565,6 +561,7 @@ pub fn setup_environment_and_start_node(
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
+    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
     let (
         network_runtimes,
         consensus_network_interfaces,
@@ -586,7 +583,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus
-    let (state_sync_runtimes, mempool_listener, consensus_notifier) =
+    let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
             storage_service_network_interfaces,
@@ -594,6 +591,13 @@ pub fn setup_environment_and_start_node(
             event_subscription_service,
             db_rw.clone(),
         )?;
+
+    // Start the node inspection service
+    services::start_node_inspection_service(
+        &node_config,
+        aptos_data_client,
+        peers_and_metadata.clone(),
+    );
 
     // Bootstrap the API and indexer
     let (mempool_client_receiver, api_runtime, indexer_runtime, indexer_grpc_runtime) =
