@@ -7,8 +7,8 @@ use aptos_api_types::{
     MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
     MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
     MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload,
-    PublicKey, ScriptPayload, Secp256k1EcdsaSignature, Signature, SingleKeySignature, Transaction,
-    TransactionInfo, TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
+    PublicKey, ScriptPayload, Signature, SingleKeySignature, Transaction, TransactionInfo,
+    TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -557,15 +557,6 @@ pub fn convert_multi_ed25519_signature(
     }
 }
 
-pub fn convert_secp256k1_ecdsa_signature(
-    sig: &Secp256k1EcdsaSignature,
-) -> transaction::Secp256k1EcdsaSignature {
-    transaction::Secp256k1EcdsaSignature {
-        public_key: sig.public_key.0.clone(),
-        signature: sig.signature.0.clone(),
-    }
-}
-
 pub fn convert_single_key_signature(sig: &SingleKeySignature) -> transaction::SingleKeySignature {
     transaction::SingleKeySignature {
         public_key: Some(convert_public_key(&sig.public_key)),
@@ -628,12 +619,6 @@ pub fn convert_account_signature(
                 convert_multi_ed25519_signature(s),
             ),
         ),
-        AccountSignature::Secp256k1EcdsaSignature(s) => (
-            transaction::account_signature::Type::Secp256k1Ecdsa,
-            transaction::account_signature::Signature::Secp256k1Ecdsa(
-                convert_secp256k1_ecdsa_signature(s),
-            ),
-        ),
         AccountSignature::SingleKeySignature(s) => (
             transaction::account_signature::Type::SingleKey,
             transaction::account_signature::Signature::SingleKeySignature(
@@ -668,9 +653,6 @@ pub fn convert_transaction_signature(
         },
         TransactionSignature::MultiAgentSignature(_) => transaction::signature::Type::MultiAgent,
         TransactionSignature::FeePayerSignature(_) => transaction::signature::Type::FeePayer,
-        TransactionSignature::Secp256k1EcdsaSignature(_) => {
-            transaction::signature::Type::Secp256k1Ecdsa
-        },
         TransactionSignature::SingleSender(_) => transaction::signature::Type::SingleSender,
     };
 
@@ -712,9 +694,6 @@ pub fn convert_transaction_signature(
                 fee_payer_address: s.fee_payer_address.to_string(),
                 fee_payer_signer: Some(convert_account_signature(&s.fee_payer_signer)),
             })
-        },
-        TransactionSignature::Secp256k1EcdsaSignature(s) => {
-            transaction::signature::Signature::Secp256k1Ecdsa(convert_secp256k1_ecdsa_signature(s))
         },
         TransactionSignature::SingleSender(s) => {
             transaction::signature::Signature::SingleSender(transaction::SingleSender {
