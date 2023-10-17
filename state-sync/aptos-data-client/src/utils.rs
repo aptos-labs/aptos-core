@@ -11,7 +11,7 @@ use aptos_config::{
 };
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::application::storage::PeersAndMetadata;
+use aptos_network::application::{metadata::PeerMetadata, storage::PeersAndMetadata};
 use itertools::Itertools;
 use maplit::hashset;
 use ordered_float::OrderedFloat;
@@ -66,23 +66,33 @@ pub fn is_priority_peer(
     false
 }
 
-/// Selects the peer with the lowest latency from the list of specified peers
-pub fn choose_lowest_latency_peer(
+/// Chooses the peer with the lowest distance from the validator set and
+/// measured latency (using the given set of serviceable peers). We prioritize
+/// distance over latency, since we want to avoid close but not up-to-date peers.
+pub fn choose_lowest_distance_and_latency_peer(
     peers: HashSet<PeerNetworkId>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Option<PeerNetworkId> {
-    let mut lowest_latency_peer = None;
+    let mut lowest_distance_and_latency_peer = None;
+    let mut lowest_distance = u64::MAX;
     let mut lowest_latency = f64::MAX;
+
+    // Find the peer with the lowest distance and latency
     for peer in &peers {
-        if let Some(latency) = get_latency_for_peer(&peers_and_metadata, *peer) {
-            if latency < lowest_latency {
-                lowest_latency_peer = Some(*peer);
+        if let Some((distance, latency)) =
+            get_distance_and_latency_for_peer(&peers_and_metadata, *peer)
+        {
+            if distance < lowest_distance
+                || (distance == lowest_distance && latency < lowest_latency)
+            {
+                lowest_distance_and_latency_peer = Some(*peer);
+                lowest_distance = distance;
                 lowest_latency = latency;
             }
         }
     }
 
-    lowest_latency_peer
+    lowest_distance_and_latency_peer
 }
 
 /// Selects the specified number of peers from the list of potential
@@ -191,19 +201,61 @@ fn get_latency_for_peer(
     peers_and_metadata: &Arc<PeersAndMetadata>,
     peer: PeerNetworkId,
 ) -> Option<f64> {
+    if let Some(peer_metadata) = get_metadata_for_peer(peers_and_metadata, peer) {
+        let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
+        if let Some(latency) = peer_monitoring_metadata.average_ping_latency_secs {
+            return Some(latency); // The latency was found
+        }
+    }
+
+    // Otherwise, no latency was found
+    log_warning_with_sample(
+        LogSchema::new(LogEntry::PeerStates)
+            .event(LogEvent::PeerSelectionError)
+            .message(&format!("Unable to get latency for peer! Peer: {:?}", peer)),
+    );
+    None
+}
+
+/// Gets the distance from the validators and measured latency (for the specified peer)
+fn get_distance_and_latency_for_peer(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    peer: PeerNetworkId,
+) -> Option<(u64, f64)> {
+    if let Some(peer_metadata) = get_metadata_for_peer(peers_and_metadata, peer) {
+        // Get the distance and latency for the peer
+        let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
+        let distance = peer_monitoring_metadata
+            .latest_network_info_response
+            .map(|response| response.distance_from_validators);
+        let latency = peer_monitoring_metadata.average_ping_latency_secs;
+
+        // Return the distance and latency if both were found
+        if let (Some(distance), Some(latency)) = (distance, latency) {
+            return Some((distance, latency));
+        }
+    }
+
+    // Otherwise, no distance and latency was found
+    log_warning_with_sample(
+        LogSchema::new(LogEntry::PeerStates)
+            .event(LogEvent::PeerSelectionError)
+            .message(&format!(
+                "Unable to get distance and latency for peer! Peer: {:?}",
+                peer
+            )),
+    );
+    None
+}
+
+/// Returns the metadata for the specified peer. If no metadata
+/// is found, an error is logged and None is returned.
+fn get_metadata_for_peer(
+    peers_and_metadata: &Arc<PeersAndMetadata>,
+    peer: PeerNetworkId,
+) -> Option<PeerMetadata> {
     match peers_and_metadata.get_metadata_for_peer(peer) {
-        Ok(peer_metadata) => {
-            let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
-            if let Some(latency) = peer_monitoring_metadata.average_ping_latency_secs {
-                return Some(latency);
-            } else {
-                log_warning_with_sample(
-                    LogSchema::new(LogEntry::PeerStates)
-                        .event(LogEvent::PeerSelectionError)
-                        .message(&format!("Unable to get latency for peer! Peer: {:?}", peer)),
-                );
-            }
-        },
+        Ok(peer_metadata) => Some(peer_metadata),
         Err(error) => {
             log_warning_with_sample(
                 LogSchema::new(LogEntry::PeerStates)
@@ -213,10 +265,9 @@ fn get_latency_for_peer(
                         peer, error
                     )),
             );
+            None // No metadata was found
         },
     }
-
-    None // No latency was found
 }
 
 /// Logs the given schema as a warning with a sampled frequency
