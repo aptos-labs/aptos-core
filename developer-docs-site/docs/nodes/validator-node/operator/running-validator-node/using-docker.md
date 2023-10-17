@@ -91,7 +91,7 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
     - `genesis.blob`
     - `waypoint.txt`
 
-6. <span id="docker-files">To recap, in your working directory, you should have a list of files:</span>
+6. To recap, in your working directory, you should have a list of files:
 
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `keys` folder containing:
@@ -109,7 +109,7 @@ Docker method has only been tested on Linux, Windows, and Intel macOS. If you ar
 
 **Now you have completed setting up your validator node. Next, setup a validator fullnode following the instructions below.**
 
-9. <span id="docker-vfn">Set up a validator fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine.</span> See [Node Files](../../../node-files-all-networks/node-files.md) for a full list of files you should download and the download commands. 
+9. Set up a validator fullnode on a different machine. Download the `fullnode.yaml` and `docker-compose-fullnode.yaml` configuration files into the working directory of fullnode machine. See [Node Files](../../../node-files-all-networks/node-files.md) for a full list of files you should download and the download commands. 
 
 10.  Edit `fullnode.yaml` file to update the IP address for validator node.
 
