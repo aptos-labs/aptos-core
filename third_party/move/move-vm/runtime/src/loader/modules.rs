@@ -273,19 +273,9 @@ impl Module {
                 let module_id = module.module_id_for_handle(module_handle);
 
                 if module_handle != module.self_handle() {
-                    let struct_ = cache.resolve_struct_by_name(struct_name, &module_id)?;
-                    if !struct_handle.abilities.is_subset(struct_.abilities)
-                        || !struct_handle
-                            .type_parameters
-                            .iter()
-                            .map(|ty| ty.is_phantom)
-                            .eq(struct_.phantom_ty_args_mask.iter().cloned())
-                    {
-                        return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                        )
-                        .with_message("Ability definition of module mismatch".to_string()));
-                    }
+                    cache
+                        .resolve_struct_by_name(struct_name, &module_id)?
+                        .check_compatibility(struct_handle)?;
                 }
                 struct_names.push(Arc::new(StructIdentifier {
                     module: module_id,

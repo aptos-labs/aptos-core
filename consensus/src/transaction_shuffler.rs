@@ -38,12 +38,12 @@ pub fn create_transaction_shuffler(
             info!("Using no-op sender aware shuffling v1");
             Arc::new(NoOpShuffler {})
         },
-        SenderAwareV2(confict_window_size) => {
+        SenderAwareV2(conflict_window_size) => {
             info!(
                 "Using sender aware transaction shuffling with conflict window size {}",
-                confict_window_size
+                conflict_window_size
             );
-            Arc::new(SenderAwareShuffler::new(confict_window_size as usize))
+            Arc::new(SenderAwareShuffler::new(conflict_window_size as usize))
         },
     }
 }

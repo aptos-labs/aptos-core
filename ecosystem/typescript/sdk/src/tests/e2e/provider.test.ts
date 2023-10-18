@@ -28,12 +28,6 @@ describe("Provider", () => {
     expect(provider.indexerClient).toBe(undefined);
   });
 
-  it("does not set indexer client when local netowrk is provided", async () => {
-    const provider = new Provider(Network.LOCAL);
-    expect(provider.aptosClient.nodeUrl).toBe(NetworkToNodeAPI[Network.LOCAL]);
-    expect(provider.indexerClient).toBe(undefined);
-  });
-
   it("includes static methods", async () => {
     expect(Provider).toHaveProperty("generateBCSTransaction");
     expect(Provider).toHaveProperty("generateBCSSimulation");

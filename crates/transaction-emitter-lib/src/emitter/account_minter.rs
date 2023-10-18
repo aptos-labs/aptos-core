@@ -3,8 +3,10 @@
 
 use crate::{EmitJobRequest, EmitModeParams};
 use anyhow::{anyhow, bail, format_err, Context, Result};
-use aptos::common::{types::EncodingType, utils::prompt_yes};
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    encoding_type::EncodingType,
+};
 use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -503,3 +505,24 @@ pub fn create_and_fund_account_request(
 }
 
 const CREATION_PARALLELISM: usize = 500;
+
+/// Copied from aptos crate, to not need to link it whole.
+/// Prompts for confirmation until a yes or no is given explicitly
+pub fn prompt_yes(prompt: &str) -> bool {
+    let mut result: Result<bool, ()> = Err(());
+
+    // Read input until a yes or a no is given
+    while result.is_err() {
+        println!("{} [yes/no] >", prompt);
+        let mut input = String::new();
+        if std::io::stdin().read_line(&mut input).is_err() {
+            continue;
+        }
+        result = match input.trim().to_lowercase().as_str() {
+            "yes" | "y" => Ok(true),
+            "no" | "n" => Ok(false),
+            _ => Err(()),
+        };
+    }
+    result.unwrap()
+}

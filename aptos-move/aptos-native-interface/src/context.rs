@@ -120,7 +120,7 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     }
 
     /// Returns true if the aggregator snapshots feature is enabled.
-    pub fn aggregator_snapshots_enabled(&self) -> bool {
-        self.get_feature_flags().is_aggregator_snapshots_enabled()
+    pub fn aggregator_v2_api_enabled(&self) -> bool {
+        self.get_feature_flags().is_aggregator_v2_api_enabled()
     }
 }

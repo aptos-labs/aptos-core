@@ -80,7 +80,7 @@ The FAs is a struct representing the type and the amount of units held. As the s
 
 ```rust
 #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct FungibleStore has key {
+struct FungibleStore has key {
     /// The address of the base metadata object.
     metadata: Object<Metadata>,
     /// The balance of the fungible metadata.

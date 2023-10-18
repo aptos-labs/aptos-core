@@ -6,9 +6,8 @@ sidebar_position: 9
 
 # Run a Local Testnet with Validator
 
-:::tip Using CLI to run a local testnet
-
-If you want to use CLI to start and run a local testnet, see [Using CLI to Run a Local Testnet](./using-cli-to-run-a-local-testnet.md).
+:::tip Using the CLI to run a local development network
+Running a local testnet with the Aptos CLI is simpler and more fully featured. Learn how by following this guide: [Run a Local Development Network with the CLI](../../guides/local-development-network.md).
 :::
 
 You can run a local testnet of the Aptos blockchain. This local testnet will not be connected to the Aptos devnet. It will run on your local machine, independent of other Aptos networks. You can use this local testnet for testing and development purposes.

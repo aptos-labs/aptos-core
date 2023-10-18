@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pipeline::CommitBlockMessage;
+use crate::{metrics::NUM_TXNS, pipeline::CommitBlockMessage};
 use aptos_crypto::hash::HashValue;
 use aptos_db::metrics::API_LATENCY_SECONDS;
 use aptos_executor::{
@@ -83,6 +83,9 @@ where
                 execution_time,
                 num_txns,
             } = msg;
+            NUM_TXNS
+                .with_label_values(&["commit"])
+                .inc_by(num_txns as u64);
             self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);

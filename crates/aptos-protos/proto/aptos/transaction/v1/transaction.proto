@@ -403,7 +403,7 @@ message Signature {
     TYPE_MULTI_ED25519 = 2;
     TYPE_MULTI_AGENT = 3;
     TYPE_FEE_PAYER = 4;
-    TYPE_SECP256K1_ECDSA = 5;
+    TYPE_SINGLE_SENDER = 6;
   }
 
   Type type = 1;
@@ -412,7 +412,7 @@ message Signature {
     MultiEd25519Signature multi_ed25519 = 3;
     MultiAgentSignature multi_agent = 4;
     FeePayerSignature fee_payer = 5;
-    Secp256k1ECDSASignature secp256k1_ecdsa = 6;
+    SingleSender single_sender = 7;
   }
 }
 
@@ -442,9 +442,46 @@ message FeePayerSignature {
   AccountSignature fee_payer_signer = 5;
 }
 
-message Secp256k1ECDSASignature {
-  bytes public_key = 1;
+message AnyPublicKey {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ED25519 = 1;
+    TYPE_SECP256K1_ECDSA = 2;
+  }
+
+  Type type = 1;
+  bytes public_key = 2;
+}
+
+message AnySignature {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_ED25519 = 1;
+    TYPE_SECP256K1_ECDSA = 2;
+  }
+
+  Type type = 1;
   bytes signature = 2;
+}
+
+message SingleKeySignature {
+  AnyPublicKey public_key = 1;
+  AnySignature signature = 2;
+}
+
+message IndexedSignature {
+  uint32 index = 1;
+  AnySignature signature = 2;
+}
+
+message MultiKeySignature {
+  repeated AnyPublicKey public_keys = 1;
+  repeated IndexedSignature signatures = 2;
+  uint32 signatures_required = 3;
+}
+
+message SingleSender {
+  AccountSignature sender = 1;
 }
 
 message AccountSignature {
@@ -452,13 +489,15 @@ message AccountSignature {
     TYPE_UNSPECIFIED = 0;
     TYPE_ED25519 = 1;
     TYPE_MULTI_ED25519 = 2;
-    TYPE_SECP256K1_ECDSA = 3;
+    TYPE_SINGLE_KEY = 4;
+    TYPE_MULTI_KEY = 5;
   }
 
   Type type = 1;
   oneof signature {
     Ed25519Signature ed25519 = 2;
     MultiEd25519Signature multi_ed25519 = 3;
-    Secp256k1ECDSASignature secp256k1_ecdsa = 4;
+    SingleKeySignature single_key_signature = 5;
+    MultiKeySignature multi_key_signature = 6;
   }
 }

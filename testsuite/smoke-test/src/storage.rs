@@ -241,8 +241,9 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .unwrap();
     assert!(
         replay.status.success(),
-        "{}",
-        std::str::from_utf8(&replay.stderr).unwrap()
+        "{}, {}",
+        std::str::from_utf8(&replay.stderr).unwrap(),
+        std::str::from_utf8(&replay.stdout).unwrap(),
     );
 
     info!(

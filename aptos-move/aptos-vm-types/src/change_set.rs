@@ -10,8 +10,9 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::ChangeSet as StorageChangeSet,
-    write_set::{WriteOp, WriteSetMut},
+    write_set::{TransactionWrite, WriteOp, WriteSetMut},
 };
+use claims::assert_none;
 use move_binary_format::errors::Location;
 use move_core_types::{
     language_storage::StructTag,
@@ -29,7 +30,7 @@ pub struct GroupWrite {
     /// derive metadata_op will be validated during parallel execution to make sure
     /// it is correct, and the bytes will be replaced after the transaction is committed
     /// with correct serialized group update to obtain storage WriteOp.
-    pub metadata_op: WriteOp,
+    metadata_op: WriteOp,
     /// Updates to individual group members. WriteOps are 'legacy', i.e. no metadata.
     /// If the metadata_op is a deletion, all (correct) inner_ops should be deletions,
     /// and if metadata_op is a creation, then there may not be a creation inner op.
@@ -37,7 +38,55 @@ pub struct GroupWrite {
     /// exist in the group. Note: During parallel block execution, due to speculative
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    pub inner_ops: HashMap<StructTag, WriteOp>,
+    inner_ops: HashMap<StructTag, WriteOp>,
+}
+
+impl GroupWrite {
+    /// Creates a group write and ensures that the format is correct: in particular,
+    /// sets the bytes of a non-deletion metadata_op by serializing the provided size,
+    /// and ensures inner ops do not contain any metadata.
+    pub fn new(
+        mut metadata_op: WriteOp,
+        group_size: u64,
+        inner_ops: HashMap<StructTag, WriteOp>,
+    ) -> Self {
+        for v in inner_ops.values() {
+            assert_none!(v.metadata());
+        }
+
+        let encoded_group_size = bcs::to_bytes(&group_size)
+            .expect("Must serialize u64 successfully")
+            .into();
+        metadata_op.set_bytes(encoded_group_size);
+
+        Self {
+            metadata_op,
+            inner_ops,
+        }
+    }
+
+    /// Utility method that extracts the serialized group size from metadata_op. Returns
+    /// None if group is being deleted, otherwise asserts on deserializing the size.
+    pub fn encoded_group_size(&self) -> Option<u64> {
+        self.metadata_op
+            .bytes()
+            .map(|b| bcs::from_bytes::<u64>(b).expect("Must be serialized group size"))
+    }
+
+    // TODO: refactor storage fee & refund interfaces to operate on metadata directly,
+    // as that would avoid providing &mut to the whole metadata op in here, including
+    // bytes that are not raw bytes (encoding group size) and must not be modified.
+    pub fn metadata_op_mut(&mut self) -> &mut WriteOp {
+        &mut self.metadata_op
+    }
+
+    pub fn metadata_op(&self) -> &WriteOp {
+        &self.metadata_op
+    }
+
+    pub fn inner_ops(&self) -> &HashMap<StructTag, WriteOp> {
+        &self.inner_ops
+    }
 }
 
 /// A change set produced by the VM.
@@ -212,6 +261,12 @@ impl VMChangeSet {
             .iter_mut()
             .chain(self.module_write_set.iter_mut())
             .chain(self.aggregator_write_set.iter_mut())
+    }
+
+    pub fn group_write_set_iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (&StateKey, &mut GroupWrite)> {
+        self.resource_group_write_set.iter_mut()
     }
 
     pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
@@ -487,8 +542,53 @@ mod tests {
     use crate::tests::utils::{
         mock_tag_0, mock_tag_1, mock_tag_2, raw_metadata, write_op_with_metadata,
     };
+    use bytes::Bytes;
     use claims::{assert_err, assert_ok, assert_some_eq};
     use test_case::test_case;
+
+    macro_rules! assert_group_write_size {
+        ($op:expr, $s:expr, $exp:expr) => {{
+            let group_write = GroupWrite::new($op, $s, HashMap::new());
+            assert_eq!(group_write.encoded_group_size(), $exp);
+        }};
+    }
+
+    #[test]
+    fn test_group_write_size() {
+        // Deletions should lead to size 0.
+        assert_group_write_size!(WriteOp::Deletion, 0, None);
+        assert_group_write_size!(
+            WriteOp::DeletionWithMetadata {
+                metadata: raw_metadata(10)
+            },
+            0,
+            None
+        );
+
+        let sizes = [20, 100, 45279432, 5];
+        assert_group_write_size!(WriteOp::Creation(Bytes::new()), sizes[0], Some(sizes[0]));
+        assert_group_write_size!(
+            WriteOp::CreationWithMetadata {
+                data: Bytes::new(),
+                metadata: raw_metadata(20)
+            },
+            sizes[1],
+            Some(sizes[1])
+        );
+        assert_group_write_size!(
+            WriteOp::Modification(Bytes::new()),
+            sizes[2],
+            Some(sizes[2])
+        );
+        assert_group_write_size!(
+            WriteOp::ModificationWithMetadata {
+                data: Bytes::new(),
+                metadata: raw_metadata(30)
+            },
+            sizes[3],
+            Some(sizes[3])
+        );
+    }
 
     #[test]
     fn test_squash_groups_one_empty() {

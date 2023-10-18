@@ -38,16 +38,9 @@ aptos node get-stake-pool \
 2. Download the `genesis.blob` and `waypoint.txt` files published by Aptos. 
    - See [Node Files](../../node-files-all-networks/node-files.md) for your network (mainnet, testnet, or devnet) for the locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**. Do not change anything else. Keep the keys as they are. 
-4. Pull the latest changes from the associated (ex. `mainnet`) branch. 
-5. [Optional] You can use [fast sync](../../../guides/state-sync.md#fast-syncing) to bootstrap your node if the network has been running for a long time (e.g. testnet, mainnet). Add the below configuration to your `validator.yaml` and `fullnode.yaml` files:
-    ```yaml
-    state_sync:
-     state_sync_driver:
-         bootstrapping_mode: DownloadLatestStates
-         continuous_syncing_mode: ApplyTransactionOutputs
-    ```
-6. Close the metrics port `9101` and the REST API port `80` on your validator (you can leave it open for public fullnode).
-7. Restart the validator node and validator fullnode.
+4. Pull the latest changes from the associated (ex. `mainnet`) branch.
+5. Close the metrics port `9101` and the REST API port `80` on your validator (you can leave it open for public fullnode).
+6. Restart the validator node and validator fullnode.
 
 ### Using Docker
 
@@ -57,51 +50,18 @@ aptos node get-stake-pool \
    - See [Node Files](../../node-files-all-networks/node-files.md) for locations and commands to download these files.
 3. Update your `account_address` in the `validator-identity.yaml` and `validator-fullnode-identity.yaml` files to your **pool address**.
 4. Update your Docker image to the [latest release](../../../releases/index.md) of the network branch (e.g. mainnet, testnet).
-5. [Optional] You can use [fast sync](../../../guides/state-sync.md#fast-syncing) to bootstrap your node if the network has been running for a long time (e.g. testnet). Add this configuration to your `validator.yaml` and `fullnode.yaml` files:
-    ```yaml
-    state_sync:
-     state_sync_driver:
-         bootstrapping_mode: DownloadLatestStates
-         continuous_syncing_mode: ApplyTransactionOutputs
-    ```
-6. Close the metrics port `9101` and the REST API port `80` on your validator (remove it from the Docker compose file). You can leave it open for the public fullnode.
-7. Restart the node with: `docker compose up`
+5. Close the metrics port `9101` and the REST API port `80` on your validator (remove it from the Docker compose file). You can leave it open for the public fullnode.
+6. Restart the node with: `docker compose up`
 
 ### Using Terraform
 
 1. Increase the `era` number in your Terraform configuration. When this configuration is applied, it will wipe the data.
 2. Update `chain_id` to 1 (for mainnet). The chain IDs for other Aptos networks are in [Aptos Blockchain Deployments](../../deployments.md).
 3. Update your Docker image to the [latest release](../../../releases/index.md) of the network branch (e.g. mainnet, testnet).
-4. Close the metrics port and the REST API port for validator. 
-5. [Optional] You can use fast sync to bootstrap your node if the network has been running for a long time (e.g. testnet). by adding the following Helm values in your `main.tf ` file:
-
-    ```json
-    module "aptos-node" {
-        ...
-
-        helm_values = {
-            validator = {
-              config = {
-                # use fast sync to start the node
-                state_sync = {
-                  state_sync_driver = {
-                    bootstrapping_mode = "DownloadLatestStates"
-                  }
-                }
-              }
-            }
-            service = {
-              validator = {
-                enableRestApi = false
-                enableMetricsPort = false
-              }
-            }
-        }
-    }
-    ```
+4. Close the metrics port and the REST API port for validator.
 
 
-6. **Add monitoring components**
+5. **Add monitoring components**
 
   :::tip Supported only using Terraform
   This is currently only supported using Terraform.
@@ -151,68 +111,9 @@ aptos node get-stake-pool \
       --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
   ```
 
-## Verify Node Connections
-
-Now that you have [connected to the Aptos network](./connect-to-aptos-network.md), you should verify your node connections.
-
-:::tip Node Liveness Definition
-See [node liveness criteria](../operator/node-liveness-criteria.md) for details. 
-:::
-
-After your validator node has joined the validator set, you can validate its correctness by following these steps:
-
-1. Verify that your node is connecting to other peers on the network. **Replace `127.0.0.1` with your validator IP/DNS if deployed on the cloud**.
-
-    ```bash
-    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_connections{.*\"Validator\".*}"
-    ```
-
-    The command will output the number of inbound and outbound connections of your validator node. For example:
-
-    ```bash
-    aptos_connections{direction="inbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 5
-    aptos_connections{direction="outbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 2
-    ```
-
-    As long as one of the metrics is greater than zero, your node is connected to at least one of the peers on the testnet.
-
-2. You can also check if your node is connected to an Aptos node: replace `<Aptos Peer ID>` with the peer ID shared by Aptos team.
-
-    ```bash
-    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
-    ```
-
-3. Check if your node is state syncing.
-
-    ```bash
-    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version"
-    ```
-    
-    You should expect to see the "committed" version keeps increasing.
-
-4. After your node state syncs to the latest version, you can also check if consensus is making progress, and your node is proposing.
-
-    ```bash
-    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
-
-    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_proposals_count"
-    ```
-
-    You should expect to see this number keep increasing.
-    
-5. Finally, the most straight forward way to see if your node is functioning properly is to check if it is making staking reward. You can check it on the Aptos Explorer: `https://explorer.aptoslabs.com/account/<owner-account-address>?network=Mainnet`:
-
-    ```json
-    0x1::stake::StakePool
-
-    "active": {
-      "value": "100009129447462"
-    }
-    ```
-
 ## Joining Validator Set
 
-After your node has synced, follow the below steps to set up the validator node using the operator account and join the validator set.
+Next, follow the below steps to set up the validator node using the operator account and join the validator set. This is required for your validator and validator fullnode to start syncing.
 
 :::tip Mainnet vs Testnet
 The below CLI command examples use mainnet. Change the `--network` value for testnet and devnet. View the values in [Aptos Blockchain Deployments](../../deployments.md) to see how profiles can be configured based on the network.
@@ -305,3 +206,71 @@ aptos node show-validator-set --profile mainnet-operator | jq -r '.Result.active
 ```
     
     You should expect the active value for your `StakePool` to keep increasing. It is updated at every epoch.
+
+
+## Verify Node Correctness
+
+Now that you have joined the validator set, you should verify your node correctness.
+
+:::tip First time syncing?
+Note that in some environments, e.g., `testnet`, your validator fullnode will begin syncing first (before your validator is able to sync).
+This is normal behaviour. Once your validator fullnode has finished syncing, your validator node will start syncing and eventually start participating in consensus.
+:::
+
+:::tip Node Liveness Definition
+See [node liveness criteria](../operator/node-liveness-criteria.md) for details.
+:::
+
+After your validator node has joined the validator set, you can validate its correctness by following these steps:
+
+1. Check if your node is state syncing. **Replace `127.0.0.1` with your validator IP/DNS if deployed on the cloud**.
+
+    ```bash
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_state_sync_version"
+    ```
+
+   You should expect to see the `synced` or `synced_states` versions increasing. The versions should start increasing
+   for your validator fullnode first, then eventually your validator node will start syncing.
+
+2. Verify that your validator is connecting to other peers on the network.
+
+    ```bash
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_connections{.*\"Validator\".*}"
+    ```
+
+   The command will output the number of inbound and outbound connections of your validator node. For example:
+
+    ```bash
+    aptos_connections{direction="inbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 5
+    aptos_connections{direction="outbound",network_id="Validator",peer_id="f326fd30",role_type="validator"} 2
+    ```
+
+   As long as one of the metrics is greater than zero, your validator node is connected to at least one of the peers on the network. If your validator is not
+   connected to any peers, make sure your validator fullnode has completed syncing first. Once your validator fullnode has finished syncing, your validator
+   node will start syncing and eventually be able to connect to other peers.
+
+3. You can also check if your node is connected to an Aptos node: replace `<Aptos Peer ID>` with the peer ID shared by Aptos team.
+
+    ```bash
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_network_peer_connected{.*remote_peer_id=\"<Aptos Peer ID>\".*}"
+    ```
+
+4. After your node state syncs to the latest version, you can also check if consensus is making progress, and your node is proposing.
+
+    ```bash
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_current_round"
+
+    curl 127.0.0.1:9101/metrics 2> /dev/null | grep "aptos_consensus_proposals_count"
+    ```
+
+   You should expect to see this number keep increasing.
+
+5. Finally, the most straight forward way to see if your node is functioning properly is to check if it is making staking reward. You can check it on the Aptos Explorer: `https://explorer.aptoslabs.com/account/<owner-account-address>?network=Mainnet`:
+
+    ```json
+    0x1::stake::StakePool
+
+    "active": {
+      "value": "100009129447462"
+    }
+    ```

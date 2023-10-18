@@ -83,7 +83,12 @@ impl VerifiedEpochStates {
     }
 
     /// Sets `verified_waypoint` to true
-    pub fn set_verified_waypoint(&mut self) {
+    pub fn set_verified_waypoint(&mut self, waypoint_version: Version) {
+        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+            "The waypoint has been verified! Waypoint version: {:?}.",
+            waypoint_version
+        )));
+
         self.verified_waypoint = true;
     }
 
@@ -145,7 +150,7 @@ impl VerifiedEpochStates {
             // Check if we've found the ledger info corresponding to the waypoint version
             if ledger_info_version == waypoint_version {
                 match waypoint.verify(ledger_info) {
-                    Ok(()) => self.set_verified_waypoint(),
+                    Ok(()) => self.set_verified_waypoint(waypoint_version),
                     Err(error) => {
                         return Err(Error::VerificationError(
                             format!("Failed to verify the waypoint: {:?}! Waypoint: {:?}, given ledger info: {:?}",
@@ -166,8 +171,8 @@ impl VerifiedEpochStates {
     ) -> Result<(), Error> {
         let ledger_info = epoch_ending_ledger_info.ledger_info();
         info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-            "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}",
-            ledger_info.epoch(), ledger_info.version(), ledger_info.ends_epoch(),
+            "Adding a new epoch to the epoch ending ledger infos. Epoch: {:?}, Version: {:?}, Ends epoch: {:?}, Waypoint: {:?}",
+            ledger_info.epoch(), ledger_info.version(), ledger_info.ends_epoch(), Waypoint::new_epoch_boundary(ledger_info),
         )));
 
         // Insert the version to ledger info mapping
@@ -870,7 +875,8 @@ impl<
         let latest_ledger_info = utils::fetch_latest_synced_ledger_info(self.storage.clone())?;
         let waypoint_version = self.driver_configuration.waypoint.version();
         if latest_ledger_info.ledger_info().version() >= waypoint_version {
-            self.verified_epoch_states.set_verified_waypoint();
+            self.verified_epoch_states
+                .set_verified_waypoint(waypoint_version);
             return Ok(());
         }
 

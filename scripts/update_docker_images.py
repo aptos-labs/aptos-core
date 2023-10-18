@@ -13,9 +13,12 @@ IMAGES = {
     "rust": "rust:1.72.1-bullseye",
 }
 
+
 def update() -> int:
     script_dir = os.path.dirname(os.path.realpath(__file__))
-    dockerfile_path = os.path.join(script_dir, "..", "docker", "builder", "docker-bake-rust-all.hcl")
+    dockerfile_path = os.path.join(
+        script_dir, "..", "docker", "builder", "docker-bake-rust-all.hcl"
+    )
 
     update_exists = False
 
@@ -23,20 +26,22 @@ def update() -> int:
         manifest = None
         digest = None
         current_digest = None
-        regex = f"{base_image} = \"docker-image://{image_name}.*\""
+        regex = f'{base_image} = "docker-image://{image_name}.*"'
 
         print(f"Update {image_name}")
-        manifest_inspect = subprocess.check_output(["docker", "manifest", "inspect", image_name])
-        manifest = json.loads(manifest_inspect)
-
-        if manifest == None:
-            print(f"Unable to find manifest for {image_name}")
-            continue
-
-        for m in manifest["manifests"]:
-            if m["platform"]["architecture"] == ARCH and m["platform"]["os"] == OS:
-                digest = m["digest"]
-                break
+        # Note space before {{ in --format is important.
+        digest = subprocess.check_output(
+            [
+                "docker",
+                "buildx",
+                "imagetools",
+                "inspect",
+                image_name,
+                "--format",
+                " {{.Manifest.Digest}}",
+            ]
+        )
+        digest = digest.strip().decode("utf-8")
 
         if digest == None:
             print(f"Unable to find digest for {image_name}")
@@ -48,9 +53,9 @@ def update() -> int:
 
         for line in dockerfile_content.splitlines():
             if re.search(regex, line):
-                current_digest = line.split("@")[1].split("\"")[0]
+                current_digest = line.split("@")[1].split('"')[0]
                 break
-            
+
         if current_digest == None:
             print(f"Unable to find current_digest for {image_name}")
             continue
@@ -60,7 +65,11 @@ def update() -> int:
             continue
 
         print(f"Found update for {image_name}: {current_digest} -> {digest}")
-        dockerfile_content = re.sub(regex, f"{base_image} = \"docker-image://{image_name}@{digest}\"", dockerfile_content)
+        dockerfile_content = re.sub(
+            regex,
+            f'{base_image} = "docker-image://{image_name}@{digest}"',
+            dockerfile_content,
+        )
 
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
@@ -68,6 +77,7 @@ def update() -> int:
         update_exists = True
 
     return update_exists
+
 
 def write_github_output(key, value) -> None:
     print(f"GITHUB_OUTPUT: {key}={value}")

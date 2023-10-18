@@ -5,7 +5,10 @@
 use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, secp256k1_ecdsa};
-use aptos_sdk::types::{transaction::authenticator::AuthenticationKey, LocalAccount};
+use aptos_sdk::types::{
+    transaction::authenticator::{AnyPublicKey, AuthenticationKey},
+    LocalAccount,
+};
 use rand::{rngs::StdRng, SeedableRng};
 use std::convert::TryInto;
 
@@ -17,7 +20,8 @@ async fn test_secp256k1_ecdsa() {
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let private_key: secp256k1_ecdsa::PrivateKey = aptos_crypto::Uniform::generate(&mut rng);
     let public_key = aptos_crypto::PrivateKey::public_key(&private_key);
-    let address = AuthenticationKey::secp256k1_ecdsa(&public_key).account_address();
+    let address = AuthenticationKey::any_key(AnyPublicKey::secp256k1_ecdsa(public_key.clone()))
+        .account_address();
 
     // Set a dummy key
     let key_bytes =

@@ -10,11 +10,11 @@ use crate::{
 };
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, RocksdbConfigs,
-    StateMerklePrunerConfig, BUFFERED_STATE_TARGET_ITEMS,
+    StateMerklePrunerConfig, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_storage_interface::{DbReader, DbWriter, ExecutedTrees, Order};
+use aptos_storage_interface::{DbReader, ExecutedTrees, Order};
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -179,8 +179,8 @@ pub fn test_state_merkle_pruning_impl(
     // set up DB with state prune window 5 and epoch ending state prune window 10
     let tmp_dir = TempPath::new();
     let db = AptosDB::open(
-        &tmp_dir,
-        false, /* is_read_only */
+        StorageDirPaths::from_path(tmp_dir),
+        /*readonly=*/ false,
         PrunerConfig {
             ledger_pruner_config: LedgerPrunerConfig {
                 enable: true,
@@ -218,7 +218,7 @@ pub fn test_state_merkle_pruning_impl(
     let mut snapshot_versions = vec![];
     for (txns_to_commit, ledger_info_with_sigs) in input.iter() {
         test_helper::update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-        db.save_transactions(
+        db.save_transactions_for_test(
             txns_to_commit,
             next_ver,                /* first_version */
             next_ver.checked_sub(1), /* base_state_version */

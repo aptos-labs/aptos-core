@@ -209,7 +209,7 @@ impl StorageOpt {
     }
 }
 
-#[derive(Parser)]
+#[derive(Parser, Clone, Debug)]
 #[clap(group(
     ArgGroup::new("storage")
     .required(true)

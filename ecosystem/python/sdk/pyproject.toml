@@ -15,6 +15,7 @@ httpx = "^0.24.0"
 PyNaCl = "^1.5.0"
 python = ">=3.8.1,<4.0"
 tomli = "^2.0.1"
+typing-extensions = "^4.4.0"
 
 [tool.poetry.dev-dependencies]
 autoflake = "2.2.0"
@@ -24,7 +25,6 @@ flake8 = "6.0.0"
 isort = "^5.10.1"
 mypy = "^1.0.0"
 mypy-extensions = "^1.0.0"
-typing-extensions = "^4.4.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

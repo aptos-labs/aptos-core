@@ -1,12 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    db_debugger::ShardingConfig, ledger_db::LedgerDb, state_merkle_db::StateMerkleDb,
-    STATE_MERKLE_DB_NAME,
-};
+use crate::{db_debugger::ShardingConfig, ledger_db::LedgerDb, state_merkle_db::StateMerkleDb};
 use anyhow::Result;
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_types::nibble::{nibble_path::NibblePath, Nibble};
 use clap::Parser;
 use core::default::Default;
@@ -16,6 +13,7 @@ pub const PAGE_SIZE: usize = 10;
 
 #[derive(Parser, Clone)]
 pub struct DbDir {
+    // TODO(grao): Support path override here.
     #[clap(long, value_parser)]
     db_dir: PathBuf,
 
@@ -26,7 +24,7 @@ pub struct DbDir {
 impl DbDir {
     pub fn open_state_merkle_db(&self) -> Result<StateMerkleDb> {
         StateMerkleDb::new(
-            self.db_dir.join(STATE_MERKLE_DB_NAME).as_path(),
+            &StorageDirPaths::from_path(&self.db_dir),
             RocksdbConfigs {
                 enable_storage_sharding: self.sharding_config.enable_storage_sharding,
                 ..Default::default()

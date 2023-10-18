@@ -11,11 +11,14 @@ use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_state_view::StateView;
 use aptos_storage_interface::{
-    cached_state_view::CachedStateView, state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter,
+    cached_state_view::{CachedStateView, ShardedStateCache},
+    state_delta::StateDelta,
+    DbReader, DbReaderWriter, DbWriter,
 };
 use aptos_types::{
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
     ledger_info::LedgerInfoWithSignatures,
+    state_store::ShardedStateUpdates,
     test_helpers::transaction_test_helpers::BLOCK_GAS_LIMIT,
     transaction::{
         signature_verified_transaction::{
@@ -120,6 +123,8 @@ impl DbWriter for FakeDb {
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         _sync_commit: bool,
         _in_memory_state: StateDelta,
+        _block_state_updates: Option<ShardedStateUpdates>,
+        _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         Ok(())
     }

@@ -14,6 +14,7 @@ pub(crate) struct PinExeThreadsToCoresThreadManager {
     non_exe_threads: ThreadPool,
     high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
+    background_threads: ThreadPool,
 }
 
 impl PinExeThreadsToCoresThreadManager {
@@ -54,11 +55,18 @@ impl PinExeThreadsToCoresThreadManager {
             pin_cpu_set(non_exe_cpu_set),
         );
 
+        let background_threads = spawn_rayon_thread_pool_with_start_hook(
+            "background".into(),
+            Some(32),
+            pin_cpu_set(non_exe_cpu_set),
+        );
+
         Self {
             exe_threads,
             non_exe_threads,
             high_pri_io_threads,
             io_threads,
+            background_threads,
         }
     }
 }
@@ -78,5 +86,9 @@ impl<'a> ThreadManager<'a> for PinExeThreadsToCoresThreadManager {
 
     fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool {
         &self.high_pri_io_threads
+    }
+
+    fn get_background_pool(&'a self) -> &'a ThreadPool {
+        &self.background_threads
     }
 }

@@ -56,11 +56,11 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
       # replay-verify config
-      BUCKET: aptos-testnet-backup-2223d95b
+      BUCKET: aptos-testnet-backup-b7b1ad7a
       SUB_DIR: e1
       HISTORY_START: 250000000 # TODO: We need an exhaustive list of txns_to_skip before we can set this to 0.
       TXNS_TO_SKIP: 46874937 151020059 409163615 409163669 409163708 409163774 409163845 409163955 409164059 409164191 414625832
-      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s5cmd-public.yaml
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 840
@@ -76,11 +76,11 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
       # replay-verify config
-      BUCKET: aptos-mainnet-backup-backup-831a69a8
+      BUCKET: aptos-mainnet-backup-backup-e098483d
       SUB_DIR: e1
       HISTORY_START: 0
       TXNS_TO_SKIP: 12253479 12277499 148358668
-      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s5cmd-public.yaml
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 300
@@ -93,11 +93,11 @@ jobs:
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
       # replay-verify config
-      BUCKET: aptos-testnet-backup-2223d95b
+      BUCKET: aptos-testnet-backup-b7b1ad7a
       SUB_DIR: e1
       HISTORY_START: 250000000 # TODO: We need an exhaustive list of txns_to_skip before we can set this to 0.
       TXNS_TO_SKIP: 46874937 151020059 409163615 409163669 409163708 409163774 409163845 409163955 409164059 409164191 414625832
-      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/s5cmd-public.yaml
+      BACKUP_CONFIG_TEMPLATE_PATH: terraform/helm/fullnode/files/backup/gcs.yaml
       # workflow config
       RUNS_ON: "high-perf-docker-with-local-ssd"
       TIMEOUT_MINUTES: 120 # increase test replay timeout to capture more flaky errors

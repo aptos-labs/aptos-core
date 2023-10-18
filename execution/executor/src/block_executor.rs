@@ -404,7 +404,7 @@ where
             APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
             let result_in_memory_state = block.output.state().clone();
-            self.db.writer.save_transaction_block(
+            self.db.writer.save_transactions(
                 txns_to_commit,
                 first_version,
                 committed_block.output.state().base_version,
@@ -419,9 +419,9 @@ where
                 block
                     .output
                     .get_ledger_update()
-                    .state_updates_before_last_checkpoint
+                    .state_updates_until_last_checkpoint
                     .clone(),
-                &block.output.get_ledger_update().sharded_state_cache,
+                Some(&block.output.get_ledger_update().sharded_state_cache),
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();

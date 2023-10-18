@@ -58,9 +58,7 @@ use aptos_types::{
     transaction::Version,
     write_set::{TransactionWrite, WriteSet},
 };
-use arr_macro::arr;
 use claims::{assert_ge, assert_le};
-use dashmap::DashMap;
 use rayon::prelude::*;
 use std::{collections::HashSet, ops::Deref, sync::Arc};
 
@@ -780,7 +778,7 @@ impl StateStore {
         let mut usage = self.get_usage(base_version)?;
         let base_version_usage = usage;
 
-        let mut state_cache_with_version = &arr![DashMap::new(); 16];
+        let mut state_cache_with_version = &ShardedStateCache::default();
         if let Some(base_version) = base_version {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["put_stats_and_indices__total_get"])
@@ -796,9 +794,9 @@ impl StateStore {
                     .flat_map(|sharded_states| sharded_states.iter().flatten())
                     .map(|(key, _)| key)
                     .collect::<HashSet<_>>();
-                THREAD_MANAGER.get_io_pool().scope(|s| {
+                THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
                     for key in key_set {
-                        let cache = &state_cache_with_version[key.get_shard_id() as usize];
+                        let cache = state_cache_with_version.shard(key.get_shard_id());
                         s.spawn(move |_| {
                             let _timer = OTHER_TIMERS_SECONDS
                                 .with_label_values(&["put_stats_and_indices__get_state_value"])
@@ -1108,7 +1106,7 @@ impl StateStore {
         base_version: Version,
         sharded_state_cache: &ShardedStateCache,
     ) -> Result<()> {
-        THREAD_MANAGER.get_io_pool().scope(|s| {
+        THREAD_MANAGER.get_high_pri_io_pool().scope(|s| {
             sharded_state_cache.par_iter().for_each(|shard| {
                 shard.iter_mut().for_each(|mut entry| {
                     match entry.value() {

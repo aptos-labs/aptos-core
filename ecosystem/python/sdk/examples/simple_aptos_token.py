@@ -133,7 +133,7 @@ async def main():
         + json.dumps({"address": str(collection_addr), **collection_data}, indent=4)
     )
 
-    token_addr: AccountAddress = minted_tokens[0]
+    token_addr = minted_tokens[0]
 
     # Check the owner
     # :!:>section_7

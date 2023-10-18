@@ -19,6 +19,10 @@ pub struct TransactionAccumulatorPruner {
 }
 
 impl DBSubPruner for TransactionAccumulatorPruner {
+    fn name(&self) -> &str {
+        "TransactionAccumulatorPruner"
+    }
+
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
         self.transaction_store.prune_transaction_accumulator(

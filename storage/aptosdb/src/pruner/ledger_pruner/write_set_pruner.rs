@@ -19,6 +19,10 @@ pub struct WriteSetPruner {
 }
 
 impl DBSubPruner for WriteSetPruner {
+    fn name(&self) -> &str {
+        "WriteSetPruner"
+    }
+
     fn prune(&self, current_progress: Version, target_version: Version) -> Result<()> {
         let batch = SchemaBatch::new();
         self.transaction_store

@@ -33,7 +33,7 @@ impl TransactionMetadata {
         Self {
             sender: txn.sender(),
             authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
-            secondary_signers: txn.authenticator().secondary_signer_addreses(),
+            secondary_signers: txn.authenticator().secondary_signer_addresses(),
             secondary_authentication_keys: txn
                 .authenticator()
                 .secondary_signers()

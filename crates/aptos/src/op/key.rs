@@ -4,8 +4,8 @@
 use crate::{
     common::{
         types::{
-            account_address_from_public_key, CliError, CliTypedResult, EncodingOptions,
-            EncodingType, KeyType, RngArgs, SaveFile,
+            account_address_from_public_key, CliError, CliTypedResult, EncodingOptions, KeyType,
+            RngArgs, SaveFile,
         },
         utils::{
             append_file_extension, check_if_file_exists, generate_vanity_account_ed25519,
@@ -15,7 +15,9 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_config::config::{Peer, PeerRole};
-use aptos_crypto::{bls12381, ed25519, x25519, PrivateKey, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381, ed25519, encoding_type::EncodingType, x25519, PrivateKey, ValidCryptoMaterial,
+};
 use aptos_genesis::config::HostAndPort;
 use aptos_types::account_address::{
     create_multisig_account_address, from_identity_public_key, AccountAddress,
@@ -146,8 +148,8 @@ impl NetworkKeyInputOptions {
     ) -> CliTypedResult<x25519::PublicKey> {
         // The grouping above prevents there from being more than one, but just in case
         match (self.public_network_key,  self.public_network_key_file, self.private_network_key, self.private_network_key_file){
-            (Some(public_network_key), None, None, None) => encoding.decode_key("--public-network-key", public_network_key.as_bytes().to_vec()),
-            (None, Some(public_network_key_file),None,  None) => encoding.load_key("--public-network-key-file", public_network_key_file.as_path()),
+            (Some(public_network_key), None, None, None) => Ok(encoding.decode_key("--public-network-key", public_network_key.as_bytes().to_vec())?),
+            (None, Some(public_network_key_file),None,  None) => Ok(encoding.load_key("--public-network-key-file", public_network_key_file.as_path())?),
             (None, None, Some(private_network_key),  None) => {
                 let private_network_key: x25519::PrivateKey = encoding.decode_key("--private-network-key", private_network_key.as_bytes().to_vec())?;
                 Ok(private_network_key.public_key())

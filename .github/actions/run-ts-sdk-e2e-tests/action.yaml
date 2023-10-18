@@ -53,8 +53,9 @@ runs:
       with:
         IMAGE_TAG: ${{ steps.get-docker-image-tag.outputs.IMAGE_TAG }}
         GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+        WITH_INDEXER_API: "true"
 
-    # Run the TS SDK tests.
+    # Run the non indexer TS SDK tests.
     - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
       name: sdk-pnpm-test
       env:
@@ -66,3 +67,17 @@ runs:
         max_attempts: 3
         timeout_minutes: 25
         command: cd ./ecosystem/typescript/sdk && pnpm run test:ci
+
+
+    # Run the indexer TS SDK tests.
+    - uses: nick-fields/retry@7f8f3d9f0f62fe5925341be21c2e8314fd4f7c7c # pin@v2
+      name: ts-sdk-indexer-test
+      env:
+        # This is important, it ensures that the tempdir we create for cloning the ANS
+        # repo and mounting it into the CLI container is created in a location that
+        # actually supports mounting. Learn more here: https://stackoverflow.com/a/76523941/3846032.
+        TMPDIR: ${{ runner.temp }}
+      with:
+        max_attempts: 3
+        timeout_minutes: 20
+        command: cd ./ecosystem/typescript/sdk && pnpm run test:indexer

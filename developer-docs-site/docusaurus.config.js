@@ -341,6 +341,14 @@ const config = {
             from: "/aptos-white-paper/aptos-white-paper-index/",
           },
           {
+            to: "/guides/local-development-network",
+            from: "/guides/local-testnet-dev-flow",
+          },
+          {
+            to: "/guides/local-development-network",
+            from: "/nodes/local-testnet/using-cli-to-run-a-local-testnet",
+          },
+          {
             to: "/guides/system-integrators-guide",
             from: "/guides/getting-started",
           },

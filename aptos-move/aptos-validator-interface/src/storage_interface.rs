@@ -5,8 +5,8 @@
 use crate::AptosValidatorInterface;
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::{
-    RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-    NO_OP_STORAGE_PRUNER_CONFIG,
+    RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+    DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::AptosDB;
 use aptos_storage_interface::{DbReader, MAX_REQUEST_LIMIT};
@@ -23,7 +23,7 @@ pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 impl DBDebuggerInterface {
     pub fn open<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
         Ok(Self(Arc::new(AptosDB::open(
-            db_root_path,
+            StorageDirPaths::from_path(db_root_path),
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),

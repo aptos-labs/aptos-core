@@ -3357,18 +3357,18 @@ whether the lockup expired on the stake pool.
     // unsynced are rewards and slashes routed exclusively <b>to</b>/out the <a href="stake.md#0x1_stake">stake</a> pool
 
     // operator `active` rewards not persisted yet <b>to</b> the active shares pool
-    <b>let</b> commission_active = total_coins(&pool.active_shares);
-    commission_active = <b>if</b> (active &gt; commission_active) {
-        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(active - commission_active, pool.operator_commission_percentage, <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>)
+    <b>let</b> pool_active = total_coins(&pool.active_shares);
+    <b>let</b> commission_active = <b>if</b> (active &gt; pool_active) {
+        <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(active - pool_active, pool.operator_commission_percentage, <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>)
     } <b>else</b> {
         // handle <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> slashing applied <b>to</b> `active` <a href="stake.md#0x1_stake">stake</a>
         0
     };
     // operator `pending_inactive` rewards not persisted yet <b>to</b> the pending_inactive shares pool
-    <b>let</b> commission_pending_inactive = total_coins(<a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool));
-    commission_pending_inactive = <b>if</b> (pending_inactive &gt; commission_pending_inactive) {
+    <b>let</b> pool_pending_inactive = total_coins(<a href="delegation_pool.md#0x1_delegation_pool_pending_inactive_shares_pool">pending_inactive_shares_pool</a>(pool));
+    <b>let</b> commission_pending_inactive = <b>if</b> (pending_inactive &gt; pool_pending_inactive) {
         <a href="../../aptos-stdlib/doc/math64.md#0x1_math64_mul_div">math64::mul_div</a>(
-            pending_inactive - commission_pending_inactive,
+            pending_inactive - pool_pending_inactive,
             pool.operator_commission_percentage,
             <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>
         )

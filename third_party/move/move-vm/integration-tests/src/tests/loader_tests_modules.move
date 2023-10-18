@@ -170,4 +170,13 @@ address 0x2 {
             another_b
         }
     }
+    module H {
+        struct S<phantom T> {
+            f1: u64,
+        }
+
+        struct F<phantom T> has copy{
+            f1: u64,
+        }
+    }
 }

@@ -59,7 +59,7 @@ where
 {
     let db = DbReaderWriter::new(
         AptosDB::open(
-            &config.storage.dir(),
+            config.storage.get_dir_paths(),
             false, /* readonly */
             config.storage.storage_pruner_config,
             config.storage.rocksdb_configs,

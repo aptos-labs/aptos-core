@@ -13,7 +13,7 @@ pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
     let executor = FakeExecutor::from_head_genesis().set_parallel();
 
     let mut harness = MoveHarness::new_with_executor(executor);
-    harness.enable_features(vec![FeatureFlag::AGGREGATOR_SNAPSHOTS], vec![]);
+    harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![]);
     let account = harness.new_account_at(AccountAddress::ONE);
     assert_success!(harness.publish_package_cache_building(&account, &path));
     (harness, account)

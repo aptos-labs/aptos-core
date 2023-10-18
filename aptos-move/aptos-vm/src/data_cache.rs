@@ -7,6 +7,7 @@ use crate::{
     aptos_vm_impl::gas_config,
     move_vm_ext::{
         get_max_binary_format_version, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
+        ResourceGroupResolver,
     },
 };
 #[allow(unused_imports)]
@@ -171,13 +172,37 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {
+impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
     fn release_resource_group_cache(
         &self,
     ) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
         self.resource_group_view.release_group_cache()
     }
+
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64> {
+        self.resource_group_view.resource_group_size(group_key)
+    }
+
+    fn resource_size_in_group(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> anyhow::Result<u64> {
+        self.resource_group_view
+            .resource_size_in_group(group_key, resource_tag)
+    }
+
+    fn resource_exists_in_group(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> anyhow::Result<bool> {
+        self.resource_group_view
+            .resource_exists_in_group(group_key, resource_tag)
+    }
 }
+
+impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
     fn get_resource_with_metadata(
@@ -313,5 +338,25 @@ impl<'e, E: ExecutorView> AsExecutorView for StorageAdapter<'e, E> {
 impl<'e, E> AsResourceGroupView for StorageAdapter<'e, E> {
     fn as_resource_group_view(&self) -> &dyn ResourceGroupView {
         &self.resource_group_view
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use aptos_vm_types::resource_group_adapter::GroupSizeKind;
+
+    // Expose a method to create a storage adapter with a provided group size kind.
+    pub(crate) fn as_resolver_with_group_size_kind<S: StateView>(
+        state_view: &S,
+        group_size_kind: GroupSizeKind,
+    ) -> StorageAdapter<S> {
+        let gas_feature_version = match group_size_kind {
+            GroupSizeKind::AsSum => 12,
+            GroupSizeKind::AsBlob => 10,
+            GroupSizeKind::None => 1,
+        };
+        let group_adapter = ResourceGroupAdapter::new(None, state_view, gas_feature_version);
+        StorageAdapter::new(state_view, 0, group_adapter)
     }
 }

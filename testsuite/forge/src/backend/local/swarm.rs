@@ -7,7 +7,6 @@ use crate::{
     SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos::common::types::EncodingType;
 use aptos_config::{
     config::{NetworkConfig, NodeConfig, OverrideNodeConfig, PersistableConfig},
     keys::ConfigKey,
@@ -20,7 +19,7 @@ use aptos_genesis::builder::{
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
-    crypto::ed25519::Ed25519PrivateKey,
+    crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType},
     types::{
         chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
         PeerId,

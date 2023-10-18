@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::aggr_overridden_state_view::TOTAL_SUPPLY_AGGR_BASE_VAL;
+use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_state_view::StateView;
 use aptos_types::{
     state_store::state_key::StateKey, transaction::TransactionOutput,
@@ -221,9 +222,10 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
                 for (round, txn_outputs) in shard_output.iter_mut().enumerate() {
                     let delta_for_round =
                         aggr_total_supply_delta_ref[round * num_shards + shard_id] + base_val_delta;
+                    let num_txn_outputs = txn_outputs.len();
                     txn_outputs
                         .par_iter_mut()
-                        .with_min_len(25)
+                        .with_min_len(optimal_min_len(num_txn_outputs, 32))
                         .for_each(|txn_output| {
                             if let Some(txn_total_supply) =
                                 txn_output.write_set().get_total_supply()
@@ -240,9 +242,10 @@ pub fn aggregate_and_update_total_supply<S: StateView>(
     let delta_for_global_shard = aggr_total_supply_delta[num_shards * num_rounds] + base_val_delta;
     let delta_for_global_shard_ref = &delta_for_global_shard;
     executor_thread_pool.scope(|_| {
+        let num_txn_outputs = global_output.len();
         global_output
             .par_iter_mut()
-            .with_min_len(25)
+            .with_min_len(optimal_min_len(num_txn_outputs, 32))
             .for_each(|txn_output| {
                 if let Some(txn_total_supply) = txn_output.write_set().get_total_supply() {
                     txn_output.update_total_supply(

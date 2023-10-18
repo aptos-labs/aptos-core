@@ -303,6 +303,9 @@ pub async fn start_poller(poller: DataSummaryPoller) {
             );
         }
 
+        // Update the logs and metrics for the peer request distributions
+        poller.data_client.update_peer_request_logs_and_metrics();
+
         // Determine the peers to poll this round. If the round is even, poll
         // the priority peers. Otherwise, poll the regular peers. This allows
         // us to alternate between peer types and load balance requests.

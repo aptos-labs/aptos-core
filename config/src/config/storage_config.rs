@@ -6,18 +6,75 @@ use crate::{
     config::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig},
     utils,
 };
+use anyhow::{ensure, Result};
 use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
+use arr_macro::arr;
+use number_range::NumberRangeOptions;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 // Lru cache will consume about 2G RAM based on this default value.
 pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
 
 pub const BUFFERED_STATE_TARGET_ITEMS: usize = 100_000;
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DbPathConfig {
+    pub ledger_db_path: Option<PathBuf>,
+    pub state_kv_db_path: Option<ShardedDbPathConfig>,
+    pub state_merkle_db_path: Option<ShardedDbPathConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ShardedDbPathConfig {
+    pub metadata_path: Option<PathBuf>,
+    pub shard_paths: Vec<ShardPathConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ShardPathConfig {
+    pub shards: String,
+    pub path: PathBuf,
+}
+
+impl ShardedDbPathConfig {
+    pub fn get_shard_paths(&self) -> Result<HashMap<u8, PathBuf>> {
+        let mut result = HashMap::new();
+        for shard_path in &self.shard_paths {
+            let shard_ids = NumberRangeOptions::<u8>::new()
+                .with_list_sep(',')
+                .with_range_sep('-')
+                .parse(shard_path.shards.as_str())?
+                .collect::<Vec<u8>>();
+            let path = &shard_path.path;
+            ensure!(
+                path.is_absolute(),
+                "Path ({path:?}) is not an absolute path."
+            );
+            for shard_id in shard_ids {
+                ensure!(
+                    shard_id < 16,
+                    "Shard id ({shard_id}) is out of range [0, 16)."
+                );
+                let exist = result.insert(shard_id, path.clone()).is_some();
+                ensure!(
+                    !exist,
+                    "Duplicated shard id ({shard_id}) is not allowed in the config."
+                );
+            }
+        }
+
+        Ok(result)
+    }
+}
 
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
@@ -113,6 +170,10 @@ pub struct StorageConfig {
     /// since genesis. To recover operation after data loss, or to bootstrap a node in fast sync
     /// mode, the indexer db needs to be copied in from another node.
     pub enable_indexer: bool,
+    /// Fine grained control for db paths of individal databases/shards.
+    /// If not specificed, will use `dir` as default.
+    /// Only allowed when sharding is enabled.
+    pub db_path_overrides: Option<DbPathConfig>,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
@@ -259,6 +320,7 @@ impl Default for StorageConfig {
             data_dir: PathBuf::from("/opt/aptos/data"),
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
+            db_path_overrides: None,
             buffered_state_target_items: BUFFERED_STATE_TARGET_ITEMS,
             max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         }
@@ -274,6 +336,32 @@ impl StorageConfig {
         }
     }
 
+    pub fn get_dir_paths(&self) -> StorageDirPaths {
+        let default_dir = self.dir();
+        let mut ledger_db_path = None;
+        let mut state_kv_db_paths = ShardedDbPaths::default();
+        let mut state_merkle_db_paths = ShardedDbPaths::default();
+
+        if let Some(db_path_overrides) = self.db_path_overrides.as_ref() {
+            ledger_db_path = db_path_overrides.ledger_db_path.clone();
+
+            if let Some(state_kv_db_path) = db_path_overrides.state_kv_db_path.as_ref() {
+                state_kv_db_paths = ShardedDbPaths::new(state_kv_db_path);
+            }
+
+            if let Some(state_merkle_db_path) = db_path_overrides.state_merkle_db_path.as_ref() {
+                state_merkle_db_paths = ShardedDbPaths::new(state_merkle_db_path);
+            }
+        }
+
+        StorageDirPaths::new(
+            default_dir,
+            ledger_db_path,
+            state_kv_db_paths,
+            state_merkle_db_paths,
+        )
+    }
+
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.data_dir = data_dir;
     }
@@ -281,6 +369,102 @@ impl StorageConfig {
     pub fn randomize_ports(&mut self) {
         self.backup_service_address
             .set_port(utils::get_available_port());
+    }
+}
+
+pub struct StorageDirPaths {
+    default_path: PathBuf,
+    ledger_db_path: Option<PathBuf>,
+    state_kv_db_paths: ShardedDbPaths,
+    state_merkle_db_paths: ShardedDbPaths,
+}
+
+impl StorageDirPaths {
+    pub fn default_root_path(&self) -> &PathBuf {
+        &self.default_path
+    }
+
+    pub fn ledger_db_root_path(&self) -> &PathBuf {
+        if let Some(ledger_db_path) = self.ledger_db_path.as_ref() {
+            ledger_db_path
+        } else {
+            &self.default_path
+        }
+    }
+
+    pub fn state_kv_db_metadata_root_path(&self) -> &PathBuf {
+        self.state_kv_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn state_kv_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+        self.state_kv_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn state_merkle_db_metadata_root_path(&self) -> &PathBuf {
+        self.state_merkle_db_paths
+            .metadata_path()
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn state_merkle_db_shard_root_path(&self, shard_id: u8) -> &PathBuf {
+        self.state_merkle_db_paths
+            .shard_path(shard_id)
+            .unwrap_or(&self.default_path)
+    }
+
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Self {
+        Self {
+            default_path: path.as_ref().to_path_buf(),
+            ledger_db_path: None,
+            state_kv_db_paths: Default::default(),
+            state_merkle_db_paths: Default::default(),
+        }
+    }
+
+    fn new(
+        default_path: PathBuf,
+        ledger_db_path: Option<PathBuf>,
+        state_kv_db_paths: ShardedDbPaths,
+        state_merkle_db_paths: ShardedDbPaths,
+    ) -> Self {
+        Self {
+            default_path,
+            ledger_db_path,
+            state_kv_db_paths,
+            state_merkle_db_paths,
+        }
+    }
+}
+
+#[derive(Default)]
+struct ShardedDbPaths {
+    metadata_path: Option<PathBuf>,
+    shard_paths: [Option<PathBuf>; 16],
+}
+
+impl ShardedDbPaths {
+    fn new(config: &ShardedDbPathConfig) -> Self {
+        let mut shard_paths = arr![None; 16];
+        for (shard_id, shard_path) in config.get_shard_paths().expect("Invalid config.") {
+            shard_paths[shard_id as usize] = Some(shard_path);
+        }
+
+        Self {
+            metadata_path: config.metadata_path.clone(),
+            shard_paths,
+        }
+    }
+
+    fn metadata_path(&self) -> Option<&PathBuf> {
+        self.metadata_path.as_ref()
+    }
+
+    fn shard_path(&self, shard_id: u8) -> Option<&PathBuf> {
+        self.shard_paths[shard_id as usize].as_ref()
     }
 }
 
@@ -332,13 +516,64 @@ impl ConfigSanitizer for StorageConfig {
             ));
         }
 
+        if let Some(db_path_overrides) = config.db_path_overrides.as_ref() {
+            if !config.rocksdb_configs.enable_storage_sharding {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "db_path_overrides is allowed only if sharding is enabled.".to_string(),
+                ));
+            }
+
+            if let Some(ledger_db_path) = db_path_overrides.ledger_db_path.as_ref() {
+                if !ledger_db_path.is_absolute() {
+                    return Err(Error::ConfigSanitizerFailed(
+                        sanitizer_name,
+                        "Path {ledger_db_path:?} in db_path_overrides is not an absolute path."
+                            .to_string(),
+                    ));
+                }
+            }
+
+            if let Some(state_kv_db_path) = db_path_overrides.state_kv_db_path.as_ref() {
+                if let Some(metadata_path) = state_kv_db_path.metadata_path.as_ref() {
+                    if !metadata_path.is_absolute() {
+                        return Err(Error::ConfigSanitizerFailed(
+                            sanitizer_name,
+                            "Path {metadata_path:?} in db_path_overrides is not an absolute path."
+                                .to_string(),
+                        ));
+                    }
+                }
+
+                if let Err(e) = state_kv_db_path.get_shard_paths() {
+                    return Err(Error::ConfigSanitizerFailed(sanitizer_name, e.to_string()));
+                }
+            }
+
+            if let Some(state_merkle_db_path) = db_path_overrides.state_merkle_db_path.as_ref() {
+                if let Some(metadata_path) = state_merkle_db_path.metadata_path.as_ref() {
+                    if !metadata_path.is_absolute() {
+                        return Err(Error::ConfigSanitizerFailed(
+                            sanitizer_name,
+                            "Path {metadata_path:?} in db_path_overrides is not an absolute path."
+                                .to_string(),
+                        ));
+                    }
+                }
+
+                if let Err(e) = state_merkle_db_path.get_shard_paths() {
+                    return Err(Error::ConfigSanitizerFailed(sanitizer_name, e.to_string()));
+                }
+            }
+        }
+
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::config::PrunerConfig;
+    use crate::config::{PrunerConfig, ShardPathConfig, ShardedDbPathConfig};
 
     #[test]
     pub fn test_default_prune_window() {
@@ -348,5 +583,70 @@ mod test {
         assert!(config.ledger_pruner_config.prune_window >= 50_000_000);
         assert!(config.state_merkle_pruner_config.prune_window >= 100_000);
         assert!(config.epoch_snapshot_pruner_config.prune_window > 50_000_000);
+    }
+
+    #[test]
+    pub fn test_sharded_db_path_config() {
+        let path_overrides = ShardedDbPathConfig {
+            metadata_path: Some("/disk0/db".into()),
+            shard_paths: vec![
+                ShardPathConfig {
+                    shards: "2-4".into(),
+                    path: "/disk1/db".into(),
+                },
+                ShardPathConfig {
+                    shards: "8,10-11".into(),
+                    path: "/disk2/db".into(),
+                },
+            ],
+        };
+
+        let shard_path_map = path_overrides.get_shard_paths().unwrap();
+        assert_eq!(shard_path_map.len(), 6);
+        assert_eq!(shard_path_map.get(&2), Some(&"/disk1/db".into()));
+        assert_eq!(shard_path_map.get(&3), Some(&"/disk1/db".into()));
+        assert_eq!(shard_path_map.get(&4), Some(&"/disk1/db".into()));
+        assert_eq!(shard_path_map.get(&8), Some(&"/disk2/db".into()));
+        assert_eq!(shard_path_map.get(&10), Some(&"/disk2/db".into()));
+        assert_eq!(shard_path_map.get(&11), Some(&"/disk2/db".into()));
+    }
+
+    #[test]
+    pub fn test_invalid_sharded_db_path_config() {
+        let path_overrides = ShardedDbPathConfig {
+            metadata_path: None,
+            shard_paths: vec![ShardPathConfig {
+                shards: "16".into(),
+                path: "/disk1/db".into(),
+            }],
+        };
+
+        assert!(path_overrides.get_shard_paths().is_err());
+
+        let path_overrides = ShardedDbPathConfig {
+            metadata_path: None,
+            shard_paths: vec![ShardPathConfig {
+                shards: "1".into(),
+                path: "db".into(),
+            }],
+        };
+
+        assert!(path_overrides.get_shard_paths().is_err());
+
+        let path_overrides = ShardedDbPathConfig {
+            metadata_path: None,
+            shard_paths: vec![
+                ShardPathConfig {
+                    shards: "12".into(),
+                    path: "/disk1/db".into(),
+                },
+                ShardPathConfig {
+                    shards: "11-13".into(),
+                    path: "/disk1/db".into(),
+                },
+            ],
+        };
+
+        assert!(path_overrides.get_shard_paths().is_err());
     }
 }

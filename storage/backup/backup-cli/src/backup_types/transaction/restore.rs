@@ -630,7 +630,7 @@ impl TransactionRestoreBatchController {
                         .start_timer();
                     tokio::task::spawn_blocking(move || {
                         let committed_chunk = chunk_replayer.commit()?;
-                        let v = committed_chunk.result_view.version().unwrap_or(0);
+                        let v = committed_chunk.result_state.current_version.unwrap_or(0);
                         let total_replayed = v - first_version + 1;
                         TRANSACTION_REPLAY_VERSION.set(v as i64);
                         info!(

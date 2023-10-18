@@ -147,7 +147,7 @@ impl AccountGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),

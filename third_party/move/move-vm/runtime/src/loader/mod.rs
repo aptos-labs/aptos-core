@@ -1542,22 +1542,12 @@ impl Script {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-            let struct_ = cache
+            cache
                 .resolve_struct_by_name(struct_name, &module_id)
+                .map_err(|err| err.finish(Location::Script))?
+                .check_compatibility(struct_handle)
                 .map_err(|err| err.finish(Location::Script))?;
-            if !struct_handle.abilities.is_subset(struct_.abilities)
-                || !struct_handle
-                    .type_parameters
-                    .iter()
-                    .map(|ty| ty.is_phantom)
-                    .eq(struct_.phantom_ty_args_mask.iter().cloned())
-            {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Ability definition of module mismatch".to_string())
-                        .finish(Location::Script),
-                );
-            }
+
             struct_names.push(Arc::new(StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),

@@ -11931,7 +11931,10 @@
             "$ref": "#/components/schemas/AccountSignature_MultiEd25519Signature"
           },
           {
-            "$ref": "#/components/schemas/AccountSignature_Secp256k1EcdsaSignature"
+            "$ref": "#/components/schemas/AccountSignature_SingleKeySignature"
+          },
+          {
+            "$ref": "#/components/schemas/AccountSignature_MultiKeySignature"
           }
         ],
         "discriminator": {
@@ -11939,7 +11942,8 @@
           "mapping": {
             "ed25519_signature": "#/components/schemas/AccountSignature_Ed25519Signature",
             "multi_ed25519_signature": "#/components/schemas/AccountSignature_MultiEd25519Signature",
-            "secp256k1_ecdsa_signature": "#/components/schemas/AccountSignature_Secp256k1EcdsaSignature"
+            "single_key_signature": "#/components/schemas/AccountSignature_SingleKeySignature",
+            "multi_key_signature": "#/components/schemas/AccountSignature_MultiKeySignature"
           }
         }
       },
@@ -11981,7 +11985,7 @@
           }
         ]
       },
-      "AccountSignature_Secp256k1EcdsaSignature": {
+      "AccountSignature_MultiKeySignature": {
         "allOf": [
           {
             "type": "object",
@@ -11991,12 +11995,31 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "secp256k1_ecdsa_signature"
+                "example": "multi_key_signature"
               }
             }
           },
           {
-            "$ref": "#/components/schemas/Secp256k1EcdsaSignature"
+            "$ref": "#/components/schemas/MultiKeySignature"
+          }
+        ]
+      },
+      "AccountSignature_SingleKeySignature": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "single_key_signature"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/SingleKeySignature"
           }
         ]
       },
@@ -12686,6 +12709,22 @@
           }
         }
       },
+      "IndexedSignature": {
+        "type": "object",
+        "required": [
+          "index",
+          "signature"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        }
+      },
       "ModuleBundlePayload": {
         "type": "object",
         "required": [
@@ -13081,6 +13120,33 @@
           }
         }
       },
+      "MultiKeySignature": {
+        "type": "object",
+        "description": "A multi key signature",
+        "required": [
+          "public_keys",
+          "signatures",
+          "signatures_required"
+        ],
+        "properties": {
+          "public_keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicKey"
+            }
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndexedSignature"
+            }
+          },
+          "signatures_required": {
+            "type": "integer",
+            "format": "uint8"
+          }
+        }
+      },
       "MultisigPayload": {
         "type": "object",
         "description": "A multisig transaction that allows an owner of a multisig account to execute a pre-approved\ntransaction as the multisig account.",
@@ -13143,6 +13209,43 @@
           }
         }
       },
+      "PublicKey": {
+        "type": "object",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+          },
+          {
+            "$ref": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "ed25519": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
+            "secp256k1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+          }
+        }
+      },
+      "PublicKey_string(HexEncodedBytes)": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "secp256k1_ecdsa"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        ]
+      },
       "RawTableItemRequest": {
         "type": "object",
         "description": "Table Item request for the GetTableItemRaw API",
@@ -13203,19 +13306,56 @@
           }
         }
       },
-      "Secp256k1EcdsaSignature": {
+      "Signature": {
         "type": "object",
-        "description": "A single Secp256k1Ecdsa signature",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/Signature_string(HexEncodedBytes)"
+          },
+          {
+            "$ref": "#/components/schemas/Signature_string(HexEncodedBytes)"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "ed25519": "#/components/schemas/Signature_string(HexEncodedBytes)",
+            "secp256k1_ecdsa": "#/components/schemas/Signature_string(HexEncodedBytes)"
+          }
+        }
+      },
+      "Signature_string(HexEncodedBytes)": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "secp256k1_ecdsa"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          }
+        ]
+      },
+      "SingleKeySignature": {
+        "type": "object",
+        "description": "A single key signature",
         "required": [
           "public_key",
           "signature"
         ],
         "properties": {
           "public_key": {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "$ref": "#/components/schemas/PublicKey"
           },
           "signature": {
-            "$ref": "#/components/schemas/HexEncodedBytes"
+            "$ref": "#/components/schemas/Signature"
           }
         }
       },
@@ -13488,7 +13628,7 @@
             "$ref": "#/components/schemas/TransactionSignature_FeePayerSignature"
           },
           {
-            "$ref": "#/components/schemas/TransactionSignature_Secp256k1EcdsaSignature"
+            "$ref": "#/components/schemas/TransactionSignature_AccountSignature"
           }
         ],
         "discriminator": {
@@ -13498,9 +13638,28 @@
             "multi_ed25519_signature": "#/components/schemas/TransactionSignature_MultiEd25519Signature",
             "multi_agent_signature": "#/components/schemas/TransactionSignature_MultiAgentSignature",
             "fee_payer_signature": "#/components/schemas/TransactionSignature_FeePayerSignature",
-            "secp256k1_ecdsa_signature": "#/components/schemas/TransactionSignature_Secp256k1EcdsaSignature"
+            "single_sender": "#/components/schemas/TransactionSignature_AccountSignature"
           }
         }
+      },
+      "TransactionSignature_AccountSignature": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "single_sender"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/AccountSignature"
+          }
+        ]
       },
       "TransactionSignature_Ed25519Signature": {
         "allOf": [
@@ -13575,25 +13734,6 @@
           },
           {
             "$ref": "#/components/schemas/MultiEd25519Signature"
-          }
-        ]
-      },
-      "TransactionSignature_Secp256k1EcdsaSignature": {
-        "allOf": [
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "example": "secp256k1_ecdsa_signature"
-              }
-            }
-          },
-          {
-            "$ref": "#/components/schemas/Secp256k1EcdsaSignature"
           }
         ]
       },

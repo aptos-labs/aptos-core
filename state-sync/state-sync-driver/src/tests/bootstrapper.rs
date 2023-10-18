@@ -1402,7 +1402,7 @@ fn manipulate_verified_epoch_states(
         verified_epoch_states.set_fetched_epoch_ending_ledger_infos();
     }
     if verified_waypoint {
-        verified_epoch_states.set_verified_waypoint();
+        verified_epoch_states.set_verified_waypoint(0);
     }
     if let Some(highest_version) = highest_version_to_insert {
         let epoch_ending_ledger_info = create_random_epoch_ending_ledger_info(highest_version, 0);

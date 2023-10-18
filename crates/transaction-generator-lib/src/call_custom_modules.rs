@@ -185,7 +185,7 @@ impl CustomModulesDelegationGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for CustomModulesDelegationGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(CustomModulesDelegationGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),

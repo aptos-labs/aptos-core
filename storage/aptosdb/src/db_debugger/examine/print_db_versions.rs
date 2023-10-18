@@ -21,7 +21,7 @@ use crate::{
     AptosDB,
 };
 use anyhow::Result;
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, ReadOptions, DB};
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -44,7 +44,7 @@ impl Cmd {
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &self.db_dir,
+            &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,

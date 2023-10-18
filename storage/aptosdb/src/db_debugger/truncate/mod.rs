@@ -18,7 +18,7 @@ use crate::{
     AptosDB, StateStore,
 };
 use anyhow::{ensure, Result};
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_schemadb::{ReadOptions, DB};
 use aptos_types::transaction::Version;
@@ -33,6 +33,7 @@ use std::{fs, path::PathBuf, sync::Arc};
         .args(&["backup_checkpoint_dir", "opt_out_backup_checkpoint"]),
 ))]
 pub struct Cmd {
+    // TODO(grao): Support db_path_overrides here.
     #[clap(long, value_parser)]
     db_dir: PathBuf,
 
@@ -77,7 +78,7 @@ impl Cmd {
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &self.db_dir,
+            &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             /*readonly=*/ false,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
@@ -240,7 +241,7 @@ mod test {
         utils::truncation_helper::num_frozen_nodes_in_accumulator,
         AptosDB, NUM_STATE_SHARDS,
     };
-    use aptos_storage_interface::{DbReader, DbWriter};
+    use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
     use proptest::prelude::*;
 
@@ -262,7 +263,14 @@ mod test {
             let mut version = 0;
             for (txns_to_commit, ledger_info_with_sigs) in input.0.iter() {
                 update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-                db.save_transactions(txns_to_commit, version, version.checked_sub(1), Some(ledger_info_with_sigs), true, in_memory_state.clone())
+                db.save_transactions_for_test(
+                    txns_to_commit,
+                    version,
+                    version.checked_sub(1),
+                    Some(ledger_info_with_sigs),
+                    true,
+                    in_memory_state.clone()
+                )
                     .unwrap();
                 version += txns_to_commit.len() as u64;
             }
@@ -306,7 +314,7 @@ mod test {
             drop(db);
 
             let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-                tmp_dir.path().to_path_buf(),
+                &StorageDirPaths::from_path(tmp_dir.path()),
                 RocksdbConfigs {
                     enable_storage_sharding: input.1,
                     ..Default::default()

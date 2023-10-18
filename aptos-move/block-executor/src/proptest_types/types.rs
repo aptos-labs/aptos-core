@@ -201,6 +201,10 @@ impl TransactionWrite for ValueType {
             None => StateValue::new_legacy(bytes),
         })
     }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        self.bytes = bytes.into();
+    }
 }
 
 #[derive(Clone, Copy)]

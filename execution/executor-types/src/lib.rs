@@ -49,7 +49,47 @@ pub mod state_checkpoint_output;
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
     /// are valid, executes them and returns the executed result for commit.
+    ///
+    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
+    ///       and pipe them up.
     fn execute_chunk(
+        &self,
+        txn_list_with_proof: TransactionListWithProof,
+        // Target LI that has been verified independently: the proofs are relative to this version.
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.enqueue_chunk_by_execution(txn_list_with_proof, verified_target_li, epoch_change_li)?;
+
+        self.update_ledger()
+    }
+
+    /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
+    /// outputs directly to get the executed result.
+    ///
+    /// TODO: Remove after all callsites split the execute / apply stage into two separate stages
+    ///       and pipe them up.
+    fn apply_chunk(
+        &self,
+        txn_output_list_with_proof: TransactionOutputListWithProof,
+        // Target LI that has been verified independently: the proofs are relative to this version.
+        verified_target_li: &LedgerInfoWithSignatures,
+        epoch_change_li: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        self.enqueue_chunk_by_transaction_outputs(
+            txn_output_list_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        )?;
+
+        self.update_ledger()
+    }
+
+    /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
+    /// are valid, executes them and make state checkpoint, so that a later chunk of transaction can
+    /// be applied on top of it. This stage calculates the state checkpoint, but not the top level
+    /// transaction accumulator.
+    fn enqueue_chunk_by_execution(
         &self,
         txn_list_with_proof: TransactionListWithProof,
         // Target LI that has been verified independently: the proofs are relative to this version.
@@ -57,15 +97,18 @@ pub trait ChunkExecutorTrait: Send + Sync {
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()>;
 
-    /// Similar to `execute_chunk`, but instead of executing transactions, apply the transaction
-    /// outputs directly to get the executed result.
-    fn apply_chunk(
+    /// Similar to `enqueue_chunk_by_execution`, but instead of executing transactions, apply the
+    /// transaction outputs directly to get the executed result.
+    fn enqueue_chunk_by_transaction_outputs(
         &self,
         txn_output_list_with_proof: TransactionOutputListWithProof,
         // Target LI that has been verified independently: the proofs are relative to this version.
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()>;
+
+    /// As a separate stage, calculate the transaction accumulator changes, prepare for db commission.
+    fn update_ledger(&self) -> Result<()>;
 
     /// Commit a previously executed chunk. Returns a chunk commit notification.
     fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
@@ -233,7 +276,7 @@ pub trait TransactionReplayer: Send {
         verify_execution_mode: &VerifyExecutionMode,
     ) -> Result<()>;
 
-    fn commit(&self) -> Result<Arc<ExecutedChunk>>;
+    fn commit(&self) -> Result<ExecutedChunk>;
 }
 
 /// A structure that holds relevant information about a chunk that was committed.

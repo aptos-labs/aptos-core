@@ -22,6 +22,7 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, nibble::nibble_path::NibblePath,
     state_store::state_key::StateKeyTag,
 };
+use arr_macro::arr;
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::HashMap;
 

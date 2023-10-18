@@ -15,6 +15,20 @@ spec aptos_framework::account {
         //ensures global<OriginatingAddress>(aptos_addr).address_map == table::new();
     }
 
+    /// Ensure that the account exists at the end of the call.
+    spec create_account_if_does_not_exist(account_address: address) {
+        let authentication_key = bcs::to_bytes(account_address);
+
+        aborts_if !exists<Account>(account_address) && (
+            account_address == @vm_reserved
+            || account_address == @aptos_framework
+            || account_address == @aptos_token
+            || !(len(authentication_key) == 32)
+        );
+        ensures exists<Account>(account_address);
+    }
+
+
     /// Check if the bytes of the new address is 32.
     /// The Account does not exist under the new address before creating the account.
     /// Limit the new account address is not @vm_reserved / @aptos_framework / @aptos_toke.

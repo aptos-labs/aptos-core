@@ -18,7 +18,7 @@ use aptos_api_types::{
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::error;
+use aptos_logger::{error, warn};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
@@ -205,27 +205,42 @@ impl Context {
             .map_err(|e| {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
-        let (oldest_version, oldest_block_event) = self
+
+        let (oldest_version, oldest_block_height, block_height) = match self
             .db
             .get_next_block_event(maybe_oldest_version)
-            .context("Failed to retrieve oldest block information")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
-        let (_, _, newest_block_event) = self
-            .db
-            .get_block_info_by_version(ledger_info.ledger_info().version())
-            .context("Failed to retrieve latest block information")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
+        {
+            Ok((version, oldest_block_event)) => {
+                let (_, _, newest_block_event) = self
+                    .db
+                    .get_block_info_by_version(ledger_info.ledger_info().version())
+                    .context("Failed to retrieve latest block information")
+                    .map_err(|e| {
+                        E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+                    })?;
+                (
+                    version,
+                    oldest_block_event.height(),
+                    newest_block_event.height(),
+                )
+            },
+            Err(err) => {
+                // when event index is disabled, we won't be able to search the NewBlock event stream.
+                // TODO(grao): evaluate adding dedicated block_height_by_version index
+                warn!(
+                    error = ?err,
+                    "Failed to query event indices, might be turned off. Ignoring.",
+                );
+                (maybe_oldest_version, 0, 0)
+            },
+        };
 
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
             oldest_version,
-            oldest_block_event.height(),
-            newest_block_event.height(),
+            oldest_block_height,
+            block_height,
         ))
     }
 

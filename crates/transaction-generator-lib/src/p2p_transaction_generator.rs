@@ -321,7 +321,7 @@ impl P2PTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         let rng = StdRng::from_entropy();
         let sampler: Box<dyn Sampler<AccountAddress>> = match self.sampling_mode {
             SamplingMode::Basic => Box::new(BasicSampler::new()),

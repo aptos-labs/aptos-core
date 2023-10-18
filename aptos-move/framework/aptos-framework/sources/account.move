@@ -173,6 +173,12 @@ module aptos_framework::account {
         });
     }
 
+    fun create_account_if_does_not_exist(account_address: address) {
+        if (!exists<Account>(account_address)) {
+            create_account(account_address);
+        }
+    }
+
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
     /// is returned. This way, the caller of this function can publish additional resources under
     /// `new_address`.

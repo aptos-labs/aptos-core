@@ -535,6 +535,9 @@ impl AptosVM {
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
+        for (key, group_write) in change_set.resource_group_write_set().iter() {
+            gas_meter.charge_io_gas_for_group_write(key, group_write)?;
+        }
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(
             &mut change_set,
@@ -1109,6 +1112,27 @@ impl AptosVM {
             session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
+        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
+            ..
+        } = &txn.authenticator_ref()
+        {
+            if self
+                .0
+                .get_features()
+                .is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+            {
+                if let Err(err) = session.execute_function_bypass_visibility(
+                    &ACCOUNT_MODULE,
+                    CREATE_ACCOUNT_IF_DOES_NOT_EXIST,
+                    vec![],
+                    serialize_values(&vec![MoveValue::Address(txn.sender())]),
+                    gas_meter,
+                ) {
+                    return discard_error_vm_status(err.into());
+                };
+            }
+        }
+
         let storage_gas_params = unwrap_or_discard!(self.0.get_storage_gas_parameters(log_context));
         let txn_data = TransactionMetadata::new(txn);
 
@@ -1301,7 +1325,7 @@ impl AptosVM {
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         for (state_key, group_write) in change_set.resource_group_write_set().iter() {
-            for tag in group_write.inner_ops.keys() {
+            for tag in group_write.inner_ops().keys() {
                 resource_group_view
                     .get_resource_from_group(state_key, tag, None)
                     .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1646,14 +1670,14 @@ impl VMValidator for AptosVM {
         if !self
             .0
             .get_features()
-            .is_enabled(FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR)
+            .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
         {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::Secp256k1Ecdsa{ .. } = transaction.authenticator_ref() {
+            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
                 return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
             }
         }
 
-        let txn = match Self::check_signature(transaction) {
+        let txn = match self.check_signature(transaction) {
             Ok(t) => t,
             _ => {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
@@ -1699,7 +1723,19 @@ impl VMAdapter for AptosVM {
         self.0.new_session(resolver, session_id)
     }
 
-    fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
+    fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
+        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
+            ..
+        } = &txn.authenticator_ref()
+        {
+            if self
+                .0
+                .get_features()
+                .is_enabled(FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL)
+            {
+                return txn.check_fee_payer_signature();
+            }
+        }
         txn.check_signature()
     }
 

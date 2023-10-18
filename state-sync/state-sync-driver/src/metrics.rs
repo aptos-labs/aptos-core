@@ -14,6 +14,7 @@ pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_noti
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
 pub const STORAGE_SYNCHRONIZER_APPLY_CHUNK: &str = "apply_chunk";
 pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
+pub const STORAGE_SYNCHRONIZER_UPDATE_LEDGER: &str = "update_ledger";
 pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 
 /// An enum representing the component currently executing

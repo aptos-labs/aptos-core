@@ -3,7 +3,7 @@
 
 use crate::AptosDB;
 use anyhow::{anyhow, Result};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
@@ -42,10 +42,9 @@ impl FastSyncStorageWrapper {
     /// If the db is empty and configured to do fast sync, we return a FastSyncStorageWrapper
     /// Otherwise, we returns AptosDB directly and the FastSyncStorageWrapper is None
     pub fn initialize_dbs(config: &NodeConfig) -> Result<Either<AptosDB, Self>> {
-        let mut db_dir = config.storage.dir();
         let db_main = AptosDB::open(
-            db_dir.as_path(),
-            false,
+            config.storage.get_dir_paths(),
+            /*readonly=*/ false,
             config.storage.storage_pruner_config,
             config.storage.rocksdb_configs,
             config.storage.enable_indexer,
@@ -54,6 +53,7 @@ impl FastSyncStorageWrapper {
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
 
+        let mut db_dir = config.storage.dir();
         // when the db is empty and configured to do fast sync, we will create a second DB
         if config
             .state_sync
@@ -64,8 +64,8 @@ impl FastSyncStorageWrapper {
         {
             db_dir.push(SECONDARY_DB_DIR);
             let secondary_db = AptosDB::open(
-                db_dir.as_path(),
-                false,
+                StorageDirPaths::from_path(db_dir.as_path()),
+                /*readonly=*/ false,
                 config.storage.storage_pruner_config,
                 config.storage.rocksdb_configs,
                 config.storage.enable_indexer,
@@ -162,6 +162,8 @@ impl DbWriter for FastSyncStorageWrapper {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         self.get_aptos_db_write_ref().save_transactions(
             txns_to_commit,
@@ -170,28 +172,7 @@ impl DbWriter for FastSyncStorageWrapper {
             ledger_info_with_sigs,
             sync_commit,
             latest_in_memory_state,
-        )
-    }
-
-    fn save_transaction_block(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        block_state_updates: ShardedStateUpdates,
-        sharded_state_cache: &ShardedStateCache,
-    ) -> Result<()> {
-        self.get_aptos_db_write_ref().save_transaction_block(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-            block_state_updates,
+            state_updates_until_last_checkpoint,
             sharded_state_cache,
         )
     }

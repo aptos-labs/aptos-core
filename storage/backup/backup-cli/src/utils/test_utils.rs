@@ -9,7 +9,6 @@ use aptos_db::{
     AptosDB,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_storage_interface::DbWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
@@ -40,7 +39,7 @@ pub fn tmp_db_with_random_content() -> (
     let blocks = ValueGenerator::new().generate(arb_blocks_to_commit());
     for (txns_to_commit, ledger_info_with_sigs) in &blocks {
         update_in_memory_state(&mut in_memory_state, txns_to_commit.as_slice());
-        db.save_transactions(
+        db.save_transactions_for_test(
             txns_to_commit,
             cur_ver, /* first_version */
             cur_ver.checked_sub(1),

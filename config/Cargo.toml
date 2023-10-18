@@ -22,6 +22,7 @@ aptos-secure-storage = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
+arr_macro = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 cfg-if = { workspace = true }
@@ -30,6 +31,7 @@ get_if_addrs = { workspace = true }
 maplit = { workspace = true }
 mirai-annotations = { workspace = true }
 num_cpus = { workspace = true }
+number_range = { workspace = true }
 poem-openapi = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

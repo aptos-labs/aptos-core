@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_generator::{AccountCache, AccountGenerator};
+use crate::{
+    account_generator::{AccountCache, AccountGenerator},
+    metrics::{NUM_TXNS, TIMER},
+};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
@@ -27,6 +30,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
+    cell::RefCell,
     collections::{BTreeMap, HashMap},
     fs::File,
     io::{Read, Write},
@@ -34,6 +38,7 @@ use std::{
     path::Path,
     sync::{mpsc, Arc},
 };
+use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
@@ -290,33 +295,44 @@ impl TransactionGenerator {
         &mut self,
         block_size: usize,
         num_blocks: usize,
-        mut transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
+        transaction_generator_creator: Box<dyn TransactionGeneratorCreator>,
         transactions_per_sender: usize,
     ) {
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
-        let mut transaction_generator =
-            transaction_generator_creator.create_transaction_generator();
+        let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
         for _ in 0..num_blocks {
-            let transactions: Vec<_> = rand::seq::index::sample(
+            let sender_indices = rand::seq::index::sample(
                 &mut thread_rng(),
                 account_pool_size,
                 num_senders_per_block,
             )
             .into_iter()
-            .flat_map(|idx| {
-                let sender = &self.main_signer_accounts.as_mut().unwrap().accounts[idx];
-                transaction_generator.generate_transactions(sender, transactions_per_sender)
-            })
-            .map(Transaction::UserTransaction)
-            .chain(once(Transaction::StateCheckpoint(HashValue::random())))
+            .flat_map(|sender_idx| vec![sender_idx; transactions_per_sender])
             .collect();
-
-            if let Some(sender) = &self.block_sender {
-                sender.send(transactions).unwrap();
-            }
+            self.generate_and_send_block(
+                self.main_signer_accounts.as_ref().unwrap(),
+                sender_indices,
+                |sender_idx, _| {
+                    let sender = &self.main_signer_accounts.as_ref().unwrap().accounts[sender_idx];
+                    let mut transaction_generator = transaction_generator
+                        .get_or(|| {
+                            RefCell::new(
+                                transaction_generator_creator.create_transaction_generator(),
+                            )
+                        })
+                        .borrow_mut();
+                    Transaction::UserTransaction(
+                        transaction_generator
+                            .generate_transactions(sender, 1)
+                            .pop()
+                            .unwrap(),
+                    )
+                },
+                |sender_idx| *sender_idx,
+            );
         }
     }
 
@@ -624,6 +640,7 @@ impl TransactionGenerator {
         F: Fn(T, &AccountCache) -> Transaction + Send + Sync,
         S: Fn(&T) -> usize,
     {
+        let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
         let block_size = inputs.len();
         let mut jobs = Vec::new();
         jobs.resize_with(self.num_workers, BTreeMap::new);
@@ -654,6 +671,10 @@ impl TransactionGenerator {
         }
 
         transactions.push(Transaction::StateCheckpoint(HashValue::random()));
+
+        NUM_TXNS
+            .with_label_values(&["generation_done"])
+            .inc_by(transactions.len() as u64);
 
         if let Some(sender) = &self.block_sender {
             sender.send(transactions).unwrap();

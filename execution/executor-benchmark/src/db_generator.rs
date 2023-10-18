@@ -5,7 +5,7 @@
 use crate::{add_accounts_impl, PipelineConfig};
 use aptos_config::{
     config::{
-        PrunerConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        PrunerConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     utils::get_genesis_txn,
@@ -67,7 +67,7 @@ fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, enable_storage_sharding: boo
     rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
     let (_db, db_rw) = DbReaderWriter::wrap(
         AptosDB::open(
-            &db_dir,
+            StorageDirPaths::from_path(db_dir),
             false, /* readonly */
             NO_OP_STORAGE_PRUNER_CONFIG,
             rocksdb_configs,

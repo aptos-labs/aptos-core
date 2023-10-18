@@ -207,6 +207,8 @@ pub trait TransactionWrite {
     fn is_deletion(&self) -> bool {
         self.bytes().is_none()
     }
+
+    fn set_bytes(&mut self, bytes: Bytes);
 }
 
 impl TransactionWrite for WriteOp {
@@ -235,6 +237,16 @@ impl TransactionWrite for WriteOp {
                 data: bytes,
                 metadata,
             },
+        }
+    }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        use WriteOp::*;
+
+        match self {
+            Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
+            Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
+            Deletion | DeletionWithMetadata { .. } => (),
         }
     }
 }

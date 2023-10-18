@@ -64,7 +64,7 @@ impl AccountsPoolWrapperCreator {
 }
 
 impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountsPoolWrapperGenerator::new(
             self.creator.create_transaction_generator(),
             self.accounts_pool.clone(),

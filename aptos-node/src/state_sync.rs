@@ -67,7 +67,7 @@ pub fn create_event_subscription_service(
         None
     };
 
-    let consensus_dkg_subscription = 
+    let consensus_dkg_subscription =
     if node_config.base.role.is_validator() {
         Some(
             event_subscription_service
@@ -94,6 +94,7 @@ pub fn start_state_sync_and_get_notification_handles(
     event_subscription_service: EventSubscriptionService,
     db_rw: DbReaderWriter,
 ) -> anyhow::Result<(
+    AptosDataClient,
     StateSyncRuntimes,
     MempoolNotificationListener,
     ConsensusNotifier,
@@ -149,7 +150,7 @@ pub fn start_state_sync_and_get_notification_handles(
         metadata_storage,
         consensus_listener,
         event_subscription_service,
-        aptos_data_client,
+        aptos_data_client.clone(),
         streaming_service_client,
         TimeService::real(),
     );
@@ -162,7 +163,12 @@ pub fn start_state_sync_and_get_notification_handles(
         streaming_service_runtime,
     );
 
-    Ok((state_sync_runtimes, mempool_listener, consensus_notifier))
+    Ok((
+        aptos_data_client,
+        state_sync_runtimes,
+        mempool_listener,
+        consensus_notifier,
+    ))
 }
 
 /// Sets up the data streaming service runtime

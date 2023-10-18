@@ -500,7 +500,7 @@ async fn construction_parse(
         let mut account_identifier_signers: Vec<_> =
             vec![AccountIdentifier::base_account(signed_txn.sender())];
 
-        for account in signed_txn.authenticator().secondary_signer_addreses() {
+        for account in signed_txn.authenticator().secondary_signer_addresses() {
             account_identifier_signers.push(AccountIdentifier::base_account(account))
         }
 
