@@ -137,6 +137,13 @@ impl RequestModerator {
         peer_network_id: &PeerNetworkId,
         request: &StorageServiceRequest,
     ) -> Result<(), Error> {
+        // Time the request validation
+        let _timer = metrics::start_timer(
+            &metrics::STORAGE_REQUEST_VALIDATION_LATENCY,
+            peer_network_id.network_id(),
+            request.get_label(),
+        );
+
         // If the peer is being ignored, return an error
         if let Some(peer_state) = self.unhealthy_peer_states.read().get(peer_network_id) {
             if peer_state.is_ignored() {
