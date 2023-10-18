@@ -263,7 +263,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        if let Some(write_op) = self
+        // TODO: resource_group_write_set also contains a layout. What to do with it?
+        if let Some((write_op, _layout)) = self
             .change_set
             .resource_group_write_set()
             .get(group_key)
@@ -426,6 +427,7 @@ mod test {
         let aggregator_v1_delta_set =
             HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
+        // TODO: Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = HashMap::from([
             (
                 key("resource_group_both"),
@@ -433,8 +435,14 @@ mod test {
                     WriteOp::Deletion,
                     0,
                     HashMap::from([
-                        (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
-                        (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
+                        (
+                            mock_tag_0(),
+                            (WriteOp::Modification(serialize(&1000).into()), None),
+                        ),
+                        (
+                            mock_tag_2(),
+                            (WriteOp::Modification(serialize(&300).into()), None),
+                        ),
                     ]),
                 ),
             ),
@@ -443,7 +451,10 @@ mod test {
                 GroupWrite::new(
                     WriteOp::Deletion,
                     0,
-                    HashMap::from([(mock_tag_1(), WriteOp::Modification(serialize(&5000).into()))]),
+                    HashMap::from([(
+                        mock_tag_1(),
+                        (WriteOp::Modification(serialize(&5000).into()), None),
+                    )]),
                 ),
             ),
         ]);

@@ -53,24 +53,6 @@ impl<'r> WriteOpConverter<'r> {
 
     convert_impl!(convert_aggregator, get_aggregator_v1_state_value_metadata);
 
-    pub(crate) fn convert_resource(
-        &self,
-        state_key: &StateKey,
-        move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
-        legacy_creation_as_modification: bool,
-    ) -> Result<(WriteOp, Option<Arc<MoveTypeLayout>>), VMStatus> {
-        let result = self.convert(
-            self.remote.get_resource_state_value_metadata(state_key),
-            move_storage_op.clone(),
-            legacy_creation_as_modification,
-        );
-        match move_storage_op {
-            MoveStorageOp::New((_, type_layout)) => Ok((result?, type_layout)),
-            MoveStorageOp::Modify((_, type_layout)) => Ok((result?, type_layout)),
-            MoveStorageOp::Delete => Ok((result?, None)),
-        }
-    }
-
     pub(crate) fn new(
         remote: &'r dyn AptosMoveResolver,
         is_storage_slot_metadata_enabled: bool,
@@ -87,6 +69,24 @@ impl<'r> WriteOpConverter<'r> {
         Self {
             remote,
             new_slot_metadata,
+        }
+    }
+
+    pub(crate) fn convert_resource(
+        &self,
+        state_key: &StateKey,
+        move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
+        legacy_creation_as_modification: bool,
+    ) -> Result<(WriteOp, Option<Arc<MoveTypeLayout>>), VMStatus> {
+        let result = self.convert(
+            self.remote.get_resource_state_value_metadata(state_key),
+            move_storage_op.clone(),
+            legacy_creation_as_modification,
+        );
+        match move_storage_op {
+            MoveStorageOp::New((_, type_layout)) => Ok((result?, type_layout)),
+            MoveStorageOp::Modify((_, type_layout)) => Ok((result?, type_layout)),
+            MoveStorageOp::Delete => Ok((result?, None)),
         }
     }
 
@@ -156,18 +156,18 @@ impl<'r> WriteOpConverter<'r> {
                     };
 
                     let (new_size, legacy_op) = match current_op {
-                        MoveStorageOp::Delete => (cur_size, WriteOp::Deletion),
-                        MoveStorageOp::Modify((new_data, _)) => (
+                        MoveStorageOp::Delete => (cur_size, (WriteOp::Deletion, None)),
+                        MoveStorageOp::Modify((new_data, maybe_layout)) => (
                             cur_size
                                 .checked_add(new_data.len() as u64 + tag_size)
                                 .ok_or_else(group_size_arithmetics_error)?,
-                            WriteOp::Modification(new_data),
+                            (WriteOp::Modification(new_data), maybe_layout),
                         ),
-                        MoveStorageOp::New((data, _)) => (
+                        MoveStorageOp::New((data, maybe_layout)) => (
                             cur_size
                                 .checked_add(data.len() as u64 + tag_size)
                                 .ok_or_else(group_size_arithmetics_error)?,
-                            WriteOp::Creation(data),
+                            (WriteOp::Creation(data), maybe_layout),
                         ),
                     };
                     inner_ops.insert(tag, legacy_op);
@@ -388,7 +388,7 @@ mod tests {
             resolver.resource_group_size(&key).unwrap(),
             expected_size as u64
         );
-
+        // TODO: Layout hardcoded to None. Test with layout = Some(..)
         let group_changes = HashMap::from([
             (mock_tag_0(), MoveStorageOp::Delete),
             (
@@ -412,11 +412,11 @@ mod tests {
         assert_eq!(group_write.inner_ops().len(), 2);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_0()),
-            &WriteOp::Deletion
+            &(WriteOp::Deletion, None)
         );
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
-            &WriteOp::Modification(vec![5, 5, 5, 5, 5].into())
+            &(WriteOp::Modification(vec![5, 5, 5, 5, 5].into()), None)
         );
     }
 
@@ -458,7 +458,7 @@ mod tests {
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
-            &WriteOp::Creation(vec![3, 3, 3].into())
+            &(WriteOp::Creation(vec![3, 3, 3].into()), None)
         );
     }
 
@@ -467,6 +467,7 @@ mod tests {
         let s = MockStateView::new(HashMap::new());
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
+        // TODO: Layout hardcoded to None. Test with layout = Some(..)
         let group_changes =
             HashMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
         let key = StateKey::raw(vec![0]);
@@ -484,7 +485,7 @@ mod tests {
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_1()),
-            &WriteOp::Creation(vec![2, 2].into())
+            &(WriteOp::Creation(vec![2, 2].into()), None)
         );
     }
 
