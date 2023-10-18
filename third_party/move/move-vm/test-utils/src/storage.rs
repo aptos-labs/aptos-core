@@ -46,16 +46,7 @@ impl ResourceResolver for BlankStorage {
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-        _layout: &MoveTypeLayout,
-    ) -> Result<(Option<Bytes>, usize)> {
-        Ok((None, 0))
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-        _metadata: &[Metadata],
+        _maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
@@ -67,15 +58,7 @@ impl TableResolver for BlankStorage {
         &self,
         _handle: &TableHandle,
         _key: &[u8],
-        _layout: &MoveTypeLayout,
-    ) -> Result<Option<Bytes>, Error> {
-        Ok(None)
-    }
-
-    fn resolve_table_entry_bytes(
-        &self,
-        _handle: &TableHandle,
-        _key: &[u8],
+        _maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
         Ok(None)
     }
@@ -111,7 +94,7 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         address: &AccountAddress,
         tag: &StructTag,
         metadata: &[Metadata],
-        layout: &MoveTypeLayout,
+        layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Bytes>, usize), Error> {
         if let Some(account_storage) = self.change_set.accounts().get(address) {
             if let Some(blob_opt) = account_storage.resources().get(tag) {
@@ -123,23 +106,6 @@ impl<'a, 'b, S: ResourceResolver> ResourceResolver for DeltaStorage<'a, 'b, S> {
         self.base
             .get_resource_bytes_with_metadata_and_layout(address, tag, metadata, layout)
     }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> Result<(Option<Bytes>, usize)> {
-        if let Some(account_storage) = self.change_set.accounts().get(address) {
-            if let Some(blob_opt) = account_storage.resources().get(tag) {
-                let buf = blob_opt.clone().ok();
-                let buf_size = resource_size(&buf);
-                return Ok((buf, buf_size));
-            }
-        }
-        self.base
-            .get_resource_bytes_with_metadata(address, tag, metadata)
-    }
 }
 
 #[cfg(feature = "table-extension")]
@@ -148,20 +114,11 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-        layout: &MoveTypeLayout,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
         // TODO: In addition to `change_set`, cache table outputs.
         self.base
-            .resolve_table_entry_bytes_with_layout(handle, key, layout)
-    }
-
-    fn resolve_table_entry_bytes(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> Result<Option<Bytes>, Error> {
-        // TODO: In addition to `change_set`, cache table outputs.
-        self.base.resolve_table_entry_bytes(handle, key)
+            .resolve_table_entry_bytes_with_layout(handle, key, maybe_layout)
     }
 }
 
@@ -350,11 +307,12 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceResolver for InMemoryStorage {
-    fn get_resource_bytes_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         tag: &StructTag,
         _metadata: &[Metadata],
+        _maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize)> {
         if let Some(account_storage) = self.accounts.get(address) {
             let buf = account_storage.resources.get(tag).cloned();
@@ -371,16 +329,8 @@ impl TableResolver for InMemoryStorage {
         &self,
         handle: &TableHandle,
         key: &[u8],
-        _layout: &MoveTypeLayout,
+        _maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
-        self.resolve_table_entry_bytes(handle, key)
-    }
-
-    fn resolve_table_entry_bytes(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> std::result::Result<Option<Bytes>, Error> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
     }
 }

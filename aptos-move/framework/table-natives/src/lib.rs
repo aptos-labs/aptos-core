@@ -217,19 +217,17 @@ impl Table {
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
-                let resolved_data = if self.value_layout_info.has_aggregator_lifting {
-                    // There is an aggregator lifting: need to pass layout to ensure
-                    // it gets recorded.
-                    context.resolver.resolve_table_entry_bytes_with_layout(
-                        &self.handle,
-                        entry.key(),
-                        &self.value_layout_info.layout,
-                    )
-                } else {
-                    context
-                        .resolver
-                        .resolve_table_entry_bytes(&self.handle, entry.key())
-                };
+                // If there is an aggregator lifting: need to pass layout to ensure
+                // it gets recorded.
+                let resolved_data = context.resolver.resolve_table_entry_bytes_with_layout(
+                    &self.handle,
+                    entry.key(),
+                    if self.value_layout_info.has_aggregator_lifting {
+                        Some(&self.value_layout_info.layout)
+                    } else {
+                        None
+                    },
+                );
                 let data = resolved_data.map_err(|err| {
                     partial_extension_error(format!("remote table resolver failure: {}", err))
                 })?;

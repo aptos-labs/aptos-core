@@ -210,25 +210,14 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
-    // TODO - merge into one function with optional layout
-
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        layout: &MoveTypeLayout,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, Some(layout))?)
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        struct_tag: &StructTag,
-        metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, None)?)
+        Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)?)
     }
 }
 
@@ -264,21 +253,12 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-        layout: &MoveTypeLayout,
+        layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
         self.executor_view.get_resource_bytes(
             &StateKey::table_item((*handle).into(), key.to_vec()),
-            Some(layout),
+            layout,
         )
-    }
-
-    fn resolve_table_entry_bytes(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> Result<Option<Bytes>, Error> {
-        self.executor_view
-            .get_resource_bytes(&StateKey::table_item((*handle).into(), key.to_vec()), None)
     }
 }
 

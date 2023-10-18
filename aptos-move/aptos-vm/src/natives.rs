@@ -87,15 +87,7 @@ impl TableResolver for AptosBlankStorage {
         &self,
         _handle: &TableHandle,
         _key: &[u8],
-        _layout: &MoveTypeLayout,
-    ) -> Result<Option<Bytes>, Error> {
-        Ok(None)
-    }
-
-    fn resolve_table_entry_bytes(
-        &self,
-        _handle: &TableHandle,
-        _key: &[u8],
+        _layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
         Ok(None)
     }
