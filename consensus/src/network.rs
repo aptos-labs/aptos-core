@@ -7,7 +7,7 @@ use crate::{
     counters,
     dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
     experimental::commit_reliable_broadcast::CommitMessage,
-    logging::{LogEvent, LogSchema},
+    logging::LogEvent,
     monitor,
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
@@ -640,12 +640,6 @@ impl NetworkTask {
                                 observe_block(
                                     proposal.proposal().timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED,
-                                );
-                                info!(
-                                    LogSchema::new(LogEvent::NetworkReceiveProposal)
-                                        .remote_peer(peer_id),
-                                    block_round = proposal.proposal().round(),
-                                    block_hash = proposal.proposal().id(),
                                 );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);

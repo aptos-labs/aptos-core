@@ -114,8 +114,8 @@ impl NodeSetup {
         RoundState::new(time_interval, time_service, round_timeout_sender)
     }
 
-    fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {
-        Arc::new(RotatingProposer::new(proposers, 1))
+    fn create_proposer_election(proposers: Vec<Author>) -> Box<dyn ProposerElection + Send + Sync> {
+        Box::new(RotatingProposer::new(proposers, 1))
     }
 
     fn create_nodes(
@@ -1683,11 +1683,11 @@ pub fn forking_retrieval_test() {
 
         println!("Process all local timeouts");
         for node in nodes.iter_mut() {
-            println!("Timeouts on {}", node.id);
+            info!("Timeouts on {}", node.id);
             for i in 0..timeout_votes {
-                println!("Timeout {} on {}", i, node.id);
+                info!("Timeout {} on {}", i, node.id);
                 if node.id == forking_node && (2..4).contains(&i) {
-                    println!("Got {}", node.next_commit_decision().await);
+                    info!("Got {}", node.next_commit_decision().await);
                 }
 
                 let vote_msg_on_timeout = node.next_vote().await;
@@ -1714,7 +1714,7 @@ pub fn forking_retrieval_test() {
             assert!(vote_msg_on_timeout.vote().is_timeout());
         }
 
-        println!("Got {}", nodes[forking_node].next_commit_decision().await);
+        info!("Got {}", nodes[forking_node].next_commit_decision().await);
     });
 
     info!("Create forked block");

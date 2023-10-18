@@ -176,7 +176,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     let round_state = create_round_state();
 
     // TODO: have two different nodes, one for proposing, one for accepting a proposal
-    let proposer_election = Arc::new(RotatingProposer::new(vec![signer.author()], 1));
+    let proposer_election = Box::new(RotatingProposer::new(vec![signer.author()], 1));
 
     let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
