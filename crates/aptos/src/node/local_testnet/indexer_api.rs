@@ -8,7 +8,7 @@ use super::{
     RunLocalTestnet,
 };
 use crate::node::local_testnet::utils::{
-    get_docker, setup_docker_logging, KillContainerShutdownStep,
+    get_docker, setup_docker_logging, StopContainerShutdownStep,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -205,14 +205,14 @@ impl ServiceManager for IndexerApiManager {
 
         let id = docker.create_container(options, config).await?.id;
 
-        info!("Created container with this ID: {}", id);
+        info!("Created container for indexer API with this ID: {}", id);
 
         docker
             .start_container(&id, None::<StartContainerOptions<&str>>)
             .await
             .context("Failed to start indexer API container")?;
 
-        info!("Started container {}", id);
+        info!("Started indexer API container {}", id);
 
         // Wait for the container to stop (which it shouldn't).
         let wait = docker
@@ -262,9 +262,9 @@ impl ServiceManager for IndexerApiManager {
     fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
         // Unfortunately the Hasura container does not shut down when the CLI does and
         // there doesn't seem to be a good way to make it do so. To work around this,
-        // we register a step that will delete the container on shutdown.
+        // we register a step that will stop the container on shutdown.
         // Read more here: https://stackoverflow.com/q/77171786/3846032.
-        vec![Box::new(KillContainerShutdownStep::new(
+        vec![Box::new(StopContainerShutdownStep::new(
             INDEXER_API_CONTAINER_NAME,
         ))]
     }

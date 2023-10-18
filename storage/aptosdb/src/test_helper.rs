@@ -17,6 +17,7 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
+    state_store::create_empty_sharded_state_updates,
 };
 use proptest::{collection::vec, prelude::*, sample::Index};
 use std::fmt::Debug;

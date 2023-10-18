@@ -28,7 +28,9 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
                     address = address.to_string(),
                     "[Indexer Cache] Connected to indexer gRPC server."
                 );
-                Ok(client)
+                Ok(client
+                    .max_decoding_message_size(usize::MAX)
+                    .max_encoding_message_size(usize::MAX))
             },
             Err(e) => {
                 tracing::error!(

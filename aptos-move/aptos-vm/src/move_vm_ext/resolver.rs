@@ -16,6 +16,7 @@ use std::collections::{BTreeMap, HashMap};
 /// MoveResolver implements ResourceResolver and ModuleResolver
 pub trait AptosMoveResolver:
     AggregatorResolver
+    + ResourceGroupResolver
     + ConfigStorage
     + MoveResolver
     + TableResolver
@@ -24,8 +25,25 @@ pub trait AptosMoveResolver:
     + AsExecutorView
     + AsResourceGroupView
 {
+}
+
+pub trait ResourceGroupResolver {
     fn release_resource_group_cache(&self)
         -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>;
+
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64>;
+
+    fn resource_size_in_group(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> anyhow::Result<u64>;
+
+    fn resource_exists_in_group(
+        &self,
+        group_key: &StateKey,
+        resource_tag: &StructTag,
+    ) -> anyhow::Result<bool>;
 }
 
 pub trait AsExecutorView {

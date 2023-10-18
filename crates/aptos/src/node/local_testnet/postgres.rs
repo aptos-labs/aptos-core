@@ -8,7 +8,7 @@ use super::{
     RunLocalTestnet,
 };
 use crate::node::local_testnet::utils::{
-    get_docker, setup_docker_logging, KillContainerShutdownStep,
+    get_docker, setup_docker_logging, StopContainerShutdownStep,
 };
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -25,6 +25,7 @@ use tracing::{info, warn};
 
 const POSTGRES_CONTAINER_NAME: &str = "local-testnet-postgres";
 const POSTGRES_IMAGE: &str = "postgres:14.9";
+const DATA_PATH_IN_CONTAINER: &str = "/var/lib/mydata";
 const POSTGRES_DEFAULT_PORT: u16 = 5432;
 
 /// Args related to running postgres in the local testnet.
@@ -154,21 +155,22 @@ impl ServiceManager for PostgresManager {
     }
 
     async fn pre_run(&self) -> Result<()> {
-        if self.force_restart {
-            if self.args.use_host_postgres {
+        if self.args.use_host_postgres {
+            if self.force_restart {
                 // If we're using a DB outside of Docker, drop and recreate the database.
                 self.recreate_host_database().await?;
-            } else {
-                // Kill any existing container we find.
-                delete_container(POSTGRES_CONTAINER_NAME).await?;
             }
+        } else {
+            // Kill any existing container we find.
+            delete_container(POSTGRES_CONTAINER_NAME).await?;
+
+            // Confirm Docker is available.
+            confirm_docker_available().await?;
+
+            // Pull the image here so it is not subject to the startup timeout for
+            // `run_service`.
+            pull_docker_image(POSTGRES_IMAGE).await?;
         }
-
-        // Confirm Docker is available.
-        confirm_docker_available().await?;
-
-        // Pull the image here so it is not subject to the 30 second startup timeout.
-        pull_docker_image(POSTGRES_IMAGE).await?;
 
         Ok(())
     }
@@ -206,6 +208,13 @@ impl ServiceManager for PostgresManager {
                     host_port: Some(port),
                 }]),
             }),
+            // We mount a directory into the container in which the DB will store its
+            // data.
+            binds: Some(vec![format!(
+                "{}:{}",
+                self.test_dir.join("postgres").join("data").display(),
+                DATA_PATH_IN_CONTAINER,
+            )]),
             ..Default::default()
         });
 
@@ -222,18 +231,31 @@ impl ServiceManager for PostgresManager {
                 "POSTGRES_HOST_AUTH_METHOD=trust".to_string(),
                 format!("POSTGRES_USER={}", self.args.postgres_user),
                 format!("POSTGRES_DB={}", self.args.postgres_database),
+                // This tells where postgres to store the DB data on disk. This is the
+                // directory inside the container that is mounted from the host system.
+                format!("PGDATA={}", DATA_PATH_IN_CONTAINER),
             ]),
             ..Default::default()
         };
 
+        info!("Starting postgres with this config: {:?}", config);
+
         let docker = get_docker()?;
 
-        let id = docker.create_container(options, config).await?.id;
+        let id = docker
+            .create_container(options, config)
+            .await
+            .context("Failed to create postgres container")?
+            .id;
+
+        info!("Created container for postgres with this ID: {}", id);
 
         docker
             .start_container(&id, None::<StartContainerOptions<&str>>)
             .await
             .context("Failed to start postgres container")?;
+
+        info!("Started postgres container {}", id);
 
         // Wait for the container to stop (which it shouldn't).
         let wait = docker
@@ -253,13 +275,15 @@ impl ServiceManager for PostgresManager {
     }
 
     fn get_shutdown_steps(&self) -> Vec<Box<dyn ShutdownStep>> {
-        // If --force-restart was set, shutdown the postgres container (if any).
-        if self.force_restart {
-            vec![Box::new(KillContainerShutdownStep::new(
+        if self.args.use_host_postgres {
+            vec![]
+        } else {
+            // Stop the container. Note, stopping and even deleting the container is
+            // fine because we store the data in a directory mounted in from the host
+            // system, so it will persist.
+            vec![Box::new(StopContainerShutdownStep::new(
                 POSTGRES_CONTAINER_NAME,
             ))]
-        } else {
-            vec![]
         }
     }
 }

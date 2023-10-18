@@ -18,6 +18,7 @@ aptos-gas-schedule = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
+bcs = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }

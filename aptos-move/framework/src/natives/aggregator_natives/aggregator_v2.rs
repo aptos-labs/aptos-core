@@ -48,7 +48,7 @@ fn native_create_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context.aggregator_snapshots_enabled() {
+    if !context.aggregator_v2_api_enabled() {
         return Err(SafeNativeError::Abort {
             abort_code: EAGGREGATOR_SNAPSHOTS_NOT_ENABLED,
         });

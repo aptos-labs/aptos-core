@@ -241,15 +241,22 @@ module std::features {
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
 
-    /// Whether the aggregator snapshots feature is enabled.
+    /// Whether the Aggregator V2 API feature is enabled.
+    /// Once enabled, the functions from aggregator_v2.move will be available for use.
     /// Lifetime: transient
-    const AGGREGATOR_SNAPSHOTS: u64 = 30;
+    const AGGREGATOR_V2_API: u64 = 30;
 
-    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_SNAPSHOTS }
+    public fun get_aggregator_v2_api_feature(): u64 { AGGREGATOR_V2_API }
 
-    public fun aggregator_snapshots_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_SNAPSHOTS)
+    public fun aggregator_v2_api_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_API)
     }
+
+    const SAFER_RESOURCE_GROUPS: u64 = 31;
+
+    const SAFER_METADATA: u64 = 32;
+
+    const SECP256K1_ECDSA_AUTHENTICATOR: u64 = 33;
 
     /// Whether the automatic creation of accounts is enabled for sponsored transactions.
     /// Lifetime: transient
@@ -260,6 +267,25 @@ module std::features {
     public fun sponsored_automatic_account_creation_enabled(): bool acquires Features {
         is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
     }
+
+    const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
+
+    /// Whether the Aggregator V2 delayed fields feature is enabled.
+    /// Once enabled, Aggregator V2 functions become parallel.
+    /// Lifetime: transient
+    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
+
+    /// Whether enable TokenV2 collection creation and Fungible Asset creation
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_ASSETS: u64 = 37;
+
+    public fun get_concurrent_assets_feature(): u64 { CONCURRENT_ASSETS }
+
+    public fun concurrent_assets_enabled(): bool acquires Features {
+        is_enabled(CONCURRENT_ASSETS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
