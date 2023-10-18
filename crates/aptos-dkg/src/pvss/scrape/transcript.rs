@@ -60,6 +60,7 @@ impl TryFrom<&[u8]> for Transcript {
 }
 
 impl traits::Transcript for Transcript {
+    // TODO: remove scrape typedefs, so as to be able to macro things later
     type SecretSharingConfig = ThresholdConfig;
     type PublicParameters = scrape::PublicParameters;
     type SigningPubKey = bls12381::PublicKey;

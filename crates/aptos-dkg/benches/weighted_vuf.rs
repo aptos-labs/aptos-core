@@ -2,39 +2,33 @@
 
 use criterion::measurement::WallTime;
 use criterion::{
-    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, BenchmarkId,
-    Criterion, Throughput,
+    criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, Criterion,
 };
 use rand::rngs::ThreadRng;
 use rand::thread_rng;
-use std::ops::Mul;
 
-use aptos_dkg::constants::BEST_CASE_THRESHOLD;
 use aptos_dkg::pvss::test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux};
 use aptos_dkg::pvss::traits::{SecretSharingConfig, Transcript};
-use aptos_dkg::pvss::{das, Player, ThresholdConfig, WeightedConfig, WeightedTranscript};
-use aptos_dkg::utils::random::{random_g1_points, random_g2_points, random_scalars};
-use aptos_dkg::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
+use aptos_dkg::pvss::{das, scrape, Player, ThresholdConfig, WeightedConfig, WeightedTranscript};
+use aptos_dkg::weighted_vuf::gjm21_naive::GjmNaiveWVUF;
 use aptos_dkg::weighted_vuf::pinkas::PinkasWUF;
-use aptos_dkg::weighted_vuf::traits::WeightedUF;
+use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
 pub fn all_groups(c: &mut Criterion) {
-    let mut group = c.benchmark_group("vuf");
-    for t in [10, BEST_CASE_THRESHOLD] {
-        unoptimized_threshold_vuf_share_verification(t, &mut group);
-    }
+    let mut group = c.benchmark_group("das-pinkas-sk-in-g1-vuf");
+    wvuf_benches::<das::Transcript, PinkasWUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("das-pinkas-vuf");
-    wvuf_benches::<das::Transcript, PinkasWUF, WallTime>(&mut group);
+    let mut group = c.benchmark_group("scrape-gjm21-sk-in-g2-vuf");
+    wvuf_benches::<scrape::Transcript, GjmNaiveWVUF, WallTime>(&mut group);
     group.finish();
 }
 
 pub fn wvuf_benches<
     T: Transcript<SecretSharingConfig = ThresholdConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKeyShare = Vec<T::DealtPubKeyShare>,
         SecretKeyShare = Vec<T::DealtSecretKeyShare>,
@@ -43,7 +37,7 @@ pub fn wvuf_benches<
 >(
     group: &mut BenchmarkGroup<M>,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a T::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a T::PublicParameters>,
 {
     let mut rng = thread_rng();
 
@@ -64,7 +58,7 @@ pub fn wvuf_benches<
             &mut rng,
         );
 
-        let vuf_pp = WUF::PublicParameters::from(&pvss_pp);
+        let vuf_pp = WVUF::PublicParameters::from(&pvss_pp);
 
         let mut sks = vec![];
         let mut pks = vec![];
@@ -78,10 +72,10 @@ pub fn wvuf_benches<
         for i in 0..wc.get_total_num_players() {
             let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(i), &dks[i]);
 
-            let (ask, apk) = WUF::augment_key_pair(&vuf_pp, sk.clone(), pk.clone(), &mut rng);
+            let (ask, apk) = WVUF::augment_key_pair(&vuf_pp, sk.clone(), pk.clone(), &mut rng);
             sks.push(sk);
             pks.push(pk);
-            deltas.push(WUF::get_public_delta(&apk).clone());
+            deltas.push(WVUF::get_public_delta(&apk).clone());
             asks.push(ask);
             apks.push(apk);
         }
@@ -91,28 +85,28 @@ pub fn wvuf_benches<
 
     for (wc, vuf_pp, sk, sks, pks, asks, apks, deltas) in bench_cases {
         // TODO: smallest weight player and largest weight player
-        wvuf_augment_random_keypair::<WeightedTranscript<T>, WUF, ThreadRng, M>(
+        wvuf_augment_random_keypair::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &sks, &pks, group, &mut rng,
         );
 
         // TODO: pick smallest weight player and largest weight player
         // TODO: benchmark augmenting all pubkeys too
-        wvuf_augment_random_pubkey::<WeightedTranscript<T>, WUF, ThreadRng, M>(
+        wvuf_augment_random_pubkey::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &pks, &deltas, group, &mut rng,
         );
 
-        wvuf_create_share::<WeightedTranscript<T>, WUF, ThreadRng, M>(&wc, &asks, group, &mut rng);
+        wvuf_create_share::<WeightedTranscript<T>, WVUF, ThreadRng, M>(&wc, &asks, group, &mut rng);
 
-        wvuf_verify_share::<WeightedTranscript<T>, WUF, ThreadRng, M>(
+        wvuf_verify_share::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &asks, &apks, group, &mut rng,
         );
 
         // TODO: pick worst subset and best subset
-        wvuf_aggregate_random_shares::<WeightedTranscript<T>, WUF, ThreadRng, M>(
+        wvuf_aggregate_random_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
             &wc, &asks, &apks, group, &mut rng,
         );
 
-        wvuf_eval::<WeightedTranscript<T>, WUF, M>(&wc, &sk, group);
+        wvuf_eval::<WeightedTranscript<T>, WVUF, M>(&wc, &sk, group);
 
         // TODO: derive_eval (needs create_proof)
 
@@ -122,7 +116,7 @@ pub fn wvuf_benches<
 
 fn wvuf_augment_random_keypair<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
@@ -132,13 +126,13 @@ fn wvuf_augment_random_keypair<
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfig,
-    vuf_pp: &WUF::PublicParameters,
+    vuf_pp: &WVUF::PublicParameters,
     sks: &Vec<WT::DealtSecretKeyShare>,
     pks: &Vec<WT::DealtPubKeyShare>,
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(format!("augment_keypair/{}", wc), move |b| {
         b.iter_with_setup(
@@ -147,14 +141,14 @@ fn wvuf_augment_random_keypair<
                 let id = wc.get_random_player(&mut thread_rng()).id;
                 (sks[id].clone(), pks[id].clone())
             },
-            |(sk, pk)| WUF::augment_key_pair(vuf_pp, sk, pk, rng),
+            |(sk, pk)| WVUF::augment_key_pair(vuf_pp, sk, pk, rng),
         )
     });
 }
 
 fn wvuf_augment_random_pubkey<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
@@ -164,13 +158,13 @@ fn wvuf_augment_random_pubkey<
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfig,
-    vuf_pp: &WUF::PublicParameters,
-    pks: &Vec<WUF::PubKeyShare>,
-    deltas: &Vec<WUF::Delta>,
+    vuf_pp: &WVUF::PublicParameters,
+    pks: &Vec<WVUF::PubKeyShare>,
+    deltas: &Vec<WVUF::Delta>,
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(format!("augment_pubkey/{}", wc), move |b| {
         b.iter_with_setup(
@@ -182,14 +176,14 @@ fn wvuf_augment_random_pubkey<
 
                 (pk, delta)
             },
-            |(pk, delta)| WUF::augment_pubkey(vuf_pp, pk, delta),
+            |(pk, delta)| WVUF::augment_pubkey(vuf_pp, pk, delta),
         )
     });
 }
 
 fn wvuf_create_share<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
@@ -198,11 +192,11 @@ fn wvuf_create_share<
     M: Measurement,
 >(
     wc: &WeightedConfig,
-    asks: &Vec<WUF::AugmentedSecretKeyShare>,
+    asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(format!("create_share/{}", wc), move |b| {
         b.iter_with_setup(
@@ -210,14 +204,14 @@ fn wvuf_create_share<
                 let player = wc.get_random_player(rng);
                 &asks[player.id]
             },
-            |ask| WUF::create_share(ask, BENCH_MSG),
+            |ask| WVUF::create_share(ask, BENCH_MSG),
         )
     });
 }
 
 fn wvuf_verify_share<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
@@ -226,13 +220,13 @@ fn wvuf_verify_share<
     M: Measurement,
 >(
     wc: &WeightedConfig,
-    vuf_pp: &WUF::PublicParameters,
-    asks: &Vec<WUF::AugmentedSecretKeyShare>,
-    apks: &Vec<WUF::AugmentedPubKeyShare>,
+    vuf_pp: &WVUF::PublicParameters,
+    asks: &Vec<WVUF::AugmentedSecretKeyShare>,
+    apks: &Vec<WVUF::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(format!("verify_share/{}", wc), move |b| {
         b.iter_with_setup(
@@ -240,16 +234,16 @@ fn wvuf_verify_share<
                 let player = wc.get_random_player(rng);
                 let ask = &asks[player.id];
 
-                (WUF::create_share(ask, BENCH_MSG), &apks[player.id])
+                (WVUF::create_share(ask, BENCH_MSG), &apks[player.id])
             },
-            |(proof, apk)| WUF::verify_share(vuf_pp, apk, BENCH_MSG, &proof),
+            |(proof, apk)| WVUF::verify_share(vuf_pp, apk, BENCH_MSG, &proof),
         )
     });
 }
 
 fn wvuf_aggregate_random_shares<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
@@ -259,12 +253,12 @@ fn wvuf_aggregate_random_shares<
 >(
     // For efficiency, we re-use the PVSS transcript
     wc: &WeightedConfig,
-    asks: &Vec<WUF::AugmentedSecretKeyShare>,
-    apks: &Vec<WUF::AugmentedPubKeyShare>,
+    asks: &Vec<WVUF::AugmentedSecretKeyShare>,
+    apks: &Vec<WVUF::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(format!("aggregate_shares/{}", wc), move |b| {
         b.iter_with_setup(
@@ -277,13 +271,13 @@ fn wvuf_aggregate_random_shares<
                         (
                             *p,
                             apks[p.id].clone(),
-                            WUF::create_share(&asks[p.id], BENCH_MSG),
+                            WVUF::create_share(&asks[p.id], BENCH_MSG),
                         )
                     })
-                    .collect::<Vec<(Player, WUF::AugmentedPubKeyShare, WUF::ProofShare)>>()
+                    .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>()
             },
             |apks_and_proofs| {
-                WUF::aggregate_shares(&wc, apks_and_proofs.as_slice());
+                WVUF::aggregate_shares(&wc, apks_and_proofs.as_slice());
             },
         )
     });
@@ -291,7 +285,7 @@ fn wvuf_aggregate_random_shares<
 
 fn wvuf_eval<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
@@ -299,57 +293,14 @@ fn wvuf_eval<
     M: Measurement,
 >(
     wc: &WeightedConfig,
-    sk: &WUF::SecretKey,
+    sk: &WVUF::SecretKey,
     group: &mut BenchmarkGroup<M>,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(format!("eval/{}", wc), move |b| {
-        b.iter_with_setup(|| {}, |_| WUF::eval(sk, BENCH_MSG))
+        b.iter_with_setup(|| {}, |_| WVUF::eval(sk, BENCH_MSG))
     });
-}
-
-fn unoptimized_threshold_vuf_share_verification<M: Measurement>(
-    t: usize,
-    g: &mut BenchmarkGroup<M>,
-) {
-    let mut rng = thread_rng();
-
-    g.throughput(Throughput::Elements(1u64));
-
-    g.bench_function(
-        BenchmarkId::new("unoptimized_threshold_vuf_share_verification", t),
-        move |b| {
-            b.iter_with_setup(
-                || {
-                    let g1 = random_g1_points(t + 3, &mut rng);
-                    let g2 = random_g2_points(t + 3, &mut rng);
-                    let a = random_scalars(t + 3, &mut rng);
-                    let b = random_scalars(3, &mut rng);
-                    let c = random_scalars(3, &mut rng);
-
-                    (g1, g2, a, b, c)
-                },
-                |(g1, g2, a, b, c)| {
-                    // 2 G_1 exps
-                    let _ = g1[0].mul(a[0]);
-                    let _ = g1[1].mul(a[1]);
-                    // size-3 multipairing
-                    multi_pairing(g1.iter().take(3), g2.iter().take(3));
-                    // size-4 multipairing
-                    multi_pairing(g1.iter().take(4), g2.iter().take(4));
-                    // 3 size-2 G_1 multiexps
-                    g1_multi_exp(&g1[0..2], &a[0..2]);
-                    g1_multi_exp(&g1[0..2], &b[0..2]);
-                    g1_multi_exp(&g1[0..2], &c[0..2]);
-                    // 1 size-t G_1 multiexp
-                    g1_multi_exp(&g1[0..t], &a[0..t]);
-                    // 1 size-t G_2 multiexp
-                    g2_multi_exp(&g2[0..t], &a[0..t]);
-                },
-            )
-        },
-    );
 }
 
 criterion_group!(

@@ -7,7 +7,7 @@ mod public_parameters;
 pub(crate) mod transcript;
 
 pub use low_degree_test::LowDegreeTest;
-use public_parameters::PublicParameters;
+pub use public_parameters::PublicParameters;
 pub use transcript::Transcript;
 
 pub const SCRAPE_SK_IN_G2: &'static str = "vanilla_scrape_sk_in_g2";

@@ -1,16 +1,33 @@
 use aptos_dkg::pvss;
 use aptos_dkg::pvss::test_utils::NoAux;
-use aptos_dkg::pvss::traits::{SecretSharingConfig, Transcript};
+use aptos_dkg::pvss::traits::{Convert, SecretSharingConfig, Transcript};
 use aptos_dkg::pvss::{test_utils, Player, ThresholdConfig, WeightedConfig, WeightedTranscript};
 use aptos_dkg::utils::random::random_scalar;
+use aptos_dkg::weighted_vuf::gjm21_naive::GjmNaiveWVUF;
 use aptos_dkg::weighted_vuf::pinkas::PinkasWUF;
-use aptos_dkg::weighted_vuf::traits::WeightedUF;
+use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use rand::rngs::StdRng;
 use rand::thread_rng;
 use rand_core::SeedableRng;
 
 #[test]
-fn weighted_vuf_bvt() {
+fn all_weighted_vuf_bvt() {
+    weighted_wvuf_bvt::<pvss::das::Transcript, PinkasWUF>();
+    weighted_wvuf_bvt::<pvss::scrape::Transcript, GjmNaiveWVUF>();
+}
+
+fn weighted_wvuf_bvt<
+    T: Transcript<SecretSharingConfig = ThresholdConfig>,
+    WVUF: WeightedVUF<
+        SecretKey = T::DealtSecretKey,
+        PubKey = T::DealtPubKey,
+        PubKeyShare = Vec<T::DealtPubKeyShare>,
+        SecretKeyShare = Vec<T::DealtSecretKeyShare>,
+    >,
+>()
+where
+    WVUF::PublicParameters: for<'a> From<&'a T::PublicParameters>,
+{
     let mut rng = thread_rng();
     let seed = random_scalar(&mut rng);
 
@@ -18,12 +35,10 @@ fn weighted_vuf_bvt() {
     let mut rng = StdRng::from_seed(seed.to_bytes_le());
 
     // TODO: add more weighted config cases
-    let (wc, pvss_pp, dks, sk, trx) = weighted_pvss::<pvss::das::Transcript>(&mut rng);
+    let (wc, pvss_pp, dks, sk, pk, trx) = weighted_pvss::<T>(&mut rng);
 
     // Test decrypting SK shares, creating VUF proof shares, and aggregating those shares into a VUF
-    wuf_aggregation_test::<pvss::das::Transcript, PinkasWUF, StdRng>(
-        &wc, &sk, &dks, &pvss_pp, &trx, &mut rng,
-    );
+    wvuf_aggregation_test::<T, WVUF, StdRng>(&wc, &sk, &pk, &dks, &pvss_pp, &trx, &mut rng);
 
     // TODO: Test verification of an aggregated VUF, if available
 
@@ -37,6 +52,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
     T::PublicParameters,
     Vec<T::DecryptPrivKey>,
     T::DealtSecretKey,
+    T::DealtPubKey,
     WeightedTranscript<T>,
 ) {
     let wc = WeightedConfig::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
@@ -55,10 +71,12 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
         &mut rng,
     );
 
+    let pk: <T as Transcript>::DealtPubKey = s.to(&pvss_pp);
+
     // Make sure the PVSS dealt correctly
     trx.verify(&wc, &pvss_pp, &vec![spks[0].clone()], &eks, &vec![NoAux])
         .expect("PVSS transcript failed verification");
-    (wc, pvss_pp, dks, sk, trx)
+    (wc, pvss_pp, dks, sk, pk, trx)
 }
 
 /// 1. Evaluates the VUF using the `sk` directly.
@@ -66,10 +84,11 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
 /// 3. Checks that the evaluation is the same as that from `sk`.
 ///
 /// `T` is a (non-weighted) `pvss::traits::Transcript` type.
-fn wuf_aggregation_test<
+fn wvuf_aggregation_test<
     T: Transcript<SecretSharingConfig = ThresholdConfig>,
-    WUF: WeightedUF<
+    WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
+        PubKey = T::DealtPubKey,
         PubKeyShare = Vec<T::DealtPubKeyShare>,
         SecretKeyShare = Vec<T::DealtSecretKeyShare>,
     >,
@@ -77,18 +96,19 @@ fn wuf_aggregation_test<
 >(
     wc: &WeightedConfig,
     sk: &T::DealtSecretKey,
+    pk: &T::DealtPubKey,
     dks: &Vec<T::DecryptPrivKey>,
     pvss_pp: &T::PublicParameters,
     trx: &WeightedTranscript<T>,
     rng: &mut R,
 ) where
-    WUF::PublicParameters: for<'a> From<&'a T::PublicParameters>,
+    WVUF::PublicParameters: for<'a> From<&'a T::PublicParameters>,
 {
     // Note: A WVUF scheme needs to implement conversion from all PVSS's public parameters to its own.
-    let vuf_pp = WUF::PublicParameters::from(&pvss_pp);
+    let vuf_pp = WVUF::PublicParameters::from(&pvss_pp);
 
     let msg = b"some msg";
-    let eval = WUF::eval(&sk, msg.as_slice());
+    let eval = WVUF::eval(&sk, msg.as_slice());
 
     let apks_and_proofs = wc
         .get_random_eligible_subset_of_players(rng)
@@ -96,25 +116,28 @@ fn wuf_aggregation_test<
         .map(|p| {
             let (sk, pk) = trx.decrypt_own_share(&wc, &p, &dks[p.get_id()]);
 
-            let (ask, apk) = WUF::augment_key_pair(&vuf_pp, sk, pk.clone(), rng);
+            let (ask, apk) = WVUF::augment_key_pair(&vuf_pp, sk, pk.clone(), rng);
 
             // Test that pubkey augmentation works
-            let delta = WUF::get_public_delta(&apk);
+            let delta = WVUF::get_public_delta(&apk);
             assert_eq!(
                 apk,
-                WUF::augment_pubkey(&vuf_pp, pk, delta.clone()).unwrap()
+                WVUF::augment_pubkey(&vuf_pp, pk, delta.clone()).unwrap()
             );
 
-            let proof = WUF::create_share(&ask, msg);
-            assert!(WUF::verify_share(&vuf_pp, &apk, msg, &proof).is_ok());
+            let proof = WVUF::create_share(&ask, msg);
+            WVUF::verify_share(&vuf_pp, &apk, msg, &proof).expect("WVUF proof share should verify");
 
             (p, apk, proof)
         })
-        .collect::<Vec<(Player, WUF::AugmentedPubKeyShare, WUF::ProofShare)>>();
+        .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>();
 
     // Aggregate the VUF from the subset of capable players
-    let proof = WUF::aggregate_shares(&wc, &apks_and_proofs);
-    let eval_aggr = WUF::derive_eval(msg, &proof);
+    let proof = WVUF::aggregate_shares(&wc, &apks_and_proofs);
+    let eval_aggr = WVUF::derive_eval(&vuf_pp, msg, &proof);
+
+    WVUF::verify_eval(&vuf_pp, pk, msg, &proof, &eval_aggr)
+        .expect("WVUF aggregated proof should verify");
 
     assert_eq!(eval_aggr, eval);
 }

@@ -5,7 +5,7 @@ use crate::pvss::traits::HasEncryptionPublicParams;
 use crate::pvss::{Player, WeightedConfig};
 use crate::utils::random::random_scalar;
 use crate::utils::{g1_multi_exp, g2_multi_exp, multi_pairing};
-use crate::weighted_vuf::traits::{VerifiableWUF, WeightedUF};
+use crate::weighted_vuf::traits::WeightedVUF;
 use anyhow::bail;
 use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
@@ -39,8 +39,9 @@ impl From<&pvss::das::PublicParameters> for PublicParameters {
 
 /// Implements the Pinkas weighted VUF scheme, compatible with *any* PVSS scheme with the right kind
 /// of secret key and public key.
-impl WeightedUF for PinkasWUF {
+impl WeightedVUF for PinkasWUF {
     type PublicParameters = PublicParameters;
+    type PubKey = pvss::dealt_pub_key::g2::DealtPubKey;
     type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
     type PubKeyShare = Vec<pvss::dealt_pub_key_share::g2::DealtPubKeyShare>;
     type SecretKeyShare = Vec<pvss::dealt_secret_key_share::g1::DealtSecretKeyShare>;
@@ -201,24 +202,23 @@ impl WeightedUF for PinkasWUF {
         pairing(&sk.as_group_element().to_affine(), &h)
     }
 
-    // NOTE: This VUF has the same evaluation as its proof
-    fn derive_eval(_msg: &[u8], proof: &Self::Proof) -> Self::Evaluation {
+    // NOTE: This VUF has the same evaluation as its proof.
+    fn derive_eval(
+        _pp: &Self::PublicParameters,
+        _msg: &[u8],
+        proof: &Self::Proof,
+    ) -> Self::Evaluation {
         *proof
     }
-}
 
-// TODO: remove
-impl VerifiableWUF for PinkasWUF {
-    type SecretKey = pvss::dealt_secret_key::g1::DealtSecretKey;
-    type PubKey = pvss::dealt_pub_key::g2::DealtPubKey;
-    type Proof = Self::Evaluation;
-    type Evaluation = Gt;
-
-    fn create_proof(_sk: &Self::SecretKey, _msg: &[u8]) -> Self::Proof {
-        Gt::identity()
+    // NOTE: Dummy implementation; this WUF is not actually WVUF.
+    fn create_proof(sk: &Self::SecretKey, msg: &[u8]) -> Self::Proof {
+        Self::eval(sk, msg)
     }
 
+    // NOTE: Dummy implementation; this WUF is not actually WVUF.
     fn verify_eval(
+        _pp: &Self::PublicParameters,
         _pk: &Self::PubKey,
         _msg: &[u8],
         _proof: &Self::Proof,

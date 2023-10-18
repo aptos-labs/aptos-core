@@ -7,8 +7,9 @@ use crate::pvss::{Player, WeightedConfig};
 use std::fmt::Debug;
 
 /// Weighted (not-verifiable) unpredictable function (WUF) traits.
-pub trait WeightedUF {
+pub trait WeightedVUF {
     type PublicParameters;
+    type PubKey;
     type SecretKey;
     type PubKeyShare: Clone;
     type SecretKeyShare;
@@ -57,20 +58,17 @@ pub trait WeightedUF {
     /// Used for testing only.
     fn eval(sk: &Self::SecretKey, msg: &[u8]) -> Self::Evaluation;
 
-    fn derive_eval(msg: &[u8], proof: &Self::Proof) -> Self::Evaluation;
-}
-
-/// Extends the `WUF` trait with publicy-verifiability of the aggregated proof and evaluation.
-pub trait VerifiableWUF {
-    type SecretKey;
-    type PubKey;
-    type Proof;
-    type Evaluation;
+    fn derive_eval(
+        pp: &Self::PublicParameters,
+        msg: &[u8],
+        proof: &Self::Proof,
+    ) -> Self::Evaluation;
 
     /// Used for testing only.
     fn create_proof(sk: &Self::SecretKey, msg: &[u8]) -> Self::Proof;
 
     fn verify_eval(
+        pp: &Self::PublicParameters,
         pk: &Self::PubKey,
         msg: &[u8],
         proof: &Self::Proof,
