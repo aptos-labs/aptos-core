@@ -1,14 +1,15 @@
 /// This module defines a struct storing the metadata of the block and new block events.
 module aptos_framework::block {
-    use std::config_for_next_epoch;
     use std::error;
     use std::features;
     use std::vector;
     use std::option;
 
     use aptos_framework::account;
+    use aptos_framework::dkg;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
+    use aptos_framework::reconfiguration_v2;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
@@ -153,9 +154,7 @@ module aptos_framework::block {
         state_storage::on_new_block(reconfiguration::current_epoch());
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
-            config_for_next_epoch::enable_extracts(&vm);
             reconfiguration::reconfigure();
-            config_for_next_epoch::disable_extracts(&vm);
         };
     }
 
@@ -171,7 +170,8 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        slow_reconfigure_params: vector<u8>,
+        dkg_result_available: bool,
+        dkg_result: vector<u8>,
     ) acquires BlockResource {
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
@@ -214,16 +214,16 @@ module aptos_framework::block {
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
-        state_storage::on_new_block(reconfiguration::current_epoch());
+        let cur_epoch = reconfiguration::current_epoch();
+        state_storage::on_new_block(cur_epoch);
 
-        if (reconfiguration::slow_reconfigure_in_progress()) {
-            if (timestamp >= reconfiguration::current_slow_reconfigure_deadline()) {
-                reconfiguration::abort_slow_reconfigure(&vm);
-            } else {
-                reconfiguration::update_slow_reconfigure(&vm, slow_reconfigure_params);
+        if (dkg::in_progress()) {
+            let should_proceed = dkg::update(dkg_result_available, dkg_result);
+            if (should_proceed) {
+                reconfiguration_v2::reconfigure(&vm);
             }
         } else if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
-            reconfiguration::start_slow_reconfigure(&vm);
+            dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
         };
     }
 

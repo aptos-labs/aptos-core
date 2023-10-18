@@ -77,6 +77,7 @@ return true.
 -  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
 -  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
+-  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
 -  [Function `apply_diff`](#0x1_features_apply_diff)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
@@ -1518,23 +1519,51 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
-    <b>if</b> (<a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>()) {
-        <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
-            <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_copied">config_for_next_epoch::copied</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()
-        } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-            *<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)
-        } <b>else</b> {
-            <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] }
-        };
-        <a href="features.md#0x1_features_apply_diff">apply_diff</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>, enable, disable);
-        <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(framework, <a href="features.md#0x1_features">features</a>);
-    } <b>else</b> {
-        <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
-            <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
-        };
-        <b>let</b> <a href="features.md#0x1_features">features</a> = <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
-        <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>, enable, disable);
+    <b>if</b> (!<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+        <b>move_to</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework, <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] })
     };
+    <b>let</b> <a href="features.md#0x1_features">features</a> = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
+    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
+    });
+    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_change_feature_flags_for_next_epoch"></a>
+
+## Function `change_feature_flags_for_next_epoch`
+
+Function to enable and disable features. Can only be called by a signer of @std.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+    <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
+        <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework)
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+        *<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)
+    } <b>else</b> {
+        <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] }
+    };
+    <a href="features.md#0x1_features_apply_diff">apply_diff</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>, enable, disable);
+    <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(framework, <a href="features.md#0x1_features">features</a>);
 }
 </code></pre>
 
@@ -1552,7 +1581,7 @@ While the scope is public, it can only be usd in system transactions like <code>
 who have permission to set the flag that's checked in <code>extract()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>()
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -1561,9 +1590,9 @@ who have permission to set the flag that's checked in <code>extract()</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
-        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;();
+        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(account);
         *<b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) = <a href="features.md#0x1_features">features</a>;
     }
 }

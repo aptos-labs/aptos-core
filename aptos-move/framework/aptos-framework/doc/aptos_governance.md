@@ -89,7 +89,6 @@ on a proposal multiple times as long as the total voting power of these votes do
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="aptos_coin.md#0x1_aptos_coin">0x1::aptos_coin</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -97,6 +96,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2">0x1::reconfiguration_v2</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
@@ -1474,11 +1474,9 @@ Force reconfigure. To be called at the end of a proposal that alters on-chain co
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>()) {
-        <a href="reconfiguration.md#0x1_reconfiguration_start_slow_reconfigure">reconfiguration::start_slow_reconfigure</a>(aptos_framework);
+        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>();
     } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(aptos_framework);
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(aptos_framework);
     }
 }
 </code></pre>
@@ -1508,11 +1506,9 @@ Update feature flags and also trigger reconfiguration.
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags">features::change_feature_flags</a>(aptos_framework, enable, disable);
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>()) {
-        <a href="reconfiguration.md#0x1_reconfiguration_start_slow_reconfigure">reconfiguration::start_slow_reconfigure</a>(aptos_framework);
+        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>();
     } <b>else</b> {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_enable_extracts">config_for_next_epoch::enable_extracts</a>(aptos_framework);
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
-        <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_extracts">config_for_next_epoch::disable_extracts</a>(aptos_framework);
     }
 }
 </code></pre>

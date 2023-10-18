@@ -10,7 +10,6 @@
 /// 2. Voters can vote on a proposal. Their voting power is derived from the backing stake pool. A stake pool can vote
 /// on a proposal multiple times as long as the total voting power of these votes doesn't exceed its total voting power.
 module aptos_framework::aptos_governance {
-    use std::config_for_next_epoch;
     use std::error;
     use std::option;
     use std::signer;
@@ -32,6 +31,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use aptos_framework::reconfiguration_v2;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
@@ -541,11 +541,9 @@ module aptos_framework::aptos_governance {
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (features::reconfigure_with_dkg_enabled()) {
-            reconfiguration::start_slow_reconfigure(aptos_framework);
+            reconfiguration_v2::start();
         } else {
-            config_for_next_epoch::enable_extracts(aptos_framework);
             reconfiguration::reconfigure();
-            config_for_next_epoch::disable_extracts(aptos_framework);
         }
     }
 
@@ -555,11 +553,9 @@ module aptos_framework::aptos_governance {
         features::change_feature_flags(aptos_framework, enable, disable);
 
         if (features::reconfigure_with_dkg_enabled()) {
-            reconfiguration::start_slow_reconfigure(aptos_framework);
+            reconfiguration_v2::start();
         } else {
-            config_for_next_epoch::enable_extracts(aptos_framework);
             reconfiguration::reconfigure();
-            config_for_next_epoch::disable_extracts(aptos_framework);
         }
     }
 

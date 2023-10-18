@@ -7,7 +7,6 @@ spec aptos_framework::execution_config {
     /// Ensure the caller is admin
     /// When setting now time must be later than last_reconfiguration_time.
     spec set(account: &signer, config: vector<u8>) {
-        use aptos_framework::timestamp;
         use std::signer;
         use std::features;
         use aptos_framework::transaction_fee;

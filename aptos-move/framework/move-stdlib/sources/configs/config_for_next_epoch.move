@@ -55,11 +55,6 @@ module std::config_for_next_epoch {
         exists<ForNextEpoch<T>>(@std)
     }
 
-    /// Return a copy of the buffered on-chain config. Abort if the buffer is empty.
-    public fun copied<T: copy + store>(): T acquires ForNextEpoch {
-        borrow_global<ForNextEpoch<T>>(@std).payload
-    }
-
     /// Save an on-chain config to the buffer for the next epoch.
     /// If the buffer is not empty, put in the new one and discard the old one.
     /// Typically followed by a `aptos_framework::reconfigure::start_reconfigure_with_dkg()` to make it effective as soon as possible.
@@ -76,8 +71,9 @@ module std::config_for_next_epoch {
     /// Should only be used at the end of a reconfiguration.
     ///
     /// NOTE: The caller has to ensure updates are enabled using `enable_updates()`.
-    public fun extract<T: store>(): T acquires ForNextEpoch {
-        assert!(!extracts_enabled(), std::error::invalid_state(EPERMISSION_DENIED));
+    public fun extract<T: store>(account: &signer): T acquires ForNextEpoch {
+        let addr = address_of(account);
+        assert!(addr == @std || addr == @vm, std::error::invalid_state(EPERMISSION_DENIED));
         let ForNextEpoch<T> { payload } = move_from<ForNextEpoch<T>>(@std);
         payload
     }

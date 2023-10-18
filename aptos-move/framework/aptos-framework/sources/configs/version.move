@@ -3,11 +3,12 @@ module aptos_framework::version {
     use std::config_for_next_epoch;
     use std::error;
     use std::signer;
+    use aptos_framework::reconfiguration;
 
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
-    friend aptos_framework::reconfiguration;
+    friend aptos_framework::reconfiguration_v2;
 
     struct Version has drop, key, store {
         major: u64,
@@ -35,20 +36,29 @@ module aptos_framework::version {
     /// This can be called by on chain governance.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
 
-        if (std::features::reconfigure_with_dkg_enabled()) {
-            config_for_next_epoch::upsert(account, Version {major});
-        } else {
-            let config = borrow_global_mut<Version>(@aptos_framework);
-            config.major = major;
-        }
+        let config = borrow_global_mut<Version>(@aptos_framework);
+        config.major = major;
+
+        // Need to trigger reconfiguration so validator nodes can sync on the updated version.
+        reconfiguration::reconfigure();
     }
 
-    public(friend) fun on_new_epoch() acquires Version {
+    /// Updates the major version to a larger version.
+    /// This can be called by on chain governance.
+    public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
+        assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        let old_major = borrow_global<Version>(@aptos_framework).major;
+        assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
+        config_for_next_epoch::upsert(account, Version {major});
+    }
+
+    public(friend) fun on_new_epoch(account: &signer) acquires Version {
         if (config_for_next_epoch::does_exist<Version>()) {
-            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>();
+            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>(account);
         }
     }
 

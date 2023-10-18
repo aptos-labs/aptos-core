@@ -1,10 +1,8 @@
 /// Publishes configuration information for validators, and issues reconfiguration events
 /// to synchronize configuration changes for the validators.
 module aptos_framework::reconfiguration {
-    use std::config_for_next_epoch;
     use std::error;
     use std::features;
-    use std::features::Features;
     use std::signer;
 
     use aptos_framework::account;
@@ -13,16 +11,17 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
-    use aptos_framework::consensus_config;
-    use aptos_framework::dkg;
-    use aptos_framework::execution_config;
-    use aptos_framework::gas_schedule;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
+    friend aptos_framework::consensus_config;
+    friend aptos_framework::execution_config;
+    friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_v2;
+    friend aptos_framework::version;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a
@@ -55,10 +54,6 @@ module aptos_framework::reconfiguration {
     const EINVALID_BLOCK_TIME: u64 = 4;
     /// An invalid block time was encountered.
     const EINVALID_GUID_FOR_EVENT: u64 = 5;
-    /// Another reconfiguration is in progress.
-    const EANOTHER_RECONFIGURATION_IN_PROGRESS: u64 = 6;
-    /// There is no reconfiguration in progress.
-    const ENO_RECONFIGURATION_IN_PROGRESS: u64 = 7;
 
     /// Only called during genesis.
     /// Publishes `Configuration` resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
@@ -141,11 +136,6 @@ module aptos_framework::reconfiguration {
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
         stake::on_new_epoch();
         storage_gas::on_reconfig();
-        features::on_new_epoch();
-        consensus_config::on_new_epoch();
-        execution_config::on_new_epoch();
-        gas_schedule::on_new_epoch();
-        std::version::on_new_epoch();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
@@ -162,50 +152,6 @@ module aptos_framework::reconfiguration {
         );
     }
 
-    /// This, if present under the system account, indicates that a slow reconfiguration is in progress.
-    struct SlowReconfigureStatus has drop, key {
-        in_progress: bool,
-        deadline: u64,
-    }
-
-    public(friend) fun slow_reconfigure_in_progress(): bool acquires SlowReconfigureStatus {
-        borrow_global<SlowReconfigureStatus>(@aptos_framework).in_progress
-    }
-
-    public(friend) fun current_slow_reconfigure_deadline(): u64 acquires SlowReconfigureStatus {
-        borrow_global<SlowReconfigureStatus>(@aptos_framework).deadline
-    }
-
-    public(friend) fun start_slow_reconfigure(account: &signer) acquires SlowReconfigureStatus {
-        assert!(!slow_reconfigure_in_progress(), error::invalid_state(EANOTHER_RECONFIGURATION_IN_PROGRESS));
-        let status = borrow_global_mut<SlowReconfigureStatus>(@aptos_framework);
-        status.in_progress = true;
-        status.deadline = timestamp::now_seconds() + 999999999;
-        stake::disable_validator_set_changes();
-        std::config_for_next_epoch::disable_upserts(account);
-        //TODO: start DKG.
-    }
-
-    public(friend) fun update_slow_reconfigure(account: &signer, params: vector<u8>) acquires SlowReconfigureStatus, Configuration {
-        assert!(slow_reconfigure_in_progress(), error::invalid_state(ENO_RECONFIGURATION_IN_PROGRESS));
-        let ready_to_proceed = dkg::update(params);
-        if (ready_to_proceed) {
-            config_for_next_epoch::enable_extracts(account);
-            reconfigure();
-            config_for_next_epoch::disable_extracts(account);
-            config_for_next_epoch::enable_upserts(account);
-        }
-    }
-
-    public(friend) fun abort_slow_reconfigure(account: &signer) acquires Configuration {
-        //TODO: potential DKG clean-up.
-
-        // Force-proceed to the next epoch without randomness.
-        config_for_next_epoch::enable_extracts(account);
-        reconfigure();
-        config_for_next_epoch::disable_extracts(account);
-        config_for_next_epoch::enable_upserts(account);
-    }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {
         borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time

@@ -17,7 +17,6 @@ This wrapper helps store an on-chain config for the next epoch.
 -  [Function `disable_upserts`](#0x1_config_for_next_epoch_disable_upserts)
 -  [Function `enable_upserts`](#0x1_config_for_next_epoch_enable_upserts)
 -  [Function `does_exist`](#0x1_config_for_next_epoch_does_exist)
--  [Function `copied`](#0x1_config_for_next_epoch_copied)
 -  [Function `upsert`](#0x1_config_for_next_epoch_upsert)
 -  [Function `extract`](#0x1_config_for_next_epoch_extract)
 -  [Function `upsert_lock_state`](#0x1_config_for_next_epoch_upsert_lock_state)
@@ -344,31 +343,6 @@ Check whether there is a pending config payload for <code>T</code>.
 
 </details>
 
-<a name="0x1_config_for_next_epoch_copied"></a>
-
-## Function `copied`
-
-Return a copy of the buffered on-chain config. Abort if the buffer is empty.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_copied">copied</a>&lt;T: <b>copy</b>, store&gt;(): T
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_copied">copied</a>&lt;T: <b>copy</b> + store&gt;(): T <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a> {
-    <b>borrow_global</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a>&lt;T&gt;&gt;(@std).payload
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_config_for_next_epoch_upsert"></a>
 
 ## Function `upsert`
@@ -411,7 +385,7 @@ Should only be used at the end of a reconfiguration.
 NOTE: The caller has to ensure updates are enabled using <code>enable_updates()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">extract</a>&lt;T: store&gt;(): T
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">extract</a>&lt;T: store&gt;(account: &<a href="signer.md#0x1_signer">signer</a>): T
 </code></pre>
 
 
@@ -420,8 +394,9 @@ NOTE: The caller has to ensure updates are enabled using <code>enable_updates()<
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">extract</a>&lt;T: store&gt;(): T <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a> {
-    <b>assert</b>!(!<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extracts_enabled">extracts_enabled</a>(), std::error::invalid_state(<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_EPERMISSION_DENIED">EPERMISSION_DENIED</a>));
+<pre><code><b>public</b> <b>fun</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">extract</a>&lt;T: store&gt;(account: &<a href="signer.md#0x1_signer">signer</a>): T <b>acquires</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a> {
+    <b>let</b> addr = address_of(account);
+    <b>assert</b>!(addr == @std || addr == @vm, std::error::invalid_state(<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_EPERMISSION_DENIED">EPERMISSION_DENIED</a>));
     <b>let</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a>&lt;T&gt; { payload } = <b>move_from</b>&lt;<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_ForNextEpoch">ForNextEpoch</a>&lt;T&gt;&gt;(@std);
     payload
 }

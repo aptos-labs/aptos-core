@@ -38,6 +38,7 @@ module aptos_framework::stake {
     friend aptos_framework::block;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
+    friend aptos_framework::reconfiguration_v2;
     friend aptos_framework::transaction_fee;
 
     /// Validator Config not published.
@@ -170,7 +171,7 @@ module aptos_framework::stake {
     /// 1. join_validator_set adds to pending_active queue.
     /// 2. leave_valdiator_set moves from active to pending_inactive queue.
     /// 3. on_new_epoch processes two pending queues and refresh ValidatorInfo from the owner's address.
-    struct ValidatorSet has key {
+    struct ValidatorSet has copy, drop, key, store {
         consensus_scheme: u8,
         // Active validators for the current epoch.
         active_validators: vector<ValidatorInfo>,
@@ -1187,6 +1188,86 @@ module aptos_framework::stake {
             // Update rewards rate after reward distribution.
             staking_config::calculate_and_save_latest_epoch_rewards_rate();
         };
+    }
+
+    public(friend) fun cur_validator_set(): ValidatorSet acquires ValidatorSet {
+        *borrow_global<ValidatorSet>(@aptos_framework)
+    }
+
+    /// Compute the validator set for the next epoch.
+    public(friend) fun next_validator_set(): ValidatorSet acquires StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+        // Init.
+        let cur_validator_set = borrow_global<ValidatorSet>(@aptos_framework);
+        let staking_config = staking_config::get();
+        let validator_perf = borrow_global<ValidatorPerformance>(@aptos_framework);
+        let (minimum_stake, _) = staking_config::get_required_stake(&staking_config);
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(&staking_config);
+
+        // Compute new validator set.
+        let new_active_validators = vector[];
+        let num_new_actives = 0;
+        let candidate_idx = 0;
+        let new_total_power = 0;
+        let num_cur_actives = vector::length(&cur_validator_set.active_validators);
+        let num_cur_pending_actives = vector::length(&cur_validator_set.pending_active);
+        let num_candidates = num_cur_actives + num_cur_pending_actives;
+        while (candidate_idx < num_candidates) {
+            let candidate = if (candidate_idx < num_cur_actives) {
+                vector::borrow(&cur_validator_set.active_validators, candidate_idx)
+            } else {
+                vector::borrow(&cur_validator_set.pending_active, candidate_idx - num_cur_actives)
+            };
+            let stake_pool = borrow_global<StakePool>(candidate.addr);
+            let cur_active = coin::value(&stake_pool.active);
+            let cur_pending_active = coin::value(&stake_pool.pending_active);
+            let cur_pending_inactive = coin::value(&stake_pool.pending_inactive);
+
+            let cur_perf = vector::borrow(&validator_perf.validators, candidate.config.validator_index);
+            let cur_reward = if (cur_active > 0) {
+                calculate_rewards_amount(cur_active, cur_perf.successful_proposals, cur_perf.successful_proposals + cur_perf.failed_proposals, rewards_rate, rewards_rate_denominator)
+            } else {
+                0
+            };
+            let cur_fee = if (features::collect_and_distribute_gas_fees()) {
+                let fees_table = &borrow_global<ValidatorFees>(@aptos_framework).fees_table;
+                if (table::contains(fees_table, candidate.addr)) {
+                    let fee = table::borrow(fees_table, candidate.addr);
+                    coin::value(fee)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+
+            let new_voting_power = cur_active + cur_pending_inactive + cur_pending_active + cur_reward + cur_fee;
+
+            if (new_voting_power >= minimum_stake) {
+                let config = *borrow_global<ValidatorConfig>(candidate.addr);
+                config.validator_index = num_new_actives;
+                let new_validator_info = ValidatorInfo {
+                    addr: candidate.addr,
+                    voting_power: new_voting_power,
+                    config,
+                };
+
+                // Update ValidatorSet.
+                new_total_power = new_total_power + (new_voting_power as u128);
+                vector::push_back(&mut new_active_validators, new_validator_info);
+                num_new_actives = num_new_actives + 1;
+
+            };
+            candidate_idx = candidate_idx + 1;
+        };
+
+        ValidatorSet {
+            consensus_scheme: cur_validator_set.consensus_scheme,
+            active_validators: new_active_validators,
+            pending_inactive: vector[],
+            pending_active: vector[],
+            total_voting_power: new_total_power,
+            total_joining_power: 0,
+        }
     }
 
     /// Update individual validator's stake pool
