@@ -6,7 +6,6 @@ use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_infallible::RwLock;
 use aptos_logger::warn;
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
@@ -14,8 +13,8 @@ use aptos_storage_service_types::{
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use arc_swap::ArcSwap;
+use dashmap::DashMap;
 use std::{
-    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -109,7 +108,7 @@ pub struct RequestModerator {
     peers_and_metadata: Arc<PeersAndMetadata>,
     storage_service_config: StorageServiceConfig,
     time_service: TimeService,
-    unhealthy_peer_states: Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>>,
+    unhealthy_peer_states: Arc<DashMap<PeerNetworkId, UnhealthyPeerState>>,
 }
 
 impl RequestModerator {
@@ -123,7 +122,7 @@ impl RequestModerator {
         Self {
             aptos_data_client_config,
             cached_storage_server_summary,
-            unhealthy_peer_states: Arc::new(RwLock::new(HashMap::new())),
+            unhealthy_peer_states: Arc::new(DashMap::new()),
             peers_and_metadata,
             storage_service_config,
             time_service,
@@ -145,7 +144,7 @@ impl RequestModerator {
         );
 
         // If the peer is being ignored, return an error
-        if let Some(peer_state) = self.unhealthy_peer_states.read().get(peer_network_id) {
+        if let Some(peer_state) = self.unhealthy_peer_states.get(peer_network_id) {
             if peer_state.is_ignored() {
                 return Err(Error::TooManyInvalidRequests(format!(
                     "Peer is temporarily ignored. Unable to handle request: {:?}",
@@ -164,8 +163,8 @@ impl RequestModerator {
             request,
         ) {
             // Increment the invalid request count for the peer
-            let mut unhealthy_peer_states = self.unhealthy_peer_states.write();
-            let unhealthy_peer_state = unhealthy_peer_states
+            let mut unhealthy_peer_state = self
+                .unhealthy_peer_states
                 .entry(*peer_network_id)
                 .or_insert_with(|| {
                     // Create a new unhealthy peer state (this is the first invalid request)
@@ -209,7 +208,6 @@ impl RequestModerator {
         // Remove disconnected peers and refresh ignored peer states
         let mut num_ignored_peers = 0;
         self.unhealthy_peer_states
-            .write()
             .retain(|peer_network_id, unhealthy_peer_state| {
                 if connected_peers_and_metadata.contains_key(peer_network_id) {
                     // Refresh the ignored peer state
@@ -240,7 +238,7 @@ impl RequestModerator {
     /// Returns a copy of the unhealthy peer states for testing
     pub(crate) fn get_unhealthy_peer_states(
         &self,
-    ) -> Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>> {
+    ) -> Arc<DashMap<PeerNetworkId, UnhealthyPeerState>> {
         self.unhealthy_peer_states.clone()
     }
 }
