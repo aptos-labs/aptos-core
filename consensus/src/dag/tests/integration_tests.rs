@@ -81,7 +81,6 @@ impl DagBootstrapUnit {
                 self_peer,
                 signer,
                 Arc::new(epoch_state),
-                storage.get_ledger_info(),
                 Arc::new(dag_storage),
                 network.clone(),
                 network.clone(),

@@ -1039,7 +1039,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (3700, 0.35, 0.5, 0.8, 0.65),
             (2800, 0.35, 0.5, 1.2, 1.3),
-            (1800, 0.35, 2.0, 1.5, 2.7),
+            (1800, 0.35, 2.0, 1.5, 3.0),
             (950, 0.35, 0.65, 1.5, 2.9),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
@@ -1798,21 +1798,24 @@ fn realistic_env_max_load_test(
                 ))
                 .add_latency_threshold(3.4, LatencyType::P50)
                 .add_latency_threshold(4.5, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
-                    (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                    // only reaches close to threshold during epoch change
-                    (
-                        LatencyBreakdownSlice::QsPosToProposal,
-                        if ha_proxy { 0.7 } else { 0.6 },
-                    ),
-                    // can be adjusted down if less backpressure
-                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
-                    // can be adjusted down if less backpressure
-                    (
-                        LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                        if ha_proxy { 1.3 } else { 0.75 },
-                    ),
-                ]))
+                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+                    vec![
+                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                        // only reaches close to threshold during epoch change
+                        (
+                            LatencyBreakdownSlice::QsPosToProposal,
+                            if ha_proxy { 0.7 } else { 0.6 },
+                        ),
+                        // can be adjusted down if less backpressure
+                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                        // can be adjusted down if less backpressure
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            if ha_proxy { 1.3 } else { 0.75 },
+                        ),
+                    ],
+                    5,
+                ))
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,

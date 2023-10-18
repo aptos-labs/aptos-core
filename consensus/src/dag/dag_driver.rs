@@ -179,7 +179,7 @@ impl DagDriver {
                     &dag_reader
                         .reachable(
                             strong_links.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(DAG_WINDOW as u64)),
+                            Some(highest_commit_round.saturating_sub(DAG_WINDOW)),
                             |_| true,
                         )
                         .map(|node_status| node_status.as_node().payload())
