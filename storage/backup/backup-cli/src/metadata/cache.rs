@@ -13,7 +13,6 @@ use aptos_logger::prelude::*;
 use aptos_temppath::TempPath;
 use async_trait::async_trait;
 use clap::Parser;
-use futures::stream::poll_fn;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
@@ -24,7 +23,7 @@ use tokio::{
     fs::{create_dir_all, read_dir, remove_file, OpenOptions},
     io::{AsyncRead, AsyncReadExt},
 };
-use tokio_stream::StreamExt;
+use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
 #[derive(Clone, Parser)]
 pub struct MetadataCacheOpt {
@@ -99,25 +98,19 @@ pub async fn sync_and_load(
     create_dir_all(&cache_dir).await.err_notes(&cache_dir)?; // create if not present already
 
     // List cached metadata files.
-    let mut dir = read_dir(&cache_dir).await.err_notes(&cache_dir)?;
-    let local_entries = poll_fn(|ctx| {
-        ::std::task::Poll::Ready(match futures::ready!(dir.poll_next_entry(ctx)) {
-            Ok(Some(entry)) => Some(Ok(entry)),
-            Ok(None) => None,
-            Err(err) => Some(Err(err)),
+    let dir = read_dir(&cache_dir).await.err_notes(&cache_dir)?;
+    let local_hashes_vec: Vec<String> = ReadDirStream::new(dir)
+        .filter_map(|entry| match entry {
+            Ok(e) => {
+                let path = e.path();
+                let file_name = path.file_name()?.to_str()?;
+                Some(file_name.to_string())
+            },
+            Err(_) => None,
         })
-    })
-    .collect::<tokio::io::Result<Vec<_>>>()
-    .await?;
-    let local_hashes = local_entries
-        .iter()
-        .map(|e| {
-            e.file_name()
-                .into_string()
-                .map_err(|s| anyhow!("into_string() failed for file name {:?}", s))
-        })
-        .collect::<Result<HashSet<_>>>()?;
-
+        .collect()
+        .await;
+    let local_hashes: HashSet<_> = local_hashes_vec.into_iter().collect();
     // List remote metadata files.
     let mut remote_file_handles = storage.list_metadata_files().await?;
     if remote_file_handles.is_empty() {
@@ -164,7 +157,9 @@ pub async fn sync_and_load(
             download_file(storage_ref, file_handle, &local_tmp_file).await?;
             // rename to target file only if successful; stale tmp file caused by failure will be
             // reclaimed on next run
-            tokio::fs::rename(local_tmp_file, local_file).await?;
+            tokio::fs::rename(local_tmp_file.clone(), local_file)
+                .await
+                .err_notes(local_tmp_file)?;
             info!(
                 file_handle = file_handle,
                 processed = i + 1,

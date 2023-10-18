@@ -13,7 +13,7 @@ use processor::{
     IndexerGrpcProcessorConfig,
 };
 use reqwest::Url;
-use server_framework::{run_server_with_config, GenericConfig};
+use server_framework::RunnableConfig;
 use std::collections::HashSet;
 use tokio::sync::OnceCell;
 use tracing::info;
@@ -48,7 +48,7 @@ pub struct ProcessorArgs {
 
 #[derive(Debug)]
 pub struct ProcessorManager {
-    config: GenericConfig<IndexerGrpcProcessorConfig>,
+    config: IndexerGrpcProcessorConfig,
     prerequisite_health_checkers: HashSet<HealthChecker>,
 }
 
@@ -56,7 +56,6 @@ impl ProcessorManager {
     fn new(
         processor_name: &ProcessorName,
         prerequisite_health_checkers: HashSet<HealthChecker>,
-        health_check_port: u16,
         data_service_url: Url,
         postgres_connection_string: String,
     ) -> Result<Self> {
@@ -84,7 +83,7 @@ impl ProcessorManager {
             ProcessorName::TokenV2Processor => ProcessorConfig::TokenV2Processor,
             ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
         };
-        let server_config = IndexerGrpcProcessorConfig {
+        let config = IndexerGrpcProcessorConfig {
             processor_config,
             postgres_connection_string,
             indexer_grpc_data_service_address: data_service_url,
@@ -93,10 +92,6 @@ impl ProcessorManager {
             starting_version: None,
             ending_version: None,
             number_concurrent_processing_tasks: None,
-        };
-        let config = GenericConfig {
-            server_config,
-            health_check_port,
         };
         let manager = Self {
             config,
@@ -116,23 +111,20 @@ impl ProcessorManager {
             bail!("Must specify at least one processor to run");
         }
         let mut managers = Vec::new();
-        let mut health_check_port = 43234;
         for processor_name in &args.processor_args.processors {
             managers.push(Self::new(
                 processor_name,
                 prerequisite_health_checkers.clone(),
-                health_check_port,
                 data_service_url.clone(),
                 postgres_connection_string.clone(),
             )?);
-            health_check_port += 1;
         }
         Ok(managers)
     }
 
-    /// Ccreate the necessary tables in the DB for the processors to work.
+    /// Create the necessary tables in the DB for the processors to work.
     async fn run_migrations(&self) -> Result<()> {
-        let connection_string = &self.config.server_config.postgres_connection_string;
+        let connection_string = &self.config.postgres_connection_string;
         let mut connection = AsyncPgConnection::establish(connection_string)
             .await
             .with_context(|| format!("Failed to connect to postgres at {}", connection_string))?;
@@ -144,21 +136,14 @@ impl ProcessorManager {
 #[async_trait]
 impl ServiceManager for ProcessorManager {
     fn get_name(&self) -> String {
-        format!(
-            "processor_{}",
-            self.config.server_config.processor_config.name()
-        )
+        format!("processor_{}", self.config.processor_config.name())
     }
 
     fn get_health_checkers(&self) -> HashSet<HealthChecker> {
-        hashset![HealthChecker::Http(
-            Url::parse(&format!(
-                "http://127.0.0.1:{}",
-                self.config.health_check_port
-            ))
-            .unwrap(),
-            self.get_name(),
-        )]
+        hashset! {HealthChecker::Processor(
+            self.config.postgres_connection_string.to_string(),
+            self.config.processor_config.name().to_string(),
+        ) }
     }
 
     fn get_prerequisite_health_checkers(&self) -> HashSet<&HealthChecker> {
@@ -189,6 +174,6 @@ impl ServiceManager for ProcessorManager {
             .await;
 
         // Run the processor.
-        run_server_with_config(self.config, tokio::runtime::Handle::current()).await
+        self.config.run().await
     }
 }

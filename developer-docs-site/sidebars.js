@@ -391,9 +391,8 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
-            "guides/local-testnet-dev-flow",
+            "guides/local-development-network",
             "nodes/local-testnet/run-a-local-testnet",
-            "nodes/local-testnet/using-cli-to-run-a-local-testnet",
             "guides/running-a-local-multi-node-network",
           ],
         },

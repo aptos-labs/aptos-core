@@ -144,7 +144,7 @@ impl DriverFactory {
 
         // Create the storage synchronizer
         let event_subscription_service = Arc::new(Mutex::new(event_subscription_service));
-        let (storage_synchronizer, _, _) = StorageSynchronizer::new(
+        let (storage_synchronizer, _, _, _) = StorageSynchronizer::new(
             node_config.state_sync.state_sync_driver,
             chunk_executor,
             commit_notification_sender.clone(),

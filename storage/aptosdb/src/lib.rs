@@ -42,6 +42,8 @@ mod aptosdb_test;
 pub mod db_debugger;
 pub mod fast_sync_storage_wrapper;
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::state_store::buffered_state::BufferedState;
 use crate::{
     backup::{backup_handler::BackupHandler, restore_handler::RestoreHandler, restore_utils},
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -65,12 +67,12 @@ use crate::{
     stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
-    state_store::{buffered_state::BufferedState, StateStore},
+    state_store::StateStore,
     transaction_store::TransactionStore,
 };
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::{
-    PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG,
+    PrunerConfig, RocksdbConfig, RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 #[cfg(any(test, feature = "fuzzing"))]
 use aptos_config::config::{
@@ -102,7 +104,6 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
-        create_empty_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
@@ -400,8 +401,8 @@ impl AptosDB {
         }
     }
 
-    fn open_internal<P: AsRef<Path> + Clone>(
-        db_root_path: P,
+    fn open_internal(
+        db_paths: &StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
@@ -416,7 +417,7 @@ impl AptosDB {
         );
 
         let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
-            db_root_path.as_ref(),
+            db_paths,
             rocksdb_configs,
             readonly,
             max_num_nodes_per_lru_cache_shard,
@@ -434,14 +435,17 @@ impl AptosDB {
         );
 
         if !readonly && enable_indexer {
-            myself.open_indexer(db_root_path, rocksdb_configs.index_db_config)?;
+            myself.open_indexer(
+                db_paths.default_root_path(),
+                rocksdb_configs.index_db_config,
+            )?;
         }
 
         Ok(myself)
     }
 
-    pub fn open<P: AsRef<Path> + Clone>(
-        db_root_path: P,
+    pub fn open(
+        db_paths: StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
@@ -450,7 +454,7 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         Self::open_internal(
-            db_root_path,
+            &db_paths,
             readonly,
             pruner_config,
             rocksdb_configs,
@@ -461,8 +465,8 @@ impl AptosDB {
         )
     }
 
-    pub fn open_kv_only<P: AsRef<Path> + Clone>(
-        db_root_path: P,
+    pub fn open_kv_only(
+        db_paths: StorageDirPaths,
         readonly: bool,
         pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
@@ -471,7 +475,7 @@ impl AptosDB {
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         Self::open_internal(
-            db_root_path,
+            &db_paths,
             readonly,
             pruner_config,
             rocksdb_configs,
@@ -482,21 +486,21 @@ impl AptosDB {
         )
     }
 
-    pub fn open_dbs<P: AsRef<Path> + Clone>(
-        db_root_path: P,
+    pub fn open_dbs(
+        db_paths: &StorageDirPaths,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
-        let ledger_db = LedgerDb::new(db_root_path.as_ref(), rocksdb_configs, readonly)?;
+        let ledger_db = LedgerDb::new(db_paths.ledger_db_root_path(), rocksdb_configs, readonly)?;
         let state_kv_db = StateKvDb::new(
-            db_root_path.as_ref(),
+            db_paths,
             rocksdb_configs,
             readonly,
             ledger_db.metadata_db_arc(),
         )?;
         let state_merkle_db = StateMerkleDb::new(
-            db_root_path,
+            db_paths,
             rocksdb_configs,
             readonly,
             max_num_nodes_per_lru_cache_shard,
@@ -555,7 +559,7 @@ impl AptosDB {
         enable_indexer: bool,
     ) -> Self {
         Self::open(
-            db_root_path,
+            StorageDirPaths::from_path(db_root_path),
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
@@ -589,7 +593,7 @@ impl AptosDB {
             ..Default::default()
         };
         Self::open(
-            db_root_path,
+            StorageDirPaths::from_path(db_root_path),
             false,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             db_config,

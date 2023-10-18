@@ -7,9 +7,8 @@ use anyhow::{Context, Result};
 use aptos_api_types::{
     AccountSignature as APIAccountSignature, Ed25519Signature as APIEd25519Signature,
     FeePayerSignature as APIFeePayerSignature, MultiAgentSignature as APIMultiAgentSignature,
-    MultiEd25519Signature as APIMultiEd25519Signature,
-    Secp256k1EcdsaSignature as APISecp256k1EcdsaSignature,
-    TransactionSignature as APITransactionSignature,
+    MultiEd25519Signature as APIMultiEd25519Signature, MultiKeySignature as APIMultiKeySignature,
+    SingleKeySignature as APISingleKeySignature, TransactionSignature as APITransactionSignature,
 };
 use aptos_bitvec::BitVec;
 use field_count::FieldCount;
@@ -81,8 +80,8 @@ impl Signature {
                 transaction_version,
                 transaction_block_height,
             ),
-            APITransactionSignature::Secp256k1EcdsaSignature(sig) => {
-                Ok(vec![Self::parse_secp256k1_ecdsa_signature(
+            APITransactionSignature::SingleSender(sig) => {
+                Ok(Self::parse_multi_agent_signature_helper(
                     sig,
                     sender,
                     transaction_version,
@@ -90,7 +89,7 @@ impl Signature {
                     true,
                     0,
                     None,
-                )])
+                ))
             },
         }
     }
@@ -105,9 +104,7 @@ impl Signature {
                 String::from("multi_agent_signature")
             },
             APITransactionSignature::FeePayerSignature(_) => String::from("fee_payer_signature"),
-            APITransactionSignature::Secp256k1EcdsaSignature(_) => {
-                String::from("secp256k1_ecdsa_signature")
-            },
+            APITransactionSignature::SingleSender(_sig) => String::from("single_sender"),
         }
     }
 
@@ -286,22 +283,29 @@ impl Signature {
                 multi_agent_index,
                 override_address,
             ),
-            APIAccountSignature::Secp256k1EcdsaSignature(sig) => {
-                vec![Self::parse_secp256k1_ecdsa_signature(
-                    sig,
-                    sender,
-                    transaction_version,
-                    transaction_block_height,
-                    is_sender_primary,
-                    multi_agent_index,
-                    override_address,
-                )]
-            },
+            APIAccountSignature::SingleKeySignature(sig) => vec![Self::parse_single_key_signature(
+                sig,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                is_sender_primary,
+                multi_agent_index,
+                override_address,
+            )],
+            APIAccountSignature::MultiKeySignature(sig) => vec![Self::parse_multi_key_signature(
+                sig,
+                sender,
+                transaction_version,
+                transaction_block_height,
+                is_sender_primary,
+                multi_agent_index,
+                override_address,
+            )],
         }
     }
 
-    fn parse_secp256k1_ecdsa_signature(
-        s: &APISecp256k1EcdsaSignature,
+    fn parse_single_key_signature(
+        _s: &APISingleKeySignature,
         sender: &String,
         transaction_version: i64,
         transaction_block_height: i64,
@@ -315,11 +319,36 @@ impl Signature {
             transaction_block_height,
             signer,
             is_sender_primary,
-            type_: String::from("secp256k1_ecdsa_signature"),
-            public_key: s.public_key.to_string(),
+            type_: String::from("single_key_signature"),
+            public_key: "Not implemented".into(),
             threshold: 1,
             public_key_indices: serde_json::Value::Array(vec![]),
-            signature: s.signature.to_string(),
+            signature: "Not implemented".into(),
+            multi_agent_index,
+            multi_sig_index: 0,
+        }
+    }
+
+    fn parse_multi_key_signature(
+        _s: &APIMultiKeySignature,
+        sender: &String,
+        transaction_version: i64,
+        transaction_block_height: i64,
+        is_sender_primary: bool,
+        multi_agent_index: i64,
+        override_address: Option<&String>,
+    ) -> Self {
+        let signer = standardize_address(override_address.unwrap_or(sender));
+        Self {
+            transaction_version,
+            transaction_block_height,
+            signer,
+            is_sender_primary,
+            type_: String::from("multi_key_signature"),
+            public_key: "Not implemented".into(),
+            threshold: 1,
+            public_key_indices: serde_json::Value::Array(vec![]),
+            signature: "Not implemented".into(),
             multi_agent_index,
             multi_sig_index: 0,
         }

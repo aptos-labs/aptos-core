@@ -7,9 +7,10 @@ import os
 import subprocess
 import shutil
 import sys
-import math
 from multiprocessing import Pool, freeze_support
 from typing import Tuple
+from collections import deque
+
 
 from verify_core.common import clear_artifacts, query_backup_latest_version
 
@@ -29,7 +30,7 @@ from verify_core.common import clear_artifacts, query_backup_latest_version
 #  2. meanwhile, the oncall should delete the old ranges that are beyond 300M window that we want to scan
 #
 
-testnet_runner_mapping = [
+TESTNET_RANGES = [
     [250000000, 255584106],
     [255584107, 271874718],
     [271874719, 300009463],
@@ -49,10 +50,10 @@ testnet_runner_mapping = [
     [640_000_001, sys.maxsize],
 ]
 
-mainnet_runner_mapping = [
-    [0, 50_000_000],
-    [50_000_001, 100_000_000],
-    [100_000_001, 110_000_000],
+MAINNET_RANGES = [
+    [0, 40_000_000],
+    [40_000_001, 95_000_000],
+    [95_000_001, 110_000_000],
     [110_000_001, 150_000_000],
     [150_000_001, 170_000_000],
     [170_000_001, 180_000_000],
@@ -64,9 +65,9 @@ mainnet_runner_mapping = [
     [230_000_001, 240_000_000],
     [240_000_001, 250_000_000],
     [250_000_001, 260_000_000],
-    [260_000_001, 270_000_000],
-    [270_000_001, 278_000_000],
-    [278_000_001, sys.maxsize],
+    [260_000_001, 275_000_000],
+    [275_000_001, 285_000_000],
+    [285_000_001, sys.maxsize],
 ]
 
 
@@ -78,7 +79,7 @@ def replay_verify_partition(
     latest_version: int,
     txns_to_skip: Tuple[int],
     backup_config_template_path: str,
-) -> Tuple[int, int]:
+) -> Tuple[int, int, bytes]:
     """
     Run replay-verify for a partition of the backup, returning a tuple of the (partition number, return code)
 
@@ -91,15 +92,17 @@ def replay_verify_partition(
     backup_config_template_path: path to the backup config template
     """
     end = history_start + n * per_partition
-    if n == N - 1 and end < latest_version:
+    if n == N and end < latest_version:
         end = latest_version
 
     start = end - per_partition
     partition_name = f"run_{n}_{start}_{end}"
 
     print(f"[partition {n}] spawning {partition_name}")
-    os.mkdir(partition_name)
-    shutil.copytree("metadata-cache", f"{partition_name}/metadata-cache")
+    if not os.path.exists(partition_name):
+        os.mkdir(partition_name)
+        # the metadata cache is shared across partitions and downloaded when querying the latest version.
+        shutil.copytree("metadata-cache", f"{partition_name}/metadata-cache")
 
     txns_to_skip_args = [f"--txns-to-skip={txn}" for txn in txns_to_skip]
 
@@ -110,7 +113,7 @@ def replay_verify_partition(
             "replay-verify",
             *txns_to_skip_args,
             "--concurrent-downloads",
-            "2",
+            "8",
             "--replay-concurrency-level",
             "2",
             "--metadata-cache-dir",
@@ -126,19 +129,20 @@ def replay_verify_partition(
             backup_config_template_path,
         ],
         stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,  # redirect stderr to stdout
     )
     if process.stdout is None:
         raise Exception(f"[partition {n}] stdout is None")
+    last_lines = deque(maxlen=10)
     for line in iter(process.stdout.readline, b""):
         print(f"[partition {n}] {line}", flush=True)
-
-    # set the returncode
+        last_lines.append(line)
     process.communicate()
 
-    return (n, process.returncode)
+    return (n, process.returncode, b"\n".join(last_lines))
 
 
-def main():
+def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
     # collect all required ENV variables
     REQUIRED_ENVS = [
         "BUCKET",
@@ -150,13 +154,17 @@ def main():
 
     if not all(env in os.environ for env in REQUIRED_ENVS):
         raise Exception("Missing required ENV variables")
-    (runner_no, runner_cnt) = (
-        (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (None, None)
+
+    # the runner may have small overlap at the boundary to prevent missing any transactions
+    runner_mapping = (
+        TESTNET_RANGES if "testnet" in os.environ["BUCKET"] else MAINNET_RANGES
     )
-    # by default we only run one job
+
+    # by default we only have 1 runner
     if runner_no is None or runner_cnt is None:
         runner_no = 0
         runner_cnt = 1
+        runner_mapping = [[runner_mapping[0][0], runner_mapping[-1][1]]]
 
     assert (
         runner_no >= 0 and runner_no < runner_cnt
@@ -172,29 +180,27 @@ def main():
         if "aws" in config and shutil.which("aws") is None:
             raise Exception("Missing required AWS CLI for pulling backup data from S3")
 
-    if os.environ.get("REUSE_BACKUP_ARTIFACTS", "true") == "true":
+    if os.environ.get("REUSE_BACKUP_ARTIFACTS", "true") != "true":
         print("[main process] clearing existing backup artifacts")
         clear_artifacts()
     else:
         print("[main process] skipping clearing backup artifacts")
-
-    LATEST_VERSION = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
-
-    # the runner may have small overlap at the boundary to prevent missing any transactions
-    runner_mapping = (
-        testnet_runner_mapping
-        if "testnet" in os.environ["BUCKET"]
-        else mainnet_runner_mapping
-    )
 
     assert runner_cnt == len(
         runner_mapping
     ), "runner_cnt must match the number of runners in the mapping"
     runner_start = runner_mapping[runner_no][0]
     runner_end = runner_mapping[runner_no][1]
+    latest_version = query_backup_latest_version(BACKUP_CONFIG_TEMPLATE_PATH)
     if runner_no == runner_cnt - 1:
-        runner_end = LATEST_VERSION
+        runner_end = latest_version
+        if runner_end is None:
+            raise Exception("Failed to query latest version from backup")
     print("runner start %d end %d" % (runner_start, runner_end))
+    if start_version is not None and end_version is not None:
+        runner_start = start_version
+        runner_end = end_version
+
     # run replay-verify in parallel
     N = 16
     PER_PARTITION = (runner_end - runner_start) // N
@@ -212,17 +218,19 @@ def main():
                     TXNS_TO_SKIP,
                     BACKUP_CONFIG_TEMPLATE_PATH,
                 )
-                for n in range(1, N)
+                for n in range(1, N + 1)
             ],
         )
 
     print("[main process] finished")
 
     err = False
-    for partition_num, return_code in all_partitions:
+    for partition_num, return_code, msg in all_partitions:
         if return_code != 0:
             print("======== ERROR ========")
-            print(f"ERROR: partition {partition_num} failed (exit {return_code})")
+            print(
+                f"ERROR: partition {partition_num} failed with exit status {return_code}, {msg})"
+            )
             err = True
 
     if err:
@@ -231,4 +239,7 @@ def main():
 
 if __name__ == "__main__":
     freeze_support()
-    main()
+    (runner_no, runner_cnt) = (
+        (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (None, None)
+    )
+    main(runner_no, runner_cnt)
