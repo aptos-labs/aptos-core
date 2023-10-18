@@ -5,7 +5,10 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
+    dag::{
+        DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
+        TDAGNetworkSender,
+    },
     experimental::commit_reliable_broadcast::CommitMessage,
     logging::{LogEvent, LogSchema},
     monitor,
@@ -51,7 +54,7 @@ use std::{
 };
 use tokio::time::timeout;
 
-pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
+pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
@@ -450,7 +453,7 @@ impl TDAGNetworkSender for NetworkSender {
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
@@ -482,13 +485,13 @@ impl TDAGNetworkSender for NetworkSender {
 }
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage> for NetworkSender {
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))

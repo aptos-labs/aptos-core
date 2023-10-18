@@ -4,7 +4,7 @@ use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         anchor_election::RoundRobinAnchorElection,
-        dag_driver::{DagDriver, DagDriverError},
+        dag_driver::DagDriver,
         dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
@@ -16,7 +16,7 @@ use crate::{
             order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage},
-        RpcHandler,
+        RpcHandler, errors::DagDriverError, DAGRpcResult,
     },
     payload_manager::PayloadManager,
     test_utils::MockPayloadManager,
@@ -40,13 +40,13 @@ use tokio_retry::strategy::ExponentialBackoff;
 struct MockNetworkSender {}
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage> for MockNetworkSender {
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockNetworkSender {
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
         _messagee: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 }
@@ -58,7 +58,7 @@ impl TDAGNetworkSender for MockNetworkSender {
         _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 

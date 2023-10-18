@@ -13,7 +13,7 @@ use super::{
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     types::DAGMessage,
-    ProofNotifier,
+    ProofNotifier, DAGRpcResult,
 };
 use crate::{
     dag::{
@@ -55,7 +55,7 @@ pub struct DagBootstrapper {
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
-    rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
+    rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage, DAGRpcResult>>,
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     proof_notifier: Arc<dyn ProofNotifier>,
     time_service: aptos_time_service::TimeService,
@@ -72,7 +72,7 @@ impl DagBootstrapper {
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
-        rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
+        rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage, DAGRpcResult>>,
         dag_network_sender: Arc<dyn TDAGNetworkSender>,
         proof_notifier: Arc<dyn ProofNotifier>,
         time_service: aptos_time_service::TimeService,
@@ -351,7 +351,7 @@ pub(super) fn bootstrap_dag_for_test(
     signer: ValidatorSigner,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
-    rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
+    rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage, DAGRpcResult>>,
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
     proof_notifier: Arc<dyn ProofNotifier>,
     time_service: aptos_time_service::TimeService,

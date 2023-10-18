@@ -10,39 +10,40 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 pub trait RBMessage: Send + Sync + Clone {}
 
 #[async_trait]
-pub trait RBNetworkSender<M: RBMessage>: Send + Sync {
+pub trait RBNetworkSender<M: RBMessage, R: RBMessage = M>: Send + Sync {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
         message: M,
         timeout: Duration,
-    ) -> anyhow::Result<M>;
+    ) -> anyhow::Result<R>;
 }
 
-pub trait BroadcastStatus<M: RBMessage> {
-    type Ack: Into<M> + TryFrom<M> + Clone;
+pub trait BroadcastStatus<M: RBMessage, R: RBMessage = M> {
+    type Ack: Into<R> + TryFrom<R> + Clone;
     type Aggregated;
     type Message: Into<M> + TryFrom<M> + Clone;
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>>;
 }
 
-pub struct ReliableBroadcast<M: RBMessage, TBackoff> {
+pub struct ReliableBroadcast<M: RBMessage, TBackoff, R: RBMessage = M> {
     validators: Vec<Author>,
-    network_sender: Arc<dyn RBNetworkSender<M>>,
+    network_sender: Arc<dyn RBNetworkSender<M, R>>,
     backoff_policy: TBackoff,
     time_service: TimeService,
     rpc_timeout_duration: Duration,
 }
 
-impl<M, TBackoff> ReliableBroadcast<M, TBackoff>
+impl<M, TBackoff, R> ReliableBroadcast<M, TBackoff, R>
 where
     M: RBMessage,
     TBackoff: Iterator<Item = Duration> + Clone,
+    R: RBMessage,
 {
     pub fn new(
         validators: Vec<Author>,
-        network_sender: Arc<dyn RBNetworkSender<M>>,
+        network_sender: Arc<dyn RBNetworkSender<M, R>>,
         backoff_policy: TBackoff,
         time_service: TimeService,
         rpc_timeout_duration: Duration,
@@ -56,7 +57,7 @@ where
         }
     }
 
-    pub fn broadcast<S: BroadcastStatus<M>>(
+    pub fn broadcast<S: BroadcastStatus<M, R>>(
         &self,
         message: S::Message,
         mut aggregating: S,

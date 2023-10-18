@@ -6,6 +6,7 @@ use crate::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::{FetchRequester, TFetchRequester},
         dag_store::Dag,
+        errors::DagDriverError,
         observability::{
             counters,
             logging::{LogEvent, LogSchema},
@@ -19,6 +20,7 @@ use crate::{
             Extensions, Node, SignatureBuilder,
         },
         RpcHandler,
+        DAGRpcResult
     },
     payload_manager::PayloadManager,
     state_replication::PayloadClient,
@@ -38,14 +40,7 @@ use futures::{
     FutureExt,
 };
 use std::{sync::Arc, time::Duration};
-use thiserror::Error as ThisError;
 use tokio_retry::strategy::ExponentialBackoff;
-
-#[derive(Debug, ThisError)]
-pub enum DagDriverError {
-    #[error("missing parents")]
-    MissingParents,
-}
 
 pub(crate) struct DagDriver {
     author: Author,
@@ -53,7 +48,7 @@ pub(crate) struct DagDriver {
     dag: Arc<RwLock<Dag>>,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
+    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
     rb_abort_handle: Option<(AbortHandle, u64)>,
     storage: Arc<dyn DAGStorage>,
@@ -72,7 +67,7 @@ impl DagDriver {
         dag: Arc<RwLock<Dag>>,
         payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
-        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
+        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
