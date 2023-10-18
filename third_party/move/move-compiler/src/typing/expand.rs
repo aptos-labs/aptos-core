@@ -67,7 +67,7 @@ fn type_struct_ty_param(context: &mut Context, ty: &mut Type, i: usize, ty_name:
                 .param
                 .user_specified_name
                 .value;
-            let msg = format!("Cannot infer the type parameter {param_name} for generic struct {ty_name}. Try providing a type parameter.");
+            let msg = format!("Cannot infer the type parameter `{param_name}` for generic struct `{ty_name}`. Try providing a type parameter.");
             type_msg_(context, ty, &msg);
         },
         _ => type_(context, ty),
@@ -82,7 +82,7 @@ fn type_fun_ty_param(
     n: &FunctionName,
 ) {
     let param_name = context.function_info(m, n).signature.type_parameters[i].user_specified_name;
-    type_msg_(context, ty, &format!("Cannot infer the type parameter {param_name} for generic function {m}::{n}. Try providing a type parameter."));
+    type_msg_(context, ty, &format!("Cannot infer the type parameter `{param_name}` for generic function `{m}::{n}`. Try providing a type parameter."));
 }
 
 pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
@@ -238,7 +238,7 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
             };
             let new_exp = if v > max {
                 let msg = format!(
-                    "Expected a literal of type '{}', but the value is too large.",
+                    "Expected a literal of type `{}`, but the value is too large.",
                     bt
                 );
                 let fix_bt = if v > u128_max {
@@ -255,7 +255,7 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
                 };
 
                 let fix = format!(
-                    "Annotating the literal might help inference: '{value}{type}'",
+                    "Annotating the literal might help inference: `{value}{type}`",
                     value=v,
                     type=fix_bt,
                 );
@@ -417,7 +417,7 @@ fn builtin_function(context: &mut Context, b: &mut T::BuiltinFunction) {
             type_msg_(
                 context,
                 bt,
-                &format!("Cannot infer a type parameter for built-in function '{f_name}'"),
+                &format!("Cannot infer a type parameter for built-in function `{f_name}`"),
             );
         },
         B::Assert(_) => (),

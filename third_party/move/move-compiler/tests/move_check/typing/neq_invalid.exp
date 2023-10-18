@@ -106,7 +106,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/neq_invalid.move:26:9
    │
 26 │         G0{} != G0{};
-   │         ^^^^ Cannot infer the type parameter T for generic struct 0x8675309::M::G0. Try providing a type parameter.
+   │         ^^^^ Cannot infer the type parameter `T` for generic struct `0x8675309::M::G0`. Try providing a type parameter.
 
 error[E05001]: ability constraint not satisfied
    ┌─ tests/move_check/typing/neq_invalid.move:27:9
@@ -124,7 +124,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/neq_invalid.move:27:9
    │
 27 │         G1{} != G1{};
-   │         ^^^^ Cannot infer the type parameter T for generic struct 0x8675309::M::G1. Try providing a type parameter.
+   │         ^^^^ Cannot infer the type parameter `T` for generic struct `0x8675309::M::G1`. Try providing a type parameter.
 
 error[E05001]: ability constraint not satisfied
    ┌─ tests/move_check/typing/neq_invalid.move:27:17
@@ -154,7 +154,7 @@ error[E04010]: cannot infer type
    ┌─ tests/move_check/typing/neq_invalid.move:28:9
    │
 28 │         G2{} != G2{};
-   │         ^^^^ Cannot infer the type parameter T for generic struct 0x8675309::M::G2. Try providing a type parameter.
+   │         ^^^^ Cannot infer the type parameter `T` for generic struct `0x8675309::M::G2`. Try providing a type parameter.
 
 error[E05001]: ability constraint not satisfied
    ┌─ tests/move_check/typing/neq_invalid.move:28:17
