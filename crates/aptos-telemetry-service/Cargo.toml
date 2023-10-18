@@ -34,7 +34,7 @@ hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
-rand ={ workspace = true }
+rand = { workspace = true }
 rand_core = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
@@ -51,4 +51,5 @@ uuid = { workspace = true }
 warp = { workspace = true }
 
 [dev-dependencies]
+claims = { workspace = true }
 httpmock = { workspace = true }

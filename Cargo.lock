@@ -3629,6 +3629,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs 0.1.4",
  "chrono",
+ "claims",
  "clap 4.3.21",
  "debug-ignore",
  "flate2",
