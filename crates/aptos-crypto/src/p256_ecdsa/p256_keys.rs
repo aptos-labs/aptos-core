@@ -131,6 +131,7 @@ impl Uniform for P256PrivateKey {
         let bignum = BigUint::from_bytes_be(&bytes[..]);
         let order = BigUint::from_bytes_be(&ORDER);
         let remainder = bignum.mod_floor(&order);
+        // TODO: Make sure _le is the right endianness here
         P256PrivateKey(p256::ecdsa::SigningKey::from_slice(&remainder.to_bytes_le()).unwrap())
     }
 }
