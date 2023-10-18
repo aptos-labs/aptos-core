@@ -463,6 +463,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     state.versioned_map.data().provide_base_value(
                         state_key.clone(),
                         TransactionWrite::from_state_value(maybe_patched_from_storage),
+                        maybe_layout.cloned().map(Arc::new),
                     );
 
                     ret = state.read_data_by_kind(state_key, self.txn_idx, kind);
