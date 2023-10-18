@@ -79,13 +79,15 @@ pub enum FeatureFlag {
     ModuleEvent,
     EmitFeeStatement,
     StorageDeletionRefund,
-    AggregatorSnapshots,
+    AggregatorV2Api,
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
     SingleSenderAuthenticator,
     SponsoredAutomaticAccountCreation,
     FeePayerAccountOptional,
+    AggregatorV2DelayedFields,
+    ConcurrentAssets,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -213,7 +215,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ModuleEvent => AptosFeatureFlag::MODULE_EVENT,
             FeatureFlag::EmitFeeStatement => AptosFeatureFlag::EMIT_FEE_STATEMENT,
             FeatureFlag::StorageDeletionRefund => AptosFeatureFlag::STORAGE_DELETION_REFUND,
-            FeatureFlag::AggregatorSnapshots => AptosFeatureFlag::AGGREGATOR_SNAPSHOTS,
+            FeatureFlag::AggregatorV2Api => AptosFeatureFlag::AGGREGATOR_V2_API,
             FeatureFlag::SignatureCheckerV2ScriptFix => {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
@@ -224,6 +226,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
             },
             FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+            FeatureFlag::AggregatorV2DelayedFields => {
+                AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS
+            },
+            FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
         }
     }
 }
@@ -274,7 +280,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MODULE_EVENT => FeatureFlag::ModuleEvent,
             AptosFeatureFlag::EMIT_FEE_STATEMENT => FeatureFlag::EmitFeeStatement,
             AptosFeatureFlag::STORAGE_DELETION_REFUND => FeatureFlag::StorageDeletionRefund,
-            AptosFeatureFlag::AGGREGATOR_SNAPSHOTS => FeatureFlag::AggregatorSnapshots,
+            AptosFeatureFlag::AGGREGATOR_V2_API => FeatureFlag::AggregatorV2Api,
             AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
@@ -285,6 +291,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::SponsoredAutomaticAccountCreation
             },
             AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
+            AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS => {
+                FeatureFlag::AggregatorV2DelayedFields
+            },
+            AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
         }
     }
 }

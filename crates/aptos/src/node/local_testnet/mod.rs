@@ -112,10 +112,11 @@ impl RunLocalTestnet {
         for health_checker in health_checkers {
             let silent = match health_checker {
                 HealthChecker::NodeApi(_) => false,
-                // We don't want to print anything for the processors, it'd be too spammy.
-                HealthChecker::Http(_, name) => name.contains("processor"),
+                HealthChecker::Http(_, _) => false,
                 HealthChecker::DataServiceGrpc(_) => false,
                 HealthChecker::Postgres(_) => false,
+                // We don't want to print anything for the processors, it'd be too spammy.
+                HealthChecker::Processor(_, _) => true,
                 // We don't want to actually wait on this health checker here because
                 // it will never return true since we apply the metadata in a post
                 // healthy step (which comes after we call this function). So we move
