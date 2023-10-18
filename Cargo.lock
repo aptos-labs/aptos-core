@@ -3758,6 +3758,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
+ "aptos-types",
  "async-trait",
  "clap 4.3.21",
  "futures",
