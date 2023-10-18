@@ -124,7 +124,6 @@ proptest! {
         prop_assert!(deserialized.verify(&hashable, &keypair.public_key).is_ok());
     }
 
-
     // Check for canonical S.
     #[test]
     fn test_signature_malleability(
