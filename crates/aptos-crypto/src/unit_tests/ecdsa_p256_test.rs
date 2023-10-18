@@ -21,6 +21,17 @@ use signature::Verifier;
 
 #[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
 struct CryptoHashable(pub usize);
+
+#[test]
+fn test_private_key_deserialization_endianness() {
+    let more_than_order_be: [u8; 32] = [0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xBC, 0xE6, 0xFA, 0xAD, 0xA7, 0x17, 0x9E, 0x84, 0xF3, 0xB9, 0xCA, 0xC2, 0xFC, 0x63, 0x25, 0xFF,];
+    // If this assert passes, we know `from_bytes_unchecked` expects big-endian inputs
+    assert_eq!(
+        P256Signature::from_bytes_unchecked(&more_than_order_be),
+        Err(CryptoMaterialError::DeserializationError),
+    );
+}
+
 proptest! {
     #[test]
     fn test_pub_key_deserialization(bits in any::<[u8; 32]>()){
@@ -32,6 +43,7 @@ proptest! {
         );
         prop_assert!(check);
     }
+
 
     #[test]
     fn test_keys_encode(keypair in uniform_keypair_strategy::<P256PrivateKey, P256PublicKey>()) {
@@ -123,6 +135,7 @@ proptest! {
         let deserialized = P256Signature::try_from(serialized).unwrap();
         prop_assert!(deserialized.verify(&hashable, &keypair.public_key).is_ok());
     }
+
 
     // Check for canonical S.
     #[test]

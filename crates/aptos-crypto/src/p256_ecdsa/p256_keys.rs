@@ -49,8 +49,8 @@ impl P256PrivateKey {
     }
 
     /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
-    /// Uses the SEC1 serialization format.
-    fn from_bytes_unchecked(
+    /// Uses the SEC1 serialization format. Bytes are expected to be in big-endian form.
+    pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
         match p256::ecdsa::SigningKey::from_slice(bytes) {
