@@ -1206,6 +1206,6 @@ fn gen_id_start_value(sequential: bool) -> u32 {
     // block doesn't get committed, but chain halts.
     // (take a different range from parallel execution, to even more easily differentiate)
 
-    let offset = if sequential { 0 } else {1000};
+    let offset = if sequential { 0 } else { 1000 };
     thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
 }

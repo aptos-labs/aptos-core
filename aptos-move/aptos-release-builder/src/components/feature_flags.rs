@@ -220,7 +220,6 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SignatureCheckerV2ScriptFix => {
                 AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX
             },
-            FeatureFlag::AggregatorApi => AptosFeatureFlag::AGGREGATOR_API,
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
             FeatureFlag::SingleSenderAuthenticator => AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
@@ -287,7 +286,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX => {
                 FeatureFlag::SignatureCheckerV2ScriptFix
             },
-            AptosFeatureFlag::AGGREGATOR_API => FeatureFlag::AggregatorApi,
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
             AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR => FeatureFlag::SingleSenderAuthenticator,
