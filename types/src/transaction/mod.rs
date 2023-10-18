@@ -12,7 +12,10 @@ use crate::{
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
-    transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    transaction::authenticator::{
+        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
+        TransactionAuthenticator,
+    },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
@@ -672,10 +675,26 @@ impl SignedTransaction {
         public_key: secp256k1_ecdsa::PublicKey,
         signature: secp256k1_ecdsa::Signature,
     ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::secp256k1_ecdsa(public_key, signature);
+        let authenticator = TransactionAuthenticator::single_sender(
+            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+                AnyPublicKey::secp256k1_ecdsa(public_key),
+                AnySignature::secp256k1_ecdsa(signature),
+            )),
+        );
         SignedTransaction {
             raw_txn,
             authenticator,
+            size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_single_sender(
+        raw_txn: RawTransaction,
+        authenticator: AccountAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::single_sender(authenticator),
             size: OnceCell::new(),
         }
     }
@@ -770,7 +789,7 @@ impl SignedTransaction {
     }
 
     pub fn contains_duplicate_signers(&self) -> bool {
-        let mut all_signer_addresses = self.authenticator.secondary_signer_addreses();
+        let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
         all_signer_addresses.push(self.sender());
         let mut s = BTreeSet::new();
         all_signer_addresses.iter().any(|a| !s.insert(*a))

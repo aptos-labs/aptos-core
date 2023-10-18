@@ -442,14 +442,12 @@ backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
 bigdecimal = { version = "0.3.0", features = ["serde"] }
+version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
-# We use a version of bollard where it relies on a lower version of serde_with.
-# Otherwise it imposes that we use serde 1.0.157, which we can't due to this issue:
-# https://github.com/aptos-labs/aptos-core/issues/10424
-bollard = { git = "https://github.com/banool/bollard.git", rev = "0bf0b43f736040bb3d4aacb20125fd2b4021733d" }
+bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
 bytes = { version = "1.4.0", features = ["serde"] }
@@ -543,6 +541,7 @@ ntest = "0.9.0"
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
+number_range = "0.3.2"
 once_cell = "1.10.0"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
@@ -595,9 +594,9 @@ sha2 = "0.9.3"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
-# For more information about why we are pinned to 1.0.149, see this issue:
+# For more information about why we are pinned to 1.0.152, see this issue:
 # https://github.com/aptos-labs/aptos-core/issues/10424
-serde = { version = "=1.0.149", features = ["derive", "rc"] }
+serde = { version = "=1.0.152", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
@@ -632,7 +631,7 @@ tokio = { version = "1.21.0", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
-tokio-stream = "0.1.8"
+tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"

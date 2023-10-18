@@ -4,11 +4,16 @@
 use super::traits::ShutdownStep;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use bollard::{container::RemoveContainerOptions, image::CreateImageOptions, Docker};
+use bollard::{
+    container::{RemoveContainerOptions, StopContainerOptions},
+    image::CreateImageOptions,
+    Docker,
+};
 use futures::TryStreamExt;
 use reqwest::Url;
 use std::{fs::create_dir_all, net::SocketAddr, path::Path};
 use tracing::info;
+use version_compare::Version;
 
 pub fn socket_addr_to_url(socket_addr: &SocketAddr, scheme: &str) -> Result<Url> {
     let host = match socket_addr {
@@ -27,17 +32,58 @@ pub fn get_docker() -> Result<Docker> {
 
 pub async fn confirm_docker_available() -> Result<()> {
     let docker = get_docker()?;
-    docker
+    let info = docker
         .info()
         .await
         .context("Docker is not available, confirm it is installed and running. On Linux you may need to use sudo.")?;
+
+    info!("Docker Info: {:?}", info);
+
+    let version = docker
+        .version()
+        .await
+        .context("Failed to get Docker version")?;
+
+    info!("Docker Version: {:?}", version);
+
+    // Try to warn the user about their Docker version being too old. We don't error
+    // out if the version is too old in case we're wrong about the minimum version
+    // for their particular system. We just print a warning.
+    match version.api_version {
+        Some(current_api_version) => match Version::from(&current_api_version) {
+            Some(current_api_version) => {
+                let minimum_api_version = Version::from("1.42").unwrap();
+                if current_api_version < minimum_api_version {
+                    eprintln!(
+                            "WARNING: Docker API version {} is too old, minimum required version is {}. Please update Docker!",
+                            current_api_version,
+                            minimum_api_version,
+                        );
+                } else {
+                    eprintln!("Docker version is sufficient: {}", current_api_version);
+                }
+            },
+            None => {
+                eprintln!(
+                    "WARNING: Failed to parse Docker API version: {}",
+                    current_api_version
+                );
+            },
+        },
+        None => {
+            eprintln!(
+                "WARNING: Failed to determine Docker version, confirm your Docker is up to date!"
+            );
+        },
+    }
+
     Ok(())
 }
 
 /// Delete a container. If the container doesn't exist, that's fine, just move on.
 pub async fn delete_container(container_name: &str) -> Result<()> {
     info!(
-        "Removing any existing postgres container with name {}",
+        "Removing container with name {} (if it exists)",
         container_name
     );
 
@@ -52,7 +98,32 @@ pub async fn delete_container(container_name: &str) -> Result<()> {
     let _ = docker.remove_container(container_name, options).await;
 
     info!(
-        "Removed any existing postgres container with name {}",
+        "Removed container with name {} (if it existed)",
+        container_name
+    );
+
+    Ok(())
+}
+
+/// Stop a container. If the container doesn't exist, that's fine, just move on.
+pub async fn stop_container(container_name: &str) -> Result<()> {
+    info!(
+        "Stopping container with name {} (if it exists)",
+        container_name
+    );
+
+    let docker = get_docker()?;
+
+    let options = Some(StopContainerOptions {
+        // Timeout in seconds before we kill the contianer.
+        t: 1,
+    });
+
+    // Ignore any error, it'll be because the container doesn't exist.
+    let _ = docker.stop_container(container_name, options).await;
+
+    info!(
+        "Stopping container with name {} (if it existed)",
         container_name
     );
 
@@ -114,23 +185,25 @@ pub fn setup_docker_logging(test_dir: &Path, dir_name: &str, container_name: &st
     Ok(())
 }
 
-/// This shutdown step forcibly kills a container with the given name. If no container
-/// is found we continue without error.
+/// This shutdown step stops a container with the given name. If no container is found
+/// we continue without error. We choose to stop the container on shutdown rather than
+/// totally delete it so the user can check the logs if it was an unexpected shutdown.
+/// When the local testnet is started again, any leftover container will be deleted.
 #[derive(Clone, Debug)]
-pub struct KillContainerShutdownStep {
+pub struct StopContainerShutdownStep {
     container_name: &'static str,
 }
 
-impl KillContainerShutdownStep {
+impl StopContainerShutdownStep {
     pub fn new(container_name: &'static str) -> Self {
         Self { container_name }
     }
 }
 
 #[async_trait]
-impl ShutdownStep for KillContainerShutdownStep {
+impl ShutdownStep for StopContainerShutdownStep {
     async fn run(self: Box<Self>) -> Result<()> {
-        delete_container(self.container_name).await?;
+        stop_container(self.container_name).await?;
         Ok(())
     }
 }
