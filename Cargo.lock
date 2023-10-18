@@ -891,6 +891,7 @@ dependencies = [
  "merlin",
  "more-asserts",
  "num-bigint 0.3.3",
+ "num-integer",
  "once_cell",
  "p256",
  "proptest",

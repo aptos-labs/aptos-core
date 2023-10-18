@@ -33,6 +33,7 @@ libsecp256k1 = { workspace = true }
 merlin = { workspace = true }
 more-asserts = { workspace = true }
 num-bigint = { workspace = true }
+num-integer = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }

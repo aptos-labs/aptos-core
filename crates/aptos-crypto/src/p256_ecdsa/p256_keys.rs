@@ -7,17 +7,18 @@
 use crate::test_utils::{self, KeyPair};
 use crate::{
     hash::CryptoHash,
-    p256_ecdsa::{P256Signature, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
+    p256_ecdsa::{P256Signature, ORDER, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
     traits::*,
 };
 use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
+use num_bigint::BigUint;
+use num_integer::Integer;
 use p256::{self, ecdsa::signature::Signer};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::prelude::*;
 use serde::Serialize;
 use std::fmt;
-use num_bigint::BigUint;
 
 /// A P256 private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
@@ -117,17 +118,20 @@ impl SigningKey for P256PrivateKey {
     }
 }
 
-// TODO: This is broken and will panic if the random bytes are greater than the field modulus
 impl Uniform for P256PrivateKey {
+    // Returns a random field element as a private key indistinguishable from uniformly random.
+    // Uses a hack to get around the incompatability of the `aptos-crypto` RngCore trait and the
+    // `RustCrypto` RngCore trait
     fn generate<R>(rng: &mut R) -> Self
     where
         R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
         let mut bytes = [0u8; P256_PRIVATE_KEY_LENGTH * 2];
         rng.fill_bytes(&mut bytes);
-        let bignum = BigUint::from_bytes_le(&bytes[..]);
-        let remainder = bignum.mod_floor(&SCALAR_FIELD_ORDER);
-        P256PrivateKey(p256::ecdsa::SigningKey::from_slice(&bytes[..]).unwrap())
+        let bignum = BigUint::from_bytes_be(&bytes[..]);
+        let order = BigUint::from_bytes_be(&ORDER);
+        let remainder = bignum.mod_floor(&order);
+        P256PrivateKey(p256::ecdsa::SigningKey::from_slice(&remainder.to_bytes_le()).unwrap())
     }
 }
 
