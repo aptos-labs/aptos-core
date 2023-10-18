@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    modifiers::create_swarm_cpu_stress,
-    multi_region_network_test::create_multi_region_swarm_network_chaos, LoadDestination,
-    NetworkLoadTest,
+    modifiers::{create_swarm_cpu_stress, CpuChaosConfig},
+    multi_region_network_test::create_multi_region_swarm_network_chaos,
+    LoadDestination, NetworkLoadTest,
 };
 use anyhow::Error;
 use aptos_config::config::OverrideNodeConfig;
@@ -54,7 +54,13 @@ impl PFNPerformance {
         let shuffled_peer_ids = self.gather_and_shuffle_peer_ids(swarm);
 
         // Create CPU chaos for the swarm
-        create_swarm_cpu_stress(shuffled_peer_ids, None)
+        create_swarm_cpu_stress(
+            shuffled_peer_ids,
+            Some(CpuChaosConfig {
+                num_groups: 3,
+                load_per_worker: 10000,
+            }),
+        )
     }
 
     /// Creates network emulation chaos for the swarm. Note: network chaos
