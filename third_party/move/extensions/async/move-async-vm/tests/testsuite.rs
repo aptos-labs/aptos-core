@@ -397,21 +397,12 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {
-    fn get_resource_value_with_metadata(
-        &self,
-        address: &AccountAddress,
-        typ: &StructTag,
-        metadata: &[Metadata],
-        _layout: &MoveTypeLayout,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        self.get_resource_bytes_with_metadata(address, typ, metadata)
-    }
-
-    fn get_resource_bytes_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
+        _maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Bytes>, usize)> {
         let res = self
             .harness
