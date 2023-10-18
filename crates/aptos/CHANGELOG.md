@@ -3,6 +3,19 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## [2.2.2] - 2023/10/16
+### Updated
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to d6f55d4baba32960ea7be60878552e73ffbe8b7e.
+
+## [2.2.1] - 2023/10/13
+### Fixed
+- Fixed postgres data persistence between restarts when using `aptos node run-local-testnet --with-indexer-api`.
+
+## [2.2.0] - 2023/10/11
+### Added
+- Added `--with-indexer-api` to `aptos node run-local-testnet`. With this flag you can run a full processor + indexer API stack as part of your local testnet. You must have Docker installed to use this feature. For more information, see https://aptos.dev/nodes/local-testnet/local-testnet-index.
+### Updated
 - Updated CLI source compilation to use rust toolchain version 1.72.1 (from 1.71.1).
 
 ## [2.1.1] - 2023/09/27

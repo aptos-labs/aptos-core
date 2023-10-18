@@ -1,19 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_backup_cli::{
-    coordinators::replay_verify::ReplayVerifyCoordinator,
+    coordinators::replay_verify::{ReplayError, ReplayVerifyCoordinator},
     metadata::cache::MetadataCacheOpt,
     storage::DBToolStorageOpt,
     utils::{ConcurrentDownloadsOpt, ReplayConcurrencyLevelOpt, RocksdbOpt, TrustedWaypointOpt},
 };
 use aptos_config::config::{
-    BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
     NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_db::{AptosDB, GetRestoreHandler};
 use aptos_executor_types::VerifyExecutionMode;
+use aptos_logger::info;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use std::{path::PathBuf, sync::Arc};
@@ -58,10 +59,12 @@ pub struct Opt {
     lazy_quit: bool,
 }
 
+const RETRY_ATTEMPT: u8 = 5;
+
 impl Opt {
     pub async fn run(self) -> Result<()> {
         let restore_handler = Arc::new(AptosDB::open(
-            self.db_dir,
+            StorageDirPaths::from_path(self.db_dir),
             false,                       /* read_only */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
             self.rocksdb_opt.into(),
@@ -70,19 +73,46 @@ impl Opt {
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         )?)
         .get_restore_handler();
-        ReplayVerifyCoordinator::new(
-            self.storage.init_storage().await?,
-            self.metadata_cache_opt,
-            self.trusted_waypoints_opt,
-            self.concurrent_downloads.get(),
-            self.replay_concurrency_level.get(),
-            restore_handler,
-            self.start_version.unwrap_or(0),
-            self.end_version.unwrap_or(Version::MAX),
-            self.validate_modules,
-            VerifyExecutionMode::verify_except(self.txns_to_skip).set_lazy_quit(self.lazy_quit),
-        )?
-        .run()
-        .await
+        let mut attempt = 0;
+        while attempt < RETRY_ATTEMPT {
+            let ret = ReplayVerifyCoordinator::new(
+                self.storage.clone().init_storage().await?,
+                self.metadata_cache_opt.clone(),
+                self.trusted_waypoints_opt.clone(),
+                self.concurrent_downloads.get(),
+                self.replay_concurrency_level.get(),
+                restore_handler.clone(),
+                self.start_version.unwrap_or(0),
+                self.end_version.unwrap_or(Version::MAX),
+                self.validate_modules,
+                VerifyExecutionMode::verify_except(self.txns_to_skip.clone())
+                    .set_lazy_quit(self.lazy_quit),
+            )?
+            .run()
+            .await;
+            match ret {
+                Err(e) => match e {
+                    ReplayError::TxnMismatch => {
+                        info!("ReplayVerify coordinator exiting with Txn output mismatch error.");
+                        break;
+                    },
+                    _ => {
+                        info!(
+                            "ReplayVerify coordinator retrying with attempt {}.",
+                            attempt
+                        );
+                    },
+                },
+                _ => {
+                    info!("ReplayVerify coordinator succeeded");
+                    return Ok(());
+                },
+            }
+            attempt += 1;
+        }
+        bail!(
+            "ReplayVerify coordinator failed after {} attempts.",
+            RETRY_ATTEMPT
+        )
     }
 }

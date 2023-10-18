@@ -74,8 +74,6 @@ pub struct LedgerDb {
 }
 
 impl LedgerDb {
-    // TODO(grao): Support more flexible path to make it easier for people to put different shards
-    // on different disks.
     pub(crate) fn new<P: AsRef<Path>>(
         db_root_path: P,
         rocksdb_configs: RocksdbConfigs,
