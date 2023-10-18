@@ -32,7 +32,10 @@ hkdf = { workspace = true }
 libsecp256k1 = { workspace = true }
 merlin = { workspace = true }
 more-asserts = { workspace = true }
+num-bigint = { workspace = true }
+num-integer = { workspace = true }
 once_cell = { workspace = true }
+p256 = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
@@ -43,6 +46,7 @@ serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
 sha2_0_10_6 = { workspace = true }
+signature = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
