@@ -767,15 +767,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
     }
 
     fn generate_delayed_field_id(&self) -> T::Identifier {
-        match &self.latest_view.latest_view {
-            ViewState::Sync(state) => (state.counter.fetch_add(1, Ordering::SeqCst) as u64).into(),
-            ViewState::Unsync(state) => {
-                let mut counter = state.counter.borrow_mut();
-                let id = (*counter as u64).into();
-                *counter += 1;
-                id
-            },
-        }
+        self.latest_view.generate_delayed_field_id()
     }
 
     pub fn into_inner(self) -> HashSet<T::Identifier> {
