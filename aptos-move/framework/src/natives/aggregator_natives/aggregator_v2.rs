@@ -36,7 +36,7 @@ pub const EAGGREGATOR_API_NOT_ENABLED: u64 = 0x03_0006;
 /// The generic type supplied to the aggregators is not supported.
 pub const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 0x03_0007;
 
-/// Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together)
+/// Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
 pub const ECONCAT_STRING_LENGTH_TOO_LARGE: u64 = 0x03_0008;
 
 /// The native aggregator function, that is in the move file, is not yet supported.
@@ -57,21 +57,19 @@ fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeRes
 }
 
 /// Given the native function argument and a type, returns a tuple of its
-/// fields: (`aggregator id`, `limit`).
+/// fields: (`aggregator id`, `max_value`).
 pub fn get_aggregator_fields_by_type(
     ty_arg: &Type,
     agg: &StructRef,
 ) -> SafeNativeResult<(u128, u128)> {
     match ty_arg {
         Type::U128 => {
-            // Get aggregator information and a value to add.
-            let (id, limit) = get_aggregator_fields_u128(agg)?;
-            Ok((id, limit))
+            let (id, max_value) = get_aggregator_fields_u128(agg)?;
+            Ok((id, max_value))
         },
         Type::U64 => {
-            // Get aggregator information and a value to add.
-            let (id, limit) = get_aggregator_fields_u64(agg)?;
-            Ok((id as u128, limit as u128))
+            let (id, max_value) = get_aggregator_fields_u64(agg)?;
+            Ok((id as u128, max_value as u128))
         },
         _ => Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
@@ -166,7 +164,7 @@ impl SnapshotType {
                     },
                 )])))
             },
-            // ty_arg cannot be Integer, if value is String
+            // Type cannot be Integer, if value is String
             _ => Err(SafeNativeError::Abort {
                 abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
             }),
@@ -255,7 +253,7 @@ macro_rules! abort_if_not_enabled {
 }
 
 /***************************************************************************************************
- * native fun create_aggregator<Element>(max_value: Element): Aggregator<Element>;
+ * native fun create_aggregator<IntElement>(max_value: IntElement): Aggregator<IntElement>;
  **************************************************************************************************/
 
 fn native_create_aggregator(
@@ -266,6 +264,7 @@ fn native_create_aggregator(
     abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
+    debug_assert_eq!(ty_args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
     let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
@@ -290,6 +289,7 @@ fn native_create_unbounded_aggregator(
     abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 0);
+    debug_assert_eq!(ty_args.len(), 1);
 
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
     let max_value = {
@@ -313,7 +313,7 @@ fn native_create_unbounded_aggregator(
 }
 
 /***************************************************************************************************
- * native fun try_add<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
+ * native fun try_add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
  **************************************************************************************************/
 fn native_try_add(
     context: &mut SafeNativeContext,
@@ -323,6 +323,7 @@ fn native_try_add(
     abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 2);
+    debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_TRY_ADD_BASE)?;
 
     let input = pop_value_by_type(&ty_args[0], &mut args)?;
@@ -344,7 +345,7 @@ fn native_try_add(
 }
 
 /***************************************************************************************************
- * native fun try_sub<Element>(aggregator: &mut Aggregator<Element>, value: Element): bool;
+ * native fun try_sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
  **************************************************************************************************/
 fn native_try_sub(
     context: &mut SafeNativeContext,
@@ -354,6 +355,7 @@ fn native_try_sub(
     abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 2);
+    debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
 
     let input = pop_value_by_type(&ty_args[0], &mut args)?;
@@ -374,7 +376,7 @@ fn native_try_sub(
 }
 
 /***************************************************************************************************
- * native fun read<Element>(aggregator: &Aggregator<Element>): Element;
+ * native fun read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement;
  **************************************************************************************************/
 
 fn native_read(
@@ -385,6 +387,7 @@ fn native_read(
     abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
+    debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_BASE)?;
 
     let (agg_value, agg_max_value) =
@@ -401,7 +404,7 @@ fn native_read(
 }
 
 /***************************************************************************************************
- * native fun snapshot(aggregator: &Aggregator): AggregatorSnapshot<u128>;
+ * native fun snapshot<IntElement>(aggregator: &Aggregator<IntElement>): AggregatorSnapshot<IntElement>;
  **************************************************************************************************/
 
 fn native_snapshot(
@@ -412,6 +415,7 @@ fn native_snapshot(
     abort_if_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
+    debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_SNAPSHOT_BASE)?;
 
     let (agg_value, _agg_max_value) =
@@ -425,7 +429,7 @@ fn native_snapshot(
 }
 
 /***************************************************************************************************
- * native fun create_snapshot(value: Element): AggregatorSnapshot<Element>;
+ * native fun create_snapshot<Element>(value: Element): AggregatorSnapshot<Element>
  **************************************************************************************************/
 
 fn native_create_snapshot(
@@ -450,7 +454,7 @@ fn native_create_snapshot(
 }
 
 /***************************************************************************************************
- * native fun copy_snapshot(snapshot: AggregatorSnapshot<Element>): AggregatorSnapshot<Element>;
+ * native fun copy_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): AggregatorSnapshot<Element>
  **************************************************************************************************/
 
 fn native_copy_snapshot(
@@ -478,7 +482,7 @@ fn native_copy_snapshot(
 }
 
 /***************************************************************************************************
- * native fun read_snapshot(snapshot: AggregatorSnapshot<Element>): Element;
+ * native fun read_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): Element;
  **************************************************************************************************/
 
 fn native_read_snapshot(
@@ -503,7 +507,7 @@ fn native_read_snapshot(
 }
 
 /***************************************************************************************************
- * native fun native fun string_concat<Element>(before: String, snapshot: &AggregatorSnapshot<Element>, after: String): AggregatorSnapshot<String>;
+ * native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): AggregatorSnapshot<String>;
  **************************************************************************************************/
 
 fn native_string_concat(
@@ -540,7 +544,11 @@ fn native_string_concat(
 
     let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
 
-    if prefix.len() + suffix.len() > CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH {
+    if prefix
+        .len()
+        .checked_add(suffix.len())
+        .map_or(false, |v| v > CONCAT_PREFIX_AND_SUFFIX_MAX_LENGTH)
+    {
         return Err(SafeNativeError::Abort {
             abort_code: ECONCAT_STRING_LENGTH_TOO_LARGE,
         });

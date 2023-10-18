@@ -34,6 +34,7 @@ operation that also reduced parallelism, and should be avoided as much as possib
 -  [Function `test_aggregator_valid_type`](#0x1_aggregator_v2_test_aggregator_valid_type)
 -  [Specification](#@Specification_1)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
+    -  [Function `create_unbounded_aggregator`](#@Specification_1_create_unbounded_aggregator)
     -  [Function `try_add`](#@Specification_1_try_add)
     -  [Function `try_sub`](#@Specification_1_try_sub)
     -  [Function `read`](#@Specification_1_read)
@@ -56,7 +57,7 @@ operation that also reduced parallelism, and should be avoided as much as possib
 Represents an integer which supports parallel additions and subtractions
 across multiple transactions. See the module description for more details.
 
-Currently supported types for Element are u64 and u128.
+Currently supported types for IntElement are u64 and u128.
 
 
 <pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">Aggregator</a>&lt;IntElement&gt; <b>has</b> drop, store
@@ -164,7 +165,7 @@ and any calls will raise this error.
 
 <a name="0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE"></a>
 
-Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together)
+Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
 
 
 <pre><code><b>const</b> <a href="aggregator_v2.md#0x1_aggregator_v2_ECONCAT_STRING_LENGTH_TOO_LARGE">ECONCAT_STRING_LENGTH_TOO_LARGE</a>: u64 = 8;
@@ -223,7 +224,7 @@ Returns <code>max_value</code> exceeding which aggregator overflows.
 
 Creates new aggregator, with given 'max_value'.
 
-Currently supported types for Element are u64 and u128.
+Currently supported types for IntElement are u64 and u128.
 EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
@@ -250,7 +251,7 @@ EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
 due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
 
-Currently supported types for Element are u64 and u128.
+Currently supported types for IntElement are u64 and u128.
 EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
 
 
@@ -521,7 +522,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>()
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>()
 </code></pre>
 
 
@@ -530,7 +531,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>() {
+<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>() {
     <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u64&gt;();
     <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u128&gt;();
     <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u64&gt;(5);
@@ -553,6 +554,22 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_create_unbounded_aggregator"></a>
+
+### Function `create_unbounded_aggregator`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
 </code></pre>
 
 

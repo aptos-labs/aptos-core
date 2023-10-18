@@ -27,7 +27,7 @@ module aptos_framework::aggregator_v2 {
     /// The generic type supplied to the aggregator is not supported.
     const EUNSUPPORTED_AGGREGATOR_TYPE: u64 = 7;
 
-    /// Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together)
+    /// Arguments passed to concat exceed max limit of 256 bytes (for prefix and suffix together).
     const ECONCAT_STRING_LENGTH_TOO_LARGE: u64 = 8;
 
     /// The native aggregator function, that is in the move file, is not yet supported.
@@ -37,7 +37,7 @@ module aptos_framework::aggregator_v2 {
     /// Represents an integer which supports parallel additions and subtractions
     /// across multiple transactions. See the module description for more details.
     ///
-    /// Currently supported types for Element are u64 and u128.
+    /// Currently supported types for IntElement are u64 and u128.
     struct Aggregator<IntElement> has store, drop {
         value: IntElement,
         max_value: IntElement,
@@ -57,14 +57,14 @@ module aptos_framework::aggregator_v2 {
 
     /// Creates new aggregator, with given 'max_value'.
     ///
-    /// Currently supported types for Element are u64 and u128.
+    /// Currently supported types for IntElement are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_aggregator<IntElement: copy + drop>(max_value: IntElement): Aggregator<IntElement>;
 
     /// Creates new aggregator, without any 'max_value' on top of the implicit bound restriction
     /// due to the width of the type (i.e. MAX_U64 for u64, MAX_U128 for u128).
     ///
-    /// Currently supported types for Element are u64 and u128.
+    /// Currently supported types for IntElement are u64 and u128.
     /// EAGGREGATOR_ELEMENT_TYPE_NOT_SUPPORTED raised if called with a different type.
     public native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
 
@@ -73,7 +73,7 @@ module aptos_framework::aggregator_v2 {
     public native fun try_add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
 
     // Adds `value` to aggregator, uncoditionally.
-    // If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown
+    // If addition would exceed the max_value, EAGGREGATOR_OVERFLOW exception will be thrown.
     public fun add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_add(aggregator, value), error::out_of_range(EAGGREGATOR_OVERFLOW));
     }
@@ -82,8 +82,8 @@ module aptos_framework::aggregator_v2 {
     /// If subtraction would result in a negative value, `false` is returned, and aggregator value is left unchanged.
     public native fun try_sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool;
 
-    // Adds `value` to aggregator, uncoditionally.
-    // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown
+    // Subtracts `value` to aggregator, uncoditionally.
+    // If subtraction would result in a negative value, EAGGREGATOR_UNDERFLOW exception will be thrown.
     public fun sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement) {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
@@ -118,7 +118,7 @@ module aptos_framework::aggregator_v2 {
     public native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): AggregatorSnapshot<String>;
 
     #[test]
-    public fun test_aggregator() {
+    fun test_aggregator() {
         let agg = create_aggregator(10);
         assert!(try_add(&mut agg, 5), 1);
         assert!(try_add(&mut agg, 5), 2);
@@ -135,7 +135,7 @@ module aptos_framework::aggregator_v2 {
     }
 
     #[test]
-    public fun test_correct_read() {
+    fun test_correct_read() {
         let snapshot = create_snapshot(42);
         assert!(read_snapshot(&snapshot) == 42, 0);
 
@@ -145,13 +145,13 @@ module aptos_framework::aggregator_v2 {
 
     #[test]
     #[expected_failure(abort_code = 0x030009, location = Self)]
-    public fun test_copy_not_yet_supported() {
+    fun test_copy_not_yet_supported() {
         let snapshot = create_snapshot(42);
         copy_snapshot(&snapshot);
     }
 
     #[test]
-    public fun test_string_concat1() {
+    fun test_string_concat1() {
         let snapshot = create_snapshot(42);
         let snapshot2 = string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
         assert!(read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
@@ -159,14 +159,16 @@ module aptos_framework::aggregator_v2 {
 
     #[test]
     #[expected_failure(abort_code = 0x030005, location = Self)]
-    public fun test_string_concat_from_string_not_supported() {
+    fun test_string_concat_from_string_not_supported() {
         let snapshot = create_snapshot<String>(std::string::utf8(b"42"));
         string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
     }
 
+    // Tests commented out, as flag used in rust cannot be disabled.
+
     // #[test(fx = @std)]
     // #[expected_failure(abort_code = 0x030006, location = Self)]
-    // public fun test_snapshot_feature_not_enabled(fx: &signer) {
+    // fun test_snapshot_feature_not_enabled(fx: &signer) {
     //     use std::features;
     //     use aptos_framework::reconfiguration;
     //     let feature = features::get_aggregator_v2_api_feature();
@@ -177,7 +179,7 @@ module aptos_framework::aggregator_v2 {
 
     // #[test(fx = @std)]
     // #[expected_failure(abort_code = 0x030006, location = Self)]
-    // public fun test_aggregator_feature_not_enabled(fx: &signer) {
+    // fun test_aggregator_feature_not_enabled(fx: &signer) {
     //     use std::features;
     //     use aptos_framework::reconfiguration;
     //     let feature = features::get_aggregator_v2_api_feature();
@@ -188,11 +190,11 @@ module aptos_framework::aggregator_v2 {
 
     #[test]
     #[expected_failure(abort_code = 0x030007, location = Self)]
-    public fun test_aggregator_invalid_type1() {
+    fun test_aggregator_invalid_type1() {
         create_unbounded_aggregator<u8>();
     }
 
-    public fun test_aggregator_valid_type() {
+    fun test_aggregator_valid_type() {
         create_unbounded_aggregator<u64>();
         create_unbounded_aggregator<u128>();
         create_aggregator<u64>(5);
@@ -201,14 +203,14 @@ module aptos_framework::aggregator_v2 {
 
     #[test]
     #[expected_failure(abort_code = 0x030005, location = Self)]
-    public fun test_snpashot_invalid_type1() {
+    fun test_snpashot_invalid_type1() {
         use std::option;
         create_snapshot(option::some(42));
     }
 
     #[test]
     #[expected_failure(abort_code = 0x030005, location = Self)]
-    public fun test_snpashot_invalid_type2() {
+    fun test_snpashot_invalid_type2() {
         create_snapshot(vector[42]);
     }
 }
