@@ -1705,7 +1705,6 @@ impl TransactionOptions {
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Simulating transaction locally with the gas profiler...");
-        println!("This is still experimental so results may be inaccurate.");
 
         let client = self.rest_client()?;
 
@@ -1755,7 +1754,7 @@ impl TransactionOptions {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
 
-        // Generate the file name for the flamegraphs
+        // Generate a humen-readable name for the report
         let entry_point = gas_log.entry_point();
 
         let human_readable_name = match entry_point {
@@ -1774,74 +1773,9 @@ impl TransactionOptions {
         };
         let raw_file_name = format!("txn-{}-{}", hash, human_readable_name);
 
-        // Create the directory if it does not exist yet.
-        let dir: &Path = Path::new("gas-profiling");
-
-        macro_rules! create_dir {
-            () => {
-                if let Err(err) = std::fs::create_dir(dir) {
-                    if err.kind() != std::io::ErrorKind::AlreadyExists {
-                        return Err(CliError::UnexpectedError(format!(
-                            "failed to create directory {}",
-                            dir.display()
-                        )));
-                    }
-                }
-            };
-        }
-
-        // Generate the execution & IO flamegraph.
-        println!();
-        match gas_log
-            .exec_io
-            .to_flamegraph(format!("Transaction {} -- Execution & IO", hash))?
-        {
-            Some(graph_bytes) => {
-                create_dir!();
-                let graph_file_path = Path::join(dir, format!("{}.exec_io.svg", raw_file_name));
-                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Failed to write flamegraph to file {} : {:?}",
-                        graph_file_path.display(),
-                        err
-                    ))
-                })?;
-                println!(
-                    "Execution & IO Gas flamegraph saved to {}",
-                    graph_file_path.display()
-                );
-            },
-            None => {
-                println!("Skipped generating execution & IO flamegraph");
-            },
-        }
-
-        // Generate the storage fee flamegraph.
-        match gas_log
-            .storage
-            .to_flamegraph(format!("Transaction {} -- Storage Fee", hash))?
-        {
-            Some(graph_bytes) => {
-                create_dir!();
-                let graph_file_path = Path::join(dir, format!("{}.storage.svg", raw_file_name));
-                std::fs::write(&graph_file_path, graph_bytes).map_err(|err| {
-                    CliError::UnexpectedError(format!(
-                        "Failed to write flamegraph to file {} : {:?}",
-                        graph_file_path.display(),
-                        err
-                    ))
-                })?;
-                println!(
-                    "Storage fee flamegraph saved to {}",
-                    graph_file_path.display()
-                );
-            },
-            None => {
-                println!("Skipped generating storage fee flamegraph");
-            },
-        }
-
-        println!();
+        // Generate the report
+        let path = Path::new("gas-profiling").join(raw_file_name);
+        gas_log.generate_html_report(path, format!("Gas Report - {}", human_readable_name))?;
 
         // Generate the transaction summary
 
