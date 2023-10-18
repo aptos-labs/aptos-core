@@ -190,13 +190,16 @@ impl<'r> TransactionDataCache<'r> {
             // If we need to process aggregator lifting, we pass type layout to remote.
             // Remote, in turn ensures that all aggregator values are lifted if the resolved
             // resource comes from storage.
-            let resolved_result = if has_aggregator_lifting {
-                self.remote
-                    .get_resource_value_with_metadata(&addr, &ty_tag, metadata, &ty_layout)
-            } else {
-                self.remote
-                    .get_resource_bytes_with_metadata(&addr, &ty_tag, metadata)
-            };
+            let resolved_result = self.remote.get_resource_bytes_with_metadata_and_layout(
+                &addr,
+                &ty_tag,
+                metadata,
+                if has_aggregator_lifting {
+                    Some(&ty_layout)
+                } else {
+                    None
+                },
+            );
 
             let (data, bytes_loaded) = resolved_result.map_err(|err| {
                 let msg = format!("Unexpected storage error: {:?}", err);

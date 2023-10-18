@@ -1941,11 +1941,14 @@ impl Loader {
     // It seems that this is only because there is no support for native
     // types.
     // Let's think how we can do this nicer.
-
     fn get_identifier_mapping_kind(
         &self,
         struct_name: &StructIdentifier,
     ) -> Option<IdentifierMappingKind> {
+        if !self.vm_config.aggregator_v2_type_tagging {
+            return None;
+        }
+
         let ident_str_to_kind = |ident_str: &IdentStr| -> Option<IdentifierMappingKind> {
             if ident_str.eq(ident_str!("Aggregator")) {
                 Some(IdentifierMappingKind::Aggregator)
