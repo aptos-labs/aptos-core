@@ -85,7 +85,8 @@ fn type_fun_ty_param(
     type_msg_(context, ty, &format!("Cannot infer the type parameter `{param_name}` for generic function `{m}::{n}`. Try providing a type parameter."));
 }
 
-pub fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
+// Try to expand the type of ty, warning with msg_uninferred if type cannot be inferred.
+fn type_msg_(context: &mut Context, ty: &mut Type, msg_uninferred: &str) {
     use Type_::*;
     match &mut ty.value {
         Anything | UnresolvedError | Param(_) | Unit => (),
