@@ -9,10 +9,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
-use move_core_types::{
-    value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
-};
+use move_core_types::value::MoveTypeLayout;
 use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
 
 /// The execution result of a transaction
@@ -26,40 +23,18 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
+    /// During transaction execution, it detected that it is in inconsistent state
+    /// due to speculative reads it did, and needs to be re-executed
+    SpeculativeExecutionAbortError(String),
+    /// During transaction execution, it detected code invariant error
+    /// Which can only be caused by the bug in the code.
+    DelayedFieldsCodeInvariantError(String),
 }
 
 /// Inference result of a transaction.
 pub struct Accesses<K> {
     pub keys_read: Vec<K>,
     pub keys_written: Vec<K>,
-}
-
-pub enum ErrorCategory {
-    CodeInvariantError,
-    SpeculativeExecutionError,
-    ValidError,
-}
-
-pub trait CategorizeError {
-    fn categorize(&self) -> ErrorCategory;
-}
-
-impl CategorizeError for usize {
-    fn categorize(&self) -> ErrorCategory {
-        ErrorCategory::ValidError
-    }
-}
-
-impl CategorizeError for VMStatus {
-    fn categorize(&self) -> ErrorCategory {
-        match self.status_code() {
-            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR => ErrorCategory::CodeInvariantError,
-            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => {
-                ErrorCategory::SpeculativeExecutionError
-            },
-            _ => ErrorCategory::ValidError,
-        }
-    }
 }
 
 /// Trait for single threaded transaction executor.
@@ -72,7 +47,7 @@ pub trait ExecutorTask: Sync {
     type Output: TransactionOutput<Txn = Self::Txn> + 'static;
 
     /// Type of error when the executor failed to process a transaction and needs to abort.
-    type Error: Debug + Clone + Send + Sync + Eq + CategorizeError + 'static;
+    type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
     /// Type to initialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
