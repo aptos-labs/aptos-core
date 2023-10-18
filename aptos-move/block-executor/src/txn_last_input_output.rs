@@ -4,7 +4,7 @@
 use crate::{
     captured_reads::CapturedReads,
     errors::Error,
-    task::{CategorizeError, ErrorCategory, ExecutionStatus, TransactionOutput},
+    task::{ExecutionStatus, TransactionOutput},
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -58,7 +58,7 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     module_read_write_intersection: AtomicBool,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + CategorizeError>
+impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     TxnLastInputOutput<T, O, E>
 {
     pub fn new(num_txns: TxnIndex) -> Self {
@@ -113,7 +113,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
             },
-            ExecutionStatus::Abort(_) => BTreeMap::new(),
+            ExecutionStatus::Abort(_)
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
         };
 
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {
@@ -214,7 +216,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
                         .map(|k| (k, false))
                         .chain(t.module_write_set().into_keys().map(|k| (k, true))),
                 ),
-                ExecutionStatus::Abort(_) => None,
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
     }
 
@@ -228,7 +232,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     Some(t.resource_write_set())
                 },
-                ExecutionStatus::Abort(_) => None,
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
     }
 
@@ -243,7 +249,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     Some(t.delayed_field_change_set().into_keys())
                 },
-                ExecutionStatus::Abort(_) => None,
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
     }
 
@@ -254,7 +262,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     t.aggregator_v1_delta_set().into_keys().collect()
                 },
-                ExecutionStatus::Abort(_) => vec![],
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             },
         )
     }
@@ -270,25 +280,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
                     let events = t.get_events();
                     Box::new(events.into_iter())
                 },
-                ExecutionStatus::Abort(_) => {
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
                     Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
                 },
             },
         )
-    }
-
-    pub(crate) fn output_category(&self, txn_idx: TxnIndex) -> Option<ErrorCategory> {
-        self.outputs[txn_idx as usize]
-            .load()
-            .as_ref()
-            .and_then(|txn_output| match txn_output.output_status() {
-                ExecutionStatus::Success(_) => None,
-                ExecutionStatus::SkipRest(_) => None,
-                ExecutionStatus::Abort(Error::UserError(err)) => Some(err.categorize()),
-                ExecutionStatus::Abort(Error::ModulePathReadWrite) => {
-                    Some(ErrorCategory::ValidError)
-                },
-            })
     }
 
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
@@ -312,7 +310,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone + Ca
                     patched_events,
                 );
             },
-            ExecutionStatus::Abort(_) => {},
+            ExecutionStatus::Abort(_)
+            | ExecutionStatus::SpeculativeExecutionAbortError(_)
+            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
     }
 
