@@ -1785,11 +1785,13 @@ dependencies = [
  "aptos-types",
  "aptos-vm-types",
  "bcs 0.1.4",
+ "handlebars",
  "inferno",
  "move-binary-format",
  "move-core-types",
  "move-vm-types",
  "regex",
+ "serde_json",
  "smallvec",
 ]
 
