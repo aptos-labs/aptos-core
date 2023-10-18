@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::SCALAR_FIELD_ORDER;
-use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
+use blstrs::{
+    pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
+};
 use group::Curve;
 use num_bigint::BigUint;
 use num_integer::Integer;
@@ -77,6 +79,34 @@ where
     );
 
     res.final_exponentiation()
+}
+
+/// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
+pub fn multi_pairing_g1_g2<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
+where
+    I1: Iterator<Item = &'a G1Projective>,
+    I2: Iterator<Item = &'a G2Projective>,
+{
+    multi_pairing(lhs, rhs)
+}
+
+/// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
+pub fn multi_pairing_g2_g1<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
+where
+    I1: Iterator<Item = &'a G2Projective>,
+    I2: Iterator<Item = &'a G1Projective>,
+{
+    multi_pairing(rhs, lhs)
+}
+
+/// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
+pub fn pairing_g1_g2(lhs: &G1Affine, rhs: &G2Affine) -> Gt {
+    pairing(lhs, rhs)
+}
+
+/// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
+pub fn pairing_g2_g1(lhs: &G2Affine, rhs: &G1Affine) -> Gt {
+    pairing(rhs, lhs)
 }
 
 pub trait HasMultiExp: Sized {

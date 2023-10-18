@@ -1,8 +1,22 @@
+# Summary
+
+PVSS schemes:
+
+ - SCRAPE PVSS with PKs in $\mathbb{G}_1$ and SKs in $\mathbb{G}_2$
+ - Das PVSS with PKs in $\mathbb{G}_2$ and SKs in $\mathbb{G}_1$
+
+WVUF schemes:
+ - Pinkas WVUF with PKs in $\mathbb{G}_2$ and SKs in $\mathbb{G}_1$
+ - GJM+21 WVUF with PKs in $\mathbb{G}_1$ and SKs in $\mathbb{G}_2$
+ - GJM+21 WVUF with PKs in $\mathbb{G}_2$ and SKs in $\mathbb{G}_1$
+
 # TODOs
 
- - PVSS transcript needs to contain a PoK of the dealt secret. Otherwise, last dealer can decide the randomness.
- - PVSS transcript needs to contain a signature from the dealer on $g^s$, such that we can tell where an aggregated transcript was aggregated from.
-   + Ideally, these two can be combined into one, al a [GJM+21]
+ - PVSS transcript needs to contain:
+   - PoK of the dealt secret. Otherwise, last dealer can decide the randomness.
+   - A signature from the dealer on $g^s$, such that we can tell where an aggregated transcript was aggregated from.
+   - [DONE] For Das PVSS
+   - For SCRAPE PVSS
  - accumulator_poly uses hard-coded FFT threshold to decide when to switch between slow/fast implementations
 
 # Workarounds

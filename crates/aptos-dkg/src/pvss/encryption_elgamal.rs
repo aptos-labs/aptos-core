@@ -31,9 +31,9 @@ macro_rules! encryption_elgamal_pp_impl {
         #[derive(DeserializeKey, PartialEq, Clone, SerializeKey, Eq, Debug)]
         pub struct PublicParameters {
             /// A group element $g \in G$, where $G$ is $G_1$, $G_2$ or $G_T$ used to exponentiate
-            /// both the (1) ciphertext randomness and the (2) the SK when computing its PK.
+            /// both the (1) ciphertext randomness and the (2) the DSK when computing its EK.
             g: $GTProjective,
-            /// A group element $h \in G$ used to exponentiate the encrypted message
+            /// A group element $h \in G$ that is raised to the encrypted message
             h: $GTProjective,
         }
 
