@@ -255,13 +255,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
-    pub fn provide_base_value(&self, key: K, data: V) {
+    pub fn provide_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {
         let mut v = self.values.entry(key).or_default();
         let bytes_len = data.bytes_len();
         // For base value, incarnation is irrelevant, set to 0.
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::zero(),
-            CachePadded::new(Entry::new_write_from(0, data, None)),
+            CachePadded::new(Entry::new_write_from(0, data, maybe_layout)),
         );
 
         assert!(prev_entry.map_or(true, |entry| -> bool {
