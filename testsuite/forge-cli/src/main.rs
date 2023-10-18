@@ -1830,7 +1830,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     // ALSO THESE ARE THE MOST COMMONLY USED TUNE-ABLES:
     const USE_CRAZY_MACHINES: bool = true;
-    const ENABLE_VFNS: bool = false;
+    const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 12;
 
     let mut forge_config = ForgeConfig::default()
@@ -1856,6 +1856,18 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             if USE_CRAZY_MACHINES {
                 config.execution.concurrency_level = 48;
             }
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Mempool config optimizations
+            mempool_config_practically_non_expiring(&mut config.mempool);
+
+            // Higher concurrency level
+            if USE_CRAZY_MACHINES {
+                config.execution.concurrency_level = 48;
+            }
+
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
         }));
 
     if ENABLE_VFNS {
