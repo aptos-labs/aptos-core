@@ -37,13 +37,15 @@ pub enum FeatureFlag {
     EMIT_FEE_STATEMENT = 27,
     STORAGE_DELETION_REFUND = 28,
     SIGNATURE_CHECKER_V2_SCRIPT_FIX = 29,
-    AGGREGATOR_SNAPSHOTS = 30,
+    AGGREGATOR_V2_API = 30,
     SAFER_RESOURCE_GROUPS = 31,
     SAFER_METADATA = 32,
-    SECP256K1_ECDSA_AUTHENTICATOR = 33,
+    SINGLE_SENDER_AUTHENTICATOR = 33,
     SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
-    RECONFIGURE_WITH_DKG = 36,
+    AGGREGATOR_V2_DELAYED_FIELDS = 36,
+    CONCURRENT_ASSETS = 37,
+    RECONFIGURE_WITH_DKG = 38,
 }
 
 /// Representation of features on chain as a bitset.
@@ -97,8 +99,16 @@ impl Features {
             && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
-    pub fn is_aggregator_snapshots_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_SNAPSHOTS)
+    /// Whether the Aggregator V2 API feature is enabled.
+    /// Once enabled, the functions from aggregator_v2.move will be available for use.
+    pub fn is_aggregator_v2_api_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
+    }
+
+    /// Whether the Aggregator V2 delayed fields feature is enabled.
+    /// Once enabled, Aggregator V2 functions become parallel.
+    pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
     }
 }
 

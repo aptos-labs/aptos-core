@@ -70,10 +70,12 @@ return true.
 -  [Function `signer_native_format_fix_enabled`](#0x1_features_signer_native_format_fix_enabled)
 -  [Function `get_module_event_feature`](#0x1_features_get_module_event_feature)
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
--  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
--  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
+-  [Function `get_aggregator_v2_api_feature`](#0x1_features_get_aggregator_v2_api_feature)
+-  [Function `aggregator_v2_api_enabled`](#0x1_features_aggregator_v2_api_enabled)
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
+-  [Function `get_concurrent_assets_feature`](#0x1_features_get_concurrent_assets_feature)
+-  [Function `concurrent_assets_enabled`](#0x1_features_concurrent_assets_enabled)
 -  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
 -  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -134,13 +136,26 @@ The enabled features, represented by a bitset stored on chain.
 ## Constants
 
 
-<a name="0x1_features_AGGREGATOR_SNAPSHOTS"></a>
+<a name="0x1_features_AGGREGATOR_V2_API"></a>
 
-Whether the aggregator snapshots feature is enabled.
+Whether the Aggregator V2 API feature is enabled.
+Once enabled, the functions from aggregator_v2.move will be available for use.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>: u64 = 30;
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>: u64 = 30;
+</code></pre>
+
+
+
+<a name="0x1_features_AGGREGATOR_V2_DELAYED_FIELDS"></a>
+
+Whether the Aggregator V2 delayed fields feature is enabled.
+Once enabled, Aggregator V2 functions become parallel.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_DELAYED_FIELDS">AGGREGATOR_V2_DELAYED_FIELDS</a>: u64 = 36;
 </code></pre>
 
 
@@ -238,6 +253,18 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_CONCURRENT_ASSETS"></a>
+
+Whether enable TokenV2 collection creation and Fungible Asset creation
+to create higher throughput concurrent variants.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>: u64 = 37;
+</code></pre>
+
+
+
 <a name="0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES"></a>
 
 Whether generic algebra basic operation support in <code>crypto_algebra.<b>move</b></code> are enabled.
@@ -289,6 +316,15 @@ The provided signer has not a framework address.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_features_FEE_PAYER_ACCOUNT_OPTIONAL"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ACCOUNT_OPTIONAL">FEE_PAYER_ACCOUNT_OPTIONAL</a>: u64 = 35;
 </code></pre>
 
 
@@ -366,7 +402,7 @@ Whether reconfiguration with DKG is enabled.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 36;
+<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 38;
 </code></pre>
 
 
@@ -378,6 +414,33 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
+</code></pre>
+
+
+
+<a name="0x1_features_SAFER_METADATA"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_METADATA">SAFER_METADATA</a>: u64 = 32;
+</code></pre>
+
+
+
+<a name="0x1_features_SAFER_RESOURCE_GROUPS"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_RESOURCE_GROUPS">SAFER_RESOURCE_GROUPS</a>: u64 = 31;
+</code></pre>
+
+
+
+<a name="0x1_features_SECP256K1_ECDSA_AUTHENTICATOR"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SECP256K1_ECDSA_AUTHENTICATOR">SECP256K1_ECDSA_AUTHENTICATOR</a>: u64 = 33;
 </code></pre>
 
 
@@ -1362,13 +1425,13 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_aggregator_snapshots_feature"></a>
+<a name="0x1_features_get_aggregator_v2_api_feature"></a>
 
-## Function `get_aggregator_snapshots_feature`
+## Function `get_aggregator_v2_api_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_v2_api_feature">get_aggregator_v2_api_feature</a>(): u64
 </code></pre>
 
 
@@ -1377,20 +1440,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_v2_api_feature">get_aggregator_v2_api_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a> }
 </code></pre>
 
 
 
 </details>
 
-<a name="0x1_features_aggregator_snapshots_enabled"></a>
+<a name="0x1_features_aggregator_v2_api_enabled"></a>
 
-## Function `aggregator_snapshots_enabled`
+## Function `aggregator_v2_api_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>(): bool
 </code></pre>
 
 
@@ -1399,8 +1462,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_SNAPSHOTS">AGGREGATOR_SNAPSHOTS</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>)
 }
 </code></pre>
 
@@ -1447,6 +1510,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_sponsored_automatic_account_creation_enabled">sponsored_automatic_account_creation_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_concurrent_assets_feature"></a>
+
+## Function `get_concurrent_assets_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_concurrent_assets_enabled"></a>
+
+## Function `concurrent_assets_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>)
 }
 </code></pre>
 

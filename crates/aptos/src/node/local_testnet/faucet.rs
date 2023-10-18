@@ -70,7 +70,7 @@ impl ServiceManager for FaucetManager {
         "Faucet".to_string()
     }
 
-    fn get_healthchecks(&self) -> HashSet<HealthChecker> {
+    fn get_health_checkers(&self) -> HashSet<HealthChecker> {
         hashset! {HealthChecker::http_checker_from_port(
             self.config.server_config.listen_port,
             self.get_name(),

@@ -338,19 +338,45 @@ async fn test_fee_payer_signed_transaction() {
         )
         .unwrap();
 
-    let another_txn = match another_txn.authenticator() {
+    let (sender, secondary_signer_addresses, secondary_signers) = match another_txn.authenticator()
+    {
         TransactionAuthenticator::FeePayer {
             sender,
             secondary_signer_addresses,
             secondary_signers,
             fee_payer_address: _,
+            fee_payer_signer: _,
+        } => (sender, secondary_signer_addresses, secondary_signers),
+        _ => panic!(
+            "expecting TransactionAuthenticator::FeePayer, but got: {:?}",
+            txn.authenticator()
+        ),
+    };
+
+    let another_txn = another_raw_txn
+        .clone()
+        .sign_fee_payer(
+            another_account.private_key(),
+            vec![],
+            vec![],
+            fee_payer.address(),
+            fee_payer.private_key(),
+        )
+        .unwrap();
+
+    let another_txn = match another_txn.authenticator() {
+        TransactionAuthenticator::FeePayer {
+            sender: _,
+            secondary_signer_addresses: _,
+            secondary_signers: _,
+            fee_payer_address,
             fee_payer_signer,
         } => {
             let auth = TransactionAuthenticator::fee_payer(
                 sender,
                 secondary_signer_addresses,
                 secondary_signers,
-                fee_payer.address(),
+                fee_payer_address,
                 fee_payer_signer,
             );
             SignedTransaction::new_signed_transaction(another_raw_txn, auth)

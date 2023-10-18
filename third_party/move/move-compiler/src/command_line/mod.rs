@@ -41,3 +41,9 @@ pub const COMPILED_NAMED_ADDRESS_MAPPING: &str = "compiled-module-address-name";
 pub const MOVE_COMPILER_DEBUG_ENV_VAR: &str = "MOVE_COMPILER_DEBUG";
 
 pub const DEBUG_FLAG: &str = "debug";
+
+pub const MOVE_COMPILER_WARN_OF_DEPRECATION_USE: &str = "MOVE_COMPILER_WARN_OF_DEPRECATION_USE";
+pub const MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG: &str = "Wdeprecation";
+
+pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS: &str = "WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS";
+pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG: &str = "Wdeprecation-aptos";

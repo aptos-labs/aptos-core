@@ -26,6 +26,7 @@ aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
 aptos-fallible = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }

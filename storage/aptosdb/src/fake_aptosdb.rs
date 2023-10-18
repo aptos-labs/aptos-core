@@ -228,7 +228,7 @@ impl FakeAptosDB {
             // code in genesis is necessary for benchmark execution. Note that only the genesis
             // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
-                self.inner.save_transactions(
+                self.inner.save_transactions_for_test(
                     &txns_to_commit
                         .iter()
                         .map(|txn| txn.borrow().clone())
@@ -387,27 +387,8 @@ impl DbWriter for FakeAptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        self.save_transactions_impl(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            sync_commit,
-            latest_in_memory_state,
-        )
-    }
-
-    fn save_transaction_block(
-        &self,
-        txns_to_commit: &[Arc<TransactionToCommit>],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        sync_commit: bool,
-        latest_in_memory_state: StateDelta,
-        _block_state_updates: ShardedStateUpdates,
-        _sharded_state_cache: &ShardedStateCache,
+        _state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
         self.save_transactions_impl(
             txns_to_commit,
@@ -899,7 +880,7 @@ mod tests {
     };
     use anyhow::{anyhow, ensure, Result};
     use aptos_crypto::{hash::CryptoHash, HashValue};
-    use aptos_storage_interface::{DbReader, DbWriter};
+    use aptos_storage_interface::{cached_state_view::ShardedStateCache, DbReader, DbWriter};
     use aptos_temppath::TempPath;
     use aptos_types::{
         account_address::AccountAddress,
@@ -936,6 +917,8 @@ mod tests {
                     Some(ledger_info_with_sigs),
                     false, /* sync_commit */
                     in_memory_state.clone(),
+                    None, // ignored
+                    Some(&ShardedStateCache::default()) // ignored
                 )
                 .unwrap();
 

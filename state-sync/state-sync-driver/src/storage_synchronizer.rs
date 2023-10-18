@@ -190,16 +190,20 @@ impl<
         metadata_storage: MetadataStorage,
         storage: DbReaderWriter,
         runtime: Option<&Runtime>,
-    ) -> (Self, JoinHandle<()>, JoinHandle<()>) {
+    ) -> (Self, JoinHandle<()>, JoinHandle<()>, JoinHandle<()>) {
         // Create a channel to notify the executor when data chunks are ready
         let max_pending_data_chunks = driver_config.max_pending_data_chunks as usize;
         let (executor_notifier, executor_listener) = mpsc::channel(max_pending_data_chunks);
 
-        // Create a channel to notify the committer when executed chunks are ready
+        // Create a channel to notify the ledger updater when executed chunks are ready
+        let (ledger_updater_notifier, ledger_updater_listener) =
+            mpsc::channel(max_pending_data_chunks);
+
+        // Create a channel to notify the committer when the ledger has been updated
         let (committer_notifier, committer_listener) = mpsc::channel(max_pending_data_chunks);
 
         // Create a shared pending data chunk counter
-        let pending_transaction_chunks = Arc::new(AtomicU64::new(0));
+        let pending_data_chunks = Arc::new(AtomicU64::new(0));
 
         // Spawn the executor that executes/applies storage data chunks
         let runtime = runtime.map(|runtime| runtime.handle().clone());
@@ -207,8 +211,18 @@ impl<
             chunk_executor.clone(),
             error_notification_sender.clone(),
             executor_listener,
+            ledger_updater_notifier,
+            pending_data_chunks.clone(),
+            runtime.clone(),
+        );
+
+        // Spawn the ledger updater that updates the ledger in storage
+        let ledger_updater_handle = spawn_ledger_updater(
+            chunk_executor.clone(),
+            error_notification_sender.clone(),
+            ledger_updater_listener,
             committer_notifier,
-            pending_transaction_chunks.clone(),
+            pending_data_chunks.clone(),
             runtime.clone(),
         );
 
@@ -220,7 +234,7 @@ impl<
             event_subscription_service,
             mempool_notification_handler,
             storage_service_notification_handler,
-            pending_transaction_chunks.clone(),
+            pending_data_chunks.clone(),
             runtime.clone(),
             storage.reader.clone(),
         );
@@ -235,14 +249,19 @@ impl<
             driver_config,
             error_notification_sender,
             executor_notifier,
-            pending_data_chunks: pending_transaction_chunks,
+            pending_data_chunks,
             metadata_storage,
             runtime,
             state_snapshot_notifier: None,
             storage,
         };
 
-        (storage_synchronizer, executor_handle, committer_handle)
+        (
+            storage_synchronizer,
+            executor_handle,
+            ledger_updater_handle,
+            committer_handle,
+        )
     }
 
     /// Notifies the executor of new data chunks
@@ -391,22 +410,22 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
-    mut committer_notifier: mpsc::Sender<NotificationId>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    mut ledger_updater_notifier: mpsc::Sender<NotificationId>,
+    pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create an executor
     let executor = async move {
         while let Some(storage_data_chunk) = executor_listener.next().await {
             // Execute/apply the storage data chunk
-            let (notification_id, result) = match storage_data_chunk {
+            let (notification_id, result, executed_chunk) = match storage_data_chunk {
                 StorageDataChunk::Transactions(
                     notification_id,
                     transactions_with_proof,
                     target_ledger_info,
                     end_of_epoch_ledger_info,
                 ) => {
-                    let timer = metrics::start_timer(
+                    let _timer = metrics::start_timer(
                         &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                         metrics::STORAGE_SYNCHRONIZER_EXECUTE_CHUNK,
                     );
@@ -440,8 +459,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             num_transactions as u64,
                         );
                     }
-                    drop(timer);
-                    (notification_id, result)
+                    (notification_id, result, true)
                 },
                 StorageDataChunk::TransactionOutputs(
                     notification_id,
@@ -449,7 +467,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     target_ledger_info,
                     end_of_epoch_ledger_info,
                 ) => {
-                    let timer = metrics::start_timer(
+                    let _timer = metrics::start_timer(
                         &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                         metrics::STORAGE_SYNCHRONIZER_APPLY_CHUNK,
                     );
@@ -483,8 +501,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             num_outputs as u64,
                         );
                     }
-                    drop(timer);
-                    (notification_id, result)
+                    (notification_id, result, false)
                 },
                 storage_data_chunk => {
                     error!(
@@ -497,9 +514,74 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                 },
             };
 
-            // Notify the committer of new executed chunks
+            // Notify the ledger updater of the new executed/applied chunks
             match result {
                 Ok(()) => {
+                    if let Err(error) = ledger_updater_notifier.send(notification_id).await {
+                        let error =
+                            format!("Failed to notify the ledger updater! Error: {:?}", error);
+                        send_storage_synchronizer_error(
+                            error_notification_sender.clone(),
+                            notification_id,
+                            error,
+                        )
+                        .await;
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
+                    }
+                },
+                Err(error) => {
+                    let error = if executed_chunk {
+                        format!("Failed to execute the data chunk! Error: {:?}", error)
+                    } else {
+                        format!("Failed to apply the data chunk! Error: {:?}", error)
+                    };
+                    send_storage_synchronizer_error(
+                        error_notification_sender.clone(),
+                        notification_id,
+                        error,
+                    )
+                    .await;
+                    decrement_pending_data_chunks(pending_data_chunks.clone());
+                },
+            }
+        }
+    };
+
+    // Spawn the executor
+    spawn(runtime, executor)
+}
+
+/// Spawns a dedicated updater that updates the ledger after chunk execution/application
+fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
+    chunk_executor: Arc<ChunkExecutor>,
+    error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
+    mut ledger_updater_listener: mpsc::Receiver<NotificationId>,
+    mut committer_notifier: mpsc::Sender<NotificationId>,
+    pending_data_chunks: Arc<AtomicU64>,
+    runtime: Option<Handle>,
+) -> JoinHandle<()> {
+    // Create a ledger updater
+    let ledger_updater = async move {
+        while let Some(notification_id) = ledger_updater_listener.next().await {
+            // Update the storage ledger
+            let _timer = metrics::start_timer(
+                &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
+                metrics::STORAGE_SYNCHRONIZER_UPDATE_LEDGER,
+            );
+            let result = update_ledger(chunk_executor.clone()).await;
+
+            // Notify the committer of the updated ledger
+            match result {
+                Ok(()) => {
+                    // Log the ledger update
+                    debug!(
+                        LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                            "Updated the ledger for notification ID {:?}!",
+                            notification_id,
+                        ))
+                    );
+
+                    // Notify the committer of the update
                     if let Err(error) = committer_notifier.send(notification_id).await {
                         let error = format!("Failed to notify the committer! Error: {:?}", error);
                         send_storage_synchronizer_error(
@@ -508,28 +590,25 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             error,
                         )
                         .await;
-                        decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                        decrement_pending_data_chunks(pending_data_chunks.clone());
                     }
                 },
                 Err(error) => {
-                    let error = format!(
-                        "Failed to execute/apply the storage data chunk! Error: {:?}",
-                        error
-                    );
+                    let error = format!("Failed to update the ledger! Error: {:?}", error);
                     send_storage_synchronizer_error(
                         error_notification_sender.clone(),
                         notification_id,
                         error,
                     )
                     .await;
-                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    decrement_pending_data_chunks(pending_data_chunks.clone());
                 },
-            }
+            };
         }
     };
 
-    // Spawn the executor
-    spawn(runtime, executor)
+    // Spawn the ledger updater
+    spawn(runtime, ledger_updater)
 }
 
 /// Spawns a dedicated committer that commits executed (but pending) chunks
@@ -544,7 +623,7 @@ fn spawn_committer<
     event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
     mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
     storage_service_notification_handler: StorageServiceNotificationHandler<StorageServiceNotifier>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
     storage: Arc<dyn DbReader>,
 ) -> JoinHandle<()> {
@@ -552,7 +631,7 @@ fn spawn_committer<
     let committer = async move {
         while let Some(notification_id) = committer_listener.next().await {
             // Commit the executed chunk
-            let timer = metrics::start_timer(
+            let _timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_COMMIT_CHUNK,
             );
@@ -603,8 +682,7 @@ fn spawn_committer<
                     .await;
                 },
             };
-            drop(timer);
-            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+            decrement_pending_data_chunks(pending_data_chunks.clone());
         }
     };
 
@@ -621,7 +699,7 @@ fn spawn_state_snapshot_receiver<
     mut state_snapshot_listener: mpsc::Receiver<StorageDataChunk>,
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
-    pending_transaction_chunks: Arc<AtomicU64>,
+    pending_data_chunks: Arc<AtomicU64>,
     metadata_storage: MetadataStorage,
     storage: DbReaderWriter,
     epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
@@ -704,7 +782,7 @@ fn spawn_state_snapshot_receiver<
                                     )
                                     .await;
                                 }
-                                decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                                decrement_pending_data_chunks(pending_data_chunks.clone());
                                 continue; // Wait for the next chunk
                             }
 
@@ -730,7 +808,7 @@ fn spawn_state_snapshot_receiver<
                                 )
                                 .await;
                             }
-                            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                            decrement_pending_data_chunks(pending_data_chunks.clone());
                             return; // There's nothing left to do!
                         },
                         Err(error) => {
@@ -754,7 +832,7 @@ fn spawn_state_snapshot_receiver<
                     );
                 },
             }
-            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+            decrement_pending_data_chunks(pending_data_chunks.clone());
         }
     };
 
@@ -772,7 +850,7 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
     tokio::task::spawn_blocking(move || {
-        chunk_executor.apply_chunk(
+        chunk_executor.enqueue_chunk_by_transaction_outputs(
             outputs_with_proof,
             &target_ledger_info,
             end_of_epoch_ledger_info.as_ref(),
@@ -792,7 +870,7 @@ async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
 ) -> anyhow::Result<()> {
     tokio::task::spawn_blocking(move || {
-        chunk_executor.execute_chunk(
+        chunk_executor.enqueue_chunk_by_execution(
             transactions_with_proof,
             &target_ledger_info,
             end_of_epoch_ledger_info.as_ref(),
@@ -800,6 +878,17 @@ async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     })
     .await
     .expect("Spawn_blocking(execute_transaction_chunk) failed!")
+}
+
+/// Spawns a dedicated task that updates the ledger in storage. We use
+/// `spawn_blocking` so that the heavy synchronous function doesn't
+/// block the async thread.
+async fn update_ledger<ChunkExecutor: ChunkExecutorTrait + 'static>(
+    chunk_executor: Arc<ChunkExecutor>,
+) -> anyhow::Result<()> {
+    tokio::task::spawn_blocking(move || chunk_executor.update_ledger())
+        .await
+        .expect("Spawn_blocking(update_ledger) failed!")
 }
 
 /// Spawns a dedicated task that commits a data chunk. We use
