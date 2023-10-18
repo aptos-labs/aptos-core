@@ -209,7 +209,7 @@ fn native_create_aggregator(
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
     let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
 
-    let value_field_value = if context.aggregator_execution_enabled() {
+    let value_field_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = resolver.generate_delayed_field_id();
         aggregator_data.create_new_aggregator(AggregatorVersionedID::V2(id), max_value);
@@ -239,7 +239,7 @@ fn native_try_add(
     let agg_struct = safely_pop_arg!(args, StructRef);
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
         let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
@@ -273,7 +273,7 @@ fn native_try_sub(
     let agg_struct = safely_pop_arg!(args, StructRef);
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
         let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
@@ -306,7 +306,7 @@ fn native_read(
     let (agg_value, agg_max_value) =
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
         let id = AggregatorVersionedID::V2(aggregator_value_field_as_id(agg_value)?);
         let aggregator = aggregator_data.get_aggregator(id, agg_max_value)?;
@@ -338,7 +338,7 @@ fn native_snapshot(
     let (agg_value, agg_max_value) =
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
         let aggregator_id = aggregator_value_field_as_id(agg_value)?;
         aggregator_data
@@ -375,7 +375,7 @@ fn native_create_snapshot(
     let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
         let snapshot_id = aggregator_data.create_new_snapshot(input, resolver);
         SnapshotValue::Integer(snapshot_id.as_u64() as u128)
@@ -438,7 +438,7 @@ fn native_read_snapshot(
     let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
     let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
 
         let aggregator_id = aggregator_snapshot_value_field_as_id(snapshot_value)?;
@@ -488,7 +488,7 @@ fn native_string_concat(
 
     let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
 
-    let result_value = if context.aggregator_execution_enabled() {
+    let result_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut aggregator_data) = get_context_data(context);
 
         let aggregator_id = aggregator_value_field_as_id(snapshot_value)?;

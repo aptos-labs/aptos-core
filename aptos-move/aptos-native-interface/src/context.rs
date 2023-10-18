@@ -125,6 +125,7 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
     }
 
     pub fn aggregator_v2_delayed_fields_enabled(&self) -> bool {
-        self.get_feature_flags().is_aggregator_v2_delayed_fields_enabled()
+        self.get_feature_flags()
+            .is_aggregator_v2_delayed_fields_enabled()
     }
 }

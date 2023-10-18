@@ -21,6 +21,15 @@ This module provides an interface for aggregators (version 2).
 -  [Function `copy_snapshot`](#0x1_aggregator_v2_copy_snapshot)
 -  [Function `read_snapshot`](#0x1_aggregator_v2_read_snapshot)
 -  [Function `string_concat`](#0x1_aggregator_v2_string_concat)
+-  [Specification](#@Specification_1)
+    -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
+    -  [Function `try_add`](#@Specification_1_try_add)
+    -  [Function `try_sub`](#@Specification_1_try_sub)
+    -  [Function `read`](#@Specification_1_read)
+    -  [Function `snapshot`](#@Specification_1_snapshot)
+    -  [Function `create_snapshot`](#@Specification_1_create_snapshot)
+    -  [Function `copy_snapshot`](#@Specification_1_copy_snapshot)
+    -  [Function `string_concat`](#@Specification_1_string_concat)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -430,6 +439,137 @@ raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
 
 
 </details>
+
+<a name="@Specification_1"></a>
+
+## Specification
+
+
+<a name="@Specification_1_create_aggregator"></a>
+
+### Function `create_aggregator`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_try_add"></a>
+
+### Function `try_add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_add">try_add</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_try_sub"></a>
+
+### Function `try_sub`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">try_sub</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<b>mut</b> <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;, value: IntElement): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_read"></a>
+
+### Function `read`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read">read</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): IntElement
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_snapshot"></a>
+
+### Function `snapshot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_snapshot">snapshot</a>&lt;IntElement&gt;(<a href="aggregator.md#0x1_aggregator">aggregator</a>: &<a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_create_snapshot"></a>
+
+### Function `create_snapshot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_snapshot">create_snapshot</a>&lt;Element: <b>copy</b>, drop&gt;(value: Element): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_copy_snapshot"></a>
+
+### Function `copy_snapshot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_copy_snapshot">copy_snapshot</a>&lt;Element: <b>copy</b>, drop&gt;(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;Element&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a name="@Specification_1_string_concat"></a>
+
+### Function `string_concat`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

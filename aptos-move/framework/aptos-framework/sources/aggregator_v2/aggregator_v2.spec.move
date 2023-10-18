@@ -5,10 +5,10 @@ spec aptos_framework::aggregator_v2 {
         pragma opaque;
     }
 
-    spec create_unbounded_aggregator {
-        // TODO: temporary mockup.
-        pragma opaque;
-    }
+    // spec create_unbounded_aggregator {
+    //     // TODO: temporary mockup.
+    //     pragma opaque;
+    // }
 
     spec try_add {
         // TODO: temporary mockup.
