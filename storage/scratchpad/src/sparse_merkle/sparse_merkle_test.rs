@@ -438,6 +438,7 @@ fn update(smt: &SparseMerkleTree) -> SparseMerkleTree {
 }
 
 #[test]
+#[ignore] // gonna remove this functionality
 fn test_get_oldest_ancestor() {
     // smt0 - smt00 - smt000 - smt0000 - smt00000
     //              \

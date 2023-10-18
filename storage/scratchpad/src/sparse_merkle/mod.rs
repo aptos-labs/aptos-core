@@ -111,7 +111,7 @@ const BITS_IN_BYTE: usize = 8;
 /// To help finding the oldest ancestor of any SMT, a branch tracker is created each time
 /// the chain of SMTs forked (two or more SMTs updating the same parent).
 #[derive(Debug)]
-struct BranchTracker<V> {
+struct BranchTracker<V: Send + Sync + 'static> {
     /// Current branch head, n.b. when the head just started dropping, this weak link becomes
     /// invalid, we fall back to the `next`
     head: Weak<Inner<V>>,
@@ -122,7 +122,7 @@ struct BranchTracker<V> {
     parent: Option<Arc<Mutex<BranchTracker<V>>>>,
 }
 
-impl<V> BranchTracker<V> {
+impl<V: Send + Sync + 'static> BranchTracker<V> {
     fn new_head_unknown(
         parent: Option<Arc<Mutex<Self>>>,
         _locked_family: &MutexGuard<()>,
@@ -159,19 +159,19 @@ impl<V> BranchTracker<V> {
         // Notice the starting of the drop a SMT is not protected by the family lock -- but
         // change of the links between the branch trackers and SMTs are always protected by the
         // family lock.
-        // see `impl<V> Drop for Inner<V>`
+        // see `impl<V: Send + Sync + 'static> Drop for Inner<V>`
         self.head.upgrade().or_else(|| self.next.upgrade())
     }
 }
 
 /// Keeps track of references of children and the branch tracker of the current branch.
 #[derive(Debug)]
-struct InnerLinks<V> {
+struct InnerLinks<V: Send + Sync + 'static> {
     children: Vec<Arc<Inner<V>>>,
     branch_tracker: Arc<Mutex<BranchTracker<V>>>,
 }
 
-impl<V> InnerLinks<V> {
+impl<V: Send + Sync + 'static> InnerLinks<V> {
     fn new(branch_tracker: Arc<Mutex<BranchTracker<V>>>) -> Mutex<Self> {
         Mutex::new(Self {
             children: Vec::new(),
@@ -183,7 +183,7 @@ impl<V> InnerLinks<V> {
 /// The inner content of a sparse merkle tree, we have this so that even if a tree is dropped, the
 /// INNER of it can still live if referenced by a previous version.
 #[derive(Debug)]
-struct Inner<V> {
+struct Inner<V: Send + Sync + 'static> {
     root: SubTree<V>,
     usage: StateStorageUsage,
     links: Mutex<InnerLinks<V>>,
@@ -191,7 +191,7 @@ struct Inner<V> {
     family_lock: Arc<Mutex<()>>,
 }
 
-impl<V> Drop for Inner<V> {
+impl<V: Send + Sync + 'static> Drop for Inner<V> {
     fn drop(&mut self) {
         // To prevent recursively locking the family, buffer all descendants outside.
         let mut processed_descendants = Vec::new();
@@ -222,14 +222,20 @@ impl<V> Drop for Inner<V> {
                 processed_descendants.push(descendant);
             }
         };
-        // Now that the lock is released, those in `processed_descendants` will be dropped in turn
-        // if applicable.
+        // Now that the lock is released, those in `processed_descendants` can be dropped if
+        // applicable.
+        //
+        // Send the Arc to multiple threads so that the dropping happens in parallel (specifically,
+        // dropping of the SMTs).
+        for descendant_arc in processed_descendants {
+            aptos_drop_helper::DEFAULT_DROP_HELPER.schedule_drop(descendant_arc)
+        }
 
         self.log_generation("drop");
     }
 }
 
-impl<V> Inner<V> {
+impl<V: Send + Sync + 'static> Inner<V> {
     fn new(root: SubTree<V>, usage: StateStorageUsage) -> Arc<Self> {
         let family_lock = Arc::new(Mutex::new(()));
         let branch_tracker = BranchTracker::new_head_unknown(None, &family_lock.lock());
@@ -358,13 +364,13 @@ impl<V> Inner<V> {
 
 /// The Sparse Merkle Tree implementation.
 #[derive(Clone, Debug)]
-pub struct SparseMerkleTree<V> {
+pub struct SparseMerkleTree<V: Send + Sync + 'static> {
     inner: Arc<Inner<V>>,
 }
 
-impl<V> SparseMerkleTree<V>
+impl<V: Send + Sync + 'static> SparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync,
+    V: Clone + CryptoHash + Send + Sync + 'static,
 {
     /// Constructs a Sparse Merkle Tree with a root hash. This is often used when we restart and
     /// the scratch pad and the storage have identical state, so we use a single root hash to
@@ -451,9 +457,9 @@ where
 
 /// In tests and benchmark, reference to ancestors are manually managed
 #[cfg(any(feature = "fuzzing", feature = "bench", test))]
-impl<V> SparseMerkleTree<V>
+impl<V: Send + Sync + 'static> SparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync,
+    V: Clone + CryptoHash + Send + Sync + 'static,
 {
     pub fn batch_update(
         &self,
@@ -471,9 +477,9 @@ where
     }
 }
 
-impl<V> Default for SparseMerkleTree<V>
+impl<V: Send + Sync + 'static> Default for SparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync,
+    V: Clone + CryptoHash + Send + Sync + 'static,
 {
     fn default() -> Self {
         SparseMerkleTree::new_empty()
@@ -482,7 +488,7 @@ where
 
 /// `AccountStatus` describes the result of querying an account from this SparseMerkleTree.
 #[derive(Debug, Eq, PartialEq)]
-pub enum StateStoreStatus<V> {
+pub enum StateStoreStatus<V: Send + Sync + 'static> {
     /// The entry exists in the tree, therefore we can give its value.
     ExistsInScratchPad(V),
 
@@ -505,15 +511,15 @@ pub enum StateStoreStatus<V> {
 /// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
 /// SMT is held inside.
 #[derive(Clone, Debug)]
-pub struct FrozenSparseMerkleTree<V> {
+pub struct FrozenSparseMerkleTree<V: Send + Sync + 'static> {
     base_smt: SparseMerkleTree<V>,
     base_generation: u64,
     smt: SparseMerkleTree<V>,
 }
 
-impl<V> FrozenSparseMerkleTree<V>
+impl<V: Send + Sync + 'static> FrozenSparseMerkleTree<V>
 where
-    V: Clone + CryptoHash + Send + Sync,
+    V: Clone + CryptoHash + Send + Sync + 'static,
 {
     fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
         let smt = SparseMerkleTree {

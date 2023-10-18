@@ -28,7 +28,9 @@ impl DropHelper {
     pub fn new(name: &'static str, max_concurrent_drops: usize) -> Self {
         let (token_tx, token_rx) = channel();
         for _ in 0..max_concurrent_drops {
-            token_tx.send(()).expect("Failed to buffer initial tokens.");
+            token_tx
+                .send(())
+                .expect("DropHelper: Failed to buffer initial tokens.");
         }
         Self {
             name,
