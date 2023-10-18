@@ -42,6 +42,7 @@ use bytes::Bytes;
 use claims::assert_none;
 use move_core_types::value::MoveTypeLayout;
 use num_cpus;
+use rand::{thread_rng, Rng};
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
@@ -891,7 +892,7 @@ where
         assert!(self.concurrency_level > 1, "Must use sequential execution");
 
         let versioned_cache = MVHashMap::new();
-        let shared_counter = AtomicU32::new(0);
+        let shared_counter = AtomicU32::new(gen_id_start_value(false));
 
         if signature_verified_block.is_empty() {
             return Ok(vec![]);
@@ -1030,7 +1031,7 @@ where
         let executor = E::init(executor_arguments);
         drop(init_timer);
 
-        let counter = RefCell::new(0);
+        let counter = RefCell::new(gen_id_start_value(true));
         let unsync_map = UnsyncMap::new();
         let mut ret = Vec::with_capacity(num_txns);
         let mut accumulated_fee_statement = FeeStatement::zero();
@@ -1196,4 +1197,15 @@ where
         }
         ret
     }
+}
+
+fn gen_id_start_value(sequential: bool) -> u32 {
+    // IDs are ephemeral. Pick a random prefix, and different each time,
+    // in case exchange is mistakenly not performed - to more easily catch it.
+    // And in a bad case where it happens in prod, to and make sure incorrect
+    // block doesn't get committed, but chain halts.
+    // (take a different range from parallel execution, to even more easily differentiate)
+
+    let offset = if sequential { 0 } else {1000};
+    thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
 }

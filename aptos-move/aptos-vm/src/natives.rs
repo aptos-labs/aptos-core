@@ -48,7 +48,8 @@ struct AptosBlankStorage {
 impl AptosBlankStorage {
     pub fn new() -> Self {
         Self {
-            counter: AtomicU32::new(0),
+            // Put some recognizable number, to easily spot missed exchanges
+            counter: AtomicU32::new(55551111),
         }
     }
 }
