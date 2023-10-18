@@ -493,16 +493,15 @@ The runtime always runs this before executing the transactions in a block.
     // Performance scores have <b>to</b> be updated before the epoch transition <b>as</b> the transaction that triggers the
     // transition is the last <a href="block.md#0x1_block">block</a> in the previous epoch.
     <a href="stake.md#0x1_stake_update_performance_statistics">stake::update_performance_statistics</a>(proposer_index, failed_proposer_indices);
-    <b>let</b> cur_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
-    <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(cur_epoch);
+    <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
 
     <b>if</b> (<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>()) {
         <b>let</b> should_proceed = <a href="dkg.md#0x1_dkg_update">dkg::update</a>(dkg_result_available, dkg_result);
         <b>if</b> (should_proceed) {
-            <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_reconfigure">reconfiguration_v2::reconfigure</a>(&vm);
+            <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish">reconfiguration_v2::finish</a>(&vm);
         }
     } <b>else</b> <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= block_metadata_ref.epoch_interval) {
-        <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch, <a href="stake.md#0x1_stake_cur_validator_set">stake::cur_validator_set</a>(), cur_epoch + 1, <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>());
+        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>(&vm);
     };
 }
 </code></pre>

@@ -214,16 +214,15 @@ module aptos_framework::block {
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
-        let cur_epoch = reconfiguration::current_epoch();
-        state_storage::on_new_block(cur_epoch);
+        state_storage::on_new_block(reconfiguration::current_epoch());
 
         if (dkg::in_progress()) {
             let should_proceed = dkg::update(dkg_result_available, dkg_result);
             if (should_proceed) {
-                reconfiguration_v2::reconfigure(&vm);
+                reconfiguration_v2::finish(&vm);
             }
         } else if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
-            dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
+            reconfiguration_v2::start(&vm);
         };
     }
 

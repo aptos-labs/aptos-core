@@ -6,7 +6,7 @@
 
 
 -  [Function `start`](#0x1_reconfiguration_v2_start)
--  [Function `reconfigure`](#0x1_reconfiguration_v2_reconfigure)
+-  [Function `finish`](#0x1_reconfiguration_v2_finish)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
@@ -28,7 +28,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">start</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -37,7 +37,8 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">start</a>() {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_upserts">config_for_next_epoch::disable_upserts</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> cur_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
     <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch, <a href="stake.md#0x1_stake_cur_validator_set">stake::cur_validator_set</a>(), cur_epoch + 1, <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>());
 }
@@ -47,16 +48,16 @@
 
 </details>
 
-<a name="0x1_reconfiguration_v2_reconfigure"></a>
+<a name="0x1_reconfiguration_v2_finish"></a>
 
-## Function `reconfigure`
+## Function `finish`
 
 Apply buffered on-chain configs.
 Re-enable on-chain config changes.
 Trigger the default reconfiguration.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_reconfigure">reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish">finish</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -65,7 +66,7 @@ Trigger the default reconfiguration.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_reconfigure">reconfigure</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish">finish</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_on_new_epoch">features::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
     <a href="consensus_config.md#0x1_consensus_config_on_new_epoch">consensus_config::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);
     <a href="execution_config.md#0x1_execution_config_on_new_epoch">execution_config::on_new_epoch</a>(<a href="account.md#0x1_account">account</a>);

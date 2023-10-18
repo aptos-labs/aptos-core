@@ -1474,7 +1474,7 @@ Force reconfigure. To be called at the end of a proposal that alters on-chain co
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>()) {
-        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>();
+        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>(aptos_framework);
     } <b>else</b> {
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
     }
@@ -1506,7 +1506,7 @@ Update feature flags and also trigger reconfiguration.
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_change_feature_flags">features::change_feature_flags</a>(aptos_framework, enable, disable);
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>()) {
-        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>();
+        <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>(aptos_framework);
     } <b>else</b> {
         <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
     }

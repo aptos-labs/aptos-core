@@ -10,7 +10,8 @@ module aptos_framework::reconfiguration_v2 {
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
-    public(friend) fun start() {
+    public(friend) fun start(account: &signer) {
+        config_for_next_epoch::disable_upserts(account);
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
     }
@@ -18,7 +19,7 @@ module aptos_framework::reconfiguration_v2 {
     /// Apply buffered on-chain configs.
     /// Re-enable on-chain config changes.
     /// Trigger the default reconfiguration.
-    public(friend) fun reconfigure(account: &signer) {
+    public(friend) fun finish(account: &signer) {
         features::on_new_epoch(account);
         consensus_config::on_new_epoch(account);
         execution_config::on_new_epoch(account);

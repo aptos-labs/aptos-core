@@ -541,7 +541,7 @@ module aptos_framework::aptos_governance {
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (features::reconfigure_with_dkg_enabled()) {
-            reconfiguration_v2::start();
+            reconfiguration_v2::start(aptos_framework);
         } else {
             reconfiguration::reconfigure();
         }
@@ -553,7 +553,7 @@ module aptos_framework::aptos_governance {
         features::change_feature_flags(aptos_framework, enable, disable);
 
         if (features::reconfigure_with_dkg_enabled()) {
-            reconfiguration_v2::start();
+            reconfiguration_v2::start(aptos_framework);
         } else {
             reconfiguration::reconfigure();
         }
