@@ -4,6 +4,7 @@
 //! As a result, we only define weighted VUF traits here.
 
 use crate::pvss::{Player, WeightedConfig};
+use serde::Serialize;
 use std::fmt::Debug;
 
 /// Weighted (not-verifiable) unpredictable function (WUF) traits.
@@ -24,7 +25,7 @@ pub trait WeightedVUF {
 
     /// NOTE: Not unsafe to have Debug here, since if an evaluation was aggregated, more than 33% of
     /// the stake must've contributed to create it.
-    type Evaluation: Debug + Eq;
+    type Evaluation: Serialize + Debug + Eq;
 
     fn augment_key_pair<R: rand_core::RngCore + rand_core::CryptoRng>(
         pp: &Self::PublicParameters,

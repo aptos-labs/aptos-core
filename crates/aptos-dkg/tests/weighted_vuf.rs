@@ -9,6 +9,7 @@ use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use rand::rngs::StdRng;
 use rand::thread_rng;
 use rand_core::SeedableRng;
+use sha3::{Digest, Sha3_256};
 
 #[test]
 fn all_weighted_vuf_bvt() {
@@ -137,6 +138,10 @@ fn wvuf_aggregation_test<
     // Aggregate the VUF from the subset of capable players
     let proof = WVUF::aggregate_shares(&wc, &apks_and_proofs);
     let eval_aggr = WVUF::derive_eval(&vuf_pp, msg, &proof);
+
+    // Test that we can hash this via, say, SHA3
+    let eval_bytes = bcs::to_bytes(&eval).unwrap();
+    let _hash = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
 
     WVUF::verify_eval(&vuf_pp, pk, msg, &proof, &eval_aggr)
         .expect("WVUF aggregated proof should verify");
