@@ -1,0 +1,1 @@
+../../../../../../../framework/move-stdlib/sources/configs/config_for_next_epoch.move
