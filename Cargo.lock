@@ -3336,6 +3336,7 @@ name = "aptos-scratchpad"
 version = "0.1.0"
 dependencies = [
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-experimental-runtimes",
  "aptos-infallible",
  "aptos-metrics-core",
