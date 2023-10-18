@@ -143,8 +143,6 @@ impl PartialEq<Self> for P256PrivateKey {
 
 impl Eq for P256PrivateKey {}
 
-// We could have a distinct kind of validation for the PrivateKey: e.g., checking the derived
-// PublicKey is valid?
 impl TryFrom<&[u8]> for P256PrivateKey {
     type Error = CryptoMaterialError;
 
