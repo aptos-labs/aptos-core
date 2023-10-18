@@ -10,7 +10,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
     metadata::Metadata,
-    resolver::{resource_size, ResourceResolver},
+    resolver::ResourceResolver,
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -137,12 +137,12 @@ macro_rules! patch_blob_from_db {
 }
 
 impl ResourceResolver for MockStateView {
-    fn get_resource_value_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
-        layout: &MoveTypeLayout,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Bytes>, usize)> {
         let ap = AccessPath::resource_access_path(*address, typ.clone())
             .expect("Access path for resource have to be valid");
@@ -154,43 +154,28 @@ impl ResourceResolver for MockStateView {
                 // If a resource is not cached, we must exchange lifted values.
                 match self.db.get_bytes(&state_key) {
                     Some(blob) => {
-                        let patched_blob = patch_blob_from_db!(blob, layout, self)?;
-                        let resource_size = patched_blob.len();
-                        (Some(patched_blob.into()), resource_size)
+                        if let Some(layout) = maybe_layout {
+                            let patched_blob = patch_blob_from_db!(blob, layout, self)?;
+                            let resource_size = patched_blob.len();
+                            (Some(patched_blob.into()), resource_size)
+                        } else {
+                            let resource_size = blob.len();
+                            (Some(blob), resource_size)
+                        }
                     },
                     None => (None, 0),
                 }
             },
         })
     }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        typ: &StructTag,
-        _metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        let ap = AccessPath::resource_access_path(*address, typ.clone())
-            .expect("Access path for resource have to be valid");
-        let state_key = StateKey::access_path(ap);
-
-        Ok(match self.in_memory_cache.get(&state_key) {
-            Some(blob) => (Some(blob.clone()), blob.len()),
-            None => {
-                let maybe_blob = self.db.get_bytes(&state_key);
-                let resource_size = resource_size(&maybe_blob);
-                (maybe_blob, resource_size)
-            },
-        })
-    }
 }
 
 impl TableResolver for MockStateView {
-    fn resolve_table_entry_value(
+    fn resolve_table_entry_bytes_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
-        layout: &MoveTypeLayout,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<Option<Bytes>> {
         let state_key = StateKey::table_item((*handle).into(), key.to_vec());
         Ok(match self.in_memory_cache.get(&state_key) {
@@ -200,23 +185,16 @@ impl TableResolver for MockStateView {
                 // Since we have a layout passed, we can need to do the value exchange
                 // here by serialization round-trip.
                 match self.db.get_bytes(&state_key) {
-                    Some(blob) => Some(patch_blob_from_db!(blob, layout, self)?.into()),
+                    Some(blob) => Some(
+                        if let Some(layout) = maybe_layout {
+                            patch_blob_from_db!(blob, layout, self)?.into()
+                        } else {
+                            blob
+                        },
+                    ),
                     None => None,
                 }
             },
         })
-    }
-
-    fn resolve_table_entry_bytes(
-        &self,
-        handle: &TableHandle,
-        key: &[u8],
-    ) -> anyhow::Result<Option<Bytes>> {
-        let state_key = StateKey::table_item((*handle).into(), key.to_vec());
-        Ok(self
-            .in_memory_cache
-            .get(&state_key)
-            .cloned()
-            .or_else(|| self.db.get_bytes(&state_key)))
     }
 }

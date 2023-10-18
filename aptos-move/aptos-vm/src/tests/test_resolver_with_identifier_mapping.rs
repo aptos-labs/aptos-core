@@ -76,14 +76,19 @@ fn test_resource_in_storage() {
     );
 
     let (blob, _) = view
-        .get_resource_bytes_with_metadata(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[])
+        .get_resource_bytes_with_metadata_and_layout(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[], None)
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 200, 300, 400, "foo", "bar");
     assert!(actual_value.equals(&expected_value).unwrap());
 
     let (blob, _) = view
-        .get_resource_value_with_metadata(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[], &TEST_LAYOUT)
+        .get_resource_bytes_with_metadata_and_layout(
+            &TEST_ADDRESS,
+            &TEST_RESOURCE_TAG,
+            &[],
+            Some(&TEST_LAYOUT),
+        )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
@@ -104,14 +109,18 @@ fn test_table_item_in_storage() {
     );
 
     let blob = view
-        .resolve_table_entry_bytes(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY)
+        .resolve_table_entry_bytes_with_layout(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY, None)
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 200, 300, 400, "foo", "bar");
     assert!(actual_value.equals(&expected_value).unwrap());
 
     let blob = view
-        .resolve_table_entry_value(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY, &TEST_LAYOUT)
+        .resolve_table_entry_bytes_with_layout(
+            &TEST_TABLE_HANDLE,
+            &TEST_TABLE_KEY,
+            Some(&TEST_LAYOUT),
+        )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
@@ -138,14 +147,19 @@ fn test_resource_in_memory_cache() {
     view.assert_mapping_equal_at(2, bytes_to_string(to_utf8_bytes("bar")));
 
     let (blob, _) = view
-        .get_resource_bytes_with_metadata(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[])
+        .get_resource_bytes_with_metadata_and_layout(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[], None)
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
     assert!(actual_value.equals(&expected_value).unwrap());
 
     let (blob, _) = view
-        .get_resource_value_with_metadata(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[], &TEST_LAYOUT)
+        .get_resource_bytes_with_metadata_and_layout(
+            &TEST_ADDRESS,
+            &TEST_RESOURCE_TAG,
+            &[],
+            Some(&TEST_LAYOUT),
+        )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
@@ -169,14 +183,18 @@ fn test_table_item_in_memory_cache() {
     view.assert_mapping_equal_at(2, bytes_to_string(to_utf8_bytes("bar")));
 
     let blob = view
-        .resolve_table_entry_bytes(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY)
+        .resolve_table_entry_bytes_with_layout(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY, None)
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");
     assert!(actual_value.equals(&expected_value).unwrap());
 
     let blob = view
-        .resolve_table_entry_value(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY, &TEST_LAYOUT)
+        .resolve_table_entry_bytes_with_layout(
+            &TEST_TABLE_HANDLE,
+            &TEST_TABLE_KEY,
+            Some(&TEST_LAYOUT),
+        )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
     let expected_value = test_struct!(100, 0, 300, 1, "foo", "2");

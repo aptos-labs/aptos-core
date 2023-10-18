@@ -44,23 +44,12 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 pub trait ResourceResolver {
     // TODO: this can return Value, so that we can push deserialization to
     // implementations of `ResourceResolver`.
-    fn get_resource_value_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         metadata: &[Metadata],
-        // Default implementation does not use layout. This way there is no
-        // need to implement this method.
-        #[allow(unused_variables)] layout: &MoveTypeLayout,
-    ) -> anyhow::Result<(Option<Bytes>, usize), Error> {
-        self.get_resource_bytes_with_metadata(address, typ, metadata)
-    }
-
-    fn get_resource_bytes_with_metadata(
-        &self,
-        address: &AccountAddress,
-        typ: &StructTag,
-        metadata: &[Metadata],
+        layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Bytes>, usize), Error>;
 }
 
@@ -82,7 +71,7 @@ pub trait MoveResolver: ModuleResolver + ResourceResolver {
         typ: &StructTag,
         metadata: &[Metadata],
     ) -> Result<(Option<Bytes>, usize), Error> {
-        self.get_resource_bytes_with_metadata(address, typ, metadata)
+        self.get_resource_bytes_with_metadata_and_layout(address, typ, metadata, None)
     }
 }
 

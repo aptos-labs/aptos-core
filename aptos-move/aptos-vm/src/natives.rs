@@ -26,6 +26,7 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
+use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use {
@@ -82,10 +83,11 @@ impl TDelayedFieldView for AptosBlankStorage {
 
 #[cfg(feature = "testing")]
 impl TableResolver for AptosBlankStorage {
-    fn resolve_table_entry_bytes(
+    fn resolve_table_entry_bytes_with_layout(
         &self,
         _handle: &TableHandle,
         _key: &[u8],
+        _layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
         Ok(None)
     }
