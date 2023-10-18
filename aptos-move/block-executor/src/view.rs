@@ -433,7 +433,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         // There are aggregators / aggregator snapshots in the
                         // resource, so we have to replace the actual values with
                         // identifiers.
-                        // TODO(aggregator): gate by the flag.
                         (Some(state_value), Some(layout)) => {
                             let res = self.replace_values_with_identifiers(state_value, layout);
                             match res {
