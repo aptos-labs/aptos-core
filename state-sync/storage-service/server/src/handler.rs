@@ -6,8 +6,8 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics,
     metrics::{
-        increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE, OPTIMISTIC_FETCH_ADD,
-        SUBSCRIPTION_ADD, SUBSCRIPTION_FAILURE, SUBSCRIPTION_NEW_STREAM,
+        increment_counter, LRU_CACHE_HIT, LRU_CACHE_PROBE, OPTIMISTIC_FETCH_ADD, SUBSCRIPTION_ADD,
+        SUBSCRIPTION_FAILURE, SUBSCRIPTION_NEW_STREAM,
     },
     moderator::RequestModerator,
     network::ResponseSender,
@@ -121,8 +121,8 @@ impl<T: StorageReaderInterface> Handler<T> {
         request: StorageServiceRequest,
         optimistic_fetch_related: bool,
     ) -> aptos_storage_service_types::Result<StorageServiceResponse> {
-        // Time the request processing (the timer will stop when it's dropped)
-        let _timer = start_timer(
+        // Time the request processing
+        let _timer = metrics::start_timer(
             &metrics::STORAGE_REQUEST_PROCESSING_LATENCY,
             peer_network_id.network_id(),
             request.get_label(),
@@ -371,6 +371,13 @@ impl<T: StorageReaderInterface> Handler<T> {
             );
             return Ok(response.clone());
         }
+
+        // Otherwise, we need to fetch the data from storage. Start the timer.
+        let _timer = metrics::start_timer(
+            &metrics::STORAGE_FETCH_PROCESSING_LATENCY,
+            peer_network_id.network_id(),
+            request.get_label(),
+        );
 
         // Fetch the data response from storage
         let data_response = match &request.data_request {
