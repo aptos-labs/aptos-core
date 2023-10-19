@@ -1179,7 +1179,7 @@ dependencies = [
  "serde_with 2.3.2",
  "sha3 0.9.1",
  "static_assertions",
- ]
+]
 
 [[package]]
 name = "aptos-drop-helper"
