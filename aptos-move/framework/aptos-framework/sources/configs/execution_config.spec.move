@@ -16,6 +16,10 @@ spec aptos_framework::execution_config {
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
 
+        // It caused 51s to verified in the local environment
+        // However it failed in the github unit test (about 120s)
+        pragma verify_duration_estimate = 120;
+
         let addr = signer::address_of(account);
 
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;

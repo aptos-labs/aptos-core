@@ -223,7 +223,10 @@ fn test_dag_recover_from_storage() {
 fn test_dag_bitmask() {
     let (signers, epoch_state, mut dag, _) = setup();
 
-    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(1, vec![]));
+    assert_eq!(
+        dag.bitmask(15),
+        DagSnapshotBitmask::new(1, vec![vec![false; 4]; 15])
+    );
 
     for round in 1..5 {
         let parents = dag
@@ -234,10 +237,9 @@ fn test_dag_bitmask() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    assert_eq!(
-        dag.bitmask(15),
-        DagSnapshotBitmask::new(1, vec![vec![true, true, true, false]; 4])
-    );
+    let mut bitmask = vec![vec![true, true, true, false]; 4];
+    bitmask.resize(15, vec![false; 4]);
+    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(1, bitmask));
 
     // Populate the fourth author for all rounds
     for round in 1..5 {
@@ -247,6 +249,12 @@ fn test_dag_bitmask() {
         let node = new_certified_node(round, signers[3].author(), parents.clone());
         assert!(dag.add_node(node).is_ok());
     }
-    assert_eq!(dag.bitmask(15), DagSnapshotBitmask::new(5, vec![]));
-    assert_eq!(dag.bitmask(6), DagSnapshotBitmask::new(5, vec![]));
+    assert_eq!(
+        dag.bitmask(15),
+        DagSnapshotBitmask::new(5, vec![vec![false; 4]; 11])
+    );
+    assert_eq!(
+        dag.bitmask(6),
+        DagSnapshotBitmask::new(5, vec![vec![false; 4]; 2])
+    );
 }

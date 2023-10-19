@@ -9,7 +9,7 @@ use crate::dag::{
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::{anyhow, ensure};
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_time_service::TimeService;
@@ -207,7 +207,7 @@ impl DagFetcherService {
             RemoteFetchRequest::new(
                 node.metadata().epoch(),
                 missing_parents,
-                dag_reader.bitmask(node.round()),
+                dag_reader.bitmask(node.round().saturating_sub(1)),
             )
         };
         self.inner
@@ -258,6 +258,7 @@ impl TDagFetcher for DagFetcher {
             LogSchema::new(LogEvent::FetchNodes),
             start_round = remote_request.start_round(),
             target_round = remote_request.target_round(),
+            lens = remote_request.exists_bitmask().len(),
             missing_nodes = remote_request.exists_bitmask().num_missing(),
         );
         let mut rpc = RpcWithFallback::new(
@@ -269,30 +270,31 @@ impl TDagFetcher for DagFetcher {
             self.time_service.clone(),
         );
 
-        // TODO retry
         while let Some(response) = rpc.next().await {
-            if let Ok(response) = response
+            match response
                 .and_then(FetchResponse::try_from)
                 .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
             {
-                let certified_nodes = response.certified_nodes();
-                // TODO: support chunk response or fallback to state sync
-                {
-                    let mut dag_writer = dag.write();
-                    for node in certified_nodes.into_iter().rev() {
-                        if let Err(e) = dag_writer.add_node(node) {
-                            error!("Failed to add node {}", e);
+                Ok(response) => {
+                    let certified_nodes = response.certified_nodes();
+                    // TODO: support chunk response or fallback to state sync
+                    {
+                        let mut dag_writer = dag.write();
+                        for node in certified_nodes.into_iter().rev() {
+                            if let Err(e) = dag_writer.add_node(node) {
+                                error!("Failed to add node {}", e);
+                            }
                         }
                     }
-                }
 
-                if dag.read().all_exists(remote_request.targets()) {
-                    return Ok(());
-                }
+                    if dag.read().all_exists(remote_request.targets()) {
+                        return Ok(());
+                    }
+                },
+                Err(err) => error!("Fetch rpc failed {}", err),
             }
-            // TODO retry
         }
-        Err(anyhow!("fetch failed"))
+        Err(anyhow!("Fetch with fallback failed"))
     }
 }
 
@@ -300,6 +302,8 @@ impl TDagFetcher for DagFetcher {
 pub enum FetchRequestHandleError {
     #[error("target nodes are missing")]
     TargetsMissing,
+    #[error("garbage collected, request round {0}, lowest round {1}")]
+    GarbageCollected(Round, Round),
 }
 
 pub struct FetchRequestHandler {
@@ -329,15 +333,21 @@ impl RpcHandler for FetchRequestHandler {
         // request.
         // `Node`: In the good case, the sender of the Node should have the parents in its local DAG
         // to satisfy this request.
-        ensure!(
-            dag_reader.all_exists(message.targets()),
-            FetchRequestHandleError::TargetsMissing
-        );
-
         debug!(
             LogSchema::new(LogEvent::ReceiveFetchNodes).round(dag_reader.highest_round()),
             start_round = message.start_round(),
             target_round = message.target_round(),
+        );
+        ensure!(
+            dag_reader.all_exists(message.targets()),
+            FetchRequestHandleError::TargetsMissing
+        );
+        ensure!(
+            dag_reader.lowest_round() <= message.start_round(),
+            FetchRequestHandleError::GarbageCollected(
+                message.start_round(),
+                dag_reader.lowest_round()
+            ),
         );
 
         let certified_nodes: Vec<_> = dag_reader

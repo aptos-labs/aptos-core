@@ -1,77 +1,14 @@
 ---
 remote_endpoint: ~
-name: "v1.7"
+name: "v1.8"
 proposals:
-  - name: enable_module_event
-    metadata:
-      title: "Enable module event"
-      description: "AIP-44: The new module event framework associates every event stream with a static struct type instead of an EventHandle of current event system."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/200"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - module_event
   - name: upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.7"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.7"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.8"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.8"
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
-      - FeatureFlag:
-          enabled:
-            - safer_resource_groups
-      - FeatureFlag:
-          enabled:
-            - safer_metadata
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: enable_signature_checker_v2_fix
-    metadata:
-      title: "Enable a fix signature checker v2"
-      description: "Fixing a counting bug"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - signature_checker_v2_script_fix
-  - name: enable_block_gas_limit_and_transaction_shuffling
-    metadata:
-      title: "Enable Block Gas Limit and Transaction Shuffling"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency.
-                    AIP-27: Sender Aware Transaction Shuffling"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132
-                       https://github.com/aptos-foundation/AIPs/issues/109"
-    execution_mode: MultiStep
-    update_sequence:
-      - Execution:
-          V3:
-            transaction_shuffler_type:
-              sender_aware_v2: 32
-            block_gas_limit: 35000
-            transaction_deduper_type: txn_hash_and_authenticator_v1
-  - name: enable_bulletproofs
-    metadata:
-      title: "Enable Bulletproofs Module"
-      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - bulletproofs_natives
-  - name: enable_storage_deletion_refund
-    metadata:
-      title: "Enable Storage Deletion Refund"
-      description: "AIP-32: Storage Deletion Refund"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/127"
-    execution_mode: MultiStep
-    update_sequence:
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_32_initialization.move
-      - FeatureFlag:
-          enabled:
-            - storage_slot_metadata
-            - emit_fee_statement
-            - storage_deletion_refund

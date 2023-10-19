@@ -7,41 +7,12 @@ use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use aptos_vm::AptosVM;
-use std::{fmt::Write, fs, path::Path};
+use std::path::Path;
 
 fn save_profiling_results(name: &str, log: &TransactionGasLog) {
     let path = Path::new("gas-profiling").join(name);
-
-    if let Err(err) = fs::create_dir_all(&path) {
-        match err.kind() {
-            std::io::ErrorKind::AlreadyExists => (),
-            _ => panic!("failed to create directory {}: {}", path.display(), err),
-        }
-    }
-
-    if let Some(graph_bytes) = log.exec_io.to_flamegraph(name.to_string()).unwrap() {
-        fs::write(path.join("exec_io.svg"), graph_bytes).unwrap();
-    }
-    if let Some(graph_bytes) = log.storage.to_flamegraph(name.to_string()).unwrap() {
-        fs::write(path.join("storage.svg"), graph_bytes).unwrap();
-    }
-
-    let mut text = String::new();
-    let erased = log.to_erased();
-
-    erased.exec_io.textualize(&mut text, true).unwrap();
-    writeln!(text).unwrap();
-    writeln!(text).unwrap();
-    log.exec_io
-        .aggregate_gas_events()
-        .textualize(&mut text)
+    log.generate_html_report(path, format!("Gas Report - {}", name))
         .unwrap();
-    writeln!(text).unwrap();
-    writeln!(text).unwrap();
-
-    erased.storage.textualize(&mut text, true).unwrap();
-
-    fs::write(path.join("log.txt"), text).unwrap();
 }
 
 /// Run with `cargo test test_gas -- --nocapture` to see output.

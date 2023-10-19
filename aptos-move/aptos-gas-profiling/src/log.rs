@@ -81,6 +81,7 @@ pub struct WriteStorage {
     pub key: StateKey,
     pub op_type: WriteOpType,
     pub cost: Fee,
+    pub refund: Fee,
 }
 
 #[derive(Debug)]
@@ -104,6 +105,7 @@ pub struct ExecutionAndIOCosts {
 // Struct containing all types of storage fees.
 pub struct StorageFees {
     pub total: Fee,
+    pub total_refund: Fee,
 
     pub write_set_storage: Vec<WriteStorage>,
     pub events: Vec<EventStorage>,
@@ -168,11 +170,70 @@ impl CallFrame {
     }
 }
 
+impl StorageFees {
+    pub(crate) fn assert_consistency(&self) {
+        let mut total = Fee::zero();
+        let mut total_refund = Fee::zero();
+
+        for write in &self.write_set_storage {
+            total += write.cost;
+            total_refund += write.refund;
+        }
+
+        for event in &self.events {
+            total += event.cost;
+        }
+
+        total += self.txn_storage;
+
+        if total != self.total {
+            panic!(
+                "Storage fees do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
+                self.total, total
+            );
+        }
+        if total_refund != self.total_refund {
+            panic!(
+                "Storage refunds do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
+                self.total_refund, total
+            );
+        }
+    }
+}
+
 impl ExecutionAndIOCosts {
     #[allow(clippy::needless_lifetimes)]
     pub fn gas_events<'a>(&'a self) -> GasEventIter<'a> {
         GasEventIter {
             stack: smallvec![(&self.call_graph, 0)],
+        }
+    }
+
+    pub(crate) fn assert_consistency(&self) {
+        use ExecutionGasEvent::{Bytecode, Call, CallNative, LoadResource, Loc};
+
+        let mut total = InternalGas::zero();
+
+        total += self.intrinsic_cost;
+
+        for op in self.gas_events() {
+            match op {
+                Loc(..) | Call(..) => (),
+                Bytecode { cost, .. } | CallNative { cost, .. } | LoadResource { cost, .. } => {
+                    total += *cost
+                },
+            }
+        }
+
+        for write in &self.write_set_transient {
+            total += write.cost;
+        }
+
+        if total != self.total {
+            panic!(
+                "Execution & IO costs do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
+                self.total, total
+            )
         }
     }
 }

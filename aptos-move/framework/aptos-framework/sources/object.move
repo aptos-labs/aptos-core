@@ -511,12 +511,19 @@ module aptos_framework::object {
         );
 
         let current_address = object.owner;
-
         let count = 0;
-        while (owner != current_address) {
+        while ({
+            spec {
+                invariant count < MAXIMUM_OBJECT_NESTING;
+                invariant forall i in 0..count:
+                    exists<ObjectCore>(current_address) && global<ObjectCore>(current_address).allow_ungated_transfer;
+                // invariant forall i in 0..count:
+                //     current_address == get_transfer_address(global<ObjectCore>(destination).owner, i);
+            };
+            owner != current_address
+        }) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
-
             // At this point, the first object exists and so the more likely case is that the
             // object's owner is not an object. So we return a more sensible error.
             assert!(
@@ -528,7 +535,6 @@ module aptos_framework::object {
                 object.allow_ungated_transfer,
                 error::permission_denied(ENO_UNGATED_TRANSFERS),
             );
-
             current_address = object.owner;
         };
     }
@@ -597,7 +603,14 @@ module aptos_framework::object {
         let current_address = object.owner;
 
         let count = 0;
-        while (owner != current_address) {
+        while ({
+            spec {
+                invariant count < MAXIMUM_OBJECT_NESTING;
+                invariant forall i in 0..count:
+                    owner != current_address && exists<ObjectCore>(current_address);
+            };
+            owner != current_address
+        }) {
             let count = count + 1;
             assert!(count < MAXIMUM_OBJECT_NESTING, error::out_of_range(EMAXIMUM_NESTING));
             if (!exists<ObjectCore>(current_address)) {

@@ -130,14 +130,14 @@ fn test_remote_fetch_request() {
     let request = RemoteFetchRequest::new(
         1,
         vec![parents[0].clone()],
-        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]; 2]),
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]; 3]),
     );
     assert_ok!(request.verify(&validator_verifier));
 
     let request = RemoteFetchRequest::new(
         1,
         parents,
-        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]; 2]),
+        DagSnapshotBitmask::new(1, vec![vec![false; signers.len()]; 3]),
     );
     assert_ok!(request.verify(&validator_verifier));
 }

@@ -1266,6 +1266,8 @@ async fn test_gas_estimation_cache() {
     node_config.api.gas_estimation.low_block_history = max_block_history;
     node_config.api.gas_estimation.market_block_history = max_block_history;
     node_config.api.gas_estimation.aggressive_block_history = max_block_history;
+    let sleep_duration =
+        Duration::from_millis(node_config.api.gas_estimation.cache_expiration_ms * 2);
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;
@@ -1275,6 +1277,8 @@ async fn test_gas_estimation_cache() {
     }
     ctx.get("/estimate_gas_price").await;
     assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 4);
+    // Wait for cache to expire
+    sleep(sleep_duration).await;
 
     // Expect max of 10 entries
     for _i in 0..8 {
@@ -1286,7 +1290,7 @@ async fn test_gas_estimation_cache() {
         max_block_history
     );
     // Wait for cache to expire
-    sleep(Duration::from_secs(1)).await;
+    sleep(sleep_duration).await;
     ctx.get("/estimate_gas_price").await;
     assert_eq!(
         ctx.last_updated_gas_estimation_cache_size(),
@@ -1303,7 +1307,7 @@ async fn test_gas_estimation_cache() {
         max_block_history
     );
     // Wait for cache to expire
-    sleep(Duration::from_secs(1)).await;
+    sleep(sleep_duration).await;
     ctx.get("/estimate_gas_price").await;
     assert_eq!(
         ctx.last_updated_gas_estimation_cache_size(),
