@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod metrics;
-pub mod service;
+mod grpc_response_stream;
+mod metrics;
+mod response_dispatcher;
+mod service;
