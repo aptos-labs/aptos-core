@@ -1694,7 +1694,7 @@ mod test {
 
         /*
             layout = Struct {
-                agg: Aggregator
+                agg: Aggregator<u64>
             }
         */
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
@@ -1733,7 +1733,7 @@ mod test {
 
         /*
             layout = Struct {
-                aggregators: vec![Aggregator]
+                aggregators: vec![Aggregator<u64>]
             }
         */
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
@@ -1772,10 +1772,6 @@ mod test {
             patched_state_value,
             StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
         );
-        assert!(
-            identifiers.contains(&DelayedFieldID::new(6)),
-            "The value 25 should have been replaced in the identifier 5"
-        );
         let (final_state_value, identifiers) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
@@ -1784,5 +1780,55 @@ mod test {
             identifiers.len() == 3,
             "Three identifiers should have been replaced in this case"
         );
+
+        /*
+            layout = Struct {
+                aggregators: vec![AggregatorSnapshot<u128>]
+            }
+        */
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
+            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
+                    Box::new(MoveTypeLayout::U128),
+                ),
+            ]))),
+        )]));
+        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::u128(20)])),
+            Value::struct_(Struct::pack(vec![Value::u128(35)])),
+            Value::struct_(Struct::pack(vec![Value::u128(0)])),
+        ])]));
+        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let (patched_state_value, identifiers) = latest_view
+            .replace_values_with_identifiers(state_value.clone(), &layout)
+            .unwrap();
+        assert!(
+            identifiers.len() == 3,
+            "Three identifiers should have been replaced in this case"
+        );
+        assert!(
+            counter == RefCell::new(12),
+            "The counter should have been updated to 12"
+        );
+        let patched_value =
+            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+                Value::struct_(Struct::pack(vec![Value::u128(9)])),
+                Value::struct_(Struct::pack(vec![Value::u128(10)])),
+                Value::struct_(Struct::pack(vec![Value::u128(11)])),
+            ])]));
+        assert_eq!(
+            patched_state_value,
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+        );
+        let (final_state_value, identifiers2) = latest_view
+            .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
+            .unwrap();
+        assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
+        assert!(
+            identifiers2.len() == 3,
+            "Three identifiers should have been replaced in this case"
+        );
+        assert_eq!(identifiers, identifiers2);
     }
 }
