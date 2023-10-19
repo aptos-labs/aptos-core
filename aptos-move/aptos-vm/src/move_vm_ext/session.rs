@@ -34,7 +34,7 @@ use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::BorrowMut,
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
 };

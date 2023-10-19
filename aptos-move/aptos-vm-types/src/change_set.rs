@@ -14,7 +14,7 @@ use move_binary_format::errors::Location;
 use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
-    HashMap, BTreeMap,
+    BTreeMap,
 };
 
 /// A change set produced by the VM.
@@ -222,7 +222,7 @@ impl VMChangeSet {
             aggregator_delta_set
                 .into_iter()
                 .map(into_write)
-                .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
+                .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
         aggregator_write_set.extend(materialized_aggregator_delta_set.into_iter());
 
         Ok(Self {

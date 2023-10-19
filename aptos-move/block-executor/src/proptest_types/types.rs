@@ -25,7 +25,7 @@ use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet, HashMap, BTreeMap},
+    collections::{hash_map::DefaultHasher, BTreeMap, BTreeSet},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},

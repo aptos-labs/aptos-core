@@ -11,7 +11,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     write_set::{TransactionWrite, WriteOp},
 };
-use std::{collections::{HashMap, BTreeMap}, fmt::Debug, hash::Hash};
+use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
 #[derive(Debug)]
