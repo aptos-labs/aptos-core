@@ -1952,10 +1952,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-data-access"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-metrics-core",
+ "aptos-protos",
+ "async-trait",
+ "backoff",
+ "backtrace",
+ "base64 0.13.0",
+ "bytes",
+ "clap 4.3.21",
+ "cloud-storage",
+ "dashmap",
+ "enum_dispatch",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "google-cloud-storage",
+ "itertools 0.10.5",
+ "once_cell",
+ "prometheus",
+ "prost 0.12.1",
+ "redis",
+ "redis-test",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.3",
+ "toml 0.7.4",
+ "tonic 0.10.0",
+ "tracing",
+ "tracing-subscriber",
+ "warp",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-data-service"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
