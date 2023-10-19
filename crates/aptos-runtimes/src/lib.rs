@@ -43,6 +43,9 @@ where
         })
         .on_thread_start(on_thread_start)
         .disable_lifo_slot()
+        // Only the Rest API needs many blocking threads, and we are trying to limit the concurrency
+        // a little bit.
+        .max_blocking_threads(64)
         .enable_all();
     if let Some(num_worker_threads) = num_worker_threads {
         builder.worker_threads(num_worker_threads);

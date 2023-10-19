@@ -6,6 +6,7 @@ use crate::{
     failpoint::fail_point_poem,
     response::{
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+        ServiceUnavailableError,
     },
     ApiTags, Context,
 };
@@ -44,21 +45,38 @@ impl ViewFunctionApi {
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveValue>> {
-        fail_point_poem("endpoint_view_function")?;
-        self.context
-            .check_api_output_enabled("View function", &accept_type)?;
+        let context = self.context.clone();
+        tokio::task::spawn_blocking(move || {
+            Self::view_function_impl(context, accept_type, request, ledger_version)
+        })
+        .await
+        .map_err(|e| {
+            BasicErrorWith404::service_unavailable_with_code_no_info(
+                e,
+                AptosErrorCode::InternalError,
+            )
+        })?
+    }
 
-        let (ledger_info, requested_version) = self
-            .context
+    fn view_function_impl(
+        context: Arc<Context>,
+        accept_type: AcceptType,
+        request: Json<ViewRequest>,
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<Vec<MoveValue>> {
+        fail_point_poem("endpoint_view_function")?;
+        context.check_api_output_enabled("View function", &accept_type)?;
+
+        let (ledger_info, requested_version) = context
             .get_latest_ledger_info_and_verify_lookup_version(
                 ledger_version.map(|inner| inner.0),
             )?;
 
-        let state_view = self.context.latest_state_view_poem(&ledger_info)?;
+        let state_view = context.latest_state_view_poem(&ledger_info)?;
         let resolver = state_view.as_move_resolver();
 
         let entry_func = resolver
-            .as_converter(self.context.db.clone())
+            .as_converter(context.db.clone())
             .convert_view_function(request.0)
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
@@ -67,8 +85,7 @@ impl ViewFunctionApi {
                     &ledger_info,
                 )
             })?;
-        let state_view = self
-            .context
+        let state_view = context
             .state_view_at_version(requested_version)
             .map_err(|err| {
                 BasicErrorWith404::bad_request_with_code(
@@ -84,7 +101,7 @@ impl ViewFunctionApi {
             entry_func.function().to_owned(),
             entry_func.ty_args().to_owned(),
             entry_func.args().to_owned(),
-            self.context.node_config.api.max_gas_view_function,
+            context.node_config.api.max_gas_view_function,
         )
         .map_err(|err| {
             BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
@@ -95,7 +112,7 @@ impl ViewFunctionApi {
             },
             AcceptType::Json => {
                 let return_types = resolver
-                    .as_converter(self.context.db.clone())
+                    .as_converter(context.db.clone())
                     .function_return_types(&entry_func)
                     .and_then(|tys| {
                         tys.into_iter()
@@ -115,7 +132,7 @@ impl ViewFunctionApi {
                     .zip(return_types.into_iter())
                     .map(|(v, ty)| {
                         resolver
-                            .as_converter(self.context.db.clone())
+                            .as_converter(context.db.clone())
                             .try_into_move_value(&ty, &v)
                     })
                     .collect::<anyhow::Result<Vec<_>>>()
