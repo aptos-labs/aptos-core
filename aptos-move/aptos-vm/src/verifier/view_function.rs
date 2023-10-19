@@ -52,7 +52,6 @@ pub(crate) fn validate_view_function(
                 .with_message("view function must return values".to_string()),
         );
     }
-
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let args = transaction_arg_validation::construct_args(
         session,

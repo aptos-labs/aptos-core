@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{account_address::create_derived_object_address, event::EventHandle};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -11,15 +12,12 @@ use move_core_types::{
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-pub fn primary_store(address: &AccountAddress) -> AccountAddress {
-    let mut bytes = address.to_vec();
-    bytes.append(&mut AccountAddress::TEN.to_vec());
-    bytes.push(0xFC);
-    AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+pub fn primary_apt_store(address: AccountAddress) -> AccountAddress {
+    create_derived_object_address(address, AccountAddress::TEN)
 }
 
 /// The balance resource held under an account.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct FungibleStoreResource {
     metadata: AccountAddress,
@@ -55,3 +53,46 @@ impl MoveStructType for FungibleStoreResource {
 }
 
 impl MoveResource for FungibleStoreResource {}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct FungibleAssetEventsResource {
+    deposit_events: EventHandle,
+    withdraw_events: EventHandle,
+    frozen_events: EventHandle,
+}
+
+impl FungibleAssetEventsResource {
+    pub fn new(
+        deposit_events: EventHandle,
+        withdraw_events: EventHandle,
+        frozen_events: EventHandle,
+    ) -> Self {
+        Self {
+            deposit_events,
+            withdraw_events,
+            frozen_events,
+        }
+    }
+}
+
+impl MoveStructType for FungibleAssetEventsResource {
+    const MODULE_NAME: &'static IdentStr = ident_str!("fungible_asset");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("FungibleAssetEvents");
+}
+
+impl MoveResource for FungibleAssetEventsResource {}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct MigrationFlag {
+    // Thanks to the "feature" of 1-byte empty struct
+    dummy: bool,
+}
+
+impl MoveStructType for MigrationFlag {
+    const MODULE_NAME: &'static IdentStr = ident_str!("coin");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("MigrationFlag");
+}
+
+impl MoveResource for MigrationFlag {}

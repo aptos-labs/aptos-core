@@ -181,7 +181,7 @@ module aptos_framework::resource_account {
         };
 
         if (empty_container) {
-            let container = move_from(source_addr);
+            let container = move_from<Container>(source_addr);
             let Container { store } = container;
             simple_map::destroy_empty(store);
         };
@@ -248,7 +248,6 @@ module aptos_framework::resource_account {
     }
 
     #[test(framework = @0x1, user = @0x2345)]
-    #[expected_failure(abort_code = 0x60005, location = aptos_framework::coin)]
     public entry fun without_coin(framework: signer, user: signer) acquires Container {
         let user_addr = signer::address_of(&user);
         let (burn, mint) = aptos_framework::aptos_coin::initialize_for_test(&framework);

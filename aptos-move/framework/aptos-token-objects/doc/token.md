@@ -367,6 +367,16 @@ directly understand the behavior in a writeset.
 ## Constants
 
 
+<a id="0x4_token_ENOT_OWNER"></a>
+
+The calling signer is not the owner
+
+
+<pre><code><b>const</b> <a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x4_token_EURI_TOO_LONG"></a>
 
 The URI is over the maximum length
@@ -382,16 +392,6 @@ The URI is over the maximum length
 
 
 <pre><code><b>const</b> <a href="token.md#0x4_token_MAX_URI_LENGTH">MAX_URI_LENGTH</a>: u64 = 512;
-</code></pre>
-
-
-
-<a id="0x4_token_ENOT_OWNER"></a>
-
-The calling signer is not the owner
-
-
-<pre><code><b>const</b> <a href="token.md#0x4_token_ENOT_OWNER">ENOT_OWNER</a>: u64 = 8;
 </code></pre>
 
 

@@ -1,6 +1,7 @@
 module aptos_framework::account {
     use std::bcs;
     use std::error;
+    use std::features;
     use std::hash;
     use std::option::{Self, Option};
     use std::signer;
@@ -15,6 +16,7 @@ module aptos_framework::account {
     use aptos_std::multi_ed25519;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::lite_account;
 
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
@@ -50,7 +52,7 @@ module aptos_framework::account {
         type_info: TypeInfo,
     }
 
-    struct CapabilityOffer<phantom T> has store { for: Option<address> }
+    struct CapabilityOffer<phantom T> has store, copy { for: Option<address> }
 
     struct RotationCapability has drop, store { account: address }
 
@@ -162,13 +164,17 @@ module aptos_framework::account {
     /// An attempt to create a resource account on an account that has a committed transaction
     const EACCOUNT_ALREADY_USED: u64 = 16;
     /// Offerer address doesn't exist
-    const EOFFERER_ADDRESS_DOES_NOT_EXIST: u64 = 17;
+    const EOFFERER_ACCOUNT_DOES_NOT_EXIST: u64 = 17;
     /// The specified rotation capability offer does not exist at the specified offerer address
     const ENO_SUCH_ROTATION_CAPABILITY_OFFER: u64 = 18;
     // The signer capability is not offered to any address
     const ENO_SIGNER_CAPABILITY_OFFERED: u64 = 19;
     // This account has exceeded the allocated GUIDs it can create. It should be impossible to reach this number for real applications.
     const EEXCEEDED_MAX_GUID_CREATION_NUM: u64 = 20;
+    // The rotation capability is not offered to any address
+    const ENO_ROTATION_CAPABILITY_OFFERED: u64 = 21;
+    // The account is a lite account that does not use native authenticator.
+    const EACCOUNT_DOES_NOT_USE_NATIVE_AUTHENTICATOR: u64 = 22;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
@@ -186,7 +192,7 @@ module aptos_framework::account {
     }
 
     public fun create_account_if_does_not_exist(account_address: address) {
-        if (!exists<Account>(account_address)) {
+        if (!features::lite_account_enabled() && !exists<Account>(account_address)) {
             create_account(account_address);
         }
     }
@@ -197,14 +203,17 @@ module aptos_framework::account {
     public(friend) fun create_account(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
         assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
+        if (features::lite_account_enabled()) {
+            lite_account::create_account(new_address)
+        } else {
+            // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
+            assert!(
+                new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
+                error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
+            );
 
-        // NOTE: @core_resources gets created via a `create_account` call, so we do not include it below.
-        assert!(
-            new_address != @vm_reserved && new_address != @aptos_framework && new_address != @aptos_token,
-            error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
-        );
-
-        create_account_unchecked(new_address)
+            create_account_unchecked(new_address)
+        }
     }
 
     fun create_account_unchecked(new_address: address): signer {
@@ -241,17 +250,39 @@ module aptos_framework::account {
 
     #[view]
     public fun exists_at(addr: address): bool {
+        exists<Account>(addr) || features::lite_account_enabled()
+    }
+
+    #[view]
+    public fun account_resource_exists_at(addr: address): bool {
+        resource_exists_at(addr)
+    }
+
+    inline fun resource_exists_at(addr: address): bool {
         exists<Account>(addr)
     }
 
     #[view]
+    #[deprecated]
     public fun get_guid_next_creation_num(addr: address): u64 acquires Account {
-        borrow_global<Account>(addr).guid_creation_num
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).guid_creation_num
+        } else if (features::lite_account_enabled()) {
+            lite_account::guid_creation_number(addr)
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[view]
     public fun get_sequence_number(addr: address): u64 acquires Account {
-        borrow_global<Account>(addr).sequence_number
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).sequence_number
+        } else if (features::lite_account_enabled()) {
+            lite_account::get_sequence_number(addr)
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     public(friend) fun increment_sequence_number(addr: address) acquires Account {
@@ -267,7 +298,13 @@ module aptos_framework::account {
 
     #[view]
     public fun get_authentication_key(addr: address): vector<u8> acquires Account {
-        borrow_global<Account>(addr).authentication_key
+        if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).authentication_key
+        } else if (features::lite_account_enabled() && lite_account::using_native_authenticator(addr)) {
+            option::destroy_some(lite_account::native_authenticator(addr))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     /// This function is used to rotate a resource account's authentication key to `new_auth_key`. This is done in
@@ -277,13 +314,21 @@ module aptos_framework::account {
     /// 3. During multisig_v2 account creation
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        assert!(
-            vector::length(&new_auth_key) == 32,
-            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
-        );
-        let account_resource = borrow_global_mut<Account>(addr);
-        account_resource.authentication_key = new_auth_key;
+        if (resource_exists_at(addr)) {
+            assert!(
+                vector::length(&new_auth_key) == 32,
+                error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+            );
+            let account_resource = borrow_global_mut<Account>(addr);
+            account_resource.authentication_key = new_auth_key;
+        } else if (features::lite_account_enabled()) {
+            lite_account::update_native_authenticator_impl(
+                account,
+                if (new_auth_key == ZERO_AUTH_KEY) { option::none() } else { option::some(new_auth_key) }
+            )
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
     }
 
     /// Private entry function for key rotation that allows the signer to update their authentication key.
@@ -295,6 +340,7 @@ module aptos_framework::account {
         rotate_authentication_key_internal(account, new_auth_key);
     }
 
+    #[deprecated]
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
     /// To authorize the rotation, we need two signatures:
     /// - the first signature `cap_rotate_key` refers to the signature by the account owner's current key on a valid `RotationProofChallenge`,
@@ -333,22 +379,27 @@ module aptos_framework::account {
         cap_update_table: vector<u8>,
     ) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        let account_resource = borrow_global_mut<Account>(addr);
+        let auth_key = if (resource_exists_at(addr)) {
+            borrow_global<Account>(addr).authentication_key
+        } else if (features::lite_account_enabled() && lite_account::using_native_authenticator(addr)) {
+            option::destroy_some(lite_account::native_authenticator(addr))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
 
         // Verify the given `from_public_key_bytes` matches this account's current authentication key.
         if (from_scheme == ED25519_SCHEME) {
             let from_pk = ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
             let from_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
             assert!(
-                account_resource.authentication_key == from_auth_key,
+                auth_key == from_auth_key,
                 error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY)
             );
         } else if (from_scheme == MULTI_ED25519_SCHEME) {
             let from_pk = multi_ed25519::new_unvalidated_public_key_from_bytes(from_public_key_bytes);
             let from_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&from_pk);
             assert!(
-                account_resource.authentication_key == from_auth_key,
+                auth_key == from_auth_key,
                 error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY)
             );
         } else {
@@ -356,9 +407,9 @@ module aptos_framework::account {
         };
 
         // Construct a valid `RotationProofChallenge` that `cap_rotate_key` and `cap_update_table` will validate against.
-        let curr_auth_key_as_address = from_bcs::to_address(account_resource.authentication_key);
+        let curr_auth_key_as_address = from_bcs::to_address(auth_key);
         let challenge = RotationProofChallenge {
-            sequence_number: account_resource.sequence_number,
+            sequence_number: get_sequence_number(addr),
             originator: addr,
             current_auth_key: curr_auth_key_as_address,
             new_public_key: to_public_key_bytes,
@@ -371,6 +422,7 @@ module aptos_framework::account {
             cap_rotate_key,
             &challenge
         );
+
         let new_auth_key = assert_valid_rotation_proof_signature_and_get_auth_key(
             to_scheme,
             to_public_key_bytes,
@@ -379,9 +431,10 @@ module aptos_framework::account {
         );
 
         // Update the `OriginatingAddress` table.
-        update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
+        update_auth_key_and_originating_address_table(addr, new_auth_key);
     }
 
+    #[deprecated]
     public entry fun rotate_authentication_key_with_rotation_capability(
         delegate_signer: &signer,
         rotation_cap_offerer_address: address,
@@ -389,17 +442,37 @@ module aptos_framework::account {
         new_public_key_bytes: vector<u8>,
         cap_update_table: vector<u8>
     ) acquires Account, OriginatingAddress {
-        assert!(exists_at(rotation_cap_offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
-
         // Check that there exists a rotation capability offer at the offerer's account resource for the delegate.
         let delegate_address = signer::address_of(delegate_signer);
-        let offerer_account_resource = borrow_global<Account>(rotation_cap_offerer_address);
-        assert!(
-            option::contains(&offerer_account_resource.rotation_capability_offer.for, &delegate_address),
-            error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
-        );
+        if (resource_exists_at(rotation_cap_offerer_address)) {
+            assert!(
+                option::contains(
+                    &borrow_global<Account>(rotation_cap_offerer_address).rotation_capability_offer.for,
+                    &delegate_address
+                ),
+                error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
+            );
+        } else if (features::lite_account_enabled()) {
+            assert!(
+                lite_account::rotation_capability_offer(rotation_cap_offerer_address) == option::some(delegate_address),
+                error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
+            );
+        } else {
+            abort error::not_found(EOFFERER_ACCOUNT_DOES_NOT_EXIST)
+        };
 
-        let curr_auth_key = from_bcs::to_address(offerer_account_resource.authentication_key);
+        let curr_auth_key = from_bcs::to_address(if (resource_exists_at(rotation_cap_offerer_address)) {
+            borrow_global<Account>(rotation_cap_offerer_address).authentication_key
+        } else if (features::lite_account_enabled()) {
+            assert!(
+                lite_account::using_native_authenticator(rotation_cap_offerer_address),
+                error::invalid_state(EACCOUNT_DOES_NOT_USE_NATIVE_AUTHENTICATOR)
+            );
+            option::destroy_some(lite_account::native_authenticator(rotation_cap_offerer_address))
+        } else {
+            abort error::not_found(EOFFERER_ACCOUNT_DOES_NOT_EXIST)
+        });
+
         let challenge = RotationProofChallenge {
             sequence_number: get_sequence_number(delegate_address),
             originator: rotation_cap_offerer_address,
@@ -416,14 +489,13 @@ module aptos_framework::account {
         );
 
         // Update the `OriginatingAddress` table, so we can find the originating address using the new address.
-        let offerer_account_resource = borrow_global_mut<Account>(rotation_cap_offerer_address);
         update_auth_key_and_originating_address_table(
             rotation_cap_offerer_address,
-            offerer_account_resource,
             new_auth_key
         );
     }
 
+    #[deprecated]
     /// Offers rotation capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its rotation capability to only one other address at one time. If the account
     /// has an existing rotation capability offer, calling this function will update the rotation capability offer with
@@ -449,13 +521,27 @@ module aptos_framework::account {
         recipient_address: address,
     ) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!(
+            resource_exists_at(recipient_address) || features::lite_account_enabled(),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        );
+
+        let (sequence_number, authentication_key) = if (resource_exists_at(addr)) {
+            (borrow_global<Account>(addr).sequence_number, borrow_global<Account>(addr).authentication_key)
+        } else if (features::lite_account_enabled()) {
+            assert!(
+                lite_account::using_native_authenticator(addr),
+                error::invalid_state(EACCOUNT_DOES_NOT_USE_NATIVE_AUTHENTICATOR)
+            );
+            (lite_account::get_sequence_number(addr), option::destroy_some(lite_account::native_authenticator(addr)))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
 
         // proof that this account intends to delegate its rotation capability to another account
-        let account_resource = borrow_global_mut<Account>(addr);
         let proof_challenge = RotationCapabilityOfferProofChallengeV2 {
             chain_id: chain_id::get(),
-            sequence_number: account_resource.sequence_number,
+            sequence_number,
             source_address: addr,
             recipient_address,
         };
@@ -465,7 +551,7 @@ module aptos_framework::account {
             let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
             let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
             assert!(
-                account_resource.authentication_key == expected_auth_key,
+                authentication_key == expected_auth_key,
                 error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY)
             );
 
@@ -478,7 +564,7 @@ module aptos_framework::account {
             let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key_bytes);
             let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
             assert!(
-                account_resource.authentication_key == expected_auth_key,
+                authentication_key == expected_auth_key,
                 error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY)
             );
 
@@ -491,46 +577,96 @@ module aptos_framework::account {
             abort error::invalid_argument(EINVALID_SCHEME)
         };
 
-        // update the existing rotation capability offer or put in a new rotation capability offer for the current account
-        option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, recipient_address);
+        if (resource_exists_at(addr)) {
+            // update the existing rotation capability offer or put in a new rotation capability offer for the current account
+            option::swap_or_fill(
+                &mut borrow_global_mut<Account>(addr).rotation_capability_offer.for,
+                recipient_address
+            );
+        } else if (features::lite_account_enabled()) {
+            lite_account::set_rotation_capability_offer(account, option::some(recipient_address));
+        } // No else here because it should abort earlier.
     }
 
     #[view]
+    #[deprecated]
     /// Returns true if the account at `account_addr` has a rotation capability offer.
     public fun is_rotation_capability_offered(account_addr: address): bool acquires Account {
-        let account_resource = borrow_global<Account>(account_addr);
-        option::is_some(&account_resource.rotation_capability_offer.for)
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global<Account>(account_addr);
+            option::is_some(&account_resource.rotation_capability_offer.for)
+        } else if (features::lite_account_enabled()) {
+            option::is_some(&lite_account::rotation_capability_offer(account_addr))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[view]
+    #[deprecated]
     /// Returns the address of the account that has a rotation capability offer from the account at `account_addr`.
     public fun get_rotation_capability_offer_for(account_addr: address): address acquires Account {
-        let account_resource = borrow_global<Account>(account_addr);
-        assert!(
-            option::is_some(&account_resource.rotation_capability_offer.for),
-            error::not_found(ENO_SIGNER_CAPABILITY_OFFERED),
-        );
-        *option::borrow(&account_resource.rotation_capability_offer.for)
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global<Account>(account_addr);
+            assert!(
+                option::is_some(&account_resource.rotation_capability_offer.for),
+                error::not_found(ENO_ROTATION_CAPABILITY_OFFERED),
+            );
+            *option::borrow(&account_resource.rotation_capability_offer.for)
+        } else if (features::lite_account_enabled()) {
+            let rotation_offer = lite_account::rotation_capability_offer(account_addr);
+            assert!(
+                option::is_some(&rotation_offer),
+                error::not_found(ENO_ROTATION_CAPABILITY_OFFERED),
+            );
+            option::destroy_some(rotation_offer)
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
+    #[deprecated]
     /// Revoke the rotation capability offer given to `to_be_revoked_recipient_address` from `account`
     public entry fun revoke_rotation_capability(account: &signer, to_be_revoked_address: address) acquires Account {
-        assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        let addr = signer::address_of(account);
-        let account_resource = borrow_global_mut<Account>(addr);
         assert!(
-            option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address),
-            error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
+            resource_exists_at(to_be_revoked_address) || features::lite_account_enabled(),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST)
         );
+        let account_addr = signer::address_of(account);
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global<Account>(account_addr);
+            assert!(
+                option::contains(&account_resource.rotation_capability_offer.for, &to_be_revoked_address),
+                error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
+            );
+        } else if (features::lite_account_enabled()) {
+            let rotation_offer = lite_account::rotation_capability_offer(account_addr);
+            assert!(
+                option::contains(&rotation_offer, &to_be_revoked_address),
+                error::not_found(ENO_SUCH_ROTATION_CAPABILITY_OFFER)
+            );
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
         revoke_any_rotation_capability(account);
     }
 
+    #[deprecated]
     /// Revoke any rotation capability offer in the specified account.
+    /// Account V1 only.
     public entry fun revoke_any_rotation_capability(account: &signer) acquires Account {
-        let account_resource = borrow_global_mut<Account>(signer::address_of(account));
-        option::extract(&mut account_resource.rotation_capability_offer.for);
+        let account_addr = signer::address_of(account);
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global_mut<Account>(account_addr);
+            option::extract(&mut account_resource.rotation_capability_offer.for);
+        } else if (features::lite_account_enabled()) {
+            lite_account::set_rotation_capability_offer(account, option::none());
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
     }
 
+    #[deprecated]
     /// Offers signer capability on behalf of `account` to the account at address `recipient_address`.
     /// An account can delegate its signer capability to only one other address at one time.
     /// `signer_capability_key_bytes` is the `SignerCapabilityOfferProofChallengeV2` signed by the account owner's key
@@ -548,71 +684,142 @@ module aptos_framework::account {
         recipient_address: address
     ) acquires Account {
         let source_address = signer::address_of(account);
-        assert!(exists_at(recipient_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!(
+            resource_exists_at(recipient_address) || features::lite_account_enabled(),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        );
 
-        // Proof that this account intends to delegate its signer capability to another account.
-        let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: get_sequence_number(source_address),
-            source_address,
-            recipient_address,
-        };
-        verify_signed_message(
-            source_address, account_scheme, account_public_key_bytes, signer_capability_sig_bytes, proof_challenge);
+        if (resource_exists_at(source_address)) {
+            // Proof that this account intends to delegate its signer capability to another account.
+            let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+                sequence_number: get_sequence_number(source_address),
+                source_address,
+                recipient_address,
+            };
+            verify_signed_message(
+                source_address, account_scheme, account_public_key_bytes, signer_capability_sig_bytes, proof_challenge);
 
-        // Update the existing signer capability offer or put in a new signer capability offer for the recipient.
-        let account_resource = borrow_global_mut<Account>(source_address);
-        option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+            // Update the existing signer capability offer or put in a new signer capability offer for the recipient.
+            let account_resource = borrow_global_mut<Account>(source_address);
+            option::swap_or_fill(&mut account_resource.signer_capability_offer.for, recipient_address);
+        } else if (features::lite_account_enabled()) {
+            // Proof that this account intends to delegate its signer capability to another account.
+            assert!(
+                lite_account::using_native_authenticator(source_address),
+                error::invalid_state(EACCOUNT_DOES_NOT_USE_NATIVE_AUTHENTICATOR)
+            );
+            let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
+                sequence_number: lite_account::get_sequence_number(source_address),
+                source_address,
+                recipient_address,
+            };
+            verify_signed_message(
+                source_address, account_scheme, account_public_key_bytes, signer_capability_sig_bytes, proof_challenge);
+            lite_account::set_signer_capability_offer(account, option::some(recipient_address));
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[view]
+    #[deprecated]
     /// Returns true if the account at `account_addr` has a signer capability offer.
     public fun is_signer_capability_offered(account_addr: address): bool acquires Account {
-        let account_resource = borrow_global<Account>(account_addr);
-        option::is_some(&account_resource.signer_capability_offer.for)
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global<Account>(account_addr);
+            option::is_some(&account_resource.signer_capability_offer.for)
+        } else if (features::lite_account_enabled()) {
+            option::is_some(&lite_account::signer_capability_offer(account_addr))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[view]
+    #[deprecated]
     /// Returns the address of the account that has a signer capability offer from the account at `account_addr`.
     public fun get_signer_capability_offer_for(account_addr: address): address acquires Account {
-        let account_resource = borrow_global<Account>(account_addr);
-        assert!(
-            option::is_some(&account_resource.signer_capability_offer.for),
-            error::not_found(ENO_SIGNER_CAPABILITY_OFFERED),
-        );
-        *option::borrow(&account_resource.signer_capability_offer.for)
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global<Account>(account_addr);
+            assert!(
+                option::is_some(&account_resource.signer_capability_offer.for),
+                error::not_found(ENO_SIGNER_CAPABILITY_OFFERED),
+            );
+            *option::borrow(&account_resource.signer_capability_offer.for)
+        } else if (features::lite_account_enabled()) {
+            let signer_offer = lite_account::signer_capability_offer(account_addr);
+            assert!(
+                option::is_some(&signer_offer),
+                error::not_found(ENO_SIGNER_CAPABILITY_OFFERED),
+            );
+            option::destroy_some(signer_offer)
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
+    #[deprecated]
     /// Revoke the account owner's signer capability offer for `to_be_revoked_address` (i.e., the address that
     /// has a signer capability offer from `account` but will be revoked in this function).
     public entry fun revoke_signer_capability(account: &signer, to_be_revoked_address: address) acquires Account {
-        assert!(exists_at(to_be_revoked_address), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        let addr = signer::address_of(account);
-        let account_resource = borrow_global_mut<Account>(addr);
         assert!(
-            option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address),
-            error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
+            resource_exists_at(to_be_revoked_address) || features::lite_account_enabled(),
+            error::not_found(EACCOUNT_DOES_NOT_EXIST)
         );
+        let account_addr = signer::address_of(account);
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global<Account>(account_addr);
+            assert!(
+                option::contains(&account_resource.signer_capability_offer.for, &to_be_revoked_address),
+                error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
+            );
+        } else if (features::lite_account_enabled()) {
+            let signer_offer = lite_account::signer_capability_offer(account_addr);
+            assert!(
+                option::contains(&signer_offer, &to_be_revoked_address),
+                error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
+            );
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
         revoke_any_signer_capability(account);
     }
 
+    #[deprecated]
     /// Revoke any signer capability offer in the specified account.
     public entry fun revoke_any_signer_capability(account: &signer) acquires Account {
-        let account_resource = borrow_global_mut<Account>(signer::address_of(account));
-        option::extract(&mut account_resource.signer_capability_offer.for);
+        let account_addr = signer::address_of(account);
+        if (resource_exists_at(account_addr)) {
+            let account_resource = borrow_global_mut<Account>(account_addr);
+            option::extract(&mut account_resource.signer_capability_offer.for);
+        } else if (features::lite_account_enabled()) {
+            lite_account::set_signer_capability_offer(account, option::none());
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
     }
 
+    #[deprecated]
     /// Return an authorized signer of the offerer, if there's an existing signer capability offer for `account`
     /// at the offerer's address.
     public fun create_authorized_signer(account: &signer, offerer_address: address): signer acquires Account {
-        assert!(exists_at(offerer_address), error::not_found(EOFFERER_ADDRESS_DOES_NOT_EXIST));
-
-        // Check if there's an existing signer capability offer from the offerer.
-        let account_resource = borrow_global<Account>(offerer_address);
         let addr = signer::address_of(account);
-        assert!(
-            option::contains(&account_resource.signer_capability_offer.for, &addr),
-            error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
-        );
+        // Check if there's an existing signer capability offer from the offerer.
+        if (resource_exists_at(offerer_address)) {
+            let account_resource = borrow_global<Account>(offerer_address);
+            assert!(
+                option::contains(&account_resource.signer_capability_offer.for, &addr),
+                error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
+            );
+        } else if (features::lite_account_enabled()) {
+            let signer_offer = lite_account::signer_capability_offer(addr);
+            assert!(
+                option::contains(&signer_offer, &addr),
+                error::not_found(ENO_SUCH_SIGNER_CAPABILITY)
+            );
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
 
         create_signer(offerer_address)
     }
@@ -651,16 +858,23 @@ module aptos_framework::account {
     /// in the event of key recovery.
     fun update_auth_key_and_originating_address_table(
         originating_addr: address,
-        account_resource: &mut Account,
         new_auth_key_vector: vector<u8>,
-    ) acquires OriginatingAddress {
+    ) acquires OriginatingAddress, Account {
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let curr_auth_key = from_bcs::to_address(account_resource.authentication_key);
 
+        let curr_auth_key = if (resource_exists_at(originating_addr)) {
+            borrow_global<Account>(originating_addr).authentication_key
+        } else if (lite_account::using_native_authenticator(originating_addr)) {
+            option::destroy_some(lite_account::native_authenticator(originating_addr))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        };
+
+        let curr_auth_key_as_address = from_bcs::to_address(curr_auth_key);
         // Checks `OriginatingAddress[curr_auth_key]` is either unmapped, or mapped to `originating_address`.
         // If it's mapped to the originating address, removes that mapping.
         // Otherwise, abort if it's mapped to a different address.
-        if (table::contains(address_map, curr_auth_key)) {
+        if (table::contains(address_map, curr_auth_key_as_address)) {
             // If account_a with address_a is rotating its keypair from keypair_a to keypair_b, we expect
             // the address of the account to stay the same, while its keypair updates to keypair_b.
             // Here, by asserting that we're calling from the account with the originating address, we enforce
@@ -671,7 +885,7 @@ module aptos_framework::account {
             // If the account with address b calls this function with two valid signatures, it will abort at this step,
             // because address b is not the account's originating address.
             assert!(
-                originating_addr == table::remove(address_map, curr_auth_key),
+                originating_addr == table::remove(address_map, curr_auth_key_as_address),
                 error::not_found(EINVALID_ORIGINATING_ADDRESS)
             );
         };
@@ -680,23 +894,32 @@ module aptos_framework::account {
         let new_auth_key = from_bcs::to_address(new_auth_key_vector);
         table::add(address_map, new_auth_key, originating_addr);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(KeyRotation {
-                account: originating_addr,
-                old_authentication_key: account_resource.authentication_key,
-                new_authentication_key: new_auth_key_vector,
-            });
+        if (resource_exists_at(originating_addr)) {
+            let account = borrow_global_mut<Account>(originating_addr);
+            // Update the account resource's authentication key.
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(KeyRotation {
+                    account: originating_addr,
+                    old_authentication_key: account.authentication_key,
+                    new_authentication_key: new_auth_key_vector,
+                });
+            };
+            event::emit_event<KeyRotationEvent>(
+                &mut account.key_rotation_events,
+                KeyRotationEvent {
+                    old_authentication_key: account.authentication_key,
+                    new_authentication_key: new_auth_key_vector,
+                }
+            );
+            account.authentication_key = new_auth_key_vector;
+        } else if (features::lite_account_enabled() && lite_account::using_native_authenticator(originating_addr)) {
+            lite_account::update_native_authenticator_impl(
+                &create_signer(originating_addr),
+                option::some(new_auth_key_vector)
+            );
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
         };
-        event::emit_event<KeyRotationEvent>(
-            &mut account_resource.key_rotation_events,
-            KeyRotationEvent {
-                old_authentication_key: account_resource.authentication_key,
-                new_authentication_key: new_auth_key_vector,
-            }
-        );
-
-        // Update the account resource's authentication key.
-        account_resource.authentication_key = new_auth_key_vector;
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -712,6 +935,7 @@ module aptos_framework::account {
         from_bcs::to_address(hash::sha3_256(bytes))
     }
 
+    #[deprecated]
     /// A resource account is used to manage resources independent of an account managed by a user.
     /// In Aptos a resource account is created based upon the sha3 256 of the source's address and additional seed data.
     /// A resource account can only be created once, this is designated by setting the
@@ -723,7 +947,7 @@ module aptos_framework::account {
     /// than `(1/2)^(256)`.
     public fun create_resource_account(source: &signer, seed: vector<u8>): (signer, SignerCapability) acquires Account {
         let resource_addr = create_resource_address(&signer::address_of(source), seed);
-        let resource = if (exists_at(resource_addr)) {
+        let resource = if (resource_exists_at(resource_addr)) {
             let account = borrow_global<Account>(resource_addr);
             assert!(
                 option::is_none(&account.signer_capability_offer.for),
@@ -735,7 +959,7 @@ module aptos_framework::account {
             );
             create_signer(resource_addr)
         } else {
-            create_account_unchecked(resource_addr)
+            create_account(resource_addr)
         };
 
         // By default, only the SignerCapability should have control over the resource account and not the auth key.
@@ -743,8 +967,12 @@ module aptos_framework::account {
         // of the resource account using the SignerCapability.
         rotate_authentication_key_internal(&resource, ZERO_AUTH_KEY);
 
-        let account = borrow_global_mut<Account>(resource_addr);
-        account.signer_capability_offer.for = option::some(resource_addr);
+        if (resource_exists_at(resource_addr)) {
+            let account = borrow_global_mut<Account>(resource_addr);
+            account.signer_capability_offer.for = option::some(resource_addr);
+        } else if (features::lite_account_enabled()) {
+            lite_account::set_signer_capability_offer(&resource, option::some(resource_addr));
+        };
         let signer_cap = SignerCapability { account: resource_addr };
         (resource, signer_cap)
     }
@@ -764,46 +992,56 @@ module aptos_framework::account {
                 addr == @0xa,
             error::permission_denied(ENO_VALID_FRAMEWORK_RESERVED_ADDRESS),
         );
-        let signer = create_account_unchecked(addr);
+        let signer = if (features::lite_account_enabled()) {
+            lite_account::create_account_unchecked(addr)
+        } else {
+            create_account_unchecked(addr)
+        };
         let signer_cap = SignerCapability { account: addr };
         (signer, signer_cap)
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    /// GUID management methods.
-    ///////////////////////////////////////////////////////////////////////////
-
+    #[deprecated]
     public fun create_guid(account_signer: &signer): guid::GUID acquires Account {
         let addr = signer::address_of(account_signer);
-        let account = borrow_global_mut<Account>(addr);
-        let guid = guid::create(addr, &mut account.guid_creation_num);
-        assert!(
-            account.guid_creation_num < MAX_GUID_CREATION_NUM,
-            error::out_of_range(EEXCEEDED_MAX_GUID_CREATION_NUM),
-        );
-        guid
+        if (resource_exists_at(addr)) {
+            let account = borrow_global_mut<Account>(addr);
+            let guid = guid::create(addr, &mut account.guid_creation_num);
+            assert!(
+                account.guid_creation_num < MAX_GUID_CREATION_NUM,
+                error::out_of_range(EEXCEEDED_MAX_GUID_CREATION_NUM),
+            );
+            guid
+        } else if (features::lite_account_enabled()) {
+            let guid = lite_account::create_guid(account_signer);
+            assert!(
+                lite_account::guid_creation_number(addr) < MAX_GUID_CREATION_NUM,
+                error::out_of_range(EEXCEEDED_MAX_GUID_CREATION_NUM),
+            );
+            guid
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    /// GUID management methods.
-    ///////////////////////////////////////////////////////////////////////////
-
+    #[deprecated]
     public fun new_event_handle<T: drop + store>(account: &signer): EventHandle<T> acquires Account {
         event::new_event_handle(create_guid(account))
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    /// Coin management methods.
-    ///////////////////////////////////////////////////////////////////////////
-
+    #[deprecated]
     public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
-        let account = borrow_global_mut<Account>(account_addr);
-        event::emit_event<CoinRegisterEvent>(
-            &mut account.coin_register_events,
-            CoinRegisterEvent {
-                type_info: type_info::type_of<CoinType>(),
-            },
-        );
+        if (resource_exists_at(account_addr)) {
+            let account = borrow_global_mut<Account>(account_addr);
+            event::emit_event<CoinRegisterEvent>(
+                &mut account.coin_register_events,
+                CoinRegisterEvent {
+                    type_info: type_info::type_of<CoinType>(),
+                },
+            );
+        } else if (!features::lite_account_enabled()) {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -822,19 +1060,18 @@ module aptos_framework::account {
         }
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    /// Capability based functions for efficient use.
-    ///////////////////////////////////////////////////////////////////////////
-
+    #[deprecated]
     public fun create_signer_with_capability(capability: &SignerCapability): signer {
         let addr = &capability.account;
         create_signer(*addr)
     }
 
+    #[deprecated]
     public fun get_signer_capability_address(capability: &SignerCapability): address {
         capability.account
     }
 
+    #[deprecated]
     public fun verify_signed_message<T: drop>(
         account: address,
         account_scheme: u8,
@@ -842,13 +1079,13 @@ module aptos_framework::account {
         signed_message_bytes: vector<u8>,
         message: T,
     ) acquires Account {
-        let account_resource = borrow_global_mut<Account>(account);
+        let auth_key = get_authentication_key(account);
         // Verify that the `SignerCapabilityOfferProofChallengeV2` has the right information and is signed by the account owner's key
         if (account_scheme == ED25519_SCHEME) {
             let pubkey = ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
             let expected_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
             assert!(
-                account_resource.authentication_key == expected_auth_key,
+                auth_key == expected_auth_key,
                 error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
             );
 
@@ -861,7 +1098,7 @@ module aptos_framework::account {
             let pubkey = multi_ed25519::new_unvalidated_public_key_from_bytes(account_public_key);
             let expected_auth_key = multi_ed25519::unvalidated_public_key_to_authentication_key(&pubkey);
             assert!(
-                account_resource.authentication_key == expected_auth_key,
+                auth_key == expected_auth_key,
                 error::invalid_argument(EWRONG_CURRENT_PUBLIC_KEY),
             );
 
@@ -877,6 +1114,18 @@ module aptos_framework::account {
 
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
+        // Make this easier by just allowing the account to be created again in a test
+        if (resource_exists_at(new_address)) {
+            create_signer_for_test(new_address)
+        } else if (!features::lite_account_enabled()) {
+            lite_account::create_account_unchecked(new_address)
+        } else {
+            create_account_unchecked(new_address)
+        }
+    }
+
+    #[test_only]
+    public fun create_account_v1_for_test(new_address: address): signer {
         // Make this easier by just allowing the account to be created again in a test
         if (!exists_at(new_address)) {
             create_account_unchecked(new_address)
@@ -916,10 +1165,13 @@ module aptos_framework::account {
         vector::push_back(&mut seed, 1); // multisig threshold
         vector::push_back(&mut seed, 1); // signature scheme id
         let (resource, _) = create_resource_account(&alice, seed);
+        if (features::lite_account_enabled()) {
+            lite_account::update_native_authenticator_impl(&resource, option::some(alice_auth));
+        };
 
         let resource_addr = signer::address_of(&resource);
         let proof_challenge = SignerCapabilityOfferProofChallengeV2 {
-            sequence_number: borrow_global_mut<Account>(resource_addr).sequence_number,
+            sequence_number: get_sequence_number(resource_addr),
             source_address: resource_addr,
             recipient_address,
         };
@@ -976,7 +1228,6 @@ module aptos_framework::account {
     }
 
     #[test(user = @0x1)]
-    #[expected_failure(abort_code = 0x8000f, location = Self)]
     public entry fun test_duplice_create_resource_account(user: signer) acquires Account {
         create_resource_account(&user, x"01");
         create_resource_account(&user, x"01");
@@ -991,17 +1242,13 @@ module aptos_framework::account {
     public fun increment_sequence_number_for_test(
         addr: address,
     ) acquires Account {
-        let acct = borrow_global_mut<Account>(addr);
-        acct.sequence_number = acct.sequence_number + 1;
-    }
-
-    #[test_only]
-    /// Update address `addr` to have `s` as its sequence number
-    public fun set_sequence_number(
-        addr: address,
-        s: u64
-    ) acquires Account {
-        borrow_global_mut<Account>(addr).sequence_number = s;
+        if (resource_exists_at(addr)) {
+            increment_sequence_number(addr);
+        } else if (features::lite_account_enabled()) {
+            lite_account::increment_sequence_number(addr)
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[test_only]
@@ -1011,14 +1258,26 @@ module aptos_framework::account {
 
     #[test_only]
     public fun set_signer_capability_offer(offerer: address, receiver: address) acquires Account {
-        let account_resource = borrow_global_mut<Account>(offerer);
-        option::swap_or_fill(&mut account_resource.signer_capability_offer.for, receiver);
+        if (resource_exists_at(offerer)) {
+            let account_resource = borrow_global_mut<Account>(offerer);
+            option::swap_or_fill(&mut account_resource.signer_capability_offer.for, receiver);
+        } else if (features::lite_account_enabled()) {
+            lite_account::set_signer_capability_offer(&create_signer(offerer), option::some(receiver))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[test_only]
     public fun set_rotation_capability_offer(offerer: address, receiver: address) acquires Account {
-        let account_resource = borrow_global_mut<Account>(offerer);
-        option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, receiver);
+        if (resource_exists_at(offerer)) {
+            let account_resource = borrow_global_mut<Account>(offerer);
+            option::swap_or_fill(&mut account_resource.rotation_capability_offer.for, receiver);
+        } else if (features::lite_account_enabled()) {
+            lite_account::set_rotation_capability_offer(&create_signer(offerer), option::some(receiver))
+        } else {
+            abort error::not_found(EACCOUNT_DOES_NOT_EXIST)
+        }
     }
 
     #[test]
@@ -1028,13 +1287,10 @@ module aptos_framework::account {
         let addr: address = @0x1234; // Define test address
         create_account(addr); // Initialize account resource
         // Assert sequence number intializes to 0
-        assert!(borrow_global<Account>(addr).sequence_number == 0, 0);
+        assert!(get_sequence_number(addr) == 0, 0);
         increment_sequence_number_for_test(addr); // Increment sequence number
         // Assert correct mock value post-increment
-        assert!(borrow_global<Account>(addr).sequence_number == 1, 1);
-        set_sequence_number(addr, 10); // Set mock sequence number
-        // Assert correct mock value post-modification
-        assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
+        assert!(get_sequence_number(addr) == 1, 1);
     }
 
     ///////////////////////////////////////////////////////////////////////////

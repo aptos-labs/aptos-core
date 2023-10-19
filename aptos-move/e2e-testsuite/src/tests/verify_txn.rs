@@ -161,6 +161,7 @@ fn verify_reserved_sender() {
     executor.add_account_data(&sender);
     // Generate a new key pair to try and sign things with.
     let private_key = Ed25519PrivateKey::generate_for_testing();
+    // It will treat it as a lite_account if the account does not exist corresponding to the key.
     let program = aptos_stdlib::aptos_coin_transfer(*sender.address(), 100);
     let signed_txn = transaction_test_helpers::get_test_signed_txn(
         account_config::reserved_vm_address(),
@@ -173,7 +174,7 @@ fn verify_reserved_sender() {
     assert_prologue_parity!(
         executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
+        StatusCode::INVALID_AUTH_KEY
     );
 }
 
@@ -267,17 +268,18 @@ fn verify_simple_payment() {
     );
 
     // Create a new transaction from a bogus account that doesn't exist
-    let bogus_account = executor.create_raw_account_data(100_000, 10);
+    // Account can be non-existent.
+    let bogus_account = executor.create_raw_account_data(100_000, 0);
     let txn = bogus_account
         .account()
         .transaction()
         .script(Script::new(empty_script.clone(), vec![], vec![]))
         .sequence_number(10)
         .sign();
-    assert_prologue_parity!(
-        executor.validate_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
+    assert_prologue_disparity!(
+        executor.validate_transaction(txn.clone()).status() => None,
+        executor.execute_transaction(txn).status() =>
+        TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
     );
 
     // The next couple tests test transaction size, and bounds on gas price and the number of

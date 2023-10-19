@@ -4,7 +4,7 @@
 
 //! Support for mocking the Aptos data store.
 
-use crate::account::AccountData;
+use crate::account::{AccountData, LiteAccountData};
 use aptos_types::{
     account_config::CoinInfoResource,
     on_chain_config::{Features, OnChainConfig},
@@ -100,6 +100,12 @@ impl FakeDataStore {
     /// Adds an [`AccountData`] to this data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
         let write_set = account_data.to_writeset();
+        self.add_write_set(&write_set)
+    }
+
+    /// Adds an [`LiteAccountData`] to this data store.
+    pub fn add_lite_account_data(&mut self, lite_account_data: &LiteAccountData) {
+        let write_set = lite_account_data.writeset();
         self.add_write_set(&write_set)
     }
 

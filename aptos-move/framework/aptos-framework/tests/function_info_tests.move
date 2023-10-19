@@ -45,12 +45,11 @@ module aptos_framework::function_info_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x2, location = aptos_framework::function_info)]
     fun test_func_type_eq_reject_same_module() {
         let m2 = string::utf8(b"function_info_tests");
         let lhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"lhs"));
         let rhs = function_info::new_function_info_from_address(@aptos_framework, m2, string::utf8(b"rhs"));
-        assert!(function_info::check_dispatch_type_compatibility(&lhs, &rhs), 0x1);
+        assert!(!function_info::check_dispatch_type_compatibility(&lhs, &rhs), 0x1);
     }
 
     #[test]

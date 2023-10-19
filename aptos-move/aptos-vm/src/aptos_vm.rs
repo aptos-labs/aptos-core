@@ -2793,6 +2793,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
 ) -> VMResult<bool> {
     Ok(
         features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+            && !features.is_enabled(FeatureFlag::LITE_ACCOUNT)
             && txn_data.fee_payer.is_some()
             && txn_data.sequence_number == 0
             && resolver

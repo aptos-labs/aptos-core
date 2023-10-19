@@ -1222,6 +1222,16 @@ Event emitted when a transaction's metadata is updated.
 ## Constants
 
 
+<a id="0x1_multisig_account_ENOT_OWNER"></a>
+
+Account executing this operation is not an owner of the multisig account.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>: u64 = 2003;
+</code></pre>
+
+
+
 <a id="0x1_multisig_account_ZERO_AUTH_KEY"></a>
 
 
@@ -1359,16 +1369,6 @@ Transaction has not received enough rejections to be officially rejected.
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_ENOUGH_REJECTIONS">ENOT_ENOUGH_REJECTIONS</a>: u64 = 10;
-</code></pre>
-
-
-
-<a id="0x1_multisig_account_ENOT_OWNER"></a>
-
-Account executing this operation is not an owner of the multisig account.
-
-
-<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ENOT_OWNER">ENOT_OWNER</a>: u64 = 2003;
 </code></pre>
 
 

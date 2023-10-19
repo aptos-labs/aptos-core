@@ -603,6 +603,17 @@ module std::features {
         is_enabled(COLLECTION_OWNER)
     }
 
+    /// Whether to use lite account as the default account.
+    ///
+    /// Lifetime: transient
+    const LITE_ACCOUNT: u64 = 80;
+
+    public fun get_lite_account_feature(): u64 { LITE_ACCOUNT }
+
+    public fun lite_account_enabled(): bool acquires Features {
+        is_enabled(LITE_ACCOUNT)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

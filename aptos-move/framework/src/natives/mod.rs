@@ -21,6 +21,7 @@ pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
+pub mod lite_account;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
@@ -91,6 +92,7 @@ pub fn all_natives(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)
     );
+    add_natives_from_module!("lite_account", lite_account::make_all(builder));
 
     if inject_create_signer_for_gov_sim {
         add_natives_from_module!(

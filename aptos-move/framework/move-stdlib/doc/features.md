@@ -133,6 +133,8 @@ return true.
 -  [Function `transaction_simulation_enhancement_enabled`](#0x1_features_transaction_simulation_enhancement_enabled)
 -  [Function `get_collection_owner_feature`](#0x1_features_get_collection_owner_feature)
 -  [Function `is_collection_owner_enabled`](#0x1_features_is_collection_owner_enabled)
+-  [Function `get_lite_account_feature`](#0x1_features_get_lite_account_feature)
+-  [Function `lite_account_enabled`](#0x1_features_lite_account_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -599,6 +601,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH">LIMIT_MAX_IDENTIFIER_LENGTH</a>: u64 = 38;
+</code></pre>
+
+
+
+<a id="0x1_features_LITE_ACCOUNT"></a>
+
+Whether to use lite account as the default account.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_LITE_ACCOUNT">LITE_ACCOUNT</a>: u64 = 80;
 </code></pre>
 
 
@@ -3266,6 +3280,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_collection_owner_enabled">is_collection_owner_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COLLECTION_OWNER">COLLECTION_OWNER</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_lite_account_feature"></a>
+
+## Function `get_lite_account_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_lite_account_feature">get_lite_account_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_lite_account_feature">get_lite_account_feature</a>(): u64 { <a href="features.md#0x1_features_LITE_ACCOUNT">LITE_ACCOUNT</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_lite_account_enabled"></a>
+
+## Function `lite_account_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_lite_account_enabled">lite_account_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_lite_account_enabled">lite_account_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_LITE_ACCOUNT">LITE_ACCOUNT</a>)
 }
 </code></pre>
 

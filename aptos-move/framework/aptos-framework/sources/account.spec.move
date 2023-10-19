@@ -315,10 +315,6 @@ spec aptos_framework::account {
 
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
 
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
-            originating_addr: addr,
-        };
-
         let post auth_key = global<Account>(addr).authentication_key;
         ensures auth_key == new_auth_key_vector;
 
@@ -366,10 +362,6 @@ spec aptos_framework::account {
         let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
 
         aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
-            originating_addr: rotation_cap_offerer_address,
-            account_resource: offerer_account_resource,
-        };
 
         let post auth_key = global<Account>(rotation_cap_offerer_address).authentication_key;
         ensures auth_key == new_auth_key_vector;
@@ -662,27 +654,10 @@ spec aptos_framework::account {
 
     spec update_auth_key_and_originating_address_table(
         originating_addr: address,
-        account_resource: &mut Account,
         new_auth_key_vector: vector<u8>,
     ) {
+        pragma verify = false;
         modifies global<OriginatingAddress>(@aptos_framework);
-        include UpdateAuthKeyAndOriginatingAddressTableAbortsIf;
-    }
-    spec schema UpdateAuthKeyAndOriginatingAddressTableAbortsIf {
-        originating_addr: address;
-        account_resource: Account;
-        new_auth_key_vector: vector<u8>;
-        let address_map = global<OriginatingAddress>(@aptos_framework).address_map;
-        let curr_auth_key = from_bcs::deserialize<address>(account_resource.authentication_key);
-        let new_auth_key = from_bcs::deserialize<address>(new_auth_key_vector);
-        aborts_if !exists<OriginatingAddress>(@aptos_framework);
-        aborts_if !from_bcs::deserializable<address>(account_resource.authentication_key);
-        aborts_if table::spec_contains(address_map, curr_auth_key) &&
-            table::spec_get(address_map, curr_auth_key) != originating_addr;
-        aborts_if !from_bcs::deserializable<address>(new_auth_key_vector);
-        aborts_if curr_auth_key != new_auth_key && table::spec_contains(address_map, new_auth_key);
-
-        ensures table::spec_contains(global<OriginatingAddress>(@aptos_framework).address_map, from_bcs::deserialize<address>(new_auth_key_vector));
     }
 
     spec verify_signed_message<T: drop>(

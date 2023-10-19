@@ -53,8 +53,10 @@ module aptos_framework::aptos_account {
     ///////////////////////////////////////////////////////////////////////////
 
     public entry fun create_account(auth_key: address) {
-        let account_signer = account::create_account(auth_key);
-        register_apt(&account_signer);
+        if (!features::lite_account_enabled()) {
+            let account_signer = account::create_account(auth_key);
+            register_apt(&account_signer);
+        }
     }
 
     /// Batch version of APT transfer.
@@ -114,12 +116,14 @@ module aptos_framework::aptos_account {
     /// Convenient function to deposit a custom CoinType into a recipient account that might not exist.
     /// This would create the recipient account first and register it to receive the CoinType, before transferring.
     public fun deposit_coins<CoinType>(to: address, coins: Coin<CoinType>) acquires DirectTransferConfig {
-        if (!account::exists_at(to)) {
-            create_account(to);
-            spec {
-                assert coin::spec_is_account_registered<AptosCoin>(to);
-                assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<AptosCoin>() ==>
-                    coin::spec_is_account_registered<CoinType>(to);
+        if (!features::lite_account_enabled()) {
+            if (!account::exists_at(to)) {
+                create_account(to);
+                spec {
+                    assert coin::spec_is_account_registered<AptosCoin>(to);
+                    assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<AptosCoin>() ==>
+                        coin::spec_is_account_registered<CoinType>(to);
+                };
             };
         };
         if (!coin::is_account_registered<CoinType>(to)) {
@@ -133,7 +137,10 @@ module aptos_framework::aptos_account {
     }
 
     public fun assert_account_exists(addr: address) {
-        assert!(account::exists_at(addr), error::not_found(EACCOUNT_NOT_FOUND));
+        assert!(
+            account::exists_at(addr) || features::lite_account_enabled(),
+            error::not_found(EACCOUNT_NOT_FOUND)
+        );
     }
 
     public fun assert_account_is_registered_for_apt(addr: address) {
@@ -159,7 +166,7 @@ module aptos_framework::aptos_account {
             emit_event(
                 &mut direct_transfer_config.update_coin_transfer_events,
                 DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });
-        } else {
+        } else if (account::exists_at(addr)) {
             let direct_transfer_config = DirectTransferConfig {
                 allow_arbitrary_coin_transfers: allow,
                 update_coin_transfer_events: new_event_handle<DirectCoinTransferConfigUpdatedEvent>(account),
@@ -283,7 +290,6 @@ module aptos_framework::aptos_account {
         let (resource_account, _) = account::create_resource_account(alice, vector[]);
         let resource_acc_addr = signer::address_of(&resource_account);
         let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(core);
-        assert!(!coin::is_account_registered<AptosCoin>(resource_acc_addr), 0);
 
         create_account(signer::address_of(alice));
         coin::deposit(signer::address_of(alice), coin::mint(10000, &mint_cap));

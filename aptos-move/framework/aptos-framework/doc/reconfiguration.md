@@ -256,7 +256,12 @@ Publishes <code><a href="reconfiguration.md#0x1_reconfiguration_Configuration">C
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
     // <b>assert</b> it matches `new_epoch_event_key()`, otherwise the <a href="event.md#0x1_event">event</a> can't be recognized
-    <b>assert</b>!(<a href="account.md#0x1_account_get_guid_next_creation_num">account::get_guid_next_creation_num</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework)) == 2, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>));
+    <b>assert</b>!(
+        <a href="account.md#0x1_account_get_guid_next_creation_num">account::get_guid_next_creation_num</a>(
+            <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework)
+        ) == <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_lite_account_enabled">features::lite_account_enabled</a>()) { 0 } <b>else</b> { 2 },
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>)
+    );
     <b>move_to</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a>&gt;(
         aptos_framework,
         <a href="reconfiguration.md#0x1_reconfiguration_Configuration">Configuration</a> {
