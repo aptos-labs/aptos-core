@@ -243,7 +243,7 @@ mod test {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::BTreeMap;
 
     /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
@@ -337,31 +337,31 @@ mod test {
         state_view.set_legacy(key("resource_group_base"), bcs::to_bytes(&tree).unwrap());
         state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
 
-        let resource_write_set = HashMap::from([
+        let resource_write_set = BTreeMap::from([
             (key("resource_both"), write(80)),
             (key("resource_write_set"), write(90)),
         ]);
 
-        let module_write_set = HashMap::from([
+        let module_write_set = BTreeMap::from([
             (key("module_both"), write(100)),
             (key("module_write_set"), write(110)),
         ]);
 
-        let aggregator_write_set = HashMap::from([
+        let aggregator_write_set = BTreeMap::from([
             (key("aggregator_both"), write(120)),
             (key("aggregator_write_set"), write(130)),
         ]);
 
         let aggregator_delta_set =
-            HashMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
+            BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
-        let resource_group_write_set = HashMap::from([
+        let resource_group_write_set = BTreeMap::from([
             (
                 key("resource_group_both"),
                 GroupWrite::new(
                     WriteOp::Deletion,
                     0,
-                    HashMap::from([
+                    BTreeMap::from([
                         (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
                         (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
                     ]),
@@ -372,7 +372,10 @@ mod test {
                 GroupWrite::new(
                     WriteOp::Deletion,
                     0,
-                    HashMap::from([(mock_tag_1(), WriteOp::Modification(serialize(&5000).into()))]),
+                    BTreeMap::from([(
+                        mock_tag_1(),
+                        WriteOp::Modification(serialize(&5000).into()),
+                    )]),
                 ),
             ),
         ]);

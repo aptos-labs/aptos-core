@@ -18,7 +18,7 @@ use move_core_types::{
     language_storage::StructTag,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::BTreeMap, hash::Hash};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// Describes an update to a resource group granularly, with WriteOps to affected
@@ -38,7 +38,7 @@ pub struct GroupWrite {
     /// exist in the group. Note: During parallel block execution, due to speculative
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    inner_ops: HashMap<StructTag, WriteOp>,
+    inner_ops: BTreeMap<StructTag, WriteOp>,
 }
 
 impl GroupWrite {
@@ -48,7 +48,7 @@ impl GroupWrite {
     pub fn new(
         mut metadata_op: WriteOp,
         group_size: u64,
-        inner_ops: HashMap<StructTag, WriteOp>,
+        inner_ops: BTreeMap<StructTag, WriteOp>,
     ) -> Self {
         for v in inner_ops.values() {
             assert_none!(v.metadata());
@@ -84,7 +84,7 @@ impl GroupWrite {
         &self.metadata_op
     }
 
-    pub fn inner_ops(&self) -> &HashMap<StructTag, WriteOp> {
+    pub fn inner_ops(&self) -> &BTreeMap<StructTag, WriteOp> {
         &self.inner_ops
     }
 }
@@ -95,13 +95,13 @@ impl GroupWrite {
 /// VM. For storage backends, use `ChangeSet`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
-    resource_write_set: HashMap<StateKey, WriteOp>,
+    resource_write_set: BTreeMap<StateKey, WriteOp>,
     // Prior to adding a dedicated write-set for resource groups, all resource group
     // updates are merged into a single WriteOp included in the resource_write_set.
-    resource_group_write_set: HashMap<StateKey, GroupWrite>,
-    module_write_set: HashMap<StateKey, WriteOp>,
-    aggregator_write_set: HashMap<StateKey, WriteOp>,
-    aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+    resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
+    module_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
     events: Vec<ContractEvent>,
 }
 
@@ -124,21 +124,21 @@ macro_rules! squash_writes_pair {
 impl VMChangeSet {
     pub fn empty() -> Self {
         Self {
-            resource_write_set: HashMap::new(),
-            resource_group_write_set: HashMap::new(),
-            module_write_set: HashMap::new(),
-            aggregator_write_set: HashMap::new(),
-            aggregator_delta_set: HashMap::new(),
+            resource_write_set: BTreeMap::new(),
+            resource_group_write_set: BTreeMap::new(),
+            module_write_set: BTreeMap::new(),
+            aggregator_write_set: BTreeMap::new(),
+            aggregator_delta_set: BTreeMap::new(),
             events: vec![],
         }
     }
 
     pub fn new(
-        resource_write_set: HashMap<StateKey, WriteOp>,
-        resource_group_write_set: HashMap<StateKey, GroupWrite>,
-        module_write_set: HashMap<StateKey, WriteOp>,
-        aggregator_write_set: HashMap<StateKey, WriteOp>,
-        aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+        resource_write_set: BTreeMap<StateKey, WriteOp>,
+        resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
+        module_write_set: BTreeMap<StateKey, WriteOp>,
+        aggregator_write_set: BTreeMap<StateKey, WriteOp>,
+        aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
         events: Vec<ContractEvent>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -172,8 +172,8 @@ impl VMChangeSet {
 
         // There should be no aggregator writes if we have a change set from
         // storage.
-        let mut resource_write_set = HashMap::new();
-        let mut module_write_set = HashMap::new();
+        let mut resource_write_set = BTreeMap::new();
+        let mut module_write_set = BTreeMap::new();
 
         for (state_key, write_op) in write_set {
             if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
@@ -188,10 +188,10 @@ impl VMChangeSet {
 
         let change_set = Self {
             resource_write_set,
-            resource_group_write_set: HashMap::new(),
+            resource_group_write_set: BTreeMap::new(),
             module_write_set,
-            aggregator_write_set: HashMap::new(),
-            aggregator_delta_set: HashMap::new(),
+            aggregator_write_set: BTreeMap::new(),
+            aggregator_delta_set: BTreeMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -269,15 +269,15 @@ impl VMChangeSet {
         self.resource_group_write_set.iter_mut()
     }
 
-    pub fn resource_write_set(&self) -> &HashMap<StateKey, WriteOp> {
+    pub fn resource_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.resource_write_set
     }
 
-    pub fn resource_group_write_set(&self) -> &HashMap<StateKey, GroupWrite> {
+    pub fn resource_group_write_set(&self) -> &BTreeMap<StateKey, GroupWrite> {
         &self.resource_group_write_set
     }
 
-    pub fn module_write_set(&self) -> &HashMap<StateKey, WriteOp> {
+    pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.module_write_set
     }
 
@@ -290,11 +290,11 @@ impl VMChangeSet {
             .extend(additional_aggregator_writes)
     }
 
-    pub fn aggregator_v1_write_set(&self) -> &HashMap<StateKey, WriteOp> {
+    pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.aggregator_write_set
     }
 
-    pub fn aggregator_v1_delta_set(&self) -> &HashMap<StateKey, DeltaOp> {
+    pub fn aggregator_v1_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
         &self.aggregator_delta_set
     }
 
@@ -330,7 +330,7 @@ impl VMChangeSet {
             aggregator_delta_set
                 .into_iter()
                 .map(into_write)
-                .collect::<anyhow::Result<HashMap<StateKey, WriteOp>, VMStatus>>()?;
+                .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
         aggregator_write_set.extend(materialized_aggregator_delta_set);
 
         Ok(Self {
@@ -338,18 +338,18 @@ impl VMChangeSet {
             resource_group_write_set,
             module_write_set,
             aggregator_write_set,
-            aggregator_delta_set: HashMap::new(),
+            aggregator_delta_set: BTreeMap::new(),
             events,
         })
     }
 
     fn squash_additional_aggregator_changes(
-        aggregator_write_set: &mut HashMap<StateKey, WriteOp>,
-        aggregator_delta_set: &mut HashMap<StateKey, DeltaOp>,
-        additional_aggregator_write_set: HashMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: HashMap<StateKey, DeltaOp>,
+        aggregator_write_set: &mut BTreeMap<StateKey, WriteOp>,
+        aggregator_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
+        additional_aggregator_write_set: BTreeMap<StateKey, WriteOp>,
+        additional_aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
-        use std::collections::hash_map::Entry::{Occupied, Vacant};
+        use std::collections::btree_map::Entry::{Occupied, Vacant};
         use WriteOp::*;
 
         // First, squash deltas.
@@ -430,11 +430,11 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_writes<K: Hash + Eq + PartialEq>(
-        write_set: &mut HashMap<K, WriteOp>,
-        additional_write_set: HashMap<K, WriteOp>,
+    fn squash_additional_writes<K: Hash + Eq + PartialEq + Ord>(
+        write_set: &mut BTreeMap<K, WriteOp>,
+        additional_write_set: BTreeMap<K, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
-        use std::collections::hash_map::Entry::{Occupied, Vacant};
+        use std::collections::btree_map::Entry::{Occupied, Vacant};
 
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
@@ -450,10 +450,10 @@ impl VMChangeSet {
     }
 
     fn squash_group_writes(
-        write_set: &mut HashMap<StateKey, GroupWrite>,
-        additional_write_set: HashMap<StateKey, GroupWrite>,
+        write_set: &mut BTreeMap<StateKey, GroupWrite>,
+        additional_write_set: BTreeMap<StateKey, GroupWrite>,
     ) -> anyhow::Result<(), VMStatus> {
-        use std::collections::hash_map::Entry::{Occupied, Vacant};
+        use std::collections::btree_map::Entry::{Occupied, Vacant};
 
         for (key, additional_update) in additional_write_set.into_iter() {
             match write_set.entry(key) {
@@ -548,7 +548,7 @@ mod tests {
 
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{
-            let group_write = GroupWrite::new($op, $s, HashMap::new());
+            let group_write = GroupWrite::new($op, $s, BTreeMap::new());
             assert_eq!(group_write.encoded_group_size(), $exp);
         }};
     }
@@ -595,15 +595,15 @@ mod tests {
         let key_1 = StateKey::raw(vec![1]);
         let key_2 = StateKey::raw(vec![2]);
 
-        let mut base_update = HashMap::new();
+        let mut base_update = BTreeMap::new();
         base_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(0, 100),
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
-        let mut additional_update = HashMap::new();
+        let mut additional_update = BTreeMap::new();
         additional_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(0, 200),
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -629,15 +629,15 @@ mod tests {
     fn test_squash_groups_mergeable_metadata(base_type_idx: u8, additional_type_idx: u8) {
         let key = StateKey::raw(vec![0]);
 
-        let mut base_update = HashMap::new();
-        let mut additional_update = HashMap::new();
+        let mut base_update = BTreeMap::new();
+        let mut additional_update = BTreeMap::new();
         base_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(base_type_idx, 100),
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
         additional_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(additional_type_idx, 200),
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -660,15 +660,15 @@ mod tests {
     fn test_squash_groups_error(base_type_idx: u8, additional_type_idx: u8) {
         let key = StateKey::raw(vec![0]);
 
-        let mut base_update = HashMap::new();
-        let mut additional_update = HashMap::new();
+        let mut base_update = BTreeMap::new();
+        let mut additional_update = BTreeMap::new();
         base_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(base_type_idx, 100),
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
         additional_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(additional_type_idx, 200),
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
 
         assert_err!(VMChangeSet::squash_group_writes(
@@ -681,15 +681,15 @@ mod tests {
     fn test_squash_groups_noop() {
         let key = StateKey::raw(vec![0]);
 
-        let mut base_update = HashMap::new();
-        let mut additional_update = HashMap::new();
+        let mut base_update = BTreeMap::new();
+        let mut additional_update = BTreeMap::new();
         base_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(0, 100), // create
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
         additional_update.insert(key.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(2, 200), // delete
-            inner_ops: HashMap::new(),
+            inner_ops: BTreeMap::new(),
         });
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -704,18 +704,18 @@ mod tests {
         let key_1 = StateKey::raw(vec![1]);
         let key_2 = StateKey::raw(vec![2]);
 
-        let mut base_update = HashMap::new();
-        let mut additional_update = HashMap::new();
+        let mut base_update = BTreeMap::new();
+        let mut additional_update = BTreeMap::new();
         base_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 100),
-            inner_ops: HashMap::from([
+            inner_ops: BTreeMap::from([
                 (mock_tag_0(), WriteOp::Creation(vec![100].into())),
                 (mock_tag_2(), WriteOp::Modification(vec![2].into())),
             ]),
         });
         additional_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: HashMap::from([
+            inner_ops: BTreeMap::from([
                 (mock_tag_0(), WriteOp::Modification(vec![0].into())),
                 (mock_tag_1(), WriteOp::Modification(vec![1].into())),
             ]),
@@ -723,7 +723,7 @@ mod tests {
 
         base_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 100),
-            inner_ops: HashMap::from([
+            inner_ops: BTreeMap::from([
                 (mock_tag_0(), WriteOp::Deletion),
                 (mock_tag_1(), WriteOp::Modification(vec![2].into())),
                 (mock_tag_2(), WriteOp::Creation(vec![2].into())),
@@ -731,7 +731,7 @@ mod tests {
         });
         additional_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: HashMap::from([
+            inner_ops: BTreeMap::from([
                 (mock_tag_0(), WriteOp::Creation(vec![0].into())),
                 (mock_tag_1(), WriteOp::Deletion),
                 (mock_tag_2(), WriteOp::Deletion),
@@ -765,9 +765,9 @@ mod tests {
         );
         assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &WriteOp::Deletion);
 
-        let additional_update = HashMap::from([(key_2.clone(), GroupWrite {
+        let additional_update = BTreeMap::from([(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: HashMap::from([(mock_tag_1(), WriteOp::Deletion)]),
+            inner_ops: BTreeMap::from([(mock_tag_1(), WriteOp::Deletion)]),
         })]);
         assert_err!(VMChangeSet::squash_group_writes(
             &mut base_update,

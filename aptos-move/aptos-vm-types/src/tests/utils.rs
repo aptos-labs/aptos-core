@@ -20,7 +20,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::VMStatus,
 };
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub(crate) struct MockChangeSetChecker;
 
@@ -116,11 +116,11 @@ pub(crate) fn build_change_set(
     aggregator_delta_set: impl IntoIterator<Item = (StateKey, DeltaOp)>,
 ) -> VMChangeSet {
     VMChangeSet::new(
-        HashMap::from_iter(resource_write_set),
-        HashMap::from_iter(resource_group_write_set),
-        HashMap::from_iter(module_write_set),
-        HashMap::from_iter(aggregator_write_set),
-        HashMap::from_iter(aggregator_delta_set),
+        BTreeMap::from_iter(resource_write_set),
+        BTreeMap::from_iter(resource_group_write_set),
+        BTreeMap::from_iter(module_write_set),
+        BTreeMap::from_iter(aggregator_write_set),
+        BTreeMap::from_iter(aggregator_delta_set),
         vec![],
         &MockChangeSetChecker,
     )

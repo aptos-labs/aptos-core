@@ -10,7 +10,7 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::value::MoveTypeLayout;
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::BTreeMap, fmt::Debug};
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -78,18 +78,18 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// aggregator_v1.
     fn resource_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     fn module_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     fn aggregator_v1_write_set(
         &self,
-    ) -> HashMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
+    ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> HashMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<<Self::Txn as Transaction>::Key, DeltaOp>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<<Self::Txn as Transaction>::Event>;

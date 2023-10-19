@@ -32,7 +32,7 @@ use aptos_vm_types::output::VMOutput;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc};
 
 // Wrapper to avoid orphan rule
 #[derive(Debug)]
@@ -78,7 +78,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn resource_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    fn resource_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
             .lock()
             .as_ref()
@@ -90,7 +90,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn module_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    fn module_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
             .lock()
             .as_ref()
@@ -102,7 +102,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    fn aggregator_v1_write_set(&self) -> BTreeMap<StateKey, WriteOp> {
         self.vm_output
             .lock()
             .as_ref()
@@ -114,7 +114,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_delta_set(&self) -> HashMap<StateKey, DeltaOp> {
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
         self.vm_output
             .lock()
             .as_ref()

@@ -18,7 +18,7 @@ use move_core_types::{
     language_storage::StructTag,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
@@ -85,7 +85,7 @@ impl<'r> WriteOpConverter<'r> {
             )
         })?;
 
-        let mut inner_ops = HashMap::new();
+        let mut inner_ops = BTreeMap::new();
 
         // STORAGE_ERROR is a placeholder. TODO: change to SPECULATIVE_EXECUTION_ABORT_ERROR, as
         // the error can happen due to speculative reads (in a non-speculative context, e.g.
