@@ -1272,7 +1272,7 @@ impl AptosVM {
         change_set: &VMChangeSet,
     ) -> Result<(), VMStatus> {
         assert!(
-            change_set.aggregator_v1_write_set().is_empty(),
+            change_set.aggregator_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
         );
 

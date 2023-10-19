@@ -107,9 +107,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         }
     }
 
-    /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
-    /// (for future incarnation). Will panic if the entry is not in the data-structure.
-    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
+    pub(crate) fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.versioned_map
             .get_mut(&txn_idx)
@@ -117,21 +115,20 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
             .mark_estimate();
     }
 
-    /// Versioned write of module at a given key (and version).
-    pub fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
+    pub(crate) fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
         let mut v = self.values.entry(key).or_default();
         v.versioned_map
             .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
     }
 
-    pub fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
+    pub(crate) fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.executables
             .entry(descriptor_hash)
             .or_insert_with(|| Arc::new(executable));
     }
 
-    pub fn fetch_module(
+    pub(crate) fn fetch_module(
         &self,
         key: &K,
         txn_idx: TxnIndex,
@@ -150,9 +147,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         }
     }
 
-    /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
-    /// if the corresponding entry does not exist.
-    pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
+    pub(crate) fn delete(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert!(

@@ -38,7 +38,7 @@ use aptos_vm_types::output::VMOutput;
 use move_core_types::vm_status::VMStatus;
 use once_cell::sync::OnceCell;
 use rayon::{prelude::*, ThreadPool};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 impl BlockExecutorTransaction for PreprocessedTransaction {
     type Event = ContractEvent;
@@ -86,54 +86,31 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         Self::new(VMOutput::empty_with_status(TransactionStatus::Retry))
     }
 
-    // TODO: get rid of the cloning data-structures in the following APIs.
-
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn resource_write_set(&self) -> HashMap<StateKey, WriteOp> {
+    fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get writes")
             .change_set()
-            .resource_write_set()
-            .clone()
+            .write_set_iter()
+            .map(|(key, op)| (key.clone(), op.clone()))
+            .collect()
     }
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn module_write_set(&self) -> HashMap<StateKey, WriteOp> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output to be set to get writes")
-            .change_set()
-            .module_write_set()
-            .clone()
-    }
-
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_write_set(&self) -> HashMap<StateKey, WriteOp> {
-        self.vm_output
-            .lock()
-            .as_ref()
-            .expect("Output to be set to get writes")
-            .change_set()
-            .aggregator_v1_write_set()
-            .clone()
-    }
-
-    /// Should never be called after incorporate_delta_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
-    fn aggregator_v1_delta_set(&self) -> HashMap<StateKey, DeltaOp> {
+    fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output to be set to get deltas")
             .change_set()
-            .aggregator_v1_delta_set()
-            .clone()
+            .aggregator_delta_set()
+            .iter()
+            .map(|(key, op)| (key.clone(), *op))
+            .collect()
     }
 
     /// Should never be called after incorporate_delta_writes, as it

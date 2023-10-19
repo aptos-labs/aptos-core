@@ -23,11 +23,20 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use std::{
-    cell::RefCell,
-    fmt::Debug,
-    sync::{atomic::AtomicU32, Arc},
-};
+use std::{cell::RefCell, fmt::Debug, hash::Hash, sync::Arc};
+
+/// A struct that is always used by a single thread performing an execution task. The struct is
+/// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
+/// data-structure. It also allows the caller to track the read-set and any dependencies.
+///
+/// TODO(issue 10177): MvHashMapView currently needs to be sync due to trait bounds, but should
+/// not be. In this case, the read_dependency member can have a RefCell<bool> type and the
+/// captured_reads member can have RefCell<Vec<ReadDescriptor<K>>> type.
+pub(crate) struct MVHashMapView<'a, K, V: TransactionWrite, X: Executable> {
+    versioned_map: &'a MVHashMap<K, V, X>,
+    scheduler: &'a Scheduler,
+    captured_reads: RefCell<Vec<ReadDescriptor<K>>>,
+}
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
@@ -45,48 +54,48 @@ pub(crate) enum ReadResult<V> {
     None,
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    versioned_map: &'a MVHashMap<T::Key, T::Value, X>,
-    scheduler: &'a Scheduler,
-    _counter: &'a AtomicU32,
-    captured_reads: RefCell<Vec<ReadDescriptor<T::Key>>>,
-}
-
-impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
-    pub(crate) fn new(
-        shared_map: &'a MVHashMap<T::Key, T::Value, X>,
-        shared_scheduler: &'a Scheduler,
-        shared_counter: &'a AtomicU32,
-    ) -> Self {
+impl<
+        'a,
+        K: ModulePath + PartialOrd + Ord + Send + Clone + Debug + Hash + Eq,
+        V: TransactionWrite + Send + Sync,
+        X: Executable,
+    > MVHashMapView<'a, K, V, X>
+{
+    pub(crate) fn new(versioned_map: &'a MVHashMap<K, V, X>, scheduler: &'a Scheduler) -> Self {
         Self {
-            versioned_map: shared_map,
-            scheduler: shared_scheduler,
-            _counter: shared_counter,
+            versioned_map,
+            scheduler,
             captured_reads: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Drains the captured reads.
+    pub(crate) fn take_reads(&self) -> Vec<ReadDescriptor<K>> {
+        self.captured_reads.take()
     }
 
     // TODO: Actually fill in the logic to record fetched executables, etc.
     fn fetch_module(
         &self,
-        key: &T::Key,
+        key: &K,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
-        // Register a fake read for the read / write path intersection fallback for modules.
+    ) -> anyhow::Result<MVModulesOutput<V, X>, MVModulesError> {
+        // Add a fake read from storage to register in reads for now in order
+        // for the read / write path intersection fallback for modules to still work.
         self.captured_reads
             .borrow_mut()
-            .push(ReadDescriptor::from_module(key.clone()));
+            .push(ReadDescriptor::from_storage(key.clone()));
 
         self.versioned_map.fetch_module(key, txn_idx)
     }
 
-    fn set_aggregator_base_value(&self, key: &T::Key, value: u128) {
+    fn set_aggregator_base_value(&self, key: &K, value: u128) {
         self.versioned_map.set_aggregator_base_value(key, value);
     }
 
     /// Captures a read from the VM execution, but not unresolved deltas, as in this case it is the
     /// callers responsibility to set the aggregator's base value and call fetch_data again.
-    fn fetch_data(&self, key: &T::Key, txn_idx: TxnIndex) -> ReadResult<T::Value> {
+    fn fetch_data(&self, key: &K, txn_idx: TxnIndex) -> ReadResult<V> {
         use MVDataError::*;
         use MVDataOutput::*;
 
@@ -160,47 +169,39 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
-    pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X>,
-    pub(crate) _counter: &'a u32,
+enum ViewMapKind<'a, T: Transaction, X: Executable> {
+    MultiVersion(&'a MVHashMapView<'a, T::Key, T::Value, X>),
+    Unsync(&'a UnsyncMap<T::Key, T::Value, X>),
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
-    Sync(ParallelState<'a, T, X>),
-    Unsync(SequentialState<'a, T, X>),
-}
-
-/// A struct that represents a single block execution worker thread's view into the state,
-/// some of which (in Sync case) might be shared with other workers / threads. By implementing
-/// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
-/// In the Sync case, also records captured reads for later validation. latest_txn_idx
-/// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
-    latest_view: ViewState<'a, T, X>,
+    latest_view: ViewMapKind<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
-    pub(crate) fn new(
+    pub(crate) fn new_mv_view(
         base_view: &'a S,
-        latest_view: ViewState<'a, T, X>,
+        map: &'a MVHashMapView<'a, T::Key, T::Value, X>,
         txn_idx: TxnIndex,
-    ) -> Self {
-        Self {
+    ) -> LatestView<'a, T, S, X> {
+        LatestView {
             base_view,
-            latest_view,
+            latest_view: ViewMapKind::MultiVersion(map),
             txn_idx,
         }
     }
 
-    /// Drains the captured reads.
-    pub(crate) fn take_reads(&self) -> Vec<ReadDescriptor<T::Key>> {
-        match &self.latest_view {
-            ViewState::Sync(state) => state.captured_reads.take(),
-            ViewState::Unsync(_) => {
-                unreachable!("Take reads called in sequential setting (not captured)")
-            },
+    pub(crate) fn new_btree_view(
+        base_view: &'a S,
+        map: &'a UnsyncMap<T::Key, T::Value, X>,
+        txn_idx: TxnIndex,
+    ) -> LatestView<'a, T, S, X> {
+        LatestView {
+            base_view,
+            latest_view: ViewMapKind::Unsync(map),
+            txn_idx,
         }
     }
 
@@ -227,13 +228,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
     type Key = T::Key;
 
     fn get_state_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        match &self.latest_view {
-            ViewState::Sync(state) => match state_key.module_path() {
+        match self.latest_view {
+            ViewMapKind::MultiVersion(map) => match state_key.module_path() {
                 Some(_) => {
                     use MVModulesError::*;
                     use MVModulesOutput::*;
 
-                    match state.fetch_module(state_key, self.txn_idx) {
+                    match map.fetch_module(state_key, self.txn_idx) {
                         Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
                         Ok(Module((v, _))) => Ok(v.as_state_value()),
                         Err(Dependency(_)) => {
@@ -245,7 +246,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                     }
                 },
                 None => {
-                    let mut mv_value = state.fetch_data(state_key, self.txn_idx);
+                    let mut mv_value = map.fetch_data(state_key, self.txn_idx);
 
                     if matches!(mv_value, ReadResult::Unresolved) {
                         let from_storage = self
@@ -255,9 +256,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
 
                         // Store base value in the versioned data-structure directly, so subsequent
                         // reads can be resolved to U128 directly without storage calls.
-                        state.set_aggregator_base_value(state_key, from_storage);
+                        map.set_aggregator_base_value(state_key, from_storage);
 
-                        mv_value = state.fetch_data(state_key, self.txn_idx);
+                        mv_value = map.fetch_data(state_key, self.txn_idx);
                     }
 
                     match mv_value {
@@ -279,7 +280,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TStateView
                     }
                 },
             },
-            ViewState::Unsync(state) => state.unsync_map.fetch_data(state_key).map_or_else(
+            ViewMapKind::Unsync(map) => map.fetch_data(state_key).map_or_else(
                 || self.get_base_value(state_key),
                 |v| Ok(v.as_state_value()),
             ),
