@@ -88,7 +88,7 @@ impl BatchTransferTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for BatchTransferTransactionGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(BatchTransferTransactionGenerator::new(
             StdRng::from_entropy(),
             self.batch_size,

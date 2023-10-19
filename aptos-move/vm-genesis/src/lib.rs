@@ -427,10 +427,9 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::EMIT_FEE_STATEMENT,
         FeatureFlag::STORAGE_DELETION_REFUND,
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
-        FeatureFlag::AGGREGATOR_SNAPSHOTS,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
         FeatureFlag::SAFER_METADATA,
-        FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR,
+        FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
     ]

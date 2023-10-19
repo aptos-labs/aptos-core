@@ -21,8 +21,9 @@ pub mod node_info;
 pub mod peer_state;
 mod request_tracker;
 
-/// The frequency at which we update the logs and metrics for the peer monitoring states
-const LOGS_AND_METRICS_FREQUENCY_SECS: u64 = 60; // 1 minute
+// Useful constants
+const LOGS_FREQUENCY_SECS: u64 = 180; // 3 minutes
+const METRICS_FREQUENCY_SECS: u64 = 60; // 1 minute
 
 #[cfg(feature = "network-perf-test")] // Disabled by default
 mod performance_monitoring;
@@ -74,10 +75,16 @@ pub fn refresh_peer_states(
         update_in_flight_metrics(peer_state_key, num_in_flight_requests);
     }
 
-    // Periodically update the logs and metrics for the peer monitoring states
+    // Periodically update the metrics
     sample!(
-        SampleRate::Duration(Duration::from_secs(LOGS_AND_METRICS_FREQUENCY_SECS)),
-        update_peer_state_logs_and_metrics(&peer_monitor_state, &connected_peers_and_metadata)?;
+        SampleRate::Duration(Duration::from_secs(METRICS_FREQUENCY_SECS)),
+        update_peer_state_metrics(&peer_monitor_state, &connected_peers_and_metadata)?;
+    );
+
+    // Periodically update the logs
+    sample!(
+        SampleRate::Duration(Duration::from_secs(LOGS_FREQUENCY_SECS)),
+        update_peer_state_logs(&peer_monitor_state, &connected_peers_and_metadata)?;
     );
 
     Ok(())
@@ -107,8 +114,32 @@ fn update_in_flight_metrics(peer_state_key: PeerStateKey, num_in_flight_requests
     metrics::update_in_flight_requests(request_label, num_in_flight_requests);
 }
 
-/// Updates the logs and metrics for the peer monitoring states
-fn update_peer_state_logs_and_metrics(
+/// Updates the logs for the peer monitoring states
+fn update_peer_state_logs(
+    peer_monitor_state: &PeerMonitorState,
+    connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
+) -> Result<(), Error> {
+    // Get the list of connected peers
+    let connected_peers: Vec<PeerNetworkId> =
+        connected_peers_and_metadata.keys().cloned().collect();
+
+    // Collect the peer states for logging
+    let mut all_peer_states = HashMap::new();
+    for peer_network_id in &connected_peers {
+        let peer_state = get_peer_state(peer_monitor_state, peer_network_id)?;
+        all_peer_states.insert(peer_network_id, format!("{}", peer_state));
+    }
+
+    // Log the peer states
+    info!(LogSchema::new(LogEntry::PeerMonitorLoop)
+        .event(LogEvent::LogAllPeerStates)
+        .message(&format!("All peer states: {:?}", all_peer_states)));
+
+    Ok(())
+}
+
+/// Updates the metrics for the peer monitoring states
+fn update_peer_state_metrics(
     peer_monitor_state: &PeerMonitorState,
     connected_peers_and_metadata: &HashMap<PeerNetworkId, PeerMetadata>,
 ) -> Result<(), Error> {
@@ -124,18 +155,6 @@ fn update_peer_state_logs_and_metrics(
             peer_state.update_peer_state_metrics(peer_network_id, &peer_state_key)?;
         }
     }
-
-    // Collect the peer states for logging
-    let mut all_peer_states = HashMap::new();
-    for peer_network_id in &connected_peers {
-        let peer_state = get_peer_state(peer_monitor_state, peer_network_id)?;
-        all_peer_states.insert(peer_network_id, format!("{}", peer_state));
-    }
-
-    // Log the peer states
-    info!(LogSchema::new(LogEntry::PeerMonitorLoop)
-        .event(LogEvent::LogAllPeerStates)
-        .message(&format!("All peer states: {:?}", all_peer_states)));
 
     Ok(())
 }

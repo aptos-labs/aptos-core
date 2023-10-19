@@ -40,7 +40,13 @@ aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
-diesel = { workspace = true }
+diesel = { workspace = true, features = [
+    "chrono",
+    "postgres",
+    "r2d2",
+    "numeric",
+    "serde_json",
+] }
 hex = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }

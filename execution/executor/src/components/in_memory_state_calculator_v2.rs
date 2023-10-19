@@ -4,10 +4,10 @@
 use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_drop_helper::DEFAULT_DROP_HELPER;
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput, ParsedTransactionOutput, ProofReader,
 };
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
@@ -49,7 +49,9 @@ impl<'a> AccountView for CoreAccountStateView<'a> {
         if let Some(v_opt) = self.updates[state_key.get_shard_id() as usize].get(state_key) {
             return Ok(v_opt.as_ref().map(StateValue::bytes).cloned());
         }
-        if let Some(entry) = self.base[state_key.get_shard_id() as usize]
+        if let Some(entry) = self
+            .base
+            .shard(state_key.get_shard_id())
             .get(state_key)
             .as_ref()
         {
@@ -79,7 +81,7 @@ impl InMemoryStateCalculatorV2 {
         Vec<Option<HashValue>>,
         StateDelta,
         Option<EpochState>,
-        ShardedStateUpdates,
+        Option<ShardedStateUpdates>,
         ShardedStateCache,
     )> {
         if is_block {
@@ -95,17 +97,6 @@ impl InMemoryStateCalculatorV2 {
         } = state_cache;
 
         let num_txns = to_keep.len();
-        // TODO(grao): Revisit if we really need to support empty chunk.
-        if num_txns == 0 {
-            return Ok((
-                vec![],
-                vec![],
-                base.clone(),
-                None,
-                create_empty_sharded_state_updates(),
-                sharded_state_cache,
-            ));
-        }
 
         let state_updates_vec = Self::get_sharded_state_updates(to_keep.parsed_outputs());
 
@@ -192,9 +183,7 @@ impl InMemoryStateCalculatorV2 {
             )?
         };
 
-        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
-            drop(frozen_base);
-        });
+        DEFAULT_DROP_HELPER.schedule_drop(frozen_base);
 
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint
@@ -224,12 +213,14 @@ impl InMemoryStateCalculatorV2 {
             updates_since_latest_checkpoint,
         );
 
+        let updates_until_latest_checkpoint =
+            last_checkpoint_index.map(|_| updates_before_last_checkpoint);
         Ok((
             state_updates_vec,
             state_checkpoint_hashes,
             result_state,
             next_epoch_state,
-            updates_before_last_checkpoint,
+            updates_until_latest_checkpoint,
             sharded_state_cache,
         ))
     }
@@ -329,7 +320,7 @@ impl InMemoryStateCalculatorV2 {
                         Self::add_to_delta(
                             k,
                             v,
-                            &sharded_state_cache[i],
+                            sharded_state_cache.shard(i as u8),
                             &mut items_delta,
                             &mut bytes_delta,
                         );
@@ -400,18 +391,14 @@ impl InMemoryStateCalculatorV2 {
         ensure!(num_txns != 0, "Empty block is not allowed.");
         ensure!(
             base.base_version == base.current_version,
-            "Base version {:?} is different from current_version {:?}, cannot calculate state.",
+            "Block base state is not a checkpoint. base_version {:?}, current_version {:?}",
             base.base_version,
             base.current_version,
         );
-
-        base.updates_since_base.iter().try_for_each(|shard| {
-            ensure!(
-                shard.is_empty(),
-                "Updates is not empty, cannot calculate state for block."
-            );
-            Ok(())
-        })?;
+        ensure!(
+            base.updates_since_base.iter().all(|shard| shard.is_empty()),
+            "Base state is corrupted, updates_since_base is not empty at a checkpoint."
+        );
 
         for (i, (txn, txn_output)) in to_keep.iter().enumerate() {
             ensure!(

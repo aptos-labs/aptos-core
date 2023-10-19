@@ -13,6 +13,8 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         github.event_name == 'schedule' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-test') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') ||
         github.event.pull_request.auto_merge != null) ||
         contains(github.event.pull_request.body, '#e2e'
       )
@@ -21,4 +23,5 @@ jobs:
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       RUNNER_NAME: executor-benchmark-runner
-      RUN_ONLY_SINGLE_NODE_PERF: ${{ github.event_name != 'schedule' }} # Run all tests on the scheduled cadence
+       # Run all tests only on the scheduled cadence, or explicitly requested
+      IS_FULL_RUN: ${{ github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'CICD:run-execution-performance-full-test') }}

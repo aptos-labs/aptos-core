@@ -10,7 +10,7 @@ use aptos_api_types::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
-        NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
@@ -122,7 +122,7 @@ pub fn new_test_context(
     } else {
         DbReaderWriter::wrap(
             AptosDB::open(
-                &tmp_dir,
+                StorageDirPaths::from_path(&tmp_dir),
                 false,                       /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),

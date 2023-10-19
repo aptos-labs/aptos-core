@@ -351,8 +351,9 @@ export class TypeTagParser {
       // If it is nested, we have to consume another nested generic
       if (this.tokens[0][1] === "<") {
         this.consumeWholeGeneric();
+      } else {
+        this.tokens.shift();
       }
-      this.tokens.shift();
     }
     this.consume(">");
   }

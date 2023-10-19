@@ -89,7 +89,7 @@ pub trait TResourceGroupView {
     /// the size of the resource group AFTER the changeset of the transaction is applied (while
     /// the resource_group_size method provides the total group size BEFORE). To compute the
     /// AFTER size, for each modified resources within the group, the prior size can be
-    /// determined by the following method.
+    /// determined by the following method (returns 0 for non-existent / deleted resources).
     fn resource_size_in_group(
         &self,
         group_key: &Self::GroupKey,
@@ -97,10 +97,7 @@ pub trait TResourceGroupView {
     ) -> anyhow::Result<u64> {
         Ok(self
             .get_resource_from_group(group_key, resource_tag, None)?
-            .map_or(0, |bytes| {
-                debug_assert!(!bytes.is_empty(), "Must be None instead of empty Bytes");
-                bytes.len() as u64
-            }))
+            .map_or(0, |bytes| bytes.len() as u64))
     }
 
     /// Needed for backwards compatibility with the additional safety mechanism for resource

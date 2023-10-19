@@ -100,7 +100,10 @@ impl NodeTool {
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
-            RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
+            RunLocalTestnet(tool) => tool
+                .execute_serialized_without_logger()
+                .await
+                .map(|_| "".to_string()),
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
         }

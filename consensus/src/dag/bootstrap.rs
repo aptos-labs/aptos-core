@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use super::{
-    adapter::{OrderedNotifier, OrderedNotifierAdapter, TLedgerInfoProvider},
+    adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
     anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
@@ -31,12 +31,12 @@ use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
 };
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, validator_signer::ValidatorSigner,
+    block_info::BlockInfo, epoch_state::EpochState, validator_signer::ValidatorSigner,
 };
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -91,17 +91,22 @@ impl DagBootstrapper {
 
     fn bootstrap_dag_store(
         &self,
-        initial_ledger_info: LedgerInfo,
-        notifier: Arc<dyn OrderedNotifier>,
-        dag_window_size_config: usize,
+        ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+        parent_block_info: BlockInfo,
+        ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        dag_window_size_config: u64,
     ) -> (Arc<RwLock<Dag>>, OrderRule) {
-        let initial_round = if initial_ledger_info.round() <= dag_window_size_config as Round {
-            1
-        } else {
+        let initial_ledger_info = ledger_info_provider
+            .get_latest_ledger_info()
+            .ledger_info()
+            .clone();
+        let commit_round = initial_ledger_info.round();
+        let initial_round = std::cmp::max(
+            1,
             initial_ledger_info
                 .round()
-                .saturating_sub(dag_window_size_config as Round)
-        };
+                .saturating_sub(dag_window_size_config),
+        );
 
         let dag = Arc::new(RwLock::new(Dag::new(
             self.epoch_state.clone(),
@@ -110,12 +115,20 @@ impl DagBootstrapper {
             dag_window_size_config,
         )));
 
+        let notifier = Arc::new(OrderedNotifierAdapter::new(
+            ordered_nodes_tx,
+            dag.clone(),
+            self.epoch_state.clone(),
+            parent_block_info,
+            ledger_info_provider.clone(),
+        ));
+
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
         let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));
 
         let order_rule = OrderRule::new(
             self.epoch_state.clone(),
-            initial_ledger_info,
+            commit_round + 1,
             dag.clone(),
             anchor_election,
             notifier,
@@ -227,20 +240,10 @@ impl DagBootstrapper {
 
             let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
 
-            let adapter = Arc::new(OrderedNotifierAdapter::new(
-                ordered_nodes_tx.clone(),
-                self.storage.clone(),
-                self.epoch_state.clone(),
-                parent_block_info,
-                ledger_info_provider.clone(),
-            ));
-
             let (dag_store, order_rule) = self.bootstrap_dag_store(
-                ledger_info_provider
-                    .get_latest_ledger_info()
-                    .ledger_info()
-                    .clone(),
-                adapter.clone(),
+                ledger_info_provider.clone(),
+                parent_block_info,
+                ordered_nodes_tx.clone(),
                 DAG_WINDOW,
             );
 
@@ -321,7 +324,6 @@ pub(super) fn bootstrap_dag_for_test(
     self_peer: Author,
     signer: ValidatorSigner,
     epoch_state: Arc<EpochState>,
-    latest_ledger_info: LedgerInfo,
     storage: Arc<dyn DAGStorage>,
     rb_network_sender: Arc<dyn RBNetworkSender<DAGMessage>>,
     dag_network_sender: Arc<dyn TDAGNetworkSender>,
@@ -358,17 +360,14 @@ pub(super) fn bootstrap_dag_for_test(
     let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
 
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
-    let adapter = Arc::new(OrderedNotifierAdapter::new(
-        ordered_nodes_tx,
-        storage.clone(),
-        epoch_state.clone(),
-        parent_block_info,
-        ledger_info_provider.clone(),
-    ));
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
-    let (dag_store, order_rule) =
-        bootstraper.bootstrap_dag_store(latest_ledger_info, adapter.clone(), DAG_WINDOW);
+    let (dag_store, order_rule) = bootstraper.bootstrap_dag_store(
+        ledger_info_provider.clone(),
+        parent_block_info,
+        ordered_nodes_tx,
+        DAG_WINDOW,
+    );
 
     let state_sync_trigger = StateSyncTrigger::new(
         epoch_state,

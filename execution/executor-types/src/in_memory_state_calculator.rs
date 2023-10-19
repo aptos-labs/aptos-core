@@ -74,18 +74,11 @@ impl InMemoryStateCalculator {
             updates_since_base,
         } = base.clone();
 
-        // TODO(grao): Rethink the strategy for state sync, and optimize this.
-        let state_cache = sharded_state_cache
-            .iter()
-            .flatten()
-            .map(|entry| (entry.key().clone(), entry.value().1.clone()))
-            .collect();
-
         Self {
             _frozen_base: frozen_base,
             proof_reader: ProofReader::new(proofs),
 
-            state_cache,
+            state_cache: sharded_state_cache.flatten(),
             next_version: current_version.map_or(0, |v| v + 1),
             updates_after_latest: create_empty_sharded_state_updates(),
             usage: current.usage(),
