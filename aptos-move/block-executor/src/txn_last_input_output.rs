@@ -3,9 +3,10 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    errors::Error,
+    errors::{Error, ModulePathReadWrite},
     task::{ExecutionStatus, TransactionOutput},
 };
+use aptos_aggregator::types::PanicOr;
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
@@ -172,7 +173,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     pub(crate) fn execution_error(&self, txn_idx: TxnIndex) -> Option<Error<E>> {
         if self.module_read_write_intersection.load(Ordering::Acquire) {
-            return Some(Error::ModulePathReadWrite);
+            return Some(Error::FallbackToSequential(PanicOr::Or(
+                ModulePathReadWrite,
+            )));
         }
 
         if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
