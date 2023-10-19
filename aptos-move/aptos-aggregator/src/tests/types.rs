@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    aggregator_v1_extension::AggregatorID,
+    bounded_math::{BoundedMath, SignedU128},
     delta_change_set::serialize,
-    resolver::{DelayedFieldReadMode, TDelayedFieldView},
-    types::{AggregatorVersionedID, DelayedFieldID, DelayedFieldValue},
+    resolver::TDelayedFieldView,
+    types::{expect_ok, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use std::{cell::RefCell, collections::HashMap};
 
-pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorVersionedID {
-    AggregatorVersionedID::V1(aggregator_v1_state_key_for_test(key))
+pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
+    AggregatorID(aggregator_v1_state_key_for_test(key))
 }
 
 pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
@@ -54,7 +56,6 @@ impl TDelayedFieldView for FakeAggregatorView {
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
-        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(self.v1_store.get(state_key).cloned())
     }
@@ -62,12 +63,24 @@ impl TDelayedFieldView for FakeAggregatorView {
     fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        _mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue> {
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         self.v2_store
             .get(id)
             .cloned()
-            .ok_or_else(|| anyhow::Error::msg(format!("Value does not exist for id {:?}", id)))
+            .ok_or(PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(*id)))
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::IdentifierV2,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        let base_value = self.get_delayed_field_value(id)?.into_aggregator_value()?;
+        let math = BoundedMath::new(max_value);
+        let base = expect_ok(math.unsigned_add_delta(base_value, base_delta))?;
+        Ok(math.unsigned_add_delta(base, delta).is_ok())
     }
 
     fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {

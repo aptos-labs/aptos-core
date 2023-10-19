@@ -8,10 +8,8 @@ use crate::{
 use aptos_logger::error;
 // TODO: After aggregators_v2 branch land, consolidate these, instead of using alias here
 pub use aptos_types::aggregator::{DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue};
-use aptos_types::state_store::{state_key::StateKey, table::TableHandle};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
-    account_address::AccountAddress,
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -27,6 +25,15 @@ pub enum PanicOr<T: std::fmt::Debug> {
     Or(T),
 }
 
+impl<T: std::fmt::Debug> PanicOr<T> {
+    pub fn map_non_panic<E: std::fmt::Debug>(self, f: impl FnOnce(T) -> E) -> PanicOr<E> {
+        match self {
+            PanicOr::CodeInvariantError(msg) => PanicOr::CodeInvariantError(msg),
+            PanicOr::Or(value) => PanicOr::Or(f(value)),
+        }
+    }
+}
+
 pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
         "Delayed logic code invariant broken (there is a bug in the code), {:?}",
@@ -37,7 +44,7 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
 }
 
 pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
-    value.map_err(code_invariant_error)
+    value.map_err(|e| code_invariant_error(format!("Expected Ok, got Err({:?})", e)))
 }
 
 impl<T: std::fmt::Debug> From<PanicError> for PanicOr<T> {
@@ -122,6 +129,12 @@ pub enum DelayedFieldsSpeculativeError {
         delta: SignedU128,
         reason: DeltaApplicationFailureReason,
     },
+    /// Merging two Deltas (value only) failed.
+    DeltaMerge {
+        base_delta: SignedU128,
+        delta: SignedU128,
+        max_value: u128,
+    },
     /// Merging two Deltas (value + history) failed, because newer
     /// one couldn't be offsetted by the delta value of the older one.
     DeltaHistoryMergeOffset {
@@ -137,43 +150,10 @@ pub enum DelayedFieldsSpeculativeError {
         achieved: SignedU128,
         overflow: SignedU128,
     },
+    InconsistentRead,
 }
 
 impl NonPanic for DelayedFieldsSpeculativeError {}
-
-/// Uniquely identifies aggregator or aggregator snapshot instances in
-/// extension and possibly storage.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AggregatorVersionedID {
-    // Aggregator V1 is implemented as a state item, and so can be queried by
-    // the state key.
-    V1(StateKey),
-    // Aggregator V2 is embedded into resources, and uses ephemeral identifiers
-    // which are unique per block.
-    V2(DelayedFieldID),
-}
-
-impl AggregatorVersionedID {
-    pub fn v1(handle: TableHandle, key: AccountAddress) -> Self {
-        let state_key = StateKey::table_item(handle, key.to_vec());
-        Self::V1(state_key)
-    }
-
-    pub fn v2(value: u64) -> Self {
-        Self::V2(DelayedFieldID::new(value))
-    }
-}
-
-impl TryFrom<AggregatorVersionedID> for StateKey {
-    type Error = PanicError;
-
-    fn try_from(vid: AggregatorVersionedID) -> Result<Self, Self::Error> {
-        match vid {
-            AggregatorVersionedID::V1(state_key) => Ok(state_key),
-            AggregatorVersionedID::V2(_) => Err(code_invariant_error("wrong version id")),
-        }
-    }
-}
 
 /// Value of a DelayedField (i.e. aggregator or snapshot)
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -309,6 +289,15 @@ impl TryFrom<DelayedFieldValue> for SnapshotValue {
             )),
             DelayedFieldValue::Snapshot(v) => Ok(SnapshotValue::Integer(v)),
             DelayedFieldValue::Derived(v) => Ok(SnapshotValue::String(v)),
+        }
+    }
+}
+
+impl From<SnapshotValue> for DelayedFieldValue {
+    fn from(value: SnapshotValue) -> DelayedFieldValue {
+        match value {
+            SnapshotValue::Integer(v) => DelayedFieldValue::Snapshot(v),
+            SnapshotValue::String(v) => DelayedFieldValue::Derived(v),
         }
     }
 }

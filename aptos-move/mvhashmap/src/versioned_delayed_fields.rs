@@ -3,7 +3,7 @@
 
 use crate::types::{AtomicTxnIndex, MVDelayedFieldsError, TxnIndex};
 use aptos_aggregator::{
-    delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
+    delayed_change::{ApplyBase, DelayedApplyEntry, DelayedEntry},
     types::{code_invariant_error, DelayedFieldValue, PanicError, PanicOr, ReadPosition},
 };
 use claims::assert_matches;
@@ -29,7 +29,7 @@ pub enum CommitError {
 enum EstimatedEntry<K: Clone> {
     NoBypass,
     // If applicable, can bypass the Estimate by considering a apply change instead.
-    Bypass(DelayedApplyChange<K>),
+    Bypass(DelayedApplyEntry<K>),
 }
 
 // There is no explicit deletion as it will be impossible to resolve the ID of a deleted
@@ -41,11 +41,11 @@ enum VersionEntry<K: Clone> {
     // of the same transaction, the delta may also be kept in the entry. This is useful
     // if speculative execution aborts and the entry is marked as estimate, as the delta
     // may be used to avoid waiting on the Estimate entry. More in comments below.
-    Value(DelayedFieldValue, Option<DelayedApplyChange<K>>),
+    Value(DelayedFieldValue, Option<DelayedApplyEntry<K>>),
     // Applies the change on top of the previous entry - either for the same ID corresponding
     // to this change, or for the apply_base_id given by the change, at a specific point defined
     // by the it's ApplyBase.
-    Apply(DelayedApplyChange<K>),
+    Apply(DelayedApplyEntry<K>),
     // Marks the entry as an estimate, indicating that the next incarnation of the
     // transaction is estimated to populate the entry. May contain a bypass internally
     // (allowing a read operation to avoid waiting for the corresponding dependency),
@@ -75,7 +75,7 @@ enum VersionedRead<K: Clone> {
     // The transaction index records the index at which the Snapshot was encountered.
     // This is required for the caller to resolve the value of the aggregator (with the
     // recorded id) from which the snapshot was created at the correct version (index).
-    DependentApply(K, TxnIndex, DelayedApplyChange<K>),
+    DependentApply(K, TxnIndex, DelayedApplyEntry<K>),
 }
 
 fn variant_eq<T>(a: &T, b: &T) -> bool {
@@ -220,9 +220,9 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     fn apply_aggregator_change_suffix(
         &self,
         iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &CachePadded<VersionEntry<K>>)>,
-        suffix: &DelayedApplyChange<K>,
+        suffix: &DelayedApplyEntry<K>,
     ) -> Result<VersionedRead<K>, PanicOr<MVDelayedFieldsError>> {
-        use DelayedApplyChange::*;
+        use DelayedApplyEntry::*;
         use EstimatedEntry::*;
         use VersionEntry::*;
 
@@ -327,8 +327,24 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     }
 }
 
-// TODO To be renamed to VersionedDelayedFields
-//
+pub trait TVersionedDelayedFieldView<K> {
+    fn read(
+        &self,
+        id: &K,
+        txn_idx: TxnIndex,
+    ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>>;
+
+    /// Returns the committed value from largest transaction index that is
+    /// smaller than the given current_txn_idx (read_position defined whether
+    /// inclusively or exclusively from the current transaction itself).
+    fn read_latest_committed_value(
+        &self,
+        id: &K,
+        current_txn_idx: TxnIndex,
+        read_position: ReadPosition,
+    ) -> Result<DelayedFieldValue, MVDelayedFieldsError>;
+}
+
 /// Maps each ID (access path) to an internal VersionedValue, managing versioned updates to the
 /// specified delayed field (which handles both Aggregator, and AggregatorSnapshot).
 ///
@@ -406,7 +422,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         &self,
         id: K,
         txn_idx: TxnIndex,
-        apply: DelayedApplyChange<K>,
+        apply: DelayedApplyEntry<K>,
     ) -> Result<(), PanicError> {
         let mut created = VersionedValue::new(None);
         created.insert(txn_idx, VersionEntry::Apply(apply));
@@ -422,18 +438,18 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         &self,
         id: K,
         txn_idx: TxnIndex,
-        change: DelayedChange<K>,
+        change: DelayedEntry<K>,
     ) -> Result<(), PanicOr<MVDelayedFieldsError>> {
         match change {
-            DelayedChange::Create(value) => self.initialize_delayed_field(id, txn_idx, value)?,
-            DelayedChange::Apply(apply) => match &apply {
-                DelayedApplyChange::AggregatorDelta { .. } => self
+            DelayedEntry::Create(value) => self.initialize_delayed_field(id, txn_idx, value)?,
+            DelayedEntry::Apply(apply) => match &apply {
+                DelayedApplyEntry::AggregatorDelta { .. } => self
                     .values
                     .get_mut(&id)
                     .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))?
                     .insert(txn_idx, VersionEntry::Apply(apply)),
-                DelayedApplyChange::SnapshotDelta { .. }
-                | DelayedApplyChange::SnapshotDerived { .. } => {
+                DelayedApplyEntry::SnapshotDelta { .. }
+                | DelayedApplyEntry::SnapshotDerived { .. } => {
                     self.initialize_dependent_delayed_field(id, txn_idx, apply)?
                 },
             },
@@ -444,56 +460,6 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// The caller must maintain the invariant that prior to calling the methods below w.
     /// a particular DelayedFieldID, an invocation of either initialize_* (for newly created
     /// delayed fields), or set_base_value (for existing delayed fields) must have been completed.
-
-    pub fn read(
-        &self,
-        id: K,
-        txn_idx: TxnIndex,
-    ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
-        let read_res = self
-            .values
-            .get(&id)
-            .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))?
-            .read(txn_idx)?;
-        // The lock on id is out of scope.
-
-        match read_res {
-            VersionedRead::Value(v) => Ok(v),
-            VersionedRead::DependentApply(dependend_id, dependent_txn_idx, apply) => {
-                // Read the source aggregator of snapshot.
-                // TODO: check/limit recursion depth is not more than 2
-                let source_value = self.read(dependend_id, dependent_txn_idx)?;
-
-                apply
-                    .apply_to_base(source_value)
-                    .map_err(MVDelayedFieldsError::from_panic_or)
-            },
-        }
-    }
-
-    /// Returns the committed value from largest transaction index that is
-    /// smaller than the given current_txn_idx (read_position defined whether
-    /// inclusively or exclusively from the current transaction itself).
-    pub fn read_latest_committed_value(
-        &self,
-        id: K,
-        current_txn_idx: TxnIndex,
-        read_position: ReadPosition,
-    ) -> Result<DelayedFieldValue, MVDelayedFieldsError> {
-        self.values
-            .get_mut(&id)
-            .ok_or(MVDelayedFieldsError::NotFound)
-            .and_then(|v| {
-                v.read_latest_committed_value(
-                    match read_position {
-                        ReadPosition::BeforeCurrentTxn => current_txn_idx,
-                        ReadPosition::AfterCurrentTxn => current_txn_idx + 1,
-                    }
-                    .min(self.next_idx_to_commit.load(Ordering::Relaxed)),
-                )
-            })
-    }
-
     pub fn mark_estimate(&self, id: &K, txn_idx: TxnIndex) {
         self.values
             .get_mut(id)
@@ -515,7 +481,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// Must be called for each transaction index, in order.
     pub fn try_commit(&self, idx_to_commit: TxnIndex, ids: Vec<K>) -> Result<(), CommitError> {
         // we may not need to return values here, we can just read them.
-        use DelayedApplyChange::*;
+        use DelayedApplyEntry::*;
 
         if idx_to_commit != self.next_idx_to_commit.load(Ordering::SeqCst) {
             return Err(CommitError::CodeInvariantError(
@@ -645,6 +611,68 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     }
 }
 
+impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
+    for VersionedDelayedFields<K>
+{
+    fn read(
+        &self,
+        id: &K,
+        txn_idx: TxnIndex,
+    ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
+        let read_res = self
+            .values
+            .get(id)
+            .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))?
+            .read(txn_idx)?;
+        // The lock on id is out of scope.
+
+        match read_res {
+            VersionedRead::Value(v) => Ok(v),
+            VersionedRead::DependentApply(dependent_id, dependent_txn_idx, apply) => {
+                if &dependent_id == id {
+                    return Err(code_invariant_error(format!(
+                        "ID of dependent apply {:?} is same as self {:?}",
+                        VersionedRead::DependentApply(dependent_id, dependent_txn_idx, apply),
+                        id
+                    ))
+                    .into());
+                }
+
+                // Read the source aggregator of snapshot.
+                // TODO: check/limit recursion depth is not more than 2
+                let source_value = self.read(&dependent_id, dependent_txn_idx)?;
+
+                apply
+                    .apply_to_base(source_value)
+                    .map_err(MVDelayedFieldsError::from_panic_or)
+            },
+        }
+    }
+
+    /// Returns the committed value from largest transaction index that is
+    /// smaller than the given current_txn_idx (read_position defined whether
+    /// inclusively or exclusively from the current transaction itself).
+    fn read_latest_committed_value(
+        &self,
+        id: &K,
+        current_txn_idx: TxnIndex,
+        read_position: ReadPosition,
+    ) -> Result<DelayedFieldValue, MVDelayedFieldsError> {
+        self.values
+            .get_mut(id)
+            .ok_or(MVDelayedFieldsError::NotFound)
+            .and_then(|v| {
+                v.read_latest_committed_value(
+                    match read_position {
+                        ReadPosition::BeforeCurrentTxn => current_txn_idx,
+                        ReadPosition::AfterCurrentTxn => current_txn_idx + 1,
+                    }
+                    .min(self.next_idx_to_commit.load(Ordering::Relaxed)),
+                )
+            })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -702,14 +730,14 @@ mod test {
                 DelayedFieldValue::Derived(vec![70, 80, 90]),
                 None,
             )),
-            APPLY_AGGREGATOR => Some(VersionEntry::Apply(DelayedApplyChange::AggregatorDelta {
+            APPLY_AGGREGATOR => Some(VersionEntry::Apply(DelayedApplyEntry::AggregatorDelta {
                 delta: test_delta(),
             })),
-            APPLY_SNAPSHOT => Some(VersionEntry::Apply(DelayedApplyChange::SnapshotDelta {
+            APPLY_SNAPSHOT => Some(VersionEntry::Apply(DelayedApplyEntry::SnapshotDelta {
                 base_aggregator: DelayedFieldID::new(2),
                 delta: test_delta(),
             })),
-            APPLY_DERIVED => Some(VersionEntry::Apply(DelayedApplyChange::SnapshotDerived {
+            APPLY_DERIVED => Some(VersionEntry::Apply(DelayedApplyEntry::SnapshotDerived {
                 base_snapshot: DelayedFieldID::new(3),
                 formula: test_formula(),
             })),
@@ -724,7 +752,7 @@ mod test {
     ) -> VersionEntry<DelayedFieldID> {
         VersionEntry::Value(
             DelayedFieldValue::Aggregator(value),
-            Some(DelayedApplyChange::AggregatorDelta { delta }),
+            Some(DelayedApplyEntry::AggregatorDelta { delta }),
         )
     }
 
@@ -735,7 +763,7 @@ mod test {
     ) -> VersionEntry<DelayedFieldID> {
         VersionEntry::Value(
             DelayedFieldValue::Snapshot(value),
-            Some(DelayedApplyChange::SnapshotDelta {
+            Some(DelayedApplyEntry::SnapshotDelta {
                 base_aggregator,
                 delta,
             }),
@@ -749,7 +777,7 @@ mod test {
     ) -> VersionEntry<DelayedFieldID> {
         VersionEntry::Value(
             DelayedFieldValue::Derived(value),
-            Some(DelayedApplyChange::SnapshotDerived {
+            Some(DelayedApplyEntry::SnapshotDerived {
                 base_snapshot,
                 formula,
             }),
@@ -790,7 +818,7 @@ mod test {
                 VersionedRead::DependentApply(
                     DelayedFieldID::new($expected_id),
                     $expected_txn_index,
-                    DelayedApplyChange::SnapshotDelta {
+                    DelayedApplyEntry::SnapshotDelta {
                         base_aggregator: DelayedFieldID::new($expected_id),
                         delta: $expected_delta
                     }
@@ -806,7 +834,7 @@ mod test {
                 VersionedRead::DependentApply(
                     DelayedFieldID::new($expected_id),
                     $expected_txn_index,
-                    DelayedApplyChange::SnapshotDerived {
+                    DelayedApplyEntry::SnapshotDerived {
                         base_snapshot: DelayedFieldID::new($expected_id),
                         formula: $expected_formula
                     }
@@ -884,7 +912,7 @@ mod test {
         assert_matches!(
             &**val_bypass.unwrap(),
             VersionEntry::Estimate(EstimatedEntry::Bypass(
-                DelayedApplyChange::AggregatorDelta { .. }
+                DelayedApplyEntry::AggregatorDelta { .. }
             ))
         );
         // Delta(30) + Value delta bypass(30) + Value(10)
@@ -896,7 +924,7 @@ mod test {
         assert_matches!(
             &**delta_bypass.unwrap(),
             VersionEntry::Estimate(EstimatedEntry::Bypass(
-                DelayedApplyChange::AggregatorDelta { .. }
+                DelayedApplyEntry::AggregatorDelta { .. }
             ))
         );
         // Delta bypass(30) + Value delta bypass(30) + Value(10)
@@ -964,7 +992,7 @@ mod test {
             assert_matches!(
                 &**snapshot_bypass.unwrap(),
                 VersionEntry::Estimate(EstimatedEntry::Bypass(
-                    DelayedApplyChange::SnapshotDelta { .. }
+                    DelayedApplyEntry::SnapshotDelta { .. }
                 ))
             );
 
@@ -1020,7 +1048,7 @@ mod test {
             assert_matches!(
                 &**snapshot_bypass.unwrap(),
                 VersionEntry::Estimate(EstimatedEntry::Bypass(
-                    DelayedApplyChange::SnapshotDerived { .. }
+                    DelayedApplyEntry::SnapshotDerived { .. }
                 ))
             );
 
@@ -1148,7 +1176,7 @@ mod test {
 
         v.insert(
             8,
-            VersionEntry::Apply(DelayedApplyChange::AggregatorDelta {
+            VersionEntry::Apply(DelayedApplyEntry::AggregatorDelta {
                 delta: negative_delta(),
             }),
         );

@@ -7,9 +7,14 @@ use crate::{
     AptosVM,
 };
 use aptos_aggregator::{
-    delayed_change::{ApplyBase, DelayedChange},
-    resolver::{DelayedFieldReadMode, TDelayedFieldView},
-    types::{DelayedFieldID, DelayedFieldValue},
+    bounded_math::{BoundedMath, SignedU128},
+    delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
+    delta_change_set::DeltaWithMax,
+    resolver::TDelayedFieldView,
+    types::{
+        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
+        DelayedFieldsSpeculativeError, PanicOr,
+    },
 };
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
@@ -28,7 +33,6 @@ use aptos_vm_types::{
     storage::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -143,18 +147,15 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::IdentifierV1,
-        mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base_executor_view
-                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op, mode)?
+                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op)?
                 .as_state_value()),
             None => match self.change_set.aggregator_v1_write_set().get(id) {
                 Some(write_op) => Ok(write_op.as_state_value()),
-                None => self
-                    .base_executor_view
-                    .get_aggregator_v1_state_value(id, mode),
+                None => self.base_executor_view.get_aggregator_v1_state_value(id),
             },
         }
     }
@@ -162,8 +163,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue> {
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         use DelayedChange::*;
 
         match self.change_set.delayed_field_change_set().get(id) {
@@ -171,18 +171,56 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
             Some(Apply(apply)) => {
                 let base_value = match apply.get_apply_base_id(id) {
                     ApplyBase::Previous(base_id) => {
-                        // TODO do we need to deal with self.base_resource_group_view ?
-                        self.base_executor_view
-                            .get_delayed_field_value(&base_id, mode)?
+                        self.base_executor_view.get_delayed_field_value(&base_id)?
                     },
                     // For Current, call on self to include current change!
-                    ApplyBase::Current(base_id) => self.get_delayed_field_value(&base_id, mode)?,
+                    ApplyBase::Current(base_id) => {
+                        // avoid infinite loop
+                        if &base_id == id {
+                            return Err(code_invariant_error(format!(
+                                "Base id is Current(self) for {:?} : Apply({:?})",
+                                id, apply
+                            ))
+                            .into());
+                        }
+                        self.get_delayed_field_value(&base_id)?
+                    },
                 };
-                Ok(apply
-                    .apply_to_base(base_value)
-                    .map_err(PartialVMError::from)?)
+                Ok(apply.apply_to_base(base_value)?)
             },
-            None => self.base_executor_view.get_delayed_field_value(id, mode),
+            None => self.base_executor_view.get_delayed_field_value(id),
+        }
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::IdentifierV2,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        use DelayedChange::*;
+
+        let math = BoundedMath::new(max_value);
+        match self.change_set.delayed_field_change_set().get(id) {
+            Some(Create(value)) => {
+                let prev_value = expect_ok(math.unsigned_add_delta(value.clone().into_aggregator_value()?, base_delta))?;
+                Ok(math.unsigned_add_delta(prev_value, delta).is_ok())
+            }
+            Some(Apply(DelayedApplyChange::AggregatorDelta { delta: change_delta })) => {
+                let merged = &DeltaWithMax::create_merged_delta(
+                    &DeltaWithMax::new(*base_delta, max_value),
+                    change_delta)?;
+                self.base_executor_view.delayed_field_try_add_delta_outcome(
+                    id,
+                    &merged.get_update(),
+                    delta,
+                    max_value)
+            },
+            Some(Apply(_)) => Err(code_invariant_error(
+                "Cannot call delayed_field_try_add_delta_outcome on non-AggregatorDelta Apply change",
+            ).into()),
+            None => self.base_executor_view.delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
         }
     }
 
@@ -306,9 +344,7 @@ mod test {
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        view.get_aggregator_v1_value(&key(s), DelayedFieldReadMode::Aggregated)
-            .unwrap()
-            .unwrap()
+        view.get_aggregator_v1_value(&key(s)).unwrap().unwrap()
     }
 
     fn read_resource_from_group(
@@ -472,4 +508,6 @@ mod test {
             5000
         );
     }
+
+    // TODO add delayed field tests
 }

@@ -132,7 +132,7 @@ fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     PanicError::CodeInvariantError(msg)
 }
 
-pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
+fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
     value.map_err(code_invariant_error)
 }
 

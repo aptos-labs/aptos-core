@@ -144,6 +144,12 @@ impl SignedU128 {
             Self::Negative(value) => Self::Positive(*value),
         }
     }
+
+    pub fn abs(&self) -> u128 {
+        match self {
+            Self::Positive(value) | Self::Negative(value) => *value,
+        }
+    }
 }
 
 #[cfg(test)]
