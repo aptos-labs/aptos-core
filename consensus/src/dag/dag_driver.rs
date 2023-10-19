@@ -113,7 +113,9 @@ impl DagDriver {
             driver.broadcast_node(node);
         } else {
             // kick start a new round
-            block_on(driver.enter_new_round(highest_strong_links_round + 1));
+            if !driver.dag.read().is_empty() {
+                block_on(driver.enter_new_round(highest_strong_links_round + 1));
+            }
         }
         driver
     }
@@ -179,7 +181,7 @@ impl DagDriver {
                     &dag_reader
                         .reachable(
                             strong_links.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(DAG_WINDOW as u64)),
+                            Some(highest_commit_round.saturating_sub(DAG_WINDOW)),
                             |_| true,
                         )
                         .map(|node_status| node_status.as_node().payload())
