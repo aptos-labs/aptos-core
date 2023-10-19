@@ -6,6 +6,7 @@ use criterion::{
 };
 use rand::rngs::ThreadRng;
 use rand::thread_rng;
+use std::iter::zip;
 
 use aptos_dkg::pvss::test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux};
 use aptos_dkg::pvss::traits::{SecretSharingConfig, Transcript};
@@ -98,13 +99,14 @@ pub fn wvuf_benches<
     }
 
     for (wc, vuf_pp, sk, sks, pks, asks, apks, deltas) in bench_cases {
-        // TODO: smallest weight player and largest weight player
         wvuf_augment_random_keypair::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &sks, &pks, group, &mut rng,
         );
 
-        // TODO: pick smallest weight player and largest weight player
-        // TODO: benchmark augmenting all pubkeys too
+        wvuf_augment_all_pubkeys::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+            &wc, &vuf_pp, &pks, &deltas, group,
+        );
+
         wvuf_augment_random_pubkey::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &pks, &deltas, group, &mut rng,
         );
@@ -185,6 +187,37 @@ fn wvuf_augment_random_keypair<
             },
             |(sk, pk)| WVUF::augment_key_pair(vuf_pp, sk, pk, rng),
         )
+    });
+}
+
+fn wvuf_augment_all_pubkeys<
+    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WVUF: WeightedVUF<
+        SecretKey = WT::DealtSecretKey,
+        PubKeyShare = WT::DealtPubKeyShare,
+        SecretKeyShare = WT::DealtSecretKeyShare,
+    >,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+    M: Measurement,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    vuf_pp: &WVUF::PublicParameters,
+    pks: &Vec<WVUF::PubKeyShare>,
+    deltas: &Vec<WVUF::Delta>,
+    group: &mut BenchmarkGroup<M>,
+) where
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+{
+    assert_eq!(pks.len(), wc.get_total_num_players());
+    assert_eq!(pks.len(), deltas.len());
+    group.bench_function(format!("augment_all_pubkeys/{}", wc), move |b| {
+        b.iter(|| {
+            for (pk, delta) in zip(pks, deltas) {
+                WVUF::augment_pubkey(vuf_pp, pk.clone(), delta.clone())
+                    .expect("augmentation should have succeeded");
+            }
+        })
     });
 }
 
