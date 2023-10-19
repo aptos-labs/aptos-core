@@ -77,6 +77,34 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> Default
 }
 
 impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGroupValue<T, V> {
+    fn set_base_values(
+        &mut self,
+        shifted_idx: ShiftedTxnIndex,
+        // TODO add layout to values
+        values: impl IntoIterator<Item = (T, V)>,
+    ) {
+        match self.idx_to_update.get(&shifted_idx) {
+            Some(previous) => {
+                // base value may have already been provided by another transaction
+                // executed simultaneously and asking for the same resource group.
+                // Value from storage must be identical, but then delayed field
+                // identifier exchange could've modiefied it.
+                //
+                // If maybe_layout is None, they are required to be identical
+                // If maybe_layout is Some, there might have been an exchange
+                // Assert the length of bytes for efficiency (instead of full equality)
+                for (tag, v) in values.into_iter() {
+                    let prev_v = previous
+                        .get(&tag)
+                        .expect("Reading twice from storage must be consistent");
+                    assert!(v.bytes_len() == prev_v.bytes_len());
+                }
+            },
+            // For base value, incarnation is irrelevant, and is always set to 0.
+            None => self.write(shifted_idx, 0, values),
+        }
+    }
+
     fn write(
         &mut self,
         shifted_idx: ShiftedTxnIndex,
@@ -251,12 +279,12 @@ impl<
         }
     }
 
-    pub fn provide_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
+    pub fn set_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
         // Incarnation is irrelevant for storage version, set to 0.
         self.group_values
             .entry(key)
             .or_default()
-            .write(ShiftedTxnIndex::zero(), 0, base_values);
+            .set_base_values(ShiftedTxnIndex::zero(), base_values);
     }
 
     pub fn write(
@@ -424,7 +452,7 @@ mod test {
             map.read_from_group(&ap_2, &2, 4),
             Err(MVGroupError::Uninitialized)
         );
-        map.provide_base_values(
+        map.set_base_values(
             ap_2.clone(),
             // base tags 0, 1.
             (0..2).map(|i| (i, TestValue::with_len(2))),
@@ -514,7 +542,7 @@ mod test {
         );
         assert_matches!(map.get_group_size(&ap, 12), Err(Uninitialized));
 
-        map.provide_base_values(
+        map.set_base_values(
             ap.clone(),
             // base tag 1, 2, 3, 4
             (1..5).map(|i| (i, TestValue::with_len(1))),
@@ -564,7 +592,7 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = VersionedGroupData::<KeyType<Vec<u8>>, usize, TestValue>::new();
 
-        map.provide_base_values(
+        map.set_base_values(
             ap.clone(),
             // base tag 1, 2, 3
             (1..4).map(|i| (i, TestValue::from_u128(i as u128))),

@@ -673,12 +673,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
                     // This base value can also be used to resolve AggregatorV1 directly from
                     // the versioned data-structure (without more storage calls).
-                    state.versioned_map.data().provide_base_value(
+                    state.versioned_map.data().set_base_value(
                         state_key.clone(),
                         TransactionWrite::from_state_value(maybe_patched_from_storage),
                         maybe_layout.cloned().map(Arc::new),
                     );
 
+                    // In case of concurrent storage fetches, we cannot use our value,
+                    // but need to fetch it from versioned_map again.
                     ret = state.read_data_by_kind(state_key, self.txn_idx, kind);
                 }
 
@@ -702,7 +704,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 let ret = match state.unsync_map.fetch_data(state_key) {
                     // TODO: Should we ignore the layout from fetch_data?
                     // What if it doesn't match with the maybe_layout given as input to this function?
-                    Some((v, _)) => Ok(v.as_state_value()),
+                    Some((v, _)) => {
+                        state.read_set.borrow_mut().insert(state_key.clone());
+                        Ok(v.as_state_value())
+                    },
                     None => {
                         self.get_base_value(state_key).map(
                             |maybe_state_value| {

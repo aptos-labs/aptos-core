@@ -158,8 +158,8 @@ fn string_to_bytes(value: Struct) -> Result<Vec<u8>, PanicError> {
     expect_ok(value.unpack())?
         .collect::<Vec<Value>>()
         .pop()
-        .map_or(
-            Err(code_invariant_error("Unable to extract bytes from String")),
+        .map_or_else(
+            || Err(code_invariant_error("Unable to extract bytes from String")),
             |v| expect_ok(v.value_as::<Vec<u8>>()),
         )
 }
