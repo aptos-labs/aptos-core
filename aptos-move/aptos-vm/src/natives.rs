@@ -6,7 +6,12 @@
 use anyhow::Error;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
-    resolver::{DelayedFieldReadMode, TDelayedFieldView},
+    bounded_math::SignedU128,
+    types::{DelayedFieldsSpeculativeError, PanicOr},
+};
+#[cfg(feature = "testing")]
+use aptos_aggregator::{
+    resolver::TDelayedFieldView,
     types::{DelayedFieldID, DelayedFieldValue},
 };
 #[cfg(feature = "testing")]
@@ -63,7 +68,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     fn get_aggregator_v1_state_value(
         &self,
         _id: &Self::IdentifierV1,
-        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
     }
@@ -71,8 +75,17 @@ impl TDelayedFieldView for AptosBlankStorage {
     fn get_delayed_field_value(
         &self,
         _id: &Self::IdentifierV2,
-        _mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<DelayedFieldValue> {
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!()
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        _id: &Self::IdentifierV2,
+        _base_delta: &SignedU128,
+        _delta: &SignedU128,
+        _max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
         unimplemented!()
     }
 
