@@ -4,10 +4,10 @@
 use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_drop_helper::DEFAULT_DROP_HELPER;
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput, ParsedTransactionOutput, ProofReader,
 };
-use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
@@ -183,9 +183,7 @@ impl InMemoryStateCalculatorV2 {
             )?
         };
 
-        THREAD_MANAGER.get_non_exe_cpu_pool().spawn(move || {
-            drop(frozen_base);
-        });
+        DEFAULT_DROP_HELPER.schedule_drop(frozen_base);
 
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint

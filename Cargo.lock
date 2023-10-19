@@ -1179,6 +1179,16 @@ dependencies = [
  "serde_with 2.3.2",
  "sha3 0.9.1",
  "static_assertions",
+ ]
+
+[[package]]
+name = "aptos-drop-helper"
+version = "0.1.0"
+dependencies = [
+ "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "once_cell",
 ]
 
 [[package]]
@@ -1244,6 +1254,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-db",
+ "aptos-drop-helper",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-experimental-runtimes",
@@ -3800,6 +3811,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-generator-lib",
+ "aptos-types",
  "async-trait",
  "clap 4.3.21",
  "futures",
