@@ -2,14 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    captured_reads::{CapturedReads, DataRead, ReadKind},
+    captured_reads::{CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, ReadKind},
     counters,
-    scheduler::{DependencyResult, DependencyStatus, Scheduler},
+    scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
 };
 use aptos_aggregator::{
+    bounded_math::{ok_overflow, BoundedMath, SignedU128},
     delta_change_set::serialize,
-    resolver::{DelayedFieldReadMode, TDelayedFieldView},
-    types::{DelayedFieldValue, PanicOr, ReadPosition, TryFromMoveValue, TryIntoMoveValue},
+    delta_math::DeltaHistory,
+    resolver::TDelayedFieldView,
+    types::{
+        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
+        ReadPosition, TryFromMoveValue, TryIntoMoveValue,
+    },
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -17,6 +22,7 @@ use aptos_mvhashmap::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVModulesError, MVModulesOutput, TxnIndex,
     },
     unsync_map::UnsyncMap,
+    versioned_delayed_fields::TVersionedDelayedFieldView,
     MVHashMap,
 };
 use aptos_state_view::{StateViewId, TStateView};
@@ -89,6 +95,279 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     captured_reads: RefCell<CapturedReads<T>>,
 }
 
+fn get_delayed_field_value_impl<T: Transaction>(
+    captured_reads: &RefCell<CapturedReads<T>>,
+    versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
+    wait_for: &dyn TWaitForDependency,
+    id: &T::Identifier,
+    txn_idx: TxnIndex,
+) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+    // We expect only DelayedFieldReadKind::Value (which is set from this function),
+    // to be a "full materialized/aggregated" read, and so we don't use the value
+    // from HistoryBounded reads.
+    // If we wanted to make it more dynamic, we could have a type of the read value
+    // inside HistoryBounded
+    let delayed_read = captured_reads
+        .borrow()
+        .get_delayed_field_by_kind(id, DelayedFieldReadKind::Value);
+    if let Some(data) = delayed_read {
+        if let DelayedFieldRead::Value { value, .. } = data {
+            return Ok(value);
+        } else {
+            let err =
+                code_invariant_error("Value DelayedField read returned non-value result").into();
+            captured_reads
+                .borrow_mut()
+                .capture_delayed_field_read_error(&err);
+            return Err(err);
+        }
+    }
+
+    loop {
+        match versioned_delayed_fields.read(id, txn_idx) {
+            Ok(value) => {
+                captured_reads.borrow_mut().capture_delayed_field_read(
+                    *id,
+                    false,
+                    DelayedFieldRead::Value {
+                        value: value.clone(),
+                    },
+                )?;
+                return Ok(value);
+            },
+            Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
+                if !wait_for_dependency(wait_for, txn_idx, dep_idx) {
+                    // TODO think of correct return type
+                    return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
+                }
+            },
+            Err(e) => {
+                captured_reads
+                    .borrow_mut()
+                    .capture_delayed_field_read_error(&e);
+                // TODO think of correct return type
+                return Err(e.map_non_panic(|_| DelayedFieldsSpeculativeError::InconsistentRead));
+            },
+        }
+    }
+}
+
+fn compute_delayed_field_try_add_delta_outcome_from_history(
+    base_delta: &SignedU128,
+    delta: &SignedU128,
+    max_value: u128,
+    mut history: DeltaHistory,
+    base_aggregator_value: u128,
+) -> Result<(bool, DelayedFieldRead), PanicOr<DelayedFieldsSpeculativeError>> {
+    let math = BoundedMath::new(max_value);
+
+    let before_value = expect_ok(math.unsigned_add_delta(base_aggregator_value, base_delta))?;
+
+    let result = if math.unsigned_add_delta(before_value, delta).is_err() {
+        match delta {
+            SignedU128::Positive(delta_value) => {
+                let overflow_delta = expect_ok(ok_overflow(
+                    math.unsigned_add_delta(*delta_value, base_delta),
+                ))?;
+
+                // We don't need to record the value if it overflowed.
+                if let Some(overflow_delta) = overflow_delta {
+                    history.record_overflow(overflow_delta);
+                }
+            },
+            SignedU128::Negative(delta_value) => {
+                let underflow_delta = expect_ok(ok_overflow(
+                    math.unsigned_add_delta(*delta_value, &base_delta.minus()),
+                ))?;
+                // We don't need to record the value if it overflowed (delta was smaller than -max_value).
+                if let Some(underflow_delta) = underflow_delta {
+                    history.record_underflow(underflow_delta);
+                }
+            },
+        };
+
+        false
+    } else {
+        let new_delta = expect_ok(math.signed_add(base_delta, delta))?;
+        history.record_success(new_delta);
+        true
+    };
+
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
+}
+
+fn compute_delayed_field_try_add_delta_outcome_first_time(
+    delta: &SignedU128,
+    max_value: u128,
+    base_aggregator_value: u128,
+) -> Result<(bool, DelayedFieldRead), PanicOr<DelayedFieldsSpeculativeError>> {
+    let math = BoundedMath::new(max_value);
+    let mut history = DeltaHistory::new();
+    let result = if math
+        .unsigned_add_delta(base_aggregator_value, delta)
+        .is_err()
+    {
+        match delta {
+            SignedU128::Positive(delta_value) => {
+                history.record_overflow(*delta_value);
+            },
+            SignedU128::Negative(delta_value) => {
+                history.record_underflow(*delta_value);
+            },
+        };
+        false
+    } else {
+        history.record_success(*delta);
+        true
+    };
+
+    Ok((result, DelayedFieldRead::HistoryBounded {
+        restriction: history,
+        max_value,
+        inner_aggregator_value: base_aggregator_value,
+    }))
+}
+// TODO: see about simplifying / split with CapturedReads
+fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
+    captured_reads: &RefCell<CapturedReads<T>>,
+    versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
+    wait_for: &dyn TWaitForDependency,
+    id: &T::Identifier,
+    base_delta: &SignedU128,
+    delta: &SignedU128,
+    max_value: u128,
+    txn_idx: TxnIndex,
+) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+    // No need to record or check or try, if input value exceeds the bound.
+    if delta.abs() > max_value {
+        return Ok(false);
+    }
+
+    let delayed_read = captured_reads
+        .borrow()
+        .get_delayed_field_by_kind(id, DelayedFieldReadKind::HistoryBounded);
+    match delayed_read {
+        Some(DelayedFieldRead::Value { value }) => {
+            let math = BoundedMath::new(max_value);
+            let before = expect_ok(
+                math.unsigned_add_delta(value.clone().into_aggregator_value()?, base_delta),
+            )?;
+            Ok(math.unsigned_add_delta(before, delta).is_ok())
+        },
+        Some(DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value: before_max_value,
+            inner_aggregator_value,
+        }) => {
+            if before_max_value != max_value {
+                return Err(
+                    code_invariant_error("Cannot merge deltas with different limits").into(),
+                );
+            }
+
+            let (result, udpated_delayed_read) =
+                compute_delayed_field_try_add_delta_outcome_from_history(
+                    base_delta,
+                    delta,
+                    max_value,
+                    history,
+                    inner_aggregator_value,
+                )?;
+
+            captured_reads.borrow_mut().capture_delayed_field_read(
+                *id,
+                true,
+                udpated_delayed_read,
+            )?;
+            Ok(result)
+        },
+        None => {
+            if !base_delta.is_zero() {
+                return Err(code_invariant_error(
+                    "Passed-in delta is not zero, but CapturedReads has no record",
+                )
+                .into());
+            }
+
+            let last_committed_value = loop {
+                match versioned_delayed_fields.read_latest_committed_value(
+                    id,
+                    txn_idx,
+                    ReadPosition::BeforeCurrentTxn,
+                ) {
+                    Ok(v) => break v,
+                    Err(MVDelayedFieldsError::Dependency(dep_idx)) => {
+                        if !wait_for_dependency(wait_for, txn_idx, dep_idx) {
+                            // TODO think of correct return type
+                            return Err(PanicOr::Or(
+                                DelayedFieldsSpeculativeError::InconsistentRead,
+                            ));
+                        }
+                    },
+                    Err(_) => {
+                        return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead))
+                    },
+                };
+            }
+            .into_aggregator_value()?;
+
+            let (result, new_delayed_read) =
+                compute_delayed_field_try_add_delta_outcome_first_time(
+                    delta,
+                    max_value,
+                    last_committed_value,
+                )?;
+
+            captured_reads
+                .borrow_mut()
+                .capture_delayed_field_read(*id, false, new_delayed_read)?;
+            Ok(result)
+        },
+    }
+}
+
+// txn_idx is estimated to have a r/w dependency on dep_idx.
+// Returns after the dependency has been resolved, the returned indicator is true if
+// it is safe to continue, and false if the execution has been halted.
+fn wait_for_dependency(
+    wait_for: &dyn TWaitForDependency,
+    txn_idx: TxnIndex,
+    dep_idx: TxnIndex,
+) -> bool {
+    match wait_for.wait_for_dependency(txn_idx, dep_idx) {
+        DependencyResult::Dependency(dep_condition) => {
+            let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
+            // Wait on a condition variable corresponding to the encountered
+            // read dependency. Once the dep_idx finishes re-execution, scheduler
+            // will mark the dependency as resolved, and then the txn_idx will be
+            // scheduled for re-execution, which will re-awaken cvar here.
+            // A deadlock is not possible due to these condition variables:
+            // suppose all threads are waiting on read dependency, and consider
+            // one with lowest txn_idx. It observed a dependency, so some thread
+            // aborted dep_idx. If that abort returned execution task, by
+            // minimality (lower transactions aren't waiting), that thread would
+            // finish execution unblock txn_idx, contradiction. Otherwise,
+            // execution_idx in scheduler was lower at a time when at least the
+            // thread that aborted dep_idx was alive, and again, since lower txns
+            // than txn_idx are not blocked, so the execution of dep_idx will
+            // eventually finish and lead to unblocking txn_idx, contradiction.
+            let (lock, cvar) = &*dep_condition;
+            let mut dep_resolved = lock.lock();
+            while let DependencyStatus::Unresolved = *dep_resolved {
+                dep_resolved = cvar.wait(dep_resolved).unwrap();
+            }
+            // dep resolved status is either resolved or execution halted.
+            matches!(*dep_resolved, DependencyStatus::Resolved)
+        },
+        DependencyResult::ExecutionHalted => false,
+        DependencyResult::Resolved => true,
+    }
+}
+
 impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
@@ -109,38 +388,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    fn read_delayed_field_last_committed_value(
-        &self,
-        id: T::Identifier,
-        txn_idx: TxnIndex,
-        read_position: ReadPosition,
-    ) -> Result<DelayedFieldValue, MVDelayedFieldsError> {
-        self.versioned_map
-            .delayed_fields()
-            .read_latest_committed_value(id, txn_idx, read_position)
-    }
-
-    fn read_delayed_field_aggregated_value(
-        &self,
-        id: T::Identifier,
-        txn_idx: TxnIndex,
-    ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
-        match self.versioned_map.delayed_fields().read(id, txn_idx) {
-            Ok(value) => {
-                self.captured_reads
-                    .borrow_mut()
-                    .capture_delayed_field_read(id, value.clone())?;
-                Ok(value)
-            },
-            Err(e) => {
-                self.captured_reads
-                    .borrow_mut()
-                    .capture_delayed_field_read_error(&e);
-                Err(e)
-            },
-        }
-    }
-
     // TODO: Actually fill in the logic to record fetched executables, etc.
     fn fetch_module(
         &self,
@@ -154,40 +401,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .push(key.clone());
 
         self.versioned_map.modules().fetch_module(key, txn_idx)
-    }
-
-    // txn_idx is estimated to have a r/w dependency on dep_idx.
-    // Returns after the dependency has been resolved, the returned indicator is true if
-    // it is safe to continue, and false if the execution has been halted.
-    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_idx: TxnIndex) -> bool {
-        match self.scheduler.wait_for_dependency(txn_idx, dep_idx) {
-            DependencyResult::Dependency(dep_condition) => {
-                let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
-                // Wait on a condition variable corresponding to the encountered
-                // read dependency. Once the dep_idx finishes re-execution, scheduler
-                // will mark the dependency as resolved, and then the txn_idx will be
-                // scheduled for re-execution, which will re-awaken cvar here.
-                // A deadlock is not possible due to these condition variables:
-                // suppose all threads are waiting on read dependency, and consider
-                // one with lowest txn_idx. It observed a dependency, so some thread
-                // aborted dep_idx. If that abort returned execution task, by
-                // minimality (lower transactions aren't waiting), that thread would
-                // finish execution unblock txn_idx, contradiction. Otherwise,
-                // execution_idx in scheduler was lower at a time when at least the
-                // thread that aborted dep_idx was alive, and again, since lower txns
-                // than txn_idx are not blocked, so the execution of dep_idx will
-                // eventually finish and lead to unblocking txn_idx, contradiction.
-                let (lock, cvar) = &*dep_condition;
-                let mut dep_resolved = lock.lock();
-                while let DependencyStatus::Unresolved = *dep_resolved {
-                    dep_resolved = cvar.wait(dep_resolved).unwrap();
-                }
-                // dep resolved status is either resolved or execution halted.
-                matches!(*dep_resolved, DependencyStatus::Resolved)
-            },
-            DependencyResult::ExecutionHalted => false,
-            DependencyResult::Resolved => true,
-        }
     }
 
     /// Captures a read from the VM execution, but not unresolved deltas, as in this case it is the
@@ -257,7 +470,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !self.wait_for_dependency(txn_idx, dep_idx) {
+                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
                         return ReadResult::HaltSpeculativeExecution(
                             "Interrupted as block execution was halted".to_string(),
                         );
@@ -683,7 +896,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::IdentifierV1,
-        _mode: DelayedFieldReadMode,
     ) -> anyhow::Result<Option<StateValue>> {
         // TODO: Integrate aggregators V1. That is, we can lift the u128 value
         //       from the state item by passing the right layout here. This can
@@ -695,37 +907,49 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     fn get_delayed_field_value(
         &self,
         id: &Self::IdentifierV2,
-        mode: DelayedFieldReadMode,
-    ) -> anyhow::Result<aptos_aggregator::types::DelayedFieldValue> {
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         match &self.latest_view {
-            ViewState::Sync(state) => match mode {
-                DelayedFieldReadMode::Aggregated => state
-                    .read_delayed_field_aggregated_value(*id, self.txn_idx)
-                    .map_err(|e| {
-                        anyhow::Error::new(VMStatus::error(
-                            StatusCode::from(&e),
-                            Some(format!("Error during read: {:?}", e)),
-                        ))
-                    }),
-                DelayedFieldReadMode::LastCommitted => state
-                    .read_delayed_field_last_committed_value(
-                        *id,
-                        self.txn_idx,
-                        ReadPosition::BeforeCurrentTxn,
-                    )
-                    .map_err(|e| {
-                        anyhow::Error::new(VMStatus::error(
-                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                            Some(format!("Error during read: {:?}", e)),
-                        ))
-                    }),
+            ViewState::Sync(state) => get_delayed_field_value_impl(&state.captured_reads, state.versioned_map.delayed_fields(), state.scheduler, id, self.txn_idx),
+            ViewState::Unsync(state) => Ok(state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
+                code_invariant_error(format!("DelayedField {:?} not found in get_delayed_field_value in sequential execution", id))
+            })?),
+        }
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::IdentifierV2,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        match &self.latest_view {
+            ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
+                &state.captured_reads,
+                state.versioned_map.delayed_fields(),
+                state.scheduler,
+                id,
+                base_delta,
+                delta,
+                max_value,
+                self.txn_idx,
+            ),
+            ViewState::Unsync(state) => {
+                // No speculation in sequential execution, just evaluate directly
+                let value = state.unsync_map
+                    .fetch_delayed_field(id)
+                    .ok_or_else(|| {
+                        code_invariant_error(format!("DelayedField {:?} not found in delayed_field_try_add_delta_outcome in sequential execution", id))
+                    })?
+                    .into_aggregator_value()?;
+                let math = BoundedMath::new(max_value);
+                let before = expect_ok(math.unsigned_add_delta(value, base_delta))?;
+                if math.unsigned_add_delta(before, delta).is_err() {
+                    Ok(false)
+                } else {
+                    Ok(true)
+                }
             },
-            ViewState::Unsync(state) => state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
-                anyhow::Error::new(VMStatus::error(
-                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                    Some(format!("Aggregator for id {:?} doesn't exist", id)),
-                ))
-            }),
         }
     }
 
@@ -810,11 +1034,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         self.delayed_field_keys.borrow_mut().insert(id);
         match &self.latest_view.latest_view {
             ViewState::Sync(state) => Ok(state
-                .read_delayed_field_last_committed_value(
-                    id,
-                    self.txn_idx,
-                    ReadPosition::AfterCurrentTxn,
-                )
+                .versioned_map
+                .delayed_fields()
+                .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
                 .expect("Committed value for ID must always exist")
                 .try_into_move_value(layout)?),
             ViewState::Unsync(state) => Ok(state
@@ -822,5 +1044,551 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 .expect("Delayed field value for ID must always exist in sequential execution")
                 .try_into_move_value(layout)?),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
+        proptest_types::types::{KeyType, MockEvent, ValueType},
+        scheduler::{DependencyResult, TWaitForDependency},
+        view::{delayed_field_try_add_delta_outcome_impl, get_delayed_field_value_impl},
+    };
+    use aptos_aggregator::{
+        bounded_math::{BoundedMath, SignedU128},
+        delta_math::DeltaHistory,
+        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, ReadPosition},
+    };
+    use aptos_mvhashmap::{
+        types::{MVDelayedFieldsError, TxnIndex},
+        versioned_delayed_fields::TVersionedDelayedFieldView,
+    };
+    use aptos_types::{aggregator::DelayedFieldID, transaction::BlockExecutableTransaction};
+    use claims::{assert_err_eq, assert_ok_eq, assert_some_eq};
+    use std::{cell::RefCell, collections::HashMap};
+
+    #[derive(Default)]
+    pub struct FakeVersionedDelayedFieldView {
+        data: HashMap<DelayedFieldID, DelayedFieldValue>,
+    }
+
+    impl FakeVersionedDelayedFieldView {
+        pub fn set_value(&mut self, id: DelayedFieldID, value: DelayedFieldValue) {
+            self.data.insert(id, value);
+        }
+    }
+
+    impl TVersionedDelayedFieldView<DelayedFieldID> for FakeVersionedDelayedFieldView {
+        fn read(
+            &self,
+            id: &DelayedFieldID,
+            _txn_idx: TxnIndex,
+        ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
+            self.data
+                .get(id)
+                .cloned()
+                .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))
+        }
+
+        fn read_latest_committed_value(
+            &self,
+            id: &DelayedFieldID,
+            _current_txn_idx: TxnIndex,
+            _read_position: ReadPosition,
+        ) -> Result<DelayedFieldValue, MVDelayedFieldsError> {
+            self.data
+                .get(id)
+                .cloned()
+                .ok_or(MVDelayedFieldsError::NotFound)
+        }
+    }
+
+    struct FakeWaitForDependency();
+
+    impl TWaitForDependency for FakeWaitForDependency {
+        fn wait_for_dependency(
+            &self,
+            _txn_idx: TxnIndex,
+            _dep_txn_idx: TxnIndex,
+        ) -> DependencyResult {
+            unreachable!();
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct TestTransactionType {}
+
+    impl BlockExecutableTransaction for TestTransactionType {
+        type Event = MockEvent;
+        type Identifier = DelayedFieldID;
+        type Key = KeyType<u32>;
+        type Tag = u32;
+        type Value = ValueType;
+    }
+
+    #[test]
+    fn test_history_updates() {
+        let mut view = FakeVersionedDelayedFieldView::default();
+        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let wait_for = FakeWaitForDependency();
+        let id = DelayedFieldID::new(600);
+        let max_value = 600;
+        let math = BoundedMath::new(max_value);
+        let txn_idx = 1;
+        let storage_value = 100;
+        view.set_value(id, DelayedFieldValue::Aggregator(storage_value));
+
+        let mut base_delta = SignedU128::Positive(0);
+        let base_value_ref = &mut base_delta;
+
+        macro_rules! assert_try_add {
+            ($delta:expr, $outcome:expr) => {
+                assert_ok_eq!(
+                    delayed_field_try_add_delta_outcome_impl(
+                        &captured_reads,
+                        &view,
+                        &wait_for,
+                        &id,
+                        base_value_ref,
+                        &$delta,
+                        max_value,
+                        txn_idx
+                    ),
+                    $outcome
+                );
+                if $outcome {
+                    *base_value_ref = math.signed_add(base_value_ref, &$delta).unwrap();
+                }
+            };
+        }
+
+        assert_try_add!(SignedU128::Positive(300), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(100), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(450), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(200), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(350), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 500,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(600), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 500,
+                    min_achieved_negative_delta: 100,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+    }
+
+    #[test]
+    fn test_aggregator_overflows() {
+        let mut view = FakeVersionedDelayedFieldView::default();
+        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let wait_for = FakeWaitForDependency();
+        let id = DelayedFieldID::new(600);
+        let max_value = 600;
+        let math = BoundedMath::new(max_value);
+        let txn_idx = 1;
+        let storage_value = 100;
+        view.set_value(id, DelayedFieldValue::Aggregator(storage_value));
+
+        let mut base_delta = SignedU128::Positive(0);
+        let base_value_ref = &mut base_delta;
+
+        macro_rules! assert_try_add {
+            ($delta:expr, $outcome:expr) => {
+                assert_ok_eq!(
+                    delayed_field_try_add_delta_outcome_impl(
+                        &captured_reads,
+                        &view,
+                        &wait_for,
+                        &id,
+                        base_value_ref,
+                        &$delta,
+                        max_value,
+                        txn_idx
+                    ),
+                    $outcome
+                );
+                if $outcome {
+                    *base_value_ref = math.signed_add(base_value_ref, &$delta).unwrap();
+                }
+            };
+        }
+
+        assert_try_add!(SignedU128::Positive(400), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(450), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(601), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(575), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: Some(525),
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(551), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: Some(501),
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Positive(570), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 400,
+                    min_achieved_negative_delta: 50,
+                    min_overflow_positive_delta: Some(501),
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+    }
+
+    #[test]
+    fn test_aggregator_underflows() {
+        let mut view = FakeVersionedDelayedFieldView::default();
+        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let wait_for = FakeWaitForDependency();
+        let id = DelayedFieldID::new(600);
+        let max_value = 600;
+        let math = BoundedMath::new(max_value);
+        let txn_idx = 1;
+        let storage_value = 200;
+        view.set_value(id, DelayedFieldValue::Aggregator(storage_value));
+
+        let mut base_delta = SignedU128::Positive(0);
+        let base_value_ref = &mut base_delta;
+
+        macro_rules! assert_try_add {
+            ($delta:expr, $outcome:expr) => {
+                assert_ok_eq!(
+                    delayed_field_try_add_delta_outcome_impl(
+                        &captured_reads,
+                        &view,
+                        &wait_for,
+                        &id,
+                        base_value_ref,
+                        &$delta,
+                        max_value,
+                        txn_idx
+                    ),
+                    $outcome
+                );
+                if $outcome {
+                    *base_value_ref = math.signed_add(base_value_ref, &$delta).unwrap();
+                }
+            };
+        }
+
+        assert_try_add!(SignedU128::Positive(300), true);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(650), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(550), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: Some(250),
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(525), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: Some(225),
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(540), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: Some(225),
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        assert_try_add!(SignedU128::Negative(501), false);
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: Some(201),
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+    }
+
+    #[test]
+    fn test_read_kind_upgrade_fail() {
+        let mut view = FakeVersionedDelayedFieldView::default();
+        let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
+        let wait_for = FakeWaitForDependency();
+        let id = DelayedFieldID::new(600);
+        let max_value = 600;
+        let txn_idx = 1;
+        let storage_value = 200;
+        view.set_value(id, DelayedFieldValue::Aggregator(storage_value));
+
+        assert_ok_eq!(
+            delayed_field_try_add_delta_outcome_impl(
+                &captured_reads,
+                &view,
+                &wait_for,
+                &id,
+                &SignedU128::Positive(0),
+                &SignedU128::Positive(300),
+                max_value,
+                txn_idx
+            ),
+            true
+        );
+
+        assert_some_eq!(
+            captured_reads
+                .borrow()
+                .get_delayed_field_by_kind(&id, DelayedFieldReadKind::HistoryBounded),
+            DelayedFieldRead::HistoryBounded {
+                restriction: DeltaHistory {
+                    max_achieved_positive_delta: 300,
+                    min_achieved_negative_delta: 0,
+                    min_overflow_positive_delta: None,
+                    max_underflow_negative_delta: None,
+                },
+                max_value,
+                inner_aggregator_value: storage_value,
+            }
+        );
+
+        view.set_value(id, DelayedFieldValue::Aggregator(400));
+        assert_err_eq!(
+            get_delayed_field_value_impl(&captured_reads, &view, &wait_for, &id, txn_idx),
+            PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead),
+        );
     }
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delta_change_set::DeltaOp,
+    delta_change_set::{DeltaOp, DeltaWithMax},
     types::{
         code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
         SnapshotToStringFormula,
@@ -12,13 +12,13 @@ use crate::{
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DelayedApplyChange<I: Clone> {
     AggregatorDelta {
-        delta: DeltaOp,
+        delta: DeltaWithMax,
     },
     /// Value is:
     /// (value of base_aggregator at the BEGINNING of the transaction + delta)
     SnapshotDelta {
         base_aggregator: I,
-        delta: DeltaOp,
+        delta: DeltaWithMax,
     },
     /// Value is:
     /// formula(value of base_snapshot at the END of the transaction)
@@ -35,6 +35,7 @@ pub enum DelayedChange<I: Clone> {
 }
 
 // Contains information on top of which value should AggregatorApplyChange be applied.
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ApplyBase<I: Clone> {
     // Apply on top of the value end the end of the previous transaction
     // (basically value at the start of the transaction.
@@ -136,7 +137,7 @@ impl<I: Copy + Clone> DelayedChange<I> {
                 Ok(Create(Aggregator(new_data)))
             },
             (Some(Apply(AggregatorDelta { delta: prev_delta })), Apply(AggregatorDelta { delta: next_delta })) => {
-                let new_delta = DeltaOp::create_merged_delta(prev_delta, next_delta)?;
+                let new_delta = DeltaWithMax::create_merged_delta(prev_delta, next_delta)?;
                 Ok(Apply(AggregatorDelta { delta: new_delta }))
             },
 
@@ -152,17 +153,107 @@ impl<I: Copy + Clone> DelayedChange<I> {
                 Ok(Create(Snapshot(new_data)))
             },
             (Some(Apply(AggregatorDelta { delta: prev_delta })), Apply(SnapshotDelta { delta: next_delta, base_aggregator })) => {
-                let new_delta = DeltaOp::create_merged_delta(prev_delta, next_delta)?;
+                let new_delta = DeltaWithMax::create_merged_delta(prev_delta, next_delta)?;
                 Ok(Apply(SnapshotDelta { delta: new_delta, base_aggregator: *base_aggregator }))
             },
         }
+    }
+
+    pub fn into_entry_no_additional_history(self) -> DelayedEntry<I> {
+        match self {
+            DelayedChange::Create(value) => DelayedEntry::Create(value),
+            DelayedChange::Apply(DelayedApplyChange::AggregatorDelta { delta }) => {
+                DelayedEntry::Apply(DelayedApplyEntry::AggregatorDelta {
+                    delta: delta.into_op_no_additional_history(),
+                })
+            },
+            DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
+                delta,
+                base_aggregator,
+            }) => DelayedEntry::Apply(DelayedApplyEntry::SnapshotDelta {
+                delta: delta.into_op_no_additional_history(),
+                base_aggregator,
+            }),
+            DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
+                base_snapshot,
+                formula,
+            }) => DelayedEntry::Apply(DelayedApplyEntry::SnapshotDerived {
+                base_snapshot,
+                formula,
+            }),
+        }
+    }
+}
+
+// TODO: See if we need these separate/duplicate classes or not
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DelayedApplyEntry<I: Clone> {
+    AggregatorDelta {
+        delta: DeltaOp,
+    },
+    /// Value is:
+    /// (value of base_aggregator at the BEGINNING of the transaction + delta)
+    SnapshotDelta {
+        base_aggregator: I,
+        delta: DeltaOp,
+    },
+    /// Value is:
+    /// formula(value of base_snapshot at the END of the transaction)
+    SnapshotDerived {
+        base_snapshot: I,
+        formula: SnapshotToStringFormula,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DelayedEntry<I: Clone> {
+    Create(DelayedFieldValue),
+    Apply(DelayedApplyEntry<I>),
+}
+
+impl<I: Copy + Clone> DelayedApplyEntry<I> {
+    pub fn get_apply_base_id_option(&self) -> Option<ApplyBase<I>> {
+        use DelayedApplyEntry::*;
+
+        match self {
+            AggregatorDelta { .. } => None,
+            SnapshotDelta {
+                base_aggregator, ..
+            } => Some(ApplyBase::Previous(*base_aggregator)),
+            SnapshotDerived { base_snapshot, .. } => Some(ApplyBase::Current(*base_snapshot)),
+        }
+    }
+
+    pub fn get_apply_base_id(&self, self_id: &I) -> ApplyBase<I> {
+        self.get_apply_base_id_option()
+            .unwrap_or(ApplyBase::Previous(*self_id))
+    }
+
+    pub fn apply_to_base(
+        &self,
+        base_value: DelayedFieldValue,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        use DelayedApplyEntry::*;
+
+        Ok(match self {
+            AggregatorDelta { delta } => {
+                DelayedFieldValue::Aggregator(delta.apply_to(base_value.into_aggregator_value()?)?)
+            },
+            SnapshotDelta { delta, .. } => {
+                DelayedFieldValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
+            },
+            SnapshotDerived { formula, .. } => {
+                DelayedFieldValue::Derived(formula.apply_to(base_value.into_snapshot_value()?))
+            },
+        })
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{bounded_math::SignedU128, delta_math::DeltaHistory, types::DelayedFieldID};
+    use crate::{bounded_math::SignedU128, types::DelayedFieldID};
     use claims::{assert_err, assert_ok};
     use DelayedApplyChange::*;
     use DelayedChange::*;
@@ -173,20 +264,10 @@ mod test {
         let aggregator_change1: DelayedChange<DelayedFieldID> = Create(Aggregator(20));
 
         let aggregator_change2 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
-                max_achieved_positive_delta: 50,
-                min_achieved_negative_delta: 5,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(10), 100),
         });
         let aggregator_change3 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
-                max_achieved_positive_delta: 50,
-                min_achieved_negative_delta: 35,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(10), 100),
         });
 
         let result =
@@ -195,10 +276,10 @@ mod test {
         let merged = result.unwrap();
 
         assert_eq!(merged, Create(Aggregator(30)));
-        assert_err!(DelayedChange::merge_two_changes(
-            Some(&merged),
-            &aggregator_change3
-        ));
+        assert_eq!(
+            DelayedChange::merge_two_changes(Some(&merged), &aggregator_change3).unwrap(),
+            Create(Aggregator(40))
+        );
     }
 
     #[test]
@@ -220,20 +301,10 @@ mod test {
     #[test]
     fn test_merge_delta_into_delta() {
         let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(10), 100, DeltaHistory {
-                max_achieved_positive_delta: 30,
-                min_achieved_negative_delta: 15,
-                min_overflow_positive_delta: Some(90),
-                max_underflow_negative_delta: Some(25),
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(10), 100),
         });
         let aggregator_change2 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(20), 100, DeltaHistory {
-                max_achieved_positive_delta: 25,
-                min_achieved_negative_delta: 20,
-                min_overflow_positive_delta: Some(95),
-                max_underflow_negative_delta: Some(45),
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(20), 100),
         });
 
         let result =
@@ -243,12 +314,7 @@ mod test {
         assert_eq!(
             result.unwrap(),
             Apply(AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Positive(30), 100, DeltaHistory {
-                    max_achieved_positive_delta: 35,
-                    min_achieved_negative_delta: 15,
-                    min_overflow_positive_delta: Some(90),
-                    max_underflow_negative_delta: Some(25),
-                },)
+                delta: DeltaWithMax::new(SignedU128::Positive(30), 100)
             })
         );
     }
@@ -256,20 +322,10 @@ mod test {
     #[test]
     fn test_merge_delta_into_delta2() {
         let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Negative(40), 100, DeltaHistory {
-                max_achieved_positive_delta: 20,
-                min_achieved_negative_delta: 59,
-                min_overflow_positive_delta: Some(40),
-                max_underflow_negative_delta: Some(80),
-            }),
+            delta: DeltaWithMax::new(SignedU128::Negative(40), 100),
         });
         let aggregator_change2 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Negative(20), 100, DeltaHistory {
-                max_achieved_positive_delta: 35,
-                min_achieved_negative_delta: 20,
-                min_overflow_positive_delta: Some(85),
-                max_underflow_negative_delta: Some(75),
-            }),
+            delta: DeltaWithMax::new(SignedU128::Negative(20), 100),
         });
 
         let result_1 =
@@ -280,21 +336,11 @@ mod test {
         assert_eq!(
             merged_1,
             Apply(AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Negative(60), 100, DeltaHistory {
-                    max_achieved_positive_delta: 20,
-                    min_achieved_negative_delta: 60,
-                    min_overflow_positive_delta: Some(40),
-                    max_underflow_negative_delta: Some(80),
-                },)
+                delta: DeltaWithMax::new(SignedU128::Negative(60), 100)
             })
         );
         let aggregator_change3 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
-                max_achieved_positive_delta: 5,
-                min_achieved_negative_delta: 5,
-                min_overflow_positive_delta: Some(91),
-                max_underflow_negative_delta: Some(95),
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(5), 100),
         });
 
         let result_2 = DelayedChange::merge_two_changes(Some(&merged_1), &aggregator_change3);
@@ -303,12 +349,7 @@ mod test {
         assert_eq!(
             result_2.unwrap(),
             Apply(AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Negative(55), 100, DeltaHistory {
-                    max_achieved_positive_delta: 20,
-                    min_achieved_negative_delta: 65,
-                    min_overflow_positive_delta: Some(31),
-                    max_underflow_negative_delta: Some(80),
-                },)
+                delta: DeltaWithMax::new(SignedU128::Negative(55), 100)
             })
         );
     }
@@ -316,20 +357,10 @@ mod test {
     #[test]
     fn test_merge_delta_into_delta3() {
         let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(20), 100, DeltaHistory {
-                max_achieved_positive_delta: 20,
-                min_achieved_negative_delta: 60,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(20), 100),
         });
         let aggregator_change2 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Negative(5), 100, DeltaHistory {
-                max_achieved_positive_delta: 10,
-                min_achieved_negative_delta: 5,
-                min_overflow_positive_delta: Some(95),
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Negative(5), 100),
         });
         let result =
             DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
@@ -338,12 +369,7 @@ mod test {
         assert_eq!(
             result.unwrap(),
             Apply(AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Positive(15), 100, DeltaHistory {
-                    max_achieved_positive_delta: 30,
-                    min_achieved_negative_delta: 60,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },)
+                delta: DeltaWithMax::new(SignedU128::Positive(15), 100)
             })
         );
     }
@@ -351,20 +377,10 @@ mod test {
     #[test]
     fn test_merge_delta_into_delta4() {
         let aggregator_change1: DelayedChange<DelayedFieldID> = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Negative(20), 100, DeltaHistory {
-                max_achieved_positive_delta: 20,
-                min_achieved_negative_delta: 60,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Negative(20), 100),
         });
         let aggregator_change2 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
-                max_achieved_positive_delta: 10,
-                min_achieved_negative_delta: 5,
-                min_overflow_positive_delta: None,
-                max_underflow_negative_delta: Some(90),
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(5), 100),
         });
         let result =
             DelayedChange::merge_two_changes(Some(&aggregator_change1), &aggregator_change2);
@@ -373,12 +389,7 @@ mod test {
         assert_eq!(
             result.unwrap(),
             Apply(AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Negative(15), 100, DeltaHistory {
-                    max_achieved_positive_delta: 20,
-                    min_achieved_negative_delta: 60,
-                    min_overflow_positive_delta: None,
-                    max_underflow_negative_delta: None,
-                },)
+                delta: DeltaWithMax::new(SignedU128::Negative(15), 100)
             })
         );
     }
@@ -386,21 +397,11 @@ mod test {
     #[test]
     fn test_merge_two_changes_with_dependent_change() {
         let aggregator_change1 = Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(3), 100, DeltaHistory {
-                max_achieved_positive_delta: 3,
-                min_achieved_negative_delta: 0,
-                min_overflow_positive_delta: Some(10),
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(3), 100),
         });
         let snapshot_change_2 = Apply(SnapshotDelta {
             base_aggregator: DelayedFieldID::new(1),
-            delta: DeltaOp::new(SignedU128::Positive(2), 100, DeltaHistory {
-                max_achieved_positive_delta: 6,
-                min_achieved_negative_delta: 0,
-                min_overflow_positive_delta: Some(8),
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(2), 100),
         });
 
         let result =
@@ -411,12 +412,7 @@ mod test {
             result.unwrap(),
             Apply(SnapshotDelta {
                 base_aggregator: DelayedFieldID::new(1),
-                delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
-                    max_achieved_positive_delta: 9,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: Some(10),
-                    max_underflow_negative_delta: None,
-                },)
+                delta: DeltaWithMax::new(SignedU128::Positive(5), 100)
             })
         );
     }

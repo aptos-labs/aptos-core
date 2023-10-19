@@ -11,8 +11,7 @@ use crate::{
 use aptos_aggregator::{
     bounded_math::SignedU128,
     delayed_change::{DelayedApplyChange, DelayedChange},
-    delta_change_set::DeltaOp,
-    delta_math::DeltaHistory,
+    delta_change_set::DeltaWithMax,
     types::{DelayedFieldID, SnapshotToStringFormula},
 };
 use aptos_types::{
@@ -443,12 +442,7 @@ fn test_aggregator_v2_snapshots_and_derived() {
     let agg_changes_1 = vec![(
         DelayedFieldID::new(1),
         Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(3), 100, DeltaHistory {
-                max_achieved_positive_delta: 3,
-                min_achieved_negative_delta: 0,
-                min_overflow_positive_delta: Some(10),
-                max_underflow_negative_delta: None,
-            }),
+            delta: DeltaWithMax::new(SignedU128::Positive(3), 100),
         }),
     )];
     let mut change_set_1 = build_change_set(vec![], vec![], vec![], vec![], vec![], agg_changes_1);
@@ -457,24 +451,14 @@ fn test_aggregator_v2_snapshots_and_derived() {
         (
             DelayedFieldID::new(1),
             Apply(AggregatorDelta {
-                delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
-                    max_achieved_positive_delta: 5,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: Some(6),
-                    max_underflow_negative_delta: None,
-                }),
+                delta: DeltaWithMax::new(SignedU128::Positive(5), 100),
             }),
         ),
         (
             DelayedFieldID::new(2),
             Apply(SnapshotDelta {
                 base_aggregator: DelayedFieldID::new(1),
-                delta: DeltaOp::new(SignedU128::Positive(2), 100, DeltaHistory {
-                    max_achieved_positive_delta: 6,
-                    min_achieved_negative_delta: 0,
-                    min_overflow_positive_delta: Some(8),
-                    max_underflow_negative_delta: None,
-                }),
+                delta: DeltaWithMax::new(SignedU128::Positive(2), 100),
             }),
         ),
         (
@@ -497,24 +481,14 @@ fn test_aggregator_v2_snapshots_and_derived() {
     assert_some_eq!(
         output_map.get(&DelayedFieldID::new(1)),
         &Apply(AggregatorDelta {
-            delta: DeltaOp::new(SignedU128::Positive(8), 100, DeltaHistory {
-                max_achieved_positive_delta: 8,
-                min_achieved_negative_delta: 0,
-                min_overflow_positive_delta: Some(9),
-                max_underflow_negative_delta: None,
-            })
+            delta: DeltaWithMax::new(SignedU128::Positive(8), 100)
         })
     );
     assert_some_eq!(
         output_map.get(&DelayedFieldID::new(2)),
         &Apply(SnapshotDelta {
             base_aggregator: DelayedFieldID::new(1),
-            delta: DeltaOp::new(SignedU128::Positive(5), 100, DeltaHistory {
-                max_achieved_positive_delta: 9,
-                min_achieved_negative_delta: 0,
-                min_overflow_positive_delta: Some(10),
-                max_underflow_negative_delta: None,
-            })
+            delta: DeltaWithMax::new(SignedU128::Positive(5), 100)
         })
     );
     assert_some_eq!(

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod aggregator_v1_extension;
 pub mod bounded_math;
 pub mod delayed_change;
 pub mod delayed_field_extension;

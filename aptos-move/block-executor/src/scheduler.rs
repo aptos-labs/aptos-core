@@ -226,6 +226,10 @@ impl ValidationStatus {
     }
 }
 
+pub trait TWaitForDependency {
+    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_txn_idx: TxnIndex) -> DependencyResult;
+}
+
 pub struct Scheduler {
     /// Number of txns to execute, immutable.
     num_txns: TxnIndex,
@@ -444,59 +448,6 @@ impl Scheduler {
         }
     }
 
-    /// When a txn depends on another txn, adds it to the dependency list of the other txn.
-    /// Returns true if successful, or false, if the dependency got resolved in the meantime.
-    /// If true is returned, Scheduler guarantees that later (dep_txn_idx will finish execution)
-    /// transaction txn_idx will be resumed, and corresponding execution task created.
-    /// If false is returned, it is caller's responsibility to repeat the read that caused the
-    /// dependency and continue the ongoing execution of txn_idx.
-    pub fn wait_for_dependency(
-        &self,
-        txn_idx: TxnIndex,
-        dep_txn_idx: TxnIndex,
-    ) -> DependencyResult {
-        // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
-        // usually has just observed the read dependency.
-
-        // Create a condition variable associated with the dependency.
-        let dep_condvar = Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
-
-        let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
-
-        // Note: is_executed & suspend calls acquire (a different, status) mutex, while holding
-        // (dependency) mutex. This is the only place in scheduler where a thread may hold > 1
-        // mutexes. Thus, acquisitions always happen in the same order (here), may not deadlock.
-
-        if self.is_executed(dep_txn_idx, true).is_some() {
-            // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
-            // To avoid zombie dependency (and losing liveness), must return here and
-            // not add a (stale) dependency.
-
-            // Note: acquires (a different, status) mutex, while holding (dependency) mutex.
-            // Only place in scheduler where a thread may hold >1 mutexes, hence, such
-            // acquisitions always happens in the same order (this function), may not deadlock.
-            return DependencyResult::Resolved;
-        }
-
-        // If the execution is already halted, suspend will return false.
-        // The synchronization is guaranteed by the Mutex around txn_status.
-        // If the execution is halted, the first finishing thread will first set the status of each txn
-        // to be ExecutionHalted, then notify the conditional variable. So if a thread sees ExecutionHalted,
-        // it knows the execution is halted and it can return; otherwise, the finishing thread will notify
-        // the conditional variable later and awake the pending thread.
-        if !self.suspend(txn_idx, dep_condvar.clone()) {
-            return DependencyResult::ExecutionHalted;
-        }
-
-        // Safe to add dependency here (still holding the lock) - finish_execution of txn
-        // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
-        stored_deps.push(txn_idx);
-
-        // Stored deps gets unlocked here.
-
-        DependencyResult::Dependency(dep_condvar)
-    }
-
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
         validation_status.maybe_max_validated_wave = Some(
@@ -647,6 +598,57 @@ impl Scheduler {
             return true;
         }
         false
+    }
+}
+
+impl TWaitForDependency for Scheduler {
+    /// When a txn depends on another txn, adds it to the dependency list of the other txn.
+    /// Returns true if successful, or false, if the dependency got resolved in the meantime.
+    /// If true is returned, Scheduler guarantees that later (dep_txn_idx will finish execution)
+    /// transaction txn_idx will be resumed, and corresponding execution task created.
+    /// If false is returned, it is caller's responsibility to repeat the read that caused the
+    /// dependency and continue the ongoing execution of txn_idx.
+    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_txn_idx: TxnIndex) -> DependencyResult {
+        // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
+        // usually has just observed the read dependency.
+
+        // Create a condition variable associated with the dependency.
+        let dep_condvar = Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
+
+        let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
+
+        // Note: is_executed & suspend calls acquire (a different, status) mutex, while holding
+        // (dependency) mutex. This is the only place in scheduler where a thread may hold > 1
+        // mutexes. Thus, acquisitions always happen in the same order (here), may not deadlock.
+
+        if self.is_executed(dep_txn_idx, true).is_some() {
+            // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
+            // To avoid zombie dependency (and losing liveness), must return here and
+            // not add a (stale) dependency.
+
+            // Note: acquires (a different, status) mutex, while holding (dependency) mutex.
+            // Only place in scheduler where a thread may hold >1 mutexes, hence, such
+            // acquisitions always happens in the same order (this function), may not deadlock.
+            return DependencyResult::Resolved;
+        }
+
+        // If the execution is already halted, suspend will return false.
+        // The synchronization is guaranteed by the Mutex around txn_status.
+        // If the execution is halted, the first finishing thread will first set the status of each txn
+        // to be ExecutionHalted, then notify the conditional variable. So if a thread sees ExecutionHalted,
+        // it knows the execution is halted and it can return; otherwise, the finishing thread will notify
+        // the conditional variable later and awake the pending thread.
+        if !self.suspend(txn_idx, dep_condvar.clone()) {
+            return DependencyResult::ExecutionHalted;
+        }
+
+        // Safe to add dependency here (still holding the lock) - finish_execution of txn
+        // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
+        stored_deps.push(txn_idx);
+
+        // Stored deps gets unlocked here.
+
+        DependencyResult::Dependency(dep_condvar)
     }
 }
 

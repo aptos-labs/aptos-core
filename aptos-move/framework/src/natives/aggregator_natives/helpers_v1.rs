@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{delayed_field_extension::extension_error, types::AggregatorVersionedID};
+use aptos_aggregator::aggregator_v1_extension::{extension_error, AggregatorID};
 use aptos_types::{account_address::AccountAddress, state_store::table::TableHandle};
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::values::{Reference, Struct, StructRef, Value};
@@ -50,14 +50,12 @@ pub(crate) fn set_aggregator_field(
 }
 
 /// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
-pub(crate) fn aggregator_info(
-    aggregator: &StructRef,
-) -> PartialVMResult<(AggregatorVersionedID, u128)> {
+pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
     let handle =
         get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
     let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<AccountAddress>()?;
     let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
-    Ok((AggregatorVersionedID::v1(TableHandle(handle), key), limit))
+    Ok((AggregatorID::new(TableHandle(handle), key), limit))
 }
 
 /// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `limit`).
