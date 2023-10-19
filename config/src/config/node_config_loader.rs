@@ -78,6 +78,11 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
         let input_dir = RootPath::new(&self.node_config_path);
         node_config.execution.load_from_path(&input_dir)?;
 
+        // Ensure the correct fields are set
+        if let Some(mut network_config) = &mut node_config.validator_network {
+            network_config.mutual_authentication = true;
+        }
+
         // Optimize and sanitize the node config
         let local_config_yaml = get_local_config_yaml(&self.node_config_path)?;
         optimize_and_sanitize_node_config(&mut node_config, local_config_yaml)?;

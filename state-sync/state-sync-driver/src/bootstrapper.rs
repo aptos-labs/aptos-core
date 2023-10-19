@@ -833,12 +833,11 @@ impl<
 
         // Compare the highest local epoch end to the highest advertised epoch end
         if highest_local_epoch_end > highest_advertised_epoch_end {
-            let error_message =
-                format!(
-                    "The highest local epoch end is higher than the advertised epoch end! Local: {:?}, advertised: {:?}",
-                    highest_local_epoch_end, highest_advertised_epoch_end
-                );
-            return Err(Error::AdvertisedDataError(error_message));
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(
+                "No new epoch ending ledger infos to fetch! This node is in a higher epoch!"
+            ));
+            self.verified_epoch_states
+                .set_fetched_epoch_ending_ledger_infos();
         } else if highest_local_epoch_end < highest_advertised_epoch_end {
             info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
                 "Found higher epoch ending ledger infos in the network! Local: {:?}, advertised: {:?}",
