@@ -25,7 +25,7 @@ use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
+    collections::{hash_map::DefaultHasher, BTreeSet, HashMap, BTreeMap},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -571,7 +571,7 @@ where
 {
     type Txn = MockTransaction<K, V, E>;
 
-    fn resource_write_set(&self) -> HashMap<K, V> {
+    fn resource_write_set(&self) -> BTreeMap<K, V> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
@@ -579,7 +579,7 @@ where
             .collect()
     }
 
-    fn module_write_set(&self) -> HashMap<K, V> {
+    fn module_write_set(&self) -> BTreeMap<K, V> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_some())
@@ -589,11 +589,11 @@ where
 
     // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
     // for all keys including ones for v1_aggregators without distinguishing).
-    fn aggregator_v1_write_set(&self) -> HashMap<K, V> {
-        HashMap::new()
+    fn aggregator_v1_write_set(&self) -> BTreeMap<K, V> {
+        BTreeMap::new()
     }
 
-    fn aggregator_v1_delta_set(&self) -> HashMap<K, DeltaOp> {
+    fn aggregator_v1_delta_set(&self) -> BTreeMap<K, DeltaOp> {
         self.deltas.iter().cloned().collect()
     }
 
