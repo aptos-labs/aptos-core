@@ -34,7 +34,6 @@ operation that also reduced parallelism, and should be avoided as much as possib
 -  [Function `test_aggregator_valid_type`](#0x1_aggregator_v2_test_aggregator_valid_type)
 -  [Specification](#@Specification_1)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
-    -  [Function `create_unbounded_aggregator`](#@Specification_1_create_unbounded_aggregator)
     -  [Function `try_add`](#@Specification_1_try_add)
     -  [Function `try_sub`](#@Specification_1_try_sub)
     -  [Function `read`](#@Specification_1_read)
@@ -554,22 +553,6 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(max_value: IntElement): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
-</code></pre>
-
-
-
-<a name="@Specification_1_create_unbounded_aggregator"></a>
-
-### Function `create_unbounded_aggregator`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;IntElement: <b>copy</b>, drop&gt;(): <a href="aggregator_v2.md#0x1_aggregator_v2_Aggregator">aggregator_v2::Aggregator</a>&lt;IntElement&gt;
 </code></pre>
 
 
