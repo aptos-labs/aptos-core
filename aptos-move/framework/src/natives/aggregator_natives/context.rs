@@ -7,7 +7,7 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delayed_field_extension::DelayedFieldData,
     delta_change_set::DeltaOp,
-    resolver::DelayedFieldResolver,
+    resolver::{AggregatorV1Resolver, DelayedFieldResolver},
     types::DelayedFieldID,
 };
 use aptos_types::state_store::state_key::StateKey;
@@ -39,19 +39,25 @@ pub struct AggregatorChangeSet {
 #[derive(Tid)]
 pub struct NativeAggregatorContext<'a> {
     txn_hash: [u8; 32],
-    pub(crate) resolver: &'a dyn DelayedFieldResolver,
-    pub(crate) aggregator_data: RefCell<AggregatorData>,
+    pub(crate) aggregator_v1_resolver: &'a dyn AggregatorV1Resolver,
+    pub(crate) aggregator_v1_data: RefCell<AggregatorData>,
+    pub(crate) delayed_field_resolver: &'a dyn DelayedFieldResolver,
     pub(crate) delayed_field_data: RefCell<DelayedFieldData>,
 }
 
 impl<'a> NativeAggregatorContext<'a> {
     /// Creates a new instance of a native aggregator context. This must be
     /// passed into VM session.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn DelayedFieldResolver) -> Self {
+    pub fn new(
+        txn_hash: [u8; 32],
+        aggregator_v1_resolver: &'a dyn AggregatorV1Resolver,
+        delayed_field_resolver: &'a dyn DelayedFieldResolver,
+    ) -> Self {
         Self {
             txn_hash,
-            resolver,
-            aggregator_data: Default::default(),
+            aggregator_v1_resolver,
+            aggregator_v1_data: Default::default(),
+            delayed_field_resolver,
             delayed_field_data: Default::default(),
         }
     }
@@ -65,11 +71,11 @@ impl<'a> NativeAggregatorContext<'a> {
     /// transaction).
     pub fn into_change_set(self) -> AggregatorChangeSet {
         let NativeAggregatorContext {
-            aggregator_data,
+            aggregator_v1_data,
             delayed_field_data,
             ..
         } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_data.into_inner().into();
+        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
 
         let mut aggregator_v1_changes = HashMap::new();
 
@@ -145,7 +151,7 @@ mod test {
     //     |  800  |               |           |     |   yes   |
     //     +-------+---------------+-----------+-----+---------+
     fn test_set_up_v1(context: &NativeAggregatorContext) {
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = context.aggregator_v1_data.borrow_mut();
 
         aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(100), 100);
         aggregator_data.create_new_aggregator(aggregator_v1_id_for_test(200), 200);
@@ -176,7 +182,7 @@ mod test {
     #[test]
     fn test_v1_into_change_set() {
         let resolver = get_test_resolver_v1();
-        let context = NativeAggregatorContext::new([0; 32], &resolver);
+        let context = NativeAggregatorContext::new([0; 32], &resolver, &resolver);
         test_set_up_v1(&context);
 
         let AggregatorChangeSet {
@@ -264,7 +270,7 @@ mod test {
                 DelayedFieldID::new(900),
                 900,
                 SignedU128::Positive(200),
-                context.resolver
+                context.delayed_field_resolver
             ),
             true
         );
@@ -274,18 +280,26 @@ mod test {
                 DelayedFieldID::new(900),
                 900,
                 SignedU128::Negative(501),
-                context.resolver
+                context.delayed_field_resolver
             ),
             false
         );
 
         // failed because of wrong max_value
         assert!(delayed_field_data
-            .snapshot(DelayedFieldID::new(900), 800, context.resolver)
+            .snapshot(
+                DelayedFieldID::new(900),
+                800,
+                context.delayed_field_resolver
+            )
             .is_err());
 
         assert_ok_eq!(
-            delayed_field_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
+            delayed_field_data.snapshot(
+                DelayedFieldID::new(900),
+                900,
+                context.delayed_field_resolver
+            ),
             DelayedFieldID::new(1)
         );
 
@@ -294,13 +308,17 @@ mod test {
                 DelayedFieldID::new(900),
                 900,
                 SignedU128::Positive(300),
-                context.resolver
+                context.delayed_field_resolver
             ),
             true
         );
 
         assert_ok_eq!(
-            delayed_field_data.snapshot(DelayedFieldID::new(900), 900, context.resolver),
+            delayed_field_data.snapshot(
+                DelayedFieldID::new(900),
+                900,
+                context.delayed_field_resolver
+            ),
             DelayedFieldID::new(2)
         );
 
@@ -309,7 +327,7 @@ mod test {
                 DelayedFieldID::new(900),
                 900,
                 SignedU128::Positive(100),
-                context.resolver
+                context.delayed_field_resolver
             ),
             true
         );
@@ -319,7 +337,7 @@ mod test {
                 DelayedFieldID::new(900),
                 900,
                 SignedU128::Positive(51),
-                context.resolver
+                context.delayed_field_resolver
             ),
             false
         );
@@ -330,13 +348,17 @@ mod test {
                 DelayedFieldID::new(2000),
                 2000,
                 SignedU128::Positive(500),
-                context.resolver
+                context.delayed_field_resolver
             ),
             true
         );
 
         assert_ok_eq!(
-            delayed_field_data.snapshot(DelayedFieldID::new(2000), 2000, context.resolver),
+            delayed_field_data.snapshot(
+                DelayedFieldID::new(2000),
+                2000,
+                context.delayed_field_resolver
+            ),
             DelayedFieldID::new(3)
         );
 
@@ -345,7 +367,7 @@ mod test {
                 DelayedFieldID::new(2200),
                 "prefix".as_bytes().to_vec(),
                 "suffix".as_bytes().to_vec(),
-                context.resolver,
+                context.delayed_field_resolver,
             ),
             DelayedFieldID::new(4)
         );
@@ -355,7 +377,7 @@ mod test {
                 DelayedFieldID::new(2000),
                 2000,
                 SignedU128::Positive(1700),
-                context.resolver
+                context.delayed_field_resolver
             ),
             false
         );
@@ -364,7 +386,7 @@ mod test {
                 DelayedFieldID::new(2000),
                 2000,
                 SignedU128::Positive(501),
-                context.resolver
+                context.delayed_field_resolver
             ),
             false
         );
@@ -373,7 +395,7 @@ mod test {
     #[test]
     fn test_v2_into_change_set() {
         let resolver = get_test_resolver_v2();
-        let context = NativeAggregatorContext::new([0; 32], &resolver);
+        let context = NativeAggregatorContext::new([0; 32], &resolver, &resolver);
         test_set_up_v2(&context);
         let AggregatorChangeSet {
             delayed_field_changes,

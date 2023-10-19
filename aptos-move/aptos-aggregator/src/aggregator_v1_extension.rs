@@ -4,7 +4,7 @@
 use crate::{
     bounded_math::{BoundedMath, BoundedMathError, SignedU128},
     delta_math::DeltaHistory,
-    resolver::DelayedFieldResolver,
+    resolver::AggregatorV1Resolver,
     types::{expect_ok, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
 };
 use aptos_types::{
@@ -219,7 +219,7 @@ impl Aggregator {
     /// `Data`).
     pub fn read_and_materialize(
         &mut self,
-        resolver: &dyn DelayedFieldResolver,
+        resolver: &dyn AggregatorV1Resolver,
         id: &AggregatorID,
     ) -> PartialVMResult<u128> {
         // If aggregator has already been read, return immediately.

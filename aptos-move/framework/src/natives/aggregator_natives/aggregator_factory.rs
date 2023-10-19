@@ -39,7 +39,7 @@ fn native_new_aggregator(
 
     // Get the current aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
 
     // Every aggregator instance uses a unique key in its id. Here we can reuse
     // the strategy from `table` implementation: taking hash of transaction and

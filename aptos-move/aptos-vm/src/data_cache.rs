@@ -14,7 +14,7 @@ use crate::{
 use anyhow::{bail, Error};
 use aptos_aggregator::{
     bounded_math::SignedU128,
-    resolver::TDelayedFieldView,
+    resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_state_view::{StateView, StateViewId};
@@ -263,27 +263,34 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
     }
 }
 
-impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = DelayedFieldID;
+impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::IdentifierV1,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id)
+    }
+}
+
+impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        self.executor_view.is_delayed_field_optimization_capable()
     }
 
     fn get_delayed_field_value(
         &self,
-        id: &Self::IdentifierV2,
+        id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         self.executor_view.get_delayed_field_value(id)
     }
 
     fn delayed_field_try_add_delta_outcome(
         &self,
-        id: &Self::IdentifierV2,
+        id: &Self::Identifier,
         base_delta: &SignedU128,
         delta: &SignedU128,
         max_value: u128,
@@ -292,7 +299,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
             .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
     }
 
-    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.executor_view.generate_delayed_field_id()
     }
 }

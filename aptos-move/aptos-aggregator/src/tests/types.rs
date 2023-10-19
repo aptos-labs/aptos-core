@@ -5,7 +5,7 @@ use crate::{
     aggregator_v1_extension::AggregatorID,
     bounded_math::{BoundedMath, SignedU128},
     delta_change_set::serialize,
-    resolver::TDelayedFieldView,
+    resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{expect_ok, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
@@ -49,20 +49,27 @@ impl FakeAggregatorView {
     }
 }
 
-impl TDelayedFieldView for FakeAggregatorView {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = DelayedFieldID;
+impl TAggregatorV1View for FakeAggregatorView {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        state_key: &Self::IdentifierV1,
+        state_key: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(self.v1_store.get(state_key).cloned())
+    }
+}
+
+impl TDelayedFieldView for FakeAggregatorView {
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        true
     }
 
     fn get_delayed_field_value(
         &self,
-        id: &Self::IdentifierV2,
+        id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         self.v2_store
             .get(id)
@@ -72,7 +79,7 @@ impl TDelayedFieldView for FakeAggregatorView {
 
     fn delayed_field_try_add_delta_outcome(
         &self,
-        id: &Self::IdentifierV2,
+        id: &Self::Identifier,
         base_delta: &SignedU128,
         delta: &SignedU128,
         max_value: u128,
@@ -83,9 +90,9 @@ impl TDelayedFieldView for FakeAggregatorView {
         Ok(math.unsigned_add_delta(base, delta).is_ok())
     }
 
-    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
         let mut counter = self.counter.borrow_mut();
-        let id = Self::IdentifierV2::new(*counter as u64);
+        let id = Self::Identifier::new(*counter as u64);
         *counter += 1;
         id
     }
