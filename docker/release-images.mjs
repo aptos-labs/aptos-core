@@ -35,18 +35,12 @@ const Features = {
 const IMAGES_TO_RELEASE_ONLY_INTERNAL = ["validator-testing"];
 const IMAGES_TO_RELEASE = {
   validator: {
-    performance: [
-      Features.Default,
-    ],
     release: [
       Features.Default,
       Features.Indexer,
     ],
   },
   "validator-testing": {
-    performance: [
-      Features.Default,
-    ],
     release: [
       Features.Default,
       Features.Indexer,
