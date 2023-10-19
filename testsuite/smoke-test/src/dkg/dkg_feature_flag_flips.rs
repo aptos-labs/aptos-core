@@ -36,7 +36,7 @@ async fn dkg_feature_flag_flips() {
     swarm.wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 3));
 
     println!("DKG should be disabled since the beginning and in epoch 3.");
-    assert(get_latest_dkg_state(&client).await.last_complete.is_none());
+    assert!(get_latest_dkg_state(&client).await.last_complete.is_none());
 
     println!("Enabling the feature.");
     let enable_dkg_script = format!(r#"
@@ -81,5 +81,5 @@ script {{
     swarm.wait_for_all_nodes_to_catchup_to_epoch(7, Duration::from_secs(epoch_duration_secs * 2));
 
     println!("DKG should be disabled again at this point.");
-    assert(get_latest_dkg_state(&client).await.last_complete.is_none());
+    assert!(get_latest_dkg_state(&client).await.last_complete.is_none());
 }
