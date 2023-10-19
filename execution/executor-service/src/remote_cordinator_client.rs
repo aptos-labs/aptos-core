@@ -15,6 +15,7 @@ use aptos_vm::sharded_block_executor::{
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
+use aptos_logger::{info, log};
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -80,6 +81,7 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command(&self) -> ExecutorShardCommand<RemoteStateViewClient> {
         match self.command_rx.recv() {
             Ok(message) => {
+                info!("&&&&&& Received command_rx from coordinator");
                 let _rx_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
                     .start_timer();

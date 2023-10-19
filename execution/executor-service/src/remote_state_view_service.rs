@@ -9,8 +9,8 @@ use std::{
 };
 
 extern crate itertools;
-use crate::metrics::REMOTE_EXECUTOR_TIMER;
-use aptos_logger::trace;
+use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_REQ_PROCESSING_SECONDS, REMOTE_EXECUTOR_TIMER};
+use aptos_logger::{info, log, trace};
 use aptos_state_view::{StateView, TStateView};
 use itertools::Itertools;
 
@@ -34,6 +34,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .build()
                 .unwrap(),
         );
+        info!("KV resp thread pool is created with {}", num_threads);
         let kv_request_type = "remote_kv_request";
         let kv_response_type = "remote_kv_response";
         let result_rx = controller.create_inbound_channel(kv_request_type.to_string());
@@ -62,6 +63,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     }
 
     pub fn start(&self) {
+        info!("Num threads in KV resp thread pool is {}", self.thread_pool.current_num_threads());
         while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();
             let kv_txs = self.kv_tx.clone();
@@ -77,13 +79,16 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         kv_tx: Arc<Vec<Sender<Message>>>,
     ) {
         // we don't know the shard id until we deserialize the message, so lets default it to 0
-        let _timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&["0", "kv_requests"])
-            .start_timer();
+        let start_time = std::time::Instant::now();
+        //let _timer = REMOTE_EXECUTOR_TIMER
+          //  .with_label_values(&["0", "kv_requests"])
+            //.start_timer();
+        let _timer = REMOTE_EXECUTOR_REMOTE_KV_REQ_PROCESSING_SECONDS.start_timer();
         let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_req_deser"])
             .start_timer();
         let req: RemoteKVRequest = bcs::from_bytes(&message.data).unwrap();
+        let req_deser_time = start_time.elapsed();
         drop(bcs_deser_timer);
 
         let (shard_id, state_keys) = req.into();
@@ -110,7 +115,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_resp_ser"])
             .start_timer();
+        let resp_prep_time = start_time.elapsed() - req_deser_time;
         let resp = bcs::to_bytes(&resp).unwrap();
+        let resp_ser_time = start_time.elapsed() - resp_prep_time;
         drop(bcs_ser_timer);
         trace!(
             "remote state view service - sending response for shard {} with {} keys",
@@ -119,5 +126,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         );
         let message = Message::new(resp);
         kv_tx[shard_id].send(message).unwrap();
+        info!(
+            "remote state view service - response for shard {} with {} keys - req deser time {:?} resp prep time {:?} resp ser time {:?} total time {:?}",
+            shard_id,
+            len,
+            req_deser_time,
+            resp_prep_time,
+            resp_ser_time,
+            start_time.elapsed());
     }
 }

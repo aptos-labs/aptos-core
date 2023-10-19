@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_metrics_core::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
-    IntCounterVec,
-};
+use aptos_metrics_core::{exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec, Histogram, register_histogram};
 use once_cell::sync::Lazy;
 
 pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
@@ -43,4 +40,11 @@ pub static REMOTE_EXECUTOR_REMOTE_KV_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         &["shard_id", "name"],
     )
     .unwrap()
+});
+
+pub static REMOTE_EXECUTOR_REMOTE_KV_REQ_PROCESSING_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "kv_req_processing_seconds",
+        "Time to process the remote key value requests on coordinator in seconds",
+    ).unwrap()
 });

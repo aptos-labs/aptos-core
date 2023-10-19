@@ -14,7 +14,7 @@ use std::{
 extern crate itertools;
 use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
 use anyhow::Result;
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_state_view::TStateView;
 use aptos_types::{
     block_executor::partitioner::ShardId,
@@ -173,9 +173,13 @@ impl RemoteStateViewClient {
         sender: Arc<Sender<Message>>,
         state_keys: Vec<StateKey>,
     ) {
+        let len = state_keys.len();
         let request = RemoteKVRequest::new(shard_id, state_keys);
         let request_message = bcs::to_bytes(&request).unwrap();
         sender.send(Message::new(request_message)).unwrap();
+        //if len > 1 {
+            info!("&&&&&&&&& Sent prefetch request for {} keys", len);
+        //}
     }
 }
 
@@ -247,12 +251,16 @@ impl RemoteStateValueReceiver {
         let _timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&[&shard_id.to_string(), "kv_responses"])
             .start_timer();
+        let mut deser_time_temp = 0.0;
         let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&[&shard_id.to_string(), "kv_resp_deser"])
             .start_timer();
         let response: RemoteKVResponse = bcs::from_bytes(&message.data).unwrap();
-        drop(bcs_deser_timer);
-
+        deser_time_temp = bcs_deser_timer.stop_and_record();
+        //drop(bcs_deser_timer);
+        //if response.inner.len() > 1 {
+            info!("&&&&&&&&& Received prefetch resp for {} keys; deser time {}", response.inner.len(), deser_time_temp);
+        //}
         REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&shard_id.to_string(), "kv_responses"])
             .inc();
