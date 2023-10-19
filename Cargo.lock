@@ -1147,6 +1147,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-drop-helper"
+version = "0.1.0"
+dependencies = [
+ "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-metrics-core",
+ "once_cell",
+]
+
+[[package]]
 name = "aptos-enum-conversion-derive"
 version = "0.0.3"
 dependencies = [
@@ -1209,6 +1219,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-db",
+ "aptos-drop-helper",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-experimental-runtimes",
