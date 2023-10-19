@@ -25,7 +25,7 @@ use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
-    collections::{hash_map::DefaultHasher, BTreeSet, HashMap},
+    collections::{hash_map::DefaultHasher, BTreeSet},
     convert::TryInto,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -555,6 +555,7 @@ where
 #[derive(Debug)]
 
 pub(crate) struct MockOutput<K, V, E> {
+    // TODO: Split writes into resources & modules.
     pub(crate) writes: Vec<(K, V)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
     pub(crate) events: Vec<E>,
@@ -571,30 +572,12 @@ where
 {
     type Txn = MockTransaction<K, V, E>;
 
-    fn resource_write_set(&self) -> HashMap<K, V> {
-        self.writes
-            .iter()
-            .filter(|(k, _)| k.module_path().is_none())
-            .cloned()
-            .collect()
+    fn get_writes(&self) -> Vec<(K, V)> {
+        self.writes.clone()
     }
 
-    fn module_write_set(&self) -> HashMap<K, V> {
-        self.writes
-            .iter()
-            .filter(|(k, _)| k.module_path().is_some())
-            .cloned()
-            .collect()
-    }
-
-    // Aggregator v1 writes are included in resource_write_set for tests (writes are produced
-    // for all keys including ones for v1_aggregators without distinguishing).
-    fn aggregator_v1_write_set(&self) -> HashMap<K, V> {
-        HashMap::new()
-    }
-
-    fn aggregator_v1_delta_set(&self) -> HashMap<K, DeltaOp> {
-        self.deltas.iter().cloned().collect()
+    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
+        self.deltas.clone()
     }
 
     fn get_events(&self) -> Vec<E> {

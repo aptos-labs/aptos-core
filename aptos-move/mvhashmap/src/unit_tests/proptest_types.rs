@@ -205,9 +205,8 @@ where
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.data()
-            .write(KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
-        map.data().mark_estimate(&KeyType(key), idx as TxnIndex);
+        map.write(KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
+        map.mark_estimate(&KeyType(key), idx as TxnIndex);
     }
 
     let current_idx = AtomicUsize::new(0);
@@ -284,11 +283,10 @@ where
                         }
                     },
                     Operator::Remove => {
-                        map.data()
-                            .write(KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
+                        map.write(KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
                     },
                     Operator::Insert(v) => {
-                        map.data().write(
+                        map.write(
                             KeyType(key.clone()),
                             (idx as TxnIndex, 1),
                             Value(Some(v.clone())),
