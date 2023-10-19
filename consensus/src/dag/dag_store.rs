@@ -9,7 +9,7 @@ use crate::dag::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -68,6 +68,12 @@ impl Dag {
         }
         if let Err(e) = storage.delete_certified_nodes(to_prune) {
             error!("Error deleting expired nodes: {:?}", e);
+        }
+        if dag.is_empty() {
+            warn!(
+                "[DAG] Start with empty DAG store at {}, need state sync",
+                dag.start_round
+            );
         }
         dag
     }
@@ -377,5 +383,9 @@ impl Dag {
             }
         }
         None
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes_by_round.is_empty() && self.start_round > 1
     }
 }

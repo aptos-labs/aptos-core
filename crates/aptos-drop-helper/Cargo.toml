@@ -1,6 +1,7 @@
 [package]
-name = "aptos-protos"
-version = "1.1.1"
+name = "aptos-drop-helper"
+description = "Aptos Drop Helper"
+version = "0.1.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -12,8 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-futures-core = { workspace = true }
-pbjson = { workspace = true }
-prost = { workspace = true }
-serde = { workspace = true }
-tonic = { workspace = true }
+aptos-experimental-runtimes = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-metrics-core = { workspace = true }
+once_cell = { workspace = true }
