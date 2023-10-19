@@ -793,7 +793,8 @@ impl MultiKeyAuthenticator {
         ensure!(
             (self.signatures_bitmap.last_set_bit().unwrap() as usize) < self.public_keys.len(),
             "Mismatch in the position of the last signature and the number of PKs, {} >= {}.",
-            self.signatures_bitmap.last_set_bit().unwrap(), self.public_keys.len(),
+            self.signatures_bitmap.last_set_bit().unwrap(),
+            self.public_keys.len(),
         );
         ensure!(
             self.signatures_bitmap.count_ones() as usize == self.signatures.len(),
@@ -839,7 +840,8 @@ impl MultiKey {
         ensure!(
             public_keys.len() >= signatures_required as usize,
             "The number of public keys is smaller than the number of required signatures, {} < {}",
-            public_keys.len(), signatures_required
+            public_keys.len(),
+            signatures_required
         );
 
         Ok(Self {
