@@ -630,7 +630,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         maybe_layout: Option<&MoveTypeLayout>,
         kind: ReadKind,
     ) -> anyhow::Result<ReadResult> {
-        println!("maybe_layout: {:?}", maybe_layout);
         debug_assert!(
             state_key.module_path().is_none(),
             "Reading a module {:?} using ResourceView",
@@ -1719,7 +1718,6 @@ mod test {
             identifiers.len() == 1,
             "One identifier should have been replaced in this case"
         );
-        println!("identifiers {:?}", identifiers);
         assert!(
             identifiers.contains(&DelayedFieldID::new(5)),
             "The value 25 should have been replaced in the identifier 5"
@@ -1760,7 +1758,6 @@ mod test {
             identifiers.len() == 3,
             "Three identifiers should have been replaced in this case"
         );
-        println!("identifiers {:?}", identifiers);
         assert!(
             counter == RefCell::new(9),
             "The counter should have been updated to 9"
