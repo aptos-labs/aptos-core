@@ -20,7 +20,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag},
     vm_status::{StatusCode, VMStatus},
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 /// Testcases:
 /// ```text
@@ -89,7 +89,7 @@ macro_rules! write_set_2 {
 
 macro_rules! expected_write_set {
     ($d:ident) => {
-        HashMap::from([
+        BTreeMap::from([
             mock_create(format!("0{}", $d), 0),
             mock_modify(format!("1{}", $d), 1),
             mock_delete(format!("2{}", $d)),
@@ -164,13 +164,13 @@ fn test_successful_squash() {
         &expected_write_set!(descriptor)
     );
 
-    let expected_aggregator_write_set = HashMap::from([
+    let expected_aggregator_write_set = BTreeMap::from([
         mock_create("18a", 136),
         mock_modify("19a", 138),
         mock_modify("22a", 122),
         mock_delete("23a"),
     ]);
-    let expected_aggregator_delta_set = HashMap::from([
+    let expected_aggregator_delta_set = BTreeMap::from([
         mock_add("15a", 15),
         mock_add("16a", 116),
         mock_add("17a", 134),
