@@ -88,9 +88,10 @@ impl Features {
     }
 
     pub fn is_storage_deletion_refund_enabled(&self) -> bool {
+        false
         // requires emit fee statement
-        self.is_emit_fee_statement_enabled()
-            && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
+        // self.is_emit_fee_statement_enabled()
+        //     && self.is_enabled(FeatureFlag::STORAGE_DELETION_REFUND)
     }
 
     pub fn is_aggregator_snapshots_enabled(&self) -> bool {

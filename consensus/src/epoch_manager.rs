@@ -47,7 +47,7 @@ use crate::{
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
-    transaction_shuffler::create_transaction_shuffler,
+    transaction_shuffler::{create_transaction_shuffler, NoOpShuffler, TransactionShuffler},
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, Context};
@@ -70,7 +70,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        OnChainExecutionConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -680,9 +680,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         };
 
         let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
-        let transaction_shuffler =
-            create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
-        let block_gas_limit = onchain_execution_config.block_gas_limit();
+        // let transaction_shuffler =
+        //     create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
+        let transaction_shuffler = Arc::new(NoOpShuffler {});
+        // let block_gas_limit = onchain_execution_config.block_gas_limit();
+        let block_gas_limit = None;
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         self.quorum_store_msg_tx = quorum_store_msg_tx;
