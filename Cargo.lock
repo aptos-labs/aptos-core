@@ -1971,7 +1971,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "google-cloud-storage",
- "itertools",
+ "itertools 0.10.5",
  "once_cell",
  "prometheus",
  "prost 0.12.1",
