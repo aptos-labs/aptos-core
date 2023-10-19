@@ -17,15 +17,15 @@ use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
 pub fn all_groups(c: &mut Criterion) {
-    let mut group = c.benchmark_group("das-pinkas-sk-in-g1-vuf");
+    let mut group = c.benchmark_group("das-pinkas-sk-in-g1");
     wvuf_benches::<das::Transcript, PinkasWUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("scrape-gjm21-naive-sk-in-g2-vuf");
+    let mut group = c.benchmark_group("scrape-gjm21-naive-sk-in-g2");
     wvuf_benches::<scrape::Transcript, gjm21_naive::g2::GjmNaiveWVUF, WallTime>(&mut group);
     group.finish();
 
-    let mut group = c.benchmark_group("scrape-gjm21-naive-sk-in-g1-vuf");
+    let mut group = c.benchmark_group("das-gjm21-naive-sk-in-g1");
     wvuf_benches::<das::Transcript, gjm21_naive::g1::GjmNaiveWVUF, WallTime>(&mut group);
     group.finish();
 }
@@ -49,6 +49,15 @@ pub fn wvuf_benches<
     for wc in get_weighted_configs_for_benchmarking() {
         let (pvss_pp, ssks, _spks, dks, eks, iss, _s, dsk) =
             setup_dealing::<WeightedTranscript<T>, ThreadRng>(&wc, &mut rng);
+
+        println!(
+            "Best-case subset size: {}",
+            wc.get_best_case_eligible_subset_of_players(&mut rng).len()
+        );
+        println!(
+            "Worst-case subset size: {}",
+            wc.get_worst_case_eligible_subset_of_players(&mut rng).len()
+        );
 
         println!("Dealing a {} PVSS transcript", T::scheme_name());
         let trx = WeightedTranscript::<T>::deal(
@@ -83,6 +92,7 @@ pub fn wvuf_benches<
             asks.push(ask);
             apks.push(apk);
         }
+        println!();
 
         bench_cases.push((wc, vuf_pp, dsk, sks, pks, asks, apks, deltas));
     }
@@ -105,9 +115,37 @@ pub fn wvuf_benches<
             &wc, &vuf_pp, &asks, &apks, group, &mut rng,
         );
 
-        // TODO: pick worst subset and best subset
-        wvuf_aggregate_random_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
-            &wc, &asks, &apks, group, &mut rng,
+        // best-case aggregation times (pick players with largest weights)
+        wvuf_aggregate_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+            &wc,
+            &asks,
+            &apks,
+            group,
+            &mut rng,
+            WeightedConfig::get_worst_case_eligible_subset_of_players,
+            "best_case".to_string(),
+        );
+
+        // average/random case aggregation time
+        wvuf_aggregate_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+            &wc,
+            &asks,
+            &apks,
+            group,
+            &mut rng,
+            WeightedConfig::get_random_eligible_subset_of_players,
+            "random".to_string(),
+        );
+
+        // worst-case aggregation times (pick players with smallest weights)
+        wvuf_aggregate_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+            &wc,
+            &asks,
+            &apks,
+            group,
+            &mut rng,
+            WeightedConfig::get_worst_case_eligible_subset_of_players,
+            "worst_case".to_string(),
         );
 
         wvuf_eval::<WeightedTranscript<T>, WVUF, M>(&wc, &sk, group);
@@ -138,7 +176,7 @@ fn wvuf_augment_random_keypair<
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
-    group.bench_function(format!("augment_keypair/{}", wc), move |b| {
+    group.bench_function(format!("augment_random_keypair/{}", wc), move |b| {
         b.iter_with_setup(
             || {
                 // Ugh, borrow checker...
@@ -170,7 +208,7 @@ fn wvuf_augment_random_pubkey<
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
-    group.bench_function(format!("augment_pubkey/{}", wc), move |b| {
+    group.bench_function(format!("augment_random_pubkey/{}", wc), move |b| {
         b.iter_with_setup(
             || {
                 // Ugh, borrow checker...
@@ -245,7 +283,7 @@ fn wvuf_verify_share<
     });
 }
 
-fn wvuf_aggregate_random_shares<
+fn wvuf_aggregate_shares<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
@@ -261,30 +299,35 @@ fn wvuf_aggregate_random_shares<
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    subset_type: String,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
-    group.bench_function(format!("aggregate_shares/{}", wc), move |b| {
-        b.iter_with_setup(
-            || {
-                let players = wc.get_random_eligible_subset_of_players(rng);
+    group.bench_function(
+        format!("aggregate_{}_shares/{}", subset_type, wc),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let players = pick_subset_fn(wc, rng);
 
-                players
-                    .iter()
-                    .map(|p| {
-                        (
-                            *p,
-                            apks[p.id].clone(),
-                            WVUF::create_share(&asks[p.id], BENCH_MSG),
-                        )
-                    })
-                    .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>()
-            },
-            |apks_and_proofs| {
-                WVUF::aggregate_shares(&wc, apks_and_proofs.as_slice());
-            },
-        )
-    });
+                    players
+                        .iter()
+                        .map(|p| {
+                            (
+                                *p,
+                                apks[p.id].clone(),
+                                WVUF::create_share(&asks[p.id], BENCH_MSG),
+                            )
+                        })
+                        .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>()
+                },
+                |apks_and_proofs| {
+                    WVUF::aggregate_shares(&wc, apks_and_proofs.as_slice());
+                },
+            )
+        },
+    );
 }
 
 fn wvuf_eval<

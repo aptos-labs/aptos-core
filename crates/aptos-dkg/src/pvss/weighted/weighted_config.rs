@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain};
+use crate::pvss::traits::SecretSharingConfig;
 use crate::pvss::{traits, Player, ThresholdConfig};
 use anyhow::anyhow;
 use more_asserts::assert_lt;
@@ -108,6 +109,55 @@ impl WeightedConfig {
 
     pub fn get_evaluation_domain(&self) -> &EvaluationDomain {
         &self.tc.get_evaluation_domain()
+    }
+
+    pub fn get_best_case_eligible_subset_of_players<R: RngCore + CryptoRng>(
+        &self,
+        _rng: &mut R,
+    ) -> Vec<Player> {
+        let mut player_and_weights = self.sort_players_by_weight();
+
+        self.pop_eligible_subset(&mut player_and_weights)
+    }
+
+    pub fn get_worst_case_eligible_subset_of_players<R: RngCore + CryptoRng>(
+        &self,
+        _rng: &mut R,
+    ) -> Vec<Player> {
+        let mut player_and_weights = self.sort_players_by_weight();
+
+        player_and_weights.reverse();
+
+        self.pop_eligible_subset(&mut player_and_weights)
+    }
+
+    fn sort_players_by_weight(&self) -> Vec<(usize, usize)> {
+        // the set of remaining players that we are picking a "capable" subset from
+        let mut player_and_weights = self
+            .weight
+            .iter()
+            .enumerate()
+            .map(|(i, w)| (i, *w))
+            .collect::<Vec<(usize, usize)>>();
+
+        player_and_weights.sort_by(|a, b| a.1.cmp(&b.1));
+        player_and_weights
+    }
+
+    fn pop_eligible_subset(&self, player_and_weights: &mut Vec<(usize, usize)>) -> Vec<Player> {
+        let mut picked_players = vec![];
+
+        let mut current_weight = 0;
+        while current_weight < self.tc.t {
+            let (player_idx, weight) = player_and_weights.pop().unwrap();
+
+            picked_players.push(self.get_player(player_idx));
+
+            // rinse and repeat until the picked players jointly have enough weight
+            current_weight += weight;
+        }
+
+        picked_players
     }
 }
 
