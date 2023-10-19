@@ -19,6 +19,7 @@ use aptos_aggregator::{
     types::{SnapshotToStringFormula, SnapshotValue},
     utils::{string_to_bytes, to_utf8_bytes, u128_to_u64},
 };
+use aptos_gas_algebra::NumBytes;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
@@ -204,8 +205,9 @@ macro_rules! abort_if_not_enabled {
 
 fn create_aggregator_impl(
     context: &mut SafeNativeContext,
+    ty_arg: &Type,
     max_value: u128,
-) {
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let value_field_value = if context.aggregator_v2_delayed_fields_enabled() {
         let (resolver, mut delayed_field_data) = get_context_data(context);
         let id = resolver.generate_delayed_field_id();
@@ -216,8 +218,8 @@ fn create_aggregator_impl(
     };
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        create_value_by_type(&ty_args[0], value_field_value)?,
-        create_value_by_type(&ty_args[0], max_value)?,
+        create_value_by_type(ty_arg, value_field_value)?,
+        create_value_by_type(ty_arg, max_value)?,
     ]))])
 }
 
@@ -238,9 +240,8 @@ fn native_create_aggregator(
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
     let max_value = pop_value_by_type(&ty_args[0], &mut args)?;
 
-    create_aggregator_impl(context, max_value)
+    create_aggregator_impl(context, &ty_args[0], max_value)
 }
-
 
 /***************************************************************************************************
  * native fun create_unbounded_aggregator<IntElement: copy + drop>(): Aggregator<IntElement>;
@@ -269,7 +270,7 @@ fn native_create_unbounded_aggregator(
         }
     };
 
-    create_aggregator_impl(context, max_value)
+    create_aggregator_impl(context, &ty_args[0], max_value)
 }
 
 /***************************************************************************************************
