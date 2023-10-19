@@ -5,7 +5,7 @@ use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
-    resolver::{DelayedFieldReadMode, DelayedFieldResolver},
+    resolver::DelayedFieldResolver,
     types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
@@ -364,7 +364,7 @@ impl VMChangeSet {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, DelayedFieldReadMode::Aggregated)?;
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
                 Ok((state_key, write))
             };
 
