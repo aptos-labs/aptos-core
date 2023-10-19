@@ -10,7 +10,7 @@ use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
-    resolver::TDelayedFieldView,
+    resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
         code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
         DelayedFieldsSpeculativeError, PanicOr,
@@ -140,13 +140,12 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = DelayedFieldID;
+impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::IdentifierV1,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
@@ -159,10 +158,19 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
             },
         }
     }
+}
+
+impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        self.base_executor_view
+            .is_delayed_field_optimization_capable()
+    }
 
     fn get_delayed_field_value(
         &self,
-        id: &Self::IdentifierV2,
+        id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         use DelayedChange::*;
 
@@ -194,7 +202,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
 
     fn delayed_field_try_add_delta_outcome(
         &self,
-        id: &Self::IdentifierV2,
+        id: &Self::Identifier,
         base_delta: &SignedU128,
         delta: &SignedU128,
         max_value: u128,
@@ -224,7 +232,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.base_executor_view.generate_delayed_field_id()
     }
 }

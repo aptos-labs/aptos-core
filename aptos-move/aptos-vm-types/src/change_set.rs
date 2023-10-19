@@ -5,7 +5,7 @@ use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
-    resolver::DelayedFieldResolver,
+    resolver::AggregatorV1Resolver,
     types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
@@ -218,6 +218,11 @@ impl VMChangeSet {
     }
 
     pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
+        // It is still invalid to convert VMChangeSet that was created in a mode
+        // that produces DelayedField or ResourceGroup write sets
+        assert!(self.delayed_field_change_set().is_empty());
+        assert!(self.resource_group_write_set().is_empty());
+
         let Self {
             resource_write_set,
             resource_group_write_set: _,
@@ -245,11 +250,19 @@ impl VMChangeSet {
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_v1_delta_set.is_empty() || !self.delayed_field_change_set.is_empty() {
+        if !self.aggregator_v1_delta_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
-                    "Cannot convert from VMChangeSet with non-materialized deltas to ChangeSet.",
+                    "Cannot convert from VMChangeSet with non-materialized Aggregator V1 deltas to ChangeSet.",
+                ),
+            ));
+        }
+        if !self.delayed_field_change_set.is_empty() {
+            return Err(VMStatus::error(
+                StatusCode::DATA_FORMAT_ERROR,
+                err_msg(
+                    "Cannot convert from VMChangeSet with non-materialized Delayed Field changes to ChangeSet.",
                 ),
             ));
         }
@@ -352,7 +365,7 @@ impl VMChangeSet {
     /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
     pub fn try_materialize_aggregator_v1_delta_set(
         self,
-        resolver: &impl DelayedFieldResolver,
+        resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,

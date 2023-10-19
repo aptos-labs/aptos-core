@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldID};
+use aptos_aggregator::{
+    resolver::{TAggregatorV1View, TDelayedFieldView},
+    types::DelayedFieldID,
+};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::state_store::{
     state_key::StateKey,
@@ -185,7 +188,8 @@ pub trait StateStorageView {
 pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
-    + TDelayedFieldView<IdentifierV1 = K, IdentifierV2 = I>
+    + TAggregatorV1View<Identifier = K>
+    + TDelayedFieldView<Identifier = I>
     + StateStorageView
 {
 }
@@ -193,7 +197,8 @@ pub trait TExecutorView<K, T, L, I>:
 impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
-        + TDelayedFieldView<IdentifierV1 = K, IdentifierV2 = I>
+        + TAggregatorV1View<Identifier = K>
+        + TDelayedFieldView<Identifier = I>
         + StateStorageView
 {
 }

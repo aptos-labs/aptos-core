@@ -212,7 +212,11 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{resolver::TDelayedFieldView, types::DelayedFieldValue, FakeAggregatorView};
+    use crate::{
+        resolver::{TAggregatorV1View, TDelayedFieldView},
+        types::DelayedFieldValue,
+        FakeAggregatorView,
+    };
     use aptos_types::{
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
@@ -480,30 +484,37 @@ mod test {
 
     struct BadStorage;
 
-    impl TDelayedFieldView for BadStorage {
-        type IdentifierV1 = StateKey;
-        type IdentifierV2 = ();
+    impl TAggregatorV1View for BadStorage {
+        type Identifier = StateKey;
 
         fn get_aggregator_v1_state_value(
             &self,
-            _id: &Self::IdentifierV1,
+            _id: &Self::Identifier,
         ) -> anyhow::Result<Option<StateValue>> {
             Err(anyhow::Error::new(VMStatus::error(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 Some("Error message from BadStorage.".to_string()),
             )))
         }
+    }
+
+    impl TDelayedFieldView for BadStorage {
+        type Identifier = ();
+
+        fn is_delayed_field_optimization_capable(&self) -> bool {
+            false
+        }
 
         fn get_delayed_field_value(
             &self,
-            _id: &Self::IdentifierV2,
+            _id: &Self::Identifier,
         ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
             Err(code_invariant_error("Error message from BadStorage.").into())
         }
 
         fn delayed_field_try_add_delta_outcome(
             &self,
-            _id: &Self::IdentifierV2,
+            _id: &Self::Identifier,
             _base_delta: &SignedU128,
             _delta: &SignedU128,
             _max_value: u128,
@@ -511,7 +522,7 @@ mod test {
             Err(code_invariant_error("Error message from BadStorage.").into())
         }
 
-        fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+        fn generate_delayed_field_id(&self) -> Self::Identifier {
             unimplemented!("Irrelevant for the test")
         }
     }
