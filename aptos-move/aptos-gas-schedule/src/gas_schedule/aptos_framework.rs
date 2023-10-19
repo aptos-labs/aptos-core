@@ -4,9 +4,8 @@
 //! This module defines the gas parameters for Aptos Framework & Stdlib.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
+    gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
-    ver::gas_feature_versions::{RELEASE_V1_12, RELEASE_V1_13},
 };
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
@@ -251,6 +250,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [function_info_check_dispatch_type_compatibility_impl_base: InternalGas, { RELEASE_V1_13.. => "function_info.check_dispatch_type_compatibility_impl.base" }, 1002],
         [function_info_load_function_base: InternalGas, { RELEASE_V1_13.. => "function_info.load_function.base" }, 551],
         [dispatchable_fungible_asset_dispatch_base: InternalGas, { RELEASE_V1_13.. => "dispatchable_fungible_asset.dispatch.base" }, 551],
+        [dispatchable_authenticate_dispatch_base: InternalGas, { RELEASE_V1_14.. => "dispatchable_authenticate.dispatch.base" }, 551],
 
         // Reusing SHA2-512's cost from Ristretto
         [hash_sha2_512_base: InternalGas, { 4.. => "hash.sha2_512.base" }, 11910],  // 3_240 * 20

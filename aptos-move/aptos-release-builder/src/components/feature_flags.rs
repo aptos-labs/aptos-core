@@ -127,6 +127,7 @@ pub enum FeatureFlag {
     EnableEnumTypes,
     EnableResourceAccessControl,
     RejectUnstableBytecodeForScript,
+    LiteAccount,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -336,6 +337,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::RejectUnstableBytecodeForScript => {
                 AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT
             },
+            FeatureFlag::LiteAccount => AptosFeatureFlag::LITE_ACCOUNT,
         }
     }
 }
@@ -474,6 +476,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::REJECT_UNSTABLE_BYTECODE_FOR_SCRIPT => {
                 FeatureFlag::RejectUnstableBytecodeForScript
             },
+            AptosFeatureFlag::LITE_ACCOUNT => FeatureFlag::LiteAccount,
         }
     }
 }

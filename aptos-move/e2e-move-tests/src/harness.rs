@@ -9,14 +9,16 @@ use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
 };
 use aptos_language_e2e_tests::{
-    account::{Account, AccountData, TransactionBuilder},
+    account::{Account, AccountData, LiteAccountData, TransactionBuilder},
     executor::FakeExecutor,
 };
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{
-        fungible_store::FungibleStoreResource, object::ObjectGroupResource, AccountResource,
-        CoinStoreResource, CORE_CODE_ADDRESS,
+        fungible_store::FungibleStoreResource,
+        lite_account::{self, LiteAccountGroup},
+        object::ObjectGroupResource,
+        AccountResource, CoinStoreResource, CORE_CODE_ADDRESS,
     },
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -78,9 +80,9 @@ pub struct MoveHarness {
     pub executor: FakeExecutor,
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
-
     pub default_gas_unit_price: u64,
     pub max_gas_per_txn: u64,
+    use_lite_account: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -101,6 +103,7 @@ impl MoveHarness {
             txn_seq_no: BTreeMap::default(),
             default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
             max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            use_lite_account: false,
         }
     }
 
@@ -108,9 +111,7 @@ impl MoveHarness {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor,
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            ..Self::new()
         }
     }
 
@@ -118,9 +119,7 @@ impl MoveHarness {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_head_genesis_with_count(count),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            ..Self::new()
         }
     }
 
@@ -128,9 +127,7 @@ impl MoveHarness {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_testnet_genesis(),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            ..Self::new()
         }
     }
 
@@ -147,17 +144,24 @@ impl MoveHarness {
         register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_mainnet_genesis(),
-            txn_seq_no: BTreeMap::default(),
-            default_gas_unit_price: DEFAULT_GAS_UNIT_PRICE,
-            max_gas_per_txn: Self::DEFAULT_MAX_GAS_PER_TXN,
+            ..Self::new()
         }
     }
 
+    pub fn set_use_lite_account(&mut self) {
+        self.use_lite_account = true;
+    }
+
     pub fn store_and_fund_account(&mut self, acc: &Account, balance: u64, seq_num: u64) -> Account {
-        let data = AccountData::with_account(acc.clone(), balance, seq_num);
-        self.executor.add_account_data(&data);
+        if self.use_lite_account {
+            let data = LiteAccountData::with_account(acc.clone(), balance, seq_num);
+            self.executor.add_lite_account_data(&data);
+        } else {
+            let data = AccountData::with_account(acc.clone(), balance, seq_num);
+            self.executor.add_account_data(&data);
+        }
         self.txn_seq_no.insert(*acc.address(), seq_num);
-        data.account().clone()
+        acc.clone()
     }
 
     /// Creates an account for the given static address. This address needs to be static so
@@ -795,7 +799,7 @@ impl MoveHarness {
             .unwrap_or(0)
             + self
                 .read_resource_from_resource_group::<FungibleStoreResource>(
-                    &aptos_types::account_config::fungible_store::primary_store(addr),
+                    &aptos_types::account_config::fungible_store::primary_apt_store(*addr),
                     ObjectGroupResource::struct_tag(),
                     FungibleStoreResource::struct_tag(),
                 )
@@ -878,9 +882,19 @@ impl MoveHarness {
     }
 
     pub fn sequence_number(&self, addr: &AccountAddress) -> u64 {
-        self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
+        if let Some(acct_v1) =
+            self.read_resource::<AccountResource>(addr, AccountResource::struct_tag())
+        {
+            acct_v1.sequence_number()
+        } else {
+            self.read_resource_from_resource_group::<lite_account::AccountResource>(
+                addr,
+                LiteAccountGroup::struct_tag(),
+                lite_account::AccountResource::struct_tag(),
+            )
             .unwrap()
-            .sequence_number()
+            .sequence_number
+        }
     }
 
     fn chain_id_is_mainnet(&self, addr: &AccountAddress) -> bool {
