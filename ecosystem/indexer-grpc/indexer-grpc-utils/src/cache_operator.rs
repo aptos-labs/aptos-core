@@ -9,14 +9,14 @@ use redis::{AsyncCommands, RedisError, RedisResult};
 // The cache size is estimated to be 3M transactions.
 // For 3M transactions, the cache size is about 25GB.
 // At TPS 20k, it takes about 2.5 minutes to fill up the cache.
-const CACHE_SIZE_ESTIMATION: u64 = 1_000_000_u64;
+const CACHE_SIZE_ESTIMATION: u64 = 300_000_u64;
 
 // Hard limit for cache lower bound. Only used for active eviction.
 // Cache worker actively evicts the cache entries if the cache entry version is
 // lower than the latest version - CACHE_SIZE_EVICTION_LOWER_BOUND.
 // The gap between CACHE_SIZE_ESTIMATION and this is to give buffer since
 // reading latest version and actual data not atomic(two operations).
-const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 1_200_000_u64;
+const CACHE_SIZE_EVICTION_LOWER_BOUND: u64 = 400_000_u64;
 
 // Keys for cache.
 const CACHE_KEY_LATEST_VERSION: &str = "latest_version";
