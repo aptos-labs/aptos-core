@@ -3,66 +3,67 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_dkg::{weighted_vuf::{self, traits::WeightedVUF}, pvss::{WeightedConfig, Player}};
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use crate::{block_info::Round, validator_verifier::ValidatorVerifier};
 
-use crate::block_info::Round;
+// pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
+pub type WVUF = weighted_vuf::gjm21_naive::g1::GjmNaiveWVUF;
+pub type WvufPP = <WVUF as WeightedVUF>::PublicParameters;
+pub type PK = <WVUF as WeightedVUF>::PubKey;
+pub type PKShare = <WVUF as WeightedVUF>::PubKeyShare;
+pub type ASK = <WVUF as WeightedVUF>::AugmentedSecretKeyShare;
+pub type APK = <WVUF as WeightedVUF>::AugmentedPubKeyShare;
+pub type ProofShare = <WVUF as WeightedVUF>::ProofShare;
+pub type Delta = <WVUF as WeightedVUF>::Delta;
+pub type Evaluation = <WVUF as WeightedVUF>::Evaluation;
+pub type Proof = <WVUF as WeightedVUF>::Proof;
 
-// Each validator will send a randomness share of size rand_size * rand_num / NUM_VALIDATORS (assuming even stake distribution)
-pub const RAND_SIZE: usize = 96;
-pub const NUM_SHARES_PER_VALIDATOR: usize = 1;
-pub const PROOF_SIZE: usize = 1;
-pub const SHARE_SIZE: usize = RAND_SIZE * NUM_SHARES_PER_VALIDATOR;
-pub const DECISION_SIZE: usize = RAND_SIZE;
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum Mode {
+    Optimistic,
+    Fallback,
+}
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandMetadata {
-    epoch: u64,
-    round: Round,
-    bloch_id: HashValue,
-    timestamp: u64,
+    pub epoch: u64,
+    pub round: Round,
+    pub block_id: HashValue,
+    pub timestamp: u64,
 }
 
 impl RandMetadata {
-    pub fn new(epoch: u64, round: Round, bloch_id: HashValue, timestamp: u64) -> Self {
-        Self { epoch, round, bloch_id, timestamp }
+    pub fn new(epoch: u64, round: Round, block_id: HashValue, timestamp: u64) -> Self {
+        Self { epoch, round, block_id, timestamp }
+    }
+    
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("[RandMessage] RandMetadata serialization failed!")
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
-pub struct RandProof {
-    // rand todo: fill
-    bytes: Vec<u8>,
-}
-
-impl RandProof {
-    pub fn new_for_test() -> Self {
-        Self { bytes: vec![0; PROOF_SIZE] }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Randomness {
     metadata: RandMetadata,
-    value: Vec<u8>,    // rand todo: fill
+    randomness: Vec<u8>,
 }
 
 impl Randomness {
-    pub fn new(metadata: RandMetadata, value: Vec<u8>) -> Self {
-        Self { metadata, value }
-    }
-
-    pub fn new_for_test(epoch: u64, round: Round, block_hash: HashValue, timestamp: u64) -> Self {
-        let metadata = RandMetadata::new(epoch, round, block_hash, timestamp);
-        let value = vec![0; RAND_SIZE];
-        Self { metadata, value }
+    pub fn new(metadata: RandMetadata, randomness: Vec<u8>) -> Self {
+        Self { metadata, randomness }
     }
 
     // Only used for the execution interface of ordering_state_computer which does not actually execute
-    pub fn dummy() -> Self {
+    pub fn default() -> Self {
         let metadata = RandMetadata::new(0, 0, HashValue::zero(), 0);
-        let value = vec![];
-        Self { metadata, value }
+        let randomness = vec![];
+        Self { metadata, randomness }
+    }
+
+    pub fn metadata(&self) -> &RandMetadata {
+        &self.metadata
     }
 
     pub fn epoch(&self) -> u64 {
@@ -74,7 +75,11 @@ impl Randomness {
     }
 
     pub fn block_id(&self) -> HashValue {
-        self.metadata.bloch_id
+        self.metadata.block_id
+    }
+
+    pub fn randomness(&self) -> &[u8] {
+        &self.randomness
     }
 
     pub fn timestamp(&self) -> u64 {
@@ -82,29 +87,31 @@ impl Randomness {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandDecision {
     randomness: Randomness,
-    proof: RandProof,
+    eval: Evaluation,
+    proof: Proof,
 }
 
 impl RandDecision {
-    pub fn new(randomness: Randomness, proof: RandProof) -> Self {
-        Self { randomness, proof }
-    }
-
-    pub fn new_for_test(epoch: u64, round: Round, block_hash: HashValue, timestamp: u64) -> Self {
-        let metadata = RandMetadata::new(epoch, round, block_hash, timestamp);
-        let randomness = Randomness::new(metadata, vec![0; DECISION_SIZE]);
-        let proof = RandProof { bytes: vec![0; PROOF_SIZE] };
-        Self { randomness, proof }
+    pub fn new(randomness: Randomness, eval: Evaluation, proof: Proof) -> Self {
+        Self { randomness, eval, proof }
     }
 
     pub fn randomness(&self) -> &Randomness {
         &self.randomness
     }
 
-    pub fn proof(&self) -> &RandProof {
+    pub fn evaluation(&self) -> &Evaluation {
+        &self.eval
+    }
+
+    pub fn metadata(&self) -> &RandMetadata {
+        &self.randomness.metadata
+    }
+
+    pub fn proof(&self) -> &Proof {
         &self.proof
     }
 
@@ -124,9 +131,28 @@ impl RandDecision {
         self.randomness.timestamp()
     }
 
-    pub fn verify(&self, _rand_config: &RandConfig) -> anyhow::Result<()> {
-        // rand todo: fill
+    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
+        <WVUF as WeightedVUF>::verify_eval(&rand_config.vuf_pp, &rand_config.pk, self.randomness.metadata.to_bytes().as_slice(), &self.proof, &self.eval)?;
+        Ok(())
+    }
+}
 
+#[derive(Clone)]
+pub struct RandKeys {
+    pub ask: ASK,
+    pub apks: Vec<Option<APK>>,
+    pub pk_shares: Vec<PKShare>,
+}
+
+impl RandKeys {
+    pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, my_index: usize, num_validators: usize) -> Self {
+        let apks = (0..num_validators).map(|i| if i == my_index { Some(apk.clone()) } else { None }).collect();
+        Self { ask, apks, pk_shares }
+    }
+
+    pub fn add_apk(&mut self, index: usize, apk: APK) -> anyhow::Result<()> {
+        assert!(index < self.apks.len());
+        self.apks[index] = Some(apk);
         Ok(())
     }
 }
@@ -134,28 +160,74 @@ impl RandDecision {
 #[derive(Clone)]
 #[allow(dead_code)]
 pub struct RandConfig {
-    // rand todo: fill
-    weights: Vec<u64>,
-    weight_f: u64,  // fallback threshold
-    weight_o: u64,  // optimistic threshold
+    pub author: AccountAddress,
+    pub validator: ValidatorVerifier,
+    pub vuf_pp: WvufPP,
+    pub pk: PK,
+    pub keys_f: RandKeys,
+    pub keys_o: RandKeys,
+    pub wc_f: WeightedConfig,
+    pub wc_o: WeightedConfig,
 }
 
 impl RandConfig {
-    pub fn new(weights: Vec<u64>, weight_f: u64, weight_o: u64) -> Self {
-        Self { weights, weight_f, weight_o }
+    pub fn new(author: AccountAddress, validator: ValidatorVerifier, vuf_pp: WvufPP, pk: PK, keys_f: RandKeys, keys_o: RandKeys, wc_f: WeightedConfig, wc_o: WeightedConfig) -> Self {
+        Self { author, validator, vuf_pp, pk, keys_f, keys_o, wc_f, wc_o }
     }
 
-    pub fn new_for_testing(num_validators: usize) -> Self {
-        let weights = vec![NUM_SHARES_PER_VALIDATOR as u64, num_validators as u64];
-        let num_shares = NUM_SHARES_PER_VALIDATOR * num_validators;
-        Self { weights, weight_f: (num_shares / 3) as u64, weight_o: (num_shares * 2 / 3) as u64 }
+    pub fn get_id(&self, peer: &AccountAddress) -> usize {
+        self.validator.address_to_validator_index().get(peer).unwrap().clone()
     }
 
-    pub fn weight_f(&self) -> u64 {
-        self.weight_f
+    pub fn add_apk(&mut self, peer: &AccountAddress, apk: APK, mode: &Mode) -> anyhow::Result<()> {
+        let index = self.get_id(peer);
+        match mode {
+            Mode::Optimistic => self.keys_o.add_apk(index, apk),
+            Mode::Fallback => self.keys_f.add_apk(index, apk),
+        }
     }
 
-    pub fn weight_o(&self) -> u64 {
-        self.weight_o
+    pub fn get_apk(&self, peer: &AccountAddress, mode: &Mode) -> Option<&APK> {
+        let index = self.get_id(peer);
+        match mode {
+            Mode::Optimistic => self.keys_o.apks[index].as_ref(),
+            Mode::Fallback => self.keys_f.apks[index].as_ref(),
+        }
+    }
+
+    pub fn get_pk_share(&self, peer: &AccountAddress, mode: &Mode) -> &PKShare {
+        let index = self.get_id(peer);
+        match mode {
+            Mode::Optimistic => &self.keys_o.pk_shares[index],
+            Mode::Fallback => &self.keys_f.pk_shares[index],
+        }
+    }
+
+    pub fn add_delta(&mut self, peer: &AccountAddress, delta: Delta, mode: &Mode) -> anyhow::Result<()> {
+        if self.get_apk(peer, mode).is_none() {
+            let apk = <WVUF as WeightedVUF>::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer, mode).clone(), delta.clone())?;
+            self.add_apk(peer, apk, mode)?;
+        }
+        Ok(())
+    }
+
+    pub fn get_delta(&self, peer: &AccountAddress, mode: &Mode) -> Option<&Delta> {
+        self.get_apk(peer, mode).map(<WVUF as WeightedVUF>::get_public_delta)
+    }
+
+    pub fn get_peer_weight(&self, peer: &AccountAddress, mode: &Mode) -> usize {
+        let player = Player{ id: self.get_id(peer) };
+        match mode {
+            Mode::Optimistic => self.wc_o.get_player_weight(&player),
+            Mode::Fallback => self.wc_f.get_player_weight(&player),
+        }
+    }
+
+    pub fn th_f(&self) -> usize {
+        self.wc_f.get_threshold_weight()
+    }
+
+    pub fn th_o(&self) -> usize {
+        self.wc_o.get_threshold_weight()
     }
 }

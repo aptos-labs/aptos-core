@@ -84,7 +84,7 @@ use aptos_types::{
         OnChainExecutionConfig, ProposerElectionType, ValidatorSet, DKGState,
     },
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, randomness::RandConfig, contract_event::ContractEvent,
+    validator_verifier::ValidatorVerifier, randomness::{RandConfig, RandKeys, WvufPP, WVUF}, contract_event::ContractEvent,
 };
 use fail::fail_point;
 use futures::{
@@ -96,6 +96,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
+use rand::{thread_rng, rngs::StdRng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -106,7 +107,7 @@ use std::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use aptos_crypto::bls12381;
-use aptos_dkg::pvss::encryption_dlog::g1::DecryptPrivKey;
+use aptos_dkg::{pvss::encryption_dlog::g1::DecryptPrivKey, utils::random::random_scalar, weighted_vuf::traits::WeightedVUF};
 use aptos_dkg::pvss::Player;
 use aptos_dkg::pvss::traits::Transcript;
 use aptos_types::dkg::DKGTranscriptWrapper;
@@ -547,6 +548,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         verifier: ValidatorVerifier,
+        rand_config: Option<RandConfig>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
         UnboundedSender<ResetRequest>,
@@ -579,8 +581,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.rand_manager_msg_tx = Some(rand_msg_tx);
         self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
 
-        // rand todo: use real rand config
-        let rand_config = RandConfig::new_for_testing(verifier.len());
         // rand todo: decide gaps
         let gc_gap_below = 10 * self.config.vote_back_pressure_limit;
         let gc_gap_above = 10 * self.config.vote_back_pressure_limit;
@@ -847,10 +847,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         onchain_consensus_config: &OnChainConsensusConfig,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
+        rand_config: Option<RandConfig>,
     ) -> Arc<dyn StateComputer> {
         if onchain_consensus_config.decoupled_execution() {
             let (block_tx, reset_rand_manager_tx, reset_buffer_manager_tx) = self
-                .spawn_decoupled_execution(commit_signer_provider, epoch_state.verifier.clone());
+                .spawn_decoupled_execution(commit_signer_provider, epoch_state.verifier.clone(), rand_config);
             Arc::new(OrderingStateComputer::new(
                 block_tx,
                 self.commit_state_computer.clone(),
@@ -891,6 +892,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        rand_config: Option<RandConfig>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -930,6 +932,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &epoch_state,
             &onchain_consensus_config,
             safety_rules_container.clone(),
+            rand_config,
         );
 
         info!(epoch = epoch, "Create BlockStore");
@@ -1060,10 +1063,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         };
         let maybe_dkg_state: anyhow::Result<DKGState> = payload.get();
+        // Generate randomness config
+        let mut rand_config = None;
         match maybe_dkg_state {
             Err(_) => {
-                warn!("[DKG] On-chain DKGState not initialized, proceed epoch without randomness.");
-                // dkg todo: when epoch starts with no dkg transcript, proceed epoch without randomness.
+                error!("[DKG] On-chain DKGState not initialized, proceed epoch without randomness.");
+                // When epoch starts with no dkg transcript, proceed epoch without randomness.
             }
             Ok(state) => {
                 if let Some(dkg_session) = state.maybe_last_complete(epoch_state.epoch) {
@@ -1073,27 +1078,48 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(dkg_session.serialized_transcript.as_slice()).unwrap();
                         let dk = self.get_decrypt_key_for_dkg();
                         let dkg_pvss_config = build_dkg_pvss_config(dkg_session.dealer_epoch, &validator_set);
+                        let vuf_pp = WvufPP::from(&dkg_pvss_config.pp);
                         let dealer_verifier: ValidatorVerifier = (&dkg_session.dealer_validator_set).into();
                         match trxs.verify(&dkg_pvss_config, &dealer_verifier) {
                             Ok(_) => {
-                                let (_sk1, _pk1) = trxs.trx_one_third.decrypt_own_share(&dkg_pvss_config.wc_1, &Player{id: my_index}, &dk);
-                                let (_sk2, _pk2) = trxs.trx_two_third.decrypt_own_share(&dkg_pvss_config.wc_2, &Player{id: my_index}, &dk);
-                                //dkg todo: start randgen with these keys.
-                                debug!("[DKG] Successfully decrypted randomness keys!");
+                                assert_eq!(trxs.trx_f.get_dealt_public_key(), trxs.trx_o.get_dealt_public_key());
+                                let pk = trxs.trx_f.get_dealt_public_key();
+
+                                let mut rng = thread_rng();
+                                let seed = random_scalar(&mut rng);
+                                let mut rng = StdRng::from_seed(seed.to_bytes_le());
+
+                                // keys for randomness fallback path
+                                let (sk_f, pk_f) = trxs.trx_f.decrypt_own_share(&dkg_pvss_config.wc_f, &Player{id: my_index}, &dk);
+                                let (ask_f, apk_f) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk_f, pk_f.clone(), &mut rng);
+                                let pk_shares_f = (0..epoch_state.verifier.len())
+                                    .map(|id| trxs.trx_f.get_public_key_share(&dkg_pvss_config.wc_f, &Player { id }))
+                                    .collect::<Vec<_>>();
+                                let keys_f = RandKeys::new(ask_f, apk_f, pk_shares_f, my_index, epoch_state.verifier.len());
+
+                                // keys for randomness optmistic path
+                                let (sk_o, pk_o) = trxs.trx_o.decrypt_own_share(&dkg_pvss_config.wc_o, &Player{id: my_index}, &dk);
+                                let (ask_o, apk_o) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk_o, pk_o.clone(), &mut rng);
+                                let pk_shares_o = (0..epoch_state.verifier.len())
+                                    .map(|id| trxs.trx_o.get_public_key_share(&dkg_pvss_config.wc_o, &Player { id }))
+                                    .collect::<Vec<_>>();
+                                let keys_o = RandKeys::new(ask_o, apk_o, pk_shares_o, my_index, epoch_state.verifier.len());
+
+                                debug!("[DKG] Successfully decrypted randomness keys! threshold_f = {}, threshold_o = {}", dkg_pvss_config.wc_f.get_threshold_weight(), dkg_pvss_config.wc_o.get_threshold_weight());
+
+                                rand_config = Some(RandConfig::new(self.author, epoch_state.verifier.clone(), vuf_pp, pk, keys_f, keys_o, dkg_pvss_config.wc_f.clone(), dkg_pvss_config.wc_o.clone()));
                             },
                             Err(error) => {
                                 // dkg todo: error handling and proceed epoch without randomness
                                 panic!("[DKG] Failed to verify DKGTranscriptWrapper: {:?}", error);
                             }
-                        }
+                        };
                     }
-
                 } else {
-                    warn!("Could not find DKG result for epoch {}, proceed without randomness.", epoch_state.epoch);
-                    //dkg todo: decide if we need to hardcode the dkg keys for epoch 1, for forge testing etc.
+                    error!("Could not find DKG result for epoch {}, proceed without randomness.", epoch_state.epoch);
                 }
             }
-        }
+        };
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
@@ -1121,6 +1147,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
+                rand_config,
             )
             .await
         } else {
@@ -1130,6 +1157,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
+                rand_config,
             )
             .await
         }
@@ -1176,6 +1204,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        rand_config: Option<RandConfig>,
     ) {
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1187,6 +1216,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     network_sender,
                     payload_client,
                     payload_manager,
+                    rand_config,
                 )
                 .await
             },
@@ -1205,6 +1235,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        rand_config: Option<RandConfig>,
     ) {
         let epoch = epoch_state.epoch;
 
@@ -1216,7 +1247,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "decoupled execution must be enabled"
         );
         let (block_tx, reset_rand_manager_tx, reset_buffer_manager_tx) =
-            self.spawn_decoupled_execution(commit_signer, epoch_state.verifier.clone());
+            self.spawn_decoupled_execution(commit_signer, epoch_state.verifier.clone(), rand_config);
         let state_computer = Arc::new(DagStateSyncComputer::new(
             self.commit_state_computer.clone(),
             reset_rand_manager_tx,

@@ -15,16 +15,16 @@ pub const STAKE_GAP_THRESHOLD : f64 = 0.02; // dkg todo: decide threshold
 pub struct DKGRoundingProfile {
     pub validator_weights: Vec<usize>,
     pub stake_gap: f64,
-    pub threshold_fallback: usize,
-    pub threshold_optimistic: usize,
+    pub threshold_f: usize,
+    pub threshold_o: usize,
 }
 
 impl Debug for DKGRoundingProfile {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "stake_gap: {}, ", self.stake_gap)?;
         write!(f, "total_weight: {}, ", self.validator_weights.iter().sum::<usize>())?;
-        write!(f, "threshold_fallback: {}, ", self.threshold_fallback)?;
-        write!(f, "threshold_optimistic: {}, ", self.threshold_optimistic)?;
+        write!(f, "threshold_fallback: {}, ", self.threshold_f)?;
+        write!(f, "threshold_optimistic: {}, ", self.threshold_o)?;
         write!(f, "validator_weights: {:?}\n", self.validator_weights)?;
 
         Ok(())
@@ -34,8 +34,8 @@ impl Debug for DKGRoundingProfile {
 #[derive(Clone, Debug)]
 pub struct DKGRounding {
     pub profile: DKGRoundingProfile,
-    pub config_fallback: WeightedConfig,
-    pub config_optimistic: WeightedConfig,
+    pub config_f: WeightedConfig,
+    pub config_o: WeightedConfig,
 }
 
 impl DKGRounding {
@@ -53,15 +53,15 @@ impl DKGRounding {
             error!("[DKG] Rounding exceeds stake_gap_threshold! stake_gap = {}, stake_gap_threshold = {}", profile.stake_gap, stake_gap_threshold);
         }
 
-        let config_fallback =
-            WeightedConfig::new(profile.threshold_fallback, profile.validator_weights.clone()).unwrap();
-        let config_optimistic =
-            WeightedConfig::new(profile.threshold_optimistic, profile.validator_weights.clone()).unwrap();
+        let config_f =
+            WeightedConfig::new(profile.threshold_f, profile.validator_weights.clone()).unwrap();
+        let config_o =
+            WeightedConfig::new(profile.threshold_o, profile.validator_weights.clone()).unwrap();
 
         Self {
             profile,
-            config_fallback,
-            config_optimistic,
+            config_f,
+            config_o,
         }
     }
 }
@@ -80,8 +80,8 @@ impl DKGRoundingProfile {
         let mut best_profile = DKGRoundingProfile {
             validator_weights: vec![],
             stake_gap: 1.0,
-            threshold_fallback: 0,
-            threshold_optimistic: 0,
+            threshold_f: 0,
+            threshold_o: 0,
         };
 
         for step in 0..steps {
@@ -144,8 +144,8 @@ pub fn compute_profile(
         .map(|stake| (*stake as f64 / stake_per_weight as f64 + c) as usize)
         .collect::<Vec<usize>>();
 
-    let threshold_fallback = ((stake_sum as f64) / (3.0 * stake_per_weight as f64) + delta_u).ceil() as usize;
-    let threshold_optimistic = ((2.0 * stake_sum as f64) / (3.0 * stake_per_weight as f64) + delta_u).ceil() as usize; 
+    let threshold_f = ((stake_sum as f64) / (3.0 * stake_per_weight as f64) + delta_u).ceil() as usize;
+    let threshold_o = ((2.0 * stake_sum as f64) / (3.0 * stake_per_weight as f64) + delta_u).ceil() as usize; 
     //dkg todo - productionize - double check if float number operations are deterministic across platform
 
     let stake_gap = stake_per_weight as f64 * delta / stake_sum as f64;
@@ -153,8 +153,8 @@ pub fn compute_profile(
     let profile = DKGRoundingProfile {
         validator_weights,
         stake_gap,
-        threshold_fallback,
-        threshold_optimistic,
+        threshold_f,
+        threshold_o,
     };
 
     trace!("[DKG] Rounding in progress! {:?}", profile);

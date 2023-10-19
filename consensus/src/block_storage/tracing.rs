@@ -23,13 +23,13 @@ impl BlockStage {
     pub const SYNCED: &'static str = "synced";
     pub const VOTED: &'static str = "voted";
     // stage related to randomness generation
+    pub const RAND_ENTER: &'static str = "rand_enter";
     pub const RAND_BC_SHARE: &'static str = "rand_bc_share";
     pub const RAND_ADD_SHARE: &'static str = "rand_add_share";
     pub const RAND_AGG_DECISION: &'static str = "rand_agg_decision";
     pub const RAND_ADD_FIRST_DECISION: &'static str = "rand_add_first_decision";
     pub const RAND_RCV_ACK_DECISION: &'static str = "rand_rcv_ack_decision";
     pub const RAND_RE_BC_SHARE: &'static str = "rand_re_bc_share";
-
     pub const RAND_READY: &'static str = "rand_ready";
 }
 

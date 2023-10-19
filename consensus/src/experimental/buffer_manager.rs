@@ -220,7 +220,7 @@ impl BufferManager {
             ordered_blocks,
             ordered_proof,
             callback,
-            randomness: _,
+            randomness,
         } = blocks;
 
         info!(
@@ -229,11 +229,15 @@ impl BufferManager {
             self.buffer.len() + 1,
         );
 
+        info!("[Randomness] round {:?} randomness {:?}", ordered_blocks.last().unwrap().round(), randomness);
+
         observe_block(ordered_blocks.last().unwrap().timestamp_usecs(), BlockStage::RAND_READY);
 
         // rand todo: replace with real randomness below
+        // use dummy randomness for now since blocks may not be aligned
+        
         let rand_ready_blocks: Vec<ExecutedBlock> = ordered_blocks.into_iter()
-        .map(|block| block.replace_randomness(Randomness::dummy()))
+        .map(|block| block.replace_randomness(Randomness::default()))
         .collect();
         // let rand_ready_blocks: Vec<ExecutedBlock> = ordered_blocks.into_iter()
         //     .map(|block| block.replace_randomness(randomness.clone()))

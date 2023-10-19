@@ -18,6 +18,7 @@ aptos-bitvec = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-dkg = { workspace = true }
+aptos-enum-conversion-derive = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 arr_macro = { workspace = true }
 bcs = { workspace = true }

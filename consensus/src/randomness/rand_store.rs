@@ -5,15 +5,21 @@ use std::{collections::{HashMap, BTreeMap}, time::Duration, fmt};
 
 use anyhow::bail;
 use aptos_consensus_types::common::{Author, Round};
+use aptos_dkg::{pvss::Player, weighted_vuf::traits::WeightedVUF};
 use aptos_logger::debug;
-use aptos_types::randomness::{Randomness, RandConfig, RandDecision, RandProof};
+use aptos_types::randomness::{Randomness, RandConfig, RandDecision, Mode, RandMetadata, WVUF};
+use serde::{Serialize, Deserialize};
+use sha3::{Digest, Sha3_256};
 
-use crate::{logging::LogEvent, block_storage::tracing::{BlockStage, observe_block}, randomness::rand_manager::log_rand_event, experimental::commit_reliable_broadcast::DropGuard};
+use crate::{logging::LogEvent, block_storage::tracing::{BlockStage, observe_block}, randomness::{rand_manager::log_rand_event, types::ShareAck}, experimental::commit_reliable_broadcast::DropGuard};
 
 use super::{block_queue::{BlockQueue, BlockQueueItem, RandReadyBlocks}, types::RandShare};
 
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RandItem {
-    weight: u64,
+    weight: usize,
+    // metadata is set only when block is available
+    metadata: Option<RandMetadata>,
     shares: HashMap<Author, RandShare>,
     decision: Option<RandDecision>,
 }
@@ -28,12 +34,13 @@ impl RandItem {
     pub fn new() -> Self {
         Self {
             weight: 0,
+            metadata: None,
             shares: HashMap::new(),
             decision: None,
         }
     }
 
-    pub fn weight(&self) -> u64 {
+    pub fn weight(&self) -> usize {
         self.weight
     }
 
@@ -49,13 +56,72 @@ impl RandItem {
         self.shares.contains_key(author)
     }
 
-    pub fn add_share(&mut self, share: RandShare) {
-        self.weight += share.weight();
+    pub fn add_share(&mut self, share: RandShare, rand_config: &RandConfig) -> anyhow::Result<()> {
+        if let Some(metadata) = self.metadata.as_ref() {
+            if metadata != share.metadata() {
+                bail!("[RandStore] RandMetadata mismatch in share {:?}!", share.metadata());
+            }
+        }
+
+        self.weight += rand_config.get_peer_weight(share.author(),  &Mode::Fallback);
         self.shares.insert(*share.author(), share);
+        Ok(())
     }
 
-    pub fn add_decision(&mut self, decision: RandDecision) {
+    pub fn add_decision(&mut self, decision: RandDecision) -> anyhow::Result<()> {
+        if let Some(metadata) = self.metadata.as_ref() {
+            if metadata != decision.metadata() {
+                bail!("[RandStore] RandMetadata mismatch in decision {:?}!", decision.metadata());
+            }
+        }
         self.decision = Some(decision);
+        Ok(())
+    }
+
+    // update metadata and remove inconsistent shares and decision, return decision if available
+    pub fn update_metadata(&mut self, metadata: RandMetadata, rand_config: &RandConfig) {
+        assert!(self.metadata.is_none(), "[RandStore] RandMetadata should not be set yet!");
+        self.metadata = Some(metadata.clone());
+        self.shares.retain(|_, share| *share.metadata() == metadata);
+        if self.decision.as_ref().map(|d| d.metadata()) != Some(&metadata) {
+            self.decision = None;
+        }
+        // update weight
+        self.weight = 0;
+        for share in self.shares.values() {
+            self.weight += rand_config.get_peer_weight(share.author(), &Mode::Fallback);
+        }
+    }
+
+    pub fn ready_to_aggregate(&self, rand_config: &RandConfig) -> bool {
+        self.weight >= rand_config.th_f() && self.metadata.is_some()
+    }
+
+    // call aggregate_shares only when all shares have correct metadata
+    pub fn aggregate_shares(&mut self, rand_config: &RandConfig) -> anyhow::Result<RandDecision> {
+        if let Some(metadata) = &self.metadata {
+            let mut apks_and_proofs = vec![];
+            for share in self.shares.values() {
+                let id = *rand_config.validator.address_to_validator_index().get(share.author()).unwrap();
+                let maybe_apk = rand_config.get_apk(share.author(), &Mode::Fallback);
+                if let Some(apk) = maybe_apk {
+                    apks_and_proofs.push((Player{ id }, apk.clone(), share.share().clone()));
+                } else {
+                    bail!("[RandStore] No augmented public key for validator id {}, {}", id, share.author());
+                }
+            }
+
+            let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wc_f, &apks_and_proofs);
+            let eval = <WVUF as WeightedVUF>::derive_eval(&rand_config.vuf_pp, metadata.to_bytes().as_slice(), &proof);
+            let eval_bytes = bcs::to_bytes(&eval).unwrap();
+            let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
+            let randomness = Randomness::new(metadata.clone(), rand_bytes);
+            let decision = RandDecision::new(randomness, eval, proof);
+
+            Ok(decision)
+        } else {
+            bail!("[RandStore] RandMetadata is None, wait for block to come first!");
+        }
     }
 }
 
@@ -66,24 +132,24 @@ pub enum AddDecisionResult {
 
 // RandStore is not required to be persisted
 pub struct RandStore {
-    author: Author,
-    rand_config: RandConfig,
+    pub author: Author,
+    pub rand_config: Option<RandConfig>,
     // all block items
-    block_queue: BlockQueue,
+    pub block_queue: BlockQueue,
     // rand todo: persist rand_map
     // all randomness items
-    rand_map: HashMap<Round, RandItem>,
+    pub rand_map: HashMap<Round, RandItem>,
 
     // garbage collect rounds < rand_round_min, or > rand_round_max
-    rand_round_min: Round,
-    rand_round_max: Round,
+    pub rand_round_min: Round,
+    pub rand_round_max: Round,
     // garbage collect gap from committed_round
-    gc_gap_below: Round,
-    gc_gap_above: Round,
+    pub gc_gap_below: Round,
+    pub gc_gap_above: Round,
 }
 
 impl RandStore {
-    pub fn new(author: Author, rand_config: RandConfig, gc_gap_below: Round, gc_gap_above: Round) -> Self {
+    pub fn new(author: Author, rand_config: Option<RandConfig>, gc_gap_below: Round, gc_gap_above: Round) -> Self {
         Self {
             author,
             rand_config,
@@ -103,8 +169,8 @@ impl RandStore {
         self.rand_round_max = Round::max_value();
     }
 
-    pub fn rand_config(&self) -> &RandConfig {
-        &self.rand_config
+    pub fn rand_config(&self) -> Option<&RandConfig> {
+        self.rand_config.as_ref()
     }
 
     pub fn block_queue(&self) -> &BTreeMap<Round, BlockQueueItem> {
@@ -175,57 +241,84 @@ impl RandStore {
         self.block_queue.dequeue_rand_ready_prefix()
     }
 
-    pub fn add_block(&mut self, block: BlockQueueItem) {
+    pub fn add_block(&mut self, block: BlockQueueItem) -> anyhow::Result<(Option<RandDecision>, AddDecisionResult)> {
+        let round = block.round();
+        let metadata = block.rand_metadata();
         self.block_queue.push_back(block);
+        
+        match self.try_aggregate_shares(round, Some(metadata)) {
+            Ok(Some(decision)) => Ok((Some(decision.clone()), self.add_decision(decision)?)),
+            Ok(None) => Ok((None, AddDecisionResult::None)),
+            Err(e) => bail!("{:?}", e),
+        }
     }
 
     pub fn update_guard(&mut self, round: Round, drop_guard: DropGuard) {
         self.block_queue.update_guard(round, drop_guard);
     }
 
-    pub fn add_share(&mut self, share: RandShare) -> anyhow::Result<(Option<RandDecision>, AddDecisionResult)> {
+    pub fn try_aggregate_shares(&mut self, round: Round, metadata: Option<RandMetadata>) -> anyhow::Result<Option<RandDecision>> {
+        if self.rand_config.is_none() {
+            return Ok(None);
+        }
+        let rand_config = self.rand_config.as_ref().unwrap();
+        let rand_item = self.rand_map.entry(round).or_insert_with(RandItem::new);
+        if rand_item.decision().is_some() {
+            return Ok(None);
+        }
+        if let Some(metadata) = metadata {
+            rand_item.update_metadata(metadata, rand_config);
+        }
+        if rand_item.ready_to_aggregate(rand_config) {
+            match rand_item.aggregate_shares(rand_config) {
+                Ok(decision) => {
+                    log_rand_event(LogEvent::AggregateRandDecision, self.author, None, decision.block_id(), decision.round());
+                    observe_block(decision.timestamp(), BlockStage::RAND_AGG_DECISION);
+
+                    return Ok(Some(decision));
+                }
+                Err(e) => bail!("{:?}", e),
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn add_share(&mut self, share: RandShare) -> anyhow::Result<(ShareAck, AddDecisionResult)> {
+        let rand_config = self.rand_config.as_ref().unwrap();
+        let missing_apk = rand_config.get_apk(share.author(), &Mode::Fallback).is_none();
+
         self.check_rounds(share.round())?;
 
         let rand_item = self.rand_map.entry(share.round()).or_insert_with(RandItem::new);
 
         if let Some(decision) = rand_item.decision() {
-            return Ok((Some(decision.clone()), AddDecisionResult::None));
+            return Ok((ShareAck::new(Some(decision.clone()), missing_apk), AddDecisionResult::None));
         }
 
         if rand_item.contain_author(share.author()) {
             if *share.author() == self.author {
-                return Ok((None, AddDecisionResult::None));
+                return Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None));
             }
             bail!("[RandStore] duplicate share from the same author {:?}", share.author());
         }
 
-        share.verify(&self.rand_config)?;
+        share.verify(Mode::Fallback, rand_config)?;
 
-        rand_item.add_share(share.clone());
+        rand_item.add_share(share.clone(), rand_config)?;
 
-        observe_block(share.block_info().timestamp_usecs(), BlockStage::RAND_ADD_SHARE);
+        observe_block(share.timestamp(), BlockStage::RAND_ADD_SHARE);
 
-        debug!("[RandStore] Added share for round {:?} from {:?}, weight {} threshold {}", share.round(), share.author(), rand_item.weight(), self.rand_config.weight_f());
+        debug!("[RandStore] Added share for round {:?} from {:?}, weight {} threshold {}", share.round(), share.author(), rand_item.weight(), rand_config.th_f());
 
-        if rand_item.weight() >= self.rand_config.weight_f() {
-            log_rand_event(LogEvent::AggregateRandDecision, self.author, Some(*share.author()), share.id(), share.round());
-
-            observe_block(share.block_info().timestamp_usecs(), BlockStage::RAND_AGG_DECISION);
-
-            // rand todo: aggregate the shares
-            // rand todo: generate real decision
-
-            let dummy_decision = Randomness::new_for_test(share.epoch(), share.round(), share.id(), share.timestamp());
-            let decision = RandDecision::new(dummy_decision, RandProof::new_for_test());
-
-            let result = self.add_decision(decision.clone())?;
-
-            return Ok((Some(decision), result));
+        match self.try_aggregate_shares(share.round(), None) {
+            Ok(Some(decision)) => Ok((ShareAck::new(Some(decision.clone()), missing_apk), self.add_decision(decision)?)),
+            Ok(None) => Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None)),
+            Err(e) => bail!("{:?}", e),
         }
-        Ok((None, AddDecisionResult::None))
     }
 
     pub fn add_decision(&mut self, decision: RandDecision) -> anyhow::Result<AddDecisionResult> {
+        let rand_config = self.rand_config.as_ref().unwrap();
         self.check_rounds(decision.round())?;
 
         let rand_item = self.rand_map.entry(decision.round()).or_insert_with(RandItem::new);
@@ -234,9 +327,9 @@ impl RandStore {
             return Ok(AddDecisionResult::None);
         }
 
-        decision.verify(&self.rand_config)?;
+        decision.verify(rand_config)?;
 
-        rand_item.add_decision(decision.clone());
+        rand_item.add_decision(decision.clone())?;
 
         debug!("[RandStore] Added decision for round {:?}", decision.round());
 

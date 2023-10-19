@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fmt};
 
 use anyhow::bail;
 use aptos_consensus_types::{executed_block::ExecutedBlock, common::Round};
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, randomness::Randomness};
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, randomness::{Randomness, RandMetadata}};
 use tokio::time::Instant;
 
 use crate::{state_replication::StateComputerCommitCallBackType, experimental::commit_reliable_broadcast::DropGuard};
@@ -59,6 +59,14 @@ impl BlockQueueItem {
             BlockQueueItem::Ordered(ordered) => ordered.timed_drop_guard = Some((Instant::now(), drop_guard)),
             BlockQueueItem::RandReady(_) => (),
         }    
+    }
+    
+    pub fn rand_metadata(&self) -> RandMetadata {
+        let block = match self {
+            BlockQueueItem::Ordered(ordered) => ordered.ordered_blocks.last().unwrap().block(),
+            BlockQueueItem::RandReady(rand_ready) => rand_ready.ordered_blocks.last().unwrap().block(),
+        };
+        RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs())
     }
 }
 

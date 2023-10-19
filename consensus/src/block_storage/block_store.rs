@@ -370,7 +370,7 @@ impl BlockStore {
         // because we may inject a block prologue transaction.
         let state_compute_result = self
             .state_computer
-            .compute(&block, block.parent_id(), Randomness::dummy())
+            .compute(&block, block.parent_id(), Randomness::default())
             .await?;
 
         Ok(ExecutedBlock::new(block, state_compute_result, None))

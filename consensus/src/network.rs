@@ -496,36 +496,6 @@ impl TDAGNetworkSender for NetworkSender {
     }
 }
 
-// #[async_trait]
-// impl RBNetworkSender<DAGMessage> for NetworkSender {
-//     async fn send_rb_rpc(
-//         &self,
-//         receiver: Author,
-//         message: DAGMessage,
-//         timeout: Duration,
-//     ) -> anyhow::Result<DAGMessage> {
-//         self.send_rpc(receiver, message.into_network_message(), timeout)
-//             .await
-//             .map_err(|e| anyhow!("invalid rpc response: {}", e))
-//             .and_then(TConsensusMsg::from_network_message)
-//     }
-// }
-
-// #[async_trait]
-// impl RBNetworkSender<DKGMessage> for NetworkSender {
-//     async fn send_rb_rpc(
-//         &self,
-//         receiver: Author,
-//         message: DKGMessage,
-//         timeout: Duration,
-//     ) -> anyhow::Result<DKGMessage> {
-//         self.send_rpc(receiver, message.into_network_message(), timeout)
-//             .await
-//             .map_err(|e| anyhow!("[DKG] invalid rpc response: {}", e))
-//             .and_then(TConsensusMsg::from_network_message)
-//     }
-// }
-
 #[async_trait::async_trait]
 impl<M> RBNetworkSender<M> for NetworkSender
 where

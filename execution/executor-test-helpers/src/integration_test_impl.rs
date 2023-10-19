@@ -32,7 +32,7 @@ use aptos_types::{
         TransactionListWithProof, TransactionWithProof, WriteSetPayload,
     },
     trusted_state::{TrustedState, TrustedStateChange},
-    waypoint::Waypoint, randomness::Randomness,
+    waypoint::Waypoint, randomness::{Randomness, RandMetadata},
 };
 use aptos_vm::AptosVM;
 use rand::SeedableRng;
@@ -93,7 +93,7 @@ pub fn test_execution_with_storage_impl_inner(
         vec![],
         1,
         None,
-        Randomness::new_for_test(1, 0, block1_id, 1),
+        Randomness::new(RandMetadata::new(1, 0, block1_id, 1), vec![]),
     ));
     let tx1 = core_resources_account
         .sign_with_transaction_builder(txn_factory.create_user_account(account1.public_key()));
@@ -154,7 +154,7 @@ pub fn test_execution_with_storage_impl_inner(
         vec![],
         2,
         None,
-        Randomness::new_for_test(2, 0, block2_id, 2),
+        Randomness::new(RandMetadata::new(2, 0, block2_id, 2), vec![]),
     ));
     let reconfig2 = core_resources_account
         .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(200)));
@@ -170,7 +170,7 @@ pub fn test_execution_with_storage_impl_inner(
         vec![],
         3,
         None,
-        Randomness::new_for_test(2, 1, block3_id, 3),
+        Randomness::new(RandMetadata::new(2, 1, block3_id, 3), vec![]),
     ));
     let mut block3 = vec![block3_meta];
     // Create 14 txns transferring 10k from account1 to account3 each.

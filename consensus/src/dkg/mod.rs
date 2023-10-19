@@ -10,9 +10,9 @@ mod tracing;
 
 use crate::dkg::dkg_rounding::DKGRounding;
 use aptos_crypto::bls12381;
-use aptos_dkg::{pvss::{das, traits::Transcript, WeightedTranscript}, constants::SEED_PVSS_PUBLIC_PARAMS};
+use aptos_dkg::{constants::SEED_PVSS_PUBLIC_PARAMS};
 use aptos_logger::debug;
-use aptos_types::{dkg::DKGPvssConfig, on_chain_config::ValidatorSet};
+use aptos_types::{dkg::{DKGPvssConfig, EncPK, DkgPP}, on_chain_config::ValidatorSet};
 pub use types::{DKGAggNode, DKGMessage, DKGNetworkMessage, DKGNode};
 
 pub fn build_dkg_pvss_config(
@@ -38,8 +38,8 @@ pub fn build_dkg_pvss_config(
             validator_stakes.len(),
             validator_stakes,
             dkg_rounding.profile.validator_weights,
-            dkg_rounding.profile.threshold_fallback,
-            dkg_rounding.profile.threshold_optimistic,
+            dkg_rounding.profile.threshold_f,
+            dkg_rounding.profile.threshold_o,
         );
 
 
@@ -49,18 +49,18 @@ pub fn build_dkg_pvss_config(
     .map(|vi| vi.consensus_public_key().clone())
     .collect();
 
-    let consensus_keys: Vec<<das::Transcript as Transcript>::EncryptPubKey> = validator_consensus_keys
+    let consensus_keys: Vec<EncPK> = validator_consensus_keys
         .iter()
         .map(|k| k.to_bytes().as_slice().try_into().unwrap())
         .collect::<Vec<_>>();
     
-    let wc_1 = dkg_rounding.config_fallback.clone();
-    let wc_2 = dkg_rounding.config_optimistic.clone();
+    let wc_f = dkg_rounding.config_f.clone();
+    let wc_o = dkg_rounding.config_o.clone();
 
-    let pp = <WeightedTranscript<das::Transcript> as Transcript>::PublicParameters::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
+    let pp = DkgPP::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
 
     let dkg_pvss_config =
-        DKGPvssConfig::new(cur_epoch, wc_1.clone(), wc_2.clone(), pp, consensus_keys);
+        DKGPvssConfig::new(cur_epoch,  wc_f.clone(), wc_o.clone(), pp, consensus_keys);
 
     dkg_pvss_config
 }

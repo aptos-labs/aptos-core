@@ -11,7 +11,7 @@ use aptos_dkg::pvss::{
 use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
 use aptos_types::{
-    dkg::DKGTranscriptWrapper,
+    dkg::{DKGTranscriptWrapper, WTrx},
     on_chain_config::{DKGSessionState, DKGState, ValidatorSet},
     validator_verifier::ValidatorVerifier,
 };
@@ -91,24 +91,24 @@ fn verify_dkg_transcript(
     let dealt_secret_2_from_shares = dealt_secret_from_shares(
         &dkg_session.target_validator_set,
         decrypt_key_map,
-        &pvss_config.wc_2,
-        &trxs.trx_two_third,
+        &pvss_config.wc_o,
+        &trxs.trx_o,
     );
     let dealt_secret_1_from_shares = dealt_secret_from_shares(
         &dkg_session.target_validator_set,
         decrypt_key_map,
-        &pvss_config.wc_1,
-        &trxs.trx_one_third,
+        &pvss_config.wc_f,
+        &trxs.trx_f,
     );
     let dealt_secret_1_from_inputs = dealt_secret_from_input(
         &pvss_config.pp,
-        &trxs.trx_one_third,
+        &trxs.trx_f,
         &dkg_session.dealer_validator_set,
         decrypt_key_map,
     );
     let dealt_secret_2_from_inputs = dealt_secret_from_input(
         &pvss_config.pp,
-        &trxs.trx_two_third,
+        &trxs.trx_o,
         &dkg_session.dealer_validator_set,
         decrypt_key_map,
     );
@@ -149,7 +149,7 @@ fn dealt_secret_from_shares(
         })
         .collect();
 
-    <WT as Transcript>::DealtSecretKey::reconstruct(pvss_config, &player_share_pairs)
+    <WTrx as Transcript>::DealtSecretKey::reconstruct(pvss_config, &player_share_pairs)
 }
 
 fn dealt_secret_from_input(
@@ -165,7 +165,7 @@ fn dealt_secret_from_input(
         let private_key = decrypt_key_map.get(&validator_addrs[dealer.id]).unwrap();
         let seed = private_key.to_bytes_be(); // Hardcoded behavior in `aptos_consensus::dkg::dkg_manager::DKGManager::start_dkg()`.
         let mut rng = StdRng::from_seed(seed);
-        let s = <WT as Transcript>::InputSecret::generate(&mut rng);
+        let s = <WTrx as Transcript>::InputSecret::generate(&mut rng);
         agg_secret += &s;
     }
 

@@ -13,17 +13,18 @@ use crate::{
     monitor,
     network::{NetworkSender, IncomingRandRequest},
     network_interface::ConsensusMsg,
-    randomness::block_queue::BlockQueueItem, logging::{LogEvent, LogSchema},
+    randomness::{block_queue::BlockQueueItem, types::DeltaMsg}, logging::{LogEvent, LogSchema},
 };
 use anyhow::bail;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
+use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::network::RpcError;
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{ReliableBroadcast, RBNetworkSender};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig},
+    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Randomness, Mode, RandMetadata, Delta, WVUF},
 };
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
@@ -36,11 +37,12 @@ use tokio_retry::strategy::ExponentialBackoff;
 
 use super::{block_queue::{OrderedBlocks, RandReadyBlocks}, types::{RandMessage, RandShare, ShareAckState}, rand_store::{RandStore, AddDecisionResult}};
 
-// rand todo: parameters. These parameters can pass smoke test.
+// rand todo: parameters. These parameters can sometimes pass smoke test.
 pub const RAND_SHARE_BROADCAST_INTERVAL_MS: u64 = 1_000;
 pub const RAND_SHARE_REBROADCAST_INTERVAL_MS: u64 = 3_000;
 pub const REBROADCAST_LOOP_INTERVAL_MS: u64 = 1_000;
 pub const GARBAGE_COLLECT_LOOP_INTERVAL_MS: u64 = 10_000;
+pub const DELTA_SENDING_TIMEOUT: u64 = 3_000;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -77,9 +79,14 @@ pub struct RandManager {
     stop: bool,
 
     // channels for randomness messages
-    rand_share_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
+    network_sender: Arc<NetworkSender>,
+    rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
+
+    // local channels
     acked_rand_decision_tx: Sender<RandDecision>,
     acked_rand_decision_rx: Receiver<RandDecision>,
+    send_delta_request_tx: Sender<Author>,
+    send_delta_request_rx: Receiver<Author>,
 
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage, ExponentialBackoff>>,
 }
@@ -89,15 +96,15 @@ impl RandManager {
         author: Author,
         epoch: u64,
         verifier: ValidatorVerifier,
-        rand_config: RandConfig,
+        rand_config: Option<RandConfig>,
         gc_gap_below: Round,
         gc_gap_above: Round,
         ordered_block_rx: UnboundedReceiver<OrderedBlocks>,
         rand_ready_block_tx: UnboundedSender<RandReadyBlocks>,
         buffer_manager_rx: Receiver<BufferManagerEvent>,
         reset_rx: UnboundedReceiver<ResetRequest>,
-        rand_share_tx: Arc<NetworkSender>,
-        rand_share_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
+        network_sender: Arc<NetworkSender>,
+        rand_msg_rx: aptos_channels::aptos_channel::Receiver<AccountAddress, IncomingRandRequest>,
     ) -> Self {
         let rand_store = RandStore::new(author, rand_config, gc_gap_below, gc_gap_above);
 
@@ -105,7 +112,7 @@ impl RandManager {
         let rb_backoff_policy = ExponentialBackoff::from_millis(2).factor(50).max_delay(Duration::from_secs(5));
         let reliable_broadcast = ReliableBroadcast::new(
             verifier.get_ordered_account_addresses(),
-            rand_share_tx.clone(),
+            network_sender.clone(),
             rb_backoff_policy,
             TimeService::real(),
             Duration::from_millis(RAND_SHARE_BROADCAST_INTERVAL_MS),
@@ -113,6 +120,8 @@ impl RandManager {
 
         let (acked_rand_decision_tx, acked_rand_decision_rx) =
             create_channel::<RandDecision>();
+
+        let (send_delta_request_tx, send_delta_request_rx) = create_channel::<Author>();
 
         Self {
             author,
@@ -125,9 +134,12 @@ impl RandManager {
             buffer_manager_rx,
             reset_rx,
             stop: false,
-            rand_share_rx,
+            network_sender,
+            rand_msg_rx,
             acked_rand_decision_tx,
             acked_rand_decision_rx,
+            send_delta_request_tx,
+            send_delta_request_rx,
             reliable_broadcast: Arc::new(reliable_broadcast),
         }
     }
@@ -136,7 +148,7 @@ impl RandManager {
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = self.reliable_broadcast.broadcast(
             shares,
-            ShareAckState::new(self.verifier.get_ordered_account_addresses_iter(), self.rand_store.rand_config().clone(), self.acked_rand_decision_tx.clone()),
+            ShareAckState::new(self.verifier.get_ordered_account_addresses_iter(), self.rand_store.rand_config().unwrap().clone(), self.acked_rand_decision_tx.clone(), self.send_delta_request_tx.clone()),
         );
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -165,9 +177,27 @@ impl RandManager {
         self.process_decision(decision).await;
     }
 
+    async fn send_apk_delta(&mut self, peer: Author) -> anyhow::Result<()> {
+        debug!("[RandManager] Sending delta to peer {:?}", peer);
+        let delta = self.rand_store.rand_config().unwrap().get_delta(&self.author, &Mode::Fallback).cloned().expect("[RandManager] No local delta to send to peer!");
+        let delta_msg = DeltaMsg::new(self.author, delta);
+        self.network_sender.send_rb_rpc(peer, RandMessage::Delta(delta_msg), Duration::from_millis(DELTA_SENDING_TIMEOUT)).await.map(|_| ())
+    }
+
+    fn process_apk_delta(&mut self, peer: &AccountAddress, delta: Delta) -> anyhow::Result<()> {
+        if let Some(rand_config) = self.rand_store.rand_config.as_mut() {
+            rand_config.add_delta(peer, delta, &Mode::Fallback)
+        } else {
+            bail!("[RandManager] No rand_config!");
+        }
+    }
+
     async fn process_share(&mut self, share: RandShare) -> anyhow::Result<RandMessage> {
         log_rand_event(LogEvent::ReceiveRandShare, self.author, Some(*share.author()), share.id(), share.round());
 
+        if share.apk_delta().is_some() {
+            self.process_apk_delta(share.author(), share.apk_delta().clone().unwrap())?;
+        }
         match self.rand_store.add_share(share.clone()) {
             Ok((maybe_decision, result)) => {
                 // Ack back decision if available
@@ -176,6 +206,7 @@ impl RandManager {
                     AddDecisionResult::NewRandReadyBlock => self.try_dequeue().await,
                     AddDecisionResult::None => (),
                 };
+
                 Ok(RandMessage::ShareAck(maybe_decision))
             },
             Err(e) => {
@@ -184,15 +215,19 @@ impl RandManager {
         }
     }
 
-    async fn process_rand_rpc(&mut self, rand_rpc: IncomingRandRequest) -> anyhow::Result<()> {
+    async fn process_rand_msg(&mut self, rand_msg: IncomingRandRequest) -> anyhow::Result<()> {
         let IncomingRandRequest {
             req,
             protocol,
             response_sender,
-        } = rand_rpc;
+        } = rand_msg;
 
         let rand_msg = match req {
             RandMessage::Share(share) => self.process_share(share).await?,
+            RandMessage::Delta(delta) => {
+                self.process_apk_delta(&delta.author, delta.delta)?;
+                RandMessage::DeltaAck(())
+            },
             _ => {
                 bail!("[RandManager] error unknown rpc message {:?}", req)
             },
@@ -227,6 +262,8 @@ impl RandManager {
         // } else {
         //     debug!("[RandManager] Round {} received blocks with optimistic rand", maybe_randomness.as_ref().unwrap().round());
         // }
+
+        observe_block(blocks.ordered_blocks.last().unwrap().timestamp_usecs(), BlockStage::RAND_ENTER);
         
         let maybe_randomness = blocks.maybe_randomness.or_else(|| {
             self.rand_store.get_randomness(&blocks.ordered_blocks.last()?.round()).cloned()
@@ -243,27 +280,58 @@ impl RandManager {
                 BlockQueueItem::RandReady(Box::new(blocks))
             },
             None => {
-                // rand todo: generate real shares
-                let share = RandShare::new_for_test(self.author, blocks.ordered_blocks.last().unwrap().block_info());
+                if self.rand_store.rand_config().is_none() {
+                    // If no rand_config, generate a dummy randomness
+                    // It happens only on first epoch which has no DKG
+                    // rand todo: hard code DKG for the first epoch on forge
+                    debug!("[RandManager] No rand_config, generate a dummy randomness for round {} block", blocks.ordered_blocks.last().unwrap().round()); 
+                    let blocks = RandReadyBlocks {
+                        ordered_blocks: blocks.ordered_blocks,
+                        ordered_proof: blocks.ordered_proof,
+                        callback: blocks.callback,
+                        randomness: Randomness::default(),
+                    };
+                    BlockQueueItem::RandReady(Box::new(blocks))
+                } else {
+                    let block = blocks.ordered_blocks.last().unwrap();
+                    let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());
+                    let ask = &self.rand_store.rand_config().as_ref().unwrap().keys_f.ask;
+                    let proof = <WVUF as WeightedVUF>::create_share(&ask, metadata.to_bytes().as_slice());
+                    let mut apk_delta = None;
+                    if block.round() <= 1 {
+                        // Sending apk_delta along with the share for the first round
+                        // If a node has no apk_delta, it will send MissingDelta in ShareAck
+                        apk_delta = self.rand_store.rand_config().unwrap().get_delta(&self.rand_store.rand_config().unwrap().author, &Mode::Fallback).cloned();
+                    }
+                    let share = RandShare::new(self.author, Mode::Fallback, metadata, proof, apk_delta);
 
-                observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
-                log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());
+                    observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
+                    log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());
 
-                let drop_guard = self.do_reliable_broadcast(share);
-                let blocks = OrderedBlocks {
-                    ordered_blocks: blocks.ordered_blocks,
-                    ordered_proof: blocks.ordered_proof,
-                    callback: blocks.callback,
-                    maybe_randomness: None,
-                    timed_drop_guard: Some((Instant::now(), drop_guard)),
-                };
+                    let drop_guard = self.do_reliable_broadcast(share);
+                    let blocks = OrderedBlocks {
+                        ordered_blocks: blocks.ordered_blocks,
+                        ordered_proof: blocks.ordered_proof,
+                        callback: blocks.callback,
+                        maybe_randomness: None,
+                        timed_drop_guard: Some((Instant::now(), drop_guard)),
+                    };
 
-                BlockQueueItem::Ordered(Box::new(blocks))
+                    BlockQueueItem::Ordered(Box::new(blocks))
+                }
             },
         };
-        let rand_ready = !block.is_ordered();
-        self.rand_store.add_block(block);
-        if rand_ready {
+        let mut try_dequeue = !block.is_ordered();
+        match self.rand_store.add_block(block) {
+            Ok((_, AddDecisionResult::NewRandReadyBlock)) => {
+                try_dequeue = true;
+            },
+            Ok(_) => (),
+            Err(e) => {
+                error!("[RandManager] error when processing ordered blocks: {}", e);
+            },
+        }
+        if try_dequeue {
             self.try_dequeue().await;
         }
     }
@@ -355,51 +423,73 @@ impl RandManager {
         let mut garbage_collect_interval = tokio::time::interval(Duration::from_millis(GARBAGE_COLLECT_LOOP_INTERVAL_MS));
 
         while !self.stop {
-            ::futures::select! {
-                blocks = self.ordered_block_rx.select_next_some() => {
-                    monitor!("rand_manager_process_ordered", {
-                        self.process_ordered_blocks(blocks).await;
-                    });
-                },
-                rand_share = self.rand_share_rx.select_next_some() => {
-                    monitor!("rand_manager_process_rand_share", {
-                        if let Err(e) = self.process_rand_rpc(rand_share).await {
-                            warn!(error = ?e, "[Randomness] error processing rpc");
-                        }
-                    });
+            // If no rand_config, only process ordered_block_rx
+            if self.rand_store.rand_config().is_none() {
+                ::futures::select! {
+                    blocks = self.ordered_block_rx.select_next_some() => {
+                        monitor!("rand_manager_process_ordered", {
+                            self.process_ordered_blocks(blocks).await;
+                        });
+                    },
+                    reset_event = self.reset_rx.select_next_some() => {
+                        monitor!("rand_manager_process_reset",
+                        self.process_reset_request(reset_event).await);
+                    },
                 }
-                rand_decision = self.acked_rand_decision_rx.select_next_some() => {
-                    monitor!("rand_manager_process_rand_decision", {
-                        self.process_acked_decision(rand_decision).await;
-                    });
-                },
-                buffer_manager_event = self.buffer_manager_rx.select_next_some() => {
-                    monitor!("rand_manager_process_buffer_manager_event", {
-                    match buffer_manager_event {
-                        BufferManagerEvent::Commit(committed_round) => {
-                            self.rand_store.update_rounds(committed_round);
-                        },
+            } else {
+                ::futures::select! {
+                    blocks = self.ordered_block_rx.select_next_some() => {
+                        monitor!("rand_manager_process_ordered", {
+                            self.process_ordered_blocks(blocks).await;
+                        });
+                    },
+                    rand_msg = self.rand_msg_rx.select_next_some() => {
+                        monitor!("rand_manager_process_rand_msg", {
+                            if let Err(e) = self.process_rand_msg(rand_msg).await {
+                                warn!(error = ?e, "[RandManager] error processing rand msg");
+                            }
+                        });
                     }
-                    });
-                },
-                reset_event = self.reset_rx.select_next_some() => {
-                    monitor!("rand_manager_process_reset",
-                    self.process_reset_request(reset_event).await);
-                },
-                _ = rebroadcast_interval.tick().fuse() => {
-                    self.print_rand_store();
-
-                    monitor!("rand_manager_process_rebroadcast_interval_tick", {
-                    self.update_rand_manager_metrics();
-                    self.rebroadcast_rand_shares().await
-                    });
-                },
-                _ = garbage_collect_interval.tick().fuse() => {
-                    monitor!("rand_manager_process_garbage_collect_interval_tick", {
-                    self.rand_store.garbage_collect();
-                    });
-                },
-                // no else branch here because interval.tick will always be available
+                    rand_decision = self.acked_rand_decision_rx.select_next_some() => {
+                        monitor!("rand_manager_process_rand_decision", {
+                            self.process_acked_decision(rand_decision).await;
+                        });
+                    },
+                    peer = self.send_delta_request_rx.select_next_some() => {
+                        monitor!("rand_manager_send_apk_delta", {
+                            if let Err(e) = self.send_apk_delta(peer.clone()).await {
+                                warn!(error = ?e, "[RandManager] error sending apk delta to peer {:?}", peer);
+                            }
+                        });
+                    },
+                    buffer_manager_event = self.buffer_manager_rx.select_next_some() => {
+                        monitor!("rand_manager_process_buffer_manager_event", {
+                        match buffer_manager_event {
+                            BufferManagerEvent::Commit(committed_round) => {
+                                self.rand_store.update_rounds(committed_round);
+                            },
+                        }
+                        });
+                    },
+                    reset_event = self.reset_rx.select_next_some() => {
+                        monitor!("rand_manager_process_reset",
+                        self.process_reset_request(reset_event).await);
+                    },
+                    _ = rebroadcast_interval.tick().fuse() => {
+                        self.print_rand_store();
+    
+                        monitor!("rand_manager_process_rebroadcast_interval_tick", {
+                        self.update_rand_manager_metrics();
+                        self.rebroadcast_rand_shares().await
+                        });
+                    },
+                    _ = garbage_collect_interval.tick().fuse() => {
+                        monitor!("rand_manager_process_garbage_collect_interval_tick", {
+                        self.rand_store.garbage_collect();
+                        });
+                    },
+                    // no else branch here because interval.tick will always be available
+                }
             }
         }
         info!("Randomness manager stops.");
