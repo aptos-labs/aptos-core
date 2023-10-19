@@ -635,7 +635,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             "Reading a module {:?} using ResourceView",
             state_key,
         );
-
         match &self.latest_view {
             ViewState::Sync(state) => {
                 let mut ret = state.read_data_by_kind(state_key, self.txn_idx, kind.clone());
@@ -1816,6 +1815,70 @@ mod test {
                 Value::struct_(Struct::pack(vec![Value::u128(9)])),
                 Value::struct_(Struct::pack(vec![Value::u128(10)])),
                 Value::struct_(Struct::pack(vec![Value::u128(11)])),
+            ])]));
+        assert_eq!(
+            patched_state_value,
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+        );
+        let (final_state_value, identifiers2) = latest_view
+            .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
+            .unwrap();
+        assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
+        assert!(
+            identifiers2.len() == 3,
+            "Three identifiers should have been replaced in this case"
+        );
+        assert_eq!(identifiers, identifiers2);
+
+        /*
+            layout = Struct {
+                aggregators: vec![AggregatorSnapshot<u128>]
+            }
+        */
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
+            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
+                    Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                        MoveTypeLayout::U8,
+                    ]))),
+                ),
+            ]))),
+        )]));
+        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::vector_u8(vec![20, 30, 21, 32]),
+            ]))])),
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::vector_u8(vec![35, 12]),
+            ]))])),
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::vector_u8(vec![12, 0, 1]),
+            ]))])),
+        ])]));
+        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let (patched_state_value, identifiers) = latest_view
+            .replace_values_with_identifiers(state_value.clone(), &layout)
+            .unwrap();
+        assert!(
+            identifiers.len() == 3,
+            "Three identifiers should have been replaced in this case"
+        );
+        assert!(
+            counter == RefCell::new(15),
+            "The counter should have been updated to 15"
+        );
+        let patched_value =
+            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                    Value::u8(12),
+                ]))])),
+                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                    Value::u8(13),
+                ]))])),
+                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                    Value::u8(14),
+                ]))])),
             ])]));
         assert_eq!(
             patched_state_value,
