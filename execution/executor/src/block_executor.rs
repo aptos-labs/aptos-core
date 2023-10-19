@@ -324,7 +324,17 @@ where
             parent_accumulator,
             current_output.output.epoch_state().clone(),
         );
+        info!(
+            next_version = output.transaction_accumulator.num_leaves(),
+            txns_to_commit = output
+                .transactions_to_commit()
+                .iter()
+                .map(|t| (t.transaction(), t.transaction_info()))
+                .collect::<Vec<_>>(),
+            "Gonna return state compute result",
+        );
         current_output.output.set_ledger_update(output);
+
         Ok(state_compute_result)
     }
 
