@@ -630,6 +630,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         maybe_layout: Option<&MoveTypeLayout>,
         kind: ReadKind,
     ) -> anyhow::Result<ReadResult> {
+        println!("maybe_layout: {:?}", maybe_layout);
         debug_assert!(
             state_key.module_path().is_none(),
             "Reading a module {:?} using ResourceView",
@@ -1054,6 +1055,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
 
 #[cfg(test)]
 mod test {
+    use super::LatestView;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
         proptest_types::types::{KeyType, MockEvent, ValueType},
@@ -1067,11 +1069,25 @@ mod test {
     };
     use aptos_mvhashmap::{
         types::{MVDelayedFieldsError, TxnIndex},
+        unsync_map::UnsyncMap,
         versioned_delayed_fields::TVersionedDelayedFieldView,
     };
-    use aptos_types::{aggregator::DelayedFieldID, transaction::BlockExecutableTransaction};
+    use aptos_state_view::TStateView;
+    use aptos_types::{
+        aggregator::DelayedFieldID,
+        executable::Executable,
+        state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+        transaction::BlockExecutableTransaction,
+    };
     use claims::{assert_err_eq, assert_ok_eq, assert_some_eq};
-    use std::{cell::RefCell, collections::HashMap};
+    use move_core_types::value::{
+        IdentifierMappingKind, LayoutTag, MoveStructLayout, MoveTypeLayout,
+    };
+    use move_vm_types::values::{Struct, Value};
+    use std::{
+        cell::RefCell,
+        collections::{HashMap, HashSet},
+    };
 
     #[derive(Default)]
     pub struct FakeVersionedDelayedFieldView {
@@ -1594,6 +1610,182 @@ mod test {
         assert_err_eq!(
             get_delayed_field_value_impl(&captured_reads, &view, &wait_for, &id, txn_idx),
             PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead),
+        );
+    }
+
+    // TODO: Check how to import MockStateView from other tests
+    // rather than rewriting it here again
+    struct MockStateView {
+        data: HashMap<KeyType<u32>, StateValue>,
+    }
+
+    impl MockStateView {
+        fn new(data: HashMap<KeyType<u32>, StateValue>) -> Self {
+            Self { data }
+        }
+    }
+
+    impl TStateView for MockStateView {
+        type Key = KeyType<u32>;
+
+        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+            Ok(self.data.get(state_key).cloned())
+        }
+
+        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+            unimplemented!();
+        }
+    }
+
+    #[derive(Clone)]
+    struct MockExecutable {}
+
+    impl Executable for MockExecutable {
+        fn size_bytes(&self) -> usize {
+            unimplemented!();
+        }
+    }
+
+    #[test]
+    fn test_id_value_exchange() {
+        // Test that replace_values_with_identifiers and replace_identifiers_with_values functions are working correctly
+
+        // create latest_view
+        let unsync_map = UnsyncMap::new();
+        let counter = RefCell::new(5);
+        let base_view = MockStateView::new(HashMap::new());
+        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
+            &base_view,
+            super::ViewState::Unsync(super::SequentialState {
+                unsync_map: &unsync_map,
+                counter: &counter,
+                read_set: RefCell::new(HashSet::new()),
+            }),
+            1,
+        );
+
+        // Test id -- value exchange for a value that does not contain delayed fields
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+            MoveTypeLayout::U64,
+            MoveTypeLayout::U64,
+            MoveTypeLayout::U64,
+        ]));
+        let value = Value::struct_(Struct::pack(vec![
+            Value::u64(1),
+            Value::u64(2),
+            Value::u64(3),
+        ]));
+        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let (patched_state_value, identifiers) = latest_view
+            .replace_values_with_identifiers(state_value.clone(), &layout)
+            .unwrap();
+        assert_eq!(state_value, patched_state_value);
+        assert!(
+            identifiers.is_empty(),
+            "No identifiers should have been replaced in this case"
+        );
+        let (final_state_value, identifiers) = latest_view
+            .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
+            .unwrap();
+        assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
+        assert!(
+            identifiers.is_empty(),
+            "No identifiers should have been replaced in this case"
+        );
+
+        /*
+            layout = Struct {
+                agg: Aggregator
+            }
+        */
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
+            MoveStructLayout::new(vec![
+                MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+                    Box::new(MoveTypeLayout::U64),
+                ),
+                MoveTypeLayout::U64,
+            ]),
+        )]));
+        let value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+            Value::u64(25),
+            Value::u64(30),
+        ]))]));
+        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let (patched_state_value, identifiers) = latest_view
+            .replace_values_with_identifiers(state_value.clone(), &layout)
+            .unwrap();
+        assert!(
+            identifiers.len() == 1,
+            "One identifier should have been replaced in this case"
+        );
+        println!("identifiers {:?}", identifiers);
+        assert!(
+            identifiers.contains(&DelayedFieldID::new(5)),
+            "The value 25 should have been replaced in the identifier 5"
+        );
+        let (final_state_value, identifiers) = latest_view
+            .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
+            .unwrap();
+        assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
+        assert!(
+            identifiers.len() == 1,
+            "One identifier should have been replaced in this case"
+        );
+
+        /*
+            layout = Struct {
+                aggregators: vec![Aggregator]
+            }
+        */
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
+            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+                    Box::new(MoveTypeLayout::U64),
+                ),
+                MoveTypeLayout::U64,
+            ]))),
+        )]));
+        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::u64(20), Value::u64(50)])),
+            Value::struct_(Struct::pack(vec![Value::u64(35), Value::u64(65)])),
+            Value::struct_(Struct::pack(vec![Value::u64(0), Value::u64(20)])),
+        ])]));
+        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let (patched_state_value, identifiers) = latest_view
+            .replace_values_with_identifiers(state_value.clone(), &layout)
+            .unwrap();
+        assert!(
+            identifiers.len() == 3,
+            "Three identifiers should have been replaced in this case"
+        );
+        println!("identifiers {:?}", identifiers);
+        assert!(
+            counter == RefCell::new(9),
+            "The counter should have been updated to 9"
+        );
+        let patched_value =
+            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+                Value::struct_(Struct::pack(vec![Value::u64(6), Value::u64(50)])),
+                Value::struct_(Struct::pack(vec![Value::u64(7), Value::u64(65)])),
+                Value::struct_(Struct::pack(vec![Value::u64(8), Value::u64(20)])),
+            ])]));
+        assert_eq!(
+            patched_state_value,
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+        );
+        assert!(
+            identifiers.contains(&DelayedFieldID::new(6)),
+            "The value 25 should have been replaced in the identifier 5"
+        );
+        let (final_state_value, identifiers) = latest_view
+            .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
+            .unwrap();
+        assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
+        assert!(
+            identifiers.len() == 3,
+            "Three identifiers should have been replaced in this case"
         );
     }
 }
