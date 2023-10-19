@@ -208,7 +208,7 @@ impl RandStore {
 
     pub fn check_rounds(&self, round: Round) -> anyhow::Result<()> {
         if round < self.rand_round_min || round > self.rand_round_max {
-            bail!("[RandStore] round {:?} is not in range [{:?}, {:?}]", round, self.rand_round_min, self.rand_round_max);
+            bail!("[RandStore] round {} is not in range [{}, {}]", round, self.rand_round_min, self.rand_round_max);
         }
         Ok(())
     }
@@ -287,6 +287,10 @@ impl RandStore {
         let rand_config = self.rand_config.as_ref().unwrap();
         let missing_apk = rand_config.get_apk(share.author(), &Mode::Fallback).is_none();
 
+        if missing_apk {
+            return Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None));
+        }
+
         self.check_rounds(share.round())?;
 
         let rand_item = self.rand_map.entry(share.round()).or_insert_with(RandItem::new);
@@ -308,7 +312,7 @@ impl RandStore {
 
         observe_block(share.timestamp(), BlockStage::RAND_ADD_SHARE);
 
-        debug!("[RandStore] Added share for round {:?} from {:?}, weight {} threshold {}", share.round(), share.author(), rand_item.weight(), rand_config.th_f());
+        debug!("[RandStore] Added share for epoch {} round {} from {:?}, weight {} threshold {}", share.epoch(), share.round(), share.author(), rand_item.weight(), rand_config.th_f());
 
         match self.try_aggregate_shares(share.round(), None) {
             Ok(Some(decision)) => Ok((ShareAck::new(Some(decision.clone()), missing_apk), self.add_decision(decision)?)),
@@ -331,7 +335,7 @@ impl RandStore {
 
         rand_item.add_decision(decision.clone())?;
 
-        debug!("[RandStore] Added decision for round {:?}", decision.round());
+        debug!("[RandStore] Added decision for epoch {} round {}", decision.epoch(), decision.round());
 
         log_rand_event(LogEvent::AddFirstRandDecision, self.author, None, decision.block_id(), decision.round());
 
@@ -343,7 +347,7 @@ impl RandStore {
                 Ok(AddDecisionResult::None)
             }
             Ok(()) => {
-                debug!("[RandStore] Updated block with decision for round {:?}", decision.round());
+                debug!("[RandStore] Updated block with decision for epoch {} round {}", decision.epoch(), decision.round());
                 Ok(AddDecisionResult::NewRandReadyBlock)
             }
         }

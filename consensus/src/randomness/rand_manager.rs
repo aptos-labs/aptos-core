@@ -170,7 +170,8 @@ impl RandManager {
         observe_block(decision.timestamp(), BlockStage::RAND_RCV_ACK_DECISION);
 
         debug!(
-            "[RandManager] Received acked decision for round {:?}",
+            "[RandManager] Received acked decision for epoch {} round {}",
+            self.epoch,
             decision.round(),
         );
 
@@ -284,7 +285,7 @@ impl RandManager {
                     // If no rand_config, generate a dummy randomness
                     // It happens only on first epoch which has no DKG
                     // rand todo: hard code DKG for the first epoch on forge
-                    debug!("[RandManager] No rand_config, generate a dummy randomness for round {} block", blocks.ordered_blocks.last().unwrap().round()); 
+                    debug!("[RandManager] No rand_config, generate a dummy randomness for epoch {} round {} block", self.epoch, blocks.ordered_blocks.last().unwrap().round()); 
                     let blocks = RandReadyBlocks {
                         ordered_blocks: blocks.ordered_blocks,
                         ordered_proof: blocks.ordered_proof,
@@ -381,14 +382,16 @@ impl RandManager {
 
         if !rebroadcast_rounds.is_empty() {
             // rand todo: add counters
-            info!("[RandManager] Re-broadcast randomness shares of rounds {:?}", rebroadcast_rounds);
+            info!("[RandManager] Re-broadcast randomness shares of epoch {} rounds {:?}", self.epoch, rebroadcast_rounds);
         }
 
         for round in rebroadcast_rounds {
-            let share = self.rand_store.get_my_share(&round).unwrap().clone();
-            observe_block(share.timestamp(), BlockStage::RAND_RE_BC_SHARE);
-
-            self.rand_store.update_guard(round, self.do_reliable_broadcast(share));
+            if let Some(share) = self.rand_store.get_my_share(&round) {
+                observe_block(share.timestamp(), BlockStage::RAND_RE_BC_SHARE);
+                self.rand_store.update_guard(round, self.do_reliable_broadcast(share.clone()));
+            } else {
+                debug!("[RandManager] No local share for epoch {} round {} to re-broadcast", self.epoch, round);
+            }
         }
     }
 

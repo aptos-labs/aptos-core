@@ -47,6 +47,13 @@ impl BlockQueueItem {
         }
     }
 
+    pub fn epoch(&self) -> u64 {
+        match self {
+            BlockQueueItem::Ordered(ordered) => ordered.ordered_blocks.last().unwrap().block().epoch(),
+            BlockQueueItem::RandReady(rand_ready) => rand_ready.ordered_blocks.last().unwrap().block().epoch(),
+        }
+    }
+
     pub fn round(&self) -> u64 {
         match self {
             BlockQueueItem::Ordered(ordered) => ordered.ordered_blocks.last().unwrap().block().round(),
@@ -137,10 +144,10 @@ impl BlockQueue {
                 self.queue.insert(round, BlockQueueItem::RandReady(Box::new(rand_ready)));
                 return Ok(());
             } else {
-                bail!("[BlockQueue] update_decision failed: round {} item is not ordered", round);
+                bail!("[BlockQueue] update_decision failed: epoch {} round {} item is not ordered", item.epoch(), round);
             }
         } else {
-            bail!("[BlockQueue] update_decision failed: round {} item not found", round);
+            bail!("[BlockQueue] update_decision failed: epoch {} round {} item not found", randomness.epoch(), round);
         }
     }
 }
