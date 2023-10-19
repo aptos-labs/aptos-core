@@ -75,16 +75,19 @@ impl Features {
     }
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+        false
+        // self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::MODULE_EVENT)
+        false
+        // self.is_enabled(FeatureFlag::MODULE_EVENT)
     }
 
     pub fn is_emit_fee_statement_enabled(&self) -> bool {
+        false
         // requires module events
-        self.is_module_event_enabled() && self.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT)
+        // self.is_module_event_enabled() && self.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT)
     }
 
     pub fn is_storage_deletion_refund_enabled(&self) -> bool {
