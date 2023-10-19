@@ -162,7 +162,7 @@ impl VMChangeSet {
     pub fn num_write_ops(&self) -> usize {
         self.resource_write_set.len()
             + self.module_write_set().len()
-            + self.aggregator_v1_write_set().len()
+            + self.aggregator_write_set().len()
     }
 
     pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, &mut WriteOp)> {
