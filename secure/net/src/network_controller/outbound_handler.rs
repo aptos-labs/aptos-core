@@ -140,6 +140,7 @@ impl OutboundHandler {
             if remote_addr == socket_addr {
                 // If the remote address is the same as the local address, then we are sending a message to ourselves
                 // so we should just pass it to the inbound handler
+                println!("Sending message to {:?}", socket_addr);
                 inbound_handler
                     .lock()
                     .unwrap()

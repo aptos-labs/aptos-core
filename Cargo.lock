@@ -1319,6 +1319,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-executor-grpc-benchmark-remote-service"
+version = "0.1.0"
+dependencies = [
+ "aptos-executor-service",
+ "aptos-secure-net",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "clap 4.3.21",
+ "rand 0.7.3",
+]
+
+[[package]]
+name = "aptos-executor-grpc-benchmark-service"
+version = "0.1.0"
+dependencies = [
+ "aptos-executor-service",
+ "aptos-secure-net",
+ "aptos-types",
+ "bcs 0.1.4",
+ "clap 4.3.21",
+]
+
+[[package]]
 name = "aptos-executor-service"
 version = "0.1.0"
 dependencies = [

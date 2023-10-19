@@ -119,6 +119,8 @@ members = [
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
+    "execution/executor-grpc-benchmark/benchmark-service",
+    "execution/executor-grpc-benchmark/remote-service",
     "execution/executor-service",
     "execution/executor-test-helpers",
     "execution/executor-types",

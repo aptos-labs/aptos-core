@@ -1,0 +1,20 @@
+[package]
+name = "aptos-executor-grpc-benchmark-service"
+description = "Aptos executor GRPC benchmark service"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-secure-net = { workspace = true }
+aptos-types = { workspace = true }
+aptos-executor-service = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }
