@@ -12,7 +12,6 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
-    bls12381,
     bls12381::Signature,
     hash::{CryptoHash, CryptoHasher},
     CryptoMaterialError, HashValue,
@@ -467,12 +466,7 @@ impl CertifiedNodeMessage {
             self.certified_node.epoch(),
             self.ledger_info().commit_info().epoch()
         );
-        self.certified_node.verify(verifier)?;
-        if self.ledger_info.commit_info().round() > 0 {
-            Ok(self.ledger_info.verify_signatures(verifier)?)
-        } else {
-            Ok(())
-        }
+        self.certified_node.verify(verifier)
     }
 }
 
@@ -487,7 +481,7 @@ impl Deref for CertifiedNodeMessage {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Vote {
     metadata: NodeMetadata,
-    signature: bls12381::Signature,
+    signature: Signature,
 }
 
 impl Vote {
@@ -498,7 +492,7 @@ impl Vote {
         }
     }
 
-    pub fn signature(&self) -> &bls12381::Signature {
+    pub fn signature(&self) -> &Signature {
         &self.signature
     }
 
@@ -647,7 +641,7 @@ impl RemoteFetchRequest {
             "Target round is not consistent"
         );
         ensure!(
-            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64
+            self.exists_bitmask.first_round() + self.exists_bitmask.bitmask.len() as u64 - 1
                 == target_round,
             "Bitmask length doesn't match, first_round {}, length {}, target {}",
             self.exists_bitmask.first_round(),
@@ -866,5 +860,9 @@ impl DagSnapshotBitmask {
 
     pub fn first_round(&self) -> Round {
         self.first_round
+    }
+
+    pub fn len(&self) -> usize {
+        self.bitmask.len()
     }
 }

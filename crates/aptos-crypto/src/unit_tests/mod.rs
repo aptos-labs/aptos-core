@@ -7,6 +7,7 @@ mod bulletproofs_test;
 mod compat_test;
 mod cross_test;
 mod cryptohasher;
+mod ecdsa_p256_test;
 mod ed25519_test;
 mod hash_test;
 mod hkdf_test;

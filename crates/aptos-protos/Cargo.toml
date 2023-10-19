@@ -1,6 +1,6 @@
 [package]
 name = "aptos-protos"
-version = "1.0.1"
+version = "1.1.1"
 
 # Workspace inherited keys
 authors = { workspace = true }
