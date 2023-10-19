@@ -10,7 +10,12 @@ use claims::assert_some;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use move_core_types::value::MoveTypeLayout;
-use std::{collections::btree_map::BTreeMap, fmt::Debug, hash::Hash, sync::Arc};
+use std::{
+    collections::btree_map::{self, BTreeMap},
+    fmt::Debug,
+    hash::Hash,
+    sync::Arc,
+};
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
@@ -255,25 +260,49 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
-    pub fn provide_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {
+    pub fn set_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {
         let mut v = self.values.entry(key).or_default();
         let bytes_len = data.bytes_len();
-        // For base value, incarnation is irrelevant, set to 0.
-        let prev_entry = v.versioned_map.insert(
-            ShiftedTxnIndex::zero(),
-            CachePadded::new(Entry::new_write_from(0, data, maybe_layout)),
-        );
+        // For base value, incarnation is irrelevant, and is always set to 0.
 
-        assert!(prev_entry.map_or(true, |entry| -> bool {
-            if let EntryCell::Write(i, v, _) = &entry.cell {
-                // base value may have already been provided due to a concurrency race,
-                // but it has to be the same as being set.
-                // Assert the length of bytes for efficiency (instead of full equality)
-                *i == 0 && v.bytes_len() == bytes_len
-            } else {
-                true
-            }
-        }));
+        use btree_map::Entry::*;
+        match v.versioned_map.entry(ShiftedTxnIndex::zero()) {
+            Vacant(v) => {
+                v.insert(CachePadded::new(Entry::new_write_from(
+                    0,
+                    data,
+                    maybe_layout,
+                )));
+            },
+            Occupied(o) => {
+                assert!(
+                    if let EntryCell::Write(i, v, layout) = &o.get().cell {
+                        // base value may have already been provided by another transaction
+                        // executed simultaneously and asking for the same resource.
+                        // Value from storage must be identical, but then delayed field
+                        // identifier exchange could've modiefied it.
+                        //
+                        // If maybe_layout is None, they are required to be identical
+                        // If maybe_layout is Some, there might have been an exchange
+                        // Assert the length of bytes for efficiency (instead of full equality)
+                        layout.is_some() == maybe_layout.is_some()
+                            && *i == 0
+                            && (layout.is_some() || v.bytes_len() == bytes_len)
+                    } else {
+                        true
+                    }
+                );
+            },
+        };
+
+        // let prev_entry = v.versioned_map.insert(
+        //     ShiftedTxnIndex::zero(),
+        //     CachePadded::new(Entry::new_write_from(0, data, maybe_layout)),
+        // );
+
+        // assert!(prev_entry.map_or(true, |entry| -> bool {
+
+        // }));
     }
 
     /// Versioned write of data at a given key (and version).
