@@ -997,6 +997,8 @@ dependencies = [
  "anyhow",
  "aptos-accumulator",
  "aptos-config",
+ "aptos-consensus",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-db-indexer",
  "aptos-executor-types",
@@ -1118,6 +1120,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-crypto",
+ "aptos-db",
  "aptos-gas-meter",
  "aptos-gas-profiling",
  "aptos-gas-schedule",

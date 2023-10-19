@@ -14,7 +14,7 @@ pub(crate) mod proof_coordinator;
 pub(crate) mod proof_manager;
 pub(crate) mod quorum_store_builder;
 pub(crate) mod quorum_store_coordinator;
-pub(crate) mod quorum_store_db;
+pub mod quorum_store_db;
 pub(crate) mod types;
 pub(crate) mod utils;
 

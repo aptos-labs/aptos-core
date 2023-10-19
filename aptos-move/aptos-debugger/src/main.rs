@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
+use aptos_db::db_debugger::examine::consensus_db::Cmd;
 use aptos_debugger::AptosDebugger;
 use aptos_rest_client::Client;
 use aptos_vm::AptosVM;
@@ -34,22 +35,27 @@ pub struct Argument {
 #[tokio::main]
 async fn main() -> Result<()> {
     aptos_logger::Logger::new().init();
+    /*
     let args = Argument::parse();
-    AptosVM::set_concurrency_level_once(args.concurrency_level);
-
-    let debugger = match args.target {
-        Target::Rest { endpoint } => {
-            AptosDebugger::rest_client(Client::new(Url::parse(&endpoint)?))?
-        },
-        Target::DB { path } => AptosDebugger::db(path)?,
-    };
 
     println!(
         "{:#?}",
         debugger
             .execute_past_transactions(args.begin_version, args.limit)
             .await?
-    );
+    );*/
+
+    AptosVM::set_concurrency_level_once(1);
+
+    let cmd = Cmd {
+        db_dir: "/Users/grao/work/data/sev".into(),
+    };
+    let txns = cmd.run();
+    let debugger = AptosDebugger::rest_client(Client::new(Url::parse(
+        &"https://fullnode.mainnet.aptoslabs.com/v1/",
+    )?))?;
+    let result = debugger.execute_transactions_at_version(301617677, txns);
+    println!("{result:?}");
 
     Ok(())
 }

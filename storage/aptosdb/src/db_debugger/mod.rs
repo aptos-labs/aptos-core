@@ -3,7 +3,7 @@
 
 pub mod checkpoint;
 mod common;
-mod examine;
+pub mod examine;
 pub mod ledger;
 pub mod state_tree;
 pub mod truncate;

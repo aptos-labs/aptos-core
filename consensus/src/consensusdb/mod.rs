@@ -63,6 +63,7 @@ impl ConsensusDB {
         ];
 
         let path = db_root_path.as_ref().join(CONSENSUS_DB_NAME);
+        println!("{:?}", path);
         let instant = Instant::now();
         let mut opts = Options::default();
         opts.create_if_missing(true);

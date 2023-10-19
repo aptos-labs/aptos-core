@@ -43,7 +43,7 @@ impl PersistedValue {
         }
     }
 
-    pub(crate) fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
+    pub fn take_payload(&mut self) -> Option<Vec<SignedTransaction>> {
         self.maybe_payload.take()
     }
 
