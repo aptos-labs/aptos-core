@@ -220,13 +220,33 @@ impl<'a> FunctionGenerator<'a> {
                 self.gen_operation(ctx, dest, oper, source)
             },
             Bytecode::Load(_, dest, cons) => {
-                let cons = self.gen.constant_index(
-                    &ctx.fun_ctx.module,
-                    &ctx.fun_ctx.loc,
-                    cons,
-                    ctx.fun_ctx.fun.get_local_type(*dest),
-                );
-                self.emit(FF::Bytecode::LdConst(cons));
+                use move_stackless_bytecode::stackless_bytecode::Constant::*;
+                match cons {
+                    Bool(b) => {
+                        if *b {
+                            self.emit(FF::Bytecode::LdTrue)
+                        } else {
+                            self.emit(FF::Bytecode::LdFalse)
+                        }
+                    },
+                    U8(n) => self.emit(FF::Bytecode::LdU8(*n)),
+                    U16(n) => self.emit(FF::Bytecode::LdU16(*n)),
+                    U32(n) => self.emit(FF::Bytecode::LdU32(*n)),
+                    U64(n) => self.emit(FF::Bytecode::LdU64(*n)),
+                    U128(n) => self.emit(FF::Bytecode::LdU128(*n)),
+                    U256(n) => self.emit(FF::Bytecode::LdU256(
+                        move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
+                    )),
+                    _ => {
+                        let cons = self.gen.constant_index(
+                            &ctx.fun_ctx.module,
+                            &ctx.fun_ctx.loc,
+                            cons,
+                            ctx.fun_ctx.fun.get_local_type(*dest),
+                        );
+                        self.emit(FF::Bytecode::LdConst(cons));
+                    },
+                }
                 self.abstract_push_result(ctx, vec![*dest]);
             },
             Bytecode::Label(_, label) => self.define_label(*label),
