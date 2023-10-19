@@ -22,7 +22,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     types::{code_invariant_error, expect_ok, PanicOr},
 };
-use aptos_logger::{debug, info};
+use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex},
     unsync_map::UnsyncMap,
@@ -51,11 +51,6 @@ use std::{
     marker::{PhantomData, Sync},
     sync::{atomic::AtomicU32, Arc},
 };
-
-struct InternalExecuteResult {
-    record_succeeded: bool,
-    updates_outside: bool,
-}
 
 pub struct BlockExecutor<T, E, S, L, X> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
@@ -97,10 +92,6 @@ where
         }
     }
 
-    fn fallback_to_sequential<M: std::fmt::Debug>(message: M) {
-        panic!("{:?}", message);
-    }
-
     fn execute(
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
@@ -110,7 +101,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-    ) -> InternalExecuteResult {
+    ) -> ::std::result::Result<bool, PanicOr<ModulePathReadWrite>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -126,12 +117,11 @@ where
             .delayed_field_keys(idx_to_execute)
             .map_or(HashSet::new(), |keys| keys.collect());
 
-        let mut speculative_inconsistent = false;
         let mut read_set = sync_view.take_reads();
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
-        let mut apply_updates = |output: &E::Output| {
+        let mut apply_updates = |output: &E::Output| -> ::std::result::Result<(), PanicError> {
             // First, apply writes.
             for (k, v) in output.resource_write_set().into_iter().chain(
                 output
@@ -188,11 +178,21 @@ where
                         .record_change(id, idx_to_execute, entry)
                 {
                     match e {
-                        PanicOr::CodeInvariantError(m) => panic!("{}", m),
-                        PanicOr::Or(_) => speculative_inconsistent = true,
+                        PanicOr::CodeInvariantError(m) => {
+                            return Err(code_invariant_error(format!(
+                                "Record change failed with CodeInvariantError: {:?}",
+                                m
+                            )));
+                        },
+                        PanicOr::Or(_) => {
+                            read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                                MVDelayedFieldsError::DeltaApplicationFailure,
+                            ));
+                        },
                     };
                 }
             }
+            Ok(())
         };
 
         let result = match execute_result {
@@ -202,12 +202,12 @@ where
             // are recorded and (final statuses) are analyzed when the block is executed.
             ExecutionStatus::Success(output) => {
                 // Apply the writes/deltas to the versioned_data_cache.
-                apply_updates(&output);
+                apply_updates(&output)?;
                 ExecutionStatus::Success(output)
             },
             ExecutionStatus::SkipRest(output) => {
                 // Apply the writes/deltas and record status indicating skip.
-                apply_updates(&output);
+                apply_updates(&output)?;
                 ExecutionStatus::SkipRest(output)
             },
             ExecutionStatus::Abort(err) => {
@@ -215,12 +215,17 @@ where
                 ExecutionStatus::Abort(Error::UserError(err))
             },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
-                speculative_inconsistent = true;
+                read_set.capture_delayed_field_read_error(&PanicOr::Or(
+                    MVDelayedFieldsError::DeltaApplicationFailure,
+                ));
                 ExecutionStatus::SpeculativeExecutionAbortError(msg)
             },
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                Self::fallback_to_sequential(msg.clone());
-                ExecutionStatus::DelayedFieldsCodeInvariantError(msg)
+                return Err(code_invariant_error(format!(
+                    "Transaction execution failed with DelayedFieldsCodeInvariantError: {:?}",
+                    msg
+                ))
+                .into());
             },
         };
 
@@ -237,31 +242,26 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if speculative_inconsistent {
-            read_set.capture_delayed_field_read_error(&PanicOr::Or(
-                MVDelayedFieldsError::DeltaApplicationFailure,
-            ));
+        if !last_input_output.record(idx_to_execute, read_set, result) {
+            return Err(PanicOr::Or(ModulePathReadWrite));
         }
-
-        let record_succeeded = last_input_output.record(idx_to_execute, read_set, result);
-        InternalExecuteResult {
-            record_succeeded,
-            updates_outside,
-        }
+        Ok(updates_outside)
     }
 
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    ) -> bool {
+    ) -> ::std::result::Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
             .read_set(idx_to_validate)
             .expect("[BlockSTM]: Prior read-set must be recorded");
 
         if read_set.validate_incorrect_use() {
-            Self::fallback_to_sequential("read_set incorrect_use");
+            return Err(code_invariant_error(
+                "Incorrect use detected in CapturedReads",
+            ));
         }
 
         // Note: we validate delayed field reads only at try_commit.
@@ -272,8 +272,10 @@ where
         // until commit, but mark as estimates).
 
         // TODO: validate modules when there is no r/w fallback.
-        read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
-            && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
+        Ok(
+            read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
+                && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate),
+        )
     }
 
     fn update_transaction_on_abort(
@@ -377,25 +379,17 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) {
+    ) -> ::std::result::Result<(), PanicOr<ModulePathReadWrite>> {
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
-            let validation_result =
-                Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output);
-            if let Err(err) = validation_result {
-                Self::fallback_to_sequential(err);
-                return;
-            }
-            if !validation_result.unwrap() {
+            if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
 
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
                 // we are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit
-
-                let InternalExecuteResult {
-                    record_succeeded, ..
-                } = Self::execute(
+                // Because of that, we can also ignore _updates_outside result.
+                let _updates_outside = Self::execute(
                     txn_idx,
                     incarnation + 1,
                     block,
@@ -404,28 +398,21 @@ where
                     executor,
                     base_view,
                     ParallelState::new(versioned_cache, scheduler, shared_counter),
-                );
-                if record_succeeded {
-                    scheduler.finish_execution_during_commit(txn_idx);
-                } else {
-                    // TODO add support
-                    panic!("module re-validation in commit retry");
-                    // if scheduler.halt() {
-                    //     *maybe_error = Some(Error::ModulePathReadWrite);
-                    // }
-                    // SchedulerTask::NoTask
-                }
+                )?;
 
-                let validation_result = Self::validate(txn_idx, last_input_output, versioned_cache);
+                scheduler.finish_execution_during_commit(txn_idx);
+
+                let validation_result =
+                    Self::validate(txn_idx, last_input_output, versioned_cache)?;
                 if !validation_result
                     || !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)
                         .unwrap_or(false)
                 {
-                    println!(
+                    return Err(code_invariant_error(format!(
                         "Validation after re-execution failed for {} txn, validate() = {}",
                         txn_idx, validation_result
-                    );
-                    Self::fallback_to_sequential("validation after re-execution failed");
+                    ))
+                    .into());
                 }
             }
 
@@ -510,6 +497,7 @@ where
                 break;
             }
         }
+        Ok(())
     }
 
     // For each delayed field in resource write set, replace the identifiers with values.
@@ -800,7 +788,7 @@ where
             Option<Error<E::Error>>,
         )>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) {
+    ) -> ::std::result::Result<(), PanicOr<ModulePathReadWrite>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -837,7 +825,7 @@ where
                     shared_counter,
                     &executor,
                     block,
-                );
+                )?;
                 scheduler.queueing_commits_mark_done();
             }
 
@@ -845,7 +833,7 @@ where
 
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(txn_idx, incarnation, wave) => {
-                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache);
+                    let valid = Self::validate(txn_idx, last_input_output, versioned_cache)?;
                     Self::update_on_validation(
                         txn_idx,
                         incarnation,
@@ -861,12 +849,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    let mut shared_commit_state_guard = shared_commit_state.acquire();
-                    let (_, _, maybe_error) = shared_commit_state_guard.dereference_mut();
-                    let InternalExecuteResult {
-                        record_succeeded,
-                        updates_outside,
-                    } = Self::execute(
+                    let updates_outside = Self::execute(
                         txn_idx,
                         incarnation,
                         block,
@@ -875,15 +858,8 @@ where
                         &executor,
                         base_view,
                         ParallelState::new(versioned_cache, scheduler, shared_counter),
-                    );
-                    if record_succeeded {
-                        scheduler.finish_execution(txn_idx, incarnation, updates_outside)
-                    } else {
-                        if scheduler.halt() {
-                            *maybe_error = Some(Error::ModulePathReadWrite);
-                        }
-                        SchedulerTask::NoTask
-                    }
+                    )?;
+                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
@@ -898,7 +874,7 @@ where
                 SchedulerTask::NoTask => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue();
-                    break;
+                    break Ok(());
                 },
             }
         }
@@ -949,7 +925,7 @@ where
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
-                    self.worker_loop(
+                    if let Err(e) = self.worker_loop(
                         &executor_initial_arguments,
                         signature_verified_block,
                         &last_input_output,
@@ -959,7 +935,13 @@ where
                         &shared_counter,
                         &shared_commit_state,
                         &final_results,
-                    );
+                    ) {
+                        if scheduler.halt() {
+                            let mut shared_commit_state_guard = shared_commit_state.acquire();
+                            let (_, _, maybe_error) = shared_commit_state_guard.dereference_mut();
+                            *maybe_error = Some(Error::FallbackToSequential(e));
+                        }
+                    }
                 });
             }
         });
@@ -1211,8 +1193,12 @@ where
             )
         };
 
-        if matches!(ret, Err(Error::ModulePathReadWrite)) {
-            debug!("[Execution]: Module read & written, sequential fallback");
+        if let Err(Error::FallbackToSequential(e)) = ret {
+            if let PanicOr::Or(ModulePathReadWrite) = e {
+                debug!("[Execution]: Module read & written, sequential fallback");
+            } else {
+                error!("[Execution]: {:?}, sequential fallback", e);
+            }
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.

@@ -244,8 +244,11 @@ impl BlockAptosVM {
 
                 Ok(output_vec)
             },
-            Err(Error::ModulePathReadWrite) => {
-                unreachable!("[Execution]: Must be handled by sequential fallback")
+            Err(Error::FallbackToSequential(e)) => {
+                unreachable!(
+                    "[Execution]: Must be handled by sequential fallback: {:?}",
+                    e
+                )
             },
             Err(Error::UserError(err)) => Err(err),
         }
