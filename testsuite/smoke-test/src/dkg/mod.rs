@@ -199,3 +199,4 @@ fn decrypt_key_map(swarm: &LocalSwarm) -> HashMap<AccountAddress, DecryptPrivKey
 mod dkg_basic;
 mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
+mod dkg_feature_flag_flips;
