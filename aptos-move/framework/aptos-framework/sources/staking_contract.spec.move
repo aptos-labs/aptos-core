@@ -83,6 +83,7 @@ spec aptos_framework::staking_contract {
         contract_creation_seed: vector<u8>,
     ) {
         pragma aborts_if_is_partial;
+        pragma verify_duration_estimate = 120;
         include PreconditionsInCreateContract;
         include WithdrawAbortsIf<AptosCoin> {account: staker};
         include CreateStakingContractWithCoinsAbortsIfAndEnsures;

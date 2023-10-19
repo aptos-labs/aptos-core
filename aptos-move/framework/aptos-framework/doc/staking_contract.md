@@ -2170,6 +2170,7 @@ Account is not frozen and sufficient to withdraw.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>pragma</b> verify_duration_estimate = 120;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_PreconditionsInCreateContract">PreconditionsInCreateContract</a>;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;AptosCoin&gt; {<a href="account.md#0x1_account">account</a>: staker};
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_CreateStakingContractWithCoinsAbortsIfAndEnsures">CreateStakingContractWithCoinsAbortsIfAndEnsures</a>;
