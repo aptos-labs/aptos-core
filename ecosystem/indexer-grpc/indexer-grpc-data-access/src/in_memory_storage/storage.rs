@@ -2,6 +2,7 @@
 
 use crate::{access_trait::AccessMetadata, REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY};
 use anyhow::Context;
+use aptos_indexer_grpc_utils::types::RedisUrl;
 use aptos_protos::transaction::v1::Transaction;
 use dashmap::DashMap;
 use prost::Message;
@@ -71,9 +72,9 @@ impl InMemoryStorageInternal {
         })
     }
 
-    pub async fn new(redis_address: String) -> anyhow::Result<Self> {
-        let redis_client =
-            redis::Client::open(redis_address).context("Failed to open Redis client.")?;
+    pub async fn new(redis_address: RedisUrl) -> anyhow::Result<Self> {
+        let redis_client = redis::Client::open(redis_address.0.to_string())
+            .context("Failed to open Redis client.")?;
         let redis_connection = redis_client
             .get_tokio_connection_manager()
             .await
@@ -122,20 +123,28 @@ where
 
         let transactions_map_size_hard_limit =
             transaction_map_size.unwrap_or(IN_MEMORY_STORAGE_SIZE_HARD_LIMIT);
-        // 1. Determine the fetch size based on old metadata.
-        let redis_fetch_size = match *metadata.read().unwrap() {
-            Some(ref current_metadata) => {
+        // 1. Determine the fetch size based on old metadata. If new, update the chain id only.
+        let redis_fetch_size = {
+            let mut guard = metadata.write().unwrap();
+            if guard.is_none() {
+                // Update the chain id only.
+                *guard = Some(AccessMetadata {
+                    chain_id: redis_chain_id,
+                    next_version: 0,
+                });
+                std::cmp::min(
+                    transactions_map_size_hard_limit,
+                    redis_ending_version_exclusive as usize,
+                )
+            } else {
+                let current_metadata = guard.as_ref().unwrap();
                 anyhow::ensure!(
                     current_metadata.chain_id == redis_chain_id,
                     "Chain ID mismatch."
                 );
                 redis_ending_version_exclusive.saturating_sub(current_metadata.next_version)
                     as usize
-            },
-            None => std::cmp::min(
-                transactions_map_size_hard_limit,
-                redis_ending_version_exclusive as usize,
-            ),
+            }
         };
         // 2. Use MGET to fetch the transactions in batches.
         let starting_version = redis_ending_version_exclusive - redis_fetch_size as u64;
@@ -174,7 +183,6 @@ where
             *current_metadata = Some(new_metadata.clone());
         }
         if redis_fetch_size == 0 {
-            tracing::info!("Redis is not ready for current fetch. Wait.");
             continue;
         }
         // Garbage collection. Note, this is *not a thread safe* operation; readers should

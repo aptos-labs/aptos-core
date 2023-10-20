@@ -23,7 +23,7 @@ pub struct LocalFileClient {
 }
 
 impl LocalFileClient {
-    pub fn new(config: LocalFileClientConfig) -> anyhow::Result<Self> {
+    pub async fn new(config: LocalFileClientConfig) -> anyhow::Result<Self> {
         Ok(Self {
             file_path: PathBuf::from(config.path),
         })
@@ -159,6 +159,7 @@ mod tests {
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
         })
+        .await
         .unwrap();
         let transactions = local_file_client.get_transactions(0, None).await.unwrap();
         let access_metadata = local_file_client.get_metadata().await.unwrap();
@@ -201,6 +202,7 @@ mod tests {
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
         })
+        .await
         .unwrap();
         let transactions = local_file_client.get_transactions(500, None).await.unwrap();
         let access_metadata = local_file_client.get_metadata().await.unwrap();
@@ -225,6 +227,7 @@ mod tests {
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
         })
+        .await
         .unwrap();
         let access_metadata = local_file_client.get_metadata().await;
         assert!(access_metadata.is_err());
@@ -259,6 +262,7 @@ mod tests {
         let local_file_client = LocalFileClient::new(LocalFileClientConfig {
             path: dir.path().to_path_buf().to_str().unwrap().to_string(),
         })
+        .await
         .unwrap();
         let transactions = local_file_client.get_transactions(0, None).await;
         let access_metadata = local_file_client.get_metadata().await.unwrap();

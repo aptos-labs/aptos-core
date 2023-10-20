@@ -1967,6 +1967,7 @@ name = "aptos-indexer-grpc-data-access"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-protos 1.1.2",
  "async-trait",

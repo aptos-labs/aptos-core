@@ -5,6 +5,7 @@ use crate::{
     REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY,
 };
 use anyhow::Context;
+use aptos_indexer_grpc_utils::types::RedisUrl;
 use aptos_protos::transaction::v1::Transaction;
 use prost::Message;
 use redis::{aio::ConnectionLike, AsyncCommands, ErrorKind};
@@ -13,19 +14,19 @@ use serde::{Deserialize, Serialize};
 const REDIS_STORAGE_NAME: &str = "Redis";
 const DEFAULT_REDIS_MGET_BATCH_SIZE: usize = 1000;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RedisClientConfig {
     // The source of the transactions.
-    redis_address: String,
+    redis_address: RedisUrl,
 }
 
 pub type RedisClient = RedisClientInternal<redis::aio::ConnectionManager>;
 
 impl RedisClient {
     pub async fn new(config: RedisClientConfig) -> anyhow::Result<Self> {
-        let redis_client =
-            redis::Client::open(config.redis_address).context("Failed to create Redis client.")?;
+        let redis_client = redis::Client::open(config.redis_address.0.clone())
+            .context("Failed to create Redis client.")?;
         let redis_connection = redis_client
             .get_tokio_connection_manager()
             .await
@@ -90,7 +91,10 @@ impl<C: ConnectionLike + Sync + Send + Clone> StorageTransactionRead for RedisCl
                 serialized_transactions
                     .into_iter()
                     .map(|serialized_transaction| {
-                        Transaction::decode(serialized_transaction.as_bytes())
+                        let serialized_transaction =
+                            base64::decode(serialized_transaction.as_bytes())
+                                .expect("Decode transaction failed.");
+                        Transaction::decode(serialized_transaction.as_slice())
                             .expect("Decode transaction failed.")
                     })
                     .collect(),
@@ -162,7 +166,9 @@ mod tests {
             version: 42,
             ..Transaction::default()
         };
-        let values = redis::Value::Bulk(vec![redis::Value::Data(transaction.encode_to_vec())]);
+        let encoded = transaction.encode_to_vec();
+        let base64_encoded = base64::encode(encoded);
+        let values = redis::Value::Bulk(vec![redis::Value::Data(base64_encoded.into())]);
         let mock_connection = MockRedisConnection::new(vec![
             MockCmd::new(
                 redis::cmd("GET").arg(REDIS_ENDING_VERSION_EXCLUSIVE_KEY),

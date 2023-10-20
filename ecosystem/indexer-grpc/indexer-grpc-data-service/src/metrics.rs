@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+#![allow(dead_code)]
 
 use aptos_metrics_core::{
     register_gauge_vec, register_histogram_vec, register_int_counter, register_int_counter_vec,

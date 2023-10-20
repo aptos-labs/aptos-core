@@ -20,17 +20,37 @@ use crate::access_trait::{
 pub enum StorageClient {
     InMemory(in_memory::InMemoryStorageClient),
     Redis(redis::RedisClient),
-    GCS(gcs::GcsClient),
+    LocalFile(local_file::LocalFileClient),
+    Gcs(gcs::GcsClient),
     MockClient(MockStorageClient),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "storage_type")]
-pub enum ReadOnlyStorageType {
+pub enum IndexerStorageClientConfig {
     InMemory(in_memory::InMemoryStorageClientConfig),
     Redis(redis::RedisClientConfig),
-    GCS(gcs::GcsClientConfig),
+    Gcs(gcs::GcsClientConfig),
     LocalFile(local_file::LocalFileClientConfig),
+}
+
+impl IndexerStorageClientConfig {
+    pub async fn create_client(&self) -> anyhow::Result<StorageClient> {
+        match self {
+            IndexerStorageClientConfig::InMemory(config) => Ok(StorageClient::InMemory(
+                in_memory::InMemoryStorageClient::new(config.clone()).await?,
+            )),
+            IndexerStorageClientConfig::Redis(config) => Ok(StorageClient::Redis(
+                redis::RedisClient::new(config.clone()).await?,
+            )),
+            IndexerStorageClientConfig::Gcs(config) => Ok(StorageClient::Gcs(
+                gcs::GcsClient::new(config.clone()).await?,
+            )),
+            IndexerStorageClientConfig::LocalFile(config) => Ok(StorageClient::LocalFile(
+                local_file::LocalFileClient::new(config.clone()).await?,
+            )),
+        }
+    }
 }
 
 const REDIS_ENDING_VERSION_EXCLUSIVE_KEY: &str = "latest_version";

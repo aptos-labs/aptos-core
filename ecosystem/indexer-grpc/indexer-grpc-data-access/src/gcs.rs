@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex};
 
 const GCS_STORAGE_NAME: &str = "Google Cloud Storage";
 const METADATA_FILE_NAME: &str = "metadata.json";
+const SERVICE_ACCOUNT_ENV_VAR: &str = "SERVICE_ACCOUNT";
 // Avoid reading metadata file too often and use stale metadata instead.
 const METADATA_FILE_MAX_STALENESS_IN_SECS: u64 = 30; // 30 seconds.
 
@@ -25,12 +26,14 @@ const METADATA_FILE_MAX_STALENESS_IN_SECS: u64 = 30; // 30 seconds.
 #[serde(deny_unknown_fields)]
 pub struct GcsClientConfig {
     bucket_name: String,
+    service_account_path: String,
 }
 
 pub type GcsClient = GcsInternalClient<google_cloud_storage::client::Client>;
 
 impl GcsClient {
     pub async fn new(config: GcsClientConfig) -> anyhow::Result<Self> {
+        std::env::set_var(SERVICE_ACCOUNT_ENV_VAR, config.service_account_path.clone());
         let gcs_config = ClientConfig::default()
             .with_auth()
             .await
@@ -57,9 +60,6 @@ impl<T: GcsClientTrait + Sync + Send + Clone> GcsInternalClient<T> {
             latest_metadata_timestamp: Arc::new(Mutex::new(None)),
             gcs_client,
         };
-        res.refresh_metadata_if_needed()
-            .await
-            .context("Failed to refresh metadata")?;
         Ok(res)
     }
 
@@ -74,18 +74,18 @@ impl<T: GcsClientTrait + Sync + Send + Clone> GcsInternalClient<T> {
                 }
             }
         }
-        let metadata = FileMetadata::from(
-            self.gcs_client
-                .download_object(
-                    &GetObjectRequest {
-                        bucket: self.bucket_name.clone(),
-                        object: METADATA_FILE_NAME.to_string(),
-                        ..Default::default()
-                    },
-                    &Range::default(),
-                )
-                .await?,
-        );
+        let file_bytes = self
+            .gcs_client
+            .patched_download_object(
+                &GetObjectRequest {
+                    bucket: self.bucket_name.clone(),
+                    object: METADATA_FILE_NAME.to_string(),
+                    ..Default::default()
+                },
+                &Range::default(),
+            )
+            .await?;
+        let metadata = FileMetadata::from(file_bytes);
         {
             let mut latest_metadata = self.latest_metadata.lock().unwrap();
             *latest_metadata = metadata;
@@ -132,7 +132,7 @@ impl<T: GcsClientTrait + Sync + Send + Clone> StorageTransactionRead for GcsInte
         let file_name = get_transactions_file_name(batch_starting_version);
         let result = self
             .gcs_client
-            .download_object(
+            .patched_download_object(
                 &GetObjectRequest {
                     bucket: self.bucket_name.clone(),
                     object: file_name.clone(),
@@ -141,6 +141,8 @@ impl<T: GcsClientTrait + Sync + Send + Clone> StorageTransactionRead for GcsInte
                 &Range::default(),
             )
             .await;
+        // Note: as the last resort of the storages, if the file cannot be found, it means
+        // the transactions are not available yet and it'll be available in the future.
         let file = match result {
             Err(Error::Response(e)) if e.code == 404 => {
                 return Ok(StorageReadStatus::NotAvailableYet)
@@ -171,7 +173,7 @@ impl<T: GcsClientTrait + Sync + Send + Clone> StorageTransactionRead for GcsInte
 
 #[async_trait::async_trait]
 pub trait GcsClientTrait: Send + Sync + Clone {
-    async fn download_object(
+    async fn patched_download_object(
         &self,
         request: &GetObjectRequest,
         range: &Range,
@@ -180,7 +182,7 @@ pub trait GcsClientTrait: Send + Sync + Clone {
 
 #[async_trait::async_trait]
 impl GcsClientTrait for google_cloud_storage::client::Client {
-    async fn download_object(
+    async fn patched_download_object(
         &self,
         request: &GetObjectRequest,
         range: &Range,
@@ -214,7 +216,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl GcsClientTrait for MockGcsClient {
-        async fn download_object(
+        async fn patched_download_object(
             &self,
             request: &GetObjectRequest,
             _range: &Range,
@@ -227,13 +229,6 @@ mod tests {
     }
     #[tokio::test]
     async fn test_get_transactions() {
-        let serialized_metadata = serde_json::to_vec(&FileMetadata {
-            chain_id: 1,
-            file_folder_size: 1000,
-            version: 1000,
-        })
-        .unwrap();
-
         let mut transactions = Vec::new();
         for i in 0..1000 {
             let transaction = Transaction {
@@ -257,19 +252,12 @@ mod tests {
         .unwrap();
 
         let mock_gcs_client = MockGcsClient {
-            resps: vec![serialized_metadata, serialized_transactions],
-            reqs: vec![
-                GetObjectRequest {
-                    object: METADATA_FILE_NAME.to_string(),
-                    bucket: "test1".to_string(),
-                    ..Default::default()
-                },
-                GetObjectRequest {
-                    object: "files/0.json".to_string(),
-                    bucket: "test1".to_string(),
-                    ..Default::default()
-                },
-            ],
+            resps: vec![serialized_transactions],
+            reqs: vec![GetObjectRequest {
+                object: "files/0.json".to_string(),
+                bucket: "test1".to_string(),
+                ..Default::default()
+            }],
             index: AtomicU64::new(0),
         };
         let gcs_client = GcsInternalClient::new_with_client("test1".to_string(), mock_gcs_client)
@@ -283,13 +271,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_transactions_with_partial() {
-        let serialized_metadata = serde_json::to_vec(&FileMetadata {
-            chain_id: 1,
-            file_folder_size: 1000,
-            version: 1000,
-        })
-        .unwrap();
-
         let mut transactions = Vec::new();
         for i in 0..1000 {
             let transaction = Transaction {
@@ -313,19 +294,12 @@ mod tests {
         .unwrap();
 
         let mock_gcs_client = MockGcsClient {
-            resps: vec![serialized_metadata, serialized_transactions],
-            reqs: vec![
-                GetObjectRequest {
-                    object: METADATA_FILE_NAME.to_string(),
-                    bucket: "test2".to_string(),
-                    ..Default::default()
-                },
-                GetObjectRequest {
-                    object: "files/0.json".to_string(),
-                    bucket: "test2".to_string(),
-                    ..Default::default()
-                },
-            ],
+            resps: vec![serialized_transactions],
+            reqs: vec![GetObjectRequest {
+                object: "files/0.json".to_string(),
+                bucket: "test2".to_string(),
+                ..Default::default()
+            }],
             index: AtomicU64::new(0),
         };
         let gcs_client = GcsInternalClient::new_with_client("test2".to_string(), mock_gcs_client)
