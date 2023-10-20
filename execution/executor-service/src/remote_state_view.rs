@@ -247,13 +247,12 @@ impl RemoteStateValueReceiver {
         let _timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&[&shard_id.to_string(), "kv_responses"])
             .start_timer();
-        let response: RemoteKVResponse;
-        {
-            let _bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-                .with_label_values(&[&shard_id.to_string(), "kv_deser"])
-                .start_timer();
-            response = bcs::from_bytes(&message.data).unwrap();
-        }
+        let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&shard_id.to_string(), "kv_resp_deser"])
+            .start_timer();
+        let response: RemoteKVResponse = bcs::from_bytes(&message.data).unwrap();
+        drop(bcs_deser_timer);
+
         REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&shard_id.to_string(), "kv_responses"])
             .inc();

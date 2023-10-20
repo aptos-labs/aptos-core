@@ -218,5 +218,6 @@ mod tests {
 
         network_controller1.shutdown();
         network_controller2.shutdown();
+        thread::sleep(std::time::Duration::from_millis(10));
     }
 }

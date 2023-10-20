@@ -17,9 +17,12 @@ pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
          2. cmd_rx_bcs_deser: deserializing the received command; \
          3. init_prefetch: initializing the prefetching of remote state values \
          4. kv_responses: processing the remote key value responses; \
-         5. kv_deser: deserializing the remote key value responses; \
+         5. kv_resp_deser: deserializing the remote key value responses; \
          6. prefetch_wait: waiting (approx) for the remote state values to be prefetched; \
-         7. non_prefetch_wait: waiting for the remote state values that were not prefetched; ",
+         7. non_prefetch_wait: waiting for the remote state values that were not prefetched; \
+         8. kv_req_deser: deserializing the remote key value requests; \
+         9. kv_requests: processing the remote key value requests; \
+         10. kv_resp_ser: serializing the remote key value responses;",
         // metric labels (dimensions)
         &["shard_id", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
