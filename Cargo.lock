@@ -328,6 +328,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-admin-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-logger",
+ "aptos-profiler",
+ "aptos-runtimes",
+ "async-mutex",
+ "futures",
+ "http",
+ "hyper",
+ "lazy_static",
+ "mime",
+ "pprof",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
@@ -1952,10 +1972,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-data-access"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-metrics-core",
+ "aptos-protos",
+ "async-trait",
+ "backoff",
+ "backtrace",
+ "base64 0.13.0",
+ "bytes",
+ "clap 4.3.21",
+ "cloud-storage",
+ "dashmap",
+ "enum_dispatch",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "google-cloud-storage",
+ "itertools 0.10.5",
+ "once_cell",
+ "prometheus",
+ "prost 0.12.1",
+ "redis",
+ "redis-test",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.3",
+ "toml 0.7.4",
+ "tonic 0.10.0",
+ "tracing",
+ "tracing-subscriber",
+ "warp",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-data-service"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
@@ -2741,6 +2802,7 @@ name = "aptos-node"
 version = "1.7.0"
 dependencies = [
  "anyhow",
+ "aptos-admin-service",
  "aptos-api",
  "aptos-backup-service",
  "aptos-build-info",
@@ -4408,6 +4470,15 @@ name = "async-lock"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e97a171d191782fba31bb902b14ad94e24a68145032b7eedf871ab0bc0d077b6"
+dependencies = [
+ "event-listener",
+]
+
+[[package]]
+name = "async-mutex"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "479db852db25d9dbf6204e6cb6253698f175c15726470f78af0d918e99d6156e"
 dependencies = [
  "event-listener",
 ]
@@ -11464,6 +11535,8 @@ dependencies = [
  "nix",
  "once_cell",
  "parking_lot 0.12.1",
+ "protobuf",
+ "protobuf-codegen-pure",
  "smallvec",
  "symbolic-demangle",
  "tempfile",
@@ -11861,6 +11934,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e081b29f63d83a4bc75cfc9f3fe424f9156cf92d8a4f0c9407cce9a1b67327cf"
 dependencies = [
  "prost 0.12.1",
+]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
+
+[[package]]
+name = "protobuf-codegen"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "033460afb75cf755fcfc16dfaed20b86468082a2ea24e05ac35ab4a099a017d6"
+dependencies = [
+ "protobuf",
+]
+
+[[package]]
+name = "protobuf-codegen-pure"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95a29399fc94bcd3eeaa951c715f7bea69409b2445356b00519740bcd6ddd865"
+dependencies = [
+ "protobuf",
+ "protobuf-codegen",
 ]
 
 [[package]]
