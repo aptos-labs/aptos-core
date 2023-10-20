@@ -83,23 +83,21 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
                 let _rx_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
                     .start_timer();
-                let request: RemoteExecutionRequest;
-                {
-                    let _bcs_deser_timer = REMOTE_EXECUTOR_TIMER
-                        .with_label_values(&[&self.shard_id.to_string(), "cmd_rx_bcs_deser"])
-                        .start_timer();
-                    request = bcs::from_bytes(&message.data).unwrap();
-                }
+                let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx_bcs_deser"])
+                    .start_timer();
+                let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
+                drop(bcs_deser_timer);
 
                 match request {
                     RemoteExecutionRequest::ExecuteBlock(command) => {
-                        {
-                            let _timer = REMOTE_EXECUTOR_TIMER
-                                .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
-                                .start_timer();
-                            let state_keys = Self::extract_state_keys(&command);
-                            self.state_view_client.init_for_block(state_keys);
-                        }
+                        let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
+                            .start_timer();
+                        let state_keys = Self::extract_state_keys(&command);
+                        self.state_view_client.init_for_block(state_keys);
+                        drop(init_prefetch_timer);
+
                         let (sub_blocks, concurrency, gas_limit) = command.into();
                         ExecutorShardCommand::ExecuteSubBlocks(
                             self.state_view_client.clone(),

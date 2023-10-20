@@ -230,20 +230,19 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         self.shard_id,
                         num_txns
                     );
-                    let ret;
-                    {
-                        let _timer = SHARDED_EXECUTOR_SERVICE_SECONDS
-                            .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
-                            .start_timer();
-                        ret = self.execute_block(
-                            transactions,
-                            state_view.as_ref(),
-                            concurrency_level_per_shard,
-                            maybe_block_gas_limit,
-                        );
-                        drop(state_view);
-                    }
-                    let _timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                    let exe_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
+                        .with_label_values(&[&self.shard_id.to_string(), "execute_block"])
+                        .start_timer();
+                    let ret = self.execute_block(
+                        transactions,
+                        state_view.as_ref(),
+                        concurrency_level_per_shard,
+                        maybe_block_gas_limit,
+                    );
+                    drop(state_view);
+                    drop(exe_timer);
+
+                    let _result_tx_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
                         .with_label_values(&[&self.shard_id.to_string(), "result_tx"])
                         .start_timer();
                     self.coordinator_client.send_execution_result(ret);
