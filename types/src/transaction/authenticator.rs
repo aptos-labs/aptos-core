@@ -786,6 +786,17 @@ impl MultiKeyAuthenticator {
 
     pub fn verify<T: Serialize + CryptoHash>(&self, message: &T) -> Result<()> {
         ensure!(
+            self.signatures_bitmap.last_set_bit().is_some(),
+            "There were no signatures set in the bitmap."
+        );
+
+        ensure!(
+            (self.signatures_bitmap.last_set_bit().unwrap() as usize) < self.public_keys.len(),
+            "Mismatch in the position of the last signature and the number of PKs, {} >= {}.",
+            self.signatures_bitmap.last_set_bit().unwrap(),
+            self.public_keys.len(),
+        );
+        ensure!(
             self.signatures_bitmap.count_ones() as usize == self.signatures.len(),
             "Mismatch in number of signatures and the number of bits set in the signatures_bitmap, {} != {}.", self.signatures_bitmap.count_ones(), self.signatures.len(),
         );
@@ -820,11 +831,23 @@ pub struct MultiKey {
 }
 
 impl MultiKey {
-    pub fn new(public_keys: Vec<AnyPublicKey>, signatures_required: u8) -> Self {
-        Self {
+    pub fn new(public_keys: Vec<AnyPublicKey>, signatures_required: u8) -> Result<Self> {
+        ensure!(
+            signatures_required > 0,
+            "The number of required signatures is 0."
+        );
+
+        ensure!(
+            public_keys.len() >= signatures_required as usize,
+            "The number of public keys is smaller than the number of required signatures, {} < {}",
+            public_keys.len(),
+            signatures_required
+        );
+
+        Ok(Self {
             public_keys,
             signatures_required,
-        }
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -1039,7 +1062,7 @@ mod tests {
             any_sender1_pub.clone(),
             any_sender1_pub.clone(),
         ];
-        let multi_key = MultiKey::new(keys, 2);
+        let multi_key = MultiKey::new(keys, 2).unwrap();
 
         let sender_auth = AuthenticationKey::multi_key(multi_key.clone());
         let sender_addr = sender_auth.account_address();
