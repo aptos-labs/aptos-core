@@ -99,9 +99,13 @@ impl IncrementalProofState {
     }
 
     fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
+        let fraction_needed: f64 = 1.0/3.0;
+        // fraction_needed should be between 1/3 and 1
+        assert!(fraction_needed >= 1.0/3.0 && fraction_needed <= 1.0);
+        let quorum_voting_power = validator_verifier.quorum_voting_power_given_fraction(fraction_needed);
         if self.aggregated_voting_power >= validator_verifier.quorum_voting_power() {
             let recheck =
-                validator_verifier.check_voting_power(self.aggregated_signature.keys(), true);
+                validator_verifier.check_voting_power_given_target(self.aggregated_signature.keys(), quorum_voting_power);
             if recheck.is_err() {
                 error!("Unexpected discrepancy: aggregated_voting_power is {}, while rechecking we get {:?}", self.aggregated_voting_power, recheck);
             }

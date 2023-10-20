@@ -147,9 +147,7 @@ impl ValidatorVerifier {
         let quorum_voting_power = if validator_infos.is_empty() {
             0
         } else {
-            // By quoram intersection f+1 is the minimum quorum size.
-            // testing with 1/3 of the total voting power.
-            total_voting_power/3 + 1
+            total_voting_power * 2 / 3 + 1
         };
         Self::build_index(validator_infos, quorum_voting_power, total_voting_power)
     }
@@ -349,6 +347,33 @@ impl ValidatorVerifier {
         Ok(())
     }
 
+    /// Ensure there is at least target voting power in the provided signatures and there
+    /// are only known authors. According to the threshold verification policy,
+    /// invalid public keys are not allowed.
+    pub fn check_voting_power_given_target<'a>(
+        &self,
+        authors: impl Iterator<Item = &'a AccountAddress>,
+        target: u128,
+    ) -> std::result::Result<(), VerifyError> {
+        // Add voting power for valid accounts, exiting early for unknown authors
+        let mut aggregated_voting_power = 0;
+        for account_address in authors {
+            match self.get_voting_power(account_address) {
+                Some(voting_power) => aggregated_voting_power += voting_power as u128,
+                None => return Err(VerifyError::UnknownAuthor),
+            }
+        }
+
+        if aggregated_voting_power < target {
+            return Err(VerifyError::TooLittleVotingPower {
+                voting_power: aggregated_voting_power,
+                expected_voting_power: target,
+            });
+        }
+        Ok(())
+    }
+
+
     /// Returns the public key for this address.
     pub fn get_public_key(&self, author: &AccountAddress) -> Option<PublicKey> {
         self.address_to_validator_index
@@ -381,6 +406,11 @@ impl ValidatorVerifier {
     /// Returns quorum voting power.
     pub fn quorum_voting_power(&self) -> u128 {
         self.quorum_voting_power
+    }
+
+    /// Returns quorum voting power for a given fraction of total voting power.
+    pub fn quorum_voting_power_given_fraction(&self, fraction_of_total: f64) -> u128 {
+        (self.total_voting_power as f64 * fraction_of_total) as u128 + 1
     }
 
     /// Returns total voting power.
