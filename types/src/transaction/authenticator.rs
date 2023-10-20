@@ -786,10 +786,19 @@ impl MultiKeyAuthenticator {
 
     pub fn verify<T: Serialize + CryptoHash>(&self, message: &T) -> Result<()> {
         ensure!(
+            self.public_keys.signatures_required() > 0,
+            "The number of required signatures is 0."
+        );
+        ensure!(
+            self.public_keys.len() >= self.public_keys.signatures_required() as usize,
+            "The number of public keys is smaller than the number of required signatures, {} < {}",
+            self.public_keys.len(),
+            signatures_required
+        );
+        ensure!(
             self.signatures_bitmap.last_set_bit().is_some(),
             "There were no signatures set in the bitmap."
         );
-
         ensure!(
             (self.signatures_bitmap.last_set_bit().unwrap() as usize) < self.public_keys.len(),
             "Mismatch in the position of the last signature and the number of PKs, {} >= {}.",
