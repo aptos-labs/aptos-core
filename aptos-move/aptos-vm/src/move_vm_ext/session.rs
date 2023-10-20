@@ -292,7 +292,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into the a single op corresponding to the whole resource group (V0).
-    /// TODO: Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
+    /// TODO[agg_v2](fix) Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
     fn split_and_merge_resource_groups<C: AccessPathCache>(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,

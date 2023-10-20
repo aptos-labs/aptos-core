@@ -115,7 +115,7 @@ mod test_cases {
 
         run_block_in_parts(&mut h.harness, BlockSplit::Whole, txns);
 
-        // TODO: proptests with random transaction generator might be useful here.
+        // TODO[agg_v2](test): proptests with random transaction generator might be useful here.
         let txns = (0..block_size)
             .map(|i| match i % 4 {
                 0 => (
@@ -295,7 +295,7 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         Just(UseType::UseTableType),
-        // TODO add back once ResourceGroups are supported
+        // TODO[agg_v2](fix) add back once ResourceGroups are supported
         // Just(UseType::UseResourceGroupType),
     ]
     .boxed()

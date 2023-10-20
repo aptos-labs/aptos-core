@@ -635,9 +635,9 @@ where
 {
     type Txn = MockTransaction<K, V, E>;
 
-    // TODO: Assigning MoveTypeLayout as None for all the writes for now. That means, the
-    // the resources do not have any aggregators embededded in them. Change it to test
-    // resources with aggregators as well.
+    // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
+    // That means, the the resources do not have any DelayedFields embededded in them.
+    // Change it to test resources with DelayedFields as well.
     fn resource_write_set(&self) -> HashMap<K, (V, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
@@ -671,11 +671,11 @@ where
         <Self::Txn as Transaction>::Identifier,
         DelayedChange<<Self::Txn as Transaction>::Identifier>,
     > {
-        // TODO: add aggregators V2 to the proptest?
+        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         HashMap::new()
     }
 
-    // TODO: Currently, appending None to all events, which means none of the
+    // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
     // events have aggregators. Test it with aggregators as well.
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
@@ -702,7 +702,7 @@ where
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
-        // TODO: Set the patched resource write set and events. But that requires the function
+        // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
     }
 

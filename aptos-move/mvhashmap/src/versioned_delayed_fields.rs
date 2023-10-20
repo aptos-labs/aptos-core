@@ -125,7 +125,13 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         self.read_estimate_deltas = false;
     }
 
-    fn insert(&mut self, txn_idx: TxnIndex, entry: VersionEntry<K>) {
+    // Insert value computed from speculative transaction execution,
+    // potentially overwritting a previous entry.
+    fn insert_speculative_value(
+        &mut self,
+        txn_idx: TxnIndex,
+        entry: VersionEntry<K>,
+    ) -> Result<(), PanicError> {
         use EstimatedEntry::*;
         use VersionEntry::*;
 
@@ -143,11 +149,10 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                         if variant_eq(apply_l, apply_r) {
                             *apply_l == *apply_r
                         } else {
-                            // TODO: change to code_invariant_error
-                            unreachable!(
+                            return Err(code_invariant_error(format!(
                                 "Storing {:?} for aggregator ID that previously had a different type of entry - {:?}",
                                 apply_r, apply_l,
-                            )
+                            )));
                         }
                     },
                     // There was a value without fallback delta bypass before and still.
@@ -155,12 +160,14 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     // Bypass stored in the estimate does not match the new entry.
                     (Estimate(_), _) => false,
 
-                    // TODO: change to code_invariant_error
                     (cur, new) => {
-                        unreachable!("Replaced entry must be an Estimate, {:?} to {:?}", cur, new,)
+                        return Err(code_invariant_error(format!(
+                            "Replaced entry must be an Estimate, {:?} to {:?}",
+                            cur, new,
+                        )))
                     },
                 } {
-                    // TODO: handle invalidation when we change read_estimate_deltas
+                    // TODO[agg_v2](fix): handle invalidation when we change read_estimate_deltas
                     self.read_estimate_deltas = false;
                 }
                 o.insert(CachePadded::new(entry));
@@ -169,6 +176,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                 v.insert(CachePadded::new(entry));
             },
         }
+        Ok(())
     }
 
     fn insert_final_value(&mut self, txn_idx: TxnIndex, value: DelayedFieldValue) {
@@ -404,7 +412,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         value: DelayedFieldValue,
     ) -> Result<(), PanicError> {
         let mut created = VersionedValue::new(None);
-        created.insert(txn_idx, VersionEntry::Value(value, None));
+        created.insert_speculative_value(txn_idx, VersionEntry::Value(value, None))?;
 
         if self.values.insert(id, created).is_some() {
             Err(code_invariant_error(
@@ -425,7 +433,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         apply: DelayedApplyEntry<K>,
     ) -> Result<(), PanicError> {
         let mut created = VersionedValue::new(None);
-        created.insert(txn_idx, VersionEntry::Apply(apply));
+        created.insert_speculative_value(txn_idx, VersionEntry::Apply(apply))?;
 
         if self.values.insert(id, created).is_some() {
             Err(code_invariant_error("VersionedValue when initializing dependent delayed field may not already exist for same id"))
@@ -447,7 +455,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                     .values
                     .get_mut(&id)
                     .ok_or(PanicOr::Or(MVDelayedFieldsError::NotFound))?
-                    .insert(txn_idx, VersionEntry::Apply(apply)),
+                    .insert_speculative_value(txn_idx, VersionEntry::Apply(apply))?,
                 DelayedApplyEntry::SnapshotDelta { .. }
                 | DelayedApplyEntry::SnapshotDerived { .. } => {
                     self.initialize_dependent_delayed_field(id, txn_idx, apply)?
@@ -609,15 +617,12 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
 
         Ok(())
     }
-}
 
-impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
-    for VersionedDelayedFields<K>
-{
-    fn read(
+    fn read_checked_depth(
         &self,
         id: &K,
         txn_idx: TxnIndex,
+        cur_depth: usize,
     ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
         let read_res = self
             .values
@@ -638,15 +643,36 @@ impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
                     .into());
                 }
 
+                if cur_depth > 2 {
+                    return Err(code_invariant_error(format!(
+                        "Recursive depth for read(), {:?} for {:?}",
+                        VersionedRead::DependentApply(dependent_id, dependent_txn_idx, apply),
+                        id
+                    ))
+                    .into());
+                }
                 // Read the source aggregator of snapshot.
-                // TODO: check/limit recursion depth is not more than 2
-                let source_value = self.read(&dependent_id, dependent_txn_idx)?;
+                // TODO[agg_v2](cleanup): check/limit recursion depth is not more than 2
+                let source_value =
+                    self.read_checked_depth(&dependent_id, dependent_txn_idx, cur_depth + 1)?;
 
                 apply
                     .apply_to_base(source_value)
                     .map_err(MVDelayedFieldsError::from_panic_or)
             },
         }
+    }
+}
+
+impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
+    for VersionedDelayedFields<K>
+{
+    fn read(
+        &self,
+        id: &K,
+        txn_idx: TxnIndex,
+    ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
+        self.read_checked_depth(id, txn_idx, 0)
     }
 
     /// Returns the committed value from largest transaction index that is
@@ -856,10 +882,10 @@ mod test {
     fn mark_estimate_no_entry(type_index: usize) {
         let mut v = VersionedValue::new(None);
         if let Some(entry) = aggregator_entry(type_index) {
-            v.insert(10, entry);
+            v.insert_speculative_value(10, entry).unwrap();
         }
         if let Some(entry) = aggregator_entry(type_index) {
-            v.insert(3, entry);
+            v.insert_speculative_value(3, entry).unwrap();
         }
         v.mark_estimate(5);
     }
@@ -868,7 +894,8 @@ mod test {
     #[test]
     fn mark_estimate_wrong_entry() {
         let mut v = VersionedValue::new(None);
-        v.insert(3, aggregator_entry(VALUE_AGGREGATOR).unwrap());
+        v.insert_speculative_value(3, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
         v.mark_estimate(3);
 
         // Marking an Estimate (first we confirm) as estimate is not allowed.
@@ -886,22 +913,27 @@ mod test {
     #[test]
     fn insert_estimate() {
         let mut v = VersionedValue::new(None);
-        v.insert(3, aggregator_entry(ESTIMATE_NO_BYPASS).unwrap());
+        v.insert_speculative_value(3, aggregator_entry(ESTIMATE_NO_BYPASS).unwrap())
+            .unwrap();
     }
 
     #[test]
     fn estimate_bypass() {
         let mut v = VersionedValue::new(None);
-        v.insert(2, aggregator_entry(VALUE_AGGREGATOR).unwrap());
-        v.insert(
+        v.insert_speculative_value(2, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
+        v.insert_speculative_value(
             3,
             aggregator_entry_aggregator_value_and_delta(15, test_delta()),
-        );
-        v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap());
-        v.insert(
+        )
+        .unwrap();
+        v.insert_speculative_value(4, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
+        v.insert_speculative_value(
             10,
             aggregator_entry_aggregator_value_and_delta(15, test_delta()),
-        );
+        )
+        .unwrap();
 
         // Delta + Value(15)
         assert_read_aggregator_value!(v.read(5), 45);
@@ -942,20 +974,24 @@ mod test {
         // Next, ensure read_estimate_deltas remains true if entries are overwritten
         // with matching deltas. Check at each point to not rely on the invariant that
         // read_estimate_deltas can only become false from true.
-        v.insert(2, aggregator_entry(VALUE_AGGREGATOR).unwrap());
+        v.insert_speculative_value(2, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
         assert!(v.read_estimate_deltas);
-        v.insert(
+        v.insert_speculative_value(
             3,
             aggregator_entry_aggregator_value_and_delta(15, test_delta()),
-        );
+        )
+        .unwrap();
         assert!(v.read_estimate_deltas);
-        v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap());
+        v.insert_speculative_value(4, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
         assert!(v.read_estimate_deltas);
 
         // Previously value with delta fallback was converted to the delta bypass in
         // the Estimate. It can match a delta too and not disable read_estimate_deltas.
         v.mark_estimate(10);
-        v.insert(10, aggregator_entry(APPLY_AGGREGATOR).unwrap());
+        v.insert_speculative_value(10, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
         assert!(v.read_estimate_deltas);
     }
 
@@ -964,7 +1000,8 @@ mod test {
         {
             let mut v = VersionedValue::new(None);
 
-            v.insert(6, aggregator_entry(VALUE_SNAPSHOT).unwrap());
+            v.insert_speculative_value(6, aggregator_entry(VALUE_SNAPSHOT).unwrap())
+                .unwrap();
             assert_read_snapshot_value!(v.read(7), 13);
 
             v.mark_estimate(6);
@@ -979,10 +1016,11 @@ mod test {
 
         {
             let mut v = VersionedValue::new(None);
-            v.insert(
+            v.insert_speculative_value(
                 8,
                 aggregator_entry_snapshot_value_and_delta(13, test_delta(), DelayedFieldID::new(2)),
-            );
+            )
+            .unwrap();
 
             assert_read_snapshot_value!(v.read(9), 13);
 
@@ -998,14 +1036,16 @@ mod test {
 
             assert_read_snapshot_dependent_apply!(v.read(9), 2, 8, test_delta());
 
-            v.insert(6, aggregator_entry(VALUE_SNAPSHOT).unwrap());
+            v.insert_speculative_value(6, aggregator_entry(VALUE_SNAPSHOT).unwrap())
+                .unwrap();
             assert!(v.read_estimate_deltas);
         }
 
         {
             // old value shouldn't affect snapshot computation, as it depends on aggregator value.
             let mut v = VersionedValue::new(Some(DelayedFieldValue::Snapshot(3)));
-            v.insert(10, aggregator_entry(APPLY_SNAPSHOT).unwrap());
+            v.insert_speculative_value(10, aggregator_entry(APPLY_SNAPSHOT).unwrap())
+                .unwrap();
 
             assert_read_snapshot_dependent_apply!(v.read(12), 2, 10, test_delta());
         }
@@ -1016,7 +1056,8 @@ mod test {
         {
             let mut v = VersionedValue::new(None);
 
-            v.insert(6, aggregator_entry(VALUE_DERIVED).unwrap());
+            v.insert_speculative_value(6, aggregator_entry(VALUE_DERIVED).unwrap())
+                .unwrap();
             assert_read_derived_value!(v.read(7), vec![70, 80, 90]);
 
             v.mark_estimate(6);
@@ -1031,14 +1072,15 @@ mod test {
 
         {
             let mut v = VersionedValue::new(None);
-            v.insert(
+            v.insert_speculative_value(
                 8,
                 aggregator_entry_derived_value_and_delta(
                     vec![70, 80, 90],
                     test_formula(),
                     DelayedFieldID::new(3),
                 ),
-            );
+            )
+            .unwrap();
 
             assert_read_derived_value!(v.read(10), vec![70, 80, 90]);
 
@@ -1054,14 +1096,16 @@ mod test {
 
             assert_read_derived_dependent_apply!(v.read(10), 3, 9, test_formula());
 
-            v.insert(6, aggregator_entry(VALUE_SNAPSHOT).unwrap());
+            v.insert_speculative_value(6, aggregator_entry(VALUE_SNAPSHOT).unwrap())
+                .unwrap();
             assert!(v.read_estimate_deltas);
         }
 
         {
             // old value shouldn't affect derived computation, as it depends on Snapshot value.
             let mut v = VersionedValue::new(Some(DelayedFieldValue::Derived(vec![80])));
-            v.insert(10, aggregator_entry(APPLY_DERIVED).unwrap());
+            v.insert_speculative_value(10, aggregator_entry(APPLY_DERIVED).unwrap())
+                .unwrap();
 
             assert_read_derived_dependent_apply!(v.read(12), 3, 11, test_formula());
         }
@@ -1078,7 +1122,7 @@ mod test {
     fn remove_non_estimate(type_index: usize) {
         let mut v = VersionedValue::new(None);
         if let Some(entry) = aggregator_entry(type_index) {
-            v.insert(10, entry);
+            v.insert_speculative_value(10, entry).unwrap();
         }
         v.remove(10);
     }
@@ -1086,7 +1130,8 @@ mod test {
     #[test]
     fn remove_estimate() {
         let mut v = VersionedValue::new(None);
-        v.insert(3, aggregator_entry(VALUE_AGGREGATOR).unwrap());
+        v.insert_speculative_value(3, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
         v.mark_estimate(3);
         v.remove(3);
         assert!(!v.read_estimate_deltas);
@@ -1099,12 +1144,12 @@ mod test {
     fn insert_twice_no_value(type_index: usize) {
         let mut v = VersionedValue::new(None);
         if let Some(entry) = aggregator_entry(type_index) {
-            v.insert(10, entry);
+            v.insert_speculative_value(10, entry).unwrap();
         }
         // Should fail because inserting can only overwrite an Estimate entry or
         // be inserting a Value when the transaction commits.
         if let Some(entry) = aggregator_entry(type_index) {
-            v.insert(10, entry);
+            v.insert_speculative_value(10, entry).unwrap();
         }
     }
 
@@ -1115,7 +1160,7 @@ mod test {
     fn read_committed_not_value(type_index: usize) {
         let mut v = VersionedValue::new(None);
         if let Some(entry) = aggregator_entry(type_index) {
-            v.insert(10, entry);
+            v.insert_speculative_value(10, entry).unwrap();
         }
         let _ = v.read_latest_committed_value(11);
     }
@@ -1124,7 +1169,8 @@ mod test {
     #[test]
     fn read_committed_estimate() {
         let mut v = VersionedValue::new(None);
-        v.insert(3, aggregator_entry(VALUE_AGGREGATOR).unwrap());
+        v.insert_speculative_value(3, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
         v.mark_estimate(3);
         let _ = v.read_latest_committed_value(11);
     }
@@ -1132,11 +1178,13 @@ mod test {
     #[test]
     fn read_latest_committed_value() {
         let mut v = VersionedValue::new(Some(DelayedFieldValue::Aggregator(5)));
-        v.insert(2, aggregator_entry(VALUE_AGGREGATOR).unwrap());
-        v.insert(
+        v.insert_speculative_value(2, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
+        v.insert_speculative_value(
             4,
             aggregator_entry_aggregator_value_and_delta(15, test_delta()),
-        );
+        )
+        .unwrap();
 
         assert_ok_eq!(
             v.read_latest_committed_value(5),
@@ -1155,10 +1203,14 @@ mod test {
     #[test]
     fn read_delta_chain() {
         let mut v = VersionedValue::new(Some(DelayedFieldValue::Aggregator(5)));
-        v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap());
-        v.insert(8, aggregator_entry(APPLY_AGGREGATOR).unwrap());
-        v.insert(12, aggregator_entry(APPLY_AGGREGATOR).unwrap());
-        v.insert(16, aggregator_entry(APPLY_AGGREGATOR).unwrap());
+        v.insert_speculative_value(4, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
+        v.insert_speculative_value(8, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
+        v.insert_speculative_value(12, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
+        v.insert_speculative_value(16, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap();
 
         assert_read_aggregator_value!(v.read(0), 5);
         assert_read_aggregator_value!(v.read(5), 35);
@@ -1170,34 +1222,38 @@ mod test {
     #[test]
     fn read_errors() {
         let mut v = VersionedValue::new(None);
-        v.insert(2, aggregator_entry(VALUE_AGGREGATOR).unwrap());
+        v.insert_speculative_value(2, aggregator_entry(VALUE_AGGREGATOR).unwrap())
+            .unwrap();
 
         assert_err_eq!(v.read(1), PanicOr::Or(MVDelayedFieldsError::NotFound));
 
-        v.insert(
+        v.insert_speculative_value(
             8,
             VersionEntry::Apply(DelayedApplyEntry::AggregatorDelta {
                 delta: negative_delta(),
             }),
-        );
+        )
+        .unwrap();
         assert_err_eq!(
             v.read(9),
             PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure)
         );
         // Ensure without underflow there would not be a failure.
 
-        v.insert(4, aggregator_entry(APPLY_AGGREGATOR).unwrap()); // adds 30.
+        v.insert_speculative_value(4, aggregator_entry(APPLY_AGGREGATOR).unwrap())
+            .unwrap(); // adds 30.
         assert_read_aggregator_value!(v.read(9), 10);
 
-        v.insert(
+        v.insert_speculative_value(
             6,
             VersionEntry::Value(DelayedFieldValue::Aggregator(35), None),
-        );
+        )
+        .unwrap();
         assert_read_aggregator_value!(v.read(9), 5);
 
         v.mark_estimate(2);
         assert_err_eq!(v.read(3), PanicOr::Or(MVDelayedFieldsError::Dependency(2)));
     }
 
-    // TODO : add tests for try-commit
+    // TODO[agg_v2](tests): add tests for try-commit
 }

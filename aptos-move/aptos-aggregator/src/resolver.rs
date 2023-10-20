@@ -162,7 +162,6 @@ where
         &self,
         _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        // TODO check if any of these methods need to be implemented
         unimplemented!("get_delayed_field_value not implemented")
     }
 

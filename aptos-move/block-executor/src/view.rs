@@ -79,7 +79,7 @@ impl ReadResult {
         match data {
             DataRead::Versioned(_, v, layout) => ReadResult::Value(v.as_state_value(), layout),
             DataRead::Resolved(v) => {
-                // TODO confirm None layout for V1 aggregators is OK
+                // TODO[agg_v1](cleanup): Move AggV1 to Delayed fields, and then handle the layout if needed
                 ReadResult::Value(Some(StateValue::new_legacy(serialize(&v).into())), None)
             },
             DataRead::Metadata(maybe_metadata) => ReadResult::Metadata(maybe_metadata),
@@ -137,7 +137,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
             },
             Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
                 if !wait_for_dependency(wait_for, txn_idx, dep_idx) {
-                    // TODO think of correct return type
+                    // TODO[agg_v2](cleanup): think of correct return type
                     return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
                 }
             },
@@ -145,7 +145,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
                 captured_reads
                     .borrow_mut()
                     .capture_delayed_field_read_error(&e);
-                // TODO think of correct return type
+                // TODO[agg_v2](cleanup): think of correct return type
                 return Err(e.map_non_panic(|_| DelayedFieldsSpeculativeError::InconsistentRead));
             },
         }
@@ -231,7 +231,8 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         inner_aggregator_value: base_aggregator_value,
     }))
 }
-// TODO: see about simplifying / split with CapturedReads
+// TODO[agg_v2](cleanup): see about the split with CapturedReads,
+// and whether anything should be moved there.
 fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
     captured_reads: &RefCell<CapturedReads<T>>,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
@@ -302,7 +303,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                     Ok(v) => break v,
                     Err(MVDelayedFieldsError::Dependency(dep_idx)) => {
                         if !wait_for_dependency(wait_for, txn_idx, dep_idx) {
-                            // TODO think of correct return type
+                            // TODO[agg_v2](cleanup): think of correct return type
                             return Err(PanicOr::Or(
                                 DelayedFieldsSpeculativeError::InconsistentRead,
                             ));
@@ -651,7 +652,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             match res {
                                 Ok((value, _)) => Some(value),
                                 Err(err) => {
-                                    // TODO(aggregator): This means replacement failed
+                                    // TODO[agg_v2](fix): This means replacement failed
                                     //       and most likely there is a bug. Log the error
                                     //       for now, and add recovery mechanism later.
                                     let log_context = AdapterLogSchema::new(
@@ -702,8 +703,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             },
             ViewState::Unsync(state) => {
                 let ret = match state.unsync_map.fetch_data(state_key) {
-                    // TODO: Should we ignore the layout from fetch_data?
-                    // What if it doesn't match with the maybe_layout given as input to this function?
+                    // TODO[agg_v2](fix): Add a check that layout matches from the one from fetch_data
                     Some((v, _)) => {
                         state.read_set.borrow_mut().insert(state_key.clone());
                         Ok(v.as_state_value())
@@ -755,8 +755,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     },
                 };
                 ret.map(|maybe_state_value| match kind {
-                    // TODO: check if we need to track layout for unsync
-                    ReadKind::Value => ReadResult::Value(maybe_state_value, None),
+                    ReadKind::Value => {
+                        ReadResult::Value(maybe_state_value, maybe_layout.cloned().map(Arc::new))
+                    },
                     ReadKind::Metadata => {
                         ReadResult::Metadata(maybe_state_value.map(StateValue::into_metadata))
                     },
@@ -792,7 +793,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         &self,
         state_key: &Self::Key,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        // TODO check that passing None here is correct
+        // TODO[agg_v2](fix) check that passing None here is correct
         self.get_resource_state_value_impl(state_key, None, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -909,9 +910,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         &self,
         state_key: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
-        // TODO: Integrate aggregators V1. That is, we can lift the u128 value
-        //       from the state item by passing the right layout here. This can
-        //       be useful for cross-testing the old and the new flows.
+        // TODO[agg_v1](cleanup):
+        // Integrate aggregators V1. That is, we can lift the u128 value
+        // from the state item by passing the right layout here. This can
+        // be useful for cross-testing the old and the new flows.
         // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
         self.get_resource_state_value(state_key, None)
     }

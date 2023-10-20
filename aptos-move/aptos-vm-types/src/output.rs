@@ -75,6 +75,7 @@ impl VMOutput {
     /// Materializes delta sets.
     /// Guarantees that if deltas are materialized successfully, the output
     /// has an empty delta set.
+    /// TODO[agg_v2](fix) organize materialization paths better.
     pub fn try_materialize(
         self,
         resolver: &impl AggregatorV1Resolver,
@@ -92,7 +93,7 @@ impl VMOutput {
         let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
         let materialized_change_set =
             change_set.try_materialize_aggregator_v1_delta_set(resolver)?;
-        // TODO do something
+        // TODO[agg_v2](fix) shouldn't be needed when reorganized
         //     .try_materialize_aggregator_v2_changes(state_view)?;
         Ok(VMOutput::new(
             materialized_change_set,

@@ -137,8 +137,6 @@ impl<'a> NativeTableContext<'a> {
                     None => continue,
                 };
 
-                // TODO(aggregator): we should attach type layout to the outputs
-                // if there are lifted values.
                 match op {
                     Op::New(val) => {
                         let bytes = serialize(&value_layout_info.layout, &val)?;
