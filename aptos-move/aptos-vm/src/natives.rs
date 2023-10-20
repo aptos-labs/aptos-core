@@ -4,6 +4,7 @@
 
 #[cfg(feature = "testing")]
 use anyhow::Error;
+#[cfg(feature = "testing")]
 use aptos_aggregator::resolver::TAggregatorV1View;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
@@ -32,6 +33,7 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
+#[cfg(feature = "testing")]
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]

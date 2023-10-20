@@ -492,6 +492,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X, T::Identifier>,
     pub(crate) read_set: RefCell<HashSet<T::Key>>,
     pub(crate) counter: &'a RefCell<u32>,
+    pub(crate) dynamic_change_set_optimizations_enabled: bool,
 }
 
 impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
@@ -710,39 +711,47 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     None => {
                         let from_storage = self.get_base_value(state_key)?;
 
-                        Ok(match (kind.clone(), from_storage, maybe_layout) {
-                            (ReadKind::Value, Some(state_value), Some(layout)) => {
-                                let res = self.replace_values_with_identifiers(state_value, layout);
-                                let patched_state_value = match res {
-                                    Ok((patched_state_value, _)) => {
-                                        state.read_set.borrow_mut().insert(state_key.clone());
-                                        state.unsync_map.write(
-                                            state_key.clone(),
-                                            TransactionWrite::from_state_value(Some(
-                                                patched_state_value.clone(),
-                                            )),
-                                            maybe_layout.map(|layout| Arc::new(layout.clone())),
-                                        );
-                                        Some(patched_state_value)
-                                    },
-                                    Err(err) => {
-                                        let log_context = AdapterLogSchema::new(
-                                            self.base_view.id(),
-                                            self.txn_idx as usize,
-                                        );
-                                        alert!(
+                        Ok(
+                            match (
+                                kind.clone(),
+                                from_storage,
+                                maybe_layout,
+                                state.dynamic_change_set_optimizations_enabled,
+                            ) {
+                                (ReadKind::Value, Some(state_value), Some(layout), true) => {
+                                    let res =
+                                        self.replace_values_with_identifiers(state_value, layout);
+                                    let patched_state_value = match res {
+                                        Ok((patched_state_value, _)) => {
+                                            state.read_set.borrow_mut().insert(state_key.clone());
+                                            state.unsync_map.write(
+                                                state_key.clone(),
+                                                TransactionWrite::from_state_value(Some(
+                                                    patched_state_value.clone(),
+                                                )),
+                                                maybe_layout.map(|layout| Arc::new(layout.clone())),
+                                            );
+                                            Some(patched_state_value)
+                                        },
+                                        Err(err) => {
+                                            let log_context = AdapterLogSchema::new(
+                                                self.base_view.id(),
+                                                self.txn_idx as usize,
+                                            );
+                                            alert!(
                                             log_context,
                                             "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
                                             state_key,
                                             err
                                         );
-                                        None
-                                    },
-                                };
-                                patched_state_value
+                                            None
+                                        },
+                                    };
+                                    patched_state_value
+                                },
+                                (_, maybe_state_value, _, _) => maybe_state_value,
                             },
-                            (_, maybe_state_value, _) => maybe_state_value,
-                        })
+                        )
                     },
                 };
                 ret.map(|maybe_state_value| match kind {
@@ -914,7 +923,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     type Identifier = T::Identifier;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
-        true
+        match &self.latest_view {
+            ViewState::Sync(_) => true,
+            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+        }
     }
 
     fn get_delayed_field_value(

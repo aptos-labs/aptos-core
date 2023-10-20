@@ -502,7 +502,7 @@ mod test {
         type Identifier = ();
 
         fn is_delayed_field_optimization_capable(&self) -> bool {
-            false
+            unimplemented!("Irrelevant for the test")
         }
 
         fn get_delayed_field_value(

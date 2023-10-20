@@ -119,14 +119,14 @@ impl VMOutput {
                 .change_set()
                 .delayed_field_change_set()
                 .is_empty(),
-            "Aggregator deltas must be empty after materialization."
+            "Delayed fields must be empty after materialization."
         );
         debug_assert!(
             materialized_output
                 .change_set()
                 .resource_group_write_set()
                 .is_empty(),
-            "Aggregator deltas must be empty after materialization."
+            "Resource Groups must be empty after materialization."
         );
         let (vm_change_set, gas_used, status) = materialized_output.unpack();
         let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();

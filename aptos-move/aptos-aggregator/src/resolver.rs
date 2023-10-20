@@ -17,6 +17,10 @@ use aptos_types::{
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
+/// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
+/// and new, more general, TDelayedFieldView.
+
+/// Allows to query AggregatorV1 values from the state storage.
 pub trait TAggregatorV1View {
     type Identifier;
 
@@ -99,13 +103,9 @@ where
     }
 }
 
-/// Allows to query aggregator values from the state storage.
-/// Because there are two types of aggregators in the system, V1 and V2, we use
-/// different code paths for each.
+/// Allows to query DelayedFields (AggregatorV2/AggregatorSnapshots) values
+/// from the state storage.
 pub trait TDelayedFieldView {
-    // We differentiate between two possible ways to identify an aggregator in
-    // storage for now (V1 or V2) so that the APIs are completely separate and
-    // we can delete all V1 code when necessary.
     type Identifier;
 
     fn is_delayed_field_optimization_capable(&self) -> bool;

@@ -181,7 +181,12 @@ impl VMChangeSet {
     pub fn try_from_storage_change_set(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
+        is_delayed_field_optimization_capable: bool,
     ) -> anyhow::Result<Self, VMStatus> {
+        assert!(
+            !is_delayed_field_optimization_capable,
+            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
+
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
