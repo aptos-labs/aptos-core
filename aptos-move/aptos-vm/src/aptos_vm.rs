@@ -20,7 +20,7 @@ use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::Gas;
-use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -307,6 +307,28 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
+        if self.0.get_gas_feature_version() >= 12 {
+            // Check if the gas meter's internal counters are consistent.
+            //
+            // Since we are already in the failure epilogue, there is not much we can do
+            // other than logging the inconsistency.
+            //
+            // This is a tradeoff. We have to either
+            //   1. Continue to calculate the gas cost based on the numbers we have.
+            //   2. Discard the transaction.
+            //
+            // Option (2) does not work, since it would enable DoS attacks.
+            // Option (1) is not ideal, but optimistically, it should allow the network
+            // to continue functioning, less the transactions that run into this problem.
+            if let Err(err) = gas_meter.algebra().check_consistency() {
+                println!(
+                    "[aptos-vm][gas-meter][failure-epilogue] {}",
+                    err.message()
+                        .unwrap_or("No message found -- this should not happen.")
+                );
+            }
+        }
+
         // Clear side effects: create new session and clear refunds from fee statement.
         let mut session = self
             .0
@@ -376,6 +398,21 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        if self.0.get_gas_feature_version() >= 12 {
+            // Check if the gas meter's internal counters are consistent.
+            //
+            // It's better to fail the transaction due to invariant violation than to allow
+            // potentially bogus states to be committed.
+            if let Err(err) = gas_meter.algebra().check_consistency() {
+                println!(
+                    "[aptos-vm][gas-meter][success-epilogue] {}",
+                    err.message()
+                        .unwrap_or("No message found -- this should not happen.")
+                );
+                return Err(err.finish(Location::Undefined).into());
+            }
+        }
+
         let fee_statement = AptosVM::fee_statement_from_gas_meter(
             txn_data,
             gas_meter,
