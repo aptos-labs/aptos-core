@@ -532,6 +532,9 @@ pub fn setup_environment_and_start_node(
     // Log the node config at node startup
     info!("Using node config {:?}", &node_config);
 
+    // Starts the admin service
+    services::start_admin_service(&node_config);
+
     // Set up the storage database and any RocksDB checkpoints
     let (aptos_db, db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
