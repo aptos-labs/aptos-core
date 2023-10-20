@@ -15,7 +15,7 @@ use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     fmt::Debug,
     iter::{empty, Iterator},
     sync::{
@@ -112,7 +112,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
             },
-            ExecutionStatus::Abort(_) => HashMap::new(),
+            ExecutionStatus::Abort(_) => BTreeMap::new(),
         };
 
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {

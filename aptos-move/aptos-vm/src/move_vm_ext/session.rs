@@ -373,11 +373,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut resource_write_set = HashMap::new();
-        let mut resource_group_write_set = HashMap::new();
-        let mut module_write_set = HashMap::new();
-        let mut aggregator_write_set = HashMap::new();
-        let mut aggregator_delta_set = HashMap::new();
+        let mut resource_write_set = BTreeMap::new();
+        let mut resource_group_write_set = BTreeMap::new();
+        let mut module_write_set = BTreeMap::new();
+        let mut aggregator_write_set = BTreeMap::new();
+        let mut aggregator_delta_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
