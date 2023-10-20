@@ -1341,7 +1341,7 @@ impl TryFrom<MultiKeySignature> for AccountAuthenticator {
             signatures.push((indexed_signature.index, signature));
         }
 
-        let multi_key = MultiKey::new(public_keys, value.signatures_required);
+        let multi_key = MultiKey::new(public_keys, value.signatures_required)?;
         let auth = MultiKeyAuthenticator::new(multi_key, signatures)?;
         Ok(AccountAuthenticator::multi_key(auth))
     }
