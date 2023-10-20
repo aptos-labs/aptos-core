@@ -18,6 +18,7 @@ use aptos_types::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
     transaction::{Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
 };
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
@@ -44,7 +45,7 @@ pub trait AptosValidatorInterface: Sync {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)>;
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>, Vec<WriteSet>)>;
 
     async fn get_latest_version(&self) -> Result<Version>;
 
@@ -114,8 +115,13 @@ pub trait AptosValidatorInterface: Sync {
 }
 
 pub struct DebuggerStateView {
-    query_sender:
-        Mutex<UnboundedSender<(StateKey, Version, std::sync::mpsc::Sender<Option<Vec<u8>>>)>>,
+    query_sender: Mutex<
+        UnboundedSender<(
+            StateKey,
+            Version,
+            std::sync::mpsc::Sender<Option<StateValue>>,
+        )>,
+    >,
     version: Version,
 }
 
@@ -124,13 +130,14 @@ async fn handler_thread<'a>(
     mut thread_receiver: UnboundedReceiver<(
         StateKey,
         Version,
-        std::sync::mpsc::Sender<Option<Vec<u8>>>,
+        std::sync::mpsc::Sender<Option<StateValue>>,
     )>,
 ) {
     const M: usize = 1024 * 1024;
-    let cache = Arc::new(Mutex::new(
-        LruCache::<(StateKey, Version), Option<Vec<u8>>>::new(M),
-    ));
+    let cache = Arc::new(Mutex::new(LruCache::<
+        (StateKey, Version),
+        Option<StateValue>,
+    >::new(M)));
 
     loop {
         let (key, version, sender) =
@@ -151,7 +158,7 @@ async fn handler_thread<'a>(
                     .get_state_value_by_version(&key, version - 1)
                     .await
                     .ok()
-                    .and_then(|v| v.map(|s| s.bytes().to_vec()));
+                    .unwrap_or(None);
                 cache.lock().unwrap().put((key, version), val.clone());
                 sender.send(val)
             });
@@ -180,8 +187,8 @@ impl DebuggerStateView {
         query_handler_locked
             .send((state_key.clone(), version, tx))
             .unwrap();
-        let bytes_opt = rx.recv()?;
-        Ok(bytes_opt.map(|bytes| StateValue::new_legacy(bytes.into())))
+        let value = rx.recv()?;
+        Ok(value)
     }
 }
 

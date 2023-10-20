@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_debugger::AptosDebugger;
 use aptos_rest_client::Client;
+use aptos_types::transaction::Transaction;
 use aptos_vm::AptosVM;
 use clap::{Parser, Subcommand};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 #[derive(Subcommand)]
@@ -44,12 +45,40 @@ async fn main() -> Result<()> {
         Target::DB { path } => AptosDebugger::db(path)?,
     };
 
+    /*
     println!(
         "{:#?}",
         debugger
             .execute_past_transactions(args.begin_version, args.limit)
             .await?
-    );
+    );*/
+
+    let version = args.begin_version;
+    let (txn, _) = debugger
+        .get_committed_transaction_at_version(version)
+        .await?;
+
+    let txn = match txn {
+        Transaction::UserTransaction(txn) => txn,
+        _ => bail!("not a user transaction"),
+    };
+
+    let (_status, output, gas_log) =
+        debugger.execute_transaction_at_version_with_gas_profiler(version, txn)?;
+
+    let txn_output =
+        output.try_into_transaction_output(&debugger.state_view_at_version(version))?;
+
+    // Show results to the user
+    println!("{:#?}", txn_output);
+
+    let report_path = Path::new("gas-profiling").join(format!("txn-{}", version));
+    gas_log.generate_html_report(
+        &report_path,
+        format!("Gas Report - Transaction {}", version),
+    )?;
+
+    println!("Gas profiling report saved to {}.", report_path.display());
 
     Ok(())
 }

@@ -18,6 +18,7 @@ use aptos_types::{
         Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
+    write_set::WriteSet,
 };
 use aptos_validator_interface::{
     AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView, RestDebuggerInterface,
@@ -108,12 +109,30 @@ impl AptosDebugger {
         Ok((status, output, gas_profiler.finish()))
     }
 
+    pub async fn get_committed_transaction_at_version(
+        &self,
+        version: Version,
+    ) -> Result<(Transaction, TransactionInfo)> {
+        let (mut txns, mut info, _) = self.debugger.get_committed_transactions(version, 1).await?;
+
+        let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
+        let info = info
+            .pop()
+            .expect("there must be exactly 1 txn info in the vec");
+
+        Ok((txn, info))
+    }
+
+    pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {
+        DebuggerStateView::new(self.debugger.clone(), version)
+    }
+
     pub async fn execute_past_transactions(
         &self,
         mut begin: Version,
         mut limit: u64,
     ) -> Result<Vec<TransactionOutput>> {
-        let (mut txns, mut txn_infos) = self
+        let (mut txns, mut txn_infos, mut write_sets) = self
             .debugger
             .get_committed_transactions(begin, limit)
             .await?;
@@ -131,7 +150,7 @@ impl AptosDebugger {
             limit -= epoch_result.len() as u64;
             txns = txns.split_off(epoch_result.len());
             let epoch_txn_infos = txn_infos.drain(0..epoch_result.len()).collect::<Vec<_>>();
-            Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin);
+            Self::print_mismatches(&epoch_result, &epoch_txn_infos, begin, &write_sets);
 
             ret.append(&mut epoch_result);
         }
@@ -142,13 +161,14 @@ impl AptosDebugger {
         txn_outputs: &[TransactionOutput],
         expected_txn_infos: &[TransactionInfo],
         first_version: Version,
+        write_sets: &[WriteSet],
     ) {
         for idx in 0..txn_outputs.len() {
             let txn_output = &txn_outputs[idx];
             let txn_info = &expected_txn_infos[idx];
             let version = first_version + idx as Version;
             txn_output
-                .ensure_match_transaction_info(version, txn_info, None, None)
+                .ensure_match_transaction_info(version, txn_info, Some(&write_sets[idx]), None)
                 .unwrap_or_else(|err| println!("{}", err))
         }
     }

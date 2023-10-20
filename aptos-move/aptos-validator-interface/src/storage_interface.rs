@@ -15,6 +15,7 @@ use aptos_types::{
     account_state::AccountState,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
 };
 use std::{path::Path, sync::Arc};
 
@@ -70,13 +71,13 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>, Vec<WriteSet>)> {
         let txn_iter = self.0.get_transaction_iterator(start, limit)?;
         let txn_info_iter = self.0.get_transaction_info_iterator(start, limit)?;
         let txns = txn_iter.collect::<Result<Vec<_>>>()?;
         let txn_infos = txn_info_iter.collect::<Result<Vec<_>>>()?;
         ensure!(txns.len() == txn_infos.len());
-        Ok((txns, txn_infos))
+        Ok((txns, txn_infos, vec![]))
     }
 
     async fn get_latest_version(&self) -> Result<Version> {

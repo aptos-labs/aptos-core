@@ -13,6 +13,7 @@ use aptos_types::{
     account_state::AccountState,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
+    write_set::WriteSet,
 };
 use std::collections::BTreeMap;
 
@@ -69,9 +70,10 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         &self,
         start: Version,
         limit: u64,
-    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>)> {
+    ) -> Result<(Vec<Transaction>, Vec<TransactionInfo>, Vec<WriteSet>)> {
         let mut txns = Vec::with_capacity(limit as usize);
         let mut txn_infos = Vec::with_capacity(limit as usize);
+        let mut txn_changes = Vec::with_capacity(limit as usize);
 
         while txns.len() < limit as usize {
             self.0
@@ -85,11 +87,12 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 .for_each(|txn| {
                     txns.push(txn.transaction);
                     txn_infos.push(txn.info);
+                    txn_changes.push(txn.changes);
                 });
             println!("Got {}/{} txns from RestApi.", txns.len(), limit);
         }
 
-        Ok((txns, txn_infos))
+        Ok((txns, txn_infos, txn_changes))
     }
 
     async fn get_latest_version(&self) -> Result<Version> {
