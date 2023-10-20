@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
-    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    module::AGGREGATOR_MODULE,
+    types::{code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, DeltaApplicationFailureReason},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -14,7 +16,7 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use move_binary_format::errors::{Location, PartialVMError};
+use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
@@ -79,8 +81,22 @@ pub trait TAggregatorV1View {
             })?;
         delta_op
             .apply_to(base)
-            .map_err(PartialVMError::from)
-            .map_err(|partial_error| partial_error.finish(Location::Undefined).into_vm_status())
+            .map_err(|e| match &e {
+                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
+                    reason: DeltaApplicationFailureReason::Overflow,
+                    ..
+                }) => addition_v1_error(e),
+                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
+                    reason: DeltaApplicationFailureReason::Underflow,
+                    ..
+                }) => subtraction_v1_error(e),
+                _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e)).into(),
+            })
+            .map_err(|partial_error| {
+                partial_error
+                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
+                    .into_vm_status()
+            })
             .map(|result| WriteOp::Modification(serialize(&result).into()))
     }
 }
@@ -162,7 +178,6 @@ where
         &self,
         _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        // TODO check if any of these methods need to be implemented
         unimplemented!("get_delayed_field_value not implemented")
     }
 

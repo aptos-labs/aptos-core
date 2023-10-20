@@ -6,7 +6,7 @@ use crate::{
     utils::{bytes_to_string, is_string_layout, string_to_bytes},
 };
 use aptos_logger::error;
-// TODO: After aggregators_v2 branch land, consolidate these, instead of using alias here
+// TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
 pub use aptos_types::aggregator::{DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
@@ -160,7 +160,7 @@ impl NonPanic for DelayedFieldsSpeculativeError {}
 pub enum DelayedFieldValue {
     Aggregator(u128),
     Snapshot(u128),
-    // TODO probably change to Derived(Arc<Vec<u8>>) to make copying predictably costly
+    // TODO[agg_v2](optimize) probably change to Derived(Arc<Vec<u8>>) to make copying predictably costly
     Derived(Vec<u8>),
 }
 
@@ -228,7 +228,8 @@ impl TryIntoMoveValue for DelayedFieldValue {
 impl TryFromMoveValue for DelayedFieldValue {
     type Error = PartialVMError;
     // Need to distinguish between aggregators and snapshots of integer types.
-    // TODO: We only need that because of the current enum-based implementations.
+    // TODO[agg_v2](cleanup): We only need that because of the current enum-based
+    // implementations. See if we want to keep that separation, or clean it up.
     type Hint = IdentifierMappingKind;
 
     fn try_from_move_value(
@@ -261,7 +262,8 @@ impl TryFromMoveValue for DelayedFieldValue {
     }
 }
 
-// TODO see if we need both AggregatorValue and SnapshotValue. Also, maybe they should be nested
+// TODO[agg_v2](cleanup) see if we need both AggregatorValue and SnapshotValue.
+// Or alternatively, maybe they should be nested (i.e. DelayedFieldValue::Snapshot(SnapshotValue))
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotValue {
     Integer(u128),

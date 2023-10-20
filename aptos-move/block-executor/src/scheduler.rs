@@ -138,7 +138,8 @@ enum ExecutionStatus {
     Executing(Incarnation),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
-    // TODO: rename to Finalized or ReadyToCommit / CommitReady? it gets committed later, without scheduler tracking.
+    // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
+    // it gets committed later, without scheduler tracking.
     Committed(Incarnation),
     Aborting(Incarnation),
     ExecutionHalted,

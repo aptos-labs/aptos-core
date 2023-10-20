@@ -1953,7 +1953,7 @@ impl Loader {
         Ok((struct_layout, has_identifier_mappings))
     }
 
-    // TODO(aggregator):
+    // TODO[agg_v2](cleanup):
     // Currently aggregator checks are hardcoded and leaking to loader.
     // It seems that this is only because there is no support for native
     // types.
@@ -2042,14 +2042,14 @@ impl Loader {
             },
             Type::Struct { name, .. } => {
                 *count += 1;
-                // TODO why does struct not increase depth?
+                // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
                     self.struct_name_to_type_layout(name, &[], count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
             Type::StructInstantiation { name, ty_args, .. } => {
                 *count += 1;
-                // TODO why does struct not increase depth?
+                // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
                     self.struct_name_to_type_layout(name, ty_args, count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)

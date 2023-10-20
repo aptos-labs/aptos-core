@@ -305,7 +305,8 @@ fn native_format_impl(
         },
         MoveTypeLayout::Tagged(tag, ty) => match tag {
             // There is no need to show any lifting information!
-            // TODO(aggregator): How does printing work with ephemeral identifiers?
+            // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
+            // Can we modify this to print tagging info, or is this something that cannot be changed
             LayoutTag::IdentifierMapping(_) => native_format_impl(context, ty, val, depth, out)?,
         },
     };
