@@ -1832,7 +1832,7 @@ mod test {
 
         /*
             layout = Struct {
-                aggregators: vec![AggregatorSnapshot<u128>]
+                aggregators: vec![AggregatorSnapshot<string>]
             }
         */
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
@@ -1847,14 +1847,14 @@ mod test {
         )]));
         let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
             Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(vec![20, 30, 21, 32]),
-            ]))])),
+                Value::u8(20), Value::u8(30), Value::u8(12), Value::u8(10)])),
+            ])),
             Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(vec![35, 12]),
-            ]))])),
+                Value::u8(10), Value::u8(30)])),
+            ])),
             Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(vec![12, 0, 1]),
-            ]))])),
+                Value::u8(0), Value::u8(30), Value::u8(12)])),
+            ])),
         ])]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
@@ -1868,18 +1868,17 @@ mod test {
             counter == RefCell::new(15),
             "The counter should have been updated to 15"
         );
-        let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                    Value::u8(12),
-                ]))])),
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                    Value::u8(13),
-                ]))])),
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                    Value::u8(14),
-                ]))])),
-            ])]));
+        let patched_value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::u8(12)])),
+            ])),
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::u8(13)])),
+            ])),
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::u8(14)])),
+            ])),
+        ])]));
         assert_eq!(
             patched_state_value,
             StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
