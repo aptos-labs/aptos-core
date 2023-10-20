@@ -35,6 +35,7 @@ use aptos_types::{
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
+    fee_statement::FeeStatement,
 };
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
@@ -904,6 +905,20 @@ impl Transaction {
                 .await?;
                 operation_index += ops.len() as u64;
                 operations.append(&mut ops);
+            }
+
+            if let Some(user_txn) = maybe_user_txn {
+                let fee_events = get_fee_statement_from_event(&events);
+                for event in fee_events {
+                    operations.push(Operation::deposit(
+                        operation_index,
+                        Some(OperationStatusType::Success),
+                        AccountIdentifier::base_account(user_txn.sender()),
+                        native_coin(),
+                        event.storage_fee_refund(),
+                    ));
+                    operation_index += 1;
+                }
             }
         } else {
             // Parse all failed operations from the payload
@@ -1809,6 +1824,25 @@ fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Vec<
             None
         }
     })
+}
+
+/// Filter v2 FeeStatement events with non-zero storage_fee_refund
+fn get_fee_statement_from_event(events: &[ContractEvent]) -> Vec<FeeStatement> {
+    events
+        .iter()
+        .filter(|event| event.is_v2())
+        .filter_map(|event| {
+            if let Ok(fee_statement_event) = bcs::from_bytes::<FeeStatement>(event.event_data()) {
+                if fee_statement_event.storage_fee_refund() != 0 {
+                    Some(fee_statement_event.clone()) // Collect only if storage_fee_refund_octas is non-zero
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn filter_events<F: Fn(&EventKey, &ContractEvent) -> Option<T>, T>(
