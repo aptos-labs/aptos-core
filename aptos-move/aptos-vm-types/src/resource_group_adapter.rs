@@ -64,7 +64,9 @@ impl<'r> ResourceGroupAdapter<'r> {
         resource_view: &'r dyn TResourceView<Key = StateKey, Layout = MoveTypeLayout>,
         gas_feature_version: u64,
     ) -> Self {
+        println!("ResourceGroupAdapter::new({:?})", gas_feature_version);
         let group_size_kind = GroupSizeKind::from_gas_feature_version(gas_feature_version);
+        println!("ResourceGroupAdapter::group_size_kind = {:?}", group_size_kind);
 
         Self {
             // TODO: when ResourceGroupView is implemented by block executor, provide
@@ -92,6 +94,7 @@ impl<'r> ResourceGroupAdapter<'r> {
         let (group_data, blob_len): (BTreeMap<StructTag, Bytes>, u64) = group_data.map_or_else(
             || Ok::<_, Error>((BTreeMap::new(), 0)),
             |group_data_blob| {
+                println!("[{:?}] group_data_blob: {:?}", group_key, group_data_blob);
                 let group_data = bcs::from_bytes(&group_data_blob)
                     .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?;
                 Ok((group_data, group_data_blob.len() as u64))

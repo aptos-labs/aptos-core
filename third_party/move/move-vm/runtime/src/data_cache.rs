@@ -203,6 +203,7 @@ impl<'r> TransactionDataCache<'r> {
 
             let (data, bytes_loaded) = resolved_result.map_err(|err| {
                 let msg = format!("Unexpected storage error: {:?}", err);
+                println!("load_resource: {}", msg);
                 PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)
             })?;
             load_res = Some(NumBytes::new(bytes_loaded as u64));
@@ -257,6 +258,7 @@ impl<'r> TransactionDataCache<'r> {
                 .finish(Location::Undefined)),
             Err(err) => {
                 let msg = format!("Unexpected storage error: {:?}", err);
+                println!("load_module: {}", msg);
                 Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
                     .with_message(msg)
                     .finish(Location::Undefined))
@@ -291,7 +293,8 @@ impl<'r> TransactionDataCache<'r> {
         Ok(self
             .remote
             .get_module(module_id)
-            .map_err(|_| {
+            .map_err(|e| {
+                println!("Unexpected error in exists module: {:?}", e);
                 PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
             })?
             .is_some())

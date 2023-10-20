@@ -115,6 +115,7 @@ impl<'r> WriteOpConverter<'r> {
         // error and block execution must abort).
         // BlockExecutor is responsible with handling this error
         let group_size_arithmetics_error = || {
+            println!("group size arithmetics error");
             VMStatus::error(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 err_msg("Group size underflow while applying updates"),
@@ -204,7 +205,8 @@ impl<'r> WriteOpConverter<'r> {
         use MoveStorageOp::*;
         use WriteOp::*;
 
-        let maybe_existing_metadata = state_value_metadata_result.map_err(|_| {
+        let maybe_existing_metadata = state_value_metadata_result.map_err(|e| {
+            println!("unexpected storage error in convert {:?}", e);
             VMStatus::error(
                 StatusCode::STORAGE_ERROR,
                 err_msg("Storage read failed when converting change set."),

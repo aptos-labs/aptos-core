@@ -550,6 +550,8 @@ impl FakeExecutor {
 
         let output = sequential_output.or(parallel_output).unwrap();
 
+        println!("Output: {:#?}", output);
+
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:#?}\n", output).as_str());
         }
