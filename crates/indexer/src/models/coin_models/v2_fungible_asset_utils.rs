@@ -68,7 +68,7 @@ impl FungibleAssetMetadata {
     }
 
     pub fn get_symbol(&self) -> String {
-        truncate_str(&self.name, FUNGIBLE_ASSET_SYMBOL)
+        truncate_str(&self.symbol, FUNGIBLE_ASSET_SYMBOL)
     }
 
     pub fn get_icon_uri(&self) -> String {
