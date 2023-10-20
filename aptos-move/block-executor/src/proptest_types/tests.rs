@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::{Error, ModulePathReadWrite},
+    errors::{Error, IntentionalFallbackToSequential},
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -84,7 +84,9 @@ fn run_transactions<K, V, E>(
         if module_access.0 && module_access.1 {
             assert_eq!(
                 output.unwrap_err(),
-                Error::FallbackToSequential(PanicOr::Or(ModulePathReadWrite))
+                Error::FallbackToSequential(PanicOr::Or(
+                    IntentionalFallbackToSequential::ModulePathReadWrite
+                ))
             );
             continue;
         }
@@ -471,7 +473,9 @@ fn publishing_fixed_params_with_block_gas_limit(
 
         assert_eq!(
             output.unwrap_err(),
-            Error::FallbackToSequential(PanicOr::Or(ModulePathReadWrite))
+            Error::FallbackToSequential(PanicOr::Or(
+                IntentionalFallbackToSequential::ModulePathReadWrite
+            ))
         );
     }
 }

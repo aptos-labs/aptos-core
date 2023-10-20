@@ -101,7 +101,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-    ) -> ::std::result::Result<bool, PanicOr<ModulePathReadWrite>> {
+    ) -> ::std::result::Result<bool, PanicOr<IntentionalFallbackToSequential>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -214,6 +214,11 @@ where
                 // Record the status indicating abort.
                 ExecutionStatus::Abort(Error::UserError(err))
             },
+            ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
+                return Err(PanicOr::Or(
+                    IntentionalFallbackToSequential::DirectWriteSetTransaction,
+                ));
+            },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
@@ -243,7 +248,9 @@ where
         }
 
         if !last_input_output.record(idx_to_execute, read_set, result) {
-            return Err(PanicOr::Or(ModulePathReadWrite));
+            return Err(PanicOr::Or(
+                IntentionalFallbackToSequential::ModulePathReadWrite,
+            ));
         }
         Ok(updates_outside)
     }
@@ -379,7 +386,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) -> ::std::result::Result<(), PanicOr<ModulePathReadWrite>> {
+    ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
@@ -750,6 +757,9 @@ where
                 ExecutionStatus::Abort(_) => {
                     txn_commit_listener.on_execution_aborted(txn_idx);
                 },
+                ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
+                    panic!("Cannot be materializing with DirectWriteSetTransactionNotCapableError");
+                },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                     panic!("Cannot be materializing with {}", msg);
@@ -763,6 +773,9 @@ where
                 final_results[txn_idx as usize] = t;
             },
             ExecutionStatus::Abort(_) => (),
+            ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
+                panic!("Cannot be materializing with DirectWriteSetTransactionNotCapableError");
+            },
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 panic!("Cannot be materializing with {}", msg);
@@ -786,7 +799,7 @@ where
             Option<Error<E::Error>>,
         )>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> ::std::result::Result<(), PanicOr<ModulePathReadWrite>> {
+    ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -1026,11 +1039,13 @@ where
         }
     }
 
+    // TODO[agg_v2][fix] Propagate code_invariant_error, to use second fallback.
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
+        dynamic_change_set_optimizations_enabled: bool,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -1049,6 +1064,7 @@ where
                     unsync_map: &unsync_map,
                     counter: &counter,
                     read_set: RefCell::new(HashSet::new()),
+                    dynamic_change_set_optimizations_enabled,
                 }),
                 idx as TxnIndex,
             );
@@ -1071,37 +1087,41 @@ where
                     // Apply the writes.
                     Self::apply_output_sequential(&unsync_map, &output);
 
-                    // Replace delayed field id with values in resource write set and read set.
-                    let delayed_field_keys = Some(output.delayed_field_change_set().into_keys());
-                    let resource_change_set = Some(output.resource_write_set());
-                    let (mut patched_resource_write_set, write_set_keys) =
-                        Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
+                    if dynamic_change_set_optimizations_enabled {
+                        // Replace delayed field id with values in resource write set and read set.
+                        let delayed_field_keys =
+                            Some(output.delayed_field_change_set().into_keys());
+                        let resource_change_set = Some(output.resource_write_set());
+                        let (mut patched_resource_write_set, write_set_keys) =
+                            Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
 
-                    let read_set = latest_view.read_set_sequential_execution();
-                    patched_resource_write_set.extend(
-                        Self::map_id_to_values_in_read_set_sequential(
-                            delayed_field_keys,
-                            write_set_keys,
-                            read_set,
-                            &unsync_map,
+                        let read_set = latest_view.read_set_sequential_execution();
+                        patched_resource_write_set.extend(
+                            Self::map_id_to_values_in_read_set_sequential(
+                                delayed_field_keys,
+                                write_set_keys,
+                                read_set,
+                                &unsync_map,
+                                &latest_view,
+                            ),
+                        );
+
+                        // Replace delayed field id with values in events
+                        let patched_events = Self::map_id_to_values_events(
+                            Box::new(output.get_events().into_iter()),
                             &latest_view,
-                        ),
-                    );
+                        );
 
-                    // Replace delayed field id with values in events
-                    let patched_events = Self::map_id_to_values_events(
-                        Box::new(output.get_events().into_iter()),
-                        &latest_view,
-                    );
+                        output.incorporate_materialized_txn_output(
+                            // No aggregator v1 delta writes are needed for sequential execution.
+                            vec![],
+                            patched_resource_write_set,
+                            patched_events,
+                        );
+                    } else {
+                        assert!(output.delayed_field_change_set().is_empty());
+                    }
 
-                    output.incorporate_materialized_txn_output(
-                        // No aggregator v1 delta writes are needed for sequential execution.
-                        vec![],
-                        patched_resource_write_set,
-                        patched_events,
-                    );
-
-                    //
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_transaction_committed(idx as TxnIndex, &output);
                     }
@@ -1114,6 +1134,11 @@ where
                     // Record the status indicating abort.
                     return Err(Error::UserError(err));
                 },
+                ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
+                    return Err(Error::FallbackToSequential(PanicOr::Or(
+                        IntentionalFallbackToSequential::DirectWriteSetTransaction,
+                    )));
+                },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                     panic!(
                         "Sequential execution must not have SpeculativeExecutionAbortError: {:?}",
@@ -1121,10 +1146,13 @@ where
                     );
                 },
                 ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    panic!(
-                        "Sequential execution must not have DelayedFieldsCodeInvariantError: {:?}",
+                    error!(
+                        "Sequential execution failed with DelayedFieldsCodeInvariantError: {:?}",
                         msg
                     );
+                    return Err(Error::FallbackToSequential(PanicOr::CodeInvariantError(
+                        msg,
+                    )));
                 },
             }
             // When the txn is a SkipRest txn, halt sequential execution.
@@ -1188,15 +1216,28 @@ where
                 executor_arguments,
                 signature_verified_block,
                 base_view,
+                true,
             )
         };
 
         if let Err(Error::FallbackToSequential(e)) = ret {
-            if let PanicOr::Or(ModulePathReadWrite) = e {
-                debug!("[Execution]: Module read & written, sequential fallback");
-            } else {
-                error!("[Execution]: {:?}, sequential fallback", e);
-            }
+            let dynamic_change_set_optimizations_enabled = match e {
+                PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
+                    debug!("[Execution]: Module read & written, sequential fallback");
+                    true
+                },
+                PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
+                    info!("[Execution]: DirectWriteSetTransaction found, sequential fallback");
+                    false
+                },
+                PanicOr::CodeInvariantError(msg) => {
+                    error!(
+                        "[Execution]: CodeInvariantError({:?}), sequential fallback",
+                        msg
+                    );
+                    false
+                },
+            };
 
             // All logs from the parallel execution should be cleared and not reported.
             // Clear by re-initializing the speculative logs.
@@ -1206,7 +1247,39 @@ where
                 executor_arguments,
                 signature_verified_block,
                 base_view,
-            )
+                dynamic_change_set_optimizations_enabled,
+            );
+
+            if ret.is_err() && dynamic_change_set_optimizations_enabled {
+                if let Err(Error::FallbackToSequential(e)) = ret {
+                    match e {
+                        PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
+                            panic!("ModulePathReadWrite shouldn't happen in sequential execution")
+                        },
+                        PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
+                            info!("[Execution]: DirectWriteSetTransaction found, during ModulePathReadWrite sequential fallback");
+                        },
+                        PanicOr::CodeInvariantError(msg) => {
+                            error!("[Execution]: CodeInvariantError({:?}) in sequential with dynamic_change_set_optimizations_enabled, sequential fallback", msg);
+                        },
+                    };
+
+                    // All logs from the parallel execution should be cleared and not reported.
+                    // Clear by re-initializing the speculative logs.
+                    init_speculative_logs(signature_verified_block.len());
+
+                    ret = self.execute_transactions_sequential(
+                        executor_arguments,
+                        signature_verified_block,
+                        base_view,
+                        false,
+                    );
+
+                    if let Err(Error::FallbackToSequential(e)) = ret {
+                        panic!("Sequential execution failed with {:?}", e);
+                    }
+                }
+            }
         }
         ret
     }

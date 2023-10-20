@@ -119,14 +119,14 @@ impl VMOutput {
                 .change_set()
                 .delayed_field_change_set()
                 .is_empty(),
-            "Aggregator deltas must be empty after materialization."
+            "Delayed fields must be empty after materialization."
         );
         debug_assert!(
             materialized_output
                 .change_set()
                 .resource_group_write_set()
                 .is_empty(),
-            "Aggregator deltas must be empty after materialization."
+            "Resource Groups must be empty after materialization."
         );
         let (vm_change_set, gas_used, status) = materialized_output.unpack();
         let (write_set, events) = vm_change_set.try_into_storage_change_set()?.into_inner();
@@ -190,6 +190,8 @@ impl VMOutput {
             "Different number of events and patched events in the output."
         );
         self.change_set.set_events(patched_events.into_iter());
+        // TODO[agg_v2](cleanup) move drain to happen when getting what to materialize.
+        let _ = self.change_set.drain_delayed_field_change_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set
