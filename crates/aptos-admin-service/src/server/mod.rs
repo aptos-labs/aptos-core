@@ -6,7 +6,7 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, Server, StatusCode,
+    Body, Request, Response, Server, StatusCode,
 };
 use std::{
     convert::Infallible,
@@ -66,7 +66,7 @@ async fn serve_requests(req: Request<Body>, enabled: bool) -> hyper::Result<Resp
     }
     match (req.method().clone(), req.uri().path()) {
         #[cfg(target_os = "linux")]
-        (Method::GET, "/profilez") => profiling::handle_cpu_profiling_request(req).await,
+        (hyper::Method::GET, "/profilez") => profiling::handle_cpu_profiling_request(req).await,
         _ => Ok(reply_with_status(StatusCode::NOT_FOUND, "Not found.")),
     }
 }
