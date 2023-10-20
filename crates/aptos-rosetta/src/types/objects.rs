@@ -907,6 +907,7 @@ impl Transaction {
                 operations.append(&mut ops);
             }
 
+            // For storage fee refund
             if let Some(user_txn) = maybe_user_txn {
                 let fee_events = get_fee_statement_from_event(&events);
                 for event in fee_events {
