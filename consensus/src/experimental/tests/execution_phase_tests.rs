@@ -23,7 +23,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, StateComputeResult};
 use aptos_types::{ledger_info::LedgerInfo, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 // ExecutionSchedulePhase and ExecutionWaitPhase chained together.
 // In BufferManager they are chained through the main loop.
@@ -64,6 +64,10 @@ pub fn prepare_execution_phase() -> (HashValue, ExecutionPhaseForTest) {
     (random_hash_value, execution_phase)
 }
 
+fn dummy_guard() -> CountedRequest<()> {
+    CountedRequest::new((), Arc::new(AtomicU64::new(0)))
+}
+
 fn add_execution_phase_test_cases(
     phase_tester: &mut PhaseTester<ExecutionPhaseForTest>,
     random_hash_value: HashValue,
@@ -84,6 +88,7 @@ fn add_execution_phase_test_cases(
     phase_tester.add_test_case(
         ExecutionRequest {
             ordered_blocks: vec![ExecutedBlock::new(block, StateComputeResult::new_dummy())],
+            lifetime_guard: dummy_guard(),
         },
         Box::new(move |resp| {
             assert_eq!(
@@ -97,6 +102,7 @@ fn add_execution_phase_test_cases(
     phase_tester.add_test_case(
         ExecutionRequest {
             ordered_blocks: vec![],
+            lifetime_guard: dummy_guard(),
         },
         Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::EmptyBlocks)))),
     );
@@ -114,6 +120,7 @@ fn add_execution_phase_test_cases(
                 bad_block,
                 StateComputeResult::new_dummy(),
             )],
+            lifetime_guard: dummy_guard(),
         },
         Box::new(move |resp| assert!(matches!(resp.inner, Err(ExecutorError::BlockNotFound(_))))),
     );
