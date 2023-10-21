@@ -16,7 +16,6 @@ use crate::{
     subscription::{SubscriptionRequest, SubscriptionStreamRequests},
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, sample, sample::SampleRate, trace, warn};
 use aptos_storage_service_types::{
     requests::{
@@ -33,7 +32,7 @@ use aptos_time_service::TimeService;
 use aptos_types::transaction::Version;
 use arc_swap::ArcSwap;
 use dashmap::{mapref::entry::Entry, DashMap};
-use lru::LruCache;
+use mini_moka::sync::Cache;
 use std::{sync::Arc, time::Duration};
 
 /// Storage server constants
@@ -48,7 +47,7 @@ const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log the storage s
 pub struct Handler<T> {
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -59,7 +58,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
         optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-        lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+        lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
         request_moderator: Arc<RequestModerator>,
         storage: T,
         subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -363,7 +362,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         );
 
         // Check if the response is already in the cache
-        if let Some(response) = self.lru_response_cache.lock().get(request) {
+        if let Some(response) = self.lru_response_cache.get(request) {
             increment_counter(
                 &metrics::LRU_CACHE_EVENT,
                 peer_network_id.network_id(),
@@ -407,10 +406,8 @@ impl<T: StorageReaderInterface> Handler<T> {
         let storage_response = StorageServiceResponse::new(data_response, request.use_compression)?;
 
         // Cache the response before returning
-        let _ = self
-            .lru_response_cache
-            .lock()
-            .put(request.clone(), storage_response.clone());
+        self.lru_response_cache
+            .insert(request.clone(), storage_response.clone());
 
         Ok(storage_response)
     }
