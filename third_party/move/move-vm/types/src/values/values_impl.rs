@@ -2171,16 +2171,11 @@ impl Vector {
                     .collect::<PartialVMResult<Vec<_>>>()?,
             ),
 
-            Type::Signer
-            | Type::Vector(_)
-            | Type::Struct { .. }
-            | Type::StructInstantiation {
-                name: _,
-                ty_args: _,
-                ..
-            } => Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
-                elements.into_iter().map(|v| v.0).collect(),
-            ))))),
+            Type::Signer | Type::Vector(_) | Type::Struct(_) | Type::StructInstantiation(_, _) => {
+                Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
+                    elements.into_iter().map(|v| v.0).collect(),
+                )))))
+            },
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
