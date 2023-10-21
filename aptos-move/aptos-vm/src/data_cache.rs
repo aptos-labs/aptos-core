@@ -138,6 +138,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
+        // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
@@ -158,7 +159,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
 
             let buf = self
                 .resource_group_view
-                .get_resource_from_group(&key, struct_tag, None)
+                .get_resource_from_group(&key, struct_tag, maybe_layout)
                 .map_err(common_error)?;
             let group_size = if first_access {
                 self.resource_group_view
