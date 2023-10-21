@@ -9,6 +9,7 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 
 mod error;
+pub mod local_executor_helper;
 mod metrics;
 pub mod process_executor_service;
 mod remote_cordinator_client;

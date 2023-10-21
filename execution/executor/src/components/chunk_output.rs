@@ -7,10 +7,12 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_service::remote_executor_client::{RemoteExecutorClient, COORDINATOR_PORT};
+use aptos_executor_service::{
+    local_executor_helper::SHARDED_BLOCK_EXECUTOR,
+    remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
+};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_infallible::Mutex;
-use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     state_delta::StateDelta,
@@ -27,66 +29,10 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{
-    sharded_block_executor::{local_executor_shard::LocalExecutorClient, ShardedBlockExecutor},
-    AptosVM, VMExecutor,
-};
+use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use once_cell::sync::{Lazy, OnceCell};
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
-
-static REMOTE_ADDRESSES: OnceCell<Vec<SocketAddr>> = OnceCell::new();
-static COORDINATOR_ADDRESS: OnceCell<SocketAddr> = OnceCell::new();
-
-pub fn set_remote_addresses(addresses: Vec<SocketAddr>) {
-    REMOTE_ADDRESSES.set(addresses).ok();
-}
-
-pub fn get_remote_addresses() -> Vec<SocketAddr> {
-    match REMOTE_ADDRESSES.get() {
-        Some(value) => value.clone(),
-        None => vec![],
-    }
-}
-
-pub fn set_coordinator_address(address: SocketAddr) {
-    COORDINATOR_ADDRESS.set(address).ok();
-}
-
-pub fn get_coordinator_address() -> SocketAddr {
-    match COORDINATOR_ADDRESS.get() {
-        Some(value) => *value,
-        None => SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT),
-    }
-}
-
-pub static SHARDED_BLOCK_EXECUTOR: Lazy<
-    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
-> = Lazy::new(|| {
-    info!("LOCAL_SHARDED_BLOCK_EXECUTOR created");
-    Arc::new(Mutex::new(
-        LocalExecutorClient::create_local_sharded_block_executor(AptosVM::get_num_shards(), None),
-    ))
-});
-
-pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
-    Arc<Mutex<ShardedBlockExecutor<CachedStateView, RemoteExecutorClient<CachedStateView>>>>,
-> = Lazy::new(|| {
-    info!("REMOTE_SHARDED_BLOCK_EXECUTOR created");
-    Arc::new(Mutex::new(
-        RemoteExecutorClient::create_remote_sharded_block_executor(
-            get_coordinator_address(),
-            get_remote_addresses(),
-            None,
-        ),
-    ))
-});
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 pub struct ChunkOutput {
     /// Input transactions.

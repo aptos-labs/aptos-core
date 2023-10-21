@@ -13,8 +13,9 @@ use aptos_block_partitioner::{
 use aptos_config::config::{
     EpochSnapshotPrunerConfig, LedgerPrunerConfig, PrunerConfig, StateMerklePrunerConfig,
 };
-use aptos_executor::{block_executor::TransactionBlockExecutor, components::chunk_output};
+use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
@@ -456,7 +457,7 @@ fn main() {
         .remote_executor_addresses
         .is_some()
     {
-        chunk_output::set_remote_addresses(
+        remote_executor_client::set_remote_addresses(
             opt.pipeline_opt
                 .sharding_opt
                 .remote_executor_addresses
@@ -465,12 +466,12 @@ fn main() {
         );
         assert_eq!(
             execution_shards,
-            chunk_output::get_remote_addresses().len(),
+            remote_executor_client::get_remote_addresses().len(),
             "Number of execution shards ({}) must be equal to the number of remote addresses ({}).",
             execution_shards,
-            chunk_output::get_remote_addresses().len()
+            remote_executor_client::get_remote_addresses().len()
         );
-        chunk_output::set_coordinator_address(
+        remote_executor_client::set_coordinator_address(
             opt.pipeline_opt.sharding_opt.coordinator_address.unwrap(),
         );
         // it does not matter because shards are on remote node, but for sake of correctness lets

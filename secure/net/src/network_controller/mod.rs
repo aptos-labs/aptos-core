@@ -14,6 +14,7 @@ use tokio::{runtime::Runtime, sync::oneshot};
 
 mod error;
 mod inbound_handler;
+pub(crate) mod metrics;
 mod outbound_handler;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
