@@ -1832,7 +1832,7 @@ mod test {
 
         /*
             layout = Struct {
-                snap: AggregatorSnapshot<string>
+                snap: vec![AggregatorSnapshot<string>]
             }
         */
         let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Vector(
@@ -1847,31 +1847,29 @@ mod test {
         )]));
         let value = Value::struct_(Struct::pack(vec![
             Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                    Value::vector_u8(bcs::to_bytes("hello").unwrap().to_vec()),
-                ])),
-            ])),
+                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("hello").unwrap().to_vec())]))])),
+                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("ab").unwrap().to_vec())]))])),
+                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("c").unwrap().to_vec())]))])),
         ])]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
-        println!("state_value: {:?}", state_value);
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
             .unwrap();
         assert!(
-            identifiers.len() == 1,
+            identifiers.len() == 3,
             "Three identifiers should have been replaced in this case"
         );
         assert!(
-            counter == RefCell::new(13),
+            counter == RefCell::new(15),
             "The counter should have been updated to 15"
         );
-        let patched_value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
-                Value::vector_u8(bcs::to_bytes("12").unwrap().to_vec())
-                ])),
-            ])),
-        ])]));
-        // TODO: This assertion is failing
+        // TODO: This assertion is failing. The replaced identifier is not BCS encoded.
+        // let patched_value = Value::struct_(Struct::pack(vec![
+        //     Value::vector_for_testing_only(vec![
+        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("12").unwrap().to_vec())]))])),
+        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("13").unwrap().to_vec())]))])),
+        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("14").unwrap().to_vec())]))])),
+        // ])]));
         // assert_eq!(
         //     patched_state_value,
         //     StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
@@ -1881,7 +1879,7 @@ mod test {
             .unwrap();
         assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
         assert!(
-            identifiers2.len() == 1,
+            identifiers2.len() == 3,
             "Three identifiers should have been replaced in this case"
         );
         assert_eq!(identifiers, identifiers2);
