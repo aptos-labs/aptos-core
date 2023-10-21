@@ -3068,11 +3068,12 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "futures-core",
  "pbjson",
  "prost 0.12.1",
+ "prost-types 0.12.1",
  "serde",
  "tonic 0.10.0",
 ]
