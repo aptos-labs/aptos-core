@@ -45,7 +45,7 @@ pub struct GroupWrite {
     /// exist in the group. Note: During parallel block execution, due to speculative
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    inner_ops: BTreeMap<StructTag, WriteOp>,
+    inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
 }
 
 impl GroupWrite {
@@ -55,9 +55,9 @@ impl GroupWrite {
     pub fn new(
         mut metadata_op: WriteOp,
         group_size: u64,
-        inner_ops: BTreeMap<StructTag, WriteOp>,
+        inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     ) -> Self {
-        for v in inner_ops.values() {
+        for (v, _layout) in inner_ops.values() {
             assert_none!(v.metadata());
         }
 
@@ -91,7 +91,7 @@ impl GroupWrite {
         &self.metadata_op
     }
 
-    pub fn inner_ops(&self) -> &BTreeMap<StructTag, WriteOp> {
+    pub fn inner_ops(&self) -> &BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         &self.inner_ops
     }
 }
@@ -391,10 +391,6 @@ impl VMChangeSet {
         additional_aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         additional_aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
-<<<<<<< HEAD
-        use std::collections::btree_map::Entry::{Occupied, Vacant};
-=======
->>>>>>> ef1c13d590 (rebase artifacts)
         use WriteOp::*;
 
         // First, squash deltas.
@@ -522,11 +518,6 @@ impl VMChangeSet {
         write_set: &mut BTreeMap<StateKey, WriteOp>,
         additional_write_set: BTreeMap<StateKey, WriteOp>,
     ) -> anyhow::Result<(), VMStatus> {
-<<<<<<< HEAD
-        use std::collections::btree_map::Entry::{Occupied, Vacant};
-
-=======
->>>>>>> ef1c13d590 (rebase artifacts)
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
@@ -544,11 +535,6 @@ impl VMChangeSet {
         write_set: &mut BTreeMap<StateKey, GroupWrite>,
         additional_write_set: BTreeMap<StateKey, GroupWrite>,
     ) -> anyhow::Result<(), VMStatus> {
-<<<<<<< HEAD
-        use std::collections::btree_map::Entry::{Occupied, Vacant};
-
-=======
->>>>>>> ef1c13d590 (rebase artifacts)
         for (key, additional_update) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut group_entry) => {
@@ -575,8 +561,7 @@ impl VMChangeSet {
                     if noop {
                         group_entry.remove();
                     } else {
-                        // TODO change to squash_additional_resource_writes
-                        Self::squash_additional_writes(
+                        Self::squash_additional_resource_writes(
                             &mut group_entry.get_mut().inner_ops,
                             additional_inner_ops,
                         )?;
@@ -584,24 +569,6 @@ impl VMChangeSet {
                 },
                 Vacant(entry) => {
                     entry.insert(additional_update);
-                },
-            }
-        }
-        Ok(())
-    }
-
-    // TODO remove in favor of squash_additional_resource_writes
-    fn squash_additional_writes<K: Hash + Eq + PartialEq>(
-        write_set: &mut BTreeMap<K, WriteOp>,
-        additional_write_set: BTreeMap<K, WriteOp>,
-    ) -> anyhow::Result<(), VMStatus> {
-        for (key, additional_write_op) in additional_write_set.into_iter() {
-            match write_set.entry(key) {
-                Occupied(mut entry) => {
-                    squash_writes_pair!(entry, additional_write_op);
-                },
-                Vacant(entry) => {
-                    entry.insert(additional_write_op);
                 },
             }
         }
@@ -865,35 +832,36 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
+        // TODO: Harcoding type layout to None. Test with layout = Some(..)
         base_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 100),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Creation(vec![100].into())),
-                (mock_tag_2(), WriteOp::Modification(vec![2].into())),
+                (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
+                (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
             ]),
         });
         additional_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Modification(vec![0].into())),
-                (mock_tag_1(), WriteOp::Modification(vec![1].into())),
+                (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
+                (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
             ]),
         });
 
         base_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 100),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Deletion),
-                (mock_tag_1(), WriteOp::Modification(vec![2].into())),
-                (mock_tag_2(), WriteOp::Creation(vec![2].into())),
+                (mock_tag_0(), (WriteOp::Deletion, None)),
+                (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
+                (mock_tag_2(), (WriteOp::Creation(vec![2].into()), None)),
             ]),
         });
         additional_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Creation(vec![0].into())),
-                (mock_tag_1(), WriteOp::Deletion),
-                (mock_tag_2(), WriteOp::Deletion),
+                (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
+                (mock_tag_1(), (WriteOp::Deletion, None)),
+                (mock_tag_2(), (WriteOp::Deletion, None)),
             ]),
         });
 
@@ -906,27 +874,27 @@ mod tests {
         assert_eq!(inner_ops_1.len(), 3);
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_0()),
-            &WriteOp::Creation(vec![0].into())
+            &(WriteOp::Creation(vec![0].into()), None)
         );
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_1()),
-            &WriteOp::Modification(vec![1].into())
+            &(WriteOp::Modification(vec![1].into()), None)
         );
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_2()),
-            &WriteOp::Modification(vec![2].into())
+            &(WriteOp::Modification(vec![2].into()), None)
         );
         let inner_ops_2 = &base_update.get(&key_2).unwrap().inner_ops;
         assert_eq!(inner_ops_2.len(), 2);
         assert_some_eq!(
             inner_ops_2.get(&mock_tag_0()),
-            &WriteOp::Modification(vec![0].into())
+            &(WriteOp::Modification(vec![0].into()), None)
         );
-        assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &WriteOp::Deletion);
+        assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &(WriteOp::Deletion, None));
 
         let additional_update = BTreeMap::from([(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: BTreeMap::from([(mock_tag_1(), WriteOp::Deletion)]),
+            inner_ops: BTreeMap::from([(mock_tag_1(), (WriteOp::Deletion, None))]),
         })]);
         assert_err!(VMChangeSet::squash_group_writes(
             &mut base_update,
