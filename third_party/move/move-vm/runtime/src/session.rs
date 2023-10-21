@@ -7,11 +7,7 @@ use crate::{
     native_extensions::NativeContextExtensions,
 };
 use bytes::Bytes;
-use move_binary_format::{
-    compatibility::Compatibility,
-    errors::*,
-    file_format::{AbilitySet, LocalIndex},
-};
+use move_binary_format::{compatibility::Compatibility, errors::*, file_format::LocalIndex};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Changes},
@@ -22,10 +18,10 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{CachedStructIndex, StructType, Type},
     values::{GlobalValue, Value},
 };
-use std::borrow::Borrow;
+use std::{borrow::Borrow, sync::Arc};
 
 pub struct Session<'r, 'l> {
     pub(crate) move_vm: &'l MoveVM,
@@ -400,9 +396,10 @@ impl<'r, 'l> Session<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    /// Gets the abilities for this type, at it's particular instantiation
-    pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        ty.abilities().map_err(|e| e.finish(Location::Undefined))
+    /// Fetch a struct type from cache, if the index is in bounds
+    /// Helpful when paired with load_type, or any other API that returns 'Type'
+    pub fn get_struct_type(&self, index: CachedStructIndex) -> Option<Arc<StructType>> {
+        self.move_vm.runtime.loader().get_struct_type(index)
     }
 
     /// Gets the underlying native extensions.
