@@ -489,7 +489,9 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             ));
         }
 
-        let mut derived_ids = Vec::new();
+        // Track separately, todo_deltas need to be done before todo_derived
+        let mut todo_deltas = Vec::new();
+        let mut todo_derived = Vec::new();
 
         for id in ids {
             let mut versioned_value = self
@@ -526,29 +528,15 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                     base_aggregator,
                     delta,
                 }) => {
-                    let prev_value = self.values
-                        .get_mut(base_aggregator)
-                        .ok_or_else(|| CommitError::CodeInvariantError("Cannot find base_aggregator for Apply(SnapshotDelta) during commit".to_string()))?
-                        .read_latest_committed_value(idx_to_commit)
-                        .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
-
-                    if let DelayedFieldValue::Aggregator(base) = prev_value {
-                        let new_value = delta.apply_to(base).map_err(|e| {
-                            CommitError::ReExecutionNeeded(format!(
-                                "Failed to apply delta to base: {:?}",
-                                e
-                            ))
-                        })?;
-                        Some(DelayedFieldValue::Snapshot(new_value))
-                    } else {
-                        return Err(CommitError::CodeInvariantError(
-                            "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
-                        ));
-                    }
+                    todo_deltas.push((id, *base_aggregator, *delta));
+                    None
                 },
-                VersionEntry::Apply(SnapshotDerived { .. }) => {
+                VersionEntry::Apply(SnapshotDerived {
+                    base_snapshot,
+                    formula,
+                }) => {
                     // Because Derived values can depend on the current value, we need to compute other values before it.
-                    derived_ids.push(id);
+                    todo_derived.push((id, *base_snapshot, formula.clone()));
                     None
                 },
                 VersionEntry::Estimate(_) => {
@@ -563,39 +551,59 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             }
         }
 
-        for id in derived_ids {
+        for (id, base_aggregator, delta) in todo_deltas {
+            let new_entry = {
+                let prev_value = self.values
+                    .get_mut(&base_aggregator)
+                    .ok_or_else(|| CommitError::CodeInvariantError("Cannot find base_aggregator for Apply(SnapshotDelta) during commit".to_string()))?
+                    .read_latest_committed_value(idx_to_commit)
+                    .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
+
+                if let DelayedFieldValue::Aggregator(base) = prev_value {
+                    let new_value = delta.apply_to(base).map_err(|e| {
+                        CommitError::ReExecutionNeeded(format!(
+                            "Failed to apply delta to base: {:?}",
+                            e
+                        ))
+                    })?;
+                    DelayedFieldValue::Snapshot(new_value)
+                } else {
+                    return Err(CommitError::CodeInvariantError(
+                        "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
+                    ));
+                }
+            };
+
             let mut versioned_value = self
                 .values
                 .get_mut(&id)
                 .expect("Value in commit needs to be in the HashMap");
-            let entry_to_commit = versioned_value
-                .versioned_map
-                .get(&idx_to_commit)
-                .expect("Value in commit at that transaction version needs to be in the HashMap");
-            let new_entry = match &**entry_to_commit {
-                VersionEntry::Apply(SnapshotDerived {
-                    base_snapshot,
-                    formula,
-                }) => {
-                    let prev_value = self.values
-                        .get_mut(base_snapshot)
-                        .ok_or_else(|| CommitError::CodeInvariantError("Cannot find base_aggregator for Apply(SnapshotDelta) during commit".to_string()))?
-                        // Read values committed in this commit
-                        .read_latest_committed_value(idx_to_commit + 1)
-                        .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
+            versioned_value.insert_final_value(idx_to_commit, new_entry);
+        }
 
-                    if let DelayedFieldValue::Snapshot(base) = prev_value {
-                        let new_value = formula.apply_to(base);
-                        DelayedFieldValue::Derived(new_value)
-                    } else {
-                        return Err(CommitError::CodeInvariantError(
-                            "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
-                        ));
-                    }
-                },
-                _ => unreachable!("We've only added derived values into derived_ids"),
+        for (id, base_snapshot, formula) in todo_derived {
+            let new_entry = {
+                let prev_value = self.values
+                    .get_mut(&base_snapshot)
+                    .ok_or_else(|| CommitError::CodeInvariantError("Cannot find base_aggregator for Apply(SnapshotDelta) during commit".to_string()))?
+                    // Read values committed in this commit
+                    .read_latest_committed_value(idx_to_commit + 1)
+                    .map_err(|e| CommitError::CodeInvariantError(format!("Cannot read latest committed value for base aggregator for ApplySnapshotDelta) during commit: {:?}", e)))?;
+
+                if let DelayedFieldValue::Snapshot(base) = prev_value {
+                    let new_value = formula.apply_to(base);
+                    DelayedFieldValue::Derived(new_value)
+                } else {
+                    return Err(CommitError::CodeInvariantError(
+                        "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
+                    ));
+                }
             };
 
+            let mut versioned_value = self
+                .values
+                .get_mut(&id)
+                .expect("Value in commit needs to be in the HashMap");
             versioned_value.insert_final_value(idx_to_commit, new_entry);
         }
 
