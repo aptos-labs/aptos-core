@@ -51,8 +51,17 @@ impl ClientBuilder {
             HeaderValue::from_static(X_APTOS_SDK_HEADER_VALUE),
         );
 
+        let mut builder = ReqwestClient::builder();
+
+        match ::std::env::var("APTOS_NO_SNI") {
+            Ok(_) => {
+                builder = builder.tls_sni(false);
+            },
+            Err(_) => ()
+        }
+
         Self {
-            reqwest_builder: ReqwestClient::builder(),
+            reqwest_builder: builder,
             base_url: aptos_base_url.to_url(),
             version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
             timeout: Duration::from_secs(10), // Default to 10 seconds
