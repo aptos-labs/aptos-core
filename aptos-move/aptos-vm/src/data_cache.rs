@@ -6,8 +6,8 @@
 use crate::{
     aptos_vm_impl::gas_config,
     move_vm_ext::{
-        get_max_binary_format_version, AptosMoveResolver, AsExecutorView, AsResourceGroupView,
-        ResourceGroupResolver,
+        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
+        AsResourceGroupView, ResourceGroupResolver,
     },
 };
 #[allow(unused_imports)]
@@ -33,7 +33,7 @@ use aptos_vm_types::{
     resource_group_adapter::ResourceGroupAdapter,
 };
 use bytes::Bytes;
-use move_binary_format::{errors::*, CompiledModule};
+use move_binary_format::{deserializer::DeserializerConfig, errors::*, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
@@ -76,7 +76,7 @@ impl<'a> ConfigStorage for ConfigAdapter<'a, StateKey, MoveTypeLayout> {
 /// for (non-group) resources and subsequent handling in the StorageAdapter itself.
 pub struct StorageAdapter<'e, E> {
     executor_view: &'e E,
-    max_binary_format_version: u32,
+    deserializer_config: DeserializerConfig,
     resource_group_view: ResourceGroupAdapter<'e>,
     accessed_groups: RefCell<HashSet<StateKey>>,
 }
@@ -89,13 +89,19 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
         let max_binary_version = get_max_binary_format_version(features, gas_feature_version);
+        let max_identifier_size = get_max_identifier_size(features);
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
             executor_view,
             gas_feature_version,
         );
 
-        Self::new(executor_view, max_binary_version, resource_group_adapter)
+        Self::new(
+            executor_view,
+            max_binary_version,
+            max_identifier_size,
+            resource_group_adapter,
+        )
     }
 
     // TODO(gelash, georgemitenkov): delete after simulation uses block executor.
@@ -110,11 +116,15 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
     fn new(
         executor_view: &'e E,
         max_binary_format_version: u32,
+        max_identifier_size: u64,
         resource_group_view: ResourceGroupAdapter<'e>,
     ) -> Self {
         Self {
             executor_view,
-            max_binary_format_version,
+            deserializer_config: DeserializerConfig::new(
+                max_binary_format_version,
+                max_identifier_size,
+            ),
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),
         }
@@ -221,13 +231,12 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
             Ok(Some(bytes)) => bytes,
             _ => return vec![],
         };
-        let module = match CompiledModule::deserialize_with_max_version(
-            &module_bytes,
-            self.max_binary_format_version,
-        ) {
-            Ok(module) => module,
-            _ => return vec![],
-        };
+        let module =
+            match CompiledModule::deserialize_with_config(&module_bytes, &self.deserializer_config)
+            {
+                Ok(module) => module,
+                _ => return vec![],
+            };
         module.metadata
     }
 
@@ -286,8 +295,13 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let features = Features::fetch_config(&config_view).unwrap_or_default();
         let max_binary_version = get_max_binary_format_version(&features, gas_feature_version);
         let resource_group_adapter = ResourceGroupAdapter::new(None, self, gas_feature_version);
-
-        StorageAdapter::new(self, max_binary_version, resource_group_adapter)
+        let max_identifier_size = get_max_identifier_size(&features);
+        StorageAdapter::new(
+            self,
+            max_binary_version,
+            max_identifier_size,
+            resource_group_adapter,
+        )
     }
 }
 
@@ -357,6 +371,6 @@ pub(crate) mod tests {
             GroupSizeKind::None => 1,
         };
         let group_adapter = ResourceGroupAdapter::new(None, state_view, gas_feature_version);
-        StorageAdapter::new(state_view, 0, group_adapter)
+        StorageAdapter::new(state_view, 0, 0, group_adapter)
     }
 }
