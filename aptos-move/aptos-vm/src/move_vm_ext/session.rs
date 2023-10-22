@@ -221,13 +221,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn populate_v0_resource_group_change_set(
         change_set: &mut BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
         state_key: StateKey,
-<<<<<<< HEAD
-        mut source_data: BTreeMap<StructTag, BytesWithResourceLayout>,
-        resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
-=======
         mut source_data: BTreeMap<StructTag, Bytes>,
-        resources: HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
->>>>>>> 90ad880028 ([agg_v2] Fix resource groups rebase bug)
+        resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
     ) -> VMResult<()> {
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
