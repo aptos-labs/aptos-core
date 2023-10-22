@@ -47,7 +47,7 @@ use rand::{thread_rng, Rng};
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{atomic::AtomicU32, Arc},
 };
@@ -502,11 +502,11 @@ where
 
     // For each delayed field in resource write set, replace the identifiers with values.
     fn map_id_to_values_in_write_set(
-        resource_write_set: Option<HashMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>>,
+        resource_write_set: Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>>,
         latest_view: &LatestView<T, S, X>,
-    ) -> (HashMap<T::Key, T::Value>, HashSet<T::Key>) {
+    ) -> (BTreeMap<T::Key, T::Value>, HashSet<T::Key>) {
         let mut write_set_keys = HashSet::new();
-        let mut patched_resource_write_set = HashMap::new();
+        let mut patched_resource_write_set = BTreeMap::new();
         if let Some(resource_write_set) = resource_write_set {
             for (key, (write_op, layout)) in resource_write_set.iter() {
                 // layout is Some(_) if it contains a delayed field
@@ -568,8 +568,8 @@ where
         write_set_keys: HashSet<T::Key>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         latest_view: &LatestView<T, S, X>,
-    ) -> HashMap<T::Key, T::Value> {
-        let mut patched_resource_write_set = HashMap::new();
+    ) -> BTreeMap<T::Key, T::Value> {
+        let mut patched_resource_write_set = BTreeMap::new();
         if let Some(delayed_field_keys) = delayed_field_keys {
             let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
             let read_set = last_input_output.read_set(txn_idx);

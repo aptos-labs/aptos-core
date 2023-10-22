@@ -93,7 +93,7 @@ impl<'r> WriteOpConverter<'r> {
     pub(crate) fn convert_resource_group_v1(
         &self,
         state_key: &StateKey,
-        group_changes: HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+        group_changes: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
     ) -> Result<GroupWrite, VMStatus> {
         // Resource group metadata is stored at the group StateKey, and can be obtained via the
         // same interfaces at for a resource at a given StateKey.
@@ -305,7 +305,6 @@ mod tests {
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use std::collections::BTreeMap;
 
     fn raw_metadata(v: u64) -> StateValueMetadata {
         StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -340,11 +339,11 @@ mod tests {
     }
 
     struct MockStateView {
-        data: HashMap<StateKey, StateValue>,
+        data: BTreeMap<StateKey, StateValue>,
     }
 
     impl MockStateView {
-        fn new(data: HashMap<StateKey, StateValue>) -> Self {
+        fn new(data: BTreeMap<StateKey, StateValue>) -> Self {
             Self { data }
         }
     }
@@ -371,7 +370,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(vec![0]);
 
-        let data = HashMap::from([(
+        let data = BTreeMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -389,7 +388,7 @@ mod tests {
             expected_size as u64
         );
         // TODO: Layout hardcoded to None. Test with layout = Some(..)
-        let group_changes = HashMap::from([
+        let group_changes = BTreeMap::from([
             (mock_tag_0(), MoveStorageOp::Delete),
             (
                 mock_tag_2(),
@@ -429,7 +428,7 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(vec![0]);
 
-        let data = HashMap::from([(
+        let data = BTreeMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
@@ -437,7 +436,7 @@ mod tests {
         let s = MockStateView::new(data);
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
-        let group_changes = HashMap::from([(
+        let group_changes = BTreeMap::from([(
             mock_tag_2(),
             MoveStorageOp::New((vec![3, 3, 3].into(), None)),
         )]);
@@ -464,12 +463,12 @@ mod tests {
 
     #[test]
     fn size_computation_new_group() {
-        let s = MockStateView::new(HashMap::new());
+        let s = MockStateView::new(BTreeMap::new());
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
         // TODO: Layout hardcoded to None. Test with layout = Some(..)
         let group_changes =
-            HashMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
+            BTreeMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
         let key = StateKey::raw(vec![0]);
         let converter = WriteOpConverter::new(&resolver, true);
         let group_write = converter
@@ -498,14 +497,14 @@ mod tests {
         let metadata = raw_metadata(100);
         let key = StateKey::raw(vec![0]);
 
-        let data = HashMap::from([(
+        let data = BTreeMap::from([(
             key.clone(),
             StateValue::new_with_metadata(bcs::to_bytes(&group).unwrap().into(), metadata.clone()),
         )]);
 
         let s = MockStateView::new(data);
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
-        let group_changes = HashMap::from([
+        let group_changes = BTreeMap::from([
             (mock_tag_0(), MoveStorageOp::Delete),
             (mock_tag_1(), MoveStorageOp::Delete),
         ]);

@@ -11,7 +11,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_core_types::vm_status::VMStatus;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 /// Output produced by the VM after executing a transaction.
 ///
 /// **WARNING**: This type should only be used inside the VM. For storage backends,
@@ -151,7 +151,7 @@ impl VMOutput {
     pub fn into_transaction_output_with_materialized_write_set(
         mut self,
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
-        patched_resource_write_set: HashMap<StateKey, WriteOp>,
+        patched_resource_write_set: BTreeMap<StateKey, WriteOp>,
         patched_events: Vec<ContractEvent>,
     ) -> TransactionOutput {
         assert_eq!(

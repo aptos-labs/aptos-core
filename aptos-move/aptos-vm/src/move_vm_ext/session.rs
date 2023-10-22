@@ -36,16 +36,16 @@ use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
-    V0(HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>),
+    V0(BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>),
     // Granular ops to individual resources within a group.
-    V1(HashMap<StateKey, HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
+    V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
 }
 type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
 type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
@@ -219,10 +219,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     }
 
     fn populate_v0_resource_group_change_set(
-        change_set: &mut HashMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
+        change_set: &mut BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
         state_key: StateKey,
         mut source_data: BTreeMap<StructTag, BytesWithResourceLayout>,
-        resources: HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+        resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
     ) -> VMResult<()> {
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -318,17 +318,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                             .collect::<BTreeMap<_, _>>(),
                     )
                 })
-                .collect::<HashMap<_, _>>()
+                .collect::<BTreeMap<_, _>>()
         });
         let mut resource_group_change_set = if maybe_resource_group_cache.is_some() {
-            ResourceGroupChangeSet::V0(HashMap::new())
+            ResourceGroupChangeSet::V0(BTreeMap::new())
         } else {
-            ResourceGroupChangeSet::V1(HashMap::new())
+            ResourceGroupChangeSet::V1(BTreeMap::new())
         };
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<
                 StructTag,
-                HashMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+                BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
             > = BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
@@ -342,7 +342,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 if let Some(resource_group_tag) = resource_group_tag {
                     if resource_groups
                         .entry(resource_group_tag)
-                        .or_insert_with(HashMap::new)
+                        .or_insert_with(BTreeMap::new)
                         .insert(struct_tag, blob_op)
                         .is_some()
                     {

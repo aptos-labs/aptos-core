@@ -22,7 +22,10 @@ use move_core_types::{
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use std::{
-    collections::BTreeMap,
+    collections::{
+        btree_map::Entry::{Occupied, Vacant},
+        BTreeMap,
+    },
     hash::Hash,
     sync::Arc,
 };
@@ -289,7 +292,9 @@ impl VMChangeSet {
         self.resource_group_write_set.iter_mut()
     }
 
-    pub fn resource_write_set(&self) -> &BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
+    pub fn resource_write_set(
+        &self,
+    ) -> &BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         &self.resource_write_set
     }
 
@@ -575,7 +580,9 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_resource_writes<K: Hash + Eq + PartialEq + Clone + std::fmt::Debug>(
+    fn squash_additional_resource_writes<
+        K: Hash + Eq + PartialEq + Ord + Clone + std::fmt::Debug,
+    >(
         write_set: &mut BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         additional_write_set: BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     ) -> anyhow::Result<(), VMStatus> {

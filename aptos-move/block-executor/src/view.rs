@@ -1845,11 +1845,16 @@ mod test {
                 ),
             ]))),
         )]));
-        let value = Value::struct_(Struct::pack(vec![
-            Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("hello").unwrap().to_vec())]))])),
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("ab").unwrap().to_vec())]))])),
-                Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("c").unwrap().to_vec())]))])),
+        let value = Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::vector_u8(bcs::to_bytes("hello").unwrap().to_vec()),
+            ]))])),
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::vector_u8(bcs::to_bytes("ab").unwrap().to_vec()),
+            ]))])),
+            Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+                Value::vector_u8(bcs::to_bytes("c").unwrap().to_vec()),
+            ]))])),
         ])]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
