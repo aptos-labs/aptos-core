@@ -667,12 +667,12 @@ where
 
     fn delayed_field_change_set(
         &self,
-    ) -> HashMap<
+    ) -> BTreeMap<
         <Self::Txn as Transaction>::Identifier,
         DelayedChange<<Self::Txn as Transaction>::Identifier>,
     > {
         // TODO: add aggregators V2 to the proptest?
-        HashMap::new()
+        BTreeMap::new()
     }
 
     // TODO: Currently, appending None to all events, which means none of the
@@ -695,7 +695,7 @@ where
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
-        _patched_resource_write_set: HashMap<
+        _patched_resource_write_set: BTreeMap<
             <Self::Txn as Transaction>::Key,
             <Self::Txn as Transaction>::Value,
         >,

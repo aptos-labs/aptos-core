@@ -228,7 +228,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn resource_write_set(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<HashMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
+    ) -> Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>> {
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match &txn_output.output_status {
@@ -298,7 +298,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
         delta_writes: Vec<(T::Key, WriteOp)>,
-        patched_resource_write_set: HashMap<T::Key, T::Value>,
+        patched_resource_write_set: BTreeMap<T::Key, T::Value>,
         patched_events: Vec<T::Event>,
     ) {
         match &self.outputs[txn_idx as usize]

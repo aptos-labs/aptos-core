@@ -128,7 +128,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
-    fn delayed_field_change_set(&self) -> HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+    fn delayed_field_change_set(&self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
         self.vm_output
             .lock()
             .as_ref()
@@ -153,7 +153,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as BlockExecutableTransaction>::Key, WriteOp)>,
-        patched_resource_write_set: HashMap<
+        patched_resource_write_set: BTreeMap<
             <Self::Txn as BlockExecutableTransaction>::Key,
             <Self::Txn as BlockExecutableTransaction>::Value,
         >,

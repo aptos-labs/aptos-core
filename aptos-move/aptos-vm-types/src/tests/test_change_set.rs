@@ -125,7 +125,7 @@ macro_rules! module_write_set_2 {
 }
 macro_rules! expected_resource_write_set {
     ($d:ident) => {
-        HashMap::from([
+        BTreeMap::from([
             mock_create_with_layout(format!("0{}", $d), 0, None),
             mock_modify_with_layout(format!("1{}", $d), 1, None),
             mock_delete_with_layout(format!("2{}", $d)),
