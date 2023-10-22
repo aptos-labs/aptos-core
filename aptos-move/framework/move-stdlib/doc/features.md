@@ -72,6 +72,8 @@ return true.
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
 -  [Function `get_aggregator_v2_api_feature`](#0x1_features_get_aggregator_v2_api_feature)
 -  [Function `aggregator_v2_api_enabled`](#0x1_features_aggregator_v2_api_enabled)
+-  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
+-  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
 -  [Function `get_concurrent_assets_feature`](#0x1_features_get_concurrent_assets_feature)
@@ -1446,6 +1448,52 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_aggregator_snapshots_feature"></a>
+
+## Function `get_aggregator_snapshots_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_aggregator_snapshots_enabled"></a>
+
+## Function `aggregator_snapshots_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>)
 }
 </code></pre>
