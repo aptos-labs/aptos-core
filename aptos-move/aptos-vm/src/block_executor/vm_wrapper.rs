@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{aptos_vm::AptosVM, block_executor::AptosTransactionOutput};
+use crate::{
+    aptos_vm::AptosVM, block_executor::AptosTransactionOutput, data_cache::AsMoveResolver,
+};
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
@@ -25,9 +27,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
     fn init(argument: (&'a S, bool)) -> Self {
         let (base_view, is_simulation) = argument;
-
-        // AptosVM has to be initialized using configs from storage.
-        let mut vm = AptosVM::new_from_state_view(base_view);
+        let mut vm = AptosVM::new(&base_view.as_move_resolver());
         if is_simulation {
             vm = vm.for_simulation();
         }

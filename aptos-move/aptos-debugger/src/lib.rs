@@ -75,8 +75,8 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // TODO(Gas): revisit this.
-        let vm = AptosVM::new_from_state_view(&state_view);
         let resolver = state_view.as_move_resolver();
+        let vm = AptosVM::new(&resolver);
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,

@@ -15,7 +15,7 @@ use aptos_types::{
     account_view::AccountView,
     transaction::{SignedTransaction, VMValidatorResult},
 };
-use aptos_vm::AptosVM;
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
 use std::sync::Arc;
@@ -55,7 +55,7 @@ impl VMValidator {
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
         );
-        AptosVM::new_from_state_view(state_view)
+        AptosVM::new(&state_view.as_move_resolver())
     }
 
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {

@@ -133,10 +133,6 @@ impl AptosVM {
         }
     }
 
-    pub fn new_from_state_view(state_view: &impl StateView) -> Self {
-        Self::new(&state_view.as_move_resolver())
-    }
-
     pub(crate) fn for_simulation(mut self) -> Self {
         self.is_simulation = true;
         self
@@ -1522,7 +1518,9 @@ impl AptosVM {
         arguments: Vec<Vec<u8>>,
         gas_budget: u64,
     ) -> Result<Vec<Vec<u8>>> {
-        let vm = AptosVM::new_from_state_view(state_view);
+        let resolver = state_view.as_move_resolver();
+        let vm = AptosVM::new(&resolver);
+
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let mut gas_meter =
             MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
@@ -1531,8 +1529,6 @@ impl AptosVM {
                 vm.vm_impl.get_storage_gas_parameters(&log_context)?.clone(),
                 gas_budget,
             )));
-
-        let resolver = vm.as_move_resolver(&state_view);
         let mut session = vm.vm_impl.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
