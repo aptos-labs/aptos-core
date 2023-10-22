@@ -266,7 +266,7 @@ impl AptosVM {
         &self,
         executor_view: &'r R,
     ) -> StorageAdapter<'r, R> {
-        StorageAdapter::from_borrowed_with_config(
+        StorageAdapter::new_with_config(
             executor_view,
             self.vm_impl.get_gas_feature_version(),
             self.vm_impl.get_features(),
@@ -278,7 +278,7 @@ impl AptosVM {
         &self,
         executor_view: &'r R,
     ) -> StorageAdapter<'r, R> {
-        StorageAdapter::from_borrowed_with_config(
+        StorageAdapter::new_with_config(
             executor_view,
             self.vm_impl.get_gas_feature_version(),
             self.vm_impl.get_features(),

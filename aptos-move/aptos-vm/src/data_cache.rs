@@ -82,7 +82,7 @@ pub struct StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
-    pub(crate) fn from_borrowed_with_config(
+    pub(crate) fn new_with_config(
         executor_view: &'e E,
         gas_feature_version: u64,
         features: &Features,
@@ -96,15 +96,6 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         );
 
         Self::new(executor_view, max_binary_version, resource_group_adapter)
-    }
-
-    // TODO(gelash, georgemitenkov): delete after simulation uses block executor.
-    pub(crate) fn from_borrowed(executor_view: &'e E) -> Self {
-        let config_view = ConfigAdapter(executor_view);
-        let (_, gas_feature_version) = gas_config(&config_view);
-        let features = Features::fetch_config(&config_view).unwrap_or_default();
-
-        Self::from_borrowed_with_config(executor_view, gas_feature_version, &features, None)
     }
 
     fn new(
