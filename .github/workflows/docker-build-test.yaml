@@ -75,7 +75,8 @@ permissions:
 # This workflow is designed such that:
 # 1. Run ALL jobs when a 'push', 'workflow_dispatch' triggered the workflow or on 'pull_request's which have set auto_merge=true or have the label "CICD:run-e2e-tests".
 # 2. Run ONLY the docker image building jobs on PRs with the "CICD:build[-<PROFILE/FEATURE>]-images" label.
-# 3. Run NOTHING when neither 1. or 2.'s conditions are satisfied.
+# 3. Run ONLY the forge-e2e-test job on PRs with the "CICD:run-forge-e2e-perf" label. 
+# 4. Run NOTHING when neither 1. or 2. or 3. conditions are satisfied.
 jobs:
   permission-check:
     if: |
@@ -256,6 +257,7 @@ jobs:
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-forge-e2e-perf') ||
         github.event.pull_request.auto_merge != null ||
         contains(github.event.pull_request.body, '#e2e')
       )
