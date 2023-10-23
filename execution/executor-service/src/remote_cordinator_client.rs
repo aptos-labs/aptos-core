@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    remote_state_view::RemoteStateViewClient, ExecuteBlockCommand, RemoteExecutionRequest,
-    RemoteExecutionResult,
+    metrics::REMOTE_EXECUTOR_TIMER, remote_state_view::RemoteStateViewClient, ExecuteBlockCommand,
+    RemoteExecutionRequest, RemoteExecutionResult,
 };
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_types::{
@@ -20,6 +20,7 @@ pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
     command_rx: Receiver<Message>,
     result_tx: Sender<Message>,
+    shard_id: ShardId,
 }
 
 impl RemoteCoordinatorClient {
@@ -41,6 +42,7 @@ impl RemoteCoordinatorClient {
             state_view_client: Arc::new(state_view_client),
             command_rx,
             result_tx,
+            shard_id,
         }
     }
 
@@ -78,11 +80,24 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command(&self) -> ExecutorShardCommand<RemoteStateViewClient> {
         match self.command_rx.recv() {
             Ok(message) => {
+                let _rx_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
+                    .start_timer();
+                let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&[&self.shard_id.to_string(), "cmd_rx_bcs_deser"])
+                    .start_timer();
                 let request: RemoteExecutionRequest = bcs::from_bytes(&message.data).unwrap();
+                drop(bcs_deser_timer);
+
                 match request {
                     RemoteExecutionRequest::ExecuteBlock(command) => {
+                        let init_prefetch_timer = REMOTE_EXECUTOR_TIMER
+                            .with_label_values(&[&self.shard_id.to_string(), "init_prefetch"])
+                            .start_timer();
                         let state_keys = Self::extract_state_keys(&command);
                         self.state_view_client.init_for_block(state_keys);
+                        drop(init_prefetch_timer);
+
                         let (sub_blocks, concurrency, gas_limit) = command.into();
                         ExecutorShardCommand::ExecuteSubBlocks(
                             self.state_view_client.clone(),
