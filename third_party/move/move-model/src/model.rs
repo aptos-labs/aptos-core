@@ -824,10 +824,24 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
+        self.diag_with_primary_and_labels(severity, loc, msg, "", labels)
+    }
+
+    /// Adds a diagnostic of given severity to this environment, with secondary labels.
+    pub fn diag_with_primary_and_labels(
+        &self,
+        severity: Severity,
+        loc: &Loc,
+        msg: &str,
+        primary: &str,
+        labels: Vec<(Loc, String)>,
+    ) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(vec![
+                Label::primary(loc.file_id, loc.span).with_message(primary)
+            ]);
         let labels = labels
             .into_iter()
             .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
@@ -3752,12 +3766,12 @@ impl<'env> FunctionEnv<'env> {
         self.data.access_specifiers.as_deref()
     }
 
-    /// Get the name to be used for a local by index, if a compiled module and source map
-    /// is attached. If the local is an argument, use that for naming, otherwise generate
-    /// a unique name.
+    /// Get the name to be used for a local by index, if available.
+    /// Otherwise generate a unique name.
+    // TODO: this function does unnecessarily return an Option, remove this
     pub fn get_local_name(&self, idx: usize) -> Option<Symbol> {
-        // Try to obtain user name
         if let Some(source_map) = &self.module_env.data.source_map {
+            // Try to obtain user name from source map
             if idx < self.data.params.len() {
                 return Some(self.data.params[idx].0);
             }
@@ -4155,5 +4169,11 @@ where
             write!(f, ">")?;
         }
         Ok(())
+    }
+}
+
+impl<'a> fmt::Display for EnvDisplay<'a, Symbol> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.val.display(self.env.symbol_pool()))
     }
 }

@@ -41,15 +41,26 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         reference_mode_kind: ReferenceKind::Immutable,
         results: vec![],
         code: vec![],
+        local_names: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
     for Parameter(name, ty) in gen.func_env.get_parameters() {
         let temp = gen.new_temp(ty);
         scope.insert(name, temp);
+        gen.local_names.insert(temp, name);
     }
-    for ty in gen.func_env.get_result_type().flatten() {
+    let tys = gen.func_env.get_result_type().flatten();
+    let multiple = tys.len() > 1;
+    for (p, ty) in tys.into_iter().enumerate() {
         let temp = gen.new_temp(ty);
-        gen.results.push(temp)
+        gen.results.push(temp);
+        let pool = gen.func_env.module_env.symbol_pool();
+        let name = if multiple {
+            pool.make(&format!("return[{}]", p))
+        } else {
+            pool.make("return")
+        };
+        gen.local_names.insert(temp, name);
     }
     gen.scopes.push(scope);
     let optional_def = gen.func_env.get_def().as_ref().cloned();
@@ -58,7 +69,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         // Need to clone expression if present because of sharing issues with `gen`. However, because
         // of interning, clone is cheap.
         gen.gen(results.clone(), &def);
-        gen.emit_with(def.node_id(), |attr| Bytecode::Ret(attr, results))
+        gen.emit_with(def.result_node_id(), |attr| Bytecode::Ret(attr, results))
     }
     let Generator {
         func_env,
@@ -71,6 +82,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         reference_mode_kind: _,
         results: _,
         code,
+        local_names,
     } = gen;
     let BytecodeGeneratorContext {
         loop_unrolling,
@@ -88,6 +100,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         vec![],
         loop_unrolling,
         loop_invariants,
+        local_names,
     )
 }
 
@@ -122,6 +135,8 @@ struct Generator<'env> {
     results: Vec<TempIndex>,
     /// The bytecode, as generated so far.
     code: Vec<Bytecode>,
+    /// Local names, as far as they have names
+    local_names: BTreeMap<TempIndex, Symbol>,
 }
 
 type Scope = BTreeMap<Symbol, TempIndex>;
@@ -319,17 +334,18 @@ impl<'env> Generator<'env> {
                     self.release_temps(targets)
                 }
             },
-            ExpData::Block(id, pat, opt_binding, body) => {
+            ExpData::Block(_, pat, opt_binding, body) => {
                 // Declare all variables bound by the pattern
                 let mut scope = BTreeMap::new();
                 for (id, sym) in pat.vars() {
                     let ty = self.get_node_type(id);
                     let temp = self.new_temp_with_valid_type(id, ty);
                     scope.insert(sym, temp);
+                    self.local_names.insert(temp, sym);
                 }
                 // If there is a binding, assign the pattern
                 if let Some(binding) = opt_binding {
-                    self.gen_assign(*id, pat, binding, Some(&scope));
+                    self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
                 }
                 // Compile the body
                 self.scopes.push(scope);
@@ -481,25 +497,14 @@ impl<'env> Generator<'env> {
     fn gen_local(&mut self, targets: Vec<TempIndex>, id: NodeId, name: Symbol) {
         let target = self.require_unary_target(id, targets);
         let attr = self.new_loc_attr(id);
-        for scope in &self.scopes {
-            if let Some(temp) = scope.get(&name) {
-                self.emit(Bytecode::Assign(attr, target, *temp, AssignKind::Move));
-                return;
-            }
-        }
-        self.internal_error(
-            id,
-            format!(
-                "unbound symbol `{}`",
-                name.display(self.env().symbol_pool())
-            ),
-        )
+        let temp = self.find_local(id, name);
+        self.emit(Bytecode::Assign(attr, target, temp, AssignKind::Inferred));
     }
 
     fn gen_temporary(&mut self, targets: Vec<TempIndex>, id: NodeId, temp: TempIndex) {
         let target = self.require_unary_target(id, targets);
         self.emit_with(id, |attr| {
-            Bytecode::Assign(attr, target, temp, AssignKind::Move)
+            Bytecode::Assign(attr, target, temp, AssignKind::Inferred)
         })
     }
 }
@@ -585,6 +590,16 @@ impl<'env> Generator<'env> {
                     BytecodeOperation::MoveFrom(mid, sid, inst.to_owned()),
                     args,
                 )
+            },
+            Operation::Copy | Operation::Move => {
+                let target = self.require_unary_target(id, targets);
+                let arg = self.gen_arg(&self.require_unary_arg(id, args));
+                let assign_kind = if matches!(op, Operation::Copy) {
+                    AssignKind::Copy
+                } else {
+                    AssignKind::Move
+                };
+                self.emit_with(id, |attr| Bytecode::Assign(attr, target, arg, assign_kind))
             },
             Operation::Borrow(kind) => {
                 let target = self.require_unary_target(id, targets);
@@ -905,7 +920,7 @@ impl<'env> Generator<'env> {
             let field_env = struct_env.get_field(field_id);
             field_env.get_offset()
         };
-        let temp = self.gen_arg(oper);
+        let temp = self.gen_auto_ref_arg(oper, kind);
         // Get instantiation of field. It is not contained in the select expression but in the
         // type of its operand.
         if let Some((_, inst)) = self
@@ -949,7 +964,7 @@ impl<'env> Generator<'env> {
         let struct_env = self.env().get_struct(str.to_qualified_id());
         let field_offset = struct_env.get_field(field).get_offset();
 
-        // Compile operand in reference mode, defaulting to immutable mpde.
+        // Compile operand in reference mode, defaulting to immutable mode.
         let oper_temp = self.gen_auto_ref_arg(oper, ReferenceKind::Immutable);
 
         // If we are in reference mode and a &mut is requested, the operand also needs to be
@@ -1057,7 +1072,7 @@ impl<'env> Generator<'env> {
             Pattern::Var(var_id, sym) => {
                 let local = self.find_local_for_pattern(*var_id, *sym, next_scope);
                 self.emit_with(id, |attr| {
-                    Bytecode::Assign(attr, local, arg, AssignKind::Move)
+                    Bytecode::Assign(attr, local, arg, AssignKind::Inferred)
                 })
             },
             Pattern::Struct(id, str, args) => {
