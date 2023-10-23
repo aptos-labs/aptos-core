@@ -44,29 +44,39 @@ const FLUSH_TIMEOUT: Duration = Duration::from_secs(5);
 const FILTER_REFRESH_INTERVAL: Duration =
     Duration::from_secs(5 /* minutes */ * 60 /* seconds */);
 
-struct TruncatedString(String);
+/// Note: To disable length limits, set `RUST_LOG_FIELD_MAX_LEN` to -1.
+const RUST_LOG_FIELD_MAX_LEN_ENV_VAR: &str = "RUST_LOG_FIELD_MAX_LEN";
+static RUST_LOG_FIELD_MAX_LEN: Lazy<usize> = Lazy::new(|| {
+    env::var(RUST_LOG_FIELD_MAX_LEN_ENV_VAR)
+        .ok()
+        .and_then(|value| i64::from_str(&value).map(|value| value as usize).ok())
+        .unwrap_or(TruncatedLogString::DEFAULT_MAX_LEN)
+});
 
-impl TruncatedString {
-    const MAX_LEN: usize = 128;
+struct TruncatedLogString(String);
+
+impl TruncatedLogString {
+    const DEFAULT_MAX_LEN: usize = 10 * 1024;
     const TRUNCATION_SUFFIX: &str = "(truncated)";
 
     fn new(s: String) -> Self {
         let mut truncated = s;
-        if truncated.len() > Self::MAX_LEN + Self::TRUNCATION_SUFFIX.len() {
-            truncated.truncate(Self::MAX_LEN);
+
+        if truncated.len() > RUST_LOG_FIELD_MAX_LEN.saturating_add(Self::TRUNCATION_SUFFIX.len()) {
+            truncated.truncate(*RUST_LOG_FIELD_MAX_LEN);
             truncated.push_str(Self::TRUNCATION_SUFFIX);
         }
-        TruncatedString(truncated)
+        TruncatedLogString(truncated)
     }
 }
 
-impl DerefMut for TruncatedString {
+impl DerefMut for TruncatedLogString {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl Deref for TruncatedString {
+impl Deref for TruncatedLogString {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
@@ -74,15 +84,15 @@ impl Deref for TruncatedString {
     }
 }
 
-impl From<String> for TruncatedString {
+impl From<String> for TruncatedLogString {
     fn from(value: String) -> Self {
-        TruncatedString::new(value)
+        TruncatedLogString::new(value)
     }
 }
 
-impl Into<String> for TruncatedString {
-    fn into(self) -> String {
-        self.0
+impl From<TruncatedLogString> for String {
+    fn from(val: TruncatedLogString) -> Self {
+        val.0
     }
 }
 
@@ -155,11 +165,11 @@ impl LogEntry {
         impl<'a> Visitor for JsonVisitor<'a> {
             fn visit_pair(&mut self, key: Key, value: Value<'_>) {
                 let v = match value {
-                    Value::Debug(d) => {
-                        serde_json::Value::String(TruncatedString::from(format!("{:?}", d)).into())
-                    },
+                    Value::Debug(d) => serde_json::Value::String(
+                        TruncatedLogString::from(format!("{:?}", d)).into(),
+                    ),
                     Value::Display(d) => {
-                        serde_json::Value::String(TruncatedString::from(d.to_string()).into())
+                        serde_json::Value::String(TruncatedLogString::from(d.to_string()).into())
                     },
                     Value::Serde(s) => match serde_json::to_value(s) {
                         Ok(value) => value,
@@ -180,7 +190,7 @@ impl LogEntry {
         let message = event
             .message()
             .map(fmt::format)
-            .map(|s| TruncatedString::from(s).into());
+            .map(|s| TruncatedLogString::from(s).into());
 
         static HOSTNAME: Lazy<Option<String>> = Lazy::new(|| {
             hostname::get()
@@ -794,7 +804,7 @@ impl LoggerFilterUpdater {
 mod tests {
     use super::{AptosData, LogEntry};
     use crate::{
-        aptos_logger::{json_format, TruncatedString, RUST_LOG_TELEMETRY},
+        aptos_logger::{json_format, TruncatedLogString, RUST_LOG_TELEMETRY},
         debug, error, info,
         logger::Logger,
         trace, warn, AptosDataBuilder, Event, Key, KeyValue, Level, LoggerFilterUpdater, Metadata,
@@ -805,6 +815,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::Value as JsonValue;
     use std::{
+        env,
         sync::{
             mpsc::{self, Receiver, SyncSender},
             Arc,
@@ -1081,15 +1092,18 @@ mod tests {
         let log_entry = LogEntry::new(
             &Event::new(
                 &Metadata::new(Level::Error, "target", "hyper", "source_path"),
-                Some(format_args!("{}", "a".repeat(2 * TruncatedString::MAX_LEN))),
+                Some(format_args!(
+                    "{}",
+                    "a".repeat(2 * TruncatedLogString::DEFAULT_MAX_LEN)
+                )),
                 &[
                     &KeyValue::new(
                         "key1",
-                        Value::Debug(&"x".repeat(2 * TruncatedString::MAX_LEN)),
+                        Value::Debug(&"x".repeat(2 * TruncatedLogString::DEFAULT_MAX_LEN)),
                     ),
                     &KeyValue::new(
                         "key2",
-                        Value::Display(&"y".repeat(2 * TruncatedString::MAX_LEN)),
+                        Value::Display(&"y".repeat(2 * TruncatedLogString::DEFAULT_MAX_LEN)),
                     ),
                 ],
             ),
@@ -1100,7 +1114,7 @@ mod tests {
             log_entry.message,
             Some(format!(
                 "{}{}",
-                "a".repeat(TruncatedString::MAX_LEN),
+                "a".repeat(TruncatedLogString::DEFAULT_MAX_LEN),
                 "(truncated)"
             ))
         );
@@ -1108,7 +1122,7 @@ mod tests {
             log_entry.data().first_key_value().unwrap().1,
             &serde_json::Value::String(format!(
                 "\"{}{}",
-                "x".repeat(TruncatedString::MAX_LEN - 1),
+                "x".repeat(TruncatedLogString::DEFAULT_MAX_LEN - 1),
                 "(truncated)"
             ))
         );
@@ -1116,7 +1130,7 @@ mod tests {
             log_entry.data().last_key_value().unwrap().1,
             &serde_json::Value::String(format!(
                 "{}{}",
-                "y".repeat(TruncatedString::MAX_LEN),
+                "y".repeat(TruncatedLogString::DEFAULT_MAX_LEN),
                 "(truncated)"
             ))
         );
