@@ -136,12 +136,6 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 <dd>
 
 </dd>
-<dt>
-<code>unlimited: bool</code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
 
@@ -769,6 +763,7 @@ This returns the capabilities to mint, burn, and transfer.
 maximum_supply defines the behavior of maximum supply when monitoring:
 - option::none(): Monitoring unlimited supply
 (width of the field - MAX_U128 is the implicit maximum supply)
+if option::some(MAX_U128) is used, it is treated as unlimited supply.
 - option::some(max): Monitoring fixed supply with <code>max</code> as the maximum supply.
 
 
@@ -815,7 +810,6 @@ maximum_supply defines the behavior of maximum supply when monitoring:
             } <b>else</b> {
                 <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">aggregator_v2::create_aggregator</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maximum_supply))
             },
-            unlimited,
         });
     } <b>else</b> {
         <b>move_to</b>(metadata_object_signer, <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a> {
@@ -954,6 +948,7 @@ Get the current supply from the <code>metadata</code> object.
 ## Function `maximum`
 
 Get the maximum supply from the <code>metadata</code> object.
+If supply is unlimited (or set explicitly to MAX_U128), none is returned
 
 
 <pre><code>#[view]
@@ -970,10 +965,11 @@ Get the maximum supply from the <code>metadata</code> object.
     <b>let</b> metadata_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
     <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address)) {
         <b>let</b> supply = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address);
-        <b>if</b> (supply.unlimited) {
+        <b>let</b> max_value = <a href="aggregator_v2.md#0x1_aggregator_v2_max_value">aggregator_v2::max_value</a>(&supply.current);
+        <b>if</b> (max_value == <a href="fungible_asset.md#0x1_fungible_asset_MAX_U128">MAX_U128</a>) {
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
         } <b>else</b> {
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="aggregator_v2.md#0x1_aggregator_v2_max_value">aggregator_v2::max_value</a>(&supply.current))
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(max_value)
         }
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(metadata_address)) {
         <b>let</b> supply = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(metadata_address);
@@ -2136,7 +2132,6 @@ Decrease the supply of a fungible asset by burning.
         <b>else</b> {
             <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">aggregator_v2::create_aggregator</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> maximum))
         },
-        unlimited,
     };
     // <b>update</b> current state:
     <a href="aggregator_v2.md#0x1_aggregator_v2_add">aggregator_v2::add</a>(&<b>mut</b> supply.current, current);

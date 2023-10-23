@@ -79,7 +79,6 @@ module aptos_framework::fungible_asset {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct ConcurrentSupply has key {
         current: Aggregator<u128>,
-        unlimited: bool,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -162,6 +161,7 @@ module aptos_framework::fungible_asset {
     /// maximum_supply defines the behavior of maximum supply when monitoring:
     ///   - option::none(): Monitoring unlimited supply
     ///     (width of the field - MAX_U128 is the implicit maximum supply)
+    ///     if option::some(MAX_U128) is used, it is treated as unlimited supply.
     ///   - option::some(max): Monitoring fixed supply with `max` as the maximum supply.
     public fun add_fungibility(
         constructor_ref: &ConstructorRef,
@@ -197,7 +197,6 @@ module aptos_framework::fungible_asset {
                 } else {
                     aggregator_v2::create_aggregator(option::extract(&mut maximum_supply))
                 },
-                unlimited,
             });
         } else {
             move_to(metadata_object_signer, Supply {
@@ -248,14 +247,16 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the maximum supply from the `metadata` object.
+    /// If supply is unlimited (or set explicitly to MAX_U128), none is returned
     public fun maximum<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
         let metadata_address = object::object_address(&metadata);
         if (exists<ConcurrentSupply>(metadata_address)) {
             let supply = borrow_global<ConcurrentSupply>(metadata_address);
-            if (supply.unlimited) {
+            let max_value = aggregator_v2::max_value(&supply.current);
+            if (max_value == MAX_U128) {
                 option::none()
             } else {
-                option::some(aggregator_v2::max_value(&supply.current))
+                option::some(max_value)
             }
         } else if (exists<Supply>(metadata_address)) {
             let supply = borrow_global<Supply>(metadata_address);
@@ -658,7 +659,6 @@ module aptos_framework::fungible_asset {
             else {
                 aggregator_v2::create_aggregator(option::extract(&mut maximum))
             },
-            unlimited,
         };
         // update current state:
         aggregator_v2::add(&mut supply.current, current);
