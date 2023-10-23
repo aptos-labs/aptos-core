@@ -174,14 +174,11 @@ fn load_option<T>(
     cursor: &mut VersionedCursor,
     loader: impl Fn(&mut VersionedCursor) -> BinaryLoaderResult<T>,
 ) -> BinaryLoaderResult<Option<T>> {
-    let b = load_u8(cursor)?;
-    if b == SerializedOption::NONE as u8 {
-        Ok(None)
-    } else if b == SerializedOption::SOME as u8 {
+    let is_some = SerializedOption::from_u8(load_u8(cursor)?)?;
+    if is_some {
         Ok(Some(loader(cursor)?))
     } else {
-        Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("invalid option flag".to_owned()))
+        Ok(None)
     }
 }
 
@@ -448,7 +445,7 @@ fn read_table(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Table> {
         Ok(kind) => kind,
         Err(_) => {
             return Err(PartialVMError::new(StatusCode::MALFORMED)
-                .with_message("Error reading table".to_string()))
+                .with_message("Error reading table".to_string()));
         },
     };
     let table_offset = load_table_offset(cursor)?;
@@ -1006,8 +1003,9 @@ fn load_access_specifiers(
     cursor: &mut VersionedCursor,
 ) -> BinaryLoaderResult<Option<Vec<AccessSpecifier>>> {
     load_option(cursor, |cursor| {
-        let mut specs: Vec<AccessSpecifier> = vec![];
-        for _ in 0..load_access_specifier_count(cursor)? {
+        let count = load_access_specifier_count(cursor)?;
+        let mut specs: Vec<AccessSpecifier> = Vec::with_capacity(count);
+        for _ in 0..count {
             specs.push(load_access_specifier(cursor)?)
         }
         Ok(specs)
@@ -1015,26 +1013,8 @@ fn load_access_specifiers(
 }
 
 fn load_access_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AccessSpecifier> {
-    let b = load_u8(cursor)?;
-    let kind = if b == SerializedAccessKind::READ as u8 {
-        AccessKind::Reads
-    } else if b == SerializedAccessKind::WRITE as u8 {
-        AccessKind::Writes
-    } else if b == SerializedAccessKind::ACQUIRES as u8 {
-        AccessKind::Acquires
-    } else {
-        return Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("invalid access kind".to_owned()));
-    };
-    let b = load_u8(cursor)?;
-    let negated = if b == SerializedBool::TRUE as u8 {
-        true
-    } else if b == SerializedBool::FALSE as u8 {
-        false
-    } else {
-        return Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("invalid access kind".to_owned()));
-    };
+    let kind = SerializedAccessKind::from_u8(load_u8(cursor)?)?;
+    let negated = SerializedBool::from_u8(load_u8(cursor)?)?;
     let resource = load_resource_specifier(cursor)?;
     let address = load_address_specifier(cursor)?;
     Ok(AccessSpecifier {
@@ -1046,41 +1026,43 @@ fn load_access_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Acc
 }
 
 fn load_resource_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ResourceSpecifier> {
-    let b = load_u8(cursor)?;
-    Ok(if b == SerializedResourceSpecifier::ANY as u8 {
-        ResourceSpecifier::Any
-    } else if b == SerializedResourceSpecifier::AT_ADDRESS as u8 {
-        ResourceSpecifier::DeclaredAtAddress(load_address_identifier_index(cursor)?)
-    } else if b == SerializedResourceSpecifier::IN_MODULE as u8 {
-        let module = load_module_handle_index(cursor)?;
-        ResourceSpecifier::DeclaredInModule(module)
-    } else if b == SerializedResourceSpecifier::RESOURCE as u8 {
-        let handle = load_struct_handle_index(cursor)?;
-        ResourceSpecifier::Resource(handle)
-    } else if b == SerializedResourceSpecifier::RESOURCE_INSTANTIATION as u8 {
-        let handle = load_struct_handle_index(cursor)?;
-        let sign = load_signature_index(cursor)?;
-        ResourceSpecifier::ResourceInstantiation(handle, sign)
-    } else {
-        return Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("invalid resource specifier".to_owned()));
-    })
+    use SerializedResourceSpecifier::*;
+    Ok(
+        match SerializedResourceSpecifier::from_u8(load_u8(cursor)?)? {
+            ANY => ResourceSpecifier::Any,
+            AT_ADDRESS => {
+                ResourceSpecifier::DeclaredAtAddress(load_address_identifier_index(cursor)?)
+            },
+            IN_MODULE => {
+                let module = load_module_handle_index(cursor)?;
+                ResourceSpecifier::DeclaredInModule(module)
+            },
+            RESOURCE => {
+                let handle = load_struct_handle_index(cursor)?;
+                ResourceSpecifier::Resource(handle)
+            },
+            RESOURCE_INSTANTIATION => {
+                let handle = load_struct_handle_index(cursor)?;
+                let sign = load_signature_index(cursor)?;
+                ResourceSpecifier::ResourceInstantiation(handle, sign)
+            },
+        },
+    )
 }
 
 fn load_address_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AddressSpecifier> {
-    let b = load_u8(cursor)?;
-    Ok(if b == SerializedAddressSpecifier::ANY as u8 {
-        AddressSpecifier::Any
-    } else if b == SerializedAddressSpecifier::LITERAL as u8 {
-        AddressSpecifier::Literal(load_address_identifier_index(cursor)?)
-    } else if b == SerializedAddressSpecifier::PARAMETER as u8 {
-        let parameter = load_local_index(cursor)?;
-        let handle = load_option(cursor, load_function_inst_index)?;
-        AddressSpecifier::Parameter(parameter, handle)
-    } else {
-        return Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("invalid address specifier".to_owned()));
-    })
+    use SerializedAddressSpecifier::*;
+    Ok(
+        match SerializedAddressSpecifier::from_u8(load_u8(cursor)?)? {
+            ANY => AddressSpecifier::Any,
+            LITERAL => AddressSpecifier::Literal(load_address_identifier_index(cursor)?),
+            PARAMETER => {
+                let parameter = load_local_index(cursor)?;
+                let handle = load_option(cursor, load_function_inst_index)?;
+                AddressSpecifier::Parameter(parameter, handle)
+            },
+        },
+    )
 }
 
 #[cfg(test)]
@@ -1284,7 +1266,7 @@ fn load_ability_set(
             Ok(byte) => byte,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Unexpected EOF".to_string()))
+                    .with_message("Unexpected EOF".to_string()));
             },
         };
         match pos {
@@ -1377,7 +1359,7 @@ fn load_struct_defs(
             Ok(byte) => SerializedNativeStructFlag::from_u8(byte)?,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid field info in struct".to_string()))
+                    .with_message("Invalid field info in struct".to_string()));
             },
         };
         let field_information = match field_information_flag {
@@ -1614,11 +1596,11 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                 if (cursor.version() < VERSION_6) =>
             {
                 return Err(
-                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Loading or casting u16, u32, u256 integers not supported in bytecode version {}",
-                        cursor.version()
-                    )),
-                );
+                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                            "Loading or casting u16, u32, u256 integers not supported in bytecode version {}",
+                            cursor.version()
+                        )),
+                    );
             },
             _ => (),
         };
@@ -1796,8 +1778,8 @@ impl SerializedType {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
 pub enum DeprecatedNominalResourceFlag {
-    NOMINAL_RESOURCE        = 0x1,
-    NORMAL_STRUCT           = 0x2,
+    NOMINAL_RESOURCE = 0x1,
+    NORMAL_STRUCT = 0x2,
 }
 
 impl DeprecatedNominalResourceFlag {
@@ -1809,13 +1791,14 @@ impl DeprecatedNominalResourceFlag {
         }
     }
 }
+
 #[rustfmt::skip]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 enum DeprecatedKind {
-    ALL                     = 0x1,
-    COPYABLE                = 0x2,
-    RESOURCE                = 0x3,
+    ALL = 0x1,
+    COPYABLE = 0x2,
+    RESOURCE = 0x3,
 }
 
 impl DeprecatedKind {
@@ -1920,6 +1903,69 @@ impl Opcodes {
             0x4C => Ok(Opcodes::CAST_U32),
             0x4D => Ok(Opcodes::CAST_U256),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
+        }
+    }
+}
+
+impl SerializedBool {
+    fn from_u8(value: u8) -> BinaryLoaderResult<bool> {
+        match value {
+            0x1 => Ok(false),
+            0x2 => Ok(true),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed boolean".to_owned())),
+        }
+    }
+}
+
+impl SerializedOption {
+    fn from_u8(value: u8) -> BinaryLoaderResult<bool> {
+        match value {
+            0x1 => Ok(false),
+            0x2 => Ok(true),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed option".to_owned())),
+        }
+    }
+}
+
+impl SerializedAccessKind {
+    fn from_u8(value: u8) -> BinaryLoaderResult<AccessKind> {
+        use AccessKind::*;
+        match value {
+            0x1 => Ok(Reads),
+            0x2 => Ok(Writes),
+            0x3 => Ok(Acquires),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed access kind".to_owned())),
+        }
+    }
+}
+
+impl SerializedResourceSpecifier {
+    fn from_u8(value: u8) -> BinaryLoaderResult<SerializedResourceSpecifier> {
+        use SerializedResourceSpecifier::*;
+        match value {
+            0x1 => Ok(ANY),
+            0x2 => Ok(AT_ADDRESS),
+            0x3 => Ok(IN_MODULE),
+            0x4 => Ok(RESOURCE),
+            0x5 => Ok(RESOURCE_INSTANTIATION),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed resource specifier".to_owned())),
+        }
+    }
+}
+
+impl SerializedAddressSpecifier {
+    fn from_u8(value: u8) -> BinaryLoaderResult<SerializedAddressSpecifier> {
+        use SerializedAddressSpecifier::*;
+        match value {
+            0x1 => Ok(ANY),
+            0x2 => Ok(LITERAL),
+            0x3 => Ok(PARAMETER),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed address specifier".to_owned())),
         }
     }
 }
