@@ -26,7 +26,9 @@ impl ProcessExecutorService {
             self_address, coordinator_address, remote_shard_addresses, num_threads
         );
         aptos_node_resource_metrics::register_node_metrics_collector();
-        let _mp = MetricsPusher::start_for_local_run("remote-executor-service");
+        let _mp = MetricsPusher::start_for_local_run(
+            &("remote-executor-service-".to_owned() + &shard_id.to_string()),
+        );
 
         AptosVM::set_concurrency_level_once(num_threads);
         let mut executor_service = ExecutorService::new(
