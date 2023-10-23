@@ -87,6 +87,8 @@ pub struct FunctionData {
     pub modify_targets: BTreeMap<QualifiedId<StructId>, Vec<Exp>>,
     /// The number of ghost type parameters introduced in order to instantiate related invariants
     pub ghost_type_param_count: usize,
+    /// A map for temporaries to associated name, if available.
+    pub local_names: BTreeMap<TempIndex, Symbol>,
 }
 
 impl<'env> FunctionTarget<'env> {
@@ -207,9 +209,18 @@ impl<'env> FunctionTarget<'env> {
     /// Get the name to be used for a local. If the local has a user name, use that for naming,
     /// otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
-        self.func_env
-            .get_local_name(idx)
-            .expect("compiled module available")
+        if let Some(name) = self.data.local_names.get(&idx) {
+            *name
+        } else {
+            self.func_env
+                .get_local_name(idx)
+                .expect("should never happen")
+        }
+    }
+
+    /// Get a raw name for a local, using its index.
+    pub fn get_local_raw_name(&self, idx: TempIndex) -> Symbol {
+        self.global_env().symbol_pool().make(&format!("$t{}", idx))
     }
 
     /// Return true if this local has a user name.
@@ -247,6 +258,17 @@ impl<'env> FunctionTarget<'env> {
         self.func_env
             .is_temporary(idx)
             .expect("compiled module available")
+    }
+
+    /// Returns a printable name for a local. If the local is a temporary which has
+    /// no name, returns `local`, otherwise `local <name>`. The returned value
+    /// should be equally produce correct English whether a name is available or not.
+    pub fn get_local_name_for_error_message(&self, temp: TempIndex) -> String {
+        if let Some(sym) = self.data.local_names.get(&temp) {
+            format!("local `{}`", sym.display(self.global_env().symbol_pool()))
+        } else {
+            "local".to_owned()
+        }
     }
 
     /// Gets the type of the local at index. This must use an index in the range as determined by
@@ -362,6 +384,14 @@ impl<'env> FunctionTarget<'env> {
             texts.push(format!("     # {}", comment));
         }
 
+        // add location
+        if cfg!(feature = "verbose-debug-print") {
+            texts.push(format!(
+                "     # {}",
+                self.get_bytecode_loc(attr_id).display(self.global_env())
+            ));
+        }
+
         // add annotations
         let annotations = self
             .annotation_formatters
@@ -412,6 +442,7 @@ impl FunctionData {
         acquires_global_resources: Vec<StructId>,
         loop_unrolling: BTreeMap<AttrId, usize>,
         loop_invariants: BTreeSet<AttrId>,
+        local_names: BTreeMap<TempIndex, Symbol>,
     ) -> Self {
         let modify_targets = func_env.get_modify_targets();
         FunctionData {
@@ -430,6 +461,7 @@ impl FunctionData {
             name_to_index,
             modify_targets,
             ghost_type_param_count: 0,
+            local_names,
         }
     }
 

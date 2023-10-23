@@ -815,6 +815,9 @@ impl<'env> SpecTranslator<'env> {
             Operation::Slice => self.translate_primitive_call("$SliceVecByRange", args),
             Operation::Range => self.translate_primitive_call("$Range", args),
 
+            // Copy and Move treated as identity for Boogie
+            Operation::Copy | Operation::Move => self.translate_exp(&args[0]),
+
             // Binary operators
             Operation::Add => self.translate_op("+", "Add", args),
             Operation::Sub => self.translate_op("-", "Sub", args),

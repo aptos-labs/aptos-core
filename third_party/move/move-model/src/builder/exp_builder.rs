@@ -1012,12 +1012,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::AddressSpecifier_::Name(name) => {
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
-                self.translate_name(
-                    &self.to_loc(&name.loc),
-                    &maccess,
-                    None,
-                    &Type::new_prim(PrimitiveType::Address),
-                );
+                self.translate_name(&maccess, None, &Type::new_prim(PrimitiveType::Address));
                 (
                     loc,
                     AddressSpecifier::Parameter(self.symbol_pool().make(name.value.as_str())),
@@ -1101,11 +1096,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
             },
             EA::Exp_::Name(maccess, type_params) => {
-                self.translate_name(&loc, maccess, type_params.as_deref(), expected_type)
+                self.translate_name(maccess, type_params.as_deref(), expected_type)
             },
             EA::Exp_::Move(var) | EA::Exp_::Copy(var) => {
                 let fake_access = sp(var.loc(), EA::ModuleAccess_::Name(var.0));
-                self.translate_name(&loc, &fake_access, None, expected_type)
+                let name_exp = self
+                    .translate_name(&fake_access, None, expected_type)
+                    .into_exp();
+                let id = self.new_node_id_with_type_loc(expected_type, &loc);
+                ExpData::Call(
+                    id,
+                    if matches!(&exp.value, EA::Exp_::Copy(_)) {
+                        Operation::Copy
+                    } else {
+                        Operation::Move
+                    },
+                    vec![name_exp],
+                )
             },
             EA::Exp_::Vector(loc, ty_opt, exps) => {
                 let loc = self.to_loc(loc);
@@ -2176,11 +2183,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Translates a name. Reports an error if the name is not found.
     fn translate_name(
         &mut self,
-        loc: &Loc,
         maccess: &EA::ModuleAccess,
         type_args: Option<&[EA::Type]>,
         expected_type: &Type,
     ) -> ExpData {
+        let loc = &self.to_loc(&maccess.loc);
         let global_var_sym = match &maccess.value {
             EA::ModuleAccess_::ModuleAccess(..) => self.parent.module_access_to_qualified(maccess),
             EA::ModuleAccess_::Name(name) => {

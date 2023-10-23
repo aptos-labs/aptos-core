@@ -130,13 +130,13 @@ fun fields::write_local_direct(): fields::S {
   1: $t5 := 0
   2: $t4 := pack fields::T($t5)
   3: $t2 := pack fields::S($t3, $t4)
-  4: $t1 := move($t2)
+  4: $t1 := infer($t2)
   5: $t6 := 42
   6: $t9 := borrow_local($t1)
   7: $t8 := borrow_field<fields::S>.g($t9)
   8: $t7 := borrow_field<fields::T>.h($t8)
   9: write_ref($t7, $t6)
- 10: $t0 := move($t1)
+ 10: $t0 := infer($t1)
  11: return $t0
 }
 
@@ -158,14 +158,14 @@ fun fields::write_local_via_ref(): fields::S {
   1: $t5 := 0
   2: $t4 := pack fields::T($t5)
   3: $t2 := pack fields::S($t3, $t4)
-  4: $t1 := move($t2)
+  4: $t1 := infer($t2)
   5: $t7 := borrow_local($t1)
-  6: $t6 := move($t7)
+  6: $t6 := infer($t7)
   7: $t8 := 42
   8: $t10 := borrow_field<fields::S>.g($t6)
   9: $t9 := borrow_field<fields::T>.h($t10)
  10: write_ref($t9, $t8)
- 11: $t0 := move($t1)
+ 11: $t0 := infer($t1)
  12: return $t0
 }
 
@@ -195,6 +195,6 @@ fun fields::write_val($t0: fields::S): fields::S {
   2: $t4 := borrow_field<fields::S>.g($t5)
   3: $t3 := borrow_field<fields::T>.h($t4)
   4: write_ref($t3, $t2)
-  5: $t1 := move($t0)
+  5: $t1 := infer($t0)
   6: return $t1
 }

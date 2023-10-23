@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: constant expression must be a literal
+error: not a valid constant expression
    ┌─ tests/checking/typing/constant_allowed_but_not_supported.move:6:20
    │
  6 │       const C: u64 = {

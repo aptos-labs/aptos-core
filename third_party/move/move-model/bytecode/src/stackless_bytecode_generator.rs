@@ -178,6 +178,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 .expect(COMPILED_MODULE_AVAILABLE),
             loop_unrolling,
             loop_invariants,
+            BTreeMap::new(),
         )
     }
 
