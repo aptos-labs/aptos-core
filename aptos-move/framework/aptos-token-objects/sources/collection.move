@@ -316,6 +316,8 @@ module aptos_token_objects::collection {
     }
 
     /// Called by token on mint to increment supply if there's an appropriate Supply struct.
+    /// TODO[agg_v2](cleanup): remove in a future release. We need to have both functions, as
+    /// increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
     public(friend) fun increment_supply(
         collection: &Object<Collection>,
         token: address,
@@ -334,7 +336,22 @@ module aptos_token_objects::collection {
         token: address,
     ): Option<AggregatorSnapshot<u64>> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let collection_addr = object::object_address(collection);
-        if (exists<FixedSupply>(collection_addr)) {
+        if (exists<ConcurrentSupply>(collection_addr)) {
+            let supply = borrow_global_mut<ConcurrentSupply>(collection_addr);
+            assert!(
+                aggregator_v2::try_add(&mut supply.current_supply, 1),
+                error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
+            );
+            aggregator_v2::add(&mut supply.total_minted, 1);
+            event::emit(
+                ConcurrentMintEvent {
+                    collection_addr,
+                    index: aggregator_v2::snapshot(&supply.total_minted),
+                    token,
+                },
+            );
+            option::some(aggregator_v2::snapshot(&supply.total_minted))
+        } else if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             supply.total_minted = supply.total_minted + 1;
@@ -361,21 +378,6 @@ module aptos_token_objects::collection {
                 },
             );
             option::some(aggregator_v2::create_snapshot<u64>(supply.total_minted))
-        } else if (exists<ConcurrentSupply>(collection_addr)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(collection_addr);
-            assert!(
-                aggregator_v2::try_add(&mut supply.current_supply, 1),
-                error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
-            );
-            aggregator_v2::add(&mut supply.total_minted, 1);
-            event::emit(
-                ConcurrentMintEvent {
-                    collection_addr,
-                    index: aggregator_v2::snapshot(&supply.total_minted),
-                    token,
-                },
-            );
-            option::some(aggregator_v2::snapshot(&supply.total_minted))
         } else {
             option::none()
         }
@@ -388,7 +390,17 @@ module aptos_token_objects::collection {
         index: Option<u64>,
     ) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let collection_addr = object::object_address(collection);
-        if (exists<FixedSupply>(collection_addr)) {
+        if (exists<ConcurrentSupply>(collection_addr)) {
+            let supply = borrow_global_mut<ConcurrentSupply>(collection_addr);
+            aggregator_v2::sub(&mut supply.current_supply, 1);
+            event::emit(
+                ConcurrentBurnEvent {
+                    collection_addr,
+                    index: *option::borrow(&index),
+                    token,
+                },
+            );
+        } else if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
             event::emit_event(
@@ -404,16 +416,6 @@ module aptos_token_objects::collection {
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
-                    index: *option::borrow(&index),
-                    token,
-                },
-            );
-        } else if (exists<ConcurrentSupply>(collection_addr)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(collection_addr);
-            aggregator_v2::sub(&mut supply.current_supply, 1);
-            event::emit(
-                ConcurrentBurnEvent {
-                    collection_addr,
                     index: *option::borrow(&index),
                     token,
                 },
@@ -434,7 +436,7 @@ module aptos_token_objects::collection {
         let metadata_object_signer = object::generate_signer_for_extending(ref);
         assert!(features::concurrent_assets_enabled(), error::invalid_argument(ECONCURRENT_NOT_ENABLED));
 
-        if (exists<FixedSupply>(metadata_object_address)) {
+        let (supply, current_supply, total_minted, burn_events, mint_events) = if (exists<FixedSupply>(metadata_object_address)) {
             let FixedSupply {
                 current_supply,
                 max_supply,
@@ -443,18 +445,11 @@ module aptos_token_objects::collection {
                 mint_events,
             } = move_from<FixedSupply>(metadata_object_address);
 
-            event::destroy_handle(burn_events);
-            event::destroy_handle(mint_events);
-
             let supply = ConcurrentSupply {
                 current_supply: aggregator_v2::create_aggregator(max_supply),
                 total_minted: aggregator_v2::create_unbounded_aggregator(),
             };
-
-            // update current state:
-            aggregator_v2::add(&mut supply.current_supply, current_supply);
-            aggregator_v2::add(&mut supply.total_minted, total_minted);
-            move_to(&metadata_object_signer, supply);
+            (supply, current_supply, total_minted, burn_events, mint_events)
         } else if (exists<UnlimitedSupply>(metadata_object_address)) {
             let UnlimitedSupply {
                 current_supply,
@@ -463,22 +458,23 @@ module aptos_token_objects::collection {
                 mint_events,
             } = move_from<UnlimitedSupply>(metadata_object_address);
 
-            event::destroy_handle(burn_events);
-            event::destroy_handle(mint_events);
-
             let supply = ConcurrentSupply {
                 current_supply: aggregator_v2::create_unbounded_aggregator(),
                 total_minted: aggregator_v2::create_unbounded_aggregator(),
             };
-
-            // update current state:
-            aggregator_v2::add(&mut supply.current_supply, current_supply);
-            aggregator_v2::add(&mut supply.total_minted, total_minted);
-            move_to(&metadata_object_signer, supply);
+            (supply, current_supply, total_minted, burn_events, mint_events)
         } else {
             // untracked collection is already concurrent, and other variants too.
             abort error::invalid_argument(EALREADY_CONCURRENT)
-        }
+        };
+
+        // update current state:
+        aggregator_v2::add(&mut supply.current_supply, current_supply);
+        aggregator_v2::add(&mut supply.total_minted, total_minted);
+        move_to(&metadata_object_signer, supply);
+
+        event::destroy_handle(burn_events);
+        event::destroy_handle(mint_events);
     }
 
     // Accessors
@@ -505,15 +501,15 @@ module aptos_token_objects::collection {
         let collection_address = object::object_address(&collection);
         check_collection_exists(collection_address);
 
-        if (exists<FixedSupply>(collection_address)) {
+        if (exists<ConcurrentSupply>(collection_address)) {
+            let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
+            option::some(aggregator_v2::read(&supply.current_supply))
+        } else if (exists<FixedSupply>(collection_address)) {
             let supply = borrow_global_mut<FixedSupply>(collection_address);
             option::some(supply.current_supply)
         } else if (exists<UnlimitedSupply>(collection_address)) {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_address);
             option::some(supply.current_supply)
-        } else if (exists<ConcurrentSupply>(collection_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
-            option::some(aggregator_v2::read(&supply.current_supply))
         } else {
             option::none()
         }

@@ -13,10 +13,13 @@ module aptos_token_objects::token {
     use std::vector;
     use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot};
     use aptos_framework::event;
-    use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
+    use aptos_framework::object::{Self, ConstructorRef, Object};
     use aptos_std::string_utils::{to_string};
     use aptos_token_objects::collection::{Self, Collection};
     use aptos_token_objects::royalty::{Self, Royalty};
+
+    #[test_only]
+    use aptos_framework::object::ExtendRef;
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -40,14 +43,14 @@ module aptos_token_objects::token {
     struct Token has key {
         /// The collection from which this token resides.
         collection: Object<Collection>,
-        /// Deprecated in favor of `index` inside TokenConcurrentFieldsAppendix.
+        /// Deprecated in favor of `index` inside ConcurrentTokenIdentifiers.
         /// Will be populated until concurrent_assets_enabled feature flag is enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
         index: u64, // DEPRECATED
         /// A brief description of the token.
         description: String,
-        /// Deprecated in favor of `name` inside TokenConcurrentFieldsAppendix.
+        /// Deprecated in favor of `name` inside ConcurrentTokenIdentifiers.
         /// Will be populated until concurrent_assets_enabled feature flag is enabled.
         ///
         /// The name of the token, which should be unique within the collection; the length of name
@@ -63,7 +66,7 @@ module aptos_token_objects::token {
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Represents first addition to the common fields for all tokens
     /// Starts being populated once aggregator_v2_api_enabled is enabled.
-    struct TokenConcurrentFieldsAppendix has key {
+    struct ConcurrentTokenIdentifiers has key {
         /// Unique identifier within the collection, optional, 0 means unassigned
         index: AggregatorSnapshot<u64>,
         /// The name of the token, which should be unique within the collection; the length of name
@@ -98,6 +101,8 @@ module aptos_token_objects::token {
         collection_name: String,
         description: String,
         name_prefix: String,
+        // If option::some, numbered token is created - i.e. index is appended to the name.
+        // If option::none, name_prefix is the full name of the token.
         name_with_index_suffix: Option<String>,
         royalty: Option<Royalty>,
         uri: String,
@@ -116,40 +121,41 @@ module aptos_token_objects::token {
         let collection_addr = collection::create_collection_address(&creator_address, &collection_name);
         let collection = object::address_to_object<Collection>(collection_addr);
 
-        // once this flag is enabled, cleanup code for aggregator_api_enabled = false.
+        // TODO[agg_v2](cleanup) once this flag is enabled, cleanup code for aggregator_api_enabled = false.
+        // Flag which controls whether any functions from aggregator_v2 module can be called.
         let aggregator_api_enabled = features::aggregator_v2_api_enabled();
+        // Flag which controls whether we are going to still continue writing to deprecated fields.
         let concurrent_assets_enabled = aggregator_api_enabled && features::concurrent_assets_enabled();
 
         let (deprecated_index, deprecated_name) = if (aggregator_api_enabled) {
-            let index = if (concurrent_assets_enabled) {
-                option::destroy_with_default(
-                    collection::increment_concurrent_supply(&collection, signer::address_of(&object_signer)),
-                    aggregator_v2::create_snapshot<u64>(0)
-                )
-            } else {
-                let id = collection::increment_supply(&collection, signer::address_of(&object_signer));
-                aggregator_v2::create_snapshot(option::get_with_default(&mut id, 0))
-            };
+            let index = option::destroy_with_default(
+                collection::increment_concurrent_supply(&collection, signer::address_of(&object_signer)),
+                aggregator_v2::create_snapshot<u64>(0)
+            );
 
+            // If create_numbered_token called us, add index to the name.
             let name = if (option::is_some(&name_with_index_suffix)) {
                 aggregator_v2::string_concat(name_prefix, &index, option::extract(&mut name_with_index_suffix))
             } else {
                 aggregator_v2::create_snapshot(name_prefix)
             };
 
+            // Until concurrent_assets_enabled is enabled, we still need to write to deprecated fields.
+            // Otherwise we put empty values there.
+            // (we need to do these calls before creating token_concurrent, to avoid copying objects)
             let deprecated_index = if (concurrent_assets_enabled) {
                 0
             } else {
                 aggregator_v2::read_snapshot(&index)
             };
-
             let deprecated_name = if (concurrent_assets_enabled) {
                 string::utf8(b"")
             } else {
                 aggregator_v2::read_snapshot(&name)
             };
 
-            let token_concurrent = TokenConcurrentFieldsAppendix {
+            // If aggregator_api_enabled, we always populate newly added fields
+            let token_concurrent = ConcurrentTokenIdentifiers {
                 index,
                 name,
             };
@@ -157,9 +163,12 @@ module aptos_token_objects::token {
 
             (deprecated_index, deprecated_name)
         } else {
+            // If aggregator_api_enabled is disabled, we cannot use increment_concurrent_supply or
+            // create ConcurrentTokenIdentifiers, so we fallback to the old behavior.
             let id = collection::increment_supply(&collection, signer::address_of(&object_signer));
             let index = option::get_with_default(&mut id, 0);
 
+            // If create_numbered_token called us, add index to the name.
             let name = if (option::is_some(&name_with_index_suffix)) {
                 let name = name_prefix;
                 string::append(&mut name, to_string<u64>(&index));
@@ -332,13 +341,14 @@ module aptos_token_objects::token {
         borrow(&token).description
     }
 
-    // To be added if/when needed
+    // To be added if/when needed - i.e. if there is a need to access name of the numbered token
+    // within the transaction that creates it, to set additional application-specific fields.
     //
     // /// This method allows minting to happen in parallel, making it efficient.
-    // fun name_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<String> acquires Token, TokenConcurrentFieldsAppendix {
+    // fun name_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<String> acquires Token, ConcurrentTokenIdentifiers {
     //     let token_address = object::object_address(token);
-    //     if (exists<TokenConcurrentFieldsAppendix>(token_address)) {
-    //         aggregator_v2::copy_snapshot(&borrow_global<TokenConcurrentFieldsAppendix>(token_address).name)
+    //     if (exists<ConcurrentTokenIdentifiers>(token_address)) {
+    //         aggregator_v2::copy_snapshot(&borrow_global<ConcurrentTokenIdentifiers>(token_address).name)
     //     } else {
     //         aggregator_v2::create_snapshot(borrow(token).name)
     //     }
@@ -347,10 +357,10 @@ module aptos_token_objects::token {
     #[view]
     /// Avoid this method in the same transaction as the token is minted
     /// as that would prohibit transactions to be executed in parallel.
-    public fun name<T: key>(token: Object<T>): String acquires Token, TokenConcurrentFieldsAppendix {
+    public fun name<T: key>(token: Object<T>): String acquires Token, ConcurrentTokenIdentifiers {
         let token_address = object::object_address(&token);
-        if (exists<TokenConcurrentFieldsAppendix>(token_address)) {
-            aggregator_v2::read_snapshot(&borrow_global<TokenConcurrentFieldsAppendix>(token_address).name)
+        if (exists<ConcurrentTokenIdentifiers>(token_address)) {
+            aggregator_v2::read_snapshot(&borrow_global<ConcurrentTokenIdentifiers>(token_address).name)
         } else {
             borrow(&token).name
         }
@@ -376,13 +386,14 @@ module aptos_token_objects::token {
         }
     }
 
-    // To be added if/when needed
+    // To be added if/when needed - i.e. if there is a need to access index of the token
+    // within the transaction that creates it, to set additional application-specific fields.
     //
     // /// This method allows minting to happen in parallel, making it efficient.
-    // fun index_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<u64> acquires Token, TokenConcurrentFieldsAppendix {
+    // fun index_snapshot<T: key>(token: &Object<T>): AggregatorSnapshot<u64> acquires Token, ConcurrentTokenIdentifiers {
     //     let token_address = object::object_address(token);
-    //     if (exists<TokenConcurrentFieldsAppendix>(token_address)) {
-    //         aggregator_v2::copy_snapshot(&borrow_global<TokenConcurrentFieldsAppendix>(token_address).index)
+    //     if (exists<ConcurrentTokenIdentifiers>(token_address)) {
+    //         aggregator_v2::copy_snapshot(&borrow_global<ConcurrentTokenIdentifiers>(token_address).index)
     //     } else {
     //         aggregator_v2::create_snapshot(borrow(token).index)
     //     }
@@ -391,10 +402,10 @@ module aptos_token_objects::token {
     #[view]
     /// Avoid this method in the same transaction as the token is minted
     /// as that would prohibit transactions to be executed in parallel.
-    public fun index<T: key>(token: Object<T>): u64 acquires Token, TokenConcurrentFieldsAppendix {
+    public fun index<T: key>(token: Object<T>): u64 acquires Token, ConcurrentTokenIdentifiers {
         let token_address = object::object_address(&token);
-        if (exists<TokenConcurrentFieldsAppendix>(token_address)) {
-            aggregator_v2::read_snapshot(&borrow_global<TokenConcurrentFieldsAppendix>(token_address).index)
+        if (exists<ConcurrentTokenIdentifiers>(token_address)) {
+            aggregator_v2::read_snapshot(&borrow_global<ConcurrentTokenIdentifiers>(token_address).index)
         } else {
             borrow(&token).index
         }
@@ -410,7 +421,7 @@ module aptos_token_objects::token {
         borrow_global_mut<Token>(mutator_ref.self)
     }
 
-    public fun burn(burn_ref: BurnRef) acquires Token, TokenConcurrentFieldsAppendix {
+    public fun burn(burn_ref: BurnRef) acquires Token, ConcurrentTokenIdentifiers {
         let addr = if (option::is_some(&burn_ref.inner)) {
             let delete_ref = option::extract(&mut burn_ref.inner);
             let addr = object::address_from_delete_ref(&delete_ref);
@@ -433,11 +444,11 @@ module aptos_token_objects::token {
             mutation_events,
         } = move_from<Token>(addr);
 
-        let index = if (exists<TokenConcurrentFieldsAppendix>(addr)) {
-            let TokenConcurrentFieldsAppendix {
+        let index = if (exists<ConcurrentTokenIdentifiers>(addr)) {
+            let ConcurrentTokenIdentifiers {
                 index,
                 name: _,
-            } = move_from<TokenConcurrentFieldsAppendix>(addr);
+            } = move_from<ConcurrentTokenIdentifiers>(addr);
             aggregator_v2::read_snapshot(&index)
         } else {
             deprecated_index
@@ -461,13 +472,13 @@ module aptos_token_objects::token {
         token.description = description;
     }
 
-    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token, TokenConcurrentFieldsAppendix {
+    public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Token, ConcurrentTokenIdentifiers {
         assert!(string::length(&name) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
 
         let token = borrow_mut(mutator_ref);
 
-        let old_name = if (exists<TokenConcurrentFieldsAppendix>(mutator_ref.self)) {
-            let token_concurrent = borrow_global_mut<TokenConcurrentFieldsAppendix>(mutator_ref.self);
+        let old_name = if (exists<ConcurrentTokenIdentifiers>(mutator_ref.self)) {
+            let token_concurrent = borrow_global_mut<ConcurrentTokenIdentifiers>(mutator_ref.self);
             let old_name = aggregator_v2::read_snapshot(&token_concurrent.name);
             token_concurrent.name = aggregator_v2::create_snapshot(name);
             old_name
@@ -618,7 +629,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_set_name(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
+    fun test_set_name(creator: &signer) acquires Token, ConcurrentTokenIdentifiers {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -652,7 +663,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_burn_without_royalty(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
+    fun test_burn_without_royalty(creator: &signer) acquires Token, ConcurrentTokenIdentifiers {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -675,7 +686,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_burn_with_royalty(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
+    fun test_burn_with_royalty(creator: &signer) acquires Token, ConcurrentTokenIdentifiers {
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
 
@@ -699,7 +710,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123)]
-    fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
+    fun test_create_from_account_burn_and_delete(creator: &signer) acquires Token, ConcurrentTokenIdentifiers {
         use aptos_framework::account;
 
         let collection_name = string::utf8(b"collection name");
@@ -724,7 +735,7 @@ module aptos_token_objects::token {
     }
 
     #[test(creator = @0x123,fx = @std)]
-    fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token, TokenConcurrentFieldsAppendix {
+    fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token, ConcurrentTokenIdentifiers {
         use aptos_framework::account;
         use std::features;
 
@@ -753,7 +764,7 @@ module aptos_token_objects::token {
     }
 
     #[test(fx = @aptos_framework, creator = @0x123, trader = @0x456)]
-    fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, TokenConcurrentFieldsAppendix {
+    fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, ConcurrentTokenIdentifiers {
         use std::debug;
 
         let feature = features::get_concurrent_assets_feature();

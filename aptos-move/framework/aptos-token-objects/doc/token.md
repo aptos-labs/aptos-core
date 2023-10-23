@@ -11,7 +11,7 @@ token are:
 
 
 -  [Resource `Token`](#0x4_token_Token)
--  [Resource `TokenConcurrentFieldsAppendix`](#0x4_token_TokenConcurrentFieldsAppendix)
+-  [Resource `ConcurrentTokenIdentifiers`](#0x4_token_ConcurrentTokenIdentifiers)
 -  [Struct `BurnRef`](#0x4_token_BurnRef)
 -  [Struct `MutatorRef`](#0x4_token_MutatorRef)
 -  [Struct `MutationEvent`](#0x4_token_MutationEvent)
@@ -86,7 +86,7 @@ Represents the common fields to all tokens.
 <code>index: u64</code>
 </dt>
 <dd>
- Deprecated in favor of <code>index</code> inside TokenConcurrentFieldsAppendix.
+ Deprecated in favor of <code>index</code> inside ConcurrentTokenIdentifiers.
  Will be populated until concurrent_assets_enabled feature flag is enabled.
 
  Unique identifier within the collection, optional, 0 means unassigned
@@ -101,7 +101,7 @@ Represents the common fields to all tokens.
 <code>name: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
- Deprecated in favor of <code>name</code> inside TokenConcurrentFieldsAppendix.
+ Deprecated in favor of <code>name</code> inside ConcurrentTokenIdentifiers.
  Will be populated until concurrent_assets_enabled feature flag is enabled.
 
  The name of the token, which should be unique within the collection; the length of name
@@ -125,16 +125,16 @@ Represents the common fields to all tokens.
 
 </details>
 
-<a name="0x4_token_TokenConcurrentFieldsAppendix"></a>
+<a name="0x4_token_ConcurrentTokenIdentifiers"></a>
 
-## Resource `TokenConcurrentFieldsAppendix`
+## Resource `ConcurrentTokenIdentifiers`
 
 Represents first addition to the common fields for all tokens
 Starts being populated once aggregator_v2_api_enabled is enabled.
 
 
 <pre><code>#[resource_group_member(#[group = <a href="../../aptos-framework/doc/object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
-<b>struct</b> <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> <b>has</b> key
+<b>struct</b> <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> <b>has</b> key
 </code></pre>
 
 
@@ -380,6 +380,8 @@ The token name is over the maximum length
     collection_name: String,
     description: String,
     name_prefix: String,
+    // If <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>, numbered <a href="token.md#0x4_token">token</a> is created - i.e. index is appended <b>to</b> the name.
+    // If <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>, name_prefix is the full name of the <a href="token.md#0x4_token">token</a>.
     name_with_index_suffix: Option&lt;String&gt;,
     <a href="royalty.md#0x4_royalty">royalty</a>: Option&lt;Royalty&gt;,
     uri: String,
@@ -398,40 +400,41 @@ The token name is over the maximum length
     <b>let</b> collection_addr = <a href="collection.md#0x4_collection_create_collection_address">collection::create_collection_address</a>(&creator_address, &collection_name);
     <b>let</b> <a href="collection.md#0x4_collection">collection</a> = <a href="../../aptos-framework/doc/object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Collection&gt;(collection_addr);
 
-    // once this flag is enabled, cleanup <a href="../../aptos-framework/doc/code.md#0x1_code">code</a> for aggregator_api_enabled = <b>false</b>.
+    // TODO[agg_v2](cleanup) once this flag is enabled, cleanup <a href="../../aptos-framework/doc/code.md#0x1_code">code</a> for aggregator_api_enabled = <b>false</b>.
+    // Flag which controls whether <a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a> functions from <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2">aggregator_v2</a> <b>module</b> can be called.
     <b>let</b> aggregator_api_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_aggregator_v2_api_enabled">features::aggregator_v2_api_enabled</a>();
+    // Flag which controls whether we are going <b>to</b> still <b>continue</b> writing <b>to</b> deprecated fields.
     <b>let</b> concurrent_assets_enabled = aggregator_api_enabled && <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>();
 
     <b>let</b> (deprecated_index, deprecated_name) = <b>if</b> (aggregator_api_enabled) {
-        <b>let</b> index = <b>if</b> (concurrent_assets_enabled) {
-            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_with_default">option::destroy_with_default</a>(
-                <a href="collection.md#0x4_collection_increment_concurrent_supply">collection::increment_concurrent_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer)),
-                <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>&lt;u64&gt;(0)
-            )
-        } <b>else</b> {
-            <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer));
-            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0))
-        };
+        <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_with_default">option::destroy_with_default</a>(
+            <a href="collection.md#0x4_collection_increment_concurrent_supply">collection::increment_concurrent_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer)),
+            <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>&lt;u64&gt;(0)
+        );
 
+        // If create_numbered_token called us, add index <b>to</b> the name.
         <b>let</b> name = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name_with_index_suffix)) {
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_string_concat">aggregator_v2::string_concat</a>(name_prefix, &index, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> name_with_index_suffix))
         } <b>else</b> {
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(name_prefix)
         };
 
+        // Until concurrent_assets_enabled is enabled, we still need <b>to</b> write <b>to</b> deprecated fields.
+        // Otherwise we put empty values there.
+        // (we need <b>to</b> do these calls before creating token_concurrent, <b>to</b> avoid copying objects)
         <b>let</b> deprecated_index = <b>if</b> (concurrent_assets_enabled) {
             0
         } <b>else</b> {
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&index)
         };
-
         <b>let</b> deprecated_name = <b>if</b> (concurrent_assets_enabled) {
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"")
         } <b>else</b> {
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&name)
         };
 
-        <b>let</b> token_concurrent = <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> {
+        // If aggregator_api_enabled, we always populate newly added fields
+        <b>let</b> token_concurrent = <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> {
             index,
             name,
         };
@@ -439,9 +442,12 @@ The token name is over the maximum length
 
         (deprecated_index, deprecated_name)
     } <b>else</b> {
+        // If aggregator_api_enabled is disabled, we cannot <b>use</b> increment_concurrent_supply or
+        // create <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>, so we fallback <b>to</b> the <b>old</b> behavior.
         <b>let</b> id = <a href="collection.md#0x4_collection_increment_supply">collection::increment_supply</a>(&<a href="collection.md#0x4_collection">collection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&object_signer));
         <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_get_with_default">option::get_with_default</a>(&<b>mut</b> id, 0);
 
+        // If create_numbered_token called us, add index <b>to</b> the name.
         <b>let</b> name = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&name_with_index_suffix)) {
             <b>let</b> name = name_prefix;
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_append">string::append</a>(&<b>mut</b> name, to_string&lt;u64&gt;(&index));
@@ -915,10 +921,10 @@ as that would prohibit transactions to be executed in parallel.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_name">name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): String <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_name">name</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): String <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> {
     <b>let</b> token_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="token.md#0x4_token">token</a>);
-    <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(token_address)) {
-        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&<b>borrow_global</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(token_address).name)
+    <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(token_address)) {
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&<b>borrow_global</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(token_address).name)
     } <b>else</b> {
         <a href="token.md#0x4_token_borrow">borrow</a>(&<a href="token.md#0x4_token">token</a>).name
     }
@@ -1007,10 +1013,10 @@ as that would prohibit transactions to be executed in parallel.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_index">index</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): u64 <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_index">index</a>&lt;T: key&gt;(<a href="token.md#0x4_token">token</a>: Object&lt;T&gt;): u64 <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> {
     <b>let</b> token_address = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(&<a href="token.md#0x4_token">token</a>);
-    <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(token_address)) {
-        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&<b>borrow_global</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(token_address).index)
+    <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(token_address)) {
+        <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&<b>borrow_global</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(token_address).index)
     } <b>else</b> {
         <a href="token.md#0x4_token_borrow">borrow</a>(&<a href="token.md#0x4_token">token</a>).index
     }
@@ -1064,7 +1070,7 @@ as that would prohibit transactions to be executed in parallel.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_burn">burn</a>(burn_ref: <a href="token.md#0x4_token_BurnRef">BurnRef</a>) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_burn">burn</a>(burn_ref: <a href="token.md#0x4_token_BurnRef">BurnRef</a>) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> {
     <b>let</b> addr = <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&burn_ref.inner)) {
         <b>let</b> delete_ref = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> burn_ref.inner);
         <b>let</b> addr = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_delete_ref">object::address_from_delete_ref</a>(&delete_ref);
@@ -1087,11 +1093,11 @@ as that would prohibit transactions to be executed in parallel.
         mutation_events,
     } = <b>move_from</b>&lt;<a href="token.md#0x4_token_Token">Token</a>&gt;(addr);
 
-    <b>let</b> index = <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(addr)) {
-        <b>let</b> <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> {
+    <b>let</b> index = <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(addr)) {
+        <b>let</b> <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> {
             index,
             name: _,
-        } = <b>move_from</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(addr);
+        } = <b>move_from</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(addr);
         <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&index)
     } <b>else</b> {
         deprecated_index
@@ -1155,13 +1161,13 @@ as that would prohibit transactions to be executed in parallel.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_name">set_name</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, name: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="token.md#0x4_token_set_name">set_name</a>(mutator_ref: &<a href="token.md#0x4_token_MutatorRef">MutatorRef</a>, name: String) <b>acquires</b> <a href="token.md#0x4_token_Token">Token</a>, <a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a> {
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(&name) &lt;= <a href="token.md#0x4_token_MAX_TOKEN_NAME_LENGTH">MAX_TOKEN_NAME_LENGTH</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="token.md#0x4_token_ETOKEN_NAME_TOO_LONG">ETOKEN_NAME_TOO_LONG</a>));
 
     <b>let</b> <a href="token.md#0x4_token">token</a> = <a href="token.md#0x4_token_borrow_mut">borrow_mut</a>(mutator_ref);
 
-    <b>let</b> old_name = <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(mutator_ref.self)) {
-        <b>let</b> token_concurrent = <b>borrow_global_mut</b>&lt;<a href="token.md#0x4_token_TokenConcurrentFieldsAppendix">TokenConcurrentFieldsAppendix</a>&gt;(mutator_ref.self);
+    <b>let</b> old_name = <b>if</b> (<b>exists</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(mutator_ref.self)) {
+        <b>let</b> token_concurrent = <b>borrow_global_mut</b>&lt;<a href="token.md#0x4_token_ConcurrentTokenIdentifiers">ConcurrentTokenIdentifiers</a>&gt;(mutator_ref.self);
         <b>let</b> old_name = <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&token_concurrent.name);
         token_concurrent.name = <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_snapshot">aggregator_v2::create_snapshot</a>(name);
         old_name
