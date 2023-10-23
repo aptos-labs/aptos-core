@@ -1,0 +1,19 @@
+version: v1
+managed:
+  enabled: true
+plugins:
+  - plugin: buf.build/community/stephenh-ts-proto
+    out: typescript/src
+    opt:
+      # See an explanation of these options here:
+      # https://github.com/stephenh/ts-proto
+      - outputServices=grpc-js
+      - outputIndex=true
+      - esModuleInterop=true
+      - forceLong=bigint
+      - useOptionals=all
+      - addGrpcMetadata=true
+      - useAsyncIterable=true
+      - useMapType=true
+      # https://github.com/stephenh/ts-proto/issues/449
+      - useExactTypes=false
