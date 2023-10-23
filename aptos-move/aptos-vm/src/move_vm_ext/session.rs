@@ -221,7 +221,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     fn populate_v0_resource_group_change_set(
         change_set: &mut BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
         state_key: StateKey,
-        mut source_data: BTreeMap<StructTag, BytesWithResourceLayout>,
+        mut source_data: BTreeMap<StructTag, Bytes>,
         resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
     ) -> VMResult<()> {
         let common_error = || {
@@ -237,11 +237,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 MoveStorageOp::Delete => {
                     source_data.remove(&struct_tag).ok_or_else(common_error)?;
                 },
-                MoveStorageOp::Modify(new_data) => {
+                MoveStorageOp::Modify((new_data, _)) => {
                     let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
                     *data = new_data;
                 },
-                MoveStorageOp::New(data) => {
+                MoveStorageOp::New((data, _)) => {
                     let data = source_data.insert(struct_tag, data);
                     if data.is_some() {
                         return Err(common_error());
@@ -310,14 +310,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
         let mut maybe_resource_group_cache = remote.release_resource_group_cache().map(|v| {
             v.into_iter()
-                .map(|(k, v)| {
-                    (
-                        k,
-                        v.into_iter()
-                            .map(|(k2, b)| (k2, (b, None)))
-                            .collect::<BTreeMap<_, _>>(),
-                    )
-                })
+                .map(|(k, v)| (k, v.into_iter().collect::<BTreeMap<_, _>>()))
                 .collect::<BTreeMap<_, _>>()
         });
         let mut resource_group_change_set = if maybe_resource_group_cache.is_some() {
