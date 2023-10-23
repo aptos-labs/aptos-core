@@ -2240,6 +2240,10 @@ fn pfn_performance(
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+        }))
         .with_success_criteria(
             SuccessCriteria::new(min_expected_tps)
                 .add_no_restarts()
