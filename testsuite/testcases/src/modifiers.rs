@@ -257,7 +257,7 @@ pub fn create_swarm_cpu_stress(
         .map(|(idx, chunk)| {
             // Lower bound the number of workers
             let num_workers = if cpu_chaos_config.num_groups > idx {
-                ((cpu_chaos_config.num_groups - idx) as u64) * 10
+                ((cpu_chaos_config.num_groups - idx) as u64) * 15
             } else {
                 1
             };
