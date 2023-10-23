@@ -305,12 +305,12 @@ B0:
 	8: Neq
 	9: BrFalse(13)
 B1:
-	10: LdConst[0](Bool: [0])
+	10: LdFalse
 	11: Ret
 B2:
 	12: Branch(13)
 B3:
-	13: LdConst[1](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	13: LdU64(0)
 	14: StLoc[4](loc2: u64)
 B4:
 	15: CopyLoc[4](loc2: u64)
@@ -329,12 +329,12 @@ B5:
 	27: Neq
 	28: BrFalse(32)
 B6:
-	29: LdConst[0](Bool: [0])
+	29: LdFalse
 	30: Ret
 B7:
 	31: Branch(32)
 B8:
-	32: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	32: LdU64(1)
 	33: StLoc[5](loc3: u64)
 	34: MoveLoc[4](loc2: u64)
 	35: MoveLoc[5](loc3: u64)
@@ -346,28 +346,28 @@ B9:
 B10:
 	40: Branch(15)
 B11:
-	41: LdConst[3](Bool: [1])
+	41: LdTrue
 	42: Ret
 }
 create1(): vector<u64> {
 B0:
-	0: LdConst[4](U64: [3, 0, 0, 0, 0, 0, 0, 0])
-	1: LdConst[5](U64: [2, 0, 0, 0, 0, 0, 0, 0])
-	2: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
-	3: LdConst[6](U64: [5, 0, 0, 0, 0, 0, 0, 0])
-	4: LdConst[7](U64: [8, 0, 0, 0, 0, 0, 0, 0])
-	5: LdConst[8](U64: [4, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(3)
+	1: LdU64(2)
+	2: LdU64(1)
+	3: LdU64(5)
+	4: LdU64(8)
+	5: LdU64(4)
 	6: VecPack(2, 6)
 	7: Ret
 }
 create2(): vector<u64> {
 B0:
-	0: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
-	1: LdConst[5](U64: [2, 0, 0, 0, 0, 0, 0, 0])
-	2: LdConst[4](U64: [3, 0, 0, 0, 0, 0, 0, 0])
-	3: LdConst[8](U64: [4, 0, 0, 0, 0, 0, 0, 0])
-	4: LdConst[6](U64: [5, 0, 0, 0, 0, 0, 0, 0])
-	5: LdConst[7](U64: [8, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: LdU64(4)
+	4: LdU64(5)
+	5: LdU64(8)
 	6: VecPack(2, 6)
 	7: Ret
 }
@@ -390,7 +390,7 @@ B0:
 B1:
 	11: Branch(14)
 B2:
-	12: LdConst[9](U64: [23, 0, 0, 0, 0, 0, 0, 0])
+	12: LdU64(23)
 	13: Abort
 B3:
 	14: ImmBorrowLoc[1](loc1: vector<u64>)
@@ -400,7 +400,7 @@ B3:
 B4:
 	18: Branch(21)
 B5:
-	19: LdConst[10](U64: [29, 0, 0, 0, 0, 0, 0, 0])
+	19: LdU64(29)
 	20: Abort
 B6:
 	21: MutBorrowLoc[0](loc0: vector<u64>)
@@ -412,7 +412,7 @@ B6:
 B7:
 	27: Branch(30)
 B8:
-	28: LdConst[11](U64: [31, 0, 0, 0, 0, 0, 0, 0])
+	28: LdU64(31)
 	29: Abort
 B9:
 	30: ImmBorrowLoc[0](loc0: vector<u64>)
@@ -422,7 +422,7 @@ B9:
 B10:
 	34: Branch(37)
 B11:
-	35: LdConst[10](U64: [29, 0, 0, 0, 0, 0, 0, 0])
+	35: LdU64(29)
 	36: Abort
 B12:
 	37: ImmBorrowLoc[0](loc0: vector<u64>)
@@ -433,7 +433,7 @@ B12:
 B13:
 	42: Branch(45)
 B14:
-	43: LdConst[11](U64: [31, 0, 0, 0, 0, 0, 0, 0])
+	43: LdU64(31)
 	44: Abort
 B15:
 	45: Ret
@@ -446,7 +446,7 @@ L3:	loc4: u64
 L4:	loc5: u64
 L5:	loc6: u64
 B0:
-	0: LdConst[1](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
 B1:
 	2: CopyLoc[0](Arg0: &mut vector<u64>)
@@ -458,7 +458,7 @@ B1:
 	8: Lt
 	9: BrFalse(57)
 B2:
-	10: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	10: LdU64(1)
 	11: StLoc[3](loc2: u64)
 	12: CopyLoc[1](loc0: u64)
 	13: MoveLoc[3](loc2: u64)
@@ -493,7 +493,7 @@ B5:
 	39: VecSwap(2)
 	40: Branch(41)
 B6:
-	41: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	41: LdU64(1)
 	42: StLoc[6](loc5: u64)
 	43: MoveLoc[4](loc3: u64)
 	44: MoveLoc[6](loc5: u64)
@@ -505,7 +505,7 @@ B7:
 B8:
 	49: Branch(16)
 B9:
-	50: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	50: LdU64(1)
 	51: StLoc[7](loc6: u64)
 	52: MoveLoc[1](loc0: u64)
 	53: MoveLoc[7](loc6: u64)
@@ -527,7 +527,7 @@ L3:	loc4: vector<u64>
 B0:
 	0: VecPack(2, 0)
 	1: StLoc[1](loc0: vector<u64>)
-	2: LdConst[1](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	2: LdU64(0)
 	3: StLoc[2](loc1: u64)
 	4: CopyLoc[0](Arg0: &vector<u64>)
 	5: VecLen(2)
@@ -544,7 +544,7 @@ B2:
 	14: VecImmBorrow(2)
 	15: ReadRef
 	16: VecPushBack(2)
-	17: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	17: LdU64(1)
 	18: StLoc[4](loc3: u64)
 	19: MoveLoc[2](loc1: u64)
 	20: MoveLoc[4](loc3: u64)

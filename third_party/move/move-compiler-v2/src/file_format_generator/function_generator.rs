@@ -16,7 +16,7 @@ use move_stackless_bytecode::{
     function_target::FunctionTarget,
     function_target_pipeline::FunctionVariant,
     livevar_analysis::LiveVarAnnotation,
-    stackless_bytecode::{Bytecode, Label, Operation},
+    stackless_bytecode::{Bytecode, Constant, Label, Operation},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -219,16 +219,7 @@ impl<'a> FunctionGenerator<'a> {
             Bytecode::Call(_, dest, oper, source, None) => {
                 self.gen_operation(ctx, dest, oper, source)
             },
-            Bytecode::Load(_, dest, cons) => {
-                let cons = self.gen.constant_index(
-                    &ctx.fun_ctx.module,
-                    &ctx.fun_ctx.loc,
-                    cons,
-                    ctx.fun_ctx.fun.get_local_type(*dest),
-                );
-                self.emit(FF::Bytecode::LdConst(cons));
-                self.abstract_push_result(ctx, vec![*dest]);
-            },
+            Bytecode::Load(_, dest, cons) => self.gen_load(ctx, dest, cons),
             Bytecode::Label(_, label) => self.define_label(*label),
             Bytecode::Branch(_, if_true, if_false, cond) => {
                 // Ensure only `cond` is on the stack before branch.
@@ -625,6 +616,38 @@ impl<'a> FunctionGenerator<'a> {
         self.emit(bc);
         self.abstract_pop_n(ctx, source.len());
         self.abstract_push_result(ctx, dest)
+    }
+
+    /// Generate code for the load instruction.
+    fn gen_load(&mut self, ctx: &BytecodeContext, dest: &TempIndex, cons: &Constant) {
+        use Constant::*;
+        match cons {
+            Bool(b) => {
+                if *b {
+                    self.emit(FF::Bytecode::LdTrue)
+                } else {
+                    self.emit(FF::Bytecode::LdFalse)
+                }
+            },
+            U8(n) => self.emit(FF::Bytecode::LdU8(*n)),
+            U16(n) => self.emit(FF::Bytecode::LdU16(*n)),
+            U32(n) => self.emit(FF::Bytecode::LdU32(*n)),
+            U64(n) => self.emit(FF::Bytecode::LdU64(*n)),
+            U128(n) => self.emit(FF::Bytecode::LdU128(*n)),
+            U256(n) => self.emit(FF::Bytecode::LdU256(
+                move_core_types::u256::U256::from_le_bytes(&n.to_le_bytes()),
+            )),
+            _ => {
+                let cons = self.gen.constant_index(
+                    &ctx.fun_ctx.module,
+                    &ctx.fun_ctx.loc,
+                    cons,
+                    ctx.fun_ctx.fun.get_local_type(*dest),
+                );
+                self.emit(FF::Bytecode::LdConst(cons));
+            },
+        }
+        self.abstract_push_result(ctx, vec![*dest]);
     }
 
     /// Emits a file-format bytecode.
