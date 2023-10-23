@@ -50,6 +50,9 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
 pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     AptosVM::set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
     AptosVM::set_concurrency_level_once(node_config.execution.concurrency_level as usize);
+    AptosVM::set_aggregator_v2_via_delayed_fields_once(
+        node_config.execution.aggregator_v2_via_delayed_fields,
+    );
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );

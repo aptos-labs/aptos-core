@@ -16,7 +16,9 @@ use crate::{
     verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    executor::BlockExecutorConfig, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::natives::code::PublishRequest;
 use aptos_gas_algebra::Gas;
@@ -85,6 +87,7 @@ use std::{
     },
 };
 
+static AGGREGATOR_V2_VIA_DELAYED_FIELDS: OnceCell<bool> = OnceCell::new();
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
@@ -136,6 +139,22 @@ impl AptosVM {
             "Adapter created for Validation"
         );
         Self::new_from_state_view(state_view)
+    }
+
+    /// Set whether Aggregators V2 should be optimized
+    /// via delayed fields execution
+    pub fn set_aggregator_v2_via_delayed_fields_once(enable: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        AGGREGATOR_V2_VIA_DELAYED_FIELDS.set(enable).ok();
+    }
+
+    /// Get whether Aggregagors V2 should be optimized
+    /// via delayed fields execution
+    pub fn get_aggregator_v2_via_delayed_fields() -> bool {
+        match AGGREGATOR_V2_VIA_DELAYED_FIELDS.get() {
+            Some(enable) => *enable,
+            None => false,
+        }
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -1285,7 +1304,7 @@ impl AptosVM {
             WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
                 change_set.clone(),
                 &change_set_configs,
-                resolver.is_delayed_field_optimization_capable(),
+                resolver.is_delayed_field_optimization_enabled(),
             ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(resolver, session_id);
@@ -1605,8 +1624,11 @@ impl VMExecutor for AptosVM {
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             state_view,
-            Self::get_concurrency_level(),
-            maybe_block_gas_limit,
+            BlockExecutorConfig {
+                concurrency_level: Self::get_concurrency_level(),
+                maybe_block_gas_limit,
+                delayed_fields_optimization_enabled: Self::get_aggregator_v2_via_delayed_fields(),
+            },
             None,
         );
         if ret.is_ok() {
@@ -1635,6 +1657,8 @@ impl VMExecutor for AptosVM {
             transactions,
             AptosVM::get_concurrency_level(),
             maybe_block_gas_limit,
+            // TODO : pass Self::get_aggregator_v2_via_delayed_fields()
+            // if we want AggV2 optimization for sharded execution
         );
         if ret.is_ok() {
             // Record the histogram count for transactions per block.

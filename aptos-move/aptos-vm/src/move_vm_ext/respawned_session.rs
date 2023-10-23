@@ -163,9 +163,9 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
 impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
+    fn is_delayed_field_optimization_enabled(&self) -> bool {
         self.base_executor_view
-            .is_delayed_field_optimization_capable()
+            .is_delayed_field_optimization_enabled()
     }
 
     fn get_delayed_field_value(

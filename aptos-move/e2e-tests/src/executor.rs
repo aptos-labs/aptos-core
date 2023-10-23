@@ -15,7 +15,9 @@ use crate::{
 use anyhow::Error;
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    executor::BlockExecutorConfig, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
@@ -104,6 +106,31 @@ pub enum ExecutorMode {
     BothComparison,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DelayedFieldOptimizationMode {
+    EnabledOnly,
+    DisabledOnly,
+    BothComparison,
+}
+
+impl DelayedFieldOptimizationMode {
+    fn individual_modes(&self) -> Vec<Self> {
+        match self {
+            Self::EnabledOnly => vec![Self::EnabledOnly],
+            Self::DisabledOnly => vec![Self::DisabledOnly],
+            Self::BothComparison => vec![Self::DisabledOnly, Self::EnabledOnly],
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        match self {
+            Self::EnabledOnly => true,
+            Self::DisabledOnly => false,
+            Self::BothComparison => panic!("Individual mode cannot be comparison"),
+        }
+    }
+}
+
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
@@ -120,6 +147,7 @@ pub struct FakeExecutor {
     /// If not set, environment variable E2E_PARALLEL_EXEC must be set
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
+    delayed_field_optimization_mode: DelayedFieldOptimizationMode,
     features: Features,
     chain_id: u8,
 }
@@ -147,6 +175,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
+            delayed_field_optimization_mode: DelayedFieldOptimizationMode::EnabledOnly,
             features: Features::default(),
             chain_id: chain_id.id(),
         };
@@ -158,6 +187,11 @@ impl FakeExecutor {
 
     pub fn set_executor_mode(mut self, mode: ExecutorMode) -> Self {
         self.executor_mode = Some(mode);
+        self
+    }
+
+    pub fn set_delayed_fields_mode(mut self, mode: DelayedFieldOptimizationMode) -> Self {
+        self.delayed_field_optimization_mode = mode;
         self
     }
 
@@ -224,6 +258,7 @@ impl FakeExecutor {
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
+            delayed_field_optimization_mode: DelayedFieldOptimizationMode::EnabledOnly,
             features: Features::default(),
             chain_id: ChainId::test().id(),
         }
@@ -463,13 +498,17 @@ impl FakeExecutor {
     pub fn execute_transaction_block_parallel(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
+        delayed_fields_optimization_enabled: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
-            usize::min(4, num_cpus::get()),
-            None,
+            BlockExecutorConfig {
+                concurrency_level: usize::min(4, num_cpus::get()),
+                maybe_block_gas_limit: None,
+                delayed_fields_optimization_enabled,
+            },
             None,
         )
     }
@@ -501,46 +540,57 @@ impl FakeExecutor {
             }
         });
 
-        let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(AptosVM::execute_block(
-                &sig_verified_block,
-                &self.data_store,
-                None,
-            ))
-        } else {
-            None
+        let mut outputs = vec![];
+
+        if mode != ExecutorMode::ParallelOnly {
+            for delayed_fields_mode in self.delayed_field_optimization_mode.individual_modes() {
+                AptosVM::set_concurrency_level_once(1);
+                AptosVM::set_aggregator_v2_via_delayed_fields_once(
+                    delayed_fields_mode.is_enabled(),
+                );
+
+                let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
+                outputs.push((output, (ExecutorMode::SequentialOnly, delayed_fields_mode)));
+            }
         };
 
-        let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block))
-        } else {
-            None
+        if mode != ExecutorMode::SequentialOnly {
+            for delayed_fields_mode in self.delayed_field_optimization_mode.individual_modes() {
+                let output = self.execute_transaction_block_parallel(
+                    &sig_verified_block,
+                    delayed_fields_mode.is_enabled(),
+                );
+                outputs.push((output, (ExecutorMode::SequentialOnly, delayed_fields_mode)));
+            }
         };
 
-        if mode == ExecutorMode::BothComparison {
-            let sequential_output = sequential_output.as_ref().unwrap();
-            let parallel_output = parallel_output.as_ref().unwrap();
+        if outputs.len() > 1 {
+            let (baseline_output, baseline_mode) = outputs.get(0).unwrap();
 
-            // make more granular comparison, to be able to understand test failures better
-            if sequential_output.is_ok() && parallel_output.is_ok() {
-                let seq_txn_output = sequential_output.as_ref().unwrap();
-                let par_txn_output = parallel_output.as_ref().unwrap();
-                assert_eq!(seq_txn_output.len(), par_txn_output.len());
-                for (idx, (seq_output, par_output)) in
-                    seq_txn_output.iter().zip(par_txn_output.iter()).enumerate()
-                {
-                    assert_eq!(
-                        seq_output, par_output,
-                        "first transaction output mismatch at index {}",
-                        idx
-                    );
+            for (output, mode) in &outputs[1..] {
+                // make more granular comparison, to be able to understand test failures better
+                if baseline_output.is_ok() && output.is_ok() {
+                    let baseline_output = baseline_output.as_ref().unwrap();
+                    let output = output.as_ref().unwrap();
+                    assert_eq!(baseline_output.len(), output.len());
+                    for (idx, (baseline_txn_output, txn_output)) in
+                        baseline_output.iter().zip(output.iter()).enumerate()
+                    {
+                        assert_eq!(
+                            baseline_txn_output, txn_output,
+                            "first transaction output mismatch at index {}, between modes {:?} and {:?}",
+                            idx,
+                            baseline_mode,
+                            mode,
+                        );
+                    }
+                } else {
+                    assert_eq!(baseline_output, output);
                 }
-            } else {
-                assert_eq!(sequential_output, parallel_output);
             }
         }
 
-        let output = sequential_output.or(parallel_output).unwrap();
+        let (output, _) = outputs.remove(0);
 
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:#?}\n", output).as_str());

@@ -4,7 +4,7 @@
 use crate::{assert_success, harness::MoveHarness};
 use aptos_language_e2e_tests::{
     account::Account,
-    executor::{ExecutorMode, FakeExecutor},
+    executor::{DelayedFieldOptimizationMode, ExecutorMode, FakeExecutor},
 };
 use aptos_types::{
     account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::SignedTransaction,
@@ -18,26 +18,17 @@ use std::path::PathBuf;
 pub fn initialize(
     path: PathBuf,
     mode: ExecutorMode,
-    aggregator_execution_enabled: bool,
+    delayed_fields_mode: DelayedFieldOptimizationMode,
     txns: usize,
 ) -> AggV2TestHarness {
     // Aggregator tests should use parallel execution.
-    let executor = FakeExecutor::from_head_genesis().set_executor_mode(mode);
+    let executor = FakeExecutor::from_head_genesis()
+        .set_executor_mode(mode)
+        .set_delayed_fields_mode(delayed_fields_mode);
 
     let mut harness = MoveHarness::new_with_executor(executor);
-    if aggregator_execution_enabled {
-        harness.enable_features(
-            vec![
-                FeatureFlag::AGGREGATOR_V2_API,
-                FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-            ],
-            vec![],
-        );
-    } else {
-        harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
-            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-        ]);
-    }
+    harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![]);
+
     let account = harness.new_account_at(AccountAddress::ONE);
     assert_success!(harness.publish_package_cache_building(&account, &path));
 

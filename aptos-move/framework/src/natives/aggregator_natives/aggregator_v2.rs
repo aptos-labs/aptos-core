@@ -189,8 +189,7 @@ fn get_context_data<'t, 'b>(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     if aggregator_context
         .delayed_field_resolver
-        .is_delayed_field_optimization_capable()
-        && context.aggregator_v2_delayed_fields_enabled()
+        .is_delayed_field_optimization_enabled()
     {
         Some((
             aggregator_context.delayed_field_resolver,

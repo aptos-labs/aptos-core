@@ -52,12 +52,17 @@ use std::{
     sync::{atomic::AtomicU32, Arc},
 };
 
-pub struct BlockExecutor<T, E, S, L, X> {
+pub struct BlockExecutorConfig {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
-    concurrency_level: usize,
+    pub concurrency_level: usize,
+    pub maybe_block_gas_limit: Option<u64>,
+    pub delayed_fields_optimization_enabled: bool,
+}
+
+pub struct BlockExecutor<T, E, S, L, X> {
     executor_thread_pool: Arc<ThreadPool>,
-    maybe_block_gas_limit: Option<u64>,
+    config: BlockExecutorConfig,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<(T, E, S, L, X)>,
 }
@@ -73,20 +78,18 @@ where
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(
-        concurrency_level: usize,
         executor_thread_pool: Arc<ThreadPool>,
-        maybe_block_gas_limit: Option<u64>,
+        config: BlockExecutorConfig,
         transaction_commit_hook: Option<L>,
     ) -> Self {
         assert!(
-            concurrency_level > 0 && concurrency_level <= num_cpus::get(),
+            config.concurrency_level > 0 && config.concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 1 and number of CPUs",
-            concurrency_level
+            config.concurrency_level
         );
         Self {
-            concurrency_level,
             executor_thread_pool,
-            maybe_block_gas_limit,
+            config,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -404,7 +407,12 @@ where
                     versioned_cache,
                     executor,
                     base_view,
-                    ParallelState::new(versioned_cache, scheduler, shared_counter),
+                    ParallelState::new(
+                        versioned_cache,
+                        scheduler,
+                        shared_counter,
+                        self.config.delayed_fields_optimization_enabled,
+                    ),
                 )?;
 
                 scheduler.finish_execution_during_commit(txn_idx);
@@ -716,7 +724,12 @@ where
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) {
-        let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
+        let parallel_state = ParallelState::<T, X>::new(
+            versioned_cache,
+            scheduler,
+            shared_counter,
+            self.config.delayed_fields_optimization_enabled,
+        );
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
@@ -830,7 +843,7 @@ where
             // Priorotize committing validated transactions
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
-                    self.maybe_block_gas_limit,
+                    self.config.maybe_block_gas_limit,
                     scheduler,
                     versioned_cache,
                     &mut scheduler_task,
@@ -872,7 +885,12 @@ where
                         versioned_cache,
                         &executor,
                         base_view,
-                        ParallelState::new(versioned_cache, scheduler, shared_counter),
+                        ParallelState::new(
+                            versioned_cache,
+                            scheduler,
+                            shared_counter,
+                            self.config.delayed_fields_optimization_enabled,
+                        ),
                     )?;
                     scheduler.finish_execution(txn_idx, incarnation, updates_outside)
                 },
@@ -906,7 +924,10 @@ where
         // will only have a coordinator role but no workers for rolling commit.
         // Need to special case no roles (commit hook by thread itself) to run
         // w. concurrency_level = 1 for some reason.
-        assert!(self.concurrency_level > 1, "Must use sequential execution");
+        assert!(
+            self.config.concurrency_level > 1,
+            "Must use sequential execution"
+        );
 
         let versioned_cache = MVHashMap::new();
         let shared_counter = AtomicU32::new(gen_id_start_value(false));
@@ -938,7 +959,7 @@ where
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         self.executor_thread_pool.scope(|s| {
-            for _ in 0..self.concurrency_level {
+            for _ in 0..self.config.concurrency_level {
                 s.spawn(|_| {
                     if let Err(e) = self.worker_loop(
                         &executor_initial_arguments,
@@ -1066,7 +1087,10 @@ where
                     unsync_map: &unsync_map,
                     counter: &counter,
                     read_set: RefCell::new(HashSet::new()),
-                    dynamic_change_set_optimizations_enabled,
+                    delayed_field_optimization_enabled: self
+                        .config
+                        .delayed_fields_optimization_enabled
+                        && dynamic_change_set_optimizations_enabled,
                 }),
                 idx as TxnIndex,
             );
@@ -1162,7 +1186,7 @@ where
                 break;
             }
 
-            if let Some(per_block_gas_limit) = self.maybe_block_gas_limit {
+            if let Some(per_block_gas_limit) = self.config.maybe_block_gas_limit {
                 // When the accumulated gas of the committed txns
                 // exceeds per_block_gas_limit, halt sequential execution.
                 let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
@@ -1192,7 +1216,7 @@ where
                 ret.len(),
                 num_txns,
                 accumulated_non_storage_gas,
-                self.maybe_block_gas_limit,
+                self.config.maybe_block_gas_limit,
             );
         }
 
@@ -1207,7 +1231,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
-        let mut ret = if self.concurrency_level > 1 {
+        let mut ret = if self.config.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
                 signature_verified_block,
@@ -1224,7 +1248,7 @@ where
 
         // Regular sequential execution fallback with dynamic_change_set_optimizations_enabled == true
         // Only worth doing if we did parallel before, i.e. if we did a different pass.
-        if self.concurrency_level > 1 {
+        if self.config.concurrency_level > 1 {
             if let Err(Error::FallbackToSequential(e)) = &ret {
                 let can_use_dynamic_change_set_optimizations = match e {
                     PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {

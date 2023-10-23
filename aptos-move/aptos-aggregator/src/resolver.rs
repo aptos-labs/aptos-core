@@ -128,7 +128,9 @@ where
 pub trait TDelayedFieldView {
     type Identifier;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool;
+    /// Some resolvers might not be capable of the optimization, and should return false.
+    /// Others might return based on the config or the run paramaters.
+    fn is_delayed_field_optimization_enabled(&self) -> bool;
 
     /// Fetch a value of a DelayedField.
     fn get_delayed_field_value(
@@ -173,7 +175,7 @@ where
 {
     type Identifier = DelayedFieldID;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
+    fn is_delayed_field_optimization_enabled(&self) -> bool {
         // For resolvers that are not capable, it cannot be enabled
         false
     }

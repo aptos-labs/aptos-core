@@ -6,13 +6,17 @@ pub(crate) mod vm_wrapper;
 
 use crate::{
     block_executor::vm_wrapper::AptosExecutorTask,
-    counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
+    counters::{
+        BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_DELAYED_FIELDS,
+        BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+    },
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, types::DelayedFieldID,
 };
 use aptos_block_executor::{
-    errors::Error, executor::BlockExecutor,
+    errors::Error,
+    executor::{BlockExecutor, BlockExecutorConfig},
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook,
 };
@@ -199,8 +203,7 @@ impl BlockAptosVM {
         executor_thread_pool: Arc<ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
-        concurrency_level: usize,
-        maybe_block_gas_limit: Option<u64>,
+        config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
@@ -211,19 +214,15 @@ impl BlockAptosVM {
             init_speculative_logs(num_txns);
         }
 
-        BLOCK_EXECUTOR_CONCURRENCY.set(concurrency_level as i64);
+        BLOCK_EXECUTOR_CONCURRENCY.set(config.concurrency_level as i64);
+        BLOCK_EXECUTOR_DELAYED_FIELDS.set(config.delayed_fields_optimization_enabled as i64);
         let executor = BlockExecutor::<
             SignatureVerifiedTransaction,
             AptosExecutorTask<S>,
             S,
             L,
             ExecutableTestType,
-        >::new(
-            concurrency_level,
-            executor_thread_pool,
-            maybe_block_gas_limit,
-            transaction_commit_listener,
-        );
+        >::new(executor_thread_pool, config, transaction_commit_listener);
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {

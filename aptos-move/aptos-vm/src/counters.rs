@@ -24,6 +24,14 @@ pub static BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS: Lazy<Histogram> = Lazy::new(|| 
     .unwrap()
 });
 
+pub static BLOCK_EXECUTOR_DELAYED_FIELDS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "block_executor_delayed_fields",
+        "Concurrency level for the block executor"
+    )
+    .unwrap()
+});
+
 pub static BLOCK_EXECUTOR_CONCURRENCY: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "block_executor_concurrency",

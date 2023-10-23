@@ -287,8 +287,8 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
-        self.executor_view.is_delayed_field_optimization_capable()
+    fn is_delayed_field_optimization_enabled(&self) -> bool {
+        self.executor_view.is_delayed_field_optimization_enabled()
     }
 
     fn get_delayed_field_value(

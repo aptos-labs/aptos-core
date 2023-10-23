@@ -2,7 +2,9 @@
 
 use crate::{transactions, transactions::RAYON_EXEC_POOL};
 use aptos_bitvec::BitVec;
-use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
+use aptos_block_executor::{
+    executor::BlockExecutorConfig, txn_commit_hook::NoOpTransactionCommitHook,
+};
 use aptos_block_partitioner::{
     v2::config::PartitionerV2Config, BlockPartitioner, PartitionerConfig,
 };
@@ -215,8 +217,11 @@ where
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             self.state_view.as_ref(),
-            1,
-            maybe_block_gas_limit,
+            BlockExecutorConfig {
+                concurrency_level: 1,
+                maybe_block_gas_limit,
+                delayed_fields_optimization_enabled: true,
+            },
             None,
         )
         .expect("VM should not fail to start");
@@ -264,8 +269,11 @@ where
             Arc::clone(&RAYON_EXEC_POOL),
             transactions,
             self.state_view.as_ref(),
-            concurrency_level_per_shard,
-            maybe_block_gas_limit,
+            BlockExecutorConfig {
+                concurrency_level: concurrency_level_per_shard,
+                maybe_block_gas_limit,
+                delayed_fields_optimization_enabled: true,
+            },
             None,
         )
         .expect("VM should not fail to start");

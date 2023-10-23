@@ -92,6 +92,9 @@ impl ReplayVerifyCoordinator {
 
     async fn run_impl(self) -> Result<(), ReplayError> {
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        // TODO[agg_v2](cleanup) see when to enable aggregator_v2_via_delayed_fields in replay-verify
+        // AptosVM::set_aggregator_v2_via_delayed_fields_once(true);
+
         AptosVM::set_timed_feature_override(TimedFeatureOverride::Replay);
 
         let metadata_view = metadata::cache::sync_and_load(

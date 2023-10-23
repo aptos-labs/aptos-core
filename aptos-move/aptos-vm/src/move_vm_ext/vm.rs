@@ -86,10 +86,6 @@ impl MoveVmExt {
             type_byte_cost = 1;
         }
 
-        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
-        // so they can be exchanged with identifiers during VM execution.
-        let aggregator_v2_type_tagging = features.is_aggregator_v2_delayed_fields_enabled();
-
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params.clone(),
@@ -118,7 +114,10 @@ impl MoveVmExt {
                     type_max_cost,
                     type_base_cost,
                     type_byte_cost,
-                    aggregator_v2_type_tagging,
+                    // If Aggregator V2 via delayed fields optimization is enabled, we need to tag aggregator_v2 types,
+                    // so they can be exchanged with identifiers during VM execution.
+                    aggregator_v2_type_tagging:
+                        crate::AptosVM::get_aggregator_v2_via_delayed_fields(),
                 },
                 resolver,
             )?,

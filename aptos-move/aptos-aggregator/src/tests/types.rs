@@ -67,7 +67,7 @@ impl TAggregatorV1View for FakeAggregatorView {
 impl TDelayedFieldView for FakeAggregatorView {
     type Identifier = DelayedFieldID;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
+    fn is_delayed_field_optimization_enabled(&self) -> bool {
         true
     }
 

@@ -93,6 +93,7 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
     scheduler: &'a Scheduler,
     counter: &'a AtomicU32,
     captured_reads: RefCell<CapturedReads<T>>,
+    delayed_field_optimization_enabled: bool,
 }
 
 fn get_delayed_field_value_impl<T: Transaction>(
@@ -374,12 +375,14 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         shared_scheduler: &'a Scheduler,
         shared_counter: &'a AtomicU32,
+        delayed_field_optimization_enabled: bool,
     ) -> Self {
         Self {
             versioned_map: shared_map,
             scheduler: shared_scheduler,
             counter: shared_counter,
             captured_reads: RefCell::new(CapturedReads::new()),
+            delayed_field_optimization_enabled,
         }
     }
 
@@ -493,7 +496,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Value, X, T::Identifier>,
     pub(crate) read_set: RefCell<HashSet<T::Key>>,
     pub(crate) counter: &'a RefCell<u32>,
-    pub(crate) dynamic_change_set_optimizations_enabled: bool,
+    pub(crate) delayed_field_optimization_enabled: bool,
 }
 
 impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
@@ -642,11 +645,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
                 if matches!(ret, ReadResult::Uninitialized) {
                     let from_storage = self.get_base_value(state_key)?;
-                    let maybe_patched_from_storage = match (from_storage, maybe_layout) {
+                    let maybe_patched_from_storage = match (
+                        from_storage,
+                        maybe_layout,
+                        state.delayed_field_optimization_enabled,
+                    ) {
                         // There are aggregators / aggregator snapshots in the
                         // resource, so we have to replace the actual values with
                         // identifiers.
-                        (Some(state_value), Some(layout)) => {
+                        (Some(state_value), Some(layout), true) => {
                             let res = self.replace_values_with_identifiers(state_value, layout);
                             match res {
                                 Ok((value, _)) => Some(value),
@@ -668,7 +675,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 },
                             }
                         },
-                        (from_storage, _) => from_storage,
+                        (from_storage, _, _) => from_storage,
                     };
 
                     // This base value can also be used to resolve AggregatorV1 directly from
@@ -715,7 +722,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 kind.clone(),
                                 from_storage,
                                 maybe_layout,
-                                state.dynamic_change_set_optimizations_enabled,
+                                state.delayed_field_optimization_enabled,
                             ) {
                                 (ReadKind::Value, Some(state_value), Some(layout), true) => {
                                     let res =
@@ -923,10 +930,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
 {
     type Identifier = T::Identifier;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
+    fn is_delayed_field_optimization_enabled(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(_) => true,
-            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+            ViewState::Sync(state) => state.delayed_field_optimization_enabled,
+            ViewState::Unsync(state) => state.delayed_field_optimization_enabled,
         }
     }
 
@@ -1680,7 +1687,7 @@ mod test {
                 unsync_map: &unsync_map,
                 counter: &counter,
                 read_set: RefCell::new(HashSet::new()),
-                dynamic_change_set_optimizations_enabled: true,
+                delayed_field_optimization_enabled: true,
             }),
             1,
         );

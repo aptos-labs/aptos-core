@@ -34,6 +34,8 @@ pub struct ExecutionConfig {
     pub paranoid_hot_potato_verification: bool,
     /// Enables enhanced metrics around processed transactions
     pub processed_transactions_detailed_counters: bool,
+    /// Number of threads to run execution
+    pub aggregator_v2_via_delayed_fields: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -63,6 +65,7 @@ impl Default for ExecutionConfig {
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
             processed_transactions_detailed_counters: false,
+            aggregator_v2_via_delayed_fields: false,
         }
     }
 }

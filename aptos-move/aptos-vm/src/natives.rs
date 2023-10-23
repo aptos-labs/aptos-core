@@ -79,7 +79,7 @@ impl TAggregatorV1View for AptosBlankStorage {
 impl TDelayedFieldView for AptosBlankStorage {
     type Identifier = DelayedFieldID;
 
-    fn is_delayed_field_optimization_capable(&self) -> bool {
+    fn is_delayed_field_optimization_enabled(&self) -> bool {
         false
     }
 

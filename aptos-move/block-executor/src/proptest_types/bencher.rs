@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    executor::BlockExecutor,
+    executor::{BlockExecutor, BlockExecutorConfig},
     proptest_types::{
         baseline::BaselineOutput,
         types::{
@@ -131,7 +131,15 @@ where
             EmptyDataView<KeyType<K>, ValueType>,
             NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType, E>, usize>,
             ExecutableTestType,
-        >::new(num_cpus::get(), executor_thread_pool, None, None)
+        >::new(
+            executor_thread_pool,
+            BlockExecutorConfig {
+                concurrency_level: num_cpus::get(),
+                maybe_block_gas_limit: None,
+                delayed_fields_optimization_enabled: true,
+            },
+            None,
+        )
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.baseline_output.assert_output(&output);

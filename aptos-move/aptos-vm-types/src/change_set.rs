@@ -183,11 +183,11 @@ impl VMChangeSet {
         checker: &dyn CheckChangeSet,
         // Pass in within which resolver context are we creating this change set.
         // Used to eagerly reject changes created in an incompatible way.
-        is_delayed_field_optimization_capable: bool,
+        is_delayed_field_optimization_enabled: bool,
     ) -> anyhow::Result<Self, VMStatus> {
         assert!(
-            !is_delayed_field_optimization_capable,
-            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
+            !is_delayed_field_optimization_enabled,
+            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_enabled context, as it doesn't support delayed field changes (type layout) and resource groups");
 
         let (write_set, events) = change_set.into_inner();
 
@@ -204,17 +204,17 @@ impl VMChangeSet {
                 // version of aggregators is implemented as a table item. Revisit when
                 // we split MVHashMap into data and aggregators.
 
-                // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+                // We can set layout to None, as we are not in the is_delayed_field_optimization_enabled context
                 resource_write_set.insert(state_key, (write_op, None));
             }
         }
 
-        // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+        // We can set layout to None, as we are not in the is_delayed_field_optimization_enabled context
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
             resource_write_set,
             // TODO[agg_v2](fix): do we use same or different capable flag for resource groups?
-            // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_capable
+            // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_enabled
             // context (i.e. if dynamic_change_set_optimizations_enabled is disabled)
             resource_group_write_set: BTreeMap::new(),
             module_write_set,

@@ -10,24 +10,26 @@ use crate::{
 use aptos_framework::natives::aggregator_natives::aggregator_v2::{
     EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
 };
-use aptos_language_e2e_tests::executor::ExecutorMode;
+use aptos_language_e2e_tests::executor::{DelayedFieldOptimizationMode, ExecutorMode};
 use aptos_types::transaction::SignedTransaction;
 use proptest::prelude::*;
 
 const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
-const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::SequentialOnly;
+const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::BothComparison;
+const DEFAULT_DELAYED_FIELDS_MODE: DelayedFieldOptimizationMode =
+    DelayedFieldOptimizationMode::BothComparison;
 
 fn setup(
     executor_mode: ExecutorMode,
-    aggregator_execution_enabled: bool,
+    delayed_fields_mode: DelayedFieldOptimizationMode,
     txns: usize,
 ) -> AggV2TestHarness {
     initialize(
         common::test_dir_path("aggregator_v2.data/pack"),
         executor_mode,
-        aggregator_execution_enabled,
+        delayed_fields_mode,
         txns,
     )
 }
@@ -35,49 +37,42 @@ fn setup(
 #[cfg(test)]
 mod test_cases {
     use super::*;
-    use test_case::test_case;
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn test_copy_snapshot(execution_enabled: bool) {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+    #[test]
+    fn test_copy_snapshot() {
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, DEFAULT_DELAYED_FIELDS_MODE, 1);
         let txn = h.verify_copy_snapshot();
         assert_abort!(h.harness.run(txn), EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED);
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn test_copy_string_snapshot(execution_enabled: bool) {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+    #[test]
+    fn test_copy_string_snapshot() {
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, DEFAULT_DELAYED_FIELDS_MODE, 1);
         let txn = h.verify_copy_string_snapshot();
         assert_abort!(h.harness.run(txn), EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED);
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn test_snapshot_concat(execution_enabled: bool) {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+    #[test]
+    fn test_snapshot_concat() {
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, DEFAULT_DELAYED_FIELDS_MODE, 1);
         let txn = h.verify_string_concat();
         assert_success!(h.harness.run(txn));
     }
 
-    #[test_case(true)]
-    #[test_case(false)]
-    fn test_string_snapshot_concat(execution_enabled: bool) {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 1);
+    #[test]
+    fn test_string_snapshot_concat() {
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, DEFAULT_DELAYED_FIELDS_MODE, 1);
         let txn = h.verify_string_snapshot_concat();
         assert_abort!(h.harness.run(txn), EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE);
     }
 
-    // This tests uses multuple blocks, so requires exchange to be done to work.
-    // #[test_case(true)]
-    #[test_case(false)]
-    fn test_aggregators_e2e(execution_enabled: bool) {
-        println!("Testing test_aggregators_e2e {:?}", execution_enabled);
+    #[test]
+    fn test_aggregators_e2e() {
+        println!("Testing test_aggregators_e2e");
         let element_type = ElementType::U64;
         let use_type = UseType::UseTableType;
 
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 100);
+        let mut h = setup(DEFAULT_EXECUTOR_MODE, DEFAULT_DELAYED_FIELDS_MODE, 100);
 
         let init_txn = init(&mut h.harness, &h.account, use_type, element_type, true);
         h.harness.run(init_txn);
@@ -245,36 +240,18 @@ fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct TestEnvConfig {
     pub executor_mode: ExecutorMode,
-    pub aggregator_execution_enabled: bool,
+    pub delayed_fields_mode: DelayedFieldOptimizationMode,
     pub block_split: BlockSplit,
 }
 
 #[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
 fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
-        // For execution disabled, use only whole blocks and txn-per-block for block splits, as it block split shouldn't matter there.
-        Just(TestEnvConfig {
-            executor_mode: ExecutorMode::BothComparison,
-            aggregator_execution_enabled: false,
-            block_split: BlockSplit::Whole
-        }),
-        Just(TestEnvConfig {
-            executor_mode: ExecutorMode::BothComparison,
-            aggregator_execution_enabled: false,
-            block_split: BlockSplit::TxnPerBlock
-        }),
-        // Sequential execution doesn't have exchanges, so we cannot use BothComparison, nor block split
         arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
             executor_mode: ExecutorMode::BothComparison,
-            aggregator_execution_enabled: true,
+            delayed_fields_mode: DelayedFieldOptimizationMode::BothComparison,
             block_split
         }),
-        // Currently, only this fails, so you can comment out all other tests, and run this one for debugging:
-        // Just(TestEnvConfig {
-        //     executor_mode: ExecutorMode::ParallelOnly,
-        //     aggregator_execution_enabled: true,
-        //     block_split: BlockSplit::TxnPerBlock
-        // }),
     ]
     .boxed()
 }
@@ -314,7 +291,7 @@ proptest! {
     #[test]
     fn test_aggregator_lifetime(test_env in arb_test_env(14), element_type in arb_agg_type(), use_type in arb_use_type()) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 14);
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 14);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -351,7 +328,7 @@ proptest! {
         is_3_collocated in any::<bool>(),
     ) {
         println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 24);
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 24);
         let acc_2 = h.harness.new_account_with_key_pair();
         let acc_3 = h.harness.new_account_with_key_pair();
 
@@ -418,7 +395,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 4);
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 4);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -442,7 +419,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 3);
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 3);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -466,7 +443,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 3);
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 3);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -490,7 +467,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h= setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 3);
+        let mut h= setup(test_env.executor_mode, test_env.delayed_fields_mode, 3);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
@@ -514,7 +491,7 @@ proptest! {
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_enabled, 9);
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 9);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
         let snap_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);

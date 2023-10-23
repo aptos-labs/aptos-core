@@ -15,6 +15,7 @@ use crate::{
         ExecutorShardCommand,
     },
 };
+use aptos_block_executor::executor::BlockExecutorConfig;
 use aptos_logger::{info, trace};
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -139,8 +140,11 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     executor_thread_pool,
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
-                    concurrency_level,
-                    maybe_block_gas_limit,
+                    BlockExecutorConfig {
+                        concurrency_level,
+                        maybe_block_gas_limit,
+                        delayed_fields_optimization_enabled: false,
+                    },
                     cross_shard_commit_sender,
                 );
                 if let Some(shard_id) = shard_id {

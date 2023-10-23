@@ -278,11 +278,6 @@ module std::features {
 
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
 
-    /// Whether the Aggregator V2 delayed fields feature is enabled.
-    /// Once enabled, Aggregator V2 functions become parallel.
-    /// Lifetime: transient
-    const AGGREGATOR_V2_DELAYED_FIELDS: u64 = 36;
-
     /// Whether enable TokenV2 collection creation and Fungible Asset creation
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient

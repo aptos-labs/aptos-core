@@ -502,7 +502,7 @@ mod test {
     impl TDelayedFieldView for BadStorage {
         type Identifier = ();
 
-        fn is_delayed_field_optimization_capable(&self) -> bool {
+        fn is_delayed_field_optimization_enabled(&self) -> bool {
             unimplemented!("Irrelevant for the test")
         }
 

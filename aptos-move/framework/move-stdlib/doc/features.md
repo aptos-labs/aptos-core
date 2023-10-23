@@ -144,18 +144,6 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_AGGREGATOR_V2_DELAYED_FIELDS"></a>
-
-Whether the Aggregator V2 delayed fields feature is enabled.
-Once enabled, Aggregator V2 functions become parallel.
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_AGGREGATOR_V2_DELAYED_FIELDS">AGGREGATOR_V2_DELAYED_FIELDS</a>: u64 = 36;
-</code></pre>
-
-
-
 <a name="0x1_features_APTOS_STD_CHAIN_ID_NATIVES"></a>
 
 Whether the new <code>aptos_stdlib::type_info::chain_id()</code> native for fetching the chain ID is enabled.

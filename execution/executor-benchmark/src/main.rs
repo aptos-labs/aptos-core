@@ -235,6 +235,9 @@ struct Opt {
     )]
     execution_threads: Option<usize>,
 
+    #[clap(long)]
+    enable_aggregator_v2_via_delayed_fields: bool,
+
     #[clap(flatten)]
     pruner_opt: PrunerOpt,
 
@@ -481,6 +484,7 @@ fn main() {
 
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
+    AptosVM::set_aggregator_v2_via_delayed_fields_once(opt.enable_aggregator_v2_via_delayed_fields);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);
 
     let config = ProfilerConfig::new_with_defaults();

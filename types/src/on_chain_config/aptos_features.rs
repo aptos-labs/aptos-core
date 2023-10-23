@@ -43,7 +43,7 @@ pub enum FeatureFlag {
     SINGLE_SENDER_AUTHENTICATOR = 33,
     SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
-    AGGREGATOR_V2_DELAYED_FIELDS = 36,
+    // CAN BE USED - 36,
     CONCURRENT_ASSETS = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
 }
@@ -103,12 +103,6 @@ impl Features {
     /// Once enabled, the functions from aggregator_v2.move will be available for use.
     pub fn is_aggregator_v2_api_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
-    }
-
-    /// Whether the Aggregator V2 delayed fields feature is enabled.
-    /// Once enabled, Aggregator V2 functions become parallel.
-    pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
     }
 }
 
