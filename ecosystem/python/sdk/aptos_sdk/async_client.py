@@ -228,6 +228,30 @@ class RestClient:
     # Transactions
     #
 
+    async def simulate_bcs_transaction(
+        self,
+        signed_transaction: SignedTransaction,
+        estimate_gas_usage: bool = False,
+    ) -> Dict[str, Any]:
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        params = {}
+        if estimate_gas_usage:
+            params = {
+                "estimate_gas_unit_price": "true",
+                "estimate_max_gas_amount": "true",
+            }
+
+        response = await self.client.post(
+            f"{self.base_url}/transactions/simulate",
+            params=params,
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
+        return response.json()
+
     async def simulate_transaction(
         self,
         transaction: RawTransaction,
