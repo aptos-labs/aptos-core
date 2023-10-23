@@ -22,6 +22,7 @@ class Authenticator:
     ED25519: int = 0
     MULTI_ED25519: int = 1
     MULTI_AGENT: int = 2
+    FEE_PAYER: int = 3
 
     variant: int
     authenticator: typing.Any
@@ -33,6 +34,8 @@ class Authenticator:
             self.variant = Authenticator.MULTI_ED25519
         elif isinstance(authenticator, MultiAgentAuthenticator):
             self.variant = Authenticator.MULTI_AGENT
+        elif isinstance(authenticator, FeePayerAuthenticator):
+            self.variant = Authenticator.FEE_PAYER
         else:
             raise Exception("Invalid type")
         self.authenticator = authenticator
@@ -68,6 +71,8 @@ class Authenticator:
             authenticator = MultiEd25519Authenticator.deserialize(deserializer)
         elif variant == Authenticator.MULTI_AGENT:
             authenticator = MultiAgentAuthenticator.deserialize(deserializer)
+        elif variant == Authenticator.FEE_PAYER:
+            authenticator = FeePayerAuthenticator.deserialize(deserializer)
         else:
             raise Exception(f"Invalid type: {variant}")
 
@@ -107,6 +112,64 @@ class Ed25519Authenticator:
     def serialize(self, serializer: Serializer):
         serializer.struct(self.public_key)
         serializer.struct(self.signature)
+
+
+class FeePayerAuthenticator:
+    sender: Authenticator
+    secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]]
+    fee_payer: typing.Tuple[AccountAddress, Authenticator]
+
+    def __init__(
+        self,
+        sender: Authenticator,
+        secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]],
+        fee_payer: typing.Tuple[AccountAddress, Authenticator],
+    ):
+        self.sender = sender
+        self.secondary_signers = secondary_signers
+        self.fee_payer = fee_payer
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FeePayerAuthenticator):
+            return NotImplemented
+        return (
+            self.sender == other.sender
+            and self.secondary_signers == other.secondary_signers
+            and self.fee_payer == other.fee_payer
+        )
+
+    def fee_payer_address(self) -> AccountAddress:
+        return self.fee_payer[0]
+
+    def secondary_addresses(self) -> List[AccountAddress]:
+        return [x[0] for x in self.secondary_signers]
+
+    def verify(self, data: bytes) -> bool:
+        if not self.sender.verify(data):
+            return False
+        if not self.fee_payer[1].verify(data):
+            return False
+        return all([x[1].verify(data) for x in self.secondary_signers])
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> FeePayerAuthenticator:
+        sender = deserializer.struct(Authenticator)
+        secondary_addresses = deserializer.sequence(AccountAddress.deserialize)
+        secondary_authenticators = deserializer.sequence(Authenticator.deserialize)
+        fee_payer_address = deserializer.struct(AccountAddress)
+        fee_payer_authenticator = deserializer.struct(Authenticator)
+        return FeePayerAuthenticator(
+            sender,
+            list(zip(secondary_addresses, secondary_authenticators)),
+            (fee_payer_address, fee_payer_authenticator),
+        )
+
+    def serialize(self, serializer: Serializer):
+        serializer.struct(self.sender)
+        serializer.sequence([x[0] for x in self.secondary_signers], Serializer.struct)
+        serializer.sequence([x[1] for x in self.secondary_signers], Serializer.struct)
+        serializer.struct(self.fee_payer[0])
+        serializer.struct(self.fee_payer[1])
 
 
 class MultiAgentAuthenticator:
