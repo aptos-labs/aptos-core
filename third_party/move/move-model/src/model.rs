@@ -3667,6 +3667,11 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Returns the access specifiers of this function.
+    /// If this is `None`, all accesses are allowed. If the list is empty,
+    /// no accesses are allowed. Otherwise the list is divided into _inclusions_ and _exclusions_,
+    /// the later being negated specifiers. Access is allowed if (a) any of the inclusion
+    /// specifiers allows it (union of inclusion specifiers) (b) none of the exclusions
+    /// specifiers disallows it (intersection of exclusion specifiers).
     pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
         self.data.access_specifiers.as_deref()
     }

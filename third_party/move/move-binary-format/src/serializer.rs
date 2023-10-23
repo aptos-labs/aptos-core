@@ -765,9 +765,9 @@ fn serialize_access_specifier(binary: &mut BinaryData, acc: &AccessSpecifier) ->
     } as u8)?;
     binary.push(
         if acc.negated {
-            SerializedOption::SOME as u8
+            SerializedBool::TRUE as u8
         } else {
-            SerializedOption::NONE as u8
+            SerializedBool::FALSE as u8
         },
     )?;
     serialize_resource_specifier(binary, &acc.resource)?;

@@ -875,7 +875,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             address,
         } = &specifier.value;
         let resource = match (module_address, module_name, resource_name) {
-            (None, None, None) => ResourceSpecifier::Any,
+            (None, None, None) => {
+                // This stems from a  specifier of the form `acquires *(0x1)`
+                ResourceSpecifier::Any
+            },
             (Some(address), None, None) => {
                 ResourceSpecifier::DeclaredAtAddress(self.translate_address(&loc, address))
             },

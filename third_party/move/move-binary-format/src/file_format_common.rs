@@ -139,6 +139,16 @@ pub enum SerializedOption {
     SOME                    = 0x2,
 }
 
+/// A marker for an boolean in the serialized output.
+#[rustfmt::skip]
+#[allow(non_camel_case_types)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+pub enum SerializedBool {
+    FALSE                  = 0x1,
+    TRUE                   = 0x2,
+}
+
 /// A marker for access specifier kind.
 #[rustfmt::skip]
 #[allow(non_camel_case_types)]

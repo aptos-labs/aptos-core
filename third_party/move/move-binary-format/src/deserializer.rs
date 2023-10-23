@@ -1027,9 +1027,9 @@ fn load_access_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Acc
             .with_message("invalid access kind".to_owned()));
     };
     let b = load_u8(cursor)?;
-    let negated = if b == SerializedOption::SOME as u8 {
+    let negated = if b == SerializedBool::TRUE as u8 {
         true
-    } else if b == SerializedOption::NONE as u8 {
+    } else if b == SerializedBool::FALSE as u8 {
         false
     } else {
         return Err(PartialVMError::new(StatusCode::MALFORMED)
