@@ -19,6 +19,8 @@ pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
     StateKey::raw(key.to_le_bytes().to_vec())
 }
 
+pub const FAKE_AGGREGATOR_VIEW_GEN_ID_START: u32 = 87654321;
+
 pub struct FakeAggregatorView {
     // TODO[agg_v2](test): consider whether it is useful (in addition to tests in view.rs)
     // to add some DelayedChanges, to have get_delayed_field_value and
@@ -34,7 +36,7 @@ impl Default for FakeAggregatorView {
             v1_store: HashMap::new(),
             v2_store: HashMap::new(),
             // Put some recognizable number, to easily spot missed exchanges
-            counter: RefCell::new(87654321),
+            counter: RefCell::new(FAKE_AGGREGATOR_VIEW_GEN_ID_START),
         }
     }
 }

@@ -119,9 +119,14 @@ impl<'a> NativeAggregatorContext<'a> {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, bounded_math::SignedU128,
-        delayed_change::DelayedApplyChange, delta_change_set::DeltaWithMax,
-        delta_math::DeltaHistory, types::DelayedFieldValue, FakeAggregatorView,
+        aggregator_v1_id_for_test, aggregator_v1_state_key_for_test,
+        bounded_math::SignedU128,
+        delayed_change::DelayedApplyChange,
+        delta_change_set::DeltaWithMax,
+        delta_math::DeltaHistory,
+        tests::types::FAKE_AGGREGATOR_VIEW_GEN_ID_START,
+        types::{DelayedFieldValue, SnapshotToStringFormula},
+        FakeAggregatorView,
     };
     use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
@@ -249,12 +254,18 @@ mod test {
         state_view
     }
 
+    fn id_from_fake_idx(idx: u64) -> DelayedFieldID {
+        DelayedFieldID::new(FAKE_AGGREGATOR_VIEW_GEN_ID_START as u64 + idx)
+    }
+
     // All aggregators are initialized deterministically based on their ID,
     // with v2 id, with the following spec.
     //
     //   agg(900) : storage(300)  -> try_add(200)  -> failed try_sub(501)  -> try_add(300)    -> try_add(100)  -> failed try_add(51)
     //                                   |                                       |
     //                               snapshot(0)                              snapshot(1)
+    //                                   |
+    //                               string_concat(4)
     //   agg(1000): storage(400)
     //
     //   agg(2000):  create()    -> try_add (500) -> failed try_add(1700) -> failed try_sub(501)
@@ -275,16 +286,6 @@ mod test {
             true
         );
 
-        assert_ok_eq!(
-            delayed_field_data.try_add_delta(
-                DelayedFieldID::new(900),
-                900,
-                SignedU128::Negative(501),
-                context.delayed_field_resolver
-            ),
-            false
-        );
-
         // failed because of wrong max_value
         assert!(delayed_field_data
             .snapshot(
@@ -300,7 +301,17 @@ mod test {
                 900,
                 context.delayed_field_resolver
             ),
-            DelayedFieldID::new(1)
+            id_from_fake_idx(0)
+        );
+
+        assert_ok_eq!(
+            delayed_field_data.try_add_delta(
+                DelayedFieldID::new(900),
+                900,
+                SignedU128::Negative(501),
+                context.delayed_field_resolver
+            ),
+            false
         );
 
         assert_ok_eq!(
@@ -319,7 +330,7 @@ mod test {
                 900,
                 context.delayed_field_resolver
             ),
-            DelayedFieldID::new(2)
+            id_from_fake_idx(1)
         );
 
         assert_ok_eq!(
@@ -359,17 +370,27 @@ mod test {
                 2000,
                 context.delayed_field_resolver
             ),
-            DelayedFieldID::new(3)
+            id_from_fake_idx(2)
         );
 
-        assert_eq!(
+        assert_ok_eq!(
             delayed_field_data.string_concat(
-                DelayedFieldID::new(2200),
+                id_from_fake_idx(2),
                 "prefix".as_bytes().to_vec(),
                 "suffix".as_bytes().to_vec(),
                 context.delayed_field_resolver,
             ),
-            DelayedFieldID::new(4)
+            id_from_fake_idx(3)
+        );
+
+        assert_ok_eq!(
+            delayed_field_data.string_concat(
+                id_from_fake_idx(0),
+                "prefix".as_bytes().to_vec(),
+                "suffix".as_bytes().to_vec(),
+                context.delayed_field_resolver,
+            ),
+            id_from_fake_idx(4)
         );
 
         assert_ok_eq!(
@@ -385,7 +406,7 @@ mod test {
             delayed_field_data.try_add_delta(
                 DelayedFieldID::new(2000),
                 2000,
-                SignedU128::Positive(501),
+                SignedU128::Negative(501),
                 context.delayed_field_resolver
             ),
             false
@@ -412,21 +433,17 @@ mod test {
         // So their validation validates full transaction, and it is not
         // needed to check aggregators too (i.e. when we do read_snapshot)
         assert_some_eq!(
-            delayed_field_changes.get(&DelayedFieldID::new(1)),
+            delayed_field_changes.get(&id_from_fake_idx(0)),
             &DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
                 base_aggregator: DelayedFieldID::new(900),
                 delta: DeltaWithMax::new(SignedU128::Positive(200), 900)
             }),
         );
         assert_some_eq!(
-            delayed_field_changes.get(&DelayedFieldID::new(2)),
-            &DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
-                delta: DeltaWithMax::new(SignedU128::Positive(500), 900) // , DeltaHistory {
-                                                                         //     max_achieved_positive_delta: 600,
-                                                                         //     min_achieved_negative_delta: 0,
-                                                                         //     min_overflow_positive_delta: Some(651),
-                                                                         //     max_underflow_negative_delta: Some(501),
-                                                                         // },),
+            delayed_field_changes.get(&id_from_fake_idx(1)),
+            &DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
+                base_aggregator: DelayedFieldID::new(900),
+                delta: DeltaWithMax::new(SignedU128::Positive(500), 900)
             }),
         );
 
@@ -436,14 +453,24 @@ mod test {
         );
 
         assert_some_eq!(
-            delayed_field_changes.get(&DelayedFieldID::new(3)),
+            delayed_field_changes.get(&id_from_fake_idx(2)),
             &DelayedChange::Create(DelayedFieldValue::Snapshot(500)),
         );
         assert_some_eq!(
-            delayed_field_changes.get(&DelayedFieldID::new(4)),
+            delayed_field_changes.get(&id_from_fake_idx(3)),
             &DelayedChange::Create(DelayedFieldValue::Derived(
                 "prefix500suffix".as_bytes().to_vec()
             )),
+        );
+        assert_some_eq!(
+            delayed_field_changes.get(&id_from_fake_idx(4)),
+            &DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
+                base_snapshot: id_from_fake_idx(0),
+                formula: SnapshotToStringFormula::Concat {
+                    prefix: "prefix".as_bytes().to_vec(),
+                    suffix: "suffix".as_bytes().to_vec(),
+                },
+            }),
         );
     }
 }

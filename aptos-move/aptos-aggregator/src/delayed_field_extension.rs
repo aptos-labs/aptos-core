@@ -172,6 +172,12 @@ impl DelayedFieldData {
                 DelayedChange::Create(DelayedFieldValue::Snapshot(*value))
             },
             Some(DelayedChange::Apply(DelayedApplyChange::AggregatorDelta { delta, .. })) => {
+                if max_value != delta.max_value {
+                    return Err(code_invariant_error(
+                        "Tried to snapshot an aggregator with a different max value",
+                    )
+                    .into());
+                }
                 DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
                     base_aggregator: aggregator_id,
                     delta: *delta,
@@ -223,20 +229,36 @@ impl DelayedFieldData {
 
     pub fn string_concat(
         &mut self,
-        id: DelayedFieldID,
+        snapshot_id: DelayedFieldID,
         prefix: Vec<u8>,
         suffix: Vec<u8>,
         resolver: &dyn DelayedFieldResolver,
-    ) -> DelayedFieldID {
+    ) -> PartialVMResult<DelayedFieldID> {
+        let snapshot = self.delayed_fields.get(&snapshot_id);
+        let formula = SnapshotToStringFormula::Concat { prefix, suffix };
+
+        let change = match snapshot {
+            // If snapshot is in Create state, we don't need to depend on it, and can just take the value.
+            Some(DelayedChange::Create(DelayedFieldValue::Snapshot(value))) => {
+                DelayedChange::Create(DelayedFieldValue::Derived(formula.apply_to(*value)))
+            },
+            Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDelta { .. })) | None => {
+                DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
+                    base_snapshot: snapshot_id,
+                    formula,
+                })
+            },
+            _ => {
+                return Err(code_invariant_error(
+                    "Tried to string_concat a non-snapshot delayed field",
+                )
+                .into())
+            },
+        };
+
         let new_id = resolver.generate_delayed_field_id();
-        self.delayed_fields.insert(
-            new_id,
-            DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
-                base_snapshot: id,
-                formula: SnapshotToStringFormula::Concat { prefix, suffix },
-            }),
-        );
-        new_id
+        self.delayed_fields.insert(new_id, change);
+        Ok(new_id)
     }
 
     /// Unpacks aggregator data.
