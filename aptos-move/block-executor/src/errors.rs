@@ -12,6 +12,10 @@ pub enum IntentionalFallbackToSequential {
     /// TODO: (short-mid term) relax the limitation, and (mid-long term) provide proper multi-versioning
     /// for code (like data) for the cache.
     ModulePathReadWrite,
+    // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization is enabled,
+    // because delayed fields do value->identifier exchange on reads, and identifier->value exhcange
+    // on writes. WriteSetPayload::Direct cannot be processed to do so, as we get outputs directly.
+    // We communicate to the executor to retry with capability disabled.
     DirectWriteSetTransaction,
 }
 

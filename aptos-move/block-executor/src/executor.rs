@@ -758,6 +758,8 @@ where
                     txn_commit_listener.on_execution_aborted(txn_idx);
                 },
                 ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
+                    // This should already be handled and fallback to sequential called,
+                    // such a transaction should never reach this point.
                     panic!("Cannot be materializing with DirectWriteSetTransactionNotCapableError");
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg)
@@ -775,6 +777,8 @@ where
             ExecutionStatus::Abort(_) => (),
             ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
                 panic!("Cannot be materializing with DirectWriteSetTransactionNotCapableError");
+                // This should already be handled and fallback to sequential called,
+                // such a transaction should never reach this point.
             },
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
@@ -1220,22 +1224,53 @@ where
             )
         };
 
-        if let Err(Error::FallbackToSequential(e)) = ret {
-            let dynamic_change_set_optimizations_enabled = match e {
+        // Regular sequential execution fallback with dynamic_change_set_optimizations_enabled == true
+        // Only worth doing if we did parallel before, i.e. if we did a different pass.
+        if self.concurrency_level > 1 {
+            if let Err(Error::FallbackToSequential(e)) = &ret {
+                let can_use_dynamic_change_set_optimizations = match e {
+                    PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
+                        debug!("[Execution]: Module read & written, sequential fallback");
+                        true
+                    },
+                    PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
+                        false
+                    },
+                    PanicOr::CodeInvariantError(msg) => {
+                        error!(
+                            "[Execution]: CodeInvariantError({:?}), sequential fallback",
+                            msg
+                        );
+                        true
+                    },
+                };
+
+                if can_use_dynamic_change_set_optimizations {
+                    // All logs from the parallel execution should be cleared and not reported.
+                    // Clear by re-initializing the speculative logs.
+                    init_speculative_logs(signature_verified_block.len());
+
+                    ret = self.execute_transactions_sequential(
+                        executor_arguments,
+                        signature_verified_block,
+                        base_view,
+                        true,
+                    );
+                }
+            }
+        }
+
+        // Sequential execution fallback with dynamic_change_set_optimizations_enabled == false
+        if let Err(Error::FallbackToSequential(e)) = &ret {
+            match e {
                 PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
-                    debug!("[Execution]: Module read & written, sequential fallback");
-                    true
+                    panic!("ModulePathReadWrite shouldn't happen in sequential execution")
                 },
                 PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
-                    info!("[Execution]: DirectWriteSetTransaction found, sequential fallback");
-                    false
+                    info!("[Execution]: DirectWriteSetTransaction found, during ModulePathReadWrite sequential fallback");
                 },
                 PanicOr::CodeInvariantError(msg) => {
-                    error!(
-                        "[Execution]: CodeInvariantError({:?}), sequential fallback",
-                        msg
-                    );
-                    false
+                    error!("[Execution]: CodeInvariantError({:?}) in sequential with dynamic_change_set_optimizations_enabled, sequential fallback", msg);
                 },
             };
 
@@ -1247,40 +1282,16 @@ where
                 executor_arguments,
                 signature_verified_block,
                 base_view,
-                dynamic_change_set_optimizations_enabled,
+                false,
             );
-
-            if ret.is_err() && dynamic_change_set_optimizations_enabled {
-                if let Err(Error::FallbackToSequential(e)) = ret {
-                    match e {
-                        PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
-                            panic!("ModulePathReadWrite shouldn't happen in sequential execution")
-                        },
-                        PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
-                            info!("[Execution]: DirectWriteSetTransaction found, during ModulePathReadWrite sequential fallback");
-                        },
-                        PanicOr::CodeInvariantError(msg) => {
-                            error!("[Execution]: CodeInvariantError({:?}) in sequential with dynamic_change_set_optimizations_enabled, sequential fallback", msg);
-                        },
-                    };
-
-                    // All logs from the parallel execution should be cleared and not reported.
-                    // Clear by re-initializing the speculative logs.
-                    init_speculative_logs(signature_verified_block.len());
-
-                    ret = self.execute_transactions_sequential(
-                        executor_arguments,
-                        signature_verified_block,
-                        base_view,
-                        false,
-                    );
-
-                    if let Err(Error::FallbackToSequential(e)) = ret {
-                        panic!("Sequential execution failed with {:?}", e);
-                    }
-                }
-            }
         }
+
+        // If after trying available fallbacks, we still are askign to do a fallback,
+        // something unrecoverable went wrong.
+        if let Err(Error::FallbackToSequential(e)) = &ret {
+            panic!("Sequential execution failed with {:?}", e);
+        }
+
         ret
     }
 }

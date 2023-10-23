@@ -181,6 +181,8 @@ impl VMChangeSet {
     pub fn try_from_storage_change_set(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
+        // Pass in within which resolver context are we creating this change set.
+        // Used to eagerly reject changes created in an incompatible way.
         is_delayed_field_optimization_capable: bool,
     ) -> anyhow::Result<Self, VMStatus> {
         assert!(
@@ -223,8 +225,12 @@ impl VMChangeSet {
     }
 
     pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
-        // It is still invalid to convert VMChangeSet that was created in a mode
-        // that produces DelayedField or ResourceGroup write sets
+        // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
+        // be done here only if dynamic_change_set_optimizations have not been used/produced
+        // data into the output.
+        // If they (DelayedField or ResourceGroup) have added data into the write set, translation
+        // into output is more complicated, and needs to be done within BlockExecutor context
+        // that knows how to deal with it.
         assert!(self.delayed_field_change_set().is_empty());
         assert!(self.resource_group_write_set().is_empty());
 
