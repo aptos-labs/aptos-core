@@ -2212,11 +2212,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Translates a name. Reports an error if the name is not found.
     fn translate_name(
         &mut self,
-        loc: &Loc,
         maccess: &EA::ModuleAccess,
         type_args: Option<&[EA::Type]>,
         expected_type: &Type,
     ) -> ExpData {
+        let loc = &self.to_loc(&maccess.loc);
         let global_var_sym = match &maccess.value {
             EA::ModuleAccess_::ModuleAccess(..) => self.parent.module_access_to_qualified(maccess),
             EA::ModuleAccess_::Name(name) => {
