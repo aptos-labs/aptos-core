@@ -52,14 +52,16 @@ impl PFNPerformance {
     fn create_cpu_chaos(&self, swarm: &mut dyn Swarm) -> SwarmCpuStress {
         // Gather and shuffle all peers IDs (so that we get random CPU chaos)
         // TODO: hacking to just VFNs
-        let shuffled_peer_ids = swarm
+        let mut shuffled_vfn_ids: Vec<_> = swarm
             .full_nodes()
             .filter(|v| !v.name().contains("public"))
+            .map(|v| v.peer_id())
             .collect();
+        shuffled_vfn_ids.shuffle(&mut StdRng::from_seed(self.shuffle_rng_seed));
 
         // Create CPU chaos for the swarm
         create_swarm_cpu_stress(
-            shuffled_peer_ids,
+            shuffled_vfn_ids,
             Some(CpuChaosConfig {
                 num_groups: 2,
                 load_per_worker: 100,
