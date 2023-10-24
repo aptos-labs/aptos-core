@@ -295,25 +295,25 @@ where
                 }
 
                 // Either all txn committed, or a committed txn caused an early halt.
-                if scheduler.halt() {
-                    counters::update_parallel_block_gas_counters(
-                        accumulated_fee_statement,
-                        (txn_idx + 1) as usize,
-                    );
-                    counters::update_parallel_txn_gas_counters(txn_fee_statements);
+                scheduler.halt();
 
-                    let accumulated_non_storage_gas = accumulated_fee_statement
-                        .execution_gas_used()
-                        + accumulated_fee_statement.io_gas_used();
-                    info!(
-                        "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
+                counters::update_parallel_block_gas_counters(
+                    accumulated_fee_statement,
+                    (txn_idx + 1) as usize,
+                );
+                counters::update_parallel_txn_gas_counters(txn_fee_statements);
+
+                let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
+                    + accumulated_fee_statement.io_gas_used();
+                info!(
+                    "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
 		         accumulated_non_storage_gas = {}, limit = {:?}",
-                        txn_idx + 1,
-                        scheduler.num_txns(),
-                        accumulated_non_storage_gas,
-                        maybe_block_gas_limit,
-                    );
-                }
+                    txn_idx + 1,
+                    scheduler.num_txns(),
+                    accumulated_non_storage_gas,
+                    maybe_block_gas_limit,
+                );
+
                 break;
             }
         }
