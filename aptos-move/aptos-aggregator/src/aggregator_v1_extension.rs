@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    bounded_math::{BoundedMath, BoundedMathError, SignedU128},
+    bounded_math::{BoundedMath, SignedU128},
     delta_math::DeltaHistory,
     resolver::AggregatorV1Resolver,
     types::{expect_ok, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason},
@@ -131,14 +131,14 @@ impl Aggregator {
                 // If aggregator knows the value, add directly and keep the state.
                 self.value = math
                     .unsigned_add(self.value, value)
-                    .map_err(addition_error)?;
+                    .map_err(addition_v1_error)?;
                 return Ok(());
             },
             AggregatorState::PositiveDelta => {
                 // If positive delta, add directly but also record the state.
                 self.value = math
                     .unsigned_add(self.value, value)
-                    .map_err(addition_error)?;
+                    .map_err(addition_v1_error)?;
             },
             AggregatorState::NegativeDelta => {
                 // Negative delta is a special case, since the state might
@@ -171,7 +171,7 @@ impl Aggregator {
                 // record the history.
                 self.value = math
                     .unsigned_subtract(self.value, value)
-                    .map_err(subtraction_error)?;
+                    .map_err(subtraction_v1_error)?;
                 return Ok(());
             },
             AggregatorState::PositiveDelta => {
@@ -184,17 +184,17 @@ impl Aggregator {
                 if self.value >= value {
                     self.value = math
                         .unsigned_subtract(self.value, value)
-                        .map_err(subtraction_error)?;
+                        .map_err(subtraction_v1_error)?;
                 } else {
                     // Check that we can subtract in general: we don't want to
                     // allow -10000 when max_value is 10.
                     // TODO: maybe `subtraction` should also know about the max_value?
                     math.unsigned_subtract(self.max_value, value)
-                        .map_err(subtraction_error)?;
+                        .map_err(subtraction_v1_error)?;
 
                     self.value = math
                         .unsigned_subtract(value, self.value)
-                        .map_err(subtraction_error)?;
+                        .map_err(subtraction_v1_error)?;
                     self.state = AggregatorState::NegativeDelta;
                 }
             },
@@ -205,7 +205,7 @@ impl Aggregator {
                 // we should return an error there.
                 self.value = math
                     .unsigned_add(self.value, value)
-                    .map_err(subtraction_error)?;
+                    .map_err(subtraction_v1_error)?;
             },
         }
 
@@ -359,11 +359,11 @@ impl AggregatorData {
     }
 }
 
-fn addition_error(_err: BoundedMathError) -> PartialVMError {
+pub(crate) fn addition_v1_error<T>(_err: T) -> PartialVMError {
     abort_error("overflow", EADD_OVERFLOW)
 }
 
-fn subtraction_error(_err: BoundedMathError) -> PartialVMError {
+pub(crate) fn subtraction_v1_error<T>(_err: T) -> PartialVMError {
     abort_error("underflow", ESUB_UNDERFLOW)
 }
 

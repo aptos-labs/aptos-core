@@ -19,7 +19,6 @@ fn get_delayed_field_value_from_storage(
     id: &DelayedFieldID,
     resolver: &dyn DelayedFieldResolver,
 ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-    // TODO transform unexpected errors into PanicError
     resolver
         .get_delayed_field_value(id)
         .map_err(|_err| PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(*id)))
