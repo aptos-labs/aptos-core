@@ -1856,6 +1856,18 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             if USE_CRAZY_MACHINES {
                 config.execution.concurrency_level = 48;
             }
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Mempool config optimizations
+            mempool_config_practically_non_expiring(&mut config.mempool);
+
+            // Higher concurrency level
+            if USE_CRAZY_MACHINES {
+                config.execution.concurrency_level = 48;
+            }
+
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
         }));
 
     if ENABLE_VFNS {
