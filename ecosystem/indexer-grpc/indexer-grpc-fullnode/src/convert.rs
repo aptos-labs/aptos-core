@@ -6,9 +6,8 @@ use aptos_api_types::{
     EntryFunctionPayload, Event, GenesisPayload, MoveAbility, MoveFunction,
     MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
     MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
-    MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload, ScriptPayload,
-    Secp256k1EcdsaSignature, Transaction, TransactionInfo, TransactionPayload,
-    TransactionSignature, WriteSet, WriteSetChange,
+    MultiEd25519Signature, MultisigPayload, MultisigTransactionPayload, ScriptPayload, Transaction,
+    TransactionInfo, TransactionPayload, TransactionSignature, WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -557,15 +556,6 @@ pub fn convert_multi_ed25519_signature(
     }
 }
 
-pub fn convert_secp256k1_ecdsa_signature(
-    sig: &Secp256k1EcdsaSignature,
-) -> transaction::Secp256k1EcdsaSignature {
-    transaction::Secp256k1EcdsaSignature {
-        public_key: sig.public_key.0.clone(),
-        signature: sig.signature.0.clone(),
-    }
-}
-
 pub fn convert_account_signature(
     account_signature: &AccountSignature,
 ) -> transaction::AccountSignature {
@@ -573,9 +563,6 @@ pub fn convert_account_signature(
         AccountSignature::Ed25519Signature(_) => transaction::account_signature::Type::Ed25519,
         AccountSignature::MultiEd25519Signature(_) => {
             transaction::account_signature::Type::MultiEd25519
-        },
-        AccountSignature::Secp256k1EcdsaSignature(_) => {
-            transaction::account_signature::Type::Secp256k1Ecdsa
         },
     };
     let signature = match account_signature {
@@ -585,11 +572,6 @@ pub fn convert_account_signature(
         AccountSignature::MultiEd25519Signature(s) => {
             transaction::account_signature::Signature::MultiEd25519(
                 convert_multi_ed25519_signature(s),
-            )
-        },
-        AccountSignature::Secp256k1EcdsaSignature(s) => {
-            transaction::account_signature::Signature::Secp256k1Ecdsa(
-                convert_secp256k1_ecdsa_signature(s),
             )
         },
     };
@@ -613,9 +595,6 @@ pub fn convert_transaction_signature(
         },
         TransactionSignature::MultiAgentSignature(_) => transaction::signature::Type::MultiAgent,
         TransactionSignature::FeePayerSignature(_) => transaction::signature::Type::FeePayer,
-        TransactionSignature::Secp256k1EcdsaSignature(_) => {
-            transaction::signature::Type::Secp256k1Ecdsa
-        },
     };
 
     let signature = match signature {
@@ -656,9 +635,6 @@ pub fn convert_transaction_signature(
                 fee_payer_address: s.fee_payer_address.to_string(),
                 fee_payer_signer: Some(convert_account_signature(&s.fee_payer_signer)),
             })
-        },
-        TransactionSignature::Secp256k1EcdsaSignature(s) => {
-            transaction::signature::Signature::Secp256k1Ecdsa(convert_secp256k1_ecdsa_signature(s))
         },
     };
 

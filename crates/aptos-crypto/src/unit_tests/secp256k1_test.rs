@@ -97,18 +97,14 @@ fn malleability() {
 
     let mut high_signature = signature.clone();
     high_signature.0.s = -high_signature.0.s;
-    let high_signature_bytes = high_signature.to_bytes();
-
-    // We can load
-    secp256k1_ecdsa::Signature::try_from(&high_signature_bytes[..]).unwrap();
-
-    // Ensure this is now high.
-    assert!(!signature.0.s.is_high());
     assert!(high_signature.0.s.is_high());
     assert!(high_signature.0.s != signature.0.s);
-    high_signature
+    assert!(high_signature
         .verify_arbitrary_msg(message, &key_pair.public_key)
-        .unwrap_err();
+        .is_ok());
+
+    let high_signature_bytes = high_signature.to_bytes();
+    secp256k1_ecdsa::Signature::try_from(&high_signature_bytes[..]).unwrap_err();
 }
 
 /// Test deserialization_failures

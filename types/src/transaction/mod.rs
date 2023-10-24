@@ -23,7 +23,6 @@ use aptos_crypto::{
     ed25519::*,
     hash::{CryptoHash, EventAccumulatorHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
     traits::{signing_message, SigningKey},
     CryptoMaterialError, HashValue,
 };
@@ -349,21 +348,6 @@ impl RawTransaction {
         ))
     }
 
-    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
-    /// into a `SignatureCheckedTransaction`.
-    ///
-    /// For a transaction that has just been signed, its signature is expected to be valid.
-    pub fn sign_secp256k1_ecdsa(
-        self,
-        private_key: &secp256k1_ecdsa::PrivateKey,
-        public_key: secp256k1_ecdsa::PublicKey,
-    ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
-        ))
-    }
-
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn multi_sign_for_testing(
         self,
@@ -665,19 +649,6 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
-            size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_secp256k1_ecdsa(
-        raw_txn: RawTransaction,
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::secp256k1_ecdsa(public_key, signature);
-        SignedTransaction {
-            raw_txn,
-            authenticator,
             size: OnceCell::new(),
         }
     }

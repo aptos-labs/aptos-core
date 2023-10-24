@@ -55,7 +55,6 @@ impl PrivateKey {
     fn sign_arbitrary_message(&self, message: &[u8]) -> Signature {
         let message =
             bytes_to_message(message).expect("Consistently hashed to 32-bytes, should never fail.");
-        // libsecp256k1 ensures that the s in signature is normalized
         self.sign(&message)
     }
 }
@@ -136,7 +135,7 @@ impl PublicKey {
 
 impl std::fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "secp256k1_ecdsa::PublicKey({})", self)
+        write!(f, "secp256k1::PublicKey({})", self)
     }
 }
 
@@ -207,11 +206,7 @@ impl Signature {
         message: &libsecp256k1::Message,
         public_key: &libsecp256k1::PublicKey,
     ) -> Result<()> {
-        // Prevent malleability attacks, low order only. The library only signs in low
-        // order, so this was done intentionally.
-        if self.0.s.is_high() {
-            Err(anyhow!(CryptoMaterialError::CanonicalRepresentationError))
-        } else if libsecp256k1::verify(message, &self.0, public_key) {
+        if libsecp256k1::verify(message, &self.0, public_key) {
             Ok(())
         } else {
             Err(anyhow!("Unable to verify signature."))
@@ -232,7 +227,15 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> std::result::Result<Signature, CryptoMaterialError> {
         match libsecp256k1::Signature::parse_standard_slice(bytes) {
-            Ok(signature) => Ok(Signature(signature)),
+            Ok(signature) => {
+                // Prevent malleability attacks, low order only. The library only signs in low
+                // order, so this was done intentionally.
+                if signature.s.is_high() {
+                    Err(CryptoMaterialError::CanonicalRepresentationError)
+                } else {
+                    Ok(Signature(signature))
+                }
+            },
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
     }
@@ -240,7 +243,7 @@ impl TryFrom<&[u8]> for Signature {
 
 impl std::fmt::Debug for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "secp256k1_ecdsa::Signature({})", self)
+        write!(f, "secp256k1::Signature({})", self)
     }
 }
 

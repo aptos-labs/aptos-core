@@ -1644,16 +1644,6 @@ impl VMValidator for AptosVM {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        if !self
-            .0
-            .get_features()
-            .is_enabled(FeatureFlag::SECP256K1_ECDSA_AUTHENTICATOR)
-        {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::Secp256k1Ecdsa{ .. } = transaction.authenticator_ref() {
-                return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-            }
-        }
-
         let txn = match self.check_signature(transaction) {
             Ok(t) => t,
             _ => {

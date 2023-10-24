@@ -29,9 +29,6 @@ impl serde::Serialize for AccountSignature {
                 account_signature::Signature::MultiEd25519(v) => {
                     struct_ser.serialize_field("multiEd25519", v)?;
                 }
-                account_signature::Signature::Secp256k1Ecdsa(v) => {
-                    struct_ser.serialize_field("secp256k1Ecdsa", v)?;
-                }
             }
         }
         struct_ser.end()
@@ -48,8 +45,6 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             "ed25519",
             "multi_ed25519",
             "multiEd25519",
-            "secp256k1_ecdsa",
-            "secp256k1Ecdsa",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -57,7 +52,6 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
             Type,
             Ed25519,
             MultiEd25519,
-            Secp256k1Ecdsa,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -82,7 +76,6 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             "type" => Ok(GeneratedField::Type),
                             "ed25519" => Ok(GeneratedField::Ed25519),
                             "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
-                            "secp256k1Ecdsa" | "secp256k1_ecdsa" => Ok(GeneratedField::Secp256k1Ecdsa),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -126,13 +119,6 @@ impl<'de> serde::Deserialize<'de> for AccountSignature {
                             signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::MultiEd25519)
 ;
                         }
-                        GeneratedField::Secp256k1Ecdsa => {
-                            if signature__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("secp256k1Ecdsa"));
-                            }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(account_signature::Signature::Secp256k1Ecdsa)
-;
-                        }
                     }
                 }
                 Ok(AccountSignature {
@@ -154,7 +140,6 @@ impl serde::Serialize for account_signature::Type {
             Self::Unspecified => "TYPE_UNSPECIFIED",
             Self::Ed25519 => "TYPE_ED25519",
             Self::MultiEd25519 => "TYPE_MULTI_ED25519",
-            Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
         };
         serializer.serialize_str(variant)
     }
@@ -169,7 +154,6 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
             "TYPE_UNSPECIFIED",
             "TYPE_ED25519",
             "TYPE_MULTI_ED25519",
-            "TYPE_SECP256K1_ECDSA",
         ];
 
         struct GeneratedVisitor;
@@ -215,7 +199,6 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
                     "TYPE_UNSPECIFIED" => Ok(account_signature::Type::Unspecified),
                     "TYPE_ED25519" => Ok(account_signature::Type::Ed25519),
                     "TYPE_MULTI_ED25519" => Ok(account_signature::Type::MultiEd25519),
-                    "TYPE_SECP256K1_ECDSA" => Ok(account_signature::Type::Secp256k1Ecdsa),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -4849,119 +4832,6 @@ impl<'de> serde::Deserialize<'de> for ScriptWriteSet {
         deserializer.deserialize_struct("aptos.transaction.v1.ScriptWriteSet", FIELDS, GeneratedVisitor)
     }
 }
-impl serde::Serialize for Secp256k1EcdsaSignature {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if !self.public_key.is_empty() {
-            len += 1;
-        }
-        if !self.signature.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.Secp256k1ECDSASignature", len)?;
-        if !self.public_key.is_empty() {
-            struct_ser.serialize_field("publicKey", pbjson::private::base64::encode(&self.public_key).as_str())?;
-        }
-        if !self.signature.is_empty() {
-            struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for Secp256k1EcdsaSignature {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &[
-            "public_key",
-            "publicKey",
-            "signature",
-        ];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            PublicKey,
-            Signature,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "publicKey" | "public_key" => Ok(GeneratedField::PublicKey),
-                            "signature" => Ok(GeneratedField::Signature),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = Secp256k1EcdsaSignature;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.Secp256k1ECDSASignature")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<Secp256k1EcdsaSignature, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
-            {
-                let mut public_key__ = None;
-                let mut signature__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::PublicKey => {
-                            if public_key__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("publicKey"));
-                            }
-                            public_key__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
-                        }
-                        GeneratedField::Signature => {
-                            if signature__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("signature"));
-                            }
-                            signature__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
-                        }
-                    }
-                }
-                Ok(Secp256k1EcdsaSignature {
-                    public_key: public_key__.unwrap_or_default(),
-                    signature: signature__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct("aptos.transaction.v1.Secp256k1ECDSASignature", FIELDS, GeneratedVisitor)
-    }
-}
 impl serde::Serialize for Signature {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -4996,9 +4866,6 @@ impl serde::Serialize for Signature {
                 signature::Signature::FeePayer(v) => {
                     struct_ser.serialize_field("feePayer", v)?;
                 }
-                signature::Signature::Secp256k1Ecdsa(v) => {
-                    struct_ser.serialize_field("secp256k1Ecdsa", v)?;
-                }
             }
         }
         struct_ser.end()
@@ -5019,8 +4886,6 @@ impl<'de> serde::Deserialize<'de> for Signature {
             "multiAgent",
             "fee_payer",
             "feePayer",
-            "secp256k1_ecdsa",
-            "secp256k1Ecdsa",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -5030,7 +4895,6 @@ impl<'de> serde::Deserialize<'de> for Signature {
             MultiEd25519,
             MultiAgent,
             FeePayer,
-            Secp256k1Ecdsa,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -5057,7 +4921,6 @@ impl<'de> serde::Deserialize<'de> for Signature {
                             "multiEd25519" | "multi_ed25519" => Ok(GeneratedField::MultiEd25519),
                             "multiAgent" | "multi_agent" => Ok(GeneratedField::MultiAgent),
                             "feePayer" | "fee_payer" => Ok(GeneratedField::FeePayer),
-                            "secp256k1Ecdsa" | "secp256k1_ecdsa" => Ok(GeneratedField::Secp256k1Ecdsa),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -5115,13 +4978,6 @@ impl<'de> serde::Deserialize<'de> for Signature {
                             signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::FeePayer)
 ;
                         }
-                        GeneratedField::Secp256k1Ecdsa => {
-                            if signature__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("secp256k1Ecdsa"));
-                            }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(signature::Signature::Secp256k1Ecdsa)
-;
-                        }
                     }
                 }
                 Ok(Signature {
@@ -5145,7 +5001,6 @@ impl serde::Serialize for signature::Type {
             Self::MultiEd25519 => "TYPE_MULTI_ED25519",
             Self::MultiAgent => "TYPE_MULTI_AGENT",
             Self::FeePayer => "TYPE_FEE_PAYER",
-            Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
         };
         serializer.serialize_str(variant)
     }
@@ -5162,7 +5017,6 @@ impl<'de> serde::Deserialize<'de> for signature::Type {
             "TYPE_MULTI_ED25519",
             "TYPE_MULTI_AGENT",
             "TYPE_FEE_PAYER",
-            "TYPE_SECP256K1_ECDSA",
         ];
 
         struct GeneratedVisitor;
@@ -5210,7 +5064,6 @@ impl<'de> serde::Deserialize<'de> for signature::Type {
                     "TYPE_MULTI_ED25519" => Ok(signature::Type::MultiEd25519),
                     "TYPE_MULTI_AGENT" => Ok(signature::Type::MultiAgent),
                     "TYPE_FEE_PAYER" => Ok(signature::Type::FeePayer),
-                    "TYPE_SECP256K1_ECDSA" => Ok(signature::Type::Secp256k1Ecdsa),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

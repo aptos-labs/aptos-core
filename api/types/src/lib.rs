@@ -50,12 +50,11 @@ pub use transaction::{
     FeePayerSignature, GasEstimation, GasEstimationBcs, GenesisPayload, GenesisTransaction,
     ModuleBundlePayload, MultiAgentSignature, MultiEd25519Signature, MultisigPayload,
     MultisigTransactionPayload, PendingTransaction, ScriptPayload, ScriptWriteSet,
-    Secp256k1EcdsaSignature, SubmitTransactionRequest, Transaction, TransactionData, TransactionId,
-    TransactionInfo, TransactionOnChainData, TransactionPayload, TransactionSignature,
-    TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
-    TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
+    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
+    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult,
+    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
+    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use view::ViewRequest;
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
