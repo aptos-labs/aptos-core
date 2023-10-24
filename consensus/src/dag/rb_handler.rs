@@ -1,15 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_fetcher::TFetchRequester, storage::DAGStorage, NodeId};
 use crate::dag::{
+    dag_fetcher::TFetchRequester,
     dag_network::RpcHandler,
     dag_store::Dag,
+    errors::NodeBroadcastHandleError,
     observability::{
         logging::{LogEvent, LogSchema},
         tracing::{observe_node, NodeStage},
     },
+    storage::DAGStorage,
     types::{Node, NodeCertificate, Vote},
+    NodeId,
 };
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
@@ -19,17 +22,6 @@ use aptos_logger::{debug, error};
 use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
-use thiserror::Error as ThisError;
-
-#[derive(ThisError, Debug)]
-pub enum NodeBroadcastHandleError {
-    #[error("invalid parent in node")]
-    InvalidParent,
-    #[error("missing parents")]
-    MissingParents,
-    #[error("stale round number")]
-    StaleRound(Round),
-}
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,

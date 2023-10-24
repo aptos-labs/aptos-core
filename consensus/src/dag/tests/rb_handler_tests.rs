@@ -4,7 +4,8 @@
 use crate::dag::{
     dag_fetcher::TFetchRequester,
     dag_store::Dag,
-    rb_handler::{NodeBroadcastHandleError, NodeBroadcastHandler},
+    errors::NodeBroadcastHandleError,
+    rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     tests::{
         dag_test::MockStorage,

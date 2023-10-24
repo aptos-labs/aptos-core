@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::types::DAGMessage;
+use super::{types::DAGMessage, DAGRpcResult};
 use aptos_consensus_types::common::Author;
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
@@ -26,13 +26,13 @@ pub trait RpcHandler {
 }
 
 #[async_trait]
-pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage> {
+pub trait TDAGNetworkSender: Send + Sync + RBNetworkSender<DAGMessage, DAGRpcResult> {
     async fn send_rpc(
         &self,
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage>;
+    ) -> anyhow::Result<DAGRpcResult>;
 
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
@@ -81,7 +81,7 @@ pub struct RpcWithFallback {
 
     terminated: bool,
     futures: Pin<
-        Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGMessage>> + Send>>>>,
+        Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGRpcResult>> + Send>>>>,
     >,
     sender: Arc<dyn TDAGNetworkSender>,
     interval: Pin<Box<Interval>>,
@@ -120,12 +120,12 @@ async fn send_rpc(
     peer: Author,
     message: DAGMessage,
     timeout: Duration,
-) -> anyhow::Result<DAGMessage> {
+) -> anyhow::Result<DAGRpcResult> {
     sender.send_rpc(peer, message, timeout).await
 }
 
 impl Stream for RpcWithFallback {
-    type Item = anyhow::Result<DAGMessage>;
+    type Item = anyhow::Result<DAGRpcResult>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if !self.futures.is_empty() {

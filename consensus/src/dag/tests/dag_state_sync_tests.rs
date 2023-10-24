@@ -10,7 +10,7 @@ use crate::{
         storage::DAGStorage,
         tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
         types::{CertifiedNodeMessage, RemoteFetchRequest},
-        CertifiedNode, DAGMessage, RpcHandler, RpcWithFallback, TDAGNetworkSender,
+        CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
     test_utils::EmptyStateComputer,
 };
@@ -33,13 +33,13 @@ use std::{sync::Arc, time::Duration};
 struct MockDAGNetworkSender {}
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage> for MockDAGNetworkSender {
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 }
@@ -51,7 +51,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
         _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 
