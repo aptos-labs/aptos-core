@@ -270,6 +270,10 @@ impl BlockTree {
             );
             last_committed_block
         };
+        root.output
+            .state()
+            .current
+            .log_generation("block_tree_base");
         let old_root = {
             let mut root_locked = self.root.lock();
             // send old root to async task to drop it
@@ -277,6 +281,7 @@ impl BlockTree {
             *root_locked = root;
             old_root
         };
+
         Ok(DEFAULT_DROP_HELPER.schedule_drop_with_waiter(old_root))
     }
 
