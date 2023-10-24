@@ -464,7 +464,8 @@ Used to create derived objects from a given objects.
 Emitted whenever the object's owner field is changed.
 
 
-<pre><code><b>struct</b> <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -1692,6 +1693,13 @@ Transfer to the destination address using a LinearTransferRef.
         <a href="object.md#0x1_object">object</a>.owner == ref.owner,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>),
     );
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+            <a href="object.md#0x1_object">object</a>: ref.self,
+            from: <a href="object.md#0x1_object">object</a>.owner,
+            <b>to</b>,
+        },
+    );
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
         <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
@@ -1819,6 +1827,13 @@ hierarchy.
 <pre><code>inline <b>fun</b> <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>: <b>address</b>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> object_core = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
     <b>if</b> (object_core.owner != <b>to</b>) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                <a href="object.md#0x1_object">object</a>,
+                from: object_core.owner,
+                <b>to</b>,
+            },
+        );
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> object_core.transfer_events,
             <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
