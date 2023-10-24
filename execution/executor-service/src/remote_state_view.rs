@@ -23,7 +23,7 @@ use aptos_types::{
 use dashmap::DashMap;
 use rayon::ThreadPool;
 
-pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
+pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 5000;
 
 pub struct RemoteStateView {
     state_values: DashMap<StateKey, RemoteStateValue>,
@@ -186,9 +186,6 @@ impl TStateView for RemoteStateViewClient {
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
-            let _timer = REMOTE_EXECUTOR_TIMER
-                .with_label_values(&[&self.shard_id.to_string(), "prefetch_wait"])
-                .start_timer();
             return state_view_reader.get_state_value(state_key);
         }
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
