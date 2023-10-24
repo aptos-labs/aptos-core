@@ -11,7 +11,8 @@ pub static NETWORK_HANDLER_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "The time spent in processing: \
          1. outbound_msgs: sending messages to remote nodes; \
-         2. inbound_msgs: routing inbound messages to respective handlers;",
+         2. inbound_msgs: routing inbound messages to respective handlers;\
+         3. outbound_msgs_full_loop: time spent in receiving and sending outgoing messages",
         // metric labels (dimensions)
         &["node_addr", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),

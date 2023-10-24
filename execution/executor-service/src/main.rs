@@ -3,6 +3,7 @@
 
 use aptos_executor_service::process_executor_service::ProcessExecutorService;
 use aptos_logger::info;
+use aptos_push_metrics::MetricsPusher;
 use clap::Parser;
 use std::net::SocketAddr;
 
@@ -33,6 +34,11 @@ fn main() {
         tx.send(()).unwrap();
     })
     .expect("Error setting Ctrl-C handler");
+
+    aptos_node_resource_metrics::register_node_metrics_collector();
+    let _mp = MetricsPusher::start_for_local_run(
+        &("remote-executor-service-".to_owned() + &args.shard_id.to_string()),
+    );
 
     let _exe_service = ProcessExecutorService::new(
         args.shard_id,

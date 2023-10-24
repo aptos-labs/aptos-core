@@ -66,7 +66,9 @@ pub static SHARDED_EXECUTOR_SERVICE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         // metric description
         "Time spent in seconds on executing a block on a shard including: \
          1. execute_block: fetching state values and cross-shard communications; \
-         2. result_tx: TX of results to coordinator.",
+         2. result_tx: TX of results to coordinator.\
+         3. kv_recv_wait_time_shard: time spent in waiting for remote value to be available locally on a shard;\
+         4. kv_read_wait_time_shard: time spent before we read the value we want to read",
         &["shard_id", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     )
