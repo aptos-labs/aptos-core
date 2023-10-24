@@ -15,6 +15,7 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
+use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress, effects::Op, gas_algebra::NumBytes, identifier::Identifier,
@@ -22,9 +23,7 @@ use move_core_types::{
 };
 // ===========================================================================================
 // Public Data Structures and Constants
-pub use move_table_extension::{
-    TableChange, TableChangeSet, TableHandle, TableInfo, TableResolver,
-};
+pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -36,6 +35,7 @@ use std::{
     cell::RefCell,
     collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     mem::drop,
+    sync::Arc,
 };
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
@@ -69,16 +69,37 @@ struct TableData {
     tables: BTreeMap<TableHandle, Table>,
 }
 
+/// A structure containing information about the layout of a value
+/// stored in a table. Needed in order to lift aggregator and snapshot
+/// values from the value and replacing them with identifiers.
+struct LayoutInfo {
+    layout: Arc<MoveTypeLayout>,
+    has_aggregator_lifting: bool,
+}
+
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
     key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    value_layout_info: LayoutInfo,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
 /// The field index of the `handle` field in the `Table` Move struct.
 const HANDLE_FIELD_INDEX: usize = 0;
+
+/// A table change set.
+#[derive(Default)]
+pub struct TableChangeSet {
+    pub new_tables: BTreeMap<TableHandle, TableInfo>,
+    pub removed_tables: BTreeSet<TableHandle>,
+    pub changes: BTreeMap<TableHandle, TableChange>,
+}
+
+/// A change of a single table.
+pub struct TableChange {
+    pub entries: BTreeMap<Vec<u8>, Op<(Bytes, Option<Arc<MoveTypeLayout>>)>>,
+}
 
 // =========================================================================================
 // Implementation of Native Table Context
@@ -105,7 +126,7 @@ impl<'a> NativeTableContext<'a> {
         let mut changes = BTreeMap::new();
         for (handle, table) in tables {
             let Table {
-                value_layout,
+                value_layout_info,
                 content,
                 ..
             } = table;
@@ -118,12 +139,18 @@ impl<'a> NativeTableContext<'a> {
 
                 match op {
                     Op::New(val) => {
-                        let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::New(bytes.into()));
+                        let bytes = serialize(&value_layout_info.layout, &val)?;
+                        let layout = value_layout_info
+                            .has_aggregator_lifting
+                            .then(|| value_layout_info.layout.clone());
+                        entries.insert(key, Op::New((bytes.into(), layout)));
                     },
                     Op::Modify(val) => {
-                        let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::Modify(bytes.into()));
+                        let bytes = serialize(&value_layout_info.layout, &val)?;
+                        let layout = value_layout_info
+                            .has_aggregator_lifting
+                            .then(|| value_layout_info.layout.clone());
+                        entries.insert(key, Op::Modify((bytes.into(), layout)));
                     },
                     Op::Delete => {
                         entries.insert(key, Op::Delete);
@@ -155,16 +182,27 @@ impl TableData {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
                 let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout = context.type_to_type_layout(value_ty)?;
+                let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
                 let table = Table {
                     handle,
                     key_layout,
-                    value_layout,
+                    value_layout_info,
                     content: Default::default(),
                 };
                 e.insert(table)
             },
             Entry::Occupied(e) => e.into_mut(),
+        })
+    }
+}
+
+impl LayoutInfo {
+    fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
+        let (layout, has_aggregator_lifting) =
+            context.type_to_type_layout_with_aggregator_lifting(value_ty)?;
+        Ok(Self {
+            layout: Arc::new(layout),
+            has_aggregator_lifting,
         })
     }
 }
@@ -177,14 +215,24 @@ impl Table {
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
-                let (gv, loaded) = match context
-                    .resolver
-                    .resolve_table_entry(&self.handle, entry.key())
-                    .map_err(|err| {
-                        partial_extension_error(format!("remote table resolver failure: {}", err))
-                    })? {
+                // If there is an aggregator lifting: need to pass layout to ensure
+                // it gets recorded.
+                let resolved_data = context.resolver.resolve_table_entry_bytes_with_layout(
+                    &self.handle,
+                    entry.key(),
+                    if self.value_layout_info.has_aggregator_lifting {
+                        Some(&self.value_layout_info.layout)
+                    } else {
+                        None
+                    },
+                );
+                let data = resolved_data.map_err(|err| {
+                    partial_extension_error(format!("remote table resolver failure: {}", err))
+                })?;
+
+                let (gv, loaded) = match data {
                     Some(val_bytes) => {
-                        let val = deserialize(&self.value_layout, &val_bytes)?;
+                        let val = deserialize(&self.value_layout_info.layout, &val_bytes)?;
                         (
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),

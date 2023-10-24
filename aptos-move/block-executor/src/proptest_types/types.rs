@@ -3,7 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::task::{ExecutionStatus, ExecutorTask, TransactionOutput};
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, serialize, DeltaOp};
+use aptos_aggregator::{
+    delayed_change::DelayedChange,
+    delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
+    types::DelayedFieldID,
+};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -17,7 +21,7 @@ use aptos_types::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
-    transaction::BlockExecutableTransaction,
+    transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::resolver::TExecutorView;
@@ -106,7 +110,7 @@ pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
     pub K,
     /// The bool field determines for testing purposes, whether the key will be interpreted
     /// as a module access path. In this case, if a module path is both read and written
-    /// during parallel execution, Error::ModulePathReadWrite must be returned and the
+    /// during parallel execution, ModulePathReadWrite must be returned and the
     /// block execution must fall back to the sequential execution.
     pub bool,
 );
@@ -305,10 +309,10 @@ impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
         V: Clone + Send + Sync + TransactionWrite + 'static,
         E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
-    > BlockExecutableTransaction for MockTransaction<K, V, E>
+    > Transaction for MockTransaction<K, V, E>
 {
     type Event = E;
-    type Identifier = ();
+    type Identifier = DelayedFieldID;
     type Key = K;
     type Tag = u32;
     type Value = V;
@@ -563,7 +567,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &impl TExecutorView<K, u32, MoveTypeLayout, ()>,
+        view: &impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID>,
         txn: &Self::Txn,
         txn_idx: TxnIndex,
         _materialize_deltas: bool,
@@ -631,11 +635,15 @@ where
 {
     type Txn = MockTransaction<K, V, E>;
 
-    fn resource_write_set(&self) -> BTreeMap<K, V> {
+    // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
+    // That means, the resources do not have any DelayedFields embededded in them.
+    // Change it to test resources with DelayedFields as well.
+    fn resource_write_set(&self) -> BTreeMap<K, (V, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
             .cloned()
+            .map(|(k, v)| (k, (v, None)))
             .collect()
     }
 
@@ -657,8 +665,20 @@ where
         self.deltas.iter().cloned().collect()
     }
 
-    fn get_events(&self) -> Vec<E> {
-        self.events.clone()
+    fn delayed_field_change_set(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Identifier,
+        DelayedChange<<Self::Txn as Transaction>::Identifier>,
+    > {
+        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        BTreeMap::new()
+    }
+
+    // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
+    // events have aggregators. Test it with aggregators as well.
+    fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
+        self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
     fn skip_output() -> Self {
@@ -672,8 +692,18 @@ where
         }
     }
 
-    fn incorporate_delta_writes(&self, delta_writes: Vec<(K, WriteOp)>) {
-        assert_ok!(self.materialized_delta_writes.set(delta_writes));
+    fn incorporate_materialized_txn_output(
+        &self,
+        aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
+        _patched_resource_write_set: BTreeMap<
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        >,
+        _patched_events: Vec<<Self::Txn as Transaction>::Event>,
+    ) {
+        assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
+        // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
+        // to take &mut self as input
     }
 
     fn fee_statement(&self) -> FeeStatement {

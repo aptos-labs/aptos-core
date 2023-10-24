@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::{
-    helpers::{aggregator_info, unpack_aggregator_struct},
+    helpers_v1::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
+use aptos_aggregator::aggregator_v1_extension::AggregatorID;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
 };
-use aptos_types::aggregator::AggregatorID;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -34,15 +34,15 @@ fn native_add(
     context.charge(AGGREGATOR_ADD_BASE)?;
 
     // Get aggregator information and a value to add.
-    let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let input = safely_pop_arg!(args, u128);
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
-    aggregator.add(value)?;
+    aggregator.add(input)?;
 
     Ok(smallvec![])
 }
@@ -63,14 +63,14 @@ fn native_read(
     context.charge(AGGREGATOR_READ_BASE)?;
 
     // Extract information from aggregator struct reference.
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id.clone(), limit)?;
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
+    let aggregator = aggregator_data.get_aggregator(id.clone(), max_value)?;
 
-    let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+    let value = aggregator.read_and_materialize(aggregator_context.aggregator_v1_resolver, &id)?;
 
     Ok(smallvec![Value::u128(value)])
 }
@@ -92,15 +92,15 @@ fn native_sub(
     context.charge(AGGREGATOR_SUB_BASE)?;
 
     // Get aggregator information and a value to subtract.
-    let value = safely_pop_arg!(args, u128);
-    let (id, limit) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
+    let input = safely_pop_arg!(args, u128);
+    let (id, max_value) = aggregator_info(&safely_pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_aggregator(id, limit)?;
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
+    let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
-    aggregator.sub(value)?;
+    aggregator.sub(input)?;
 
     Ok(smallvec![])
 }
@@ -126,7 +126,7 @@ fn native_destroy(
 
     // Get aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
 
     // Actually remove the aggregator.
     let id = AggregatorID::new(handle, key);

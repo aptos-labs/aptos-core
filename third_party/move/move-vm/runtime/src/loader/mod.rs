@@ -20,9 +20,11 @@ use move_binary_format::{
 };
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{IdentifierMappingKind, LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructIdentifier, StructType, Type};
@@ -1488,6 +1490,13 @@ impl<'a> Resolver<'a> {
         self.loader.type_to_type_layout(ty)
     }
 
+    pub(crate) fn type_to_type_layout_with_aggregator_lifting(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+        self.loader.type_to_type_layout_with_identifier_mappings(ty)
+    }
+
     pub(crate) fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,
@@ -1698,15 +1707,21 @@ impl Script {
     }
 }
 
+#[derive(Clone)]
+struct StructLayoutInfoCacheItem {
+    struct_layout: MoveStructLayout,
+    node_count: u64,
+    has_identifier_mappings: bool,
+}
+
 //
 // Cache for data associated to a Struct, used for de/serialization and more
 //
 #[derive(Clone)]
 struct StructInfoCache {
     struct_tag: Option<(StructTag, u64)>,
-    struct_layout: Option<MoveStructLayout>,
+    struct_layout_info: Option<StructLayoutInfoCacheItem>,
     annotated_struct_layout: Option<MoveStructLayout>,
-    node_count: Option<u64>,
     annotated_node_count: Option<u64>,
 }
 
@@ -1714,9 +1729,8 @@ impl StructInfoCache {
     fn new() -> Self {
         Self {
             struct_tag: None,
-            struct_layout: None,
+            struct_layout_info: None,
             annotated_struct_layout: None,
-            node_count: None,
             annotated_node_count: None,
         }
     }
@@ -1872,31 +1886,53 @@ impl Loader {
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
-    ) -> PartialVMResult<MoveStructLayout> {
+    ) -> PartialVMResult<(MoveStructLayout, bool)> {
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
-                if let Some(node_count) = &struct_info.node_count {
-                    *count += *node_count
-                }
-                if let Some(layout) = &struct_info.struct_layout {
-                    return Ok(layout.clone());
+                if let Some(struct_layout_info) = &struct_info.struct_layout_info {
+                    *count += struct_layout_info.node_count;
+                    return Ok((
+                        struct_layout_info.struct_layout.clone(),
+                        struct_layout_info.has_identifier_mappings,
+                    ));
                 }
             }
         }
 
         let count_before = *count;
         let struct_type = self.get_struct_type_by_identifier(name)?;
+
+        // Some types can have fields which are lifted at serialization or deserialization
+        // times. Right now these are Aggregator and AggregatorSnapshot.
+        let maybe_mapping = self.get_identifier_mapping_kind(name);
+
         let field_tys = struct_type
             .fields
             .iter()
             .map(|ty| self.subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let field_layouts = field_tys
-            .iter()
-            .map(|ty| self.type_to_type_layout_impl(ty, count, depth + 1))
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let field_node_count = *count - count_before;
+        let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
+            field_tys
+                .iter()
+                .map(|ty| self.type_to_type_layout_impl(ty, count, depth + 1))
+                .collect::<PartialVMResult<Vec<_>>>()?
+                .into_iter()
+                .unzip();
 
+        // For aggregators / snapshots, the first field should be lifted.
+        if let Some(kind) = &maybe_mapping {
+            if let Some(l) = field_layouts.first_mut() {
+                *l = MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(kind.clone()),
+                    Box::new(l.clone()),
+                );
+            }
+        }
+
+        let has_identifier_mappings =
+            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+
+        let field_node_count = *count - count_before;
         let struct_layout = MoveStructLayout::new(field_layouts);
 
         let mut cache = self.type_cache.write();
@@ -1906,10 +1942,42 @@ impl Loader {
             .or_insert_with(HashMap::new)
             .entry(ty_args.to_vec())
             .or_insert_with(StructInfoCache::new);
-        info.struct_layout = Some(struct_layout.clone());
-        info.node_count = Some(field_node_count);
+        info.struct_layout_info = Some(StructLayoutInfoCacheItem {
+            struct_layout: struct_layout.clone(),
+            node_count: field_node_count,
+            has_identifier_mappings,
+        });
 
-        Ok(struct_layout)
+        Ok((struct_layout, has_identifier_mappings))
+    }
+
+    // TODO[agg_v2](cleanup):
+    // Currently aggregator checks are hardcoded and leaking to loader.
+    // It seems that this is only because there is no support for native
+    // types.
+    // Let's think how we can do this nicer.
+    fn get_identifier_mapping_kind(
+        &self,
+        struct_name: &StructIdentifier,
+    ) -> Option<IdentifierMappingKind> {
+        if !self.vm_config.aggregator_v2_type_tagging {
+            return None;
+        }
+
+        let ident_str_to_kind = |ident_str: &IdentStr| -> Option<IdentifierMappingKind> {
+            if ident_str.eq(ident_str!("Aggregator")) {
+                Some(IdentifierMappingKind::Aggregator)
+            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
+                Some(IdentifierMappingKind::Snapshot)
+            } else {
+                None
+            }
+        };
+
+        (struct_name.module.address().eq(&AccountAddress::ONE)
+            && struct_name.module.name().eq(ident_str!("aggregator_v2")))
+        .then_some(ident_str_to_kind(struct_name.name.as_ident_str()))
+        .flatten()
     }
 
     fn type_to_type_layout_impl(
@@ -1917,7 +1985,7 @@ impl Loader {
         ty: &Type,
         count: &mut u64,
         depth: u64,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         if *count > MAX_TYPE_TO_LAYOUT_NODES {
             return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
         }
@@ -1927,57 +1995,62 @@ impl Loader {
         Ok(match ty {
             Type::Bool => {
                 *count += 1;
-                MoveTypeLayout::Bool
+                (MoveTypeLayout::Bool, false)
             },
             Type::U8 => {
                 *count += 1;
-                MoveTypeLayout::U8
+                (MoveTypeLayout::U8, false)
             },
             Type::U16 => {
                 *count += 1;
-                MoveTypeLayout::U16
+                (MoveTypeLayout::U16, false)
             },
             Type::U32 => {
                 *count += 1;
-                MoveTypeLayout::U32
+                (MoveTypeLayout::U32, false)
             },
             Type::U64 => {
                 *count += 1;
-                MoveTypeLayout::U64
+                (MoveTypeLayout::U64, false)
             },
             Type::U128 => {
                 *count += 1;
-                MoveTypeLayout::U128
+                (MoveTypeLayout::U128, false)
             },
             Type::U256 => {
                 *count += 1;
-                MoveTypeLayout::U256
+                (MoveTypeLayout::U256, false)
             },
             Type::Address => {
                 *count += 1;
-                MoveTypeLayout::Address
+                (MoveTypeLayout::Address, false)
             },
             Type::Signer => {
                 *count += 1;
-                MoveTypeLayout::Signer
+                (MoveTypeLayout::Signer, false)
             },
             Type::Vector(ty) => {
                 *count += 1;
-                MoveTypeLayout::Vector(Box::new(self.type_to_type_layout_impl(
-                    ty,
-                    count,
-                    depth + 1,
-                )?))
+                let (layout, has_identifier_mappings) =
+                    self.type_to_type_layout_impl(ty, count, depth + 1)?;
+                (
+                    MoveTypeLayout::Vector(Box::new(layout)),
+                    has_identifier_mappings,
+                )
             },
             Type::Struct { name, .. } => {
                 *count += 1;
-                MoveTypeLayout::Struct(self.struct_name_to_type_layout(name, &[], count, depth)?)
+                // Note depth is incread inside struct_name_to_type_layout instead.
+                let (layout, has_identifier_mappings) =
+                    self.struct_name_to_type_layout(name, &[], count, depth)?;
+                (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
             Type::StructInstantiation { name, ty_args, .. } => {
                 *count += 1;
-                MoveTypeLayout::Struct(
-                    self.struct_name_to_type_layout(name, ty_args, count, depth)?,
-                )
+                // Note depth is incread inside struct_name_to_type_layout instead.
+                let (layout, has_identifier_mappings) =
+                    self.struct_name_to_type_layout(name, ty_args, count, depth)?;
+                (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -2170,9 +2243,19 @@ impl Loader {
         self.type_to_type_tag_impl(ty, &mut gas_context)
     }
 
-    pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    pub(crate) fn type_to_type_layout_with_identifier_mappings(
+        &self,
+        ty: &Type,
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let mut count = 0;
         self.type_to_type_layout_impl(ty, &mut count, 1)
+    }
+
+    pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+        let mut count = 0;
+        let (layout, _has_identifier_mappings) =
+            self.type_to_type_layout_impl(ty, &mut count, 1)?;
+        Ok(layout)
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
