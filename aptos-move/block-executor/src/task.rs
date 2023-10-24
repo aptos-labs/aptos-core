@@ -23,13 +23,13 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
-    /// There is a DirectWriteTransaction with resolver not capable to handle it
+    /// There is a DirectWriteTransaction with resolver not capable to handle it.
     DirectWriteSetTransactionNotCapableError,
-    /// During transaction execution, it detected that it is in inconsistent state
-    /// due to speculative reads it did, and needs to be re-executed
+    /// Transaction detected that it is in inconsistent state due to speculative
+    /// reads it did, and needs to be re-executed.
     SpeculativeExecutionAbortError(String),
-    /// During transaction execution, it detected code invariant error
-    /// Which can only be caused by the bug in the code.
+    /// Code invariant error was detected during transaction execution, which
+    /// can only be caused by the bug in the code.
     DelayedFieldsCodeInvariantError(String),
 }
 

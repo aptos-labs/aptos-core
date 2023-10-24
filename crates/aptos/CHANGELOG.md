@@ -3,6 +3,14 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Added
+- Added `--node-api-key`. This lets you set an API key for the purpose of not being ratelimited.
+
+### Updated
+- Made the local testnet exit more quickly if a service fails to start.
+
+### Fixed
+- Fixed an infrequent bug that caused startup failures for the local testnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
 
 ## [2.2.2] - 2023/10/16
 ### Updated

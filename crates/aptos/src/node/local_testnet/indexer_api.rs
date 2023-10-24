@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    docker::{
+        confirm_docker_available, delete_container, get_docker, pull_docker_image,
+        setup_docker_logging, StopContainerShutdownStep,
+    },
     health_checker::HealthChecker,
     traits::{PostHealthyStep, ServiceManager, ShutdownStep},
-    utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
-};
-use crate::node::local_testnet::utils::{
-    get_docker, setup_docker_logging, StopContainerShutdownStep,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;

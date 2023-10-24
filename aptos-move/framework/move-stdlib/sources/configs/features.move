@@ -264,7 +264,7 @@ module std::features {
 
     const SAFER_METADATA: u64 = 32;
 
-    const SECP256K1_ECDSA_AUTHENTICATOR: u64 = 33;
+    const SINGLE_SENDER_AUTHENTICATOR: u64 = 33;
 
     /// Whether the automatic creation of accounts is enabled for sponsored transactions.
     /// Lifetime: transient
@@ -292,6 +292,18 @@ module std::features {
 
     public fun concurrent_assets_enabled(): bool acquires Features {
         is_enabled(CONCURRENT_ASSETS)
+    }
+
+    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
+
+    /// Whether allow changing beneficiaries for operators.
+    /// Lifetime: transient
+    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
+
+    public fun get_operator_beneficiary_change_feature(): u64 { OPERATOR_BENEFICIARY_CHANGE }
+
+    public fun operator_beneficiary_change_enabled(): bool acquires Features {
+        is_enabled(OPERATOR_BENEFICIARY_CHANGE)
     }
 
     // ============================================================================================

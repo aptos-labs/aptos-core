@@ -392,9 +392,9 @@ where
                 // Transaction needs to be re-executed, one final time.
 
                 Self::update_transaction_on_abort(txn_idx, last_input_output, versioned_cache);
-                // we are going to skip reducing validation index here, as we
+                // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
-                // after execution, inside finish_execution_during_commit
+                // after execution, inside finish_execution_during_commit.
                 // Because of that, we can also ignore _updates_outside result.
                 let _updates_outside = Self::execute(
                     txn_idx,

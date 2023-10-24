@@ -531,12 +531,12 @@ impl Scheduler {
     }
 
     pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) {
-        // we have exclusivity on this transaction
+        // We have exclusivity on this transaction.
 
         self.wake_dependencies_after_execution(txn_idx);
 
-        // we skipped decreasing validation index when invalidating,
-        // as we were executing it immediately, and are doing so now. (unconditionally)
+        // We skipped decreasing validation index when invalidating, as we were
+        // executing it immediately, and are doing so now (unconditionally).
         self.decrease_validation_idx(txn_idx + 1);
     }
 
@@ -561,7 +561,7 @@ impl Scheduler {
             // re-executed first).
             self.decrease_validation_idx(txn_idx + 1);
 
-            // can release the lock early.
+            // Can release the lock early.
         }
 
         // txn_idx must be re-executed, and if execution_idx is lower, it will be.

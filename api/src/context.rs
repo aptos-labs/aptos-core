@@ -1297,3 +1297,16 @@ pub struct GasLimitCache {
     last_updated_epoch: Option<u64>,
     block_gas_limit: Option<u64>,
 }
+
+/// This function just calls tokio::task::spawn_blocking with the given closure and in
+/// the case of an error when joining the task converts it into a 500.
+pub async fn api_spawn_blocking<F, T, E>(func: F) -> Result<T, E>
+where
+    F: FnOnce() -> Result<T, E> + Send + 'static,
+    T: Send + 'static,
+    E: InternalError + Send + 'static,
+{
+    tokio::task::spawn_blocking(func)
+        .await
+        .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?
+}

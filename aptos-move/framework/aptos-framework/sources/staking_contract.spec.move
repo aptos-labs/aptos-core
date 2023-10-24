@@ -243,6 +243,16 @@ spec aptos_framework::staking_contract {
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
     }
 
+    spec set_beneficiary_for_operator(operator: &signer, new_beneficiary: address) {
+        // TODO: temporary mockup
+        pragma verify = false;
+    }
+
+    spec beneficiary_for_operator(operator: address): address {
+        // TODO: temporary mockup
+        pragma verify = false;
+    }
+
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
         // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.

@@ -89,6 +89,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
 -  [Function `reset_beneficiary`](#0x1_vesting_reset_beneficiary)
 -  [Function `set_management_role`](#0x1_vesting_set_management_role)
 -  [Function `set_beneficiary_resetter`](#0x1_vesting_set_beneficiary_resetter)
+-  [Function `set_beneficiary_for_operator`](#0x1_vesting_set_beneficiary_for_operator)
 -  [Function `get_role_holder`](#0x1_vesting_get_role_holder)
 -  [Function `get_vesting_account_signer`](#0x1_vesting_get_vesting_account_signer)
 -  [Function `get_vesting_account_signer_internal`](#0x1_vesting_get_vesting_account_signer_internal)
@@ -133,6 +134,7 @@ withdrawable, admin can call admin_withdraw to withdraw all funds to the vesting
     -  [Function `reset_beneficiary`](#@Specification_1_reset_beneficiary)
     -  [Function `set_management_role`](#@Specification_1_set_management_role)
     -  [Function `set_beneficiary_resetter`](#@Specification_1_set_beneficiary_resetter)
+    -  [Function `set_beneficiary_for_operator`](#@Specification_1_set_beneficiary_for_operator)
     -  [Function `get_role_holder`](#@Specification_1_get_role_holder)
     -  [Function `get_vesting_account_signer`](#@Specification_1_get_vesting_account_signer)
     -  [Function `get_vesting_account_signer_internal`](#@Specification_1_get_vesting_account_signer_internal)
@@ -2462,6 +2464,34 @@ account.
 
 </details>
 
+<a name="0x1_vesting_set_beneficiary_for_operator"></a>
+
+## Function `set_beneficiary_for_operator`
+
+Set the beneficiary for the operator.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(
+    operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    new_beneficiary: <b>address</b>,
+) {
+    <a href="staking_contract.md#0x1_staking_contract_set_beneficiary_for_operator">staking_contract::set_beneficiary_for_operator</a>(operator, new_beneficiary);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x1_vesting_get_role_holder"></a>
 
 ## Function `get_role_holder`
@@ -3461,6 +3491,22 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>pragma</b> aborts_if_is_partial;
 <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="vesting.md#0x1_vesting_ROLE_BENEFICIARY_RESETTER">ROLE_BENEFICIARY_RESETTER</a>);
 <b>include</b> <a href="vesting.md#0x1_vesting_SetManagementRoleAbortsIf">SetManagementRoleAbortsIf</a>;
+</code></pre>
+
+
+
+<a name="@Specification_1_set_beneficiary_for_operator"></a>
+
+### Function `set_beneficiary_for_operator`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="vesting.md#0x1_vesting_set_beneficiary_for_operator">set_beneficiary_for_operator</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_beneficiary: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

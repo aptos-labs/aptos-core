@@ -5,7 +5,6 @@ use crate::{
     aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
-    module::AGGREGATOR_MODULE,
     types::{
         code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
         DeltaApplicationFailureReason, PanicOr,
@@ -20,7 +19,13 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_binary_format::errors::Location;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    vm_status::{StatusCode, VMStatus},
+};
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
 /// and new, more general, TDelayedFieldView.
@@ -82,6 +87,11 @@ pub trait TAggregatorV1View {
                     Some("Cannot convert delta for deleted aggregator".to_string()),
                 )
             })?;
+
+        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can be constructed.
+        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
+        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
+
         delta_op
             .apply_to(base)
             .map_err(|e| match &e {
@@ -98,7 +108,10 @@ pub trait TAggregatorV1View {
             })
             .map_err(|partial_error| {
                 partial_error
-                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
+                    .finish(Location::Module(ModuleId::new(
+                        AGGREGATOR_V1_ADDRESS,
+                        AGGREGATOR_V1_MODULE_NAME.into(),
+                    )))
                     .into_vm_status()
             })
             .map(|result| WriteOp::Modification(serialize(&result).into()))

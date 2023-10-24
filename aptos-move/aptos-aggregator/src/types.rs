@@ -91,7 +91,7 @@ impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
     }
 }
 
-/// Different reaons for why applying new start_value doesn't
+/// Different reasons for why applying new start_value doesn't
 /// satisfy history bounds
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeltaApplicationFailureReason {
