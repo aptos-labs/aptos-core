@@ -3053,7 +3053,7 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                 Some(transformation) if transformation.matches(tag) => {
                     // If values are supposed to be transformed, first clone
                     // ValueImpl to construct a Value.
-                    // TODO: Clone is cheap for current use cases, revisit if needed.
+                    // TODO[agg_v2](optimize)(?): Clone is cheap for current use cases, revisit if needed.
                     let value_to_transform =
                         Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?);
                     let transformed_value = transformation

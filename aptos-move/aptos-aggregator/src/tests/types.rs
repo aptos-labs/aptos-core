@@ -20,7 +20,9 @@ pub fn aggregator_v1_state_key_for_test(key: u128) -> StateKey {
 }
 
 pub struct FakeAggregatorView {
-    // TODO: consider adding deltas to test different read modes.
+    // TODO[agg_v2](test): consider whether it is useful (in addition to tests in view.rs)
+    // to add some DelayedChanges, to have get_delayed_field_value and
+    // delayed_field_try_add_delta_outcome operate on different state
     v1_store: HashMap<StateKey, StateValue>,
     v2_store: HashMap<DelayedFieldID, DelayedFieldValue>,
     counter: RefCell<u32>,

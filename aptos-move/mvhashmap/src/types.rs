@@ -87,8 +87,8 @@ pub enum MVModulesOutput<M, X> {
     Module((Arc<M>, HashValue)),
 }
 
-// TODO: once VersionedAggregators is separated from the MVHashMap, seems that
-// MVDataError and MVModulesError can be unified and simplified.
+// TODO[agg_v2](cleanup): once VersionedAggregators is separated from the MVHashMap,
+// seems that MVDataError and MVModulesError can be unified and simplified.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MVDelayedFieldsError {
     /// No prior entry is found. This can happen if the aggregator was created

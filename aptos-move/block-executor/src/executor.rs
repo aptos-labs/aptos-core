@@ -154,7 +154,7 @@ where
 
             let delayed_field_change_set = output.delayed_field_change_set();
 
-            // TODO: see if/how we want to incorporate DeltaHistory from read set into versoined_delayed_fields.
+            // TODO[agg_v2](optimize): see if/how we want to incorporate DeltaHistory from read set into versoined_delayed_fields.
             // Without that, currently materialized reads cannot check history and fail early.
             //
             // We can extract histories with something like the code below,
@@ -171,7 +171,7 @@ where
 
                 let entry = change.into_entry_no_additional_history();
 
-                // TODO: figure out if change should update updates_outside
+                // TODO[agg_v2](optimize): figure out if it is useful for change to update updates_outside
                 if let Err(e) =
                     versioned_cache
                         .delayed_fields()
@@ -272,8 +272,8 @@ where
         }
 
         // Note: we validate delayed field reads only at try_commit.
-        // TODO: potentially add some basic validation.
-        // TODO: potentially add more sophisticated validation, but if it fails,
+        // TODO[agg_v2](optimize): potentially add some basic validation.
+        // TODO[agg_v2](optimize): potentially add more sophisticated validation, but if it fails,
         // we mark it as a soft failure, requires some new statuses in the scheduler
         // (i.e. not re-execute unless some other part of the validation fails or
         // until commit, but mark as estimates).
@@ -558,7 +558,7 @@ where
                 Err(_) => unreachable!("Failed to replace identifiers with values in read set"),
             }
         } else {
-            // TODO: Is this unreachable?
+            // TODO[agg_v2](fix): Is this unreachable?
             unreachable!("Data read value must exist");
         }
     }
@@ -682,8 +682,8 @@ where
                 .data()
                 .materialize_delta(&k, txn_idx)
                 .unwrap_or_else(|op| {
-                    // TODO: this logic should improve with the new AGGR data structure
-                    // TODO: and the ugly base_view parameter will also disappear.
+                    // TODO[agg_v1](cleanup): this logic should improve with the new AGGR data structure
+                    // TODO[agg_v1](cleanup): and the ugly base_view parameter will also disappear.
                     let storage_value = base_view
                         .get_state_value(&k)
                         .expect("Error reading the base value for committed delta in storage");
@@ -993,8 +993,6 @@ where
             unsync_map.write(key, write_op, None);
         }
 
-        // TODO for materialization, we need to understand what we read,
-        // or do exchange on every transaction, so this logic might change
         let mut second_phase = Vec::new();
         let mut updates = HashMap::new();
         for (id, change) in output.delayed_field_change_set().into_iter() {

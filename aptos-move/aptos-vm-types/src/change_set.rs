@@ -200,19 +200,22 @@ impl VMChangeSet {
             if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
                 module_write_set.insert(state_key, write_op);
             } else {
-                // TODO(aggregator) While everything else must be a resource, first
+                // TODO[agg_v1](fix) While everything else must be a resource, first
                 // version of aggregators is implemented as a table item. Revisit when
                 // we split MVHashMap into data and aggregators.
-                // TODO: Currently using MoveTypeLayout as None indicating no aggregators are in
-                // the resource value. Check if this causes any issues.
+
+                // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
                 resource_write_set.insert(state_key, (write_op, None));
             }
         }
-        // TODO: Currently using MoveTypeLayout as None indicating no aggregators are in
-        // the event. Check if this causes any issues.
+
+        // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
             resource_write_set,
+            // TODO[agg_v2](fix): do we use same or different capable flag for resource groups?
+            // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_capable
+            // context (i.e. if dynamic_change_set_optimizations_enabled is disabled)
             resource_group_write_set: BTreeMap::new(),
             module_write_set,
             aggregator_v1_write_set: BTreeMap::new(),
@@ -438,7 +441,7 @@ impl VMChangeSet {
                     | CreationWithMetadata { data, .. }
                     | ModificationWithMetadata { data, .. } => {
                         // Apply delta on top of creation or modification.
-                        // TODO(aggregator): This will not be needed anymore once aggregator
+                        // TODO[agg_v1](cleanup): This will not be needed anymore once aggregator
                         // change sets carry non-serialized information.
                         let base: u128 = bcs::from_bytes(data)
                             .expect("Deserializing into an aggregator value always succeeds");

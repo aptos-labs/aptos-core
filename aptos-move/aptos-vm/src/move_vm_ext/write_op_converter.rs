@@ -109,12 +109,13 @@ impl<'r> WriteOpConverter<'r> {
 
         let mut inner_ops = BTreeMap::new();
 
-        // STORAGE_ERROR is a placeholder. TODO: change to SPECULATIVE_EXECUTION_ABORT_ERROR, as
-        // the error can happen due to speculative reads (in a non-speculative context, e.g.
-        // during commit, it is a more serious error and block execution must abort).
+        // We set SPECULATIVE_EXECUTION_ABORT_ERROR here, as the error can happen due to
+        // speculative reads (and in a non-speculative context, e.g. during commit, it
+        // is a more serious error and block execution must abort).
+        // BlockExecutor is responsible with handling this error.
         let group_size_arithmetics_error = || {
             VMStatus::error(
-                StatusCode::STORAGE_ERROR,
+                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                 err_msg("Group size underflow while applying updates"),
             )
         };
@@ -178,7 +179,7 @@ impl<'r> WriteOpConverter<'r> {
         // except it encodes the (speculative) size of the group after applying the updates
         // which is used for charging storage fees. Moreover, the metadata computation occurs
         // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
-        // TODO fix layoud for RG
+        // TODO[agg_v2](fix) fix layout for RG
         let metadata_op = if post_group_size == 0 {
             MoveStorageOp::Delete
         } else if pre_group_size == 0 {

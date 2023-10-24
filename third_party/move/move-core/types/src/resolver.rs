@@ -42,7 +42,7 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    // TODO: this can return Value, so that we can push deserialization to
+    // TODO[move_values](optimize): this can return Value, so that we can push deserialization to
     // implementations of `ResourceResolver`.
     fn get_resource_bytes_with_metadata_and_layout(
         &self,

@@ -115,7 +115,7 @@ mod test_cases {
 
         run_block_in_parts(&mut h.harness, BlockSplit::Whole, txns);
 
-        // TODO: proptests with random transaction generator might be useful here.
+        // TODO[agg_v2](test): proptests with random transaction generator might be useful here.
         let txns = (0..block_size)
             .map(|i| match i % 4 {
                 0 => (
@@ -295,7 +295,7 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         Just(UseType::UseTableType),
-        // TODO add back once ResourceGroups are supported
+        // TODO[agg_v2](fix) add back once ResourceGroups are supported
         // Just(UseType::UseResourceGroupType),
     ]
     .boxed()
@@ -305,8 +305,9 @@ proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough.
         // We will test a few more comprehensive tests more times, and the rest even fewer.
-        cases: 200,
-        // result_cache: prop::test_runner::basic_result_cache,
+        // when trying to stress-test, increase (to 200 or more), and disable result cache.
+        cases: 10,
+        result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 
@@ -405,8 +406,9 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough for these
-        cases: 200,
-        // result_cache: prop::test_runner::basic_result_cache,
+        // when trying to stress-test, increase (to 200 or more), and disable result cache.
+        cases: 5,
+        result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 

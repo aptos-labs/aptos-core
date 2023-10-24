@@ -69,7 +69,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .execute_single_transaction(txn, &resolver, &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
-                // TODO: move materialize deltas outside, into sequential execution.
+                // TODO[agg_v2](cleanup): move materialize deltas outside, into sequential execution.
                 if materialize_deltas {
                     vm_output = vm_output
                         .try_materialize(&resolver)

@@ -39,7 +39,7 @@ fn unsync_map_data_basic() {
     // Reads that should go the DB return None
     assert_none!(map.fetch_data(&ap));
     // Ensure write registers the new value.
-    //TODO: Hardocoding layout to None. Test when layout is Some(.) as well.
+    //TODO[agg_v2](tests): Hardocoding layout to None. Test when layout is Some(.) as well.
     map.write(ap.clone(), value_for(10, 1), None);
     assert_some_eq!(map.fetch_data(&ap), (Arc::new(value_for(10, 1)), None));
     // Ensure the next write overwrites the value.

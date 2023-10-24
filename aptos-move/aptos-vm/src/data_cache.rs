@@ -107,7 +107,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         )
     }
 
-    // TODO(gelash, georgemitenkov): delete after simulation uses block executor.
+    // TODO[agg_v2](fix): delete after simulation uses block executor.
     pub(crate) fn from_borrowed(executor_view: &'e E) -> Self {
         let config_view = ConfigAdapter(executor_view);
         let (_, gas_feature_version) = gas_config(&config_view);
@@ -143,7 +143,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
     ) -> Result<(Option<Bytes>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
-            // TODO pass the layout to resource groups
+            // TODO[agg_v2](fix) pass the layout to resource groups
 
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
@@ -375,7 +375,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
         &self,
         _state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        // TODO: forward to self.executor_view.
+        // TODO[agg_v2](fix): forward to self.executor_view.
         unimplemented!("Resource group metadata handling not yet implemented");
     }
 }

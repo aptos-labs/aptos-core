@@ -60,7 +60,8 @@ pub(crate) enum DataRead<V> {
     ),
     Metadata(Option<StateValueMetadataKind>),
     Exists(bool),
-    /// Read resolved an aggregatorV1 delta to a value. TODO: deprecate.
+    /// Read resolved an aggregatorV1 delta to a value.
+    /// TODO[agg_v1](cleanup): deprecate.
     Resolved(u128),
 }
 
@@ -236,7 +237,6 @@ impl DelayedFieldRead {
                     max_value: m2,
                 },
             ) => {
-                // TODO see if we want to perform checks on max value/delta
                 if v1 == v2 && m1 == m2 && h1.stricter_than(h2) {
                     DataReadComparison::Contains
                 } else {

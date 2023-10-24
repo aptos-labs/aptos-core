@@ -80,7 +80,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     fn set_base_values(
         &mut self,
         shifted_idx: ShiftedTxnIndex,
-        // TODO add layout to values
+        // TODO[agg_v2](fix) add layout to values
         values: impl IntoIterator<Item = (T, V)>,
     ) {
         match self.idx_to_update.get(&shifted_idx) {
@@ -109,7 +109,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         &mut self,
         shifted_idx: ShiftedTxnIndex,
         incarnation: Incarnation,
-        // TODO add layout to values
+        // TODO[agg_v2](fix) add layout to values
         values: impl IntoIterator<Item = (T, V)>,
     ) {
         let arc_map = values
@@ -121,7 +121,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 let tag_entry = self.versioned_map.entry(tag.clone()).or_default();
                 tag_entry.insert(
                     shifted_idx.clone(),
-                    // TODO layout shouldn't be none
+                    // TODO[agg_v2](fix) layout shouldn't be none
                     CachePadded::new(GroupEntry::new(incarnation, arc_v.clone(), None)),
                 );
 
