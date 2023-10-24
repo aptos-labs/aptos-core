@@ -6,17 +6,12 @@ module aptos_framework::event {
     use std::bcs;
 
     use aptos_framework::guid::GUID;
-    use std::features;
 
     friend aptos_framework::account;
     friend aptos_framework::object;
 
-    /// Module event feature is not supported.
-    const EMODULE_EVENT_NOT_SUPPORTED: u64 = 1;
-
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit<T: store + drop>(msg: T) {
-        assert!(features::module_event_enabled(), std::error::invalid_state(EMODULE_EVENT_NOT_SUPPORTED));
         write_module_event_to_store<T>(msg);
     }
 
