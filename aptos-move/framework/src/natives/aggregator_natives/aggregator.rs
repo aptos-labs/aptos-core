@@ -39,7 +39,7 @@ fn native_add(
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     aggregator.add(input)?;
@@ -67,10 +67,10 @@ fn native_read(
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id.clone(), max_value)?;
 
-    let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
+    let value = aggregator.read_and_materialize(aggregator_context.aggregator_v1_resolver, &id)?;
 
     Ok(smallvec![Value::u128(value)])
 }
@@ -97,7 +97,7 @@ fn native_sub(
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, max_value)?;
 
     aggregator.sub(input)?;
@@ -126,7 +126,7 @@ fn native_destroy(
 
     // Get aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
-    let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
+    let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
 
     // Actually remove the aggregator.
     let id = AggregatorID::new(handle, key);

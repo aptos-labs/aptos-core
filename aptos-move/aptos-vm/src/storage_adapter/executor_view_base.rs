@@ -44,32 +44,39 @@ impl<S: StateView> AsExecutorView<S> for S {
     }
 }
 
-impl<'s, S: StateView> TDelayedFieldView for ExecutorViewBase<'s, S> {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = DelayedFieldID;
+impl<'s, S: StateView> TAggregatorV1View for ExecutorViewBase<'s, S> {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        state_key: &Self::IdentifierV1,
+        state_key: &Self::Identifier,
         // Reading from StateView can be in precise mode only.
     ) -> anyhow::Result<Option<StateValue>> {
         self.base.get_state_value(state_key)
     }
+}
 
-    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+impl<'s, S: StateView> TDelayedFieldView for ExecutorViewBase<'s, S> {
+    type Identifier = DelayedFieldID;
+
+    fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
+        false
+    }
+
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
         (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
     }
 
     fn get_delayed_field_value(
         &self,
-        _id: &Self::IdentifierV2,
+        _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         unimplemented!()
     }
 
     fn delayed_field_try_add_delta_outcome(
         &self,
-        _id: &Self::IdentifierV2,
+        _id: &Self::Identifier,
         _base_delta: &SignedU128,
         _delta: &SignedU128,
         _max_value: u128,

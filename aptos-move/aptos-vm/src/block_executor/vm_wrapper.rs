@@ -7,7 +7,9 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
 use move_core_types::vm_status::{StatusCode, VMStatus};
@@ -43,6 +45,21 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+        // TODO[agg_v2](fix) look at whether it is enabled, not just capable.
+        // if it is disabled, no need to fallback.
+        #[allow(clippy::overly_complex_bool_expr)]
+        if false
+            && txn.is_valid()
+            && executor_with_group_view.is_delayed_field_optimization_capable()
+        {
+            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
+            {
+                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization is enabled
+                // And we need to communicate to the BlockExecutor, so they can retry with capability disabled
+                return ExecutionStatus::DirectWriteSetTransactionNotCapableError;
+            }
+        }
+
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self
             .vm

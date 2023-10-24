@@ -5,7 +5,7 @@ use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
-    resolver::DelayedFieldResolver,
+    resolver::AggregatorV1Resolver,
     types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
@@ -181,7 +181,14 @@ impl VMChangeSet {
     pub fn try_from_storage_change_set(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
+        // Pass in within which resolver context are we creating this change set.
+        // Used to eagerly reject changes created in an incompatible way.
+        is_delayed_field_optimization_capable: bool,
     ) -> anyhow::Result<Self, VMStatus> {
+        assert!(
+            !is_delayed_field_optimization_capable,
+            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
+
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -218,6 +225,15 @@ impl VMChangeSet {
     }
 
     pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
+        // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
+        // be done here only if dynamic_change_set_optimizations have not been used/produced
+        // data into the output.
+        // If they (DelayedField or ResourceGroup) have added data into the write set, translation
+        // into output is more complicated, and needs to be done within BlockExecutor context
+        // that knows how to deal with it.
+        assert!(self.delayed_field_change_set().is_empty());
+        assert!(self.resource_group_write_set().is_empty());
+
         let Self {
             resource_write_set,
             resource_group_write_set: _,
@@ -245,11 +261,19 @@ impl VMChangeSet {
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_v1_delta_set.is_empty() || !self.delayed_field_change_set.is_empty() {
+        if !self.aggregator_v1_delta_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
-                    "Cannot convert from VMChangeSet with non-materialized deltas to ChangeSet.",
+                    "Cannot convert from VMChangeSet with non-materialized Aggregator V1 deltas to ChangeSet.",
+                ),
+            ));
+        }
+        if !self.delayed_field_change_set.is_empty() {
+            return Err(VMStatus::error(
+                StatusCode::DATA_FORMAT_ERROR,
+                err_msg(
+                    "Cannot convert from VMChangeSet with non-materialized Delayed Field changes to ChangeSet.",
                 ),
             ));
         }
@@ -330,6 +354,12 @@ impl VMChangeSet {
             .collect::<Vec<_>>();
     }
 
+    pub(crate) fn drain_delayed_field_change_set(
+        &mut self,
+    ) -> impl Iterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)> + '_ {
+        std::mem::take(&mut self.delayed_field_change_set).into_iter()
+    }
+
     pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.aggregator_v1_write_set
     }
@@ -352,7 +382,7 @@ impl VMChangeSet {
     /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
     pub fn try_materialize_aggregator_v1_delta_set(
         self,
-        resolver: &impl DelayedFieldResolver,
+        resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,

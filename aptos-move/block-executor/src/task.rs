@@ -23,6 +23,8 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
+    /// There is a DirectWriteTransaction with resolver not capable to handle it
+    DirectWriteSetTransactionNotCapableError,
     /// During transaction execution, it detected that it is in inconsistent state
     /// due to speculative reads it did, and needs to be re-executed
     SpeculativeExecutionAbortError(String),

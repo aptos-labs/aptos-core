@@ -110,7 +110,7 @@ pub(crate) struct KeyType<K: Hash + Clone + Debug + PartialOrd + Ord + Eq>(
     pub K,
     /// The bool field determines for testing purposes, whether the key will be interpreted
     /// as a module access path. In this case, if a module path is both read and written
-    /// during parallel execution, Error::ModulePathReadWrite must be returned and the
+    /// during parallel execution, ModulePathReadWrite must be returned and the
     /// block execution must fall back to the sequential execution.
     pub bool,
 );

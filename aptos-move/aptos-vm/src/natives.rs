@@ -5,6 +5,8 @@
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
+use aptos_aggregator::resolver::TAggregatorV1View;
+#[cfg(feature = "testing")]
 use aptos_aggregator::{
     bounded_math::SignedU128,
     types::{DelayedFieldsSpeculativeError, PanicOr},
@@ -31,6 +33,7 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
+#[cfg(feature = "testing")]
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
@@ -61,27 +64,35 @@ impl AptosBlankStorage {
 }
 
 #[cfg(feature = "testing")]
-impl TDelayedFieldView for AptosBlankStorage {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = DelayedFieldID;
+impl TAggregatorV1View for AptosBlankStorage {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        _id: &Self::IdentifierV1,
+        _id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
         Ok(None)
+    }
+}
+
+#[cfg(feature = "testing")]
+impl TDelayedFieldView for AptosBlankStorage {
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        false
     }
 
     fn get_delayed_field_value(
         &self,
-        _id: &Self::IdentifierV2,
+        _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         unimplemented!()
     }
 
     fn delayed_field_try_add_delta_outcome(
         &self,
-        _id: &Self::IdentifierV2,
+        _id: &Self::Identifier,
         _base_delta: &SignedU128,
         _delta: &SignedU128,
         _max_value: u128,
@@ -89,7 +100,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         unimplemented!()
     }
 
-    fn generate_delayed_field_id(&self) -> Self::IdentifierV2 {
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
         (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
     }
 }
@@ -192,7 +203,11 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
         vec![1],
         ChainId::test().id(),
     )); // We use the testing environment chain ID here
-    exts.add(NativeAggregatorContext::new([0; 32], &*DUMMY_RESOLVER));
+    exts.add(NativeAggregatorContext::new(
+        [0; 32],
+        &*DUMMY_RESOLVER,
+        &*DUMMY_RESOLVER,
+    ));
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());

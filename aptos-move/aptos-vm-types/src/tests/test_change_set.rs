@@ -400,7 +400,8 @@ fn test_roundtrip_to_storage_change_set() {
     let storage_change_set_before = StorageChangeSet::new(write_set, vec![]);
     let change_set = assert_ok!(VMChangeSet::try_from_storage_change_set(
         storage_change_set_before.clone(),
-        &MockChangeSetChecker
+        &MockChangeSetChecker,
+        false,
     ));
     let storage_change_set_after = assert_ok!(change_set.try_into_storage_change_set());
     assert_eq!(storage_change_set_before, storage_change_set_after)

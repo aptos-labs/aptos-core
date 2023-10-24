@@ -1282,9 +1282,11 @@ impl AptosVM {
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
         match write_set_payload {
-            WriteSetPayload::Direct(change_set) => {
-                VMChangeSet::try_from_storage_change_set(change_set.clone(), &change_set_configs)
-            },
+            WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
+                change_set.clone(),
+                &change_set_configs,
+                resolver.is_delayed_field_optimization_capable(),
+            ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(resolver, session_id);
                 let senders = match txn_sender {
