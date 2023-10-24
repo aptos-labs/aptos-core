@@ -179,7 +179,7 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
-    checked_proposal_tx: aptos_channel::Sender<(), VerifiedEvent>,
+    buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
 }
 
@@ -194,7 +194,7 @@ impl RoundManager {
         network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
-        checked_proposal_tx: aptos_channel::Sender<(), VerifiedEvent>,
+        buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
     ) -> Self {
         // when decoupled execution is false,
@@ -215,7 +215,7 @@ impl RoundManager {
             network,
             storage,
             onchain_config,
-            checked_proposal_tx,
+            buffered_proposal_tx,
             local_config,
         }
     }
@@ -684,6 +684,7 @@ impl RoundManager {
                 .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
                 proposal,
+                author,
                 BACK_PRESSURE_POLLING_INTERVAL_MS,
                 self.local_config.round_initial_timeout_ms,
             )
@@ -697,17 +698,18 @@ impl RoundManager {
     async fn resend_verified_proposal_to_self(
         &self,
         proposal: Block,
+        author: Author,
         polling_interval_ms: u64,
         timeout_ms: u64,
     ) {
         let start = Instant::now();
         let block_store = self.block_store.clone();
-        let self_sender = self.checked_proposal_tx.clone();
+        let self_sender = self.buffered_proposal_tx.clone();
         let event = VerifiedEvent::VerifiedProposalMsg(Box::new(proposal));
         tokio::spawn(async move {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
                 if !block_store.vote_back_pressure() {
-                    if let Err(e) = self_sender.push((), event) {
+                    if let Err(e) = self_sender.push(author, event) {
                         error!("Failed to send event to round manager {:?}", e);
                     }
                     break;
@@ -947,7 +949,7 @@ impl RoundManager {
             (Author, Discriminant<VerifiedEvent>),
             (Author, VerifiedEvent),
         >,
-        mut checked_proposal_rx: aptos_channel::Receiver<(), VerifiedEvent>,
+        mut buffered_proposal_rx: aptos_channel::Receiver<Author, VerifiedEvent>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(epoch = self.epoch_state().epoch, "RoundManager started");
@@ -961,9 +963,9 @@ impl RoundManager {
                     }
                     break;
                 }
-                proposal = checked_proposal_rx.select_next_some() => {
+                proposal = buffered_proposal_rx.select_next_some() => {
                     let mut proposals = vec![proposal];
-                    while let Some(Some(proposal)) = checked_proposal_rx.next().now_or_never() {
+                    while let Some(Some(proposal)) = buffered_proposal_rx.next().now_or_never() {
                         proposals.push(proposal);
                     }
                     let get_round = |event: &VerifiedEvent| {
