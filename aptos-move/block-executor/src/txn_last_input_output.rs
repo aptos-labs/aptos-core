@@ -3,7 +3,7 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    errors::{Error, ModulePathReadWrite},
+    errors::{Error, IntentionalFallbackToSequential},
     task::{ExecutionStatus, TransactionOutput},
 };
 use aptos_aggregator::types::PanicOr;
@@ -115,6 +115,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 output.module_write_set()
             },
             ExecutionStatus::Abort(_)
+            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
         };
@@ -174,7 +175,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn execution_error(&self, txn_idx: TxnIndex) -> Option<Error<E>> {
         if self.module_read_write_intersection.load(Ordering::Acquire) {
             return Some(Error::FallbackToSequential(PanicOr::Or(
-                ModulePathReadWrite,
+                IntentionalFallbackToSequential::ModulePathReadWrite,
             )));
         }
 
@@ -220,6 +221,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                         .chain(t.module_write_set().into_keys().map(|k| (k, true))),
                 ),
                 ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -236,6 +238,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.resource_write_set())
                 },
                 ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -253,6 +256,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.delayed_field_change_set().into_keys())
                 },
                 ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -266,6 +270,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     t.aggregator_v1_delta_set().into_keys().collect()
                 },
                 ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             },
@@ -284,6 +289,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Box::new(events.into_iter())
                 },
                 ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
                     Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
@@ -314,6 +320,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 );
             },
             ExecutionStatus::Abort(_)
+            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
