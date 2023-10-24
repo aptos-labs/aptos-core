@@ -10,6 +10,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ### Updated
 - Made the local testnet exit more quickly if a service fails to start.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to eecbfd8d2d16156932b2cffc899fce7fa38f4117.
 
 ### Fixed
 - Fixed an infrequent bug that caused startup failures for the local testnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
