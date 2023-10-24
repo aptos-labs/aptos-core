@@ -15698,7 +15698,7 @@ dependencies = [
 [[package]]
 name = "x25519-dalek"
 version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek?rev=b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e#b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e"
+source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
 dependencies = [
  "curve25519-dalek",
  "rand_core 0.5.1",
@@ -15804,8 +15804,3 @@ checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
 dependencies = [
  "simd-adler32",
 ]
-
-[[patch.unused]]
-name = "x25519-dalek"
-version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
