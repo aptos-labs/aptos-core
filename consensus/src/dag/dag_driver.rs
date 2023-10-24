@@ -1,25 +1,24 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    adapter::TLedgerInfoProvider,
-    dag_fetcher::FetchRequester,
-    order_rule::OrderRule,
-    storage::DAGStorage,
-    types::{CertifiedAck, CertifiedNodeMessage, DAGMessage, Extensions},
-    RpcHandler,
-};
 use crate::{
     dag::{
-        dag_fetcher::TFetchRequester,
+        adapter::TLedgerInfoProvider,
+        dag_fetcher::{FetchRequester, TFetchRequester},
         dag_store::Dag,
         observability::{
             counters,
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
+        order_rule::OrderRule,
         round_state::RoundState,
-        types::{CertificateAckState, CertifiedNode, Node, SignatureBuilder},
+        storage::DAGStorage,
+        types::{
+            CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
+            Extensions, Node, SignatureBuilder,
+        },
+        RpcHandler,
     },
     payload_manager::PayloadManager,
     state_replication::PayloadClient,
@@ -39,8 +38,8 @@ use futures::{
     FutureExt,
 };
 use std::{sync::Arc, time::Duration};
-use thiserror::Error as ThisError;
 use tokio_retry::strategy::ExponentialBackoff;
+use thiserror::Error as ThisError;
 
 #[derive(Debug, ThisError)]
 pub enum DagDriverError {
@@ -199,19 +198,19 @@ impl DagDriver {
         let max_txns = self
             .payload_config
             .max_sending_txns_per_round
-            .saturating_div(self.epoch_state.verifier.len())
+            .saturating_div(self.epoch_state.verifier.len() as u64)
             .max(1);
         let max_txn_size_bytes = self
             .payload_config
             .max_sending_size_per_round_bytes
-            .saturating_div(self.epoch_state.verifier.len())
+            .saturating_div(self.epoch_state.verifier.len() as u64)
             .max(1024);
         let payload = match self
             .payload_client
             .pull_payload(
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
-                self.payload_config.max_sending_txns_per_round,
-                self.payload_config.max_sending_size_per_round_bytes,
+                max_txns,
+                max_txn_size_bytes,
                 payload_filter,
                 Box::pin(async {}),
                 false,

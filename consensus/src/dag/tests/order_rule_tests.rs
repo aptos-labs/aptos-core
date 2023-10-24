@@ -4,10 +4,12 @@
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::RoundRobinAnchorElection,
-    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
     order_rule::OrderRule,
-    tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
+    tests::{
+        dag_test::MockStorage,
+        helpers::{generate_dag_nodes, TEST_DAG_WINDOW},
+    },
     types::NodeMetadata,
     CertifiedNode,
 };
@@ -18,8 +20,6 @@ use async_trait::async_trait;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use proptest::prelude::*;
 use std::sync::Arc;
-
-use super::helpers::TEST_DAG_WINDOW;
 
 /// Generate a virtual dag that first layer represents round
 /// second layer represents nodes, Some => node exist, None => not exist
@@ -107,7 +107,7 @@ fn create_order_rule(
             anchor_election,
             Arc::new(TestNotifier { tx }),
             Arc::new(MockStorage::new()),
-            TEST_DAG_WINDOW as Round
+            TEST_DAG_WINDOW as Round,
         ),
         rx,
     )
