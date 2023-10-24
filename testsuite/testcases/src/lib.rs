@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod api_health_check;
 pub mod compatibility_test;
 pub mod consensus_reliability_tests;
 pub mod forge_setup_test;

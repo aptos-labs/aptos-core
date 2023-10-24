@@ -22,6 +22,7 @@ use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use aptos_testcases::{
+    api_health_check::ApiHealthCheck,
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
     forge_setup_test::ForgeSetupTest,
@@ -1763,14 +1764,17 @@ fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
-            inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
-                })
-                .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(if ha_proxy { 4600 } else { 6800 }),
-        }))
+        .add_network_test(wrap_with_realistic_env(CompositeNetworkTest::new(
+            TwoTrafficsTest {
+                inner_traffic: EmitJobRequest::default()
+                    .mode(EmitJobMode::MaxLoad {
+                        mempool_backlog: 40000,
+                    })
+                    .init_gas_price_multiplier(20),
+                inner_success_criteria: SuccessCriteria::new(if ha_proxy { 4600 } else { 6800 }),
+            },
+            ApiHealthCheck::new(10_000, 1_000, 10),
+        )))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
