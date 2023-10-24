@@ -18,7 +18,7 @@ pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
          3. init_prefetch: initializing the prefetching of remote state values \
          4. kv_responses: processing the remote key value responses; \
          5. kv_resp_deser: deserializing the remote key value responses; \
-         6. prefetch_wait: waiting (approx) for the remote state values to be prefetched; \
+         6. prefetch_wait: waiting (approx) for the remote state values to be prefetched; (TODO: REMOVE) \
          7. non_prefetch_wait: waiting for the remote state values that were not prefetched; \
          8. kv_req_deser: deserializing the remote key value requests; \
          9. kv_requests: processing the remote key value requests; \
