@@ -141,6 +141,8 @@ module aptos_token_objects::token {
     }
 
     #[deprecated]
+    /// DEPRECATED: Use `create` instead for identical behavior.
+    ///
     /// Creates a new token object from an account GUID and returns the ConstructorRef for
     /// additional specialization.
     public fun create_from_account(

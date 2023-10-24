@@ -7,9 +7,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 # Aptos Digital Asset Standard
 
 ## Overview of NFTs
-An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible [token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) 
-or data stored on a blockchain that uniquely defines ownership of an asset. NFTs were first defined in 
-[EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155). 
+An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible [token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move)
+or data stored on a blockchain that uniquely defines ownership of an asset. NFTs were first defined in
+[EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155).
 NFTs are typically defined using the following properties:
 
 - `name`: The name of the asset. It must be unique within a collection.
@@ -23,12 +23,11 @@ or minimally contract. Each collection has a similar set of attributes:
 - `name`: The name of the collection. The name must be unique within the creator's account.
 - `description`: The description of the collection.
 - `uri`: A URL pointer to off-chain for more information about the asset. The asset could be media such as an image or video or more metadata.
-- `supply`: The total number of NFTs in this collection. 
-- `maximum`: The maximum number of NFTs that this collection can have. If `maximum` is set to 0, then supply is untracked. 
+- `supply`: The total number of NFTs in this collection.
+- `maximum`: The maximum number of NFTs that this collection can have. If `maximum` is set to 0, then supply is untracked.
 
 ## Design principles
-The [Aptos Digital Asset Standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) 
-was developed with the following as an improvement on the Aptos Token standard. It has these ideas in mind:
+The [Aptos Digital Asset Standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token-objects/sources/token.move) was developed with the following as an improvement on the Aptos Token standard. It has these ideas in mind:
 * **Flexibility** - NFTs are flexible and can be customized to accommodate any creative designs.
 * **Composability** - Multiple NFTs can be easily composed together, such that the final object is greater than the sum of its parts
 * **Scalability** - Greater parallelism between tokens
@@ -42,7 +41,7 @@ which provides functionalities such as custom metadata (via PropertyMap) and sou
 
 Digital Asset uses Aptos [objects](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/object.move)
 rather than account resources traditionally used in Move. This allows for storing data outside the account and adding
-flexibility in this way. 
+flexibility in this way.
 * Tokens can be easily extended with custom data and functionalities without requiring any changes in the framework
 * Transfers are simply a reference update
 * Direct transfer is allowed without an opt in
@@ -196,7 +195,7 @@ minting. Thus, querying for unnamed tokens is more difficult and requires indexi
 use aptos_token_objects::token;
 
 public entry fun mint_token(creator: &signer) {
-    token::create_from_account(
+    token::create(
         creator,
         "My Collection",
         "My named Token description",
@@ -207,8 +206,8 @@ public entry fun mint_token(creator: &signer) {
 }
 ```
 
-Creators should cautiously consider whether they should use `create_named_token` or `create_from_account` when building
-their custom collection/token. In general `create_from_account` is recommended as it allows for clean deletion if the
+Creators should cautiously consider whether they should use `create_named_token` or `create` when building
+their custom collection/token. In general `create` is recommended as it allows for clean deletion if the
 tokens are burnt and generally, deterministic addresses for tokens are not always necessary thanks to indexing services.
 One example that would prefer deterministic addresses and thus `create_named_token` is a collection of soul bound tokens
 where each token's address is created from the holder's name.
@@ -226,7 +225,7 @@ A `MutatorRef` can be generated only during creation of the token.
 public entry fun mint_token(creator: &signer) {
     // Constructor ref is a non-storable struct returned when creating a new object.
     // It can be exchanged for signer to add resources to the token object.
-    let token_constructor_ref = &token::create_from_account(
+    let token_constructor_ref = &token::create(
         creator,
         "My Collection",
         "My named Token description",
@@ -246,7 +245,7 @@ More data can be added to the token as resources, similar to [for collections](#
 Tokens can be burned by the creator if they generated and stored a `BurnRef` during the creation of the token.
 ```rust
 public entry fun mint_token(creator: &signer) {
-    let token_constructor_ref = &token::create_from_account(
+    let token_constructor_ref = &token::create(
         creator,
         "My Collection",
         "My named Token description",
@@ -263,7 +262,7 @@ public entry fun burn_token(token: Object<Token>) {
     let token_address = object::object_address(&token);
     let CustomData { ... } = move_from<CustomData>(token_address);
 
-    // Retrieve the burn ref from storage    
+    // Retrieve the burn ref from storage
     let burn_ref = ...;
     token::burn(burn_ref);
 }
@@ -362,7 +361,7 @@ public entry fun create_armor_collection(creator: &signer) {
 }
 
 public entry fun create_armor_type(creator: &signer, armor_type: String) {
-    let new_armor_type_constructor_ref = &token::create_from_account(
+    let new_armor_type_constructor_ref = &token::create(
         creator,
         "Armor",
         "Armor description",
