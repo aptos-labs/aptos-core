@@ -293,7 +293,7 @@ module dao_platform::nft_dao {
         let dao_addr = signer::address_of(&res_signer);
 
         emit_create_dao_event(
-            &res_signer,
+            dao_addr,
             name,
             threshold,
             voting_duration,

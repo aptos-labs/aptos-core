@@ -5,7 +5,6 @@ upgrade_policy = "immutable"
 
 [addresses]
 dao_platform = "_"
-aptos_framework = "0x1"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

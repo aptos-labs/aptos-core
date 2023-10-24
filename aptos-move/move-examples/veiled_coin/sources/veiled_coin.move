@@ -120,7 +120,7 @@ module veiled_coin::veiled_coin {
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
 
     use veiled_coin::helpers;
     use veiled_coin::sigma_protos;
@@ -186,19 +186,21 @@ module veiled_coin::veiled_coin {
     struct VeiledCoinStore<phantom CoinType> has key {
         /// A ElGamal ciphertext of a value $v \in [0, 2^{32})$, an invariant that is enforced throughout the code.
         veiled_balance: elgamal::CompressedCiphertext,
-        deposit_events: EventHandle<DepositEvent>,
-        withdraw_events: EventHandle<WithdrawEvent>,
         pk: elgamal::CompressedPubkey,
     }
 
+    #[event]
     /// Event emitted when some amount of veiled coins were deposited into an account.
     struct DepositEvent has drop, store {
         // We cannot leak any information about how much has been deposited.
+        account: address,
     }
 
+    #[event]
     /// Event emitted when some amount of veiled coins were withdrawn from an account.
     struct WithdrawEvent has drop, store {
         // We cannot leak any information about how much has been withdrawn.
+        account: address,
     }
 
     /// Holds an `account::SignerCapability` for the resource account created when initializing this module. This
@@ -491,8 +493,6 @@ module veiled_coin::veiled_coin {
 
         let coin_store = VeiledCoinStore<CoinType> {
             veiled_balance: helpers::get_veiled_balance_zero_ciphertext(),
-            deposit_events: account::new_event_handle<DepositEvent>(user),
-            withdraw_events: account::new_event_handle<WithdrawEvent>(user),
             pk,
         };
         move_to(user, coin_store);
@@ -520,10 +520,7 @@ module veiled_coin::veiled_coin {
         let VeiledCoin<CoinType> { veiled_amount: _ } = coin;
 
         // Once successful, emit an event that a veiled deposit occurred.
-        event::emit_event<DepositEvent>(
-            &mut veiled_coin_store.deposit_events,
-            DepositEvent {},
-        );
+        event::emit(DepositEvent { account: to_addr });
     }
 
     /// Like `unveil_to`, except the proofs have been deserialized into type-safe structs.
@@ -574,10 +571,7 @@ module veiled_coin::veiled_coin {
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Emit event to indicate a veiled withdrawal occurred
-        event::emit_event<WithdrawEvent>(
-            &mut veiled_coin_store.withdraw_events,
-            WithdrawEvent { },
-        );
+        event::emit(WithdrawEvent { account: addr });
 
         // Withdraw normal `Coin`'s from the resource account and deposit them in the recipient's
         let c = coin::withdraw(&get_resource_account_signer(), cast_u32_to_u64_amount(amount));
@@ -634,10 +628,7 @@ module veiled_coin::veiled_coin {
         sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
-        event::emit_event<WithdrawEvent>(
-            &mut sender_veiled_coin_store.withdraw_events,
-            WithdrawEvent { },
-        );
+        event::emit(WithdrawEvent { account: sender_addr });
 
         // Create a new veiled coin for the recipient.
         let vc = VeiledCoin<CoinType> { veiled_amount: veiled_deposit_amount };

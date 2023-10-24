@@ -2,11 +2,8 @@
 name = "VeiledCoin"
 version = "0.0.1"
 
+[addresses]
+veiled_coin = "_"
+
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
-
-[addresses]
-std = "0x1"
-aptos_std = "0x1"
-aptos_framework = "0x1"
-veiled_coin = "_"

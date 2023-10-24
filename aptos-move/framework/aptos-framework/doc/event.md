@@ -30,8 +30,6 @@ events emitted to a handle and emit events to the event store.
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 </code></pre>
 
@@ -106,7 +104,6 @@ Emit an event with payload <code>msg</code> by using <code>handle_ref</code>'s k
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="event.md#0x1_event_emit">emit</a>&lt;T: store + drop&gt;(msg: T) {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_module_event_enabled">features::module_event_enabled</a>(), std::error::invalid_state(<a href="event.md#0x1_event_EMODULE_EVENT_NOT_SUPPORTED">EMODULE_EVENT_NOT_SUPPORTED</a>));
     <a href="event.md#0x1_event_write_module_event_to_store">write_module_event_to_store</a>&lt;T&gt;(msg);
 }
 </code></pre>
@@ -323,7 +320,6 @@ Destroy a unique handle.
 
 
 <pre><code><b>pragma</b> opaque;
-<b>aborts_if</b> !<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_module_event_enabled">features::spec_module_event_enabled</a>();
 </code></pre>
 
 

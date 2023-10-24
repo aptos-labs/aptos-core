@@ -47,8 +47,6 @@ module knight::knight {
         mutator_ref: token::MutatorRef,
         /// Used to mutate properties
         property_mutator_ref: property_map::MutatorRef,
-        /// Used to emit HealthUpdateEvent
-        health_update_events: event::EventHandle<HealthUpdateEvent>,
         /// the base URI of the token
         base_uri: String,
     }
@@ -59,8 +57,10 @@ module knight::knight {
         value: u64,
     }
 
+    #[event]
     /// The health update event
     struct HealthUpdateEvent has drop, store {
+        knight: Object<KnightToken>,
         old_health: u64,
         new_health: u64,
     }
@@ -144,7 +144,6 @@ module knight::knight {
         let knight_token = KnightToken {
             mutator_ref,
             property_mutator_ref,
-            health_update_events: object::new_event_handle(&object_signer),
             base_uri
         };
         move_to(&object_signer, knight_token);
@@ -176,9 +175,9 @@ module knight::knight {
         // Updates the health point in the property map.
         property_map::update_typed(property_mutator_ref, &string::utf8(HEALTH_POINT_PROPERTY_NAME), new_health_point);
 
-        event::emit_event(
-            &mut knight.health_update_events,
+        event::emit(
             HealthUpdateEvent {
+                knight: to,
                 old_health: old_health_point,
                 new_health: new_health_point,
             }

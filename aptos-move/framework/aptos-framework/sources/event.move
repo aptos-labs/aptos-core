@@ -3,10 +3,8 @@
 /// of `EventHandle`s it generates. An `EventHandle` is used to count the number of
 /// events emitted to a handle and emit events to the event store.
 module aptos_framework::event {
-    use std::bcs;
-
     use aptos_framework::guid::GUID;
-    use std::features;
+    use std::bcs;
 
     friend aptos_framework::account;
     friend aptos_framework::object;
@@ -16,7 +14,6 @@ module aptos_framework::event {
 
     /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
     public fun emit<T: store + drop>(msg: T) {
-        assert!(features::module_event_enabled(), std::error::invalid_state(EMODULE_EVENT_NOT_SUPPORTED));
         write_module_event_to_store<T>(msg);
     }
 

@@ -1,45 +1,43 @@
 module hello_blockchain::message {
     use std::error;
     use std::signer;
-    use std::string;
-    use aptos_framework::account;
+    use std::string::String;
     use aptos_framework::event;
 
 //:!:>resource
     struct MessageHolder has key {
-        message: string::String,
-        message_change_events: event::EventHandle<MessageChangeEvent>,
+        message: String,
     }
 //<:!:resource
 
+    #[event]
     struct MessageChangeEvent has drop, store {
-        from_message: string::String,
-        to_message: string::String,
+        from_message: String,
+        to_message: String,
     }
 
     /// There is no message present
     const ENO_MESSAGE: u64 = 0;
 
     #[view]
-    public fun get_message(addr: address): string::String acquires MessageHolder {
+    public fun get_message(addr: address): String acquires MessageHolder {
         assert!(exists<MessageHolder>(addr), error::not_found(ENO_MESSAGE));
         borrow_global<MessageHolder>(addr).message
     }
 
-    public entry fun set_message(account: signer, message: string::String)
+    public entry fun set_message(account: signer, message: String)
     acquires MessageHolder {
         let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
             move_to(&account, MessageHolder {
                 message,
-                message_change_events: account::new_event_handle<MessageChangeEvent>(&account),
             })
         } else {
             let old_message_holder = borrow_global_mut<MessageHolder>(account_addr);
             let from_message = old_message_holder.message;
-            event::emit_event(&mut old_message_holder.message_change_events, MessageChangeEvent {
+            event::emit(MessageChangeEvent {
                 from_message,
-                to_message: copy message,
+                to_message: message,
             });
             old_message_holder.message = message;
         }

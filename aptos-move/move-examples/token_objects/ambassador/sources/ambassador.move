@@ -56,8 +56,6 @@ module ambassador::ambassador {
         burn_ref: token::BurnRef,
         /// Used to mutate properties
         property_mutator_ref: property_map::MutatorRef,
-        /// Used to emit LevelUpdateEvent
-        level_update_events: event::EventHandle<LevelUpdateEvent>,
         /// the base URI of the token
         base_uri: String,
     }
@@ -68,8 +66,10 @@ module ambassador::ambassador {
         ambassador_level: u64,
     }
 
+    #[event]
     /// The ambassador level update event
     struct LevelUpdateEvent has drop, store {
+        ambassador: Object<AmbassadorToken>,
         old_level: u64,
         new_level: u64,
     }
@@ -188,19 +188,18 @@ module ambassador::ambassador {
             string::utf8(RANK_BRONZE)
         );
 
-        // Publishes the AmbassadorToken resource with the refs and the event handle for `LevelUpdateEvent`.
+        // Publishes the AmbassadorToken resource with the refs.
         let ambassador_token = AmbassadorToken {
             mutator_ref,
             burn_ref,
             property_mutator_ref,
-            level_update_events: object::new_event_handle(&object_signer),
             base_uri
         };
         move_to(&object_signer, ambassador_token);
     }
 
     /// Burns an ambassador token. This function burns the ambassador token and destroys the
-    /// AmbassadorToken resource, AmbassadorLevel resource, the event handle, and the property map.
+    /// AmbassadorToken resource, AmbassadorLevel resource, and the property map.
     public entry fun burn(creator: &signer, token: Object<AmbassadorToken>) acquires AmbassadorToken {
         authorize_creator(creator, &token);
         let ambassador_token = move_from<AmbassadorToken>(object::object_address(&token));
@@ -208,11 +207,9 @@ module ambassador::ambassador {
             mutator_ref: _,
             burn_ref,
             property_mutator_ref,
-            level_update_events,
             base_uri: _
         } = ambassador_token;
 
-        event::destroy_handle(level_update_events);
         property_map::burn(property_mutator_ref);
         token::burn(burn_ref);
     }
@@ -230,9 +227,9 @@ module ambassador::ambassador {
         let token_address = object::object_address(&token);
         let ambassador_level = borrow_global_mut<AmbassadorLevel>(token_address);
         // Emits the `LevelUpdateEvent`.
-        event::emit_event(
-            &mut borrow_global_mut<AmbassadorToken>(token_address).level_update_events,
+        event::emit(
             LevelUpdateEvent {
+                ambassador: token,
                 old_level: ambassador_level.ambassador_level,
                 new_level: new_ambassador_level,
             }

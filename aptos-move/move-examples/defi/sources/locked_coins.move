@@ -14,9 +14,8 @@
  * 4. Once the lockup has expired, the recipient can call claim to get the unlocked tokens.
  **/
 module defi::locked_coins {
-    use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
     use std::error;
@@ -38,19 +37,16 @@ module defi::locked_coins {
         withdrawal_address: address,
         // Number of locks that have not yet been claimed.
         total_locks: u64,
-
-        cancel_lockup_events: EventHandle<CancelLockupEvent>,
-        claim_events: EventHandle<ClaimEvent>,
-        update_lockup_events: EventHandle<UpdateLockupEvent>,
-        update_withdrawal_address_events: EventHandle<UpdateWithdrawalAddressEvent>,
     }
 
+    #[event]
     /// Event emitted when a lock is canceled.
     struct CancelLockupEvent has drop, store {
         recipient: address,
         amount: u64,
     }
 
+    #[event]
     /// Event emitted when a recipient claims unlocked coins.
     struct ClaimEvent has drop, store {
         recipient: address,
@@ -58,6 +54,7 @@ module defi::locked_coins {
         claimed_time_secs: u64,
     }
 
+    #[event]
     /// Event emitted when lockup is updated for an existing lock.
     struct UpdateLockupEvent has drop, store {
         recipient: address,
@@ -65,6 +62,7 @@ module defi::locked_coins {
         new_unlock_time_secs: u64,
     }
 
+    #[event]
     /// Event emitted when withdrawal address is updated.
     struct UpdateWithdrawalAddressEvent has drop, store {
         old_withdrawal_address: address,
@@ -126,11 +124,6 @@ module defi::locked_coins {
             locks: table::new<address, Lock<CoinType>>(),
             withdrawal_address,
             total_locks: 0,
-
-            cancel_lockup_events: account::new_event_handle<CancelLockupEvent>(sponsor),
-            claim_events: account::new_event_handle<ClaimEvent>(sponsor),
-            update_lockup_events: account::new_event_handle<UpdateLockupEvent>(sponsor),
-            update_withdrawal_address_events: account::new_event_handle<UpdateWithdrawalAddressEvent>(sponsor),
         })
     }
 
@@ -145,7 +138,7 @@ module defi::locked_coins {
         let old_withdrawal_address = locks.withdrawal_address;
         locks.withdrawal_address = new_withdrawal_address;
 
-        event::emit_event(&mut locks.update_withdrawal_address_events, UpdateWithdrawalAddressEvent {
+        event::emit(UpdateWithdrawalAddressEvent {
             old_withdrawal_address,
             new_withdrawal_address,
         });
@@ -197,7 +190,7 @@ module defi::locked_coins {
         // This would fail if the recipient account is not registered to receive CoinType.
         coin::deposit(recipient_address, coins);
 
-        event::emit_event(&mut locks.claim_events, ClaimEvent {
+        event::emit(ClaimEvent {
             recipient: recipient_address,
             amount,
             claimed_time_secs: now_secs,
@@ -227,7 +220,7 @@ module defi::locked_coins {
         let old_unlock_time_secs = lock.unlock_time_secs;
         lock.unlock_time_secs = new_unlock_time_secs;
 
-        event::emit_event(&mut locks.update_lockup_events, UpdateLockupEvent {
+        event::emit(UpdateLockupEvent {
             recipient,
             old_unlock_time_secs,
             new_unlock_time_secs,
@@ -257,7 +250,7 @@ module defi::locked_coins {
         let amount = coin::value(&coins);
         coin::deposit(locks.withdrawal_address, coins);
 
-        event::emit_event(&mut locks.cancel_lockup_events, CancelLockupEvent { recipient, amount });
+        event::emit(CancelLockupEvent { recipient, amount });
     }
 
     #[test_only]
@@ -268,6 +261,8 @@ module defi::locked_coins {
     use aptos_framework::aptos_coin::AptosCoin;
     #[test_only]
     use aptos_framework::aptos_account;
+    #[test_only]
+    use aptos_framework::account;
 
     #[test_only]
     fun setup(aptos_framework: &signer, sponsor: &signer): BurnCapability<AptosCoin> {
