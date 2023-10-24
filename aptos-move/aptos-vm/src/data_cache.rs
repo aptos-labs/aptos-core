@@ -11,13 +11,16 @@ use crate::{
     },
 };
 #[allow(unused_imports)]
-use anyhow::Error;
-use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
+use anyhow::{bail, Error};
+use aptos_aggregator::{
+    bounded_math::SignedU128,
+    resolver::{TAggregatorV1View, TDelayedFieldView},
+    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+};
 use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::AggregatorID,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         state_key::StateKey,
@@ -104,7 +107,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         )
     }
 
-    // TODO(gelash, georgemitenkov): delete after simulation uses block executor.
+    // TODO[agg_v2](fix): delete after simulation uses block executor.
     pub(crate) fn from_borrowed(executor_view: &'e E) -> Self {
         let config_view = ConfigAdapter(executor_view);
         let (_, gas_feature_version) = gas_config(&config_view);
@@ -130,14 +133,18 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         }
     }
 
-    fn get_any_resource(
+    fn get_any_resource_with_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
+        // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize), VMError> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
+            // TODO[agg_v2](fix) pass the layout to resource groups
+
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
                 resource_group.clone(),
@@ -152,7 +159,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
 
             let buf = self
                 .resource_group_view
-                .get_resource_from_group(&key, struct_tag, None)
+                .get_resource_from_group(&key, struct_tag, maybe_layout)
                 .map_err(common_error)?;
             let group_size = if first_access {
                 self.resource_group_view
@@ -172,7 +179,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
 
             let buf = self
                 .executor_view
-                .get_resource_bytes(&StateKey::access_path(access_path), None)
+                .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)
                 .map_err(|_| {
                     PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
                 })?;
@@ -215,13 +222,14 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        Ok(self.get_any_resource(address, struct_tag, metadata)?)
+        Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)?)
     }
 }
 
@@ -252,26 +260,57 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
 }
 
 impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
-    fn resolve_table_entry(
+    fn resolve_table_entry_bytes_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
+        layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, Error> {
-        self.executor_view
-            .get_resource_bytes(&StateKey::table_item((*handle).into(), key.to_vec()), None)
+        self.executor_view.get_resource_bytes(
+            &StateKey::table_item((*handle).into(), key.to_vec()),
+            layout,
+        )
     }
 }
 
-impl<'e, E: ExecutorView> TAggregatorView for StorageAdapter<'e, E> {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
-        self.executor_view.get_aggregator_v1_state_value(id, mode)
+        self.executor_view.get_aggregator_v1_state_value(id)
+    }
+}
+
+impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        self.executor_view.is_delayed_field_optimization_capable()
+    }
+
+    fn get_delayed_field_value(
+        &self,
+        id: &Self::Identifier,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        self.executor_view.get_delayed_field_value(id)
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::Identifier,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        self.executor_view
+            .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
+    }
+
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
+        self.executor_view.generate_delayed_field_id()
     }
 }
 
@@ -336,7 +375,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
         &self,
         _state_key: &StateKey,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        // TODO: forward to self.executor_view.
+        // TODO[agg_v2](fix): forward to self.executor_view.
         unimplemented!("Resource group metadata handling not yet implemented");
     }
 }

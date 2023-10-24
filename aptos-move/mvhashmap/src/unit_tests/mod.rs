@@ -10,14 +10,19 @@ use super::{
     unsync_map::UnsyncMap,
     *,
 };
-use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
+use aptos_aggregator::{
+    bounded_math::SignedU128,
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    delta_math::DeltaHistory,
+};
 use aptos_types::executable::ExecutableTestType;
 use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
+use std::sync::Arc;
 mod proptest_types;
 
 fn match_unresolved(
     read_result: anyhow::Result<MVDataOutput<TestValue>, MVDataError>,
-    update: DeltaUpdate,
+    update: SignedU128,
 ) {
     match read_result {
         Err(MVDataError::Unresolved(delta)) => assert_eq!(delta.get_update(), update),
@@ -27,18 +32,19 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, TestValue, ExecutableTestType> = UnsyncMap::new();
+    let map: UnsyncMap<KeyType<Vec<u8>>, TestValue, ExecutableTestType, ()> = UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 
     // Reads that should go the DB return None
     assert_none!(map.fetch_data(&ap));
     // Ensure write registers the new value.
-    map.write(ap.clone(), value_for(10, 1));
-    assert_some_eq!(map.fetch_data(&ap), arc_value_for(10, 1));
+    //TODO[agg_v2](tests): Hardocoding layout to None. Test when layout is Some(.) as well.
+    map.write(ap.clone(), value_for(10, 1), None);
+    assert_some_eq!(map.fetch_data(&ap), (Arc::new(value_for(10, 1)), None));
     // Ensure the next write overwrites the value.
-    map.write(ap.clone(), value_for(14, 1));
-    assert_some_eq!(map.fetch_data(&ap), arc_value_for(14, 1));
+    map.write(ap.clone(), value_for(14, 1), None);
+    assert_some_eq!(map.fetch_data(&ap), (Arc::new(value_for(14, 1)), None));
 }
 
 #[test]
@@ -50,14 +56,17 @@ fn create_write_read_placeholder_struct() {
     let ap2 = KeyType(b"/foo/c".to_vec());
     let ap3 = KeyType(b"/foo/d".to_vec());
 
-    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType> = MVHashMap::new();
+    let mvtbl: MVHashMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
+        MVHashMap::new();
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 5);
     assert_eq!(Err(Uninitialized), r_db);
 
     // Write by txn 10.
-    mvtbl.data().write(ap1.clone(), 10, 1, value_for(10, 1));
+    mvtbl
+        .data()
+        .write(ap1.clone(), 10, 1, (value_for(10, 1), None));
 
     // Reads that should go the DB return Err(Uninitialized)
     let r_db = mvtbl.data().fetch_data(&ap1, 9);
@@ -68,7 +77,7 @@ fn create_write_read_placeholder_struct() {
 
     // Reads for a higher txn return the entry written by txn 10.
     let r_10 = mvtbl.data().fetch_data(&ap1, 15);
-    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1))), r_10);
+    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1), None)), r_10);
 
     // More deltas.
     mvtbl
@@ -86,16 +95,20 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - (61 + 13))), r_sum);
 
     // More writes.
-    mvtbl.data().write(ap1.clone(), 12, 0, value_for(12, 0));
-    mvtbl.data().write(ap1.clone(), 8, 3, value_for(8, 3));
+    mvtbl
+        .data()
+        .write(ap1.clone(), 12, 0, (value_for(12, 0), None));
+    mvtbl
+        .data()
+        .write(ap1.clone(), 8, 3, (value_for(8, 3), None));
 
     // Verify reads.
     let r_12 = mvtbl.data().fetch_data(&ap1, 15);
     assert_eq!(Ok(Resolved(u128_for(12, 0) - (61 + 13))), r_12);
     let r_10 = mvtbl.data().fetch_data(&ap1, 11);
-    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1))), r_10);
+    assert_eq!(Ok(Versioned(Ok((10, 1)), arc_value_for(10, 1), None)), r_10);
     let r_8 = mvtbl.data().fetch_data(&ap1, 10);
-    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3))), r_8);
+    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3), None)), r_8);
 
     // Mark the entry written by 10 as an estimate.
     mvtbl.data().mark_estimate(&ap1, 10);
@@ -109,37 +122,43 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Err(Dependency(10)), r_11);
 
     // Delete the entry written by 10, write to a different ap.
-    mvtbl.data().delete(&ap1, 10);
-    mvtbl.data().write(ap2.clone(), 10, 2, value_for(10, 2));
+    mvtbl.data().remove(&ap1, 10);
+    mvtbl
+        .data()
+        .write(ap2.clone(), 10, 2, (value_for(10, 2), None));
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.data().fetch_data(&ap1, 11);
-    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3))), r_8);
+    assert_eq!(Ok(Versioned(Ok((8, 3)), arc_value_for(8, 3), None)), r_8);
 
     // Reads, writes for ap2 and ap3.
-    mvtbl.data().write(ap2.clone(), 5, 0, value_for(5, 0));
-    mvtbl.data().write(ap3.clone(), 20, 4, value_for(20, 4));
+    mvtbl
+        .data()
+        .write(ap2.clone(), 5, 0, (value_for(5, 0), None));
+    mvtbl
+        .data()
+        .write(ap3.clone(), 20, 4, (value_for(20, 4), None));
     let r_5 = mvtbl.data().fetch_data(&ap2, 10);
-    assert_eq!(Ok(Versioned(Ok((5, 0)), arc_value_for(5, 0))), r_5);
+    assert_eq!(Ok(Versioned(Ok((5, 0)), arc_value_for(5, 0), None)), r_5);
     let r_20 = mvtbl.data().fetch_data(&ap3, 21);
-    assert_eq!(Ok(Versioned(Ok((20, 4)), arc_value_for(20, 4))), r_20);
+    assert_eq!(Ok(Versioned(Ok((20, 4)), arc_value_for(20, 4), None)), r_20);
 
     // Clear ap1 and ap3.
-    mvtbl.data().delete(&ap1, 12);
-    mvtbl.data().delete(&ap1, 8);
-    mvtbl.data().delete(&ap3, 20);
+    mvtbl.data().remove(&ap1, 12);
+    mvtbl.data().remove(&ap1, 8);
+    mvtbl.data().remove(&ap3, 20);
 
     // Reads from ap1 and ap3 go to db.
     match_unresolved(
         mvtbl.data().fetch_data(&ap1, 30),
-        DeltaUpdate::Minus((61 + 13) - 11),
+        SignedU128::Negative((61 + 13) - 11),
     );
     let r_db = mvtbl.data().fetch_data(&ap3, 30);
     assert_eq!(Err(Uninitialized), r_db);
 
     // Read entry by txn 10 at ap2.
     let r_10 = mvtbl.data().fetch_data(&ap2, 15);
-    assert_eq!(Ok(Versioned(Ok((10, 2)), arc_value_for(10, 2))), r_10);
+    assert_eq!(Ok(Versioned(Ok((10, 2)), arc_value_for(10, 2), None)), r_10);
 
     // Both delta-write and delta-delta application failures are detected.
     mvtbl.data().add_delta(ap1.clone(), 30, delta_add(30, 32));
@@ -150,7 +169,7 @@ fn create_write_read_placeholder_struct() {
     let val = value_for(10, 3);
     // sub base sub_for for which should underflow.
     let sub_base = val.as_u128().unwrap().unwrap();
-    mvtbl.data().write(ap2.clone(), 10, 3, val);
+    mvtbl.data().write(ap2.clone(), 10, 3, (val, None));
     mvtbl
         .data()
         .add_delta(ap2.clone(), 30, delta_sub(30 + sub_base, u128::MAX));
@@ -170,14 +189,19 @@ fn materialize_delta_shortcut() {
     vd.add_delta(ap.clone(), 8, delta_add(20, limit));
     vd.add_delta(ap.clone(), 11, delta_add(30, limit));
 
-    match_unresolved(vd.fetch_data(&ap, 10), DeltaUpdate::Plus(30));
+    match_unresolved(vd.fetch_data(&ap, 10), SignedU128::Positive(30));
     assert_err_eq!(
         vd.materialize_delta(&ap, 8),
-        DeltaOp::new(DeltaUpdate::Plus(30), limit, 30, 0)
+        DeltaOp::new(SignedU128::Positive(30), limit, DeltaHistory {
+            max_achieved_positive_delta: 30,
+            min_achieved_negative_delta: 0,
+            min_overflow_positive_delta: None,
+            max_underflow_negative_delta: None,
+        })
     );
-    vd.provide_base_value(ap.clone(), TestValue::from_u128(5));
+    vd.set_base_value(ap.clone(), TestValue::from_u128(5), None);
     // Multiple calls are idempotent.
-    vd.provide_base_value(ap.clone(), TestValue::from_u128(5));
+    vd.set_base_value(ap.clone(), TestValue::from_u128(5), None);
 
     // With base set, commit delta should now succeed.
     assert_ok_eq!(vd.materialize_delta(&ap, 8), 35);
@@ -199,10 +223,10 @@ fn aggregator_base_mismatch() {
     let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
     let ap = KeyType(b"/foo/b".to_vec());
 
-    vd.provide_base_value(ap.clone(), TestValue::with_len(1));
+    vd.set_base_value(ap.clone(), TestValue::with_len(1), None);
     // This call must panic, because it provides a mismatching base value:
     // However, only base value length is compared in assert.
-    vd.provide_base_value(ap, TestValue::with_len(2));
+    vd.set_base_value(ap, TestValue::with_len(2), None);
 }
 
 #[test]
@@ -222,7 +246,7 @@ fn commit_without_entry() {
     let ap = KeyType(b"/foo/b".to_vec());
 
     vd.add_delta(ap.clone(), 8, delta_add(20, 1000));
-    vd.provide_base_value(ap.clone(), TestValue::from_u128(10));
+    vd.set_base_value(ap.clone(), TestValue::from_u128(10), None);
 
     // Must panic as there is no delta at provided index.
     let _ = vd.materialize_delta(&ap, 9);

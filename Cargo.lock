@@ -352,17 +352,16 @@ name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-crypto",
+ "aptos-logger",
  "aptos-state-view",
- "aptos-table-natives",
  "aptos-types",
  "bcs 0.1.4",
- "better_any",
  "claims",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "once_cell",
- "smallvec",
+ "test-case",
 ]
 
 [[package]]
@@ -624,6 +623,7 @@ dependencies = [
  "itertools 0.10.5",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "num_cpus",
  "once_cell",
  "parking_lot 0.12.1",
@@ -2600,6 +2600,7 @@ dependencies = [
  "claims",
  "crossbeam",
  "dashmap",
+ "move-core-types",
  "proptest",
  "proptest-derive",
  "rayon",
@@ -3645,6 +3646,7 @@ dependencies = [
  "aptos-native-interface",
  "aptos-types",
  "better_any",
+ "bytes",
  "move-binary-format",
  "move-core-types",
  "move-table-extension",
@@ -3897,8 +3899,10 @@ dependencies = [
  "derivative",
  "hex",
  "itertools 0.10.5",
+ "move-binary-format",
  "move-core-types",
  "move-table-extension",
+ "move-vm-types",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -4001,7 +4005,6 @@ dependencies = [
  "move-core-types",
  "move-unit-test",
  "move-vm-runtime",
- "move-vm-test-utils",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -6482,6 +6485,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "bcs 0.1.4",
+ "claims",
  "hex",
  "itertools 0.10.5",
  "move-binary-format",
@@ -6495,6 +6499,7 @@ dependencies = [
  "rstest",
  "serde",
  "tempfile",
+ "test-case",
 ]
 
 [[package]]
@@ -10225,6 +10230,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "better_any",
+ "bytes",
  "clap 4.3.21",
  "codespan-reporting",
  "colored",

@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
+    bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
     module::AGGREGATOR_MODULE,
+    types::{
+        code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
+        DeltaApplicationFailureReason, PanicOr,
+    },
 };
 use aptos_state_view::StateView;
 use aptos_types::{
-    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadataKind},
@@ -17,26 +22,12 @@ use aptos_types::{
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
-/// Defines different ways `AggregatorResolver` can be used to read its value
-/// from the state.
-pub enum AggregatorReadMode {
-    /// The returned value is guaranteed to be correct.
-    Precise,
-    /// The returned value is based on speculation or an approximation. For
-    /// example, while reading and accumulating deltas only some of them can be
-    /// taken into account.
-    Speculative,
-}
+/// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
+/// and new, more general, TDelayedFieldView.
 
-/// Allows to query aggregator values from the state storage.
-/// Because there are two types of aggregators in the system, V1 and V2, we use
-/// different code paths for each.
-pub trait TAggregatorView {
-    // We differentiate between two possible ways to identify an aggregator in
-    // storage for now (V1 or V2) so that the APIs are completely separate and
-    // we can delete all V1 code when necessary.
-    type IdentifierV1;
-    type IdentifierV2;
+/// Allows to query AggregatorV1 values from the state storage.
+pub trait TAggregatorV1View {
+    type Identifier;
 
     /// Aggregator V1 is implemented as a state item, and therefore the API has
     /// the same pattern as for modules or resources:
@@ -46,16 +37,11 @@ pub trait TAggregatorView {
     ///                       application).
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>>;
 
-    fn get_aggregator_v1_value(
-        &self,
-        id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
-    ) -> anyhow::Result<Option<u128>> {
-        let maybe_state_value = self.get_aggregator_v1_state_value(id, mode)?;
+    fn get_aggregator_v1_value(&self, id: &Self::Identifier) -> anyhow::Result<Option<u128>> {
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         match maybe_state_value {
             Some(state_value) => Ok(Some(bcs::from_bytes(state_value.bytes())?)),
             None => Ok(None),
@@ -66,27 +52,12 @@ pub trait TAggregatorView {
     /// example used to calculate storage refunds).
     fn get_aggregator_v1_state_value_metadata(
         &self,
-        id: &Self::IdentifierV1,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
-        let maybe_state_value =
-            self.get_aggregator_v1_state_value(id, AggregatorReadMode::Precise)?;
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
-    }
-
-    fn get_aggregator_v2_value(
-        &self,
-        _id: &Self::IdentifierV2,
-        _mode: AggregatorReadMode,
-    ) -> anyhow::Result<u128> {
-        unimplemented!("Aggregator V2 is not yet supported")
-    }
-
-    /// Returns a unique per-block identifier that can be used when creating a
-    /// new aggregator V2.
-    fn generate_aggregator_v2_id(&self) -> Self::IdentifierV2 {
-        unimplemented!("ID generation for Aggregator V2 is not yet supported")
     }
 
     /// Consumes a single delta of aggregator V1, and tries to materialize it
@@ -94,21 +65,37 @@ pub trait TAggregatorView {
     /// write op is produced.
     fn try_convert_aggregator_v1_delta_into_write_op(
         &self,
-        id: &Self::IdentifierV1,
+        id: &Self::Identifier,
         delta_op: &DeltaOp,
-        mode: AggregatorReadMode,
     ) -> anyhow::Result<WriteOp, VMStatus> {
         let base = self
-            .get_aggregator_v1_value(id, mode)
-            .map_err(|e| VMStatus::error(StatusCode::STORAGE_ERROR, Some(e.to_string())))?
+            .get_aggregator_v1_value(id)
+            .map_err(|e| {
+                VMStatus::error(
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                    Some(e.to_string()),
+                )
+            })?
             .ok_or_else(|| {
                 VMStatus::error(
-                    StatusCode::STORAGE_ERROR,
+                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                     Some("Cannot convert delta for deleted aggregator".to_string()),
                 )
             })?;
         delta_op
             .apply_to(base)
+            .map_err(|e| match &e {
+                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
+                    reason: DeltaApplicationFailureReason::Overflow,
+                    ..
+                }) => addition_v1_error(e),
+                PanicOr::Or(DelayedFieldsSpeculativeError::DeltaApplication {
+                    reason: DeltaApplicationFailureReason::Underflow,
+                    ..
+                }) => subtraction_v1_error(e),
+                _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
+                    .into(),
+            })
             .map_err(|partial_error| {
                 partial_error
                     .finish(Location::Module(AGGREGATOR_MODULE.clone()))
@@ -118,80 +105,99 @@ pub trait TAggregatorView {
     }
 }
 
-pub trait AggregatorResolver:
-    TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>
-{
-}
+pub trait AggregatorV1Resolver: TAggregatorV1View<Identifier = StateKey> {}
 
-impl<T: TAggregatorView<IdentifierV1 = StateKey, IdentifierV2 = AggregatorID>> AggregatorResolver
-    for T
-{
-}
+impl<T> AggregatorV1Resolver for T where T: TAggregatorV1View<Identifier = StateKey> {}
 
-impl<S> TAggregatorView for S
+impl<S> TAggregatorV1View for S
 where
     S: StateView,
 {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        state_key: &Self::IdentifierV1,
-        // Reading from StateView can be in precise mode only.
-        _mode: AggregatorReadMode,
+        state_key: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
         self.get_state_value(state_key)
     }
 }
 
-// Utils to store aggregator values in data store. Here, we
-// only care about aggregators which are state items (V1).
-#[cfg(any(test, feature = "testing"))]
-pub mod test_utils {
-    use super::*;
-    use crate::delta_change_set::serialize;
-    use aptos_types::{
-        aggregator::AggregatorHandle,
-        state_store::{state_key::StateKey, state_value::StateValue, table::TableHandle},
-    };
-    use move_core_types::account_address::AccountAddress;
-    use std::collections::HashMap;
+/// Allows to query DelayedFields (AggregatorV2/AggregatorSnapshots) values
+/// from the state storage.
+pub trait TDelayedFieldView {
+    type Identifier;
 
-    /// Generates a dummy identifier for aggregator V1 based on the given key.
-    pub fn aggregator_id_for_test(key: u128) -> AggregatorID {
-        let bytes: Vec<u8> = [key.to_le_bytes(), key.to_le_bytes()]
-            .iter()
-            .flat_map(|b| b.to_vec())
-            .collect();
-        let key = AggregatorHandle(AccountAddress::from_bytes(bytes).unwrap());
-        AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
+    fn is_delayed_field_optimization_capable(&self) -> bool;
+
+    /// Fetch a value of a DelayedField.
+    fn get_delayed_field_value(
+        &self,
+        id: &Self::Identifier,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>>;
+
+    /// Fetch an outcome of whether additional delta can be applied.
+    /// `base_delta` argument represents a cumulative value that we previously checked,
+    /// and `delta` argument represents a new increment.
+    /// (This allows method to be stateless, and not require it to store previous calls,
+    /// i.e. for sequential execution)
+    ///
+    /// For example, calls would go like this:
+    /// try_add_delta_outcome(base_delta = 0, delta = 5) -> true
+    /// try_add_delta_outcome(base_delta = 5, delta = 3) -> true
+    /// try_add_delta_outcome(base_delta = 8, delta = 2) -> false
+    /// try_add_delta_outcome(base_delta = 8, delta = 3) -> false
+    /// try_add_delta_outcome(base_delta = 8, delta = -3) -> true
+    /// try_add_delta_outcome(base_delta = 5, delta = 2) -> true
+    /// ...
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::Identifier,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>>;
+
+    /// Returns a unique per-block identifier that can be used when creating a
+    /// new aggregator V2.
+    fn generate_delayed_field_id(&self) -> Self::Identifier;
+}
+
+pub trait DelayedFieldResolver: TDelayedFieldView<Identifier = DelayedFieldID> {}
+
+impl<T> DelayedFieldResolver for T where T: TDelayedFieldView<Identifier = DelayedFieldID> {}
+
+impl<S> TDelayedFieldView for S
+where
+    S: StateView,
+{
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        // For resolvers that are not capable, it cannot be enabled
+        false
     }
 
-    #[derive(Default)]
-    pub struct AggregatorStore(HashMap<StateKey, StateValue>);
-
-    impl AggregatorStore {
-        pub fn set_from_id(&mut self, id: AggregatorID, value: u128) {
-            self.set_from_state_key(id.into_state_key(), value);
-        }
-
-        pub fn set_from_state_key(&mut self, state_key: StateKey, value: u128) {
-            self.0
-                .insert(state_key, StateValue::new_legacy(serialize(&value).into()));
-        }
+    fn get_delayed_field_value(
+        &self,
+        _id: &Self::Identifier,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!("get_delayed_field_value not implemented")
     }
 
-    impl TAggregatorView for AggregatorStore {
-        type IdentifierV1 = StateKey;
-        type IdentifierV2 = AggregatorID;
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        _id: &Self::Identifier,
+        _base_delta: &SignedU128,
+        _delta: &SignedU128,
+        _max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        unimplemented!("delayed_field_try_add_delta_outcome not implemented")
+    }
 
-        fn get_aggregator_v1_state_value(
-            &self,
-            state_key: &Self::IdentifierV1,
-            _mode: AggregatorReadMode,
-        ) -> anyhow::Result<Option<StateValue>> {
-            Ok(self.0.get(state_key).cloned())
-        }
+    /// Returns a unique per-block identifier that can be used when creating a
+    /// new aggregator V2.
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
+        unimplemented!("generate_delayed_field_id not implemented")
     }
 }

@@ -1282,9 +1282,11 @@ impl AptosVM {
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
         match write_set_payload {
-            WriteSetPayload::Direct(change_set) => {
-                VMChangeSet::try_from_storage_change_set(change_set.clone(), &change_set_configs)
-            },
+            WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
+                change_set.clone(),
+                &change_set_configs,
+                resolver.is_delayed_field_optimization_capable(),
+            ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -1341,6 +1343,7 @@ impl AptosVM {
         }
         for (state_key, group_write) in change_set.resource_group_write_set().iter() {
             for tag in group_write.inner_ops().keys() {
+                // TODO: Typelayout is set to None. Is this correct?
                 resource_group_view
                     .get_resource_from_group(state_key, tag, None)
                     .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1357,11 +1360,11 @@ impl AptosVM {
         let has_new_block_event = change_set
             .events()
             .iter()
-            .any(|e| e.event_key() == Some(&new_block_event_key()));
+            .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
         let has_new_epoch_event = change_set
             .events()
             .iter()
-            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
+            .any(|(e, _)| e.event_key() == Some(&new_epoch_event_key()));
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -1769,7 +1772,7 @@ impl VMAdapter for AptosVM {
             .change_set()
             .events()
             .iter()
-            .any(|event| event.event_key() == Some(&new_epoch_event_key))
+            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
 
     fn execute_single_transaction(
@@ -1846,9 +1849,9 @@ impl VMAdapter for AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );
-                            },
-                        // Ignore Storage Error as it can be intentionally triggered by parallel execution.
-                        StatusCode::STORAGE_ERROR => (),
+                        },
+                        // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
+                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.

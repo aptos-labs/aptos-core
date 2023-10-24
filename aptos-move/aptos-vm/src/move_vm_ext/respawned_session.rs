@@ -6,11 +6,19 @@ use crate::{
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
     AptosVM,
 };
-use aptos_aggregator::resolver::{AggregatorReadMode, TAggregatorView};
+use aptos_aggregator::{
+    bounded_math::{BoundedMath, SignedU128},
+    delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
+    delta_change_set::DeltaWithMax,
+    resolver::{TAggregatorV1View, TDelayedFieldView},
+    types::{
+        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
+        DelayedFieldsSpeculativeError, PanicOr,
+    },
+};
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
-    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -132,27 +140,100 @@ impl<'r> ExecutorViewWithChangeSet<'r> {
     }
 }
 
-impl<'r> TAggregatorView for ExecutorViewWithChangeSet<'r> {
-    type IdentifierV1 = StateKey;
-    type IdentifierV2 = AggregatorID;
+impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
+    type Identifier = StateKey;
 
     fn get_aggregator_v1_state_value(
         &self,
-        id: &Self::IdentifierV1,
-        mode: AggregatorReadMode,
+        id: &Self::Identifier,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base_executor_view
-                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op, mode)?
+                .try_convert_aggregator_v1_delta_into_write_op(id, delta_op)?
                 .as_state_value()),
             None => match self.change_set.aggregator_v1_write_set().get(id) {
                 Some(write_op) => Ok(write_op.as_state_value()),
-                None => self
-                    .base_executor_view
-                    .get_aggregator_v1_state_value(id, mode),
+                None => self.base_executor_view.get_aggregator_v1_state_value(id),
             },
         }
+    }
+}
+
+impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
+    type Identifier = DelayedFieldID;
+
+    fn is_delayed_field_optimization_capable(&self) -> bool {
+        self.base_executor_view
+            .is_delayed_field_optimization_capable()
+    }
+
+    fn get_delayed_field_value(
+        &self,
+        id: &Self::Identifier,
+    ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        use DelayedChange::*;
+
+        match self.change_set.delayed_field_change_set().get(id) {
+            Some(Create(value)) => Ok(value.clone()),
+            Some(Apply(apply)) => {
+                let base_value = match apply.get_apply_base_id(id) {
+                    ApplyBase::Previous(base_id) => {
+                        self.base_executor_view.get_delayed_field_value(&base_id)?
+                    },
+                    // For Current, call on self to include current change!
+                    ApplyBase::Current(base_id) => {
+                        // avoid infinite loop
+                        if &base_id == id {
+                            return Err(code_invariant_error(format!(
+                                "Base id is Current(self) for {:?} : Apply({:?})",
+                                id, apply
+                            ))
+                            .into());
+                        }
+                        self.get_delayed_field_value(&base_id)?
+                    },
+                };
+                Ok(apply.apply_to_base(base_value)?)
+            },
+            None => self.base_executor_view.get_delayed_field_value(id),
+        }
+    }
+
+    fn delayed_field_try_add_delta_outcome(
+        &self,
+        id: &Self::Identifier,
+        base_delta: &SignedU128,
+        delta: &SignedU128,
+        max_value: u128,
+    ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        use DelayedChange::*;
+
+        let math = BoundedMath::new(max_value);
+        match self.change_set.delayed_field_change_set().get(id) {
+            Some(Create(value)) => {
+                let prev_value = expect_ok(math.unsigned_add_delta(value.clone().into_aggregator_value()?, base_delta))?;
+                Ok(math.unsigned_add_delta(prev_value, delta).is_ok())
+            }
+            Some(Apply(DelayedApplyChange::AggregatorDelta { delta: change_delta })) => {
+                let merged = &DeltaWithMax::create_merged_delta(
+                    &DeltaWithMax::new(*base_delta, max_value),
+                    change_delta)?;
+                self.base_executor_view.delayed_field_try_add_delta_outcome(
+                    id,
+                    &merged.get_update(),
+                    delta,
+                    max_value)
+            },
+            Some(Apply(_)) => Err(code_invariant_error(
+                "Cannot call delayed_field_try_add_delta_outcome on non-AggregatorDelta Apply change",
+            ).into()),
+            None => self.base_executor_view.delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
+        }
+    }
+
+    fn generate_delayed_field_id(&self) -> Self::Identifier {
+        self.base_executor_view.generate_delayed_field_id()
     }
 }
 
@@ -166,7 +247,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
-            Some(write_op) => Ok(write_op.as_state_value()),
+            Some((write_op, _)) => Ok(write_op.as_state_value()),
             None => self
                 .base_executor_view
                 .get_resource_state_value(state_key, maybe_layout),
@@ -190,7 +271,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        if let Some(write_op) = self
+        // TODO: resource_group_write_set also contains a layout. What to do with it?
+        if let Some((write_op, _layout)) = self
             .change_set
             .resource_group_write_set()
             .get(group_key)
@@ -271,9 +353,7 @@ mod test {
     }
 
     fn read_aggregator(view: &ExecutorViewWithChangeSet, s: impl ToString) -> u128 {
-        view.get_aggregator_v1_value(&key(s), AggregatorReadMode::Precise)
-            .unwrap()
-            .unwrap()
+        view.get_aggregator_v1_value(&key(s)).unwrap().unwrap()
     }
 
     fn read_resource_from_group(
@@ -338,8 +418,8 @@ mod test {
         state_view.set_legacy(key("resource_group_both"), bcs::to_bytes(&tree).unwrap());
 
         let resource_write_set = BTreeMap::from([
-            (key("resource_both"), write(80)),
-            (key("resource_write_set"), write(90)),
+            (key("resource_both"), (write(80), None)),
+            (key("resource_write_set"), (write(90), None)),
         ]);
 
         let module_write_set = BTreeMap::from([
@@ -347,14 +427,15 @@ mod test {
             (key("module_write_set"), write(110)),
         ]);
 
-        let aggregator_write_set = BTreeMap::from([
+        let aggregator_v1_write_set = BTreeMap::from([
             (key("aggregator_both"), write(120)),
             (key("aggregator_write_set"), write(130)),
         ]);
 
-        let aggregator_delta_set =
+        let aggregator_v1_delta_set =
             BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
+        // TODO: Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = BTreeMap::from([
             (
                 key("resource_group_both"),
@@ -362,8 +443,14 @@ mod test {
                     WriteOp::Deletion,
                     0,
                     BTreeMap::from([
-                        (mock_tag_0(), WriteOp::Modification(serialize(&1000).into())),
-                        (mock_tag_2(), WriteOp::Modification(serialize(&300).into())),
+                        (
+                            mock_tag_0(),
+                            (WriteOp::Modification(serialize(&1000).into()), None),
+                        ),
+                        (
+                            mock_tag_2(),
+                            (WriteOp::Modification(serialize(&300).into()), None),
+                        ),
                     ]),
                 ),
             ),
@@ -374,7 +461,7 @@ mod test {
                     0,
                     BTreeMap::from([(
                         mock_tag_1(),
-                        WriteOp::Modification(serialize(&5000).into()),
+                        (WriteOp::Modification(serialize(&5000).into()), None),
                     )]),
                 ),
             ),
@@ -384,8 +471,9 @@ mod test {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            BTreeMap::new(),
             vec![],
             &NoOpChangeSetChecker,
         )
@@ -436,4 +524,6 @@ mod test {
             5000
         );
     }
+
+    // TODO[agg_v2](tests) add delayed field tests
 }

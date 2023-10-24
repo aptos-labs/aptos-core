@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::Error,
+    errors::{Error, IntentionalFallbackToSequential},
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -14,6 +14,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
+use aptos_aggregator::types::PanicOr;
 use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
 use claims::assert_ok;
 use num_cpus;
@@ -81,7 +82,12 @@ fn run_transactions<K, V, E>(
         .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
-            assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+            assert_eq!(
+                output.unwrap_err(),
+                Error::FallbackToSequential(PanicOr::Or(
+                    IntentionalFallbackToSequential::ModulePathReadWrite
+                ))
+            );
             continue;
         }
 
@@ -465,7 +471,12 @@ fn publishing_fixed_params_with_block_gas_limit(
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+        assert_eq!(
+            output.unwrap_err(),
+            Error::FallbackToSequential(PanicOr::Or(
+                IntentionalFallbackToSequential::ModulePathReadWrite
+            ))
+        );
     }
 }
 

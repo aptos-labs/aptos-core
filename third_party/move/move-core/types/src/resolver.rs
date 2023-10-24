@@ -6,6 +6,7 @@ use crate::{
     account_address::AccountAddress,
     language_storage::{ModuleId, StructTag},
     metadata::Metadata,
+    value::MoveTypeLayout,
 };
 use anyhow::Error;
 use bytes::Bytes;
@@ -41,12 +42,15 @@ pub fn resource_size(resource: &Option<Bytes>) -> usize {
 ///                       are always structurally valid)
 ///                    - storage encounters internal error
 pub trait ResourceResolver {
-    fn get_resource_with_metadata(
+    // TODO[move_values](optimize): this can return Value, so that we can push deserialization to
+    // implementations of `ResourceResolver`.
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         metadata: &[Metadata],
-    ) -> Result<(Option<Bytes>, usize), Error>;
+        layout: Option<&MoveTypeLayout>,
+    ) -> anyhow::Result<(Option<Bytes>, usize), Error>;
 }
 
 /// A persistent storage implementation that can resolve both resources and modules
@@ -60,27 +64,15 @@ pub trait MoveResolver: ModuleResolver + ResourceResolver {
             .get_resource_with_metadata(address, typ, &self.get_module_metadata(&typ.module_id()))?
             .0)
     }
-}
 
-impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}
-
-impl<T: ResourceResolver + ?Sized> ResourceResolver for &T {
     fn get_resource_with_metadata(
         &self,
         address: &AccountAddress,
-        tag: &StructTag,
+        typ: &StructTag,
         metadata: &[Metadata],
     ) -> Result<(Option<Bytes>, usize), Error> {
-        (**self).get_resource_with_metadata(address, tag, metadata)
+        self.get_resource_bytes_with_metadata_and_layout(address, typ, metadata, None)
     }
 }
 
-impl<T: ModuleResolver + ?Sized> ModuleResolver for &T {
-    fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
-        (**self).get_module_metadata(module_id)
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
-        (**self).get_module(module_id)
-    }
-}
+impl<T: ModuleResolver + ResourceResolver + ?Sized> MoveResolver for T {}

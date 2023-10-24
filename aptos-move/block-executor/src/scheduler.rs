@@ -138,6 +138,8 @@ enum ExecutionStatus {
     Executing(Incarnation),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
+    // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
+    // it gets committed later, without scheduler tracking.
     Committed(Incarnation),
     Aborting(Incarnation),
     ExecutionHalted,
@@ -223,6 +225,10 @@ impl ValidationStatus {
             maybe_max_validated_wave: None,
         }
     }
+}
+
+pub trait TWaitForDependency {
+    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_txn_idx: TxnIndex) -> DependencyResult;
 }
 
 pub struct Scheduler {
@@ -329,7 +335,7 @@ impl Scheduler {
     }
 
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
-    pub fn try_commit(&self) -> Option<TxnIndex> {
+    pub fn try_commit(&self) -> Option<(TxnIndex, Incarnation)> {
         let mut commit_state = self.commit_state.acquire();
         let (commit_idx, commit_wave) = commit_state.dereference_mut();
 
@@ -365,7 +371,7 @@ impl Scheduler {
                             // All txns have been committed, the parallel execution can finish.
                             self.done_marker.store(true, Ordering::SeqCst);
                         }
-                        return Some(*commit_idx - 1);
+                        return Some((*commit_idx - 1, incarnation));
                     }
                 }
             }
@@ -446,59 +452,6 @@ impl Scheduler {
         }
     }
 
-    /// When a txn depends on another txn, adds it to the dependency list of the other txn.
-    /// Returns true if successful, or false, if the dependency got resolved in the meantime.
-    /// If true is returned, Scheduler guarantees that later (dep_txn_idx will finish execution)
-    /// transaction txn_idx will be resumed, and corresponding execution task created.
-    /// If false is returned, it is caller's responsibility to repeat the read that caused the
-    /// dependency and continue the ongoing execution of txn_idx.
-    pub fn wait_for_dependency(
-        &self,
-        txn_idx: TxnIndex,
-        dep_txn_idx: TxnIndex,
-    ) -> DependencyResult {
-        // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
-        // usually has just observed the read dependency.
-
-        // Create a condition variable associated with the dependency.
-        let dep_condvar = Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
-
-        let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
-
-        // Note: is_executed & suspend calls acquire (a different, status) mutex, while holding
-        // (dependency) mutex. This is the only place in scheduler where a thread may hold > 1
-        // mutexes. Thus, acquisitions always happen in the same order (here), may not deadlock.
-
-        if self.is_executed(dep_txn_idx, true).is_some() {
-            // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
-            // To avoid zombie dependency (and losing liveness), must return here and
-            // not add a (stale) dependency.
-
-            // Note: acquires (a different, status) mutex, while holding (dependency) mutex.
-            // Only place in scheduler where a thread may hold >1 mutexes, hence, such
-            // acquisitions always happens in the same order (this function), may not deadlock.
-            return DependencyResult::Resolved;
-        }
-
-        // If the execution is already halted, suspend will return false.
-        // The synchronization is guaranteed by the Mutex around txn_status.
-        // If the execution is halted, the first finishing thread will first set the status of each txn
-        // to be ExecutionHalted, then notify the conditional variable. So if a thread sees ExecutionHalted,
-        // it knows the execution is halted and it can return; otherwise, the finishing thread will notify
-        // the conditional variable later and awake the pending thread.
-        if !self.suspend(txn_idx, dep_condvar.clone()) {
-            return DependencyResult::ExecutionHalted;
-        }
-
-        // Safe to add dependency here (still holding the lock) - finish_execution of txn
-        // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
-        stored_deps.push(txn_idx);
-
-        // Stored deps gets unlocked here.
-
-        DependencyResult::Dependency(dep_condvar)
-    }
-
     pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
         validation_status.maybe_max_validated_wave = Some(
@@ -508,26 +461,7 @@ impl Scheduler {
         );
     }
 
-    /// After txn is executed, schedule its dependencies for re-execution.
-    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
-    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
-    /// return a validation task of the transaction to the caller (otherwise NoTask).
-    pub fn finish_execution(
-        &self,
-        txn_idx: TxnIndex,
-        incarnation: Incarnation,
-        revalidate_suffix: bool,
-    ) -> SchedulerTask {
-        // Note: It is preferable to hold the validation lock throughout the finish_execution,
-        // in particular before updating execution status. The point was that we don't want
-        // any validation to come before the validation status is correspondingly updated.
-        // It may be possible to make work more granular, but shouldn't make performance
-        // difference and like this correctness argument is much easier to see, in fact also
-        // the reason why we grab write lock directly, and never release it during the whole function.
-        // So even validation status readers have to wait if they somehow end up at the same index.
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        self.set_executed_status(txn_idx, incarnation);
-
+    fn wake_dependencies_after_execution(&self, txn_idx: TxnIndex) {
         let txn_deps: Vec<TxnIndex> = {
             let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
             // Holding the lock, take dependency vector.
@@ -551,6 +485,29 @@ impl Scheduler {
             self.execution_idx
                 .fetch_min(execution_target_idx, Ordering::SeqCst);
         }
+    }
+
+    /// After txn is executed, schedule its dependencies for re-execution.
+    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
+    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
+    /// return a validation task of the transaction to the caller (otherwise NoTask).
+    pub fn finish_execution(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        revalidate_suffix: bool,
+    ) -> SchedulerTask {
+        // Note: It is preferable to hold the validation lock throughout the finish_execution,
+        // in particular before updating execution status. The point was that we don't want
+        // any validation to come before the validation status is correspondingly updated.
+        // It may be possible to make work more granular, but shouldn't make performance
+        // difference and like this correctness argument is much easier to see, in fact also
+        // the reason why we grab write lock directly, and never release it during the whole function.
+        // So even validation status readers have to wait if they somehow end up at the same index.
+        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        self.set_executed_status(txn_idx, incarnation);
+
+        self.wake_dependencies_after_execution(txn_idx);
 
         let (cur_val_idx, mut cur_wave) =
             Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
@@ -571,6 +528,16 @@ impl Scheduler {
         }
 
         SchedulerTask::NoTask
+    }
+
+    pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) {
+        // we have exclusivity on this transaction
+
+        self.wake_dependencies_after_execution(txn_idx);
+
+        // we skipped decreasing validation index when invalidating,
+        // as we were executing it immediately, and are doing so now. (unconditionally)
+        self.decrease_validation_idx(txn_idx + 1);
     }
 
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
@@ -635,6 +602,57 @@ impl Scheduler {
         }
 
         !self.has_halted.swap(true, Ordering::SeqCst)
+    }
+}
+
+impl TWaitForDependency for Scheduler {
+    /// When a txn depends on another txn, adds it to the dependency list of the other txn.
+    /// Returns true if successful, or false, if the dependency got resolved in the meantime.
+    /// If true is returned, Scheduler guarantees that later (dep_txn_idx will finish execution)
+    /// transaction txn_idx will be resumed, and corresponding execution task created.
+    /// If false is returned, it is caller's responsibility to repeat the read that caused the
+    /// dependency and continue the ongoing execution of txn_idx.
+    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_txn_idx: TxnIndex) -> DependencyResult {
+        // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
+        // usually has just observed the read dependency.
+
+        // Create a condition variable associated with the dependency.
+        let dep_condvar = Arc::new((Mutex::new(DependencyStatus::Unresolved), Condvar::new()));
+
+        let mut stored_deps = self.txn_dependency[dep_txn_idx as usize].lock();
+
+        // Note: is_executed & suspend calls acquire (a different, status) mutex, while holding
+        // (dependency) mutex. This is the only place in scheduler where a thread may hold > 1
+        // mutexes. Thus, acquisitions always happen in the same order (here), may not deadlock.
+
+        if self.is_executed(dep_txn_idx, true).is_some() {
+            // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
+            // To avoid zombie dependency (and losing liveness), must return here and
+            // not add a (stale) dependency.
+
+            // Note: acquires (a different, status) mutex, while holding (dependency) mutex.
+            // Only place in scheduler where a thread may hold >1 mutexes, hence, such
+            // acquisitions always happens in the same order (this function), may not deadlock.
+            return DependencyResult::Resolved;
+        }
+
+        // If the execution is already halted, suspend will return false.
+        // The synchronization is guaranteed by the Mutex around txn_status.
+        // If the execution is halted, the first finishing thread will first set the status of each txn
+        // to be ExecutionHalted, then notify the conditional variable. So if a thread sees ExecutionHalted,
+        // it knows the execution is halted and it can return; otherwise, the finishing thread will notify
+        // the conditional variable later and awake the pending thread.
+        if !self.suspend(txn_idx, dep_condvar.clone()) {
+            return DependencyResult::ExecutionHalted;
+        }
+
+        // Safe to add dependency here (still holding the lock) - finish_execution of txn
+        // dep_txn_idx is guaranteed to acquire the same lock later and clear the dependency.
+        stored_deps.push(txn_idx);
+
+        // Stored deps gets unlocked here.
+
+        DependencyResult::Dependency(dep_condvar)
     }
 }
 
