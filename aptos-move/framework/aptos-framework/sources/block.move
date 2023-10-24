@@ -4,14 +4,13 @@ module aptos_framework::block {
     use std::features;
     use std::vector;
     use std::option;
-    use aptos_std::debug;
 
     use aptos_framework::account;
     use aptos_framework::dkg;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
+    use aptos_framework::reconfiguration_v2;
     use aptos_framework::stake;
-    use aptos_framework::staking_config;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -57,6 +56,7 @@ module aptos_framework::block {
     const EINVALID_PROPOSER: u64 = 2;
     /// Epoch interval cannot be 0.
     const EZERO_EPOCH_INTERVAL: u64 = 3;
+    const EAPI_DISABLED: u64 = 4;
 
     /// This can only be called during Genesis.
     public(friend) fun initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
@@ -99,10 +99,8 @@ module aptos_framework::block {
         borrow_global<BlockResource>(@aptos_framework).epoch_interval / 1000000
     }
 
-    /// Set the metadata for the current block.
-    /// The runtime always runs this before executing the transactions in a block.
-    fun block_prologue(
-        vm: signer,
+    fun block_prologue_common(
+        vm: &signer,
         hash: address,
         epoch: u64,
         round: u64,
@@ -110,9 +108,9 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
-    ) acquires BlockResource {
+    ): u64 acquires BlockResource {
         // Operational constraint: can only be invoked by the VM.
-        system_addresses::assert_vm(&vm);
+        system_addresses::assert_vm(vm);
 
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
@@ -138,7 +136,7 @@ module aptos_framework::block {
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
+        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.
@@ -154,7 +152,23 @@ module aptos_framework::block {
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
 
-        if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
+        block_metadata_ref.epoch_interval
+    }
+
+    /// Set the metadata for the current block.
+    /// The runtime always runs this before executing the transactions in a block.
+    fun block_prologue(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64
+    ) acquires BlockResource {
+        let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration::reconfigure();
         };
     }
@@ -170,70 +184,21 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        dkg_transcript_available: bool,
-        serialized_dkg_transcript: vector<u8>,
+        dkg_result_available: bool,
+        dkg_result: vector<u8>,
     ) acquires BlockResource {
-        // Operational constraint: can only be invoked by the VM.
-        system_addresses::assert_vm(&vm);
-        assert!(features::reconfigure_with_dkg_enabled(), 1);
+        assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
 
-        // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
-        assert!(
-            proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-            error::permission_denied(EINVALID_PROPOSER),
-        );
+        let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
 
-        let proposer_index = option::none();
-        if (proposer != @vm_reserved) {
-            proposer_index = option::some(stake::get_validator_index(proposer));
+        if (dkg::in_progress()) {
+            let should_proceed = dkg::update(dkg_result_available, dkg_result);
+            if (should_proceed) {
+                reconfiguration_v2::finish(&vm);
+            }
+        } else if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+            reconfiguration_v2::start(&vm);
         };
-
-        let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
-        block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
-
-        let new_block_event = NewBlockEvent {
-            hash,
-            epoch,
-            round,
-            height: block_metadata_ref.height,
-            previous_block_votes_bitvec,
-            proposer,
-            failed_proposer_indices,
-            time_microseconds: timestamp,
-        };
-        emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
-
-        if (features::collect_and_distribute_gas_fees()) {
-            // Assign the fees collected from the previous block to the previous block proposer.
-            // If for any reason the fees cannot be assigned, this function burns the collected coins.
-            transaction_fee::process_collected_fees();
-            // Set the proposer of this block as the receiver of the fees, so that the fees for this
-            // block are assigned to the right account.
-            transaction_fee::register_proposer_for_fee_collection(proposer);
-        };
-
-        // Performance scores have to be updated before the epoch transition as the transaction that triggers the
-        // transition is the last block in the previous epoch.
-        stake::update_performance_statistics(proposer_index, failed_proposer_indices);
-        let cur_epoch = reconfiguration::current_epoch();
-        state_storage::on_new_block(cur_epoch);
-
-        if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
-            debug::print(&std::string::utf8(b"on_expire() started."));
-            let dkg_session_in_progress = dkg::session_in_progress();
-            if (option::is_none(&dkg_session_in_progress)) {
-                debug::print(&std::string::utf8(b"case 0."));
-                staking_config::lock();
-                dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
-            };
-            debug::print(&std::string::utf8(b"on_expire() finished."));
-        };
-
-        if (dkg_transcript_available) {
-            dkg::finish(serialized_dkg_transcript);
-            staking_config::unlock();
-            reconfiguration::reconfigure();
-        }
     }
 
     #[view]

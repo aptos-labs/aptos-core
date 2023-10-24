@@ -48,6 +48,8 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `resolve_multi_step_proposal`](#0x1_aptos_governance_resolve_multi_step_proposal)
 -  [Function `remove_approved_hash`](#0x1_aptos_governance_remove_approved_hash)
 -  [Function `reconfigure`](#0x1_aptos_governance_reconfigure)
+-  [Function `trigger_reconfiguration_v2`](#0x1_aptos_governance_trigger_reconfiguration_v2)
+-  [Function `force_finish_reconfiguration_v2`](#0x1_aptos_governance_force_finish_reconfiguration_v2)
 -  [Function `toggle_features`](#0x1_aptos_governance_toggle_features)
 -  [Function `get_signer_testnet_only`](#0x1_aptos_governance_get_signer_testnet_only)
 -  [Function `get_voting_power`](#0x1_aptos_governance_get_voting_power)
@@ -96,6 +98,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2">0x1::reconfiguration_v2</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
@@ -501,6 +504,15 @@ This matches the same enum const in voting. We have to duplicate it as Move does
 
 
 <pre><code><b>const</b> <a href="aptos_governance.md#0x1_aptos_governance_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_aptos_governance_EAPI_DISABLED"></a>
+
+
+
+<pre><code><b>const</b> <a href="aptos_governance.md#0x1_aptos_governance_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 15;
 </code></pre>
 
 
@@ -1471,8 +1483,67 @@ Force reconfigure. To be called at the end of a proposal that alters on-chain co
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="aptos_governance.md#0x1_aptos_governance_EAPI_DISABLED">EAPI_DISABLED</a>));
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aptos_governance_trigger_reconfiguration_v2"></a>
+
+## Function `trigger_reconfiguration_v2`
+
+Manully start a reconfiguration v2 (i.e., DKG-then-reconfiguration).
+Can be called at the end of a series of proposals that alters on-chain configs.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_trigger_reconfiguration_v2">trigger_reconfiguration_v2</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_trigger_reconfiguration_v2">trigger_reconfiguration_v2</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="aptos_governance.md#0x1_aptos_governance_EAPI_DISABLED">EAPI_DISABLED</a>));
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_start">reconfiguration_v2::start</a>(aptos_framework);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_aptos_governance_force_finish_reconfiguration_v2"></a>
+
+## Function `force_finish_reconfiguration_v2`
+
+Apply all the pending config changes and start a new epoch, regardless of DKG status.
+Can be used in emergency (e.g., when DKG is stuck).
+
+NOTE: there will be no randomness in the new epoch.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_finish_reconfiguration_v2">force_finish_reconfiguration_v2</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_finish_reconfiguration_v2">force_finish_reconfiguration_v2</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="aptos_governance.md#0x1_aptos_governance_EAPI_DISABLED">EAPI_DISABLED</a>));
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="reconfiguration_v2.md#0x1_reconfiguration_v2_finish">reconfiguration_v2::finish</a>(aptos_framework);
 }
 </code></pre>
 

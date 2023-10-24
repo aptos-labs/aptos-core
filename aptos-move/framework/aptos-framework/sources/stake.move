@@ -18,6 +18,7 @@
 /// 9. An owner can always switch operators by calling stake::set_operator.
 /// 10. An owner can always switch designated voter by calling stake::set_designated_voter.
 module aptos_framework::stake {
+    use std::config_for_next_epoch;
     use std::error;
     use std::features;
     use std::option::{Self, Option};
@@ -38,6 +39,7 @@ module aptos_framework::stake {
     friend aptos_framework::block;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
+    friend aptos_framework::reconfiguration_v2;
     friend aptos_framework::transaction_fee;
 
     /// Validator Config not published.
@@ -78,6 +80,8 @@ module aptos_framework::stake {
     const EINVALID_LOCKUP: u64 = 18;
     /// Table to store collected transaction fees for each validator already exists.
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
+    /// User-level validator set change temporarily disabled.
+    const EVALIDATOR_SET_CHANGES_DISABLED: u64 = 20;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
@@ -432,7 +436,7 @@ module aptos_framework::stake {
         validators: &vector<address>,
     ) acquires ValidatorSet {
         system_addresses::assert_aptos_framework(aptos_framework);
-
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let active_validators = &mut validator_set.active_validators;
         let pending_inactive = &mut validator_set.pending_inactive;
@@ -618,6 +622,7 @@ module aptos_framework::stake {
     public fun add_stake_with_cap(owner_cap: &OwnerCapability, coins: Coin<AptosCoin>) acquires StakePool, ValidatorSet {
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
 
         let amount = coin::value(&coins);
         if (amount == 0) {
@@ -697,6 +702,8 @@ module aptos_framework::stake {
         proof_of_possession: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
         assert_stake_pool_exists(pool_address);
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
+
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
 
@@ -728,8 +735,7 @@ module aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
-        let config = staking_config::get();
-        assert!(staking_config::get_allow_validator_set_change(&config), 1);
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
         force_update_network_and_fullnode_addresses(operator, pool_address, new_network_addresses, new_fullnode_addresses);
     }
 
@@ -815,6 +821,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
@@ -899,6 +906,7 @@ module aptos_framework::stake {
         owner_cap: &OwnerCapability,
         withdraw_amount: u64
     ): Coin<AptosCoin> acquires StakePool, ValidatorSet {
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -936,6 +944,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorSet {
+        assert!(config_for_next_epoch::upserts_enabled(), error::invalid_state(EVALIDATOR_SET_CHANGES_DISABLED));
         let config = staking_config::get();
         assert!(
             staking_config::get_allow_validator_set_change(&config),
@@ -1165,8 +1174,6 @@ module aptos_framework::stake {
 
     /// Compute the validator set for the next epoch.
     public(friend) fun next_validator_set(): ValidatorSet acquires StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
-        debug::print(&std::string::utf8(b"stake::next_validator_set() started."));
-
         // Init.
         let cur_validator_set = borrow_global<ValidatorSet>(@aptos_framework);
         let staking_config = staking_config::get();
@@ -1231,18 +1238,14 @@ module aptos_framework::stake {
             candidate_idx = candidate_idx + 1;
         };
 
-        let ret = ValidatorSet {
+         ValidatorSet {
             consensus_scheme: cur_validator_set.consensus_scheme,
             active_validators: new_active_validators,
             pending_inactive: vector[],
             pending_active: vector[],
             total_voting_power: new_total_power,
             total_joining_power: 0,
-        };
-
-        debug::print(&std::string::utf8(b"stake::next_validator_set() finished."));
-
-        ret
+        }
     }
 
     /// Update individual validator's stake pool
@@ -1463,7 +1466,6 @@ module aptos_framework::stake {
     #[test_only]
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;
-    use aptos_std::debug;
     #[test_only]
     use aptos_std::fixed_point64;
 

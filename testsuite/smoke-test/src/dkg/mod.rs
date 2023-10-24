@@ -82,7 +82,7 @@ fn verify_dkg_transcript(
     let pvss_config =
         build_dkg_pvss_config(dkg_session.dealer_epoch, &dkg_session.target_validator_set);
     let trxs: DKGTranscriptWrapper =
-        bcs::from_bytes(dkg_session.serialized_transcript.as_slice()).unwrap();
+        bcs::from_bytes(dkg_session.result.as_slice()).unwrap();
     if !trxs.verify(&pvss_config, &verifier).is_ok() {
         return false;
     }

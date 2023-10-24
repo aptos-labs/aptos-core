@@ -151,16 +151,6 @@ aptos_framework system address
 ## Constants
 
 
-<a name="0x1_reconfiguration_EINVALID_GUID_FOR_EVENT"></a>
-
-An invalid block time was encountered.
-
-
-<pre><code><b>const</b> <a href="reconfiguration.md#0x1_reconfiguration_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>: u64 = 5;
-</code></pre>
-
-
-
 <a name="0x1_reconfiguration_ECONFIG"></a>
 
 A <code>Reconfiguration</code> resource is in an invalid state
@@ -187,6 +177,16 @@ An invalid block time was encountered.
 
 
 <pre><code><b>const</b> <a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>: u64 = 4;
+</code></pre>
+
+
+
+<a name="0x1_reconfiguration_EINVALID_GUID_FOR_EVENT"></a>
+
+An invalid block time was encountered.
+
+
+<pre><code><b>const</b> <a href="reconfiguration.md#0x1_reconfiguration_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>: u64 = 5;
 </code></pre>
 
 

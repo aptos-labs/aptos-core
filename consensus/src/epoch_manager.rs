@@ -1075,7 +1075,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     let my_index = epoch_state.verifier.address_to_validator_index().get(&self.author).copied();
                     debug!("[DKG] start_new_epoch: with current_epoch={:?}, target_epoch={}, my_index_in_target_epoch={:?}", self.epoch_state.as_ref().map(|a|a.epoch), epoch_state.epoch, my_index);
                     if let Some(my_index) = my_index {
-                        let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(dkg_session.serialized_transcript.as_slice()).unwrap();
+                        let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(dkg_session.result.as_slice()).unwrap();
                         let dk = self.get_decrypt_key_for_dkg();
                         let dkg_pvss_config = build_dkg_pvss_config(dkg_session.dealer_epoch, &validator_set);
                         let vuf_pp = WvufPP::from(&dkg_pvss_config.pp);

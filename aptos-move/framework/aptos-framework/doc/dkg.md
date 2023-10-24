@@ -10,20 +10,20 @@
 -  [Resource `DKGState`](#0x1_dkg_DKGState)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_dkg_initialize)
--  [Function `session_in_progress`](#0x1_dkg_session_in_progress)
 -  [Function `start`](#0x1_dkg_start)
--  [Function `finish`](#0x1_dkg_finish)
+-  [Function `update`](#0x1_dkg_update)
+-  [Function `in_progress`](#0x1_dkg_in_progress)
+-  [Function `current_deadline`](#0x1_dkg_current_deadline)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
-<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
+<b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 </code></pre>
 
 
@@ -66,7 +66,7 @@
 ## Struct `DKGSessionState`
 
 The input and output of a DKG session.
-The validator set of epoch <code>x</code> works together and outputs a transcript for the target validator set of epoch <code>y</code> (typically <code>x+1</code>).
+The validator set of epoch <code>x</code> works together and outputs a transcript for the target validator set of epoch <code>x+1</code>.
 
 
 <pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a> <b>has</b> <b>copy</b>, drop, store
@@ -104,7 +104,13 @@ The validator set of epoch <code>x</code> works together and outputs a transcrip
 
 </dd>
 <dt>
-<code>serialized_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+<code>result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>deadline_microseconds: u64</code>
 </dt>
 <dd>
 
@@ -161,10 +167,27 @@ The complete and ongoing DKG sessions.
 
 <a name="0x1_dkg_EINVALID_GUID_FOR_EVENT"></a>
 
-An invalid block time was encountered.
 
 
-<pre><code><b>const</b> <a href="dkg.md#0x1_dkg_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>: u64 = 5;
+<pre><code><b>const</b> <a href="dkg.md#0x1_dkg_EINVALID_GUID_FOR_EVENT">EINVALID_GUID_FOR_EVENT</a>: u64 = 3;
+</code></pre>
+
+
+
+<a name="0x1_dkg_EDKG_IN_PROGRESS"></a>
+
+
+
+<pre><code><b>const</b> <a href="dkg.md#0x1_dkg_EDKG_IN_PROGRESS">EDKG_IN_PROGRESS</a>: u64 = 1;
+</code></pre>
+
+
+
+<a name="0x1_dkg_EDKG_NOT_IN_PROGRESS"></a>
+
+
+
+<pre><code><b>const</b> <a href="dkg.md#0x1_dkg_EDKG_NOT_IN_PROGRESS">EDKG_NOT_IN_PROGRESS</a>: u64 = 2;
 </code></pre>
 
 
@@ -202,37 +225,10 @@ An invalid block time was encountered.
 
 </details>
 
-<a name="0x1_dkg_session_in_progress"></a>
-
-## Function `session_in_progress`
-
-Return the currently in-progress DKG session, if there is one.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_session_in_progress">session_in_progress</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_session_in_progress">session_in_progress</a>(): Option&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a>&gt; <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-    <b>let</b> dkg_state = <b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    dkg_state.in_progress
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_dkg_start"></a>
 
 ## Function `start`
 
-Mark the start of a new DKG session by storing the input. Also emit the <code><a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a></code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, dealer_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>, target_epoch: u64, target_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>)
@@ -244,16 +240,21 @@ Mark the start of a new DKG session by storing the input. Also emit the <code><a
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, dealer_validator_set: ValidatorSet, target_epoch: u64, target_validator_set: ValidatorSet) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() - Started."));
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(
+    dealer_epoch: u64,
+    dealer_validator_set: ValidatorSet,
+    target_epoch: u64,
+    target_validator_set: ValidatorSet
+) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    <b>assert</b>!(std::option::is_none(&dkg_state.in_progress), 1);
+    <b>assert</b>!(std::option::is_none(&dkg_state.in_progress), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="dkg.md#0x1_dkg_EDKG_IN_PROGRESS">EDKG_IN_PROGRESS</a>));
     dkg_state.in_progress = std::option::some(<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a> {
         dealer_epoch,
         dealer_validator_set,
         target_epoch,
         target_validator_set,
-        serialized_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+        deadline_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() + 60000000,
+        result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
     });
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a>&gt;(
         &<b>mut</b> dkg_state.events,
@@ -262,7 +263,6 @@ Mark the start of a new DKG session by storing the input. Also emit the <code><a
             target_validator_set,
         },
     );
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"<a href="dkg.md#0x1_dkg_start">dkg::start</a>() - Finished."))
 }
 </code></pre>
 
@@ -270,14 +270,16 @@ Mark the start of a new DKG session by storing the input. Also emit the <code><a
 
 </details>
 
-<a name="0x1_dkg_finish"></a>
+<a name="0x1_dkg_update"></a>
 
-## Function `finish`
+## Function `update`
 
-Mark the ongoing DKG session complete.
+Update the current DKG state with a potential transcript.
+Return true if the current DKG becomes inactive and we should start a new epoch.
+Abort if no DKG is in progress.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_finish">finish</a>(serialized_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <b>update</b>(dkg_result_available: bool, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 </code></pre>
 
 
@@ -286,14 +288,72 @@ Mark the ongoing DKG session complete.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_finish">finish</a>(serialized_transcript: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="dkg.md#0x1_dkg_finish">dkg::finish</a>() - Started."));
-    <b>let</b> session_in_progress = std::option::extract(&<b>mut</b> <a href="dkg.md#0x1_dkg_session_in_progress">session_in_progress</a>());
-    session_in_progress.serialized_transcript = serialized_transcript;
-    <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    state.last_complete = std::option::some(session_in_progress);
-    state.in_progress = std::option::none();
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&std::string::utf8(b"<a href="dkg.md#0x1_dkg_finish">dkg::finish</a>() - Finished."))
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <b>update</b>(dkg_result_available: bool, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&dkg_state.in_progress), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="dkg.md#0x1_dkg_EDKG_NOT_IN_PROGRESS">EDKG_NOT_IN_PROGRESS</a>));
+    <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> dkg_state.in_progress);
+    <b>let</b> dkg_completed = <b>false</b>;
+    <b>if</b> (dkg_result_available) {
+        session.result = dkg_result;
+        dkg_completed = <b>true</b>;
+    };
+    <b>if</b> (<a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() &gt;= session.deadline_microseconds || dkg_completed) {
+        dkg_state.last_complete = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(session);
+        dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+        <b>true</b>
+    } <b>else</b> {
+        dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(session);
+        <b>false</b>
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_dkg_in_progress"></a>
+
+## Function `in_progress`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress">in_progress</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress">in_progress</a>(): bool <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_dkg_current_deadline"></a>
+
+## Function `current_deadline`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_current_deadline">current_deadline</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_current_deadline">current_deadline</a>(): u64 <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>let</b> in_progress_session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress);
+    in_progress_session.deadline_microseconds
 }
 </code></pre>
 

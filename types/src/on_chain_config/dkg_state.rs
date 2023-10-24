@@ -10,7 +10,8 @@ pub struct DKGSessionState {
     pub dealer_validator_set: ValidatorSet,
     pub target_epoch: u64,
     pub target_validator_set: ValidatorSet,
-    pub serialized_transcript: Vec<u8>,
+    pub result: Vec<u8>,
+    pub deadline_microseconds: u64,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
