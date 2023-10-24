@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig};
+use super::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig, ChainHealthBackoffValues};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 
@@ -139,6 +139,7 @@ pub struct DagConsensusConfig {
     pub rb_config: ReliableBroadcastConfig,
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
+    pub chain_backoff_config: Vec<ChainHealthBackoffValues>,
 }
 
 impl ConfigSanitizer for DagConsensusConfig {

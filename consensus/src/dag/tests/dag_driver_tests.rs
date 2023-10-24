@@ -3,7 +3,7 @@
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
-        anchor_election::RoundRobinAnchorElection,
+        anchor_election::{RoundRobinAnchorElection, TChainHealthBackoff},
         dag_driver::DagDriver,
         dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
@@ -92,6 +92,18 @@ impl TLedgerInfoProvider for MockLedgerInfoProvider {
     }
 }
 
+struct MockChainHealthBackoff {}
+
+impl TChainHealthBackoff for MockChainHealthBackoff {
+    fn get_round_backoff(&self, _round: Round) -> Option<Duration> {
+        None
+    }
+
+    fn get_round_payload_limits(&self, _round: Round) -> Option<(u64, u64)> {
+        None
+    }
+}
+
 #[tokio::test]
 async fn test_certified_node_handler() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
@@ -125,7 +137,7 @@ async fn test_certified_node_handler() {
         epoch_state.clone(),
         1,
         dag.clone(),
-        Box::new(RoundRobinAnchorElection::new(validators)),
+        Arc::new(RoundRobinAnchorElection::new(validators)),
         Arc::new(TestNotifier { tx }),
         storage.clone(),
         TEST_DAG_WINDOW as Round,
@@ -164,6 +176,7 @@ async fn test_certified_node_handler() {
         round_state,
         TEST_DAG_WINDOW as Round,
         DagPayloadConfig::default(),
+        Arc::new(MockChainHealthBackoff {}),
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
