@@ -213,7 +213,7 @@ pub struct DagConsensusConfigV1 {
 impl Default for DagConsensusConfigV1 {
     fn default() -> Self {
         Self {
-            dag_ordering_causal_history_window: 1,
+            dag_ordering_causal_history_window: 10,
         }
     }
 }

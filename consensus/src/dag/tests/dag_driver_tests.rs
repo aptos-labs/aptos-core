@@ -7,12 +7,13 @@ use crate::{
         dag_driver::{DagDriver, DagDriverError},
         dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
-        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
         order_rule::OrderRule,
         round_state::{OptimisticResponsive, RoundState},
         tests::{
-            dag_test::MockStorage, helpers::new_certified_node, order_rule_tests::TestNotifier,
+            dag_test::MockStorage,
+            helpers::{new_certified_node, TEST_DAG_WINDOW},
+            order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage},
         RpcHandler,
@@ -20,6 +21,7 @@ use crate::{
     payload_manager::PayloadManager,
     test_utils::MockPayloadManager,
 };
+use aptos_config::config::{DagFetcherConfig, DagPayloadConfig};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
@@ -68,6 +70,8 @@ impl TDAGNetworkSender for MockNetworkSender {
         _message: DAGMessage,
         _retry_interval: Duration,
         _rpc_timeout: Duration,
+        _min_concurrent_responders: u32,
+        _max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         unimplemented!()
     }
@@ -102,7 +106,7 @@ async fn test_certified_node_handler() {
         epoch_state.clone(),
         storage.clone(),
         0,
-        DAG_WINDOW,
+        TEST_DAG_WINDOW,
     )));
 
     let network_sender = Arc::new(MockNetworkSender {});
@@ -123,6 +127,7 @@ async fn test_certified_node_handler() {
         Box::new(RoundRobinAnchorElection::new(validators)),
         Arc::new(TestNotifier { tx }),
         storage.clone(),
+        TEST_DAG_WINDOW as Round,
     );
 
     let (_, fetch_requester, _, _) = DagFetcherService::new(
@@ -130,6 +135,7 @@ async fn test_certified_node_handler() {
         network_sender,
         dag.clone(),
         aptos_time_service::TimeService::mock(),
+        DagFetcherConfig::default(),
     );
     let fetch_requester = Arc::new(fetch_requester);
 
@@ -155,6 +161,8 @@ async fn test_certified_node_handler() {
         fetch_requester,
         ledger_info_provider,
         round_state,
+        TEST_DAG_WINDOW as Round,
+        DagPayloadConfig::default(),
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);

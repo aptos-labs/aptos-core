@@ -3,9 +3,8 @@
 use super::dag_test::MockStorage;
 use crate::dag::{
     dag_fetcher::FetchRequestHandler,
-    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
-    tests::helpers::new_certified_node,
+    tests::helpers::{new_certified_node, TEST_DAG_WINDOW},
     types::{DagSnapshotBitmask, FetchResponse, RemoteFetchRequest},
     RpcHandler,
 };
@@ -26,7 +25,7 @@ async fn test_dag_fetcher_receiver() {
         epoch_state.clone(),
         storage,
         0,
-        DAG_WINDOW,
+        TEST_DAG_WINDOW,
     )));
 
     let mut fetcher = FetchRequestHandler::new(dag.clone(), epoch_state);

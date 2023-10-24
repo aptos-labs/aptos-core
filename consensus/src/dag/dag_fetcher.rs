@@ -9,6 +9,7 @@ use crate::dag::{
     types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
 };
 use anyhow::{anyhow, ensure};
+use aptos_config::config::DagFetcherConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
@@ -139,6 +140,7 @@ impl DagFetcherService {
         network: Arc<dyn TDAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
         time_service: TimeService,
+        config: DagFetcherConfig,
     ) -> (
         Self,
         FetchRequester,
@@ -151,7 +153,7 @@ impl DagFetcherService {
         let ordered_authors = epoch_state.verifier.get_ordered_account_addresses();
         (
             Self {
-                inner: DagFetcher::new(epoch_state, network, time_service),
+                inner: DagFetcher::new(epoch_state, network, time_service, config),
                 dag,
                 request_rx,
                 ordered_authors,
@@ -230,6 +232,7 @@ pub(crate) struct DagFetcher {
     network: Arc<dyn TDAGNetworkSender>,
     time_service: TimeService,
     epoch_state: Arc<EpochState>,
+    config: DagFetcherConfig,
 }
 
 impl DagFetcher {
@@ -237,11 +240,13 @@ impl DagFetcher {
         epoch_state: Arc<EpochState>,
         network: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
+        config: DagFetcherConfig,
     ) -> Self {
         Self {
             network,
             time_service,
             epoch_state,
+            config,
         }
     }
 }
@@ -264,10 +269,12 @@ impl TDagFetcher for DagFetcher {
         let mut rpc = RpcWithFallback::new(
             responders,
             remote_request.clone().into(),
-            Duration::from_millis(500),
-            Duration::from_secs(1),
+            Duration::from_millis(self.config.retry_interval_ms),
+            Duration::from_millis(self.config.rpc_timeout_ms),
             self.network.clone(),
             self.time_service.clone(),
+            self.config.min_concurrent_responders,
+            self.config.max_concurrent_responders,
         );
 
         while let Some(response) = rpc.next().await {
