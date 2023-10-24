@@ -12,7 +12,7 @@ use crate::dag::{
     types::{Node, NodeCertificate, Vote},
 };
 use anyhow::{bail, ensure};
-use aptos_config::config::DagNodePayloadConfig;
+use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
@@ -38,7 +38,7 @@ pub(crate) struct NodeBroadcastHandler {
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
-    payload_config: DagNodePayloadConfig,
+    payload_config: DagPayloadConfig,
 }
 
 impl NodeBroadcastHandler {
@@ -48,7 +48,7 @@ impl NodeBroadcastHandler {
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
-        payload_config: DagNodePayloadConfig,
+        payload_config: DagPayloadConfig,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -87,8 +87,8 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
-        ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns);
-        ensure!(node.payload().size() as u64 <= self.payload_config.max_receiving_size_bytes);
+        ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns_per_round);
+        ensure!(node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes);
 
         let current_round = node.metadata().round();
 

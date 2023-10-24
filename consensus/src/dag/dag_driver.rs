@@ -25,7 +25,7 @@ use crate::{
     state_replication::PayloadClient,
 };
 use anyhow::bail;
-use aptos_config::config::DagNodePayloadConfig;
+use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, PayloadFilter};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
@@ -63,7 +63,7 @@ pub(crate) struct DagDriver {
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
     window_size_config: Round,
-    payload_config: DagNodePayloadConfig,
+    payload_config: DagPayloadConfig,
 }
 
 impl DagDriver {
@@ -81,7 +81,7 @@ impl DagDriver {
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         round_state: RoundState,
         window_size_config: Round,
-        payload_config: DagNodePayloadConfig,
+        payload_config: DagPayloadConfig,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -195,12 +195,23 @@ impl DagDriver {
                 )
             }
         };
+        // TODO: warn/panic if division yields 0 txns
+        let max_txns = self
+            .payload_config
+            .max_sending_txns_per_round
+            .saturating_div(self.epoch_state.verifier.len())
+            .max(1);
+        let max_txn_size_bytes = self
+            .payload_config
+            .max_sending_size_per_round_bytes
+            .saturating_div(self.epoch_state.verifier.len())
+            .max(1024);
         let payload = match self
             .payload_client
             .pull_payload(
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
-                self.payload_config.max_sending_txns,
-                self.payload_config.max_sending_size_bytes,
+                self.payload_config.max_sending_txns_per_round,
+                self.payload_config.max_sending_size_per_round_bytes,
                 payload_filter,
                 Box::pin(async {}),
                 false,

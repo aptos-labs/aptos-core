@@ -10,7 +10,7 @@ use crate::dag::{
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
 };
-use aptos_config::config::DagNodePayloadConfig;
+use aptos_config::config::DagPayloadConfig;
 use aptos_infallible::RwLock;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState,
@@ -61,7 +61,7 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockFetchRequester {}),
-        DagNodePayloadConfig::default(),
+        DagPayloadConfig::default(),
     );
 
     let expected_result = Vote::new(
@@ -105,7 +105,7 @@ async fn test_node_broadcast_receiver_failure() {
                 epoch_state.clone(),
                 storage,
                 Arc::new(MockFetchRequester {}),
-                DagNodePayloadConfig::default(),
+                DagPayloadConfig::default(),
             )
         })
         .collect();
@@ -186,7 +186,7 @@ async fn test_node_broadcast_receiver_storage() {
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockFetchRequester {}),
-        DagNodePayloadConfig::default(),
+        DagPayloadConfig::default(),
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -201,7 +201,7 @@ async fn test_node_broadcast_receiver_storage() {
         epoch_state,
         storage.clone(),
         Arc::new(MockFetchRequester {}),
-        DagNodePayloadConfig::default(),
+        DagPayloadConfig::default(),
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);

@@ -159,8 +159,9 @@ impl DagBootstrapper {
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
 
         // A backoff policy that starts at _base_*_factor_ ms and multiplies by _base_ each iteration.
-        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base)
-            .factor(rb_config.backoff_policy_factor);
+        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+            .factor(rb_config.backoff_policy_factor)
+            .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let rb = Arc::new(ReliableBroadcast::new(
             validators.clone(),
             self.rb_network_sender.clone(),

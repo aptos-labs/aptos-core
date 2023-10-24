@@ -4,29 +4,29 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct DagNodePayloadConfig {
-    pub max_sending_txns: u64,
-    pub max_sending_size_bytes: u64,
-    pub max_receiving_txns: u64,
-    pub max_receiving_size_bytes: u64,
+pub struct DagPayloadConfig {
+    pub max_sending_txns_per_round: u64,
+    pub max_sending_size_per_round_bytes: u64,
+    pub max_receiving_txns_per_round: u64,
+    pub max_receiving_size_per_round_bytes: u64,
 
     pub payload_pull_max_poll_time_ms: u64,
 }
 
-impl Default for DagNodePayloadConfig {
+impl Default for DagPayloadConfig {
     fn default() -> Self {
         Self {
-            max_sending_txns: 1000,
-            max_sending_size_bytes: 10 * 1024 * 1024,
-            max_receiving_txns: 2000,
-            max_receiving_size_bytes: 20 * 1024 * 1024,
+            max_sending_txns_per_round: 1000,
+            max_sending_size_per_round_bytes: 10 * 1024 * 1024,
+            max_receiving_txns_per_round: 2000,
+            max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 1000,
         }
     }
 }
 
-impl ConfigSanitizer for DagNodePayloadConfig {
+impl ConfigSanitizer for DagPayloadConfig {
     fn sanitize(
         node_config: &NodeConfig,
         _node_type: NodeType,
@@ -41,16 +41,16 @@ impl ConfigSanitizer for DagNodePayloadConfig {
     }
 }
 
-impl DagNodePayloadConfig {
+impl DagPayloadConfig {
     fn sanitize_payload_size_limits(
         sanitizer_name: &str,
-        config: &DagNodePayloadConfig,
+        config: &DagPayloadConfig,
     ) -> Result<(), Error> {
         let send_recv_pairs = [
-            (config.max_sending_txns, config.max_receiving_txns, "txns"),
+            (config.max_sending_txns_per_round, config.max_receiving_txns_per_round, "txns"),
             (
-                config.max_sending_size_bytes,
-                config.max_receiving_size_bytes,
+                config.max_sending_size_per_round_bytes,
+                config.max_receiving_size_per_round_bytes,
                 "bytes",
             ),
         ];
@@ -89,8 +89,9 @@ impl Default for DagFetcherConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ReliableBroadcastConfig {
-    pub backoff_policy_base: u64,
+    pub backoff_policy_base_ms: u64,
     pub backoff_policy_factor: u64,
+    pub backoff_policy_max_delay_ms: u64,
 
     pub rpc_timeout_ms: u64,
 }
@@ -98,9 +99,10 @@ pub struct ReliableBroadcastConfig {
 impl Default for ReliableBroadcastConfig {
     fn default() -> Self {
         Self {
-            // A backoff policy that starts at 100ms and doubles each iteration.
-            backoff_policy_base: 2,
+            // A backoff policy that starts at 100ms and doubles each iteration up to 3secs.
+            backoff_policy_base_ms: 2,
             backoff_policy_factor: 50,
+            backoff_policy_max_delay_ms: 3000,
 
             rpc_timeout_ms: 500,
         }
@@ -126,7 +128,7 @@ impl Default for DagRoundStateConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagConsensusConfig {
-    pub node_payload_config: DagNodePayloadConfig,
+    pub node_payload_config: DagPayloadConfig,
     pub rb_config: ReliableBroadcastConfig,
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
@@ -135,7 +137,7 @@ pub struct DagConsensusConfig {
 impl Default for DagConsensusConfig {
     fn default() -> Self {
         Self {
-            node_payload_config: DagNodePayloadConfig::default(),
+            node_payload_config: DagPayloadConfig::default(),
             rb_config: ReliableBroadcastConfig::default(),
             fetcher_config: DagFetcherConfig::default(),
             round_state_config: DagRoundStateConfig::default(),
@@ -149,7 +151,7 @@ impl ConfigSanitizer for DagConsensusConfig {
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
-        DagNodePayloadConfig::sanitize(node_config, node_type, chain_id)?;
+        DagPayloadConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
     }

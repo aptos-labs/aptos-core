@@ -21,7 +21,7 @@ use crate::{
     payload_manager::PayloadManager,
     test_utils::MockPayloadManager,
 };
-use aptos_config::config::{DagFetcherConfig, DagNodePayloadConfig};
+use aptos_config::config::{DagFetcherConfig, DagPayloadConfig};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
@@ -162,7 +162,7 @@ async fn test_certified_node_handler() {
         ledger_info_provider,
         round_state,
         TEST_DAG_WINDOW as Round,
-        DagNodePayloadConfig::default(),
+        DagPayloadConfig::default(),
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
