@@ -17,34 +17,45 @@ use aptos_language_e2e_tests::{
     },
 };
 use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
+use aptos_vm::counters::USER_TRANSACTIONS_EXECUTED;
 
 fn txn(seq_num: u64) -> SignedTransaction {
     let account = Account::new();
     let aptos_root = Account::new_aptos_root();
-    create_account_txn(&aptos_root, &account, seq_num + 1)
+    create_account_txn(&aptos_root, &account, seq_num)
 }
 
 #[test]
 fn test_execution_strategies() {
+    aptos_logger::Logger::init_for_testing();
+    const NUM_TXNS: u64 = 10;
     {
+        USER_TRANSACTIONS_EXECUTED.reset();
         println!("===========================================================================");
         println!("TESTING BASIC STRATEGY");
         println!("===========================================================================");
-        let big_block = (0..10).map(txn).collect();
+        let big_block = (0..NUM_TXNS).map(txn).collect();
         let mut exec = BasicExecutor::new();
         exec.execute_block(big_block).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        assert!(success_cnt.get() == NUM_TXNS);
     }
 
     {
+        USER_TRANSACTIONS_EXECUTED.reset();
         println!("===========================================================================");
         println!("TESTING RANDOM STRATEGY");
         println!("===========================================================================");
-        let big_block = (0..10).map(txn).collect();
+        let big_block = (0..NUM_TXNS).map(txn).collect();
         let mut exec = RandomExecutor::from_os_rng();
         exec.execute_block(big_block).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        assert!(success_cnt.get() == NUM_TXNS);
     }
 
     {
+        USER_TRANSACTIONS_EXECUTED.reset();
+
         println!("===========================================================================");
         println!("TESTING GUIDED STRATEGY");
         println!("===========================================================================");
@@ -69,9 +80,17 @@ fn test_execution_strategies() {
 
         let mut exec = GuidedExecutor::new(PartitionedGuidedStrategy);
         exec.execute_block(block1).unwrap();
+
+        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        assert!(success_cnt.get() == 42);
+
     }
 
     {
+        USER_TRANSACTIONS_EXECUTED.reset();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        assert!(success_cnt.get() == 0);
+
         println!("===========================================================================");
         println!("TESTING COMPOSED STRATEGY 1");
         println!("===========================================================================");
@@ -98,18 +117,27 @@ fn test_execution_strategies() {
         exec.add_executor(GuidedExecutor::new(PartitionedGuidedStrategy));
         exec.add_executor(GuidedExecutor::new(UnPartitionedGuidedStrategy));
         exec.execute_block(block1).unwrap();
+
+        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        assert!(success_cnt.get() == 42 * 2);
     }
 
     {
+        USER_TRANSACTIONS_EXECUTED.reset();
+
         println!("===========================================================================");
         println!("TESTING COMPOSED STRATEGY 2");
         println!("===========================================================================");
-        let block = (0..10).map(txn).collect();
+        let block = (0..NUM_TXNS).map(txn).collect();
 
         let mut exec = MultiExecutor::<SignedTransaction, VMStatus>::new();
         exec.add_executor(RandomExecutor::from_os_rng());
         exec.add_executor(RandomExecutor::from_os_rng());
         exec.add_executor(RandomExecutor::from_os_rng());
         exec.execute_block(block).unwrap();
+
+        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        assert!(success_cnt.get() == NUM_TXNS * 3);
+
     }
 }

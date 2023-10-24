@@ -22,8 +22,8 @@ impl PartitionStrategy for BasicStrategy {
 }
 
 pub struct BasicExecutor {
-    executor: FakeExecutor,
-    strategy: BasicStrategy,
+    pub executor: FakeExecutor,
+    pub strategy: BasicStrategy,
 }
 
 impl Default for BasicExecutor {
