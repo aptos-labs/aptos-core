@@ -7,12 +7,13 @@ title: "Run a Local Development Network"
 You can run the Aptos network locally. This local network will not be connected to any production Aptos network (e.g. mainnet), it will run on your local machine, independent of other Aptos networks. Building against a local network has a few advantages:
 - **No ratelimits:** Hosted services (including the Node API, Indexer API, and faucet) are generally subject to ratelimits. Local development networks have no ratelimits.
 - **Reproducibility:** When using a production network you might have to repeatedly make new accounts or rename Move modules to avoid incompatibility issues. With a local network you can just choose to start from scratch.
-- **High availability:** The Aptos devnet and testnet networks are occasionally upgraded, during which time they can be unavailable. The internet can also be unreliable sometimes. Local development networks are always available, even if you have no internet access.
+- **High availability:** The Aptos devnet and testnet networks are periodically upgraded, during which time they can be unavailable. The internet can also be unreliable sometimes. Local development networks are always available, even if you have no internet access.
 
 ## Prerequisites
 In order to run a local development network you must have the following installed:
 - Aptos CLI: [Installation Guide](../tools/aptos-cli/install-cli/index.md).
 - Docker: [Installation Guide](https://docs.docker.com/get-docker/).
+  - Docker Desktop is the strongly recommended installation method.
 
 :::tip
 If you do not want to run an [Indexer API](../indexer/api/index.md) as part of your local network (`--with-indexer-api`) you do not need to install Docker. Note that without the Indexer API your local network will be incomplete compared to a production network. Many features in the downstream tooling will not work as expected / at all without this API available.
@@ -230,7 +231,26 @@ Make sure the socket for connecting to Docker is present on your machine in the 
 /var/run/docker.sock
 ```
 
-If you're on Mac or Windows, we recommend you use Docker Desktop rather than installing Docker via a package manager (e.g. Homebrew or Choco).
+If it doesn't, you can find where it is like this:
+```
+$ docker context inspect | grep Host
+  "Host": "unix:///Users/dport/.docker/run/docker.sock",
+```
+
+Then make a symlink to it in the expected location:
+```
+sudo ln -s /Users/dport/.docker/run/docker.sock /var/run/docker.sock
+```
+
+Alternatively, run the CLI like this to tell it where the socket is:
+```
+DEFAULT_SOCKET=/Users/dport/.docker/run/docker.sock aptos node run-local-testnet --with-indexer-api
+```
+
+Note: If you're on Mac or Windows, we recommend you use Docker Desktop rather than installing Docker via a package manager (e.g. Homebrew or Choco).
+
+### The local network seems to hang on startup
+If the CLI seems to sit there and do nothing when you are using `--with-indexer-api`, consider quitting and restarting Docker. Sometimes Docker gets in a bad state. Note that Docker is only required if you are using `--with-indexer-api`.
 
 ### How do I use the Postgres on my host machine?
 By default when using `--with-indexer-api` the CLI will run a Postgres instance in Docker. If you have Postgres running on your host machine and would like to use that instead, you can do so with the `--use-host-postgres` flag. There are also flags for specifying how it should connect to the host Postgres. Here is an example invocation:
