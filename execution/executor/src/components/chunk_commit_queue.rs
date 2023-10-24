@@ -58,6 +58,10 @@ impl ChunkCommitQueue {
             .pop_front()
             .ok_or_else(|| anyhow!("Commit queue is empty."))?;
         self.persisted_view = committed_chunk.result_view.clone();
+        self.persisted_view
+            .state()
+            .current
+            .log_generation("commit_queue_base");
         Ok(())
     }
 }

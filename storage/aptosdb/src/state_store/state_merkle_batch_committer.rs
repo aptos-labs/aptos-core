@@ -91,6 +91,8 @@ impl StateMerkleBatchCommitter {
                     if !self.state_db.skip_usage {
                         self.check_usage_consistency(&state_delta).unwrap();
                     }
+                    state_delta.base.log_generation("buffered_state_commit");
+                    state_delta.current.log_generation("buffered_state_in_mem_base");
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
