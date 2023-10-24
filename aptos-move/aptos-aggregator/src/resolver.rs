@@ -19,7 +19,13 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use move_binary_format::errors::Location;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    vm_status::{StatusCode, VMStatus},
+};
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
 /// and new, more general, TDelayedFieldView.
@@ -81,6 +87,11 @@ pub trait TAggregatorV1View {
                     Some("Cannot convert delta for deleted aggregator".to_string()),
                 )
             })?;
+
+        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can be constructed.
+        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
+        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
+
         delta_op
             .apply_to(base)
             .map_err(|e| match &e {
@@ -95,7 +106,14 @@ pub trait TAggregatorV1View {
                 _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
                     .into(),
             })
-            .map_err(|partial_error| partial_error.finish(Location::Undefined).into_vm_status())
+            .map_err(|partial_error| {
+                partial_error
+                    .finish(Location::Module(ModuleId::new(
+                        AGGREGATOR_V1_ADDRESS,
+                        AGGREGATOR_V1_MODULE_NAME.into(),
+                    )))
+                    .into_vm_status()
+            })
             .map(|result| WriteOp::Modification(serialize(&result).into()))
     }
 }
