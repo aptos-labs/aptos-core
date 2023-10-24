@@ -74,6 +74,8 @@ return true.
 -  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
+-  [Function `get_operator_beneficiary_change_feature`](#0x1_features_get_operator_beneficiary_change_feature)
+-  [Function `operator_beneficiary_change_enabled`](#0x1_features_operator_beneficiary_change_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -343,6 +345,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_OPERATOR_BENEFICIARY_CHANGE"></a>
+
+Whether allow changing beneficiaries for operators.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>: u64 = 39;
+</code></pre>
+
+
+
 <a name="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
 
 Whether enable paritial governance voting on aptos_governance.
@@ -372,6 +385,24 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS">RESOURCE_GROUPS</a>: u64 = 9;
+</code></pre>
+
+
+
+<a name="0x1_features_SAFER_METADATA"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_METADATA">SAFER_METADATA</a>: u64 = 32;
+</code></pre>
+
+
+
+<a name="0x1_features_SAFER_RESOURCE_GROUPS"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_RESOURCE_GROUPS">SAFER_RESOURCE_GROUPS</a>: u64 = 31;
 </code></pre>
 
 
@@ -406,6 +437,15 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
+</code></pre>
+
+
+
+<a name="0x1_features_SINGLE_SENDER_AUTHENTICATOR"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SINGLE_SENDER_AUTHENTICATOR">SINGLE_SENDER_AUTHENTICATOR</a>: u64 = 33;
 </code></pre>
 
 
@@ -1441,6 +1481,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_sponsored_automatic_account_creation_enabled">sponsored_automatic_account_creation_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_get_operator_beneficiary_change_feature"></a>
+
+## Function `get_operator_beneficiary_change_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operator_beneficiary_change_feature">get_operator_beneficiary_change_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operator_beneficiary_change_feature">get_operator_beneficiary_change_feature</a>(): u64 { <a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_features_operator_beneficiary_change_enabled"></a>
+
+## Function `operator_beneficiary_change_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operator_beneficiary_change_enabled">operator_beneficiary_change_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operator_beneficiary_change_enabled">operator_beneficiary_change_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>)
 }
 </code></pre>
 

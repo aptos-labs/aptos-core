@@ -44,6 +44,7 @@ pub enum FeatureFlag {
     SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
+    OPERATOR_BENEFICIARY_CHANGE = 39,
 }
 
 /// Representation of features on chain as a bitset.

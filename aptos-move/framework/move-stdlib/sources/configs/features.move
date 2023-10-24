@@ -251,6 +251,12 @@ module std::features {
         is_enabled(AGGREGATOR_SNAPSHOTS)
     }
 
+    const SAFER_RESOURCE_GROUPS: u64 = 31;
+
+    const SAFER_METADATA: u64 = 32;
+
+    const SINGLE_SENDER_AUTHENTICATOR: u64 = 33;
+
     /// Whether the automatic creation of accounts is enabled for sponsored transactions.
     /// Lifetime: transient
     const SPONSORED_AUTOMATIC_ACCOUNT_CREATION: u64 = 34;
@@ -264,6 +270,16 @@ module std::features {
     /// Whether the fix to reduce the maximum identifer length is enabled.
     /// Lifetime: transient
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
+
+    /// Whether allow changing beneficiaries for operators.
+    /// Lifetime: transient
+    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
+
+    public fun get_operator_beneficiary_change_feature(): u64 { OPERATOR_BENEFICIARY_CHANGE }
+
+    public fun operator_beneficiary_change_enabled(): bool acquires Features {
+        is_enabled(OPERATOR_BENEFICIARY_CHANGE)
+    }
 
     // ============================================================================================
     // Feature Flag Implementation
