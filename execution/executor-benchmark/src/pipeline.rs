@@ -33,7 +33,7 @@ pub struct PipelineConfig {
     pub skip_commit: bool,
     pub allow_discards: bool,
     pub allow_aborts: bool,
-    #[derivative(Default(value = "1"))]
+    #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
     pub use_global_executor: bool,
     #[derivative(Default(value = "4"))]
@@ -164,9 +164,10 @@ where
 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 info!(
-                    "Overall execution TPS: {} txn/s (over {} txns)",
+                    "Overall execution TPS: {} txn/s (over {} txns, in {} s)",
                     executed as f64 / elapsed,
-                    executed
+                    executed,
+                    elapsed
                 );
                 info!(
                     "Overall execution GPS: {} gas/s (over {} txns)",

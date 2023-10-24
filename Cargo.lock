@@ -997,6 +997,7 @@ dependencies = [
  "aptos-network",
  "aptos-short-hex-str",
  "aptos-storage-service-types",
+ "aptos-time-service",
  "aptos-types",
  "async-trait",
  "claims",
@@ -1240,6 +1241,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-drop-helper",
+ "aptos-executor-service",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-experimental-runtimes",
@@ -1281,6 +1283,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-db",
  "aptos-executor",
+ "aptos-executor-service",
  "aptos-executor-types",
  "aptos-experimental-ptx-executor",
  "aptos-experimental-runtimes",
@@ -1326,8 +1329,12 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-executor-types",
+ "aptos-infallible",
  "aptos-language-e2e-tests",
  "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-node-resource-metrics",
+ "aptos-push-metrics",
  "aptos-retrier",
  "aptos-secure-net",
  "aptos-state-view",
@@ -1337,9 +1344,11 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.3.21",
  "crossbeam-channel",
+ "ctrlc",
  "dashmap",
  "itertools 0.10.5",
  "num_cpus",
+ "once_cell",
  "rand 0.7.3",
  "rayon",
  "serde",
@@ -3068,11 +3077,12 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "futures-core",
  "pbjson",
  "prost 0.12.1",
+ "prost-types 0.12.1",
  "serde",
  "tonic 0.10.0",
 ]
@@ -5995,6 +6005,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "049bb91fb4aaf0e3c7efa6cd5ef877dbbbd15b39dad06d9948de4ec8a75761ea"
 dependencies = [
  "cipher",
+]
+
+[[package]]
+name = "ctrlc"
+version = "3.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "82e95fbd621905b854affdc67943b043a0fbb6ed7385fd5a25650d19a8a6cfdf"
+dependencies = [
+ "nix 0.27.1",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -10427,6 +10447,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.4.0",
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "no-std-compat"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11532,7 +11563,7 @@ dependencies = [
  "inferno",
  "libc",
  "log",
- "nix",
+ "nix 0.26.2",
  "once_cell",
  "parking_lot 0.12.1",
  "protobuf",

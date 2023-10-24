@@ -45,6 +45,7 @@ pub enum FeatureFlag {
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
     CONCURRENT_ASSETS = 37,
+    LIMIT_MAX_IDENTIFIER_LENGTH = 38,
 }
 
 /// Representation of features on chain as a bitset.

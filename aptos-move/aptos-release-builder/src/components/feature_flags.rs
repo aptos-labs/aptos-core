@@ -88,6 +88,7 @@ pub enum FeatureFlag {
     FeePayerAccountOptional,
     AggregatorV2DelayedFields,
     ConcurrentAssets,
+    LimitMaxIdentifierLength,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -230,6 +231,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS
             },
             FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
+            FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         }
     }
 }
@@ -295,6 +297,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::AggregatorV2DelayedFields
             },
             AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
+            AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
         }
     }
 }

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network_controller::{Message, MessageType};
+use crate::network_controller::{metrics::NETWORK_HANDLER_TIMER, Message, MessageType};
 use aptos_logger::{error, info};
 use aptos_protos::remote_executor::v1::{
     network_message_service_client::NetworkMessageServiceClient,
@@ -20,13 +20,22 @@ use tonic::{
     Request, Response, Status,
 };
 
+const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 80;
+
 pub struct GRPCNetworkMessageServiceServerWrapper {
     inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
+    self_addr: SocketAddr,
 }
 
 impl GRPCNetworkMessageServiceServerWrapper {
-    pub fn new(inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>) -> Self {
-        Self { inbound_handlers }
+    pub fn new(
+        inbound_handlers: Arc<Mutex<HashMap<MessageType, Sender<Message>>>>,
+        self_addr: SocketAddr,
+    ) -> Self {
+        Self {
+            inbound_handlers,
+            self_addr,
+        }
     }
 
     // Note: The object is consumed here. That is once the server is started, we cannot/should not
@@ -65,10 +74,13 @@ impl GRPCNetworkMessageServiceServerWrapper {
         //           we may need to implement a healthcheck service to check if the server is up
         Server::builder()
             .timeout(std::time::Duration::from_millis(rpc_timeout_ms))
-            .add_service(NetworkMessageServiceServer::new(self))
+            .add_service(
+                NetworkMessageServiceServer::new(self).max_decoding_message_size(MAX_MESSAGE_SIZE),
+            )
             .add_service(reflection_service)
             .serve_with_shutdown(server_addr, async {
                 server_shutdown_rx.await.ok();
+                info!("Received signal to shutdown server at {:?}", server_addr);
             })
             .await
             .unwrap();
@@ -82,6 +94,9 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
         &self,
         request: Request<NetworkMessage>,
     ) -> Result<Response<Empty>, Status> {
+        let _timer = NETWORK_HANDLER_TIMER
+            .with_label_values(&[&self.self_addr.to_string(), "inbound_msgs"])
+            .start_timer();
         let remote_addr = request.remote_addr();
         let network_message = request.into_inner();
         let msg = Message::new(network_message.message);
@@ -119,7 +134,7 @@ impl GRPCNetworkMessageServiceClientWrapper {
         let conn = tonic::transport::Endpoint::new(remote_addr)
             .unwrap()
             .connect_lazy();
-        NetworkMessageServiceClient::new(conn)
+        NetworkMessageServiceClient::new(conn).max_decoding_message_size(MAX_MESSAGE_SIZE)
     }
 
     pub async fn send_message(
@@ -163,7 +178,7 @@ fn basic_test() {
         .lock()
         .unwrap()
         .insert(MessageType::new(message_type.clone()), msg_tx);
-    let server = GRPCNetworkMessageServiceServerWrapper::new(server_handlers);
+    let server = GRPCNetworkMessageServiceServerWrapper::new(server_handlers, server_addr);
 
     let rt = Runtime::new().unwrap();
     let (server_shutdown_tx, server_shutdown_rx) = oneshot::channel();

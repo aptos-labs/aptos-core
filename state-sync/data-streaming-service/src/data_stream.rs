@@ -31,6 +31,7 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use futures::{channel::mpsc, stream::FusedStream, SinkExt, Stream};
 use std::{
     cmp::min,
@@ -38,7 +39,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::task::JoinHandle;
 
@@ -106,6 +107,12 @@ pub struct DataStream<T> {
     // notification to the listener. If so, the stream is dead and it will
     // stop sending notifications. This handles when clients drop the listener.
     send_failure: bool,
+
+    // The measured subscription stream lag (if any)
+    subscription_stream_lag: Option<SubscriptionStreamLag>,
+
+    // The time service to track elapsed time (e.g., during stream lag checks)
+    time_service: TimeService,
 }
 
 impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
@@ -117,6 +124,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         aptos_data_client: T,
         notification_id_generator: Arc<U64IdGenerator>,
         advertised_data: &AdvertisedData,
+        time_service: TimeService,
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener
         let (notification_sender, notification_receiver) =
@@ -141,6 +149,8 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             stream_end_notification_id: None,
             request_failure_count: 0,
             send_failure: false,
+            subscription_stream_lag: None,
+            time_service,
         };
 
         Ok((data_stream, data_stream_listener))
@@ -160,6 +170,24 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     /// Returns true iff the first batch of data client requests has been sent
     pub fn data_requests_initialized(&self) -> bool {
         self.sent_data_requests.is_some()
+    }
+
+    /// Resets the subscription stream lag on the data stream
+    fn reset_subscription_stream_lag(&mut self) {
+        // Reset the subscription stream lag metrics
+        metrics::set_subscription_stream_lag(0);
+
+        // Reset the stream lag
+        self.subscription_stream_lag = None;
+    }
+
+    /// Sets the subscription stream lag on the data stream
+    fn set_subscription_stream_lag(&mut self, subscription_stream_lag: SubscriptionStreamLag) {
+        // Update the subscription stream lag metrics
+        metrics::set_subscription_stream_lag(subscription_stream_lag.version_lag);
+
+        // Set the stream lag
+        self.subscription_stream_lag = Some(subscription_stream_lag)
     }
 
     /// Initializes the data client requests by sending out the first batch
@@ -296,9 +324,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         // Calculate the request timeout to use, based on the
         // request type and the number of previous failures.
-        let request_timeout_ms = if is_optimistic_fetch_request(&data_client_request) {
+        let request_timeout_ms = if data_client_request.is_optimistic_fetch_request() {
             self.data_client_config.optimistic_fetch_timeout_ms
-        } else if is_subscription_request(&data_client_request) {
+        } else if data_client_request.is_subscription_request() {
             self.data_client_config.subscription_response_timeout_ms
         } else if !request_retry {
             self.data_client_config.response_timeout_ms
@@ -421,17 +449,16 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     Ok(client_response) => {
                         // Sanity check and process the response
                         if sanity_check_client_response_type(client_request, &client_response) {
-                            // If the response wasn't enough to satisfy the original request (e.g.,
-                            // it was truncated), missing data should be requested.
-                            let missing_data_requested =
-                                self.request_missing_data(client_request, &client_response.payload);
-
-                            // Send the data notification to the client
+                            // The response is valid, send the data notification to the client
+                            let client_response_payload = client_response.payload.clone();
                             self.send_data_notification_to_client(client_request, client_response)
                                 .await?;
 
-                            // Check if any missing data was requested
-                            match missing_data_requested {
+                            // If the response wasn't enough to satisfy the original request (e.g.,
+                            // it was truncated), missing data should be requested.
+                            match self
+                                .request_missing_data(client_request, &client_response_payload)
+                            {
                                 Ok(missing_data_requested) => {
                                     if missing_data_requested {
                                         break; // We're now head of line blocked on the missing data
@@ -447,6 +474,19 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                                         ));
                                 },
                             }
+
+                            // If the request was a subscription request and the subscription
+                            // stream is lagging behind the data advertisements, the stream
+                            // engine should be notified (e.g., so that it can catch up).
+                            if client_request.is_subscription_request() {
+                                if let Err(error) = self.check_subscription_stream_lag(
+                                    &global_data_summary,
+                                    &client_response_payload,
+                                ) {
+                                    self.notify_new_data_request_error(client_request, error)?;
+                                    break; // We're now head of line blocked on the failed stream
+                                }
+                            }
                         } else {
                             // The sanity check failed
                             self.handle_sanity_check_failure(
@@ -458,14 +498,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     },
                     Err(error) => {
                         // Handle the error depending on the request type
-                        if is_subscription_request(client_request)
-                            || is_optimistic_fetch_request(client_request)
+                        if client_request.is_subscription_request()
+                            || client_request.is_optimistic_fetch_request()
                         {
                             // The request was for new data. We should notify the
                             // stream engine and clear the requests queue.
-                            self.stream_engine
-                                .notify_new_data_request_error(client_request, error)?;
-                            self.clear_sent_data_requests_queue();
+                            self.notify_new_data_request_error(client_request, error)?;
                         } else {
                             // Otherwise, we should handle the error and simply retry
                             self.handle_data_client_error(client_request, &error)?;
@@ -481,6 +519,102 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         // Create and send further client requests to the network
         // to ensure we're maximizing the number of concurrent requests.
         self.create_and_send_client_requests(&global_data_summary)
+    }
+
+    /// Verifies that the subscription stream is not lagging too much (i.e.,
+    /// behind the data advertisements). If it is, an error is returned.
+    fn check_subscription_stream_lag(
+        &mut self,
+        global_data_summary: &GlobalDataSummary,
+        response_payload: &ResponsePayload,
+    ) -> Result<(), aptos_data_client::error::Error> {
+        // Get the highest version sent in the subscription response
+        let highest_response_version = match response_payload {
+            ResponsePayload::NewTransactionsWithProof((transactions_with_proof, _)) => {
+                if let Some(first_version) = transactions_with_proof.first_transaction_version {
+                    let num_transactions = transactions_with_proof.transactions.len();
+                    first_version
+                        .saturating_add(num_transactions as u64)
+                        .saturating_sub(1) // first_version + num_txns - 1
+                } else {
+                    return Err(aptos_data_client::error::Error::UnexpectedErrorEncountered(
+                        "The first transaction version is missing from the stream response!".into(),
+                    ));
+                }
+            },
+            ResponsePayload::NewTransactionOutputsWithProof((outputs_with_proof, _)) => {
+                if let Some(first_version) = outputs_with_proof.first_transaction_output_version {
+                    let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+                    first_version
+                        .saturating_add(num_outputs as u64)
+                        .saturating_sub(1) // first_version + num_outputs - 1
+                } else {
+                    return Err(aptos_data_client::error::Error::UnexpectedErrorEncountered(
+                        "The first output version is missing from the stream response!".into(),
+                    ));
+                }
+            },
+            _ => {
+                return Ok(()); // The response payload doesn't contain a subscription response
+            },
+        };
+
+        // Get the highest advertised version
+        let highest_advertised_version = global_data_summary
+            .advertised_data
+            .highest_synced_ledger_info()
+            .map(|ledger_info| ledger_info.ledger_info().version())
+            .ok_or(aptos_data_client::error::Error::UnexpectedErrorEncountered(
+                "The highest synced ledger info is missing from the global data summary!".into(),
+            ))?;
+
+        // If the stream is not lagging behind, reset the lag and return
+        if highest_response_version >= highest_advertised_version {
+            self.reset_subscription_stream_lag();
+            return Ok(());
+        }
+
+        // Otherwise, the stream is lagging behind the advertised version.
+        // Check if the stream is beyond recovery (i.e., has failed).
+        let current_stream_lag =
+            highest_advertised_version.saturating_sub(highest_response_version);
+        if let Some(mut subscription_stream_lag) = self.subscription_stream_lag.take() {
+            // Check if the stream lag is beyond recovery
+            if subscription_stream_lag
+                .is_beyond_recovery(self.streaming_service_config, current_stream_lag)
+            {
+                return Err(
+                    aptos_data_client::error::Error::SubscriptionStreamIsLagging(format!(
+                        "The subscription stream is beyond recovery! Current lag: {:?}, last lag: {:?},",
+                        current_stream_lag, subscription_stream_lag.version_lag
+                    )),
+                );
+            }
+
+            // The stream is lagging, but it's not yet beyond recovery
+            self.set_subscription_stream_lag(subscription_stream_lag);
+        } else {
+            // The stream was not previously lagging, but it is now!
+            let subscription_stream_lag =
+                SubscriptionStreamLag::new(current_stream_lag, self.time_service.clone());
+            self.set_subscription_stream_lag(subscription_stream_lag);
+        }
+
+        Ok(())
+    }
+
+    /// Notifies the stream engine that a new data request error was encountered
+    fn notify_new_data_request_error(
+        &mut self,
+        client_request: &DataClientRequest,
+        error: aptos_data_client::error::Error,
+    ) -> Result<(), Error> {
+        // Notify the stream engine and clear the requests queue
+        self.stream_engine
+            .notify_new_data_request_error(client_request, error)?;
+        self.clear_sent_data_requests_queue();
+
+        Ok(())
     }
 
     /// Requests any missing data from the previous client response
@@ -738,6 +872,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
 
         (sent_requests, sent_notifications)
     }
+
+    #[cfg(test)]
+    /// Returns the subscription stream lag (for testing)
+    pub fn get_subscription_stream_lag(&self) -> Option<SubscriptionStreamLag> {
+        self.subscription_stream_lag.clone()
+    }
 }
 
 impl<T> Drop for DataStream<T> {
@@ -754,6 +894,54 @@ impl<T> DataStream<T> {
         for spawned_task in &self.spawned_tasks {
             spawned_task.abort();
         }
+    }
+}
+
+/// A simple container to track the start time and lag of a subscription stream
+#[derive(Clone, Debug)]
+pub struct SubscriptionStreamLag {
+    pub start_time: Instant,
+    pub time_service: TimeService,
+    pub version_lag: u64,
+}
+
+impl SubscriptionStreamLag {
+    fn new(version_lag: u64, time_service: TimeService) -> Self {
+        Self {
+            start_time: time_service.now(),
+            time_service,
+            version_lag,
+        }
+    }
+
+    /// Returns true iff the subscription stream lag is considered to be
+    /// beyond recovery. This occurs when: (i) the stream is lagging for
+    /// too long; and (ii) the lag has increased since the last check.
+    fn is_beyond_recovery(
+        &mut self,
+        streaming_service_config: DataStreamingServiceConfig,
+        current_stream_lag: u64,
+    ) -> bool {
+        // Calculate the total duration the stream has been lagging
+        let current_time = self.time_service.now();
+        let stream_lag_duration = current_time.duration_since(self.start_time);
+        let max_stream_lag_duration =
+            Duration::from_secs(streaming_service_config.max_subscription_stream_lag_secs);
+
+        // If the lag is further behind and enough time has passed, the stream has failed
+        let lag_has_increased = current_stream_lag > self.version_lag;
+        let lag_duration_exceeded = stream_lag_duration >= max_stream_lag_duration;
+        if lag_has_increased && lag_duration_exceeded {
+            return true; // The stream is beyond recovery
+        }
+
+        // Otherwise, update the stream lag if we've caught up.
+        // This will ensure the lag can only improve.
+        if current_stream_lag < self.version_lag {
+            self.version_lag = current_stream_lag;
+        }
+
+        false // The stream is not yet beyond recovery
     }
 }
 
@@ -1480,31 +1668,4 @@ async fn subscribe_to_transactions_or_outputs_with_proof<
     );
     let (context, payload) = client_response.await?.into_parts();
     Ok(Response::new(context, ResponsePayload::try_from(payload)?))
-}
-
-/// Returns true iff the given request is an optimistic fetch request
-fn is_optimistic_fetch_request(request: &DataClientRequest) -> bool {
-    matches!(request, DataClientRequest::NewTransactionsWithProof(_))
-        || matches!(
-            request,
-            DataClientRequest::NewTransactionOutputsWithProof(_)
-        )
-        || matches!(
-            request,
-            DataClientRequest::NewTransactionsOrOutputsWithProof(_)
-        )
-}
-
-/// Returns true iff the given request is a subscription request
-fn is_subscription_request(request: &DataClientRequest) -> bool {
-    matches!(
-        request,
-        DataClientRequest::SubscribeTransactionsWithProof(_)
-    ) || matches!(
-        request,
-        DataClientRequest::SubscribeTransactionOutputsWithProof(_)
-    ) || matches!(
-        request,
-        DataClientRequest::SubscribeTransactionsOrOutputsWithProof(_)
-    )
 }

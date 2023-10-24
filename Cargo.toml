@@ -75,7 +75,6 @@ members = [
     "crates/aptos-openapi",
     "crates/aptos-profiler",
     "crates/aptos-proptest-helpers",
-    "crates/aptos-protos",
     "crates/aptos-push-metrics",
     "crates/aptos-rate-limiter",
     "crates/aptos-rest-client",
@@ -134,6 +133,7 @@ members = [
     "peer-monitoring-service/client",
     "peer-monitoring-service/server",
     "peer-monitoring-service/types",
+    "protos/rust",
     "sdk",
     "secure/net",
     "secure/storage",
@@ -373,7 +373,7 @@ aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server"
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
-aptos-protos = { path = "crates/aptos-protos" }
+aptos-protos = { path = "protos/rust" }
 aptos-proxy = { path = "crates/proxy" }
 aptos-push-metrics = { path = "crates/aptos-push-metrics" }
 aptos-rate-limiter = { path = "crates/aptos-rate-limiter" }

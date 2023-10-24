@@ -20,6 +20,7 @@ aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
+aptos-executor-service = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-ptx-executor = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }

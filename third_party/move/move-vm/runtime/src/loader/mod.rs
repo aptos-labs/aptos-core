@@ -323,9 +323,9 @@ impl Loader {
         script: &[u8],
         data_store: &TransactionDataCache,
     ) -> VMResult<CompiledScript> {
-        let script = match CompiledScript::deserialize_with_max_version(
+        let script = match CompiledScript::deserialize_with_config(
             script,
-            self.vm_config.max_binary_format_version,
+            &self.vm_config.deserializer_config,
         ) {
             Ok(script) => script,
             Err(err) => {
@@ -832,17 +832,15 @@ impl Loader {
 
         // for bytes obtained from the data store, they should always deserialize and verify.
         // It is an invariant violation if they don't.
-        let module = CompiledModule::deserialize_with_max_version(
-            &bytes,
-            self.vm_config.max_binary_format_version,
-        )
-        .map_err(|err| {
-            let msg = format!("Deserialization error: {:?}", err);
-            PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                .with_message(msg)
-                .finish(Location::Module(id.clone()))
-        })
-        .map_err(expect_no_verification_errors)?;
+        let module =
+            CompiledModule::deserialize_with_config(&bytes, &self.vm_config.deserializer_config)
+                .map_err(|err| {
+                    let msg = format!("Deserialization error: {:?}", err);
+                    PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
+                        .with_message(msg)
+                        .finish(Location::Module(id.clone()))
+                })
+                .map_err(expect_no_verification_errors)?;
 
         fail::fail_point!("verifier-failpoint-2", |_| { Ok(module.clone()) });
 

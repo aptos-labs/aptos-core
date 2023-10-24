@@ -15,7 +15,11 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::errors::VMResult;
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    errors::VMResult,
+    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
+};
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
@@ -33,6 +37,14 @@ pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u
         6
     } else {
         5
+    }
+}
+
+pub fn get_max_identifier_size(features: &Features) -> u64 {
+    if features.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
+        IDENTIFIER_SIZE_MAX
+    } else {
+        LEGACY_IDENTIFIER_SIZE_MAX
     }
 }
 
@@ -55,6 +67,8 @@ impl MoveVmExt {
         //       the gas schedule hasn't been updated yet.
         let max_binary_format_version =
             get_max_binary_format_version(&features, gas_feature_version);
+
+        let max_identifier_size = get_max_identifier_size(&features);
 
         let enable_invariant_violation_check_in_swap_loc =
             !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
@@ -89,7 +103,10 @@ impl MoveVmExt {
                 builder,
                 VMConfig {
                     verifier: verifier_config,
-                    max_binary_format_version,
+                    deserializer_config: DeserializerConfig::new(
+                        max_binary_format_version,
+                        max_identifier_size,
+                    ),
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,
                     type_size_limit,
