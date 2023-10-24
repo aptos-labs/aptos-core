@@ -91,6 +91,11 @@ impl ClientBuilder {
         self.version_path_base = version_path_base;
         self
     }
+    
+    pub fn tls_sni(mut self, sni_toggle: bool) -> Self {
+        self.reqwest_builder.tls_sni(sni_toggle);
+        self
+    }
 
     pub fn build(self) -> Client {
         let version_path_base = get_version_path_with_base(self.base_url.clone());
