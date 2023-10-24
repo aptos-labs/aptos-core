@@ -6,7 +6,10 @@ use crate::dag::{
     dag_store::Dag,
     rb_handler::{NodeBroadcastHandleError, NodeBroadcastHandler},
     storage::DAGStorage,
-    tests::{dag_test::MockStorage, helpers::{new_node, TEST_DAG_WINDOW}},
+    tests::{
+        dag_test::MockStorage,
+        helpers::{new_node, TEST_DAG_WINDOW},
+    },
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
 };

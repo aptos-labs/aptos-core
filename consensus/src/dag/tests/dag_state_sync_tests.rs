@@ -202,7 +202,10 @@ async fn test_dag_state_sync() {
         .await;
     let new_dag = sync_result.unwrap().unwrap();
 
-    assert_eq!(new_dag.lowest_round(), (LI_ROUNDS - TEST_DAG_WINDOW) as Round);
+    assert_eq!(
+        new_dag.lowest_round(),
+        (LI_ROUNDS - TEST_DAG_WINDOW) as Round
+    );
     assert_eq!(new_dag.highest_round(), NUM_ROUNDS as Round);
     assert_none!(new_dag.highest_ordered_anchor_round(),);
 }

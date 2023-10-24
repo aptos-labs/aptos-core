@@ -56,7 +56,7 @@ use crate::{
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{ConsensusConfig, NodeConfig, SecureBackend, DagConsensusConfig};
+use aptos_config::config::{ConsensusConfig, DagConsensusConfig, NodeConfig, SecureBackend};
 use aptos_consensus_types::{
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,

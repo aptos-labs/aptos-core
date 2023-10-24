@@ -88,7 +88,9 @@ impl NodeBroadcastHandler {
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
         ensure!(node.payload().len() as u64 <= self.payload_config.max_receiving_txns_per_round);
-        ensure!(node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes);
+        ensure!(
+            node.payload().size() as u64 <= self.payload_config.max_receiving_size_per_round_bytes
+        );
 
         let current_round = node.metadata().round();
 

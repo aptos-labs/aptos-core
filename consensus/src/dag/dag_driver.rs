@@ -38,8 +38,8 @@ use futures::{
     FutureExt,
 };
 use std::{sync::Arc, time::Duration};
-use tokio_retry::strategy::ExponentialBackoff;
 use thiserror::Error as ThisError;
+use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Debug, ThisError)]
 pub enum DagDriverError {
