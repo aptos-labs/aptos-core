@@ -2,7 +2,8 @@
 
 use crate::dag::{
     dag_network::{RpcWithFallback, TDAGNetworkSender},
-    types::{DAGMessage, TestAck, TestMessage}, DAGRpcResult,
+    types::{DAGMessage, TestAck, TestMessage},
+    DAGRpcResult,
 };
 use anyhow::{anyhow, bail};
 use aptos_consensus_types::common::Author;
@@ -13,7 +14,7 @@ use aptos_types::validator_verifier::random_validator_verifier;
 use async_trait::async_trait;
 use claims::{assert_err, assert_ok};
 use futures::StreamExt;
-use std::{collections::HashMap, sync::Arc, time::Duration, ops::Deref};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 #[derive(Clone)]
 enum TestPeerState {

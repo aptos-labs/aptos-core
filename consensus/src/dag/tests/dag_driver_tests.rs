@@ -8,6 +8,7 @@ use crate::{
         dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::Dag,
+        errors::DagDriverError,
         order_rule::OrderRule,
         round_state::{OptimisticResponsive, RoundState},
         tests::{
@@ -16,7 +17,7 @@ use crate::{
             order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage},
-        RpcHandler, errors::DagDriverError, DAGRpcResult,
+        DAGRpcResult, RpcHandler,
     },
     payload_manager::PayloadManager,
     test_utils::MockPayloadManager,

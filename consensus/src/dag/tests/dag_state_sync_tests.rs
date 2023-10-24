@@ -10,7 +10,7 @@ use crate::{
         storage::DAGStorage,
         tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
         types::{CertifiedNodeMessage, RemoteFetchRequest},
-        CertifiedNode, DAGMessage, RpcHandler, RpcWithFallback, TDAGNetworkSender, DAGRpcResult,
+        CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
     test_utils::EmptyStateComputer,
 };

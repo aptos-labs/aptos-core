@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 
-use std::ops::Deref;
-
 use aptos_consensus_types::common::Round;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use thiserror::Error as ThisError;
 
 #[derive(Clone, ThisError, Debug, Serialize, Deserialize)]

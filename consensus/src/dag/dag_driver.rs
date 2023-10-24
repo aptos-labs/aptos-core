@@ -19,8 +19,7 @@ use crate::{
             CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
             Extensions, Node, SignatureBuilder,
         },
-        RpcHandler,
-        DAGRpcResult
+        DAGRpcResult, RpcHandler,
     },
     payload_manager::PayloadManager,
     state_replication::PayloadClient,

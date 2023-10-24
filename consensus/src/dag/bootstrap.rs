@@ -13,7 +13,7 @@ use super::{
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     types::DAGMessage,
-    ProofNotifier, DAGRpcResult,
+    DAGRpcResult, ProofNotifier,
 };
 use crate::{
     dag::{

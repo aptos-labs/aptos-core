@@ -4,6 +4,7 @@
 use crate::dag::{
     dag_fetcher::TFetchRequester,
     dag_store::Dag,
+    errors::NodeBroadcastHandleError,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     tests::{
@@ -11,7 +12,7 @@ use crate::dag::{
         helpers::{new_node, TEST_DAG_WINDOW},
     },
     types::NodeCertificate,
-    NodeId, RpcHandler, Vote, errors::NodeBroadcastHandleError,
+    NodeId, RpcHandler, Vote,
 };
 use aptos_config::config::DagPayloadConfig;
 use aptos_infallible::RwLock;

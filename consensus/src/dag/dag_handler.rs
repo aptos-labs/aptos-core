@@ -154,7 +154,7 @@ impl NetworkHandler {
                         .map(|r| r.into())
                         .map_err(|err| {
                             err.downcast::<DagDriverError>()
-                                .map_or(DAGError::Unknown, |err| DAGError::DagDriverError(err))
+                                .map_or(DAGError::Unknown, DAGError::DagDriverError)
                         }),
                     _ => unreachable!("verification must catch this error"),
                 },
