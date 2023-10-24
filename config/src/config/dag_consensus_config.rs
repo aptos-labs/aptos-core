@@ -127,24 +127,13 @@ impl Default for DagRoundStateConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagConsensusConfig {
     pub node_payload_config: DagPayloadConfig,
     pub rb_config: ReliableBroadcastConfig,
     pub fetcher_config: DagFetcherConfig,
     pub round_state_config: DagRoundStateConfig,
-}
-
-impl Default for DagConsensusConfig {
-    fn default() -> Self {
-        Self {
-            node_payload_config: DagPayloadConfig::default(),
-            rb_config: ReliableBroadcastConfig::default(),
-            fetcher_config: DagFetcherConfig::default(),
-            round_state_config: DagRoundStateConfig::default(),
-        }
-    }
 }
 
 impl ConfigSanitizer for DagConsensusConfig {
