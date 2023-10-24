@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::{config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
