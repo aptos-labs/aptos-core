@@ -10,40 +10,40 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 pub trait RBMessage: Send + Sync + Clone {}
 
 #[async_trait]
-pub trait RBNetworkSender<M: RBMessage, R: RBMessage = M>: Send + Sync {
+pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: M,
+        message: Req,
         timeout: Duration,
-    ) -> anyhow::Result<R>;
+    ) -> anyhow::Result<Res>;
 }
 
-pub trait BroadcastStatus<M: RBMessage, R: RBMessage = M> {
-    type Ack: Into<R> + TryFrom<R> + Clone;
+pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req> {
+    type Ack: Into<Res> + TryFrom<Res> + Clone;
     type Aggregated;
-    type Message: Into<M> + TryFrom<M> + Clone;
+    type Message: Into<Req> + TryFrom<Req> + Clone;
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>>;
 }
 
-pub struct ReliableBroadcast<M: RBMessage, TBackoff, R: RBMessage = M> {
+pub struct ReliableBroadcast<Req: RBMessage, TBackoff, Res: RBMessage = Req> {
     validators: Vec<Author>,
-    network_sender: Arc<dyn RBNetworkSender<M, R>>,
+    network_sender: Arc<dyn RBNetworkSender<Req, Res>>,
     backoff_policy: TBackoff,
     time_service: TimeService,
     rpc_timeout_duration: Duration,
 }
 
-impl<M, TBackoff, R> ReliableBroadcast<M, TBackoff, R>
+impl<Req, TBackoff, Res> ReliableBroadcast<Req, TBackoff, Res>
 where
-    M: RBMessage,
+    Req: RBMessage,
     TBackoff: Iterator<Item = Duration> + Clone,
-    R: RBMessage,
+    Res: RBMessage,
 {
     pub fn new(
         validators: Vec<Author>,
-        network_sender: Arc<dyn RBNetworkSender<M, R>>,
+        network_sender: Arc<dyn RBNetworkSender<Req, Res>>,
         backoff_policy: TBackoff,
         time_service: TimeService,
         rpc_timeout_duration: Duration,
@@ -57,7 +57,7 @@ where
         }
     }
 
-    pub fn broadcast<S: BroadcastStatus<M, R>>(
+    pub fn broadcast<S: BroadcastStatus<Req, Res>>(
         &self,
         message: S::Message,
         mut aggregating: S,
@@ -89,7 +89,7 @@ where
                     )
                 }
             };
-            let message: M = message.into();
+            let message: Req = message.into();
             for receiver in receivers {
                 fut.push(send_message(receiver, message.clone(), None));
             }
