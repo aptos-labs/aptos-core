@@ -6,7 +6,10 @@ use crate::{
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
     module::AGGREGATOR_MODULE,
-    types::{code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, DeltaApplicationFailureReason},
+    types::{
+        code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
+        DeltaApplicationFailureReason, PanicOr,
+    },
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -90,7 +93,8 @@ pub trait TAggregatorV1View {
                     reason: DeltaApplicationFailureReason::Underflow,
                     ..
                 }) => subtraction_v1_error(e),
-                _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e)).into(),
+                _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
+                    .into(),
             })
             .map_err(|partial_error| {
                 partial_error

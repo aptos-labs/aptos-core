@@ -47,11 +47,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         // TODO[agg_v2](fix) look at whether it is enabled, not just capable.
         // if it is disabled, no need to fallback.
-        #[allow(clippy::overly_complex_bool_expr)]
-        if false
-            && txn.is_valid()
-            && executor_with_group_view.is_delayed_field_optimization_capable()
-        {
+        if txn.is_valid() && executor_with_group_view.is_delayed_field_optimization_capable() {
             if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
             {
                 // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization is enabled

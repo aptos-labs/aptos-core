@@ -16,10 +16,10 @@ use move_core_types::vm_status::StatusCode;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// When `Addition` operation overflows the `limit`.
-const EADD_OVERFLOW: u64 = 0x02_0001;
+pub(crate) const EADD_OVERFLOW: u64 = 0x02_0001;
 
 /// When `Subtraction` operation goes below zero.
-const ESUB_UNDERFLOW: u64 = 0x02_0002;
+pub(crate) const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AggregatorID(pub StateKey);

@@ -572,10 +572,10 @@ fn native_string_concat(
     context.charge(STRING_UTILS_PER_BYTE * NumBytes::new((prefix.len() + suffix.len()) as u64))?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let aggregator_id = aggregator_value_field_as_id(snapshot_value)?;
+        let base_id = aggregator_value_field_as_id(snapshot_value)?;
         SnapshotValue::Integer(
             delayed_field_data
-                .string_concat(aggregator_id, prefix, suffix, resolver)
+                .string_concat(base_id, prefix, suffix, resolver)?
                 .as_u64() as u128,
         )
     } else {

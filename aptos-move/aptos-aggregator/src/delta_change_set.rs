@@ -213,6 +213,7 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 mod test {
     use super::*;
     use crate::{
+        aggregator_v1_extension::{EADD_OVERFLOW, ESUB_UNDERFLOW},
         resolver::{TAggregatorV1View, TDelayedFieldView},
         types::DelayedFieldValue,
         FakeAggregatorView,
@@ -568,17 +569,11 @@ mod test {
 
         assert_matches!(
             state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op,),
-            Err(VMStatus::ExecutionFailure {
-                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                ..
-            })
+            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
         );
         assert_matches!(
             state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op,),
-            Err(VMStatus::ExecutionFailure {
-                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                ..
-            })
+            Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
         );
     }
 }
