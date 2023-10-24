@@ -49,7 +49,11 @@ impl DagPayloadConfig {
         config: &DagPayloadConfig,
     ) -> Result<(), Error> {
         let send_recv_pairs = [
-            (config.max_sending_txns_per_round, config.max_receiving_txns_per_round, "txns"),
+            (
+                config.max_sending_txns_per_round,
+                config.max_receiving_txns_per_round,
+                "txns",
+            ),
             (
                 config.max_sending_size_per_round_bytes,
                 config.max_receiving_size_per_round_bytes,
