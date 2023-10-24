@@ -1419,11 +1419,11 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
 
 #[cfg(test)]
 mod test {
-    use super::LatestView;
+    use super::*;
     use crate::{
         captured_reads::{CapturedReads, DelayedFieldRead, DelayedFieldReadKind},
         proptest_types::types::{KeyType, MockEvent, ValueType},
-        scheduler::{DependencyResult, TWaitForDependency},
+        scheduler::{DependencyResult, Scheduler, TWaitForDependency},
         view::{delayed_field_try_add_delta_outcome_impl, get_delayed_field_value_impl},
     };
     use aptos_aggregator::{
@@ -1435,6 +1435,7 @@ mod test {
         types::{MVDelayedFieldsError, TxnIndex},
         unsync_map::UnsyncMap,
         versioned_delayed_fields::TVersionedDelayedFieldView,
+        MVHashMap,
     };
     use aptos_state_view::TStateView;
     use aptos_types::{
@@ -1442,7 +1443,10 @@ mod test {
         executable::Executable,
         state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
         transaction::BlockExecutableTransaction,
+        write_set::TransactionWrite,
     };
+    use aptos_vm_types::resolver::TResourceView;
+    use bytes::Bytes;
     use claims::{assert_err_eq, assert_ok_eq, assert_some_eq};
     use move_core_types::value::{
         IdentifierMappingKind, LayoutTag, MoveStructLayout, MoveTypeLayout,
@@ -1451,6 +1455,7 @@ mod test {
     use std::{
         cell::RefCell,
         collections::{HashMap, HashSet},
+        sync::{atomic::AtomicU32, Arc},
     };
 
     #[derive(Default)]
@@ -2014,13 +2019,13 @@ mod test {
     fn test_id_value_exchange() {
         // Test that replace_values_with_identifiers and replace_identifiers_with_values functions are working correctly
 
-        // create latest_view
+        // Create latest_view
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            super::ViewState::Unsync(super::SequentialState {
+            ViewState::Unsync(SequentialState {
                 unsync_map: &unsync_map,
                 counter: &counter,
                 read_set: RefCell::new(HashSet::new()),
@@ -2255,5 +2260,199 @@ mod test {
             "Three identifiers should have been replaced in this case"
         );
         assert_eq!(identifiers, identifiers2);
+    }
+
+    #[test]
+    fn test_read_operations_sequential() {
+        // Create latest_view
+        let unsync_map = UnsyncMap::new();
+        let counter = RefCell::new(5);
+        let mut data = HashMap::new();
+        let state_value_3 = StateValue::new_legacy(Bytes::from(
+            Value::u64(12321)
+                .simple_serialize(&MoveTypeLayout::U64)
+                .unwrap(),
+        ));
+        data.insert(KeyType::<u32>(3, false), state_value_3.clone());
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
+            MoveStructLayout::new(vec![
+                MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+                    Box::new(MoveTypeLayout::U64),
+                ),
+                MoveTypeLayout::U64,
+            ]),
+        )]));
+        let value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+            Value::u64(25),
+            Value::u64(30),
+        ]))]));
+        let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        data.insert(KeyType::<u32>(4, false), state_value_4);
+        let base_view = MockStateView::new(data);
+        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
+            &base_view,
+            ViewState::Unsync(SequentialState {
+                unsync_map: &unsync_map,
+                counter: &counter,
+                read_set: RefCell::new(HashSet::new()),
+            }),
+            1,
+        );
+
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(1, false), None)
+                .unwrap(),
+            None
+        );
+        assert!(latest_view
+            .read_set_sequential_execution()
+            .borrow()
+            .is_empty());
+
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(2, false), Some(&layout))
+                .unwrap(),
+            None
+        );
+        assert!(latest_view
+            .read_set_sequential_execution()
+            .borrow()
+            .is_empty());
+
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(3, false), None)
+                .unwrap(),
+            Some(state_value_3.clone())
+        );
+        assert!(latest_view
+            .read_set_sequential_execution()
+            .borrow()
+            .is_empty());
+        assert_eq!(
+            unsync_map.fetch_data(&KeyType::<u32>(3, false)),
+            Some((
+                Arc::new(TransactionWrite::from_state_value(Some(state_value_3))),
+                None
+            ))
+        );
+
+        let patched_value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+            Value::u64(5),
+            Value::u64(30),
+        ]))]));
+        let state_value_4 =
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into());
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(4, false), Some(&layout))
+                .unwrap(),
+            Some(state_value_4.clone())
+        );
+        assert!(latest_view
+            .read_set_sequential_execution()
+            .borrow()
+            .contains(&KeyType(4, false)));
+        assert_eq!(
+            unsync_map.fetch_data(&KeyType::<u32>(4, false)),
+            Some((
+                Arc::new(TransactionWrite::from_state_value(Some(state_value_4))),
+                Some(Arc::new(layout))
+            ))
+        );
+    }
+
+    #[test]
+    fn test_read_operations_parallel() {
+        let counter = AtomicU32::new(5);
+        let state_value_3 = StateValue::new_legacy(Bytes::from(
+            Value::u64(12321)
+                .simple_serialize(&MoveTypeLayout::U64)
+                .unwrap(),
+        ));
+        let mut data = HashMap::new();
+        data.insert(KeyType::<u32>(3, false), state_value_3.clone());
+        let layout = MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Struct(
+            MoveStructLayout::new(vec![
+                MoveTypeLayout::Tagged(
+                    LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+                    Box::new(MoveTypeLayout::U64),
+                ),
+                MoveTypeLayout::U64,
+            ]),
+        )]));
+        let value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+            Value::u64(25),
+            Value::u64(30),
+        ]))]));
+        let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        data.insert(KeyType::<u32>(4, false), state_value_4);
+        let base_view = MockStateView::new(data);
+        let versioned_map = MVHashMap::new();
+        let scheduler = Scheduler::new(10);
+        let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
+            &base_view,
+            ViewState::Sync(ParallelState::new(&versioned_map, &scheduler, &counter)),
+            1,
+        );
+
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(1, false), None)
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(2, false), Some(&layout))
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(3, false), None)
+                .unwrap(),
+            Some(state_value_3.clone())
+        );
+
+        //TODO: This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
+        // Is Err(StorageVersion) expected here?
+        println!(
+            "data: {:?}",
+            versioned_map
+                .data()
+                .fetch_data(&KeyType::<u32>(3, false), 1)
+        );
+
+        let patched_value = Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![
+            Value::u64(5),
+            Value::u64(30),
+        ]))]));
+        let state_value_4 =
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into());
+        assert_eq!(
+            latest_view
+                .get_resource_state_value(&KeyType::<u32>(4, false), Some(&layout))
+                .unwrap(),
+            Some(state_value_4.clone())
+        );
+
+        let captured_reads = latest_view.take_reads();
+        assert!(captured_reads.validate_data_reads(versioned_map.data(), 1));
+        let read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields();
+
+        // TODO: This prints
+        // read: (KeyType(4, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
+        // read: (KeyType(2, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
+        for read in read_set_with_delayed_fields {
+            println!("read: {:?}", read);
+        }
+
+        // TODO: This assertion fails.
+        // let data_read = DataRead::Versioned(Ok((1,0)), Arc::new(TransactionWrite::from_state_value(Some(state_value_4))), Some(Arc::new(layout)));
+        // assert!(read_set_with_delayed_fields.any(|x| x == (&KeyType::<u32>(4, false), &data_read)));
     }
 }
