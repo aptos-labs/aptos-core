@@ -21,7 +21,7 @@ use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
-use claims::{assert_ge, assert_matches, assert_none, assert_some, assert_some_eq};
+use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 

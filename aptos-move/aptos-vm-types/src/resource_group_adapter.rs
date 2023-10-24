@@ -78,7 +78,7 @@ impl<'r> ResourceGroupAdapter<'r> {
 
         Self {
             maybe_resource_group_view: (group_size_kind == GroupSizeKind::AsSum)
-                .then(|| maybe_resource_group_view)
+                .then_some(maybe_resource_group_view)
                 .flatten(),
             resource_view,
             group_size_kind,

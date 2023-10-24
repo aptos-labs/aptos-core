@@ -550,7 +550,7 @@ fn non_empty_group(
     let data_view = NonEmptyGroupDataView::<KeyType<[u8; 32]>> {
         group_keys: key_universe[(key_universe_len - 3)..key_universe_len]
             .iter()
-            .map(|k| KeyType(k.clone(), false))
+            .map(|k| KeyType(*k, false))
             .collect(),
     };
 
@@ -568,7 +568,15 @@ fn non_empty_group(
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
-        >::new(num_cpus::get(), executor_thread_pool.clone(), None, None)
+        >::new(
+            executor_thread_pool.clone(),
+            BlockExecutorConfig {
+                concurrency_level: num_cpus::get(),
+                maybe_block_gas_limit: None,
+                delayed_fields_optimization_enabled: true,
+            },
+            None,
+        )
         .execute_transactions_parallel((), &transactions, &data_view);
 
         BaselineOutput::generate(&transactions, None).assert_output(&output);
@@ -581,7 +589,15 @@ fn non_empty_group(
             NonEmptyGroupDataView<KeyType<[u8; 32]>>,
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
-        >::new(num_cpus::get(), executor_thread_pool.clone(), None, None)
+        >::new(
+            executor_thread_pool.clone(),
+            BlockExecutorConfig {
+                concurrency_level: num_cpus::get(),
+                maybe_block_gas_limit: None,
+                delayed_fields_optimization_enabled: true,
+            },
+            None,
+        )
         .execute_transactions_sequential((), &transactions, &data_view, true);
         // TODO: test dynamic disabled as well.
 

@@ -275,21 +275,23 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                 )));
             },
             Occupied(o) => {
-                assert!(if let EntryCell::Write(i, v, layout) = &o.get().cell {
-                    // base value may have already been provided by another transaction
-                    // executed simultaneously and asking for the same resource.
-                    // Value from storage must be identical, but then delayed field
-                    // identifier exchange could've modiefied it.
-                    //
-                    // If maybe_layout is None, they are required to be identical
-                    // If maybe_layout is Some, there might have been an exchange
-                    // Assert the length of bytes for efficiency (instead of full equality)
-                    layout.is_some() == maybe_layout.is_some()
-                        && *i == 0
-                        && (layout.is_some() || v.bytes().map(|b| b.len()) == bytes_len)
-                } else {
-                    true
-                });
+                assert!(
+                    if let EntryCell::Write(i, v, layout) = &o.get().cell {
+                        // base value may have already been provided by another transaction
+                        // executed simultaneously and asking for the same resource.
+                        // Value from storage must be identical, but then delayed field
+                        // identifier exchange could've modiefied it.
+                        //
+                        // If maybe_layout is None, they are required to be identical
+                        // If maybe_layout is Some, there might have been an exchange
+                        // Assert the length of bytes for efficiency (instead of full equality)
+                        layout.is_some() == maybe_layout.is_some()
+                            && *i == 0
+                            && (layout.is_some() || v.bytes().map(|b| b.len()) == bytes_len)
+                    } else {
+                        true
+                    }
+                );
             },
         };
     }

@@ -30,7 +30,7 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
-use claims::{assert_le, assert_ok};
+use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout};
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
@@ -230,11 +230,13 @@ impl ValueType {
                 v.into()
             }),
             metadata: None,
-            write_op_kind: ExplicitSyncWrapper::new(if !use_value {
-                WriteOpKind::Deletion
-            } else {
-                WriteOpKind::Creation
-            }),
+            write_op_kind: ExplicitSyncWrapper::new(
+                if !use_value {
+                    WriteOpKind::Deletion
+                } else {
+                    WriteOpKind::Creation
+                },
+            ),
         }
     }
 
@@ -243,11 +245,13 @@ impl ValueType {
         Self {
             bytes: (len > 0).then_some(vec![100_u8; len].into()),
             metadata,
-            write_op_kind: ExplicitSyncWrapper::new(if len == 0 {
-                WriteOpKind::Deletion
-            } else {
-                WriteOpKind::Creation
-            }),
+            write_op_kind: ExplicitSyncWrapper::new(
+                if len == 0 {
+                    WriteOpKind::Deletion
+                } else {
+                    WriteOpKind::Creation
+                },
+            ),
         }
     }
 }
@@ -269,11 +273,13 @@ impl TransactionWrite for ValueType {
         Self {
             bytes: maybe_bytes,
             metadata: maybe_metadata,
-            write_op_kind: ExplicitSyncWrapper::new(if empty {
-                WriteOpKind::Deletion
-            } else {
-                WriteOpKind::Creation
-            }),
+            write_op_kind: ExplicitSyncWrapper::new(
+                if empty {
+                    WriteOpKind::Deletion
+                } else {
+                    WriteOpKind::Creation
+                },
+            ),
         }
     }
 
@@ -652,11 +658,10 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
             let group_key_idx = bytes[1] % 4;
 
-            (group_key_idx < 3).then(|| (group_key_idx as usize, tag))
+            (group_key_idx < 3).then_some((group_key_idx as usize, tag))
         };
 
-        let mut behavior_idx = 0;
-        for behavior in &mut behaviors {
+        for (behavior_idx, behavior) in behaviors.iter_mut().enumerate() {
             let mut reads = vec![];
             let mut group_reads = vec![];
             for read_key in behavior.reads.clone() {
@@ -719,7 +724,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                     None => None,
                 })
                 .collect();
-            behavior_idx += 1;
         }
 
         MockTransaction::from_behaviors(behaviors)
@@ -893,7 +897,7 @@ where
                         assert!(!inner_op.is_modification());
                         if exists == inner_op.is_deletion() {
                             // insert the provided inner op.
-                            new_inner_ops.insert(tag.clone(), inner_op.clone());
+                            new_inner_ops.insert(*tag, inner_op.clone());
                         }
 
                         assert!(
@@ -901,24 +905,22 @@ where
                             "RESERVED_TAG must always be present in groups in tests"
                         );
 
-                        if exists {
-                            if inner_op.is_creation() {
-                                // Adjust the type, otherwise executor will assert.
-                                if inner_op.bytes().unwrap()[0] % 4 < 3 || *tag == RESERVED_TAG {
-                                    new_inner_ops.insert(
-                                        tag.clone(),
-                                        ValueType::new(
-                                            inner_op.bytes.clone(),
-                                            inner_op.metadata.clone(),
-                                            WriteOpKind::Modification,
-                                        ),
-                                    );
-                                } else {
-                                    new_inner_ops.insert(
-                                        tag.clone(),
-                                        ValueType::new(None, None, WriteOpKind::Deletion),
-                                    );
-                                }
+                        if exists && inner_op.is_creation() {
+                            // Adjust the type, otherwise executor will assert.
+                            if inner_op.bytes().unwrap()[0] % 4 < 3 || *tag == RESERVED_TAG {
+                                new_inner_ops.insert(
+                                    *tag,
+                                    ValueType::new(
+                                        inner_op.bytes.clone(),
+                                        inner_op.metadata.clone(),
+                                        WriteOpKind::Modification,
+                                    ),
+                                );
+                            } else {
+                                new_inner_ops.insert(
+                                    *tag,
+                                    ValueType::new(None, None, WriteOpKind::Deletion),
+                                );
                             }
                         }
                     }
@@ -956,10 +958,9 @@ where
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
-    Some(StateValueMetadata::new(
-        v,
-        &CurrentTimeMicroseconds { microseconds: v },
-    ))
+    Some(StateValueMetadata::new(v, &CurrentTimeMicroseconds {
+        microseconds: v,
+    }))
 }
 
 #[derive(Debug)]

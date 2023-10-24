@@ -1242,7 +1242,7 @@ where
                     // Apply the writes.
                     // TODO: return code invariant error if dynamic change set optimizations disabled.
                     Self::apply_output_sequential(&unsync_map, &output)
-                        .map_err(|e| Error::FallbackToSequential(e))?;
+                        .map_err(Error::FallbackToSequential)?;
 
                     let mut finalized_groups = vec![];
                     for (group_key, group_metadata_op) in
@@ -1293,7 +1293,7 @@ where
 
                         // TODO[agg_v2]: patch group writes in finalized groups
                         let combined_groups = Self::combine_groups(finalized_groups)
-                            .map_err(|e| Error::FallbackToSequential(e))?;
+                            .map_err(Error::FallbackToSequential)?;
 
                         // TODO[agg_v2] patch resources in groups and provide explicitly
                         output.incorporate_materialized_txn_output(
@@ -1308,7 +1308,7 @@ where
 
                         // TODO[agg_v2]: fallback to no resource group capability instead of unwrap.
                         let combined_groups = Self::combine_groups(finalized_groups)
-                            .map_err(|e| Error::FallbackToSequential(e))?;
+                            .map_err(Error::FallbackToSequential)?;
 
                         output.incorporate_materialized_txn_output(
                             vec![],

@@ -183,9 +183,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         let idx_update_tags: Vec<T> = self
             .idx_to_update
             .remove(&shifted_idx)
-            .map_or(vec![], |map| {
-                map.into_inner().into_iter().map(|(tag, _)| tag).collect()
-            });
+            .map_or(vec![], |map| map.into_inner().into_keys().collect());
 
         // Similar to mark_estimate, need to remove an individual entry for each tag.
         for tag in idx_update_tags.iter() {
@@ -690,15 +688,10 @@ mod test {
             &Arc::new(TestValue::with_kind(203, false))
         );
 
-        map.write(
-            ap.clone(),
-            5,
-            3,
-            vec![
-                (3, TestValue::with_kind(303, false)),
-                (4, TestValue::with_kind(304, true)),
-            ],
-        );
+        map.write(ap.clone(), 5, 3, vec![
+            (3, TestValue::with_kind(303, false)),
+            (4, TestValue::with_kind(304, true)),
+        ]);
         let committed_5 = commit_group_as_hashmap(&map, &ap, 5);
         assert_eq!(committed_5.len(), 4);
         assert_some_eq!(
