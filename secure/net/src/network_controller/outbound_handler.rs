@@ -107,6 +107,9 @@ impl OutboundHandler {
         grpc_clients: &mut HashMap<SocketAddr, GRPCNetworkMessageServiceClientWrapper>,
     ) {
         loop {
+            let _outbound_msgs_full_loop_timer = NETWORK_HANDLER_TIMER
+                .with_label_values(&[&socket_addr.to_string(), "outbound_msgs_full_loop"])
+                .start_timer();
             let mut select = Select::new();
             for (receiver, _, _) in outbound_handlers.iter() {
                 select.recv(receiver);

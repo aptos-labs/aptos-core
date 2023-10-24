@@ -22,7 +22,8 @@ pub static REMOTE_EXECUTOR_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
          7. non_prefetch_wait: waiting for the remote state values that were not prefetched; \
          8. kv_req_deser: deserializing the remote key value requests; \
          9. kv_requests: processing the remote key value requests; \
-         10. kv_resp_ser: serializing the remote key value responses;",
+         10. kv_resp_ser: serializing the remote key value responses; \
+         11. kv_requests_handler_timer: time spent by handler that spawns kv_request handling tasks on coordinator; ",
         // metric labels (dimensions)
         &["shard_id", "name"],
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),

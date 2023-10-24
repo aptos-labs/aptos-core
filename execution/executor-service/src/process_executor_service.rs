@@ -3,7 +3,6 @@
 
 use crate::remote_executor_service::ExecutorService;
 use aptos_logger::info;
-use aptos_push_metrics::MetricsPusher;
 use aptos_types::block_executor::partitioner::ShardId;
 use aptos_vm::AptosVM;
 use std::net::SocketAddr;
@@ -25,10 +24,6 @@ impl ProcessExecutorService {
         info!(
             "Starting process remote executor service on {}; coordinator address: {}, other shard addresses: {:?}; num threads: {}",
             self_address, coordinator_address, remote_shard_addresses, num_threads
-        );
-        aptos_node_resource_metrics::register_node_metrics_collector();
-        let _mp = MetricsPusher::start_for_local_run(
-            &("remote-executor-service-".to_owned() + &shard_id.to_string()),
         );
 
         AptosVM::set_concurrency_level_once(num_threads);

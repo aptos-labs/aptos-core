@@ -63,6 +63,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
     pub fn start(&self) {
         while let Ok(message) = self.kv_rx.recv() {
+            let _timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&["0", "kv_requests_handler_timer"])
+                .start_timer();
             let state_view = self.state_view.clone();
             let kv_txs = self.kv_tx.clone();
             self.thread_pool.spawn(move || {
