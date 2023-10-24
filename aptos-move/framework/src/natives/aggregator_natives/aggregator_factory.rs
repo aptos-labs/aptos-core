@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::natives::aggregator_natives::{helpers_v1::get_handle, NativeAggregatorContext};
-use aptos_aggregator::aggregator_v1_extension::{extension_error, AggregatorID};
+use aptos_aggregator::aggregator_v1_extension::AggregatorID;
 use aptos_crypto::hash::DefaultHasher;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
 use aptos_types::account_address::AccountAddress;
+use move_binary_format::errors::PartialVMError;
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -41,26 +44,29 @@ fn native_new_aggregator(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_v1_data.borrow_mut();
 
-    // Every aggregator instance uses a unique key in its id. Here we can reuse
+    // Every aggregator V1 instance uses a unique key for its id. Here we can reuse
     // the strategy from `table` implementation: taking hash of transaction and
     // number of aggregator instances created so far.
-    let num_aggregators_len = aggregator_data.num_aggregators() as u32;
-
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
     hasher.update(&aggregator_context.txn_hash());
-    hasher.update(&num_aggregators_len.to_be_bytes());
+    hasher.update(&(aggregator_data.num_aggregators() as u32).to_be_bytes());
     let hash = hasher.finish().to_vec();
-    let key = AccountAddress::from_bytes(hash)
-        .map_err(|_| extension_error("unable to create aggregator key"))?;
 
-    let id = AggregatorID::new(handle, key);
-    aggregator_data.create_new_aggregator(id, limit);
+    if let Ok(key) = AccountAddress::from_bytes(hash) {
+        let id = AggregatorID::new(handle, key);
+        aggregator_data.create_new_aggregator(id, limit);
 
-    Ok(smallvec![Value::struct_(Struct::pack(vec![
-        Value::address(handle.0),
-        Value::address(key),
-        Value::u128(limit),
-    ]))])
+        Ok(smallvec![Value::struct_(Struct::pack(vec![
+            Value::address(handle.0),
+            Value::address(key),
+            Value::u128(limit),
+        ]))])
+    } else {
+        Err(SafeNativeError::InvariantViolation(
+            PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                .with_message("Unable to create a key for aggregator V1".to_string()),
+        ))
+    }
 }
 
 /***************************************************************************************************

@@ -86,7 +86,7 @@ fn native_write_to_event_store(
     )?;
     let ty_tag = context.type_to_type_tag(&ty)?;
     let (ty_layout, has_aggregator_lifting) =
-        context.type_to_type_layout_with_aggregator_lifting(&ty)?;
+        context.type_to_type_layout_with_identifier_mappings(&ty)?;
     let blob = msg.simple_serialize(&ty_layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -227,15 +227,15 @@ fn native_write_module_event_to_store(
         }
     }
     let layout = context.type_to_type_layout(&ty)?;
-    let (ty_layout, has_aggregator_lifting) =
-        context.type_to_type_layout_with_aggregator_lifting(&ty)?;
+    let (ty_layout, has_identifier_mappings) =
+        context.type_to_type_layout_with_identifier_mappings(&ty)?;
     let blob = msg.simple_serialize(&layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Event serialization failure".to_string()),
         )
     })?;
-    let ty_layout = has_aggregator_lifting.then_some(ty_layout);
+    let ty_layout = has_identifier_mappings.then_some(ty_layout);
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     ctx.events
         .push((ContractEvent::new_v2(type_tag, blob), ty_layout));
