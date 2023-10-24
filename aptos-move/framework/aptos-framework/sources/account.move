@@ -23,6 +23,19 @@ module aptos_framework::account {
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_validation;
 
+    #[event]
+    struct KeyRotation has drop, store {
+        account: address,
+        old_authentication_key: vector<u8>,
+        new_authentication_key: vector<u8>,
+    }
+
+    #[event]
+    struct CoinRegister has drop, store {
+        account: address,
+        type_info: TypeInfo,
+    }
+
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
@@ -593,6 +606,11 @@ module aptos_framework::account {
         let new_auth_key = from_bcs::to_address(new_auth_key_vector);
         table::add(address_map, new_auth_key, originating_addr);
 
+        event::emit<KeyRotation>(KeyRotation {
+            account: originating_addr,
+            old_authentication_key: account_resource.authentication_key,
+            new_authentication_key: new_auth_key_vector,
+        });
         event::emit_event<KeyRotationEvent>(
             &mut account_resource.key_rotation_events,
             KeyRotationEvent {
@@ -704,6 +722,12 @@ module aptos_framework::account {
 
     public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
         let account = borrow_global_mut<Account>(account_addr);
+        event::emit<CoinRegister>(
+            CoinRegister {
+                account: account_addr,
+                type_info: type_info::type_of<CoinType>(),
+            },
+        );
         event::emit_event<CoinRegisterEvent>(
             &mut account.coin_register_events,
             CoinRegisterEvent {
@@ -1335,7 +1359,16 @@ module aptos_framework::account {
         assert!(vector::borrow(&events, 0) == &event, 1);
         assert!(event::was_event_emitted_by_handle(eventhandle, &event), 2);
 
+        let event = CoinRegister {account: addr, type_info: type_info::type_of<FakeCoin>() };
+
+        let events = event::emitted_events<CoinRegister>();
+        assert!(vector::length(&events) == 1, 3);
+        assert!(vector::borrow(&events, 0) == &event, 4);
+        assert!(event::was_event_emitted( &event), 5);
+
         let event = CoinRegisterEvent { type_info: type_info::type_of<SadFakeCoin>() };
-        assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 3);
+        assert!(!event::was_event_emitted_by_handle(eventhandle, &event), 6);
+        let event = CoinRegister { account:addr,  type_info: type_info::type_of<SadFakeCoin>() };
+        assert!(!event::was_event_emitted(&event), 7);
     }
 }
