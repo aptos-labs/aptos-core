@@ -29,7 +29,7 @@ impl From<u64> for DelayedFieldID {
     }
 }
 
-// represents something that should never happen - i.e. a code invariant error,
+// Represents something that should never happen - i.e. a code invariant error,
 // which we would generally just panic, but since we are inside of the VM,
 // we cannot do that.
 #[derive(Clone, Debug, PartialEq, Eq)]
