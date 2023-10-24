@@ -442,6 +442,8 @@ additional specialization.
 
 ## Function `create_from_account`
 
+DEPRECATED: Use <code>create</code> instead for identical behavior.
+
 Creates a new token object from an account GUID and returns the ConstructorRef for
 additional specialization.
 
