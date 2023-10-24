@@ -8,6 +8,7 @@ use crate::{
         SnapshotToStringFormula,
     },
 };
+use fail::fail_point;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DelayedApplyChange<I: Clone> {
@@ -120,6 +121,15 @@ impl<I: Copy + Clone> DelayedChange<I> {
         use DelayedApplyChange::*;
         use DelayedChange::*;
         use DelayedFieldValue::*;
+
+        fail_point!(
+            "aptos_aggregator::delayed_change::merge_two_changes",
+            |_| {
+                Err(PanicOr::from(code_invariant_error(
+                    "Injected code invariant error",
+                )))
+            }
+        );
 
         // There are only few valid cases for merging:
         // - next_change being AggregatorDelta, and prev_change being Aggregator Create or Delta

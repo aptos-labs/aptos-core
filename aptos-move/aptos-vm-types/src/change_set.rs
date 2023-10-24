@@ -15,6 +15,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteSetMut},
 };
 use claims::assert_none;
+use fail::fail_point;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
     language_storage::StructTag,
@@ -515,6 +516,16 @@ impl VMChangeSet {
         change_set: &mut BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         additional_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     ) -> anyhow::Result<(), VMStatus> {
+        fail_point!(
+            "aptos_vm_types::change_set::squash_addtional_delayed_field_changes",
+            |_| {
+                Err(
+                    PartialVMError::from(code_invariant_error("Injected code invariant error"))
+                        .finish(Location::Undefined)
+                        .into_vm_status(),
+                )
+            }
+        );
         let merged_changes = additional_change_set
             .into_iter()
             .map(|(id, additional_change)| {

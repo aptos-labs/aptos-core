@@ -19,6 +19,7 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
+// use fail::fail_point;
 use move_binary_format::errors::Location;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
@@ -68,6 +69,11 @@ pub trait TAggregatorV1View {
         id: &Self::Identifier,
         delta_op: &DeltaOp,
     ) -> anyhow::Result<WriteOp, VMStatus> {
+        // fail_point!(
+        //     "aptos_aggregator::resolver::try_convert_aggregator_v1_delta_into_write_op",
+        //     |_| { Err(code_invariant_error("Injected code invariant error").finish(Location::Module(AGGREGATOR_MODULE.clone())))
+        //     .into_vm_status() }
+        // );
         let base = self
             .get_aggregator_v1_value(id)
             .map_err(|e| {

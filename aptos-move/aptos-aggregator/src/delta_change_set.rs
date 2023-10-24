@@ -12,7 +12,7 @@ use crate::{
         code_invariant_error, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr,
     },
 };
-
+use fail::fail_point;
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct DeltaWithMax {
     /// Delta which is the result of the execution.
@@ -60,6 +60,11 @@ impl DeltaWithMax {
         prev_delta: &DeltaWithMax,
         next_delta: &DeltaWithMax,
     ) -> Result<DeltaWithMax, PanicOr<DelayedFieldsSpeculativeError>> {
+        fail_point!(
+            "aptos_aggregator::delta_change_set::create_merged_delta",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
+
         if prev_delta.max_value != next_delta.max_value {
             Err(code_invariant_error(
                 "Cannot merge deltas with different limits",
@@ -120,6 +125,10 @@ impl DeltaOp {
         prev_delta: &DeltaOp,
         next_delta: &DeltaOp,
     ) -> Result<DeltaOp, PanicOr<DelayedFieldsSpeculativeError>> {
+        fail_point!(
+            "aptos_aggregator::delta_change_set::create_merged_delta",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
         if prev_delta.max_value != next_delta.max_value {
             Err(code_invariant_error(
                 "Cannot merge deltas with different limits",

@@ -20,6 +20,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use derivative::Derivative;
+use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use std::{
     collections::{
@@ -427,6 +428,10 @@ impl<T: Transaction> CapturedReads<T> {
         update: bool,
         read: DelayedFieldRead,
     ) -> Result<(), PanicOr<DelayedFieldsSpeculativeError>> {
+        fail_point!(
+            "block_executor::captured_reads::captured_delayed_field_read",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
         let result = match self.delayed_field_reads.entry(id) {
             Vacant(e) => {
                 e.insert(read);

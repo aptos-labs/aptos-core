@@ -9,6 +9,7 @@ use aptos_aggregator::{
 use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
+use fail::fail_point;
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     fmt::Debug,
@@ -134,7 +135,10 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     ) -> Result<(), PanicError> {
         use EstimatedEntry::*;
         use VersionEntry::*;
-
+        fail_point!(
+            "mvhashmap::versioned_delayed_fields::insert_speculative_value",
+            |_| { Err(code_invariant_error("Injected code invariant error")) }
+        );
         assert!(
             !matches!(entry, Estimate(_)),
             "Inserting Estimate is not allowed - must call mark_estimate"
@@ -233,6 +237,14 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         use DelayedApplyEntry::*;
         use EstimatedEntry::*;
         use VersionEntry::*;
+        fail_point!(
+            "mvhashmap::versioned_delayed_fields::apply_aggregator_change_suffix",
+            |_| {
+                Err(PanicOr::from(code_invariant_error(
+                    "Injected code invariant error",
+                )))
+            }
+        );
 
         let mut accumulator = if let AggregatorDelta { delta } = suffix {
             *delta
@@ -411,6 +423,11 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         txn_idx: TxnIndex,
         value: DelayedFieldValue,
     ) -> Result<(), PanicError> {
+        fail_point!(
+            "mvhashmap::versioned_delayed_fields::initialize_delayed_field",
+            |_| { Err(code_invariant_error("Injected code invariant error")) }
+        );
+
         let mut created = VersionedValue::new(None);
         created.insert_speculative_value(txn_idx, VersionEntry::Value(value, None))?;
 
@@ -432,6 +449,10 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         txn_idx: TxnIndex,
         apply: DelayedApplyEntry<K>,
     ) -> Result<(), PanicError> {
+        fail_point!(
+            "mvhashmap::versioned_delayed_fields::initialize_dependent_delayed_field",
+            |_| { Err(code_invariant_error("Injected code invariant error")) }
+        );
         let mut created = VersionedValue::new(None);
         created.insert_speculative_value(txn_idx, VersionEntry::Apply(apply))?;
 
@@ -632,6 +653,14 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         txn_idx: TxnIndex,
         cur_depth: usize,
     ) -> Result<DelayedFieldValue, PanicOr<MVDelayedFieldsError>> {
+        fail_point!(
+            "mvhashmap::versioned_delayed_fields::read_checked_depth",
+            |_| {
+                Err(PanicOr::from(code_invariant_error(
+                    "Injected code invariant error",
+                )))
+            }
+        );
         let read_res = self
             .values
             .get(id)

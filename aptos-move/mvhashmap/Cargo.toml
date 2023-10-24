@@ -23,6 +23,7 @@ bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+fail = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
 

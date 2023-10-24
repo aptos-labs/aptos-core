@@ -19,6 +19,7 @@ aptos-state-view = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
+fail = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }

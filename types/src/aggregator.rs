@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use fail::fail_point;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::values::{Struct, Value};
@@ -80,6 +81,9 @@ impl TryIntoMoveValue for DelayedFieldID {
     type Error = PanicError;
 
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
+        fail_point!("types::aggregator::try_into_move_value", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         Ok(match layout {
             MoveTypeLayout::U64 => Value::u64(self.as_u64()),
             MoveTypeLayout::U128 => Value::u128(self.as_u64() as u128),
@@ -103,6 +107,9 @@ impl TryFromMoveValue for DelayedFieldID {
         value: Value,
         _hint: &Self::Hint,
     ) -> Result<Self, Self::Error> {
+        fail_point!("types::aggregator::try_from_move_value", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         // Since we put the value there, we should be able to read it back,
         // unless there is a bug in the code - so we expect_ok() throughout.
         match layout {

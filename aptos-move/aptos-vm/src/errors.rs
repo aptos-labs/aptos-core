@@ -5,9 +5,9 @@
 use crate::transaction_validation::APTOS_TRANSACTION_VALIDATION;
 use aptos_logger::{enabled, Level};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
+use fail::fail_point;
 use move_binary_format::errors::VMError;
 use move_core_types::vm_status::{StatusCode, VMStatus};
-
 /// Error codes that can be emitted by the prologue. These have special significance to the VM when
 /// they are raised during the prologue.
 /// These errors are only expected from the module that is registered as the account module for the system.
@@ -203,6 +203,13 @@ pub fn expect_only_successful_execution(
     function_name: &str,
     log_context: &AdapterLogSchema,
 ) -> Result<(), VMStatus> {
+    fail_point!("aptos_vm::errors::expect_only_successful_execution", |_| {
+        Err(VMStatus::Error {
+            status_code: StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            sub_status: None,
+            message: Some("Injected code invariant error".to_string()),
+        })
+    });
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,

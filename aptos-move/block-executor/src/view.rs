@@ -38,6 +38,7 @@ use aptos_types::{
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{StateStorageView, TModuleView, TResourceGroupView, TResourceView};
 use bytes::Bytes;
+use fail::fail_point;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::{StatusCode, VMStatus},
@@ -114,6 +115,14 @@ fn get_delayed_field_value_impl<T: Transaction>(
         if let DelayedFieldRead::Value { value, .. } = data {
             return Ok(value);
         } else {
+            fail_point!("block_executor::view::get_delayed_field_value_impl", |_| {
+                let err = code_invariant_error("Injected code invariant error").into();
+                captured_reads
+                    .borrow_mut()
+                    .capture_delayed_field_read_error(&err);
+                Err(err)
+            });
+
             let err =
                 code_invariant_error("Value DelayedField read returned non-value result").into();
             captured_reads
@@ -243,6 +252,11 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
     max_value: u128,
     txn_idx: TxnIndex,
 ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+    fail_point!(
+        "block_executor::view::delayed_field_try_add_delta_outcome_impl",
+        |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+    );
+
     // No need to record or check or try, if input value exceeds the bound.
     if delta.abs() > max_value {
         return Ok(false);
@@ -934,6 +948,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         &self,
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        fail_point!("block_executor::view::get_delayed_field_value", |_| {
+            Err(code_invariant_error("Injected code invariant error").into())
+        });
         match &self.latest_view {
             ViewState::Sync(state) => get_delayed_field_value_impl(&state.captured_reads, state.versioned_map.delayed_fields(), state.scheduler, id, self.txn_idx),
             ViewState::Unsync(state) => Ok(state.unsync_map.fetch_delayed_field(id).ok_or_else(|| {
@@ -949,6 +966,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         delta: &SignedU128,
         max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
+        fail_point!(
+            "block_executor::view::delayed_field_try_add_delta_outcome",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
+
         match &self.latest_view {
             ViewState::Sync(state) => delayed_field_try_add_delta_outcome_impl(
                 &state.captured_reads,

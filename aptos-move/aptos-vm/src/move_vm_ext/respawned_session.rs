@@ -33,6 +33,7 @@ use aptos_vm_types::{
     storage::ChangeSetConfigs,
 };
 use bytes::Bytes;
+use fail::fail_point;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -173,6 +174,10 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         use DelayedChange::*;
+        fail_point!(
+            "aptos_vm::respawned_session::get_delayed_field_value",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
 
         match self.change_set.delayed_field_change_set().get(id) {
             Some(Create(value)) => Ok(value.clone()),
@@ -208,7 +213,10 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
         use DelayedChange::*;
-
+        fail_point!(
+            "aptos_vm::respawned_session::delayed_field_try_add_delta_outcome",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
         let math = BoundedMath::new(max_value);
         match self.change_set.delayed_field_change_set().get(id) {
             Some(Create(value)) => {

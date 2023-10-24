@@ -12,6 +12,7 @@ use crate::{
         SnapshotValue,
     },
 };
+use fail::fail_point;
 use move_binary_format::errors::PartialVMResult;
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -40,6 +41,11 @@ impl DelayedFieldData {
         input: SignedU128,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<bool> {
+        fail_point!(
+            "aptos_aggregator::delayed_field_extension::try_add_delta",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
+
         // No need to record or check or try, if input value exceeds the bound.
         if input.abs() > max_value {
             return Ok(false);
@@ -113,6 +119,10 @@ impl DelayedFieldData {
         resolver: &dyn DelayedFieldResolver,
         read_position: ReadPosition,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
+        fail_point!(
+            "aptos_aggregator::delayed_field_extension::read_value",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
         match self.delayed_fields.get(&id) {
             Some(DelayedChange::Create(value)) => {
                 match read_position {
@@ -164,6 +174,10 @@ impl DelayedFieldData {
         max_value: u128,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
+        fail_point!(
+            "aptos_aggregator::delayed_field_extension::snapshot",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
         let aggregator = self.delayed_fields.get(&aggregator_id);
 
         let change = match aggregator {
@@ -234,6 +248,10 @@ impl DelayedFieldData {
         suffix: Vec<u8>,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
+        fail_point!(
+            "aptos_aggregator::delayed_field_extension::string_concat",
+            |_| { Err(code_invariant_error("Injected code invariant error").into()) }
+        );
         let snapshot = self.delayed_fields.get(&snapshot_id);
         let formula = SnapshotToStringFormula::Concat { prefix, suffix };
 

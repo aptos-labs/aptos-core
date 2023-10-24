@@ -8,6 +8,7 @@ use crate::{
 use aptos_logger::error;
 // TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
 pub use aptos_types::aggregator::{DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue};
+use fail::fail_point;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
@@ -44,6 +45,9 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
 }
 
 pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
+    fail_point!("aptos_aggregator::types::expect_ok", |_| {
+        Err(code_invariant_error("Injected code invariant error"))
+    });
     value.map_err(|e| code_invariant_error(format!("Expected Ok, got Err({:?})", e)))
 }
 
@@ -166,6 +170,9 @@ pub enum DelayedFieldValue {
 
 impl DelayedFieldValue {
     pub fn into_aggregator_value(self) -> Result<u128, PanicError> {
+        fail_point!("aptos_aggregator::types::into_aggregator_value", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         match self {
             DelayedFieldValue::Aggregator(value) => Ok(value),
             DelayedFieldValue::Snapshot(_) => Err(code_invariant_error(
@@ -178,6 +185,9 @@ impl DelayedFieldValue {
     }
 
     pub fn into_snapshot_value(self) -> Result<u128, PanicError> {
+        fail_point!("aptos_aggregator::types::into_snapshot_value", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         match self {
             DelayedFieldValue::Snapshot(value) => Ok(value),
             DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
@@ -190,6 +200,9 @@ impl DelayedFieldValue {
     }
 
     pub fn into_derived_value(self) -> Result<Vec<u8>, PanicError> {
+        fail_point!("aptos_aggregator::types::into_derived_value", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         match self {
             DelayedFieldValue::Derived(value) => Ok(value),
             DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
@@ -272,6 +285,9 @@ pub enum SnapshotValue {
 
 impl SnapshotValue {
     pub fn into_aggregator_value(self) -> Result<u128, PanicError> {
+        fail_point!("aptos_aggregator::types::into_aggregator_value", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         match self {
             SnapshotValue::Integer(value) => Ok(value),
             SnapshotValue::String(_) => Err(code_invariant_error(
@@ -285,6 +301,9 @@ impl TryFrom<DelayedFieldValue> for SnapshotValue {
     type Error = PanicError;
 
     fn try_from(value: DelayedFieldValue) -> Result<SnapshotValue, PanicError> {
+        fail_point!("aptos_aggregator::types::try_from", |_| {
+            Err(code_invariant_error("Injected code invariant error"))
+        });
         match value {
             DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling SnapshotValue::try_from on AggregatorValue(Aggregator)",
