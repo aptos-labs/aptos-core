@@ -66,6 +66,7 @@ aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
 aptos-types = { workspace = true }
 claims = { workspace = true }
+fail = { workspace = true }
 proptest = { workspace = true }
 rand_core = { workspace = true }
 

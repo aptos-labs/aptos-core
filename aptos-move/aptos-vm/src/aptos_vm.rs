@@ -1781,6 +1781,14 @@ impl VMAdapter for AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+        if resolver.is_delayed_field_optimization_capable() {
+            fail_point!("move_adapter::execute_single_transaction", |_| {
+                Err(VMStatus::error(
+                    StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                    None,
+                ))
+            });
+        }
         if let SignatureVerifiedTransaction::Invalid(_) = txn {
             let (vm_status, output) =
                 discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
