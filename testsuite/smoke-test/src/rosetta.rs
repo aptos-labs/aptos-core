@@ -8,6 +8,10 @@ use aptos::{
     common::types::GasOptions,
     test::{CliTestFramework, INVALID_ACCOUNT},
 };
+use move_core_types::{
+    ident_str,
+    language_storage::{StructTag, TypeTag},
+};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
@@ -36,7 +40,7 @@ use aptos_rosetta::{
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
-    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+    on_chain_config::GasScheduleV2, transaction::SignedTransaction, utility_coin::APTOS_COIN_TYPE,
 };
 use serde_json::json;
 use std::{
@@ -126,7 +130,7 @@ async fn setup_test(
 async fn test_block_transactions() {
     const NUM_TXNS_PER_PAGE: u16 = 2;
 
-    let (swarm, cli, _faucet, rosetta_client) = setup_test(
+    let (mut swarm, cli, _faucet, rosetta_client) = setup_test(
         2,
         Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
     )
@@ -2680,6 +2684,113 @@ async fn test_delegation_pool_operations() {
         // Keep track of the previous
         previous_block_index = block_height;
     }
+}
+
+#[tokio::test]
+async fn test_fee_statement() {
+    const NUM_TXNS_PER_PAGE: u16 = 2;
+
+    let (mut swarm, cli, _, rosetta_client) = setup_test(
+        2,
+        Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
+    )
+    .await;
+
+    let chain_id = swarm.chain_id();
+    swarm
+        .aptos_public_info()
+        .sync_root_account_sequence_number()
+        .await;
+
+    let mut account_1 = swarm
+        .aptos_public_info()
+        .create_and_fund_user_account(10_000_000_000)
+        .await
+        .unwrap();
+
+    let seq_number = account_1.sequence_number();
+    // test initialize a new token, mint and burn to trigger the refund
+    let res = initialize_token(
+        &swarm.aptos_public_info(),
+        &mut account_1,
+        cli.account_id(0),
+        seq_number,
+    )
+    .await;
+
+    let res = mint_token(
+        &swarm.aptos_public_info(),
+        &mut account_1,
+        cli.account_id(0),
+        100,
+        seq_number+1,
+    )
+    .await;
+}
+
+// To test FeeStatement, we create a coin and burn it to trigger a storage fee refund
+async fn initialize_token(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    initializer: AccountAddress,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let managed_coin_initialization = info
+        .transaction_factory()
+        .payload(aptos_stdlib::managed_coin_initialize(
+            TypeTag::Struct(Box::new(StructTag {
+                address: initializer,
+                module: ident_str!("aptos_coin").to_owned(),
+                name: ident_str!("AptosCoin").to_owned(),
+                type_params: vec![],
+            })),
+            "name".as_bytes().to_vec(),
+            "symbol".as_bytes().to_vec(),
+            8,
+            false,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(managed_coin_initialization);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn mint_token(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    destination: AccountAddress,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let managed_coin_mint = info
+        .transaction_factory()
+        .payload(aptos_stdlib::managed_coin_mint(
+            APTOS_COIN_TYPE.clone(),
+            destination,
+            amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(managed_coin_mint);
+    info.client().submit_and_wait(&txn).await.unwrap()
+}
+
+async fn burn_token(
+    info: &AptosPublicInfo<'_>,
+    account: &mut LocalAccount,
+    amount: u64,
+    sequence_number: u64,
+) -> Response<Transaction> {
+    let managed_coin_burn = info
+        .transaction_factory()
+        .payload(aptos_stdlib::managed_coin_burn(
+            APTOS_COIN_TYPE.clone(),
+            amount,
+        ))
+        .sequence_number(sequence_number);
+
+    let txn = account.sign_with_transaction_builder(managed_coin_burn);
+    info.client().submit_and_wait(&txn).await.unwrap()
 }
 
 #[derive(Debug)]
