@@ -649,14 +649,14 @@ tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.10.0", features = [
+tonic = { version = "0.10.2", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
 ] }
-tonic-reflection = "0.10.0"
+tonic-reflection = "0.10.2"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
