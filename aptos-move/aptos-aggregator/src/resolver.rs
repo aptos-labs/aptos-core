@@ -5,7 +5,6 @@ use crate::{
     aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
-    module::AGGREGATOR_MODULE,
     types::{
         code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
         DeltaApplicationFailureReason, PanicOr,
@@ -96,11 +95,7 @@ pub trait TAggregatorV1View {
                 _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
                     .into(),
             })
-            .map_err(|partial_error| {
-                partial_error
-                    .finish(Location::Module(AGGREGATOR_MODULE.clone()))
-                    .into_vm_status()
-            })
+            .map_err(|partial_error| partial_error.finish(Location::Undefined).into_vm_status())
             .map(|result| WriteOp::Modification(serialize(&result).into()))
     }
 }

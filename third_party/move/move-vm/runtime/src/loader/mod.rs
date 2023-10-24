@@ -1490,7 +1490,7 @@ impl<'a> Resolver<'a> {
         self.loader.type_to_type_layout(ty)
     }
 
-    pub(crate) fn type_to_type_layout_with_aggregator_lifting(
+    pub(crate) fn type_to_type_layout_with_identifier_mappings(
         &self,
         ty: &Type,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {

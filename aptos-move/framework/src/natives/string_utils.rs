@@ -167,7 +167,7 @@ fn native_format_impl(
             suffix = "u256";
         },
         MoveTypeLayout::Address => {
-            let addr = val.value_as::<move_core_types::account_address::AccountAddress>()?;
+            let addr = val.value_as::<AccountAddress>()?;
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
@@ -185,9 +185,9 @@ fn native_format_impl(
                     .unpack()?
                     .next()
                     .unwrap()
-                    .value_as::<move_core_types::account_address::AccountAddress>()?
+                    .value_as::<AccountAddress>()?
             } else {
-                val.value_as::<move_core_types::account_address::AccountAddress>()?
+                val.value_as::<AccountAddress>()?
             };
 
             let str = if context.canonicalize {
