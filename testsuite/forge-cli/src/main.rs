@@ -20,7 +20,11 @@ use aptos_forge::{
 };
 use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    transaction_builder::aptos_stdlib,
+    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -1775,6 +1779,11 @@ fn realistic_env_max_load_test(
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default()).expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
