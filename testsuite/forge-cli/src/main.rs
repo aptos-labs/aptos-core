@@ -1829,7 +1829,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     //     conflict_window_size: 256
 
     // ALSO THESE ARE THE MOST COMMONLY USED TUNE-ABLES:
-    const USE_CRAZY_MACHINES: bool = false;
+    const USE_CRAZY_MACHINES: bool = true;
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 12;
 
