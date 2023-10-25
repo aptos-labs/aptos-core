@@ -11,7 +11,7 @@ cargo-fuzz = true
 aptos-consensus = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
 aptos-types = { workspace = true }
-arbitrary = "1.3.1"
+arbitrary = "1.3.0"
 bcs = { workspace = true }
 libfuzzer-sys = "0.4"
 move-binary-format = { workspace = true, features = ["fuzzing"] }
