@@ -2,8 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(clippy::arc_with_non_send_sync)]
-
 use crate::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
@@ -44,7 +42,6 @@ mod change_set;
 mod module;
 mod multisig;
 mod script;
-pub mod signature_verified_transaction;
 mod transaction_argument;
 
 use crate::{
@@ -1115,15 +1112,6 @@ impl TransactionOutput {
 
     pub fn write_set(&self) -> &WriteSet {
         &self.write_set
-    }
-
-    // This is a special function to update the total supply in the write set. 'TransactionOutput'
-    // already has materialized write set, but in case of sharding support for total_supply, we
-    // want to update the total supply in the write set by aggregating the total supply deltas from
-    // each shard. However, is costly to materialize the entire write set again, hence we have this
-    // inplace update hack.
-    pub fn update_total_supply(&mut self, value: u128) {
-        self.write_set.update_total_supply(value);
     }
 
     pub fn events(&self) -> &[ContractEvent] {
