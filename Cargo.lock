@@ -215,7 +215,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.2.2"
+version = "2.3.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2569,7 +2569,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0#a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=bcba94c26c8a6372056d2b69ce411c5719f98965#bcba94c26c8a6372056d2b69ce411c5719f98965"
 dependencies = [
  "chrono",
 ]
@@ -4191,9 +4191,9 @@ dependencies = [
 
 [[package]]
 name = "arbitrary"
-version = "1.3.0"
+version = "1.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2d098ff73c1ca148721f37baad5ea6a465a13f9573aba8641fbbbae8164a54e"
+checksum = "a2e1373abdaa212b704512ec2bd8b26bd0b7d5c3f70117411a5d9a451383c859"
 dependencies = [
  "derive_arbitrary",
 ]
@@ -11778,10 +11778,10 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0#a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=bcba94c26c8a6372056d2b69ce411c5719f98965#bcba94c26c8a6372056d2b69ce411c5719f98965"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=bcba94c26c8a6372056d2b69ce411c5719f98965)",
  "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=af4067b6606c0c4823dbb640e8f2db4cb2a1a7f9)",
  "async-trait",
  "base64 0.13.0",
@@ -13248,7 +13248,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0#a9e42dc9d80a69e9d02cd5f19c39e0f3f5cfbeb0"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=bcba94c26c8a6372056d2b69ce411c5719f98965#bcba94c26c8a6372056d2b69ce411c5719f98965"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -15698,7 +15698,7 @@ dependencies = [
 [[package]]
 name = "x25519-dalek"
 version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek?rev=b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e#b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e"
+source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
 dependencies = [
  "curve25519-dalek",
  "rand_core 0.5.1",
@@ -15804,8 +15804,3 @@ checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
 dependencies = [
  "simd-adler32",
 ]
-
-[[patch.unused]]
-name = "x25519-dalek"
-version = "1.2.0"
-source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"

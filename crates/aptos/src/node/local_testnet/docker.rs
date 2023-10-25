@@ -4,6 +4,8 @@
 use super::traits::ShutdownStep;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+#[cfg(unix)]
+use bollard::API_DEFAULT_VERSION;
 use bollard::{
     container::{RemoveContainerOptions, StopContainerOptions},
     image::CreateImageOptions,
@@ -15,27 +17,53 @@ use std::{fs::create_dir_all, path::Path};
 use tracing::{info, warn};
 use version_compare::Version;
 
-pub fn get_docker() -> Result<Docker> {
+const ERROR_MESSAGE: &str = "Docker is not available, confirm it is installed and running. See https://aptos.dev/guides/local-development-network#faq for assistance.";
+
+/// This function returns a Docker client. Before returning, it confirms that it can
+/// actually query the API and checks that the API version is sufficient. It first
+/// tries to connect at the default socket location and if that fails, it tries to find
+/// a socket in the user's home directory. On Windows NT it doesn't try that since
+/// there no second location, there is just the one named pipe.
+pub async fn get_docker() -> Result<Docker> {
     let docker = Docker::connect_with_local_defaults()
-        .context("Docker is not available, confirm it is installed and running. On Linux you may need to use sudo.")?;
-    Ok(docker)
-}
+        .context(format!("{} (init_default)", ERROR_MESSAGE))?;
 
-pub async fn confirm_docker_available() -> Result<()> {
-    let docker = get_docker()?;
-    let info = docker
-        .info()
-        .await
-        .context("Docker is not available, confirm it is installed and running. On Linux you may need to use sudo.")?;
-
-    info!("Docker Info: {:?}", info);
-
-    let version = docker
-        .version()
-        .await
-        .context("Failed to get Docker version")?;
-
-    info!("Docker Version: {:?}", version);
+    // We have to specify the type because the compiler can't figure out the error
+    // in the case where the system is Unix.
+    let out: Result<(Docker, bollard::system::Version), bollard::errors::Error> =
+        match docker.version().await {
+            Ok(version) => Ok((docker, version)),
+            Err(err) => {
+                warn!(
+                    "Received this error trying to use default Docker socket location: {:#}",
+                    err
+                );
+                // Look for the socket in ~/.docker/run
+                // We don't have to do this if this issue gets addressed:
+                // https://github.com/fussybeaver/bollard/issues/345
+                #[cfg(unix)]
+                {
+                    let path = dirs::home_dir()
+                        .context(format!("{} (home_dir)", ERROR_MESSAGE))?
+                        .join(".docker")
+                        .join("run")
+                        .join("docker.sock");
+                    info!("Looking for Docker socket at {}", path.display());
+                    let path = path.to_str().context(format!("{} (path)", ERROR_MESSAGE))?;
+                    let docker = Docker::connect_with_socket(path, 120, API_DEFAULT_VERSION)
+                        .context(format!("{} (init_home)", ERROR_MESSAGE))?;
+                    let version = docker
+                        .version()
+                        .await
+                        .context(format!("{} (version_home)", ERROR_MESSAGE))?;
+                    Ok((docker, version))
+                }
+                // Just return the original error.
+                #[cfg(not(unix))]
+                Err(err)
+            },
+        };
+    let (docker, version) = out?;
 
     // Try to warn the user about their Docker version being too old. We don't error
     // out if the version is too old in case we're wrong about the minimum version
@@ -68,7 +96,7 @@ pub async fn confirm_docker_available() -> Result<()> {
         },
     }
 
-    Ok(())
+    Ok(docker)
 }
 
 /// Delete a container. If the container doesn't exist, that's fine, just move on.
@@ -78,7 +106,7 @@ pub async fn delete_container(container_name: &str) -> Result<()> {
         container_name
     );
 
-    let docker = get_docker()?;
+    let docker = get_docker().await?;
 
     let options = Some(RemoveContainerOptions {
         force: true,
@@ -106,7 +134,7 @@ pub async fn stop_container(container_name: &str) -> Result<()> {
         container_name
     );
 
-    let docker = get_docker()?;
+    let docker = get_docker().await?;
 
     let options = Some(StopContainerOptions {
         // Timeout in seconds before we kill the container.
@@ -130,7 +158,7 @@ pub async fn stop_container(container_name: &str) -> Result<()> {
 pub async fn pull_docker_image(image_name: &str) -> Result<()> {
     info!("Checking if we have to pull docker image {}", image_name);
 
-    let docker = get_docker()?;
+    let docker = get_docker().await?;
 
     let options = Some(CreateImageOptions {
         from_image: image_name,
@@ -164,7 +192,7 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
 }
 
 pub async fn create_volume(volume_name: &str) -> Result<()> {
-    let docker = get_docker()?;
+    let docker = get_docker().await?;
 
     info!("Creating volume {}", volume_name);
 
@@ -180,7 +208,7 @@ pub async fn create_volume(volume_name: &str) -> Result<()> {
 }
 
 pub async fn delete_volume(volume_name: &str) -> Result<()> {
-    let docker = get_docker()?;
+    let docker = get_docker().await?;
 
     info!("Removing volume {}", volume_name);
 

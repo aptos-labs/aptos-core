@@ -979,6 +979,7 @@ fi
 
 install_pkg curl "$PACKAGE_MANAGER"
 install_pkg unzip "$PACKAGE_MANAGER"
+install_pkg wget "$PACKAGE_MANAGER"
 
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"

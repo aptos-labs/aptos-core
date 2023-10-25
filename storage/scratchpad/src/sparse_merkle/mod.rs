@@ -81,7 +81,7 @@ mod sparse_merkle_test;
 pub mod test_utils;
 
 use crate::sparse_merkle::{
-    metrics::{LATEST_GENERATION, OLDEST_GENERATION, TIMER},
+    metrics::{GENERATION, TIMER},
     node::{NodeInner, SubTree},
     updater::SubTreeUpdater,
     utils::get_state_shard_id,
@@ -91,6 +91,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
+use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::SparseMerkleProofExt,
@@ -223,6 +224,8 @@ impl<V> Drop for Inner<V> {
         };
         // Now that the lock is released, those in `processed_descendants` will be dropped in turn
         // if applicable.
+
+        self.log_generation("drop");
     }
 }
 
@@ -262,7 +265,6 @@ impl<V> Inner<V> {
         branch_tracker: Arc<Mutex<BranchTracker<V>>>,
         family_lock: Arc<Mutex<()>>,
     ) -> Arc<Self> {
-        LATEST_GENERATION.set(self.generation as i64 + 1);
         Arc::new(Self {
             root: child_root,
             usage: child_usage,
@@ -337,7 +339,6 @@ impl<V> Inner<V> {
             break;
         }
 
-        OLDEST_GENERATION.set(ret.generation as i64);
         ret
     }
 
@@ -348,6 +349,10 @@ impl<V> Inner<V> {
             .drain(..)
             .map(|child| child.become_oldest(locked_family))
             .collect()
+    }
+
+    fn log_generation(&self, name: &'static str) {
+        GENERATION.set_with(&[name], self.generation as i64);
     }
 }
 
@@ -400,6 +405,8 @@ where
 
     pub fn freeze(self) -> FrozenSparseMerkleTree<V> {
         let base_smt = self.get_oldest_ancestor();
+        self.log_generation("freeze");
+        base_smt.log_generation("oldest");
         let base_generation = base_smt.inner.generation;
 
         FrozenSparseMerkleTree {
@@ -407,6 +414,10 @@ where
             base_generation,
             smt: self,
         }
+    }
+
+    pub fn log_generation(&self, name: &'static str) {
+        self.inner.log_generation(name)
     }
 
     #[cfg(test)]
@@ -505,12 +516,15 @@ where
     V: Clone + CryptoHash + Send + Sync,
 {
     fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
+        let smt = SparseMerkleTree {
+            inner: self.smt.inner.spawn(child_root, child_usage),
+        };
+        smt.log_generation("spawn");
+
         Self {
             base_smt: self.base_smt.clone(),
             base_generation: self.base_generation,
-            smt: SparseMerkleTree {
-                inner: self.smt.inner.spawn(child_root, child_usage),
-            },
+            smt,
         }
     }
 

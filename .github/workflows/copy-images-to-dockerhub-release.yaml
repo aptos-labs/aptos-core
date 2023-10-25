@@ -10,6 +10,7 @@ on:
       - preview
     tags:
       - aptos-node-v*
+      - aptos-indexer-grpc-v*
 
 permissions:
   contents: read

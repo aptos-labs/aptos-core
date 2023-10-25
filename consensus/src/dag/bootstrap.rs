@@ -2,7 +2,6 @@
 
 use super::{
     adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
-    anchor_election::RoundRobinAnchorElection,
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
@@ -18,11 +17,13 @@ use super::{
 use crate::{
     dag::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
+        anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
         dag_state_sync::StateSyncStatus,
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
     },
     experimental::buffer_manager::OrderedBlocks,
+    liveness::leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
     network::IncomingDAGRequest,
     payload_manager::PayloadManager,
     state_replication::{PayloadClient, StateComputer},
@@ -44,7 +45,7 @@ use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{select, task::JoinHandle};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -131,8 +132,47 @@ impl DagBootstrapper {
             ledger_info_provider.clone(),
         ));
 
-        let validators = self.epoch_state.verifier.get_ordered_account_addresses();
-        let anchor_election = Box::new(RoundRobinAnchorElection::new(validators));
+        let num_validators = self.epoch_state.verifier.len();
+        // TODO: support multiple epochs
+        let metadata_adapter = Arc::new(MetadataBackendAdapter::new(
+            num_validators * 10,
+            HashMap::from([(
+                self.epoch_state.epoch,
+                self.epoch_state
+                    .verifier
+                    .address_to_validator_index()
+                    .clone(),
+            )]),
+        ));
+        // TODO: use onchain config
+        let heuristic: Box<dyn ReputationHeuristic> = Box::new(ProposerAndVoterHeuristic::new(
+            self.self_peer,
+            1000,
+            10,
+            1,
+            10,
+            num_validators,
+            num_validators * 10,
+            false,
+        ));
+
+        let voting_power: Vec<u64> = self
+            .epoch_state
+            .verifier
+            .get_ordered_account_addresses_iter()
+            .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
+            .collect();
+        let anchor_election = Box::new(LeaderReputationAdapter::new(
+            self.epoch_state.epoch,
+            HashMap::from([(
+                self.epoch_state.epoch,
+                self.epoch_state.verifier.get_ordered_account_addresses(),
+            )]),
+            voting_power,
+            metadata_adapter,
+            heuristic,
+            100,
+        ));
 
         let order_rule = OrderRule::new(
             self.epoch_state.clone(),

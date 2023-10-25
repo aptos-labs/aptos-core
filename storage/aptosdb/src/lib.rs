@@ -2055,6 +2055,8 @@ impl DbWriter for AptosDB {
                 .try_lock()
                 .expect("Concurrent committing detected.");
 
+            latest_in_memory_state.current.log_generation("db_save");
+
             // For reconfig suffix.
             if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
                 return Ok(());
