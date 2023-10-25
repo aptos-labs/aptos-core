@@ -3,8 +3,8 @@
 
 use super::{
     docker::{
-        confirm_docker_available, create_volume, delete_container, delete_volume, get_docker,
-        pull_docker_image, setup_docker_logging, StopContainerShutdownStep,
+        create_volume, delete_container, delete_volume, get_docker, pull_docker_image,
+        setup_docker_logging, StopContainerShutdownStep,
     },
     health_checker::HealthChecker,
     traits::{ServiceManager, ShutdownStep},
@@ -163,7 +163,7 @@ impl ServiceManager for PostgresManager {
             }
         } else {
             // Confirm Docker is available.
-            confirm_docker_available().await?;
+            get_docker().await?;
 
             // Kill any existing container we find.
             delete_container(POSTGRES_CONTAINER_NAME).await?;
@@ -195,7 +195,7 @@ impl ServiceManager for PostgresManager {
         // Let the user know where to go to see logs for postgres.
         setup_docker_logging(&self.test_dir, "postgres", POSTGRES_CONTAINER_NAME)?;
 
-        let docker = get_docker()?;
+        let docker = get_docker().await?;
 
         // If we're starting afresh, delete any existing volume.
         if self.force_restart {
