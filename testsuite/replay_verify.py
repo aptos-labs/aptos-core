@@ -70,6 +70,7 @@ MAINNET_RANGES = [
     [304_000_001, sys.maxsize],
 ]
 
+
 def replay_verify_partition(
     n: int,
     N: int,
