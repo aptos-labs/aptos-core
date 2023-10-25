@@ -163,8 +163,7 @@ pub struct StructIdentifier {
     pub name: Identifier,
 }
 
-#[derive(Derivative, Ord, PartialOrd)]
-#[derivative(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Type {
     Bool,
     U8,
@@ -175,16 +174,12 @@ pub enum Type {
     Vector(Box<Type>),
     Struct {
         name: Arc<StructIdentifier>,
-        #[derivative(PartialEq = "ignore", Hash = "ignore")]
-        ability: AbilitySet,
+        ability: AbilityInfo,
     },
     StructInstantiation {
         name: Arc<StructIdentifier>,
         ty_args: Arc<Vec<Type>>,
-        #[derivative(PartialEq = "ignore", Hash = "ignore")]
-        base_ability_set: AbilitySet,
-        #[derivative(PartialEq = "ignore", Hash = "ignore")]
-        phantom_ty_args_mask: Vec<bool>,
+        ability: AbilityInfo,
     },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
@@ -192,6 +187,28 @@ pub enum Type {
     U16,
     U32,
     U256,
+}
+
+
+// Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct AbilityInfo {
+    #[derivative(PartialEq = "ignore", Hash = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    base_ability_set: AbilitySet,
+
+    #[derivative(PartialEq = "ignore", Hash = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    phantom_ty_args_mask: Vec<bool>,
+}
+
+impl AbilityInfo {
+    pub fn struct_(ability: AbilitySet) -> Self {
+        Self { base_ability_set: ability, phantom_ty_args_mask: vec![]}
+    }
+
+    pub fn generic_struct(base_ability_set: AbilitySet, phantom_ty_args_mask: Vec<bool>) -> Self {
+        Self { base_ability_set, phantom_ty_args_mask: phantom_ty_args_mask }
+    }
 }
 
 impl Type {
@@ -227,13 +244,12 @@ impl Type {
             },
             Type::Struct { name, ability } => Type::Struct {
                 name: name.clone(),
-                ability: *ability,
+                ability: ability.clone(),
             },
             Type::StructInstantiation {
                 name,
                 ty_args: instantiation,
-                base_ability_set: base_ability,
-                phantom_ty_args_mask: is_phantom_params,
+                ability,
             } => {
                 let mut inst = vec![];
                 for ty in instantiation.iter() {
@@ -242,8 +258,7 @@ impl Type {
                 Type::StructInstantiation {
                     name: name.clone(),
                     ty_args: Arc::new(inst),
-                    base_ability_set: *base_ability,
-                    phantom_ty_args_mask: is_phantom_params.clone(),
+                    ability: ability.clone(),
                 }
             },
         };
@@ -401,11 +416,10 @@ impl Type {
                     ty.abilities()?
                 ])
             },
-            Type::Struct { ability, .. } => Ok(*ability),
+            Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
                 ty_args,
-                base_ability_set: base_ability,
-                phantom_ty_args_mask: is_phantom_params,
+                ability: AbilityInfo { base_ability_set, phantom_ty_args_mask },
                 ..
             } => {
                 let type_argument_abilities = ty_args
@@ -413,8 +427,8 @@ impl Type {
                     .map(|arg| arg.abilities())
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 AbilitySet::polymorphic_abilities(
-                    *base_ability,
-                    is_phantom_params.iter().copied(),
+                    *base_ability_set,
+                    phantom_ty_args_mask.iter().copied(),
                     type_argument_abilities,
                 )
             },
