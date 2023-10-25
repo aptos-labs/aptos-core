@@ -4,11 +4,13 @@
 use super::traits::ShutdownStep;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+#[cfg(unix)]
+use bollard::API_DEFAULT_VERSION;
 use bollard::{
     container::{RemoveContainerOptions, StopContainerOptions},
     image::CreateImageOptions,
     volume::{CreateVolumeOptions, RemoveVolumeOptions},
-    Docker, API_DEFAULT_VERSION,
+    Docker,
 };
 use futures::TryStreamExt;
 use std::{fs::create_dir_all, path::Path};
