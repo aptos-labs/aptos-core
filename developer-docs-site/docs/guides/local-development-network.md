@@ -231,7 +231,9 @@ Make sure the socket for connecting to Docker is present on your machine in the 
 /var/run/docker.sock
 ```
 
-If it doesn't, you can find where it is like this:
+If it doesn't, open Docker Desktop and enable `Settings -> Advanced -> Allow the default Docker socket to be used`.
+
+Alternatively, you can find where it is like this:
 ```
 $ docker context inspect | grep Host
   "Host": "unix:///Users/dport/.docker/run/docker.sock",
@@ -247,7 +249,7 @@ Alternatively, run the CLI like this to tell it where the socket is:
 DEFAULT_SOCKET=/Users/dport/.docker/run/docker.sock aptos node run-local-testnet --with-indexer-api
 ```
 
-Note: If you're on Mac or Windows, we recommend you use Docker Desktop rather than installing Docker via a package manager (e.g. Homebrew or Choco).
+Note: As mentioned above, if you're on Mac or Windows, we recommend you use Docker Desktop rather than installing Docker via a package manager (e.g. Homebrew or Choco).
 
 ### The local network seems to hang on startup
 If the CLI seems to sit there and do nothing when you are using `--with-indexer-api`, consider quitting and restarting Docker. Sometimes Docker gets in a bad state. Note that Docker is only required if you are using `--with-indexer-api`.
@@ -264,7 +266,7 @@ When running the CLI interactively, you can see if the network is alive by waiti
 Setup is complete, you can now use the local testnet!
 ```
 
-If you writing a script and would like to wait for the local network to come up, you can make a GET request to `http://127.0.0.1:8070`. At first this will return [503](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503). When it returns [200](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/200) it means all the services are ready.
+If you are writing a script and would like to wait for the local network to come up, you can make a GET request to `http://127.0.0.1:8070`. At first this will return [503](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/503). When it returns [200](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/200) it means all the services are ready.
 
 You can inspect the response to see which services are ready.
 

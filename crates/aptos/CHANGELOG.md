@@ -11,6 +11,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ### Fixed
 - Fixed an infrequent bug that caused startup failures for the local testnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
+- Fixed an issue where the CLI could not find the Docker socket with some Docker Desktop configurations.
 
 ## [2.2.2] - 2023/10/16
 ### Updated
