@@ -387,6 +387,32 @@ where
         executor: &E,
         block: &[T],
     ) -> ::std::result::Result<(), PanicOr<IntentionalFallbackToSequential>> {
+        let mut shared_commit_state_guard = shared_commit_state.acquire();
+        let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
+            shared_commit_state_guard.dereference_mut();
+
+        let update_counters_and_log_info =
+            |txn_idx: u32,
+             accumulated_fee_statement: &mut FeeStatement,
+             txn_fee_statements: &mut Vec<FeeStatement>| {
+                counters::update_parallel_block_gas_counters(
+                    accumulated_fee_statement,
+                    (txn_idx + 1) as usize,
+                );
+                counters::update_parallel_txn_gas_counters(txn_fee_statements);
+
+                let accumulated_non_storage_gas = accumulated_fee_statement.execution_gas_used()
+                    + accumulated_fee_statement.io_gas_used();
+                info!(
+                    "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
+		         accumulated_non_storage_gas = {}, limit = {:?}",
+                    txn_idx + 1,
+                    scheduler.num_txns(),
+                    accumulated_non_storage_gas,
+                    maybe_block_gas_limit,
+                );
+            };
+
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
             if !Self::validate_commit_ready(txn_idx, versioned_cache, last_input_output)? {
                 // Transaction needs to be re-executed, one final time.
@@ -427,10 +453,6 @@ where
                 scheduler.add_to_commit_queue(txn_idx);
             }
 
-            let mut shared_commit_state_guard = shared_commit_state.acquire();
-            let (accumulated_fee_statement, txn_fee_statements, maybe_error) =
-                shared_commit_state_guard.dereference_mut();
-
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 // For committed txns with Success status, calculate the accumulated gas costs.
                 accumulated_fee_statement.add_fee_statement(&fee_statement);
@@ -459,9 +481,33 @@ where
                 }
             }
 
-            // Committed the last transaction, BlockSTM finishes execution.
+            // We `halt` the execution in the following 4 cases:
+            // 1) We detect module read/write intersection
+            // 2) A transaction triggered an Abort
+            // 3) All transactions are scheduled for committing
+            // 4) We skip_rest after a transaction
+
+            // We cover cases 1 and 2 here
+            if let Some(err) = last_input_output.execution_error(txn_idx) {
+                if scheduler.halt() {
+                    *maybe_error = Some(err);
+                    info!(
+                        "Block execution was aborted due to {:?}",
+                        maybe_error.as_ref().unwrap()
+                    );
+                    update_counters_and_log_info(
+                        txn_idx,
+                        accumulated_fee_statement,
+                        txn_fee_statements,
+                    );
+                } // else it's already halted
+                break;
+            }
+
+            // We cover cases 3 and 4 here: Either all txn committed,
+            // or a committed txn caused an early halt.
             if txn_idx + 1 == scheduler.num_txns()
-                || last_input_output.block_truncated_at_idx(txn_idx)
+                || last_input_output.block_skips_rest_at_idx(txn_idx)
             {
                 if txn_idx + 1 == scheduler.num_txns() {
                     assert!(
@@ -470,32 +516,11 @@ where
                     );
                 }
 
-                // Either all txn committed, or a committed txn caused an early halt.
                 if scheduler.halt() {
-                    if let Some(err) = last_input_output.execution_error(txn_idx) {
-                        *maybe_error = Some(err);
-                        info!(
-                            "Block execution was aborted due to {:?}",
-                            maybe_error.as_ref().unwrap()
-                        );
-                    }
-
-                    counters::update_parallel_block_gas_counters(
+                    update_counters_and_log_info(
+                        txn_idx,
                         accumulated_fee_statement,
-                        (txn_idx + 1) as usize,
-                    );
-                    counters::update_parallel_txn_gas_counters(txn_fee_statements);
-
-                    let accumulated_non_storage_gas = accumulated_fee_statement
-                        .execution_gas_used()
-                        + accumulated_fee_statement.io_gas_used();
-                    info!(
-                        "[BlockSTM]: Parallel execution completed. {} out of {} txns committed. \
-		         accumulated_non_storage_gas = {}, limit = {:?}",
-                        txn_idx + 1,
-                        scheduler.num_txns(),
-                        accumulated_non_storage_gas,
-                        maybe_block_gas_limit,
+                        txn_fee_statements,
                     );
                 }
                 break;
