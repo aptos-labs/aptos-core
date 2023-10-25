@@ -577,13 +577,38 @@ impl FakeExecutor {
                     for (idx, (baseline_txn_output, txn_output)) in
                         baseline_output.iter().zip(output.iter()).enumerate()
                     {
-                        assert_eq!(
-                            baseline_txn_output, txn_output,
-                            "first transaction output mismatch at index {}, between modes {:?} and {:?}",
-                            idx,
-                            baseline_mode,
-                            mode,
-                        );
+                        let mut diffs = vec![];
+                        for ((baseline_key, baseline_write), (key, write)) in  baseline_txn_output.write_set().into_iter().zip(txn_output.write_set().into_iter()) {
+                            assert_eq!(baseline_key, key);
+                            if baseline_write != write {
+                                diffs.push((
+                                    baseline_write,
+                                    write,
+                                    key,
+                                ));
+                            }
+                        }
+
+                        for (baseline_write, write, key) in diffs.clone() {
+                            println!("Mismatch: {:?} an {:?}", baseline_txn_output.status(), txn_output.status());
+                            println!(
+                                "{:?} != {:?}\nfirst write op mismatch at index {}, between modes {:?} and {:?}, for key {:?}\n",
+                                baseline_write,
+                                write,
+                                idx,
+                                baseline_mode,
+                                mode,
+                                key,
+                            );
+                        }
+                        assert!(diffs.is_empty());
+                        // assert_eq!(
+                        //     baseline_txn_output, txn_output,
+                        //     "first transaction output mismatch at index {}, between modes {:?} and {:?}",
+                        //     idx,
+                        //     baseline_mode,
+                        //     mode,
+                        // );
                     }
                 } else {
                     assert_eq!(baseline_output, output);

@@ -617,7 +617,7 @@ where
                     if write_set_keys.contains(key) {
                         continue;
                     }
-                    // layout is Some(_) if it contains an delayed field
+                    // Layout is Some(_) if it contains an delayed field.
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
                         Self::replace_ids_for_resource(
                             key,
