@@ -12,6 +12,7 @@ spec aptos_framework::consensus_config {
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if exists<ConsensusConfig>(@aptos_framework);
         aborts_if !(len(config) > 0);
+        ensures  exists<ConsensusConfig>(@aptos_framework);
     }
 
     /// Ensure the caller is admin and `ConsensusConfig` should be existed.
@@ -39,5 +40,6 @@ spec aptos_framework::consensus_config {
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        ensures global<ConsensusConfig>(@aptos_framework).config == config;
     }
 }
