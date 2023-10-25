@@ -734,18 +734,27 @@ where
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
 
-        let (mut patched_resource_write_set, write_set_keys) =
-            Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
-        patched_resource_write_set.extend(Self::map_id_to_values_in_read_set_parallel(
-            txn_idx,
-            delayed_field_keys,
-            write_set_keys,
-            last_input_output,
-            &latest_view,
-        ));
+        let patched_resource_write_set = if self.config.delayed_fields_optimization_enabled {
+            let (mut patched_resource_write_set, write_set_keys) =
+                Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
+            patched_resource_write_set.extend(Self::map_id_to_values_in_read_set_parallel(
+                txn_idx,
+                delayed_field_keys,
+                write_set_keys,
+                last_input_output,
+                &latest_view,
+            ));
+            patched_resource_write_set
+        } else {
+            BTreeMap::new()
+        };
 
         let events = last_input_output.events(txn_idx);
-        let patched_events = Self::map_id_to_values_events(events, &latest_view);
+        let patched_events = if self.config.delayed_fields_optimization_enabled {
+            Self::map_id_to_values_events(events, &latest_view)
+        } else {
+            events.map(|(e, _)| e).collect()
+        };
         let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
             txn_idx,
             last_input_output,
@@ -1113,7 +1122,9 @@ where
                     // Apply the writes.
                     Self::apply_output_sequential(&unsync_map, &output);
 
-                    if dynamic_change_set_optimizations_enabled {
+                    if self.config.delayed_fields_optimization_enabled
+                        && dynamic_change_set_optimizations_enabled
+                    {
                         // Replace delayed field id with values in resource write set and read set.
                         let delayed_field_keys =
                             Some(output.delayed_field_change_set().into_keys());

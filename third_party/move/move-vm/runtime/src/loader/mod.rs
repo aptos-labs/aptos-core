@@ -1960,9 +1960,8 @@ impl Loader {
         &self,
         struct_name: &StructIdentifier,
     ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config.aggregator_v2_type_tagging {
-            return None;
-        }
+        // Note - gating is done in aptos-move/block-executor/src/view.rs
+        // We tag layouts unconditionaly here, as it is harder to get configuration to here.
 
         let ident_str_to_kind = |ident_str: &IdentStr| -> Option<IdentifierMappingKind> {
             if ident_str.eq(ident_str!("Aggregator")) {

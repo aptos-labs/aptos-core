@@ -639,21 +639,23 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             "Reading a module {:?} using ResourceView",
             state_key,
         );
+        // If optimization is not enabled, remove maybe layout.
+        let maybe_layout = if self.is_delayed_field_optimization_enabled() {
+            maybe_layout
+        } else {
+            None
+        };
         match &self.latest_view {
             ViewState::Sync(state) => {
                 let mut ret = state.read_data_by_kind(state_key, self.txn_idx, kind.clone());
 
                 if matches!(ret, ReadResult::Uninitialized) {
                     let from_storage = self.get_base_value(state_key)?;
-                    let maybe_patched_from_storage = match (
-                        from_storage,
-                        maybe_layout,
-                        state.delayed_field_optimization_enabled,
-                    ) {
+                    let maybe_patched_from_storage = match (from_storage, maybe_layout) {
                         // There are aggregators / aggregator snapshots in the
                         // resource, so we have to replace the actual values with
                         // identifiers.
-                        (Some(state_value), Some(layout), true) => {
+                        (Some(state_value), Some(layout)) => {
                             let res = self.replace_values_with_identifiers(state_value, layout);
                             match res {
                                 Ok((value, _)) => Some(value),
@@ -675,7 +677,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 },
                             }
                         },
-                        (from_storage, _, _) => from_storage,
+                        (from_storage, _) => from_storage,
                     };
 
                     // This base value can also be used to resolve AggregatorV1 directly from
@@ -717,47 +719,39 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     None => {
                         let from_storage = self.get_base_value(state_key)?;
 
-                        Ok(
-                            match (
-                                kind.clone(),
-                                from_storage,
-                                maybe_layout,
-                                state.delayed_field_optimization_enabled,
-                            ) {
-                                (ReadKind::Value, Some(state_value), Some(layout), true) => {
-                                    let res =
-                                        self.replace_values_with_identifiers(state_value, layout);
-                                    let patched_state_value = match res {
-                                        Ok((patched_state_value, _)) => {
-                                            state.read_set.borrow_mut().insert(state_key.clone());
-                                            state.unsync_map.write(
-                                                state_key.clone(),
-                                                TransactionWrite::from_state_value(Some(
-                                                    patched_state_value.clone(),
-                                                )),
-                                                maybe_layout.map(|layout| Arc::new(layout.clone())),
-                                            );
-                                            Some(patched_state_value)
-                                        },
-                                        Err(err) => {
-                                            let log_context = AdapterLogSchema::new(
-                                                self.base_view.id(),
-                                                self.txn_idx as usize,
-                                            );
-                                            alert!(
+                        Ok(match (kind.clone(), from_storage, maybe_layout) {
+                            (ReadKind::Value, Some(state_value), Some(layout)) => {
+                                let res = self.replace_values_with_identifiers(state_value, layout);
+                                let patched_state_value = match res {
+                                    Ok((patched_state_value, _)) => {
+                                        state.read_set.borrow_mut().insert(state_key.clone());
+                                        state.unsync_map.write(
+                                            state_key.clone(),
+                                            TransactionWrite::from_state_value(Some(
+                                                patched_state_value.clone(),
+                                            )),
+                                            maybe_layout.map(|layout| Arc::new(layout.clone())),
+                                        );
+                                        Some(patched_state_value)
+                                    },
+                                    Err(err) => {
+                                        let log_context = AdapterLogSchema::new(
+                                            self.base_view.id(),
+                                            self.txn_idx as usize,
+                                        );
+                                        alert!(
                                             log_context,
                                             "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
                                             state_key,
                                             err
                                         );
-                                            None
-                                        },
-                                    };
-                                    patched_state_value
-                                },
-                                (_, maybe_state_value, _, _) => maybe_state_value,
+                                        None
+                                    },
+                                };
+                                patched_state_value
                             },
-                        )
+                            (_, maybe_state_value, _) => maybe_state_value,
+                        })
                     },
                 };
                 ret.map(|maybe_state_value| match kind {
@@ -1074,7 +1068,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 .try_into_move_value(layout)?),
             ViewState::Unsync(state) => Ok(state
                 .read_delayed_field(id)
-                .expect("Delayed field value for ID must always exist in sequential execution")
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Delayed field value for ID must always exist in sequential execution {:?}",
+                        id
+                    )
+                })
                 .try_into_move_value(layout)?),
         }
     }

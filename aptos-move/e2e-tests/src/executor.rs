@@ -56,7 +56,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
-    AptosVM, VMExecutor, VMValidator,
+    AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -495,9 +495,10 @@ impl FakeExecutor {
         }
     }
 
-    pub fn execute_transaction_block_parallel(
+    pub fn execute_transaction_block_with_configs(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
+        concurrency_level: usize,
         delayed_fields_optimization_enabled: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
@@ -505,7 +506,7 @@ impl FakeExecutor {
             txn_block,
             &self.data_store,
             BlockExecutorConfig {
-                concurrency_level: usize::min(4, num_cpus::get()),
+                concurrency_level,
                 maybe_block_gas_limit: None,
                 delayed_fields_optimization_enabled,
             },
@@ -544,20 +545,20 @@ impl FakeExecutor {
 
         if mode != ExecutorMode::ParallelOnly {
             for delayed_fields_mode in self.delayed_field_optimization_mode.individual_modes() {
-                AptosVM::set_concurrency_level_once(1);
-                AptosVM::set_aggregator_v2_via_delayed_fields_once(
+                let output = self.execute_transaction_block_with_configs(
+                    &sig_verified_block,
+                    1,
                     delayed_fields_mode.is_enabled(),
                 );
-
-                let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
                 outputs.push((output, (ExecutorMode::SequentialOnly, delayed_fields_mode)));
             }
         };
 
         if mode != ExecutorMode::SequentialOnly {
             for delayed_fields_mode in self.delayed_field_optimization_mode.individual_modes() {
-                let output = self.execute_transaction_block_parallel(
+                let output = self.execute_transaction_block_with_configs(
                     &sig_verified_block,
+                    usize::min(4, num_cpus::get()),
                     delayed_fields_mode.is_enabled(),
                 );
                 outputs.push((output, (ExecutorMode::SequentialOnly, delayed_fields_mode)));
