@@ -26,14 +26,15 @@ pub enum GroupSizeKind {
 }
 
 impl GroupSizeKind {
-    pub fn from_gas_feature_version(gas_feature_version: u64) -> Self {
-        if gas_feature_version >= 9 {
-            if gas_feature_version >= 12 {
-                GroupSizeKind::AsSum
-            } else {
-                // Keep old caching behavior for replay.
-                GroupSizeKind::AsBlob
-            }
+    pub fn from_gas_feature_version(
+        gas_feature_version: u64,
+        resource_group_charge_as_size_sum_enabled: bool,
+    ) -> Self {
+        if resource_group_charge_as_size_sum_enabled {
+            GroupSizeKind::AsSum
+        } else if gas_feature_version >= 9 {
+            // Keep old caching behavior for replay.
+            GroupSizeKind::AsBlob
         } else {
             GroupSizeKind::None
         }
@@ -73,13 +74,18 @@ impl<'r> ResourceGroupAdapter<'r> {
         maybe_resource_group_view: Option<&'r dyn ResourceGroupView>,
         resource_view: &'r dyn TResourceView<Key = StateKey, Layout = MoveTypeLayout>,
         gas_feature_version: u64,
+        resource_group_charge_as_size_sum_enabled: bool,
     ) -> Self {
-        let group_size_kind = GroupSizeKind::from_gas_feature_version(gas_feature_version);
+        let group_size_kind = GroupSizeKind::from_gas_feature_version(
+            gas_feature_version,
+            resource_group_charge_as_size_sum_enabled,
+        );
 
         Self {
-            maybe_resource_group_view: (group_size_kind == GroupSizeKind::AsSum)
-                .then_some(maybe_resource_group_view)
-                .flatten(),
+            maybe_resource_group_view: maybe_resource_group_view.filter(|view| {
+                view.is_resource_group_split_in_change_set_enabled()
+                    && group_size_kind == GroupSizeKind::AsSum
+            }),
             resource_view,
             group_size_kind,
             group_cache: RefCell::new(HashMap::new()),
@@ -170,7 +176,17 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
     fn release_group_cache(
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
-        if self.group_size_kind == GroupSizeKind::AsSum {
+        // TODO[agg_v2](fix) - when is_resource_group_split_in_change_set_enabled is false,
+        // but self.group_size_kind == GroupSizeKind::AsSum, we need to special-case it.
+        // We need to return an indicator here that will force the VM to produce
+        // V0 resource group change set but charge as V1
+        // Potentially - I'm thinking to turn V0/V1 enum into struct there and prepare both,
+        // shouldn't be too complex and well-testable) - we can do that next as one of the
+        // preconditions for enabling group feature flag -> aggr2 feature flag.
+
+        if self.is_resource_group_split_in_change_set_enabled()
+            && self.group_size_kind == GroupSizeKind::AsSum
+        {
             // Clear the cache, but do not return the contents to the caller. This leads to
             // the VMChangeSet prepared in a new, granular format that the block executor
             // can handle (combined as a group update at the end).
@@ -264,22 +280,23 @@ mod tests {
     fn group_size_kind_from_gas_version() {
         for i in 0..9 {
             assert_eq!(
-                GroupSizeKind::from_gas_feature_version(i),
+                GroupSizeKind::from_gas_feature_version(i, true),
+                GroupSizeKind::AsSum
+            );
+            assert_eq!(
+                GroupSizeKind::from_gas_feature_version(i, false),
                 GroupSizeKind::None
             );
         }
 
-        for i in 9..12 {
+        for i in 9..20 {
             assert_eq!(
-                GroupSizeKind::from_gas_feature_version(i),
-                GroupSizeKind::AsBlob
-            );
-        }
-
-        for i in 12..20 {
-            assert_eq!(
-                GroupSizeKind::from_gas_feature_version(i),
+                GroupSizeKind::from_gas_feature_version(i, true),
                 GroupSizeKind::AsSum
+            );
+            assert_eq!(
+                GroupSizeKind::from_gas_feature_version(i, false),
+                GroupSizeKind::AsBlob
             );
         }
     }
@@ -287,7 +304,7 @@ mod tests {
     #[test]
     fn load_to_cache() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 3);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 3, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_1 = StateKey::raw(vec![1]);
@@ -301,7 +318,7 @@ mod tests {
     #[test]
     fn test_get_resource_by_tag() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 5);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 5, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -358,7 +375,7 @@ mod tests {
     #[test]
     fn size_as_blob_len() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 9);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 9, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::AsBlob);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -389,15 +406,16 @@ mod tests {
     #[test]
     fn set_group_view_forwarding() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 12);
-        let adapter_with_forwarding = ResourceGroupAdapter::new(Some(&adapter), &state_view, 12);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 12, true);
+        let adapter_with_forwarding =
+            ResourceGroupAdapter::new(Some(&adapter), &state_view, 12, true);
         assert_some!(adapter_with_forwarding.maybe_resource_group_view);
     }
 
     #[test]
     fn size_as_sum() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 12);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 12, true);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::AsSum);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -444,7 +462,7 @@ mod tests {
     #[test]
     fn size_as_none() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 8);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 8, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -468,7 +486,7 @@ mod tests {
     #[test]
     fn exists_resource_in_group() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 0);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 0, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -499,7 +517,7 @@ mod tests {
     #[test]
     fn resource_size_in_group() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 3);
+        let adapter = ResourceGroupAdapter::new(None, &state_view, 3, false);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::None);
 
         let key_0 = StateKey::raw(vec![0]);

@@ -88,6 +88,7 @@ pub enum FeatureFlag {
     FeePayerAccountOptional,
     ConcurrentAssets,
     LimitMaxIdentifierLength,
+    ResourceGroupsChargeAsSizeSum,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -228,6 +229,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
             FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::ResourceGroupsChargeAsSizeSum => {
+                AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
+            },
         }
     }
 }
@@ -291,6 +295,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
             AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
+            AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
+                FeatureFlag::ResourceGroupsChargeAsSizeSum
+            },
         }
     }
 }

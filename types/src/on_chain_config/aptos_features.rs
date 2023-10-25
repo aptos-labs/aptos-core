@@ -43,7 +43,7 @@ pub enum FeatureFlag {
     SINGLE_SENDER_AUTHENTICATOR = 33,
     SPONSORED_AUTOMATIC_ACCOUNT_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
-    // CAN BE USED - 36,
+    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 36,
     CONCURRENT_ASSETS = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
 }
@@ -103,6 +103,10 @@ impl Features {
     /// Once enabled, the functions from aggregator_v2.move will be available for use.
     pub fn is_aggregator_v2_api_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_API)
+    }
+
+    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 }
 
