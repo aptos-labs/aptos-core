@@ -528,4 +528,27 @@ proptest! {
             txns,
         );
     }
+
+    #[test]
+    fn test_aggregator_write_ops(test_env in arb_test_env(4)) {
+        println!("Testing test_aggregator_write_ops {:?}", test_env);
+        let element_type = ElementType::U64;
+        let use_type = UseType::UseResourceType;
+
+        let mut h = setup(test_env.executor_mode, test_env.delayed_fields_mode, 4);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
+            (0, h.new_add(&agg_loc, 1000, 100)),
+            (0, h.add(&agg_loc, 200)),
+            (0, h.sub(&agg_loc, 100))
+        ];
+        run_block_in_parts(
+            &mut h.harness,
+            test_env.block_split,
+            txns,
+        );
+    }
 }

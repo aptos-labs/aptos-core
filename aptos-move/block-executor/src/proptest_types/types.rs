@@ -209,6 +209,18 @@ impl TransactionWrite for ValueType {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.bytes = bytes.into();
     }
+
+    fn is_creation(&self) -> bool {
+        // Difference between creation and modification is not important for
+        // these tests.
+        false
+    }
+
+    fn as_modification(&self) -> Self {
+        // Difference between creation and modification is not important for
+        // these tests.
+        unreachable!("as_modification is not relevant for the test")
+    }
 }
 
 #[derive(Clone, Copy)]

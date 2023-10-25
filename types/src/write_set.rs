@@ -167,7 +167,7 @@ impl WriteOp {
     }
 }
 
-pub trait TransactionWrite {
+pub trait TransactionWrite: Sized {
     fn bytes(&self) -> Option<&Bytes>;
 
     // Returns state value that would be observed by a read following the 'self' write.
@@ -203,6 +203,14 @@ pub trait TransactionWrite {
             None => Ok(None),
         }
     }
+
+    fn is_creation(&self) -> bool;
+
+    // If write is a creation, reinterpret it as modification, and leave as is
+    // otherwise.
+    // Note: this is important for patching delayed fields, where the patched
+    // value has to be a modification.
+    fn as_modification(&self) -> Self;
 
     fn is_deletion(&self) -> bool {
         self.bytes().is_none()
@@ -247,6 +255,25 @@ impl TransactionWrite for WriteOp {
             Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
             Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
             Deletion | DeletionWithMetadata { .. } => (),
+        }
+    }
+
+    fn is_creation(&self) -> bool {
+        use WriteOp::*;
+        matches!(self, Creation(_) | CreationWithMetadata { .. })
+    }
+
+    fn as_modification(&self) -> Self {
+        use WriteOp::*;
+
+        assert!(self.is_creation());
+        match self {
+            Creation(data) => Modification(data.clone()),
+            CreationWithMetadata { data, metadata } => ModificationWithMetadata {
+                data: data.clone(),
+                metadata: metadata.clone(),
+            },
+            _ => unreachable!("Should only be called for creation write ops"),
         }
     }
 }

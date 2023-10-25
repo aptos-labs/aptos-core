@@ -571,6 +571,30 @@ where
         }
     }
 
+    /// Given a resource read from `key`, replaces all identifiers in it, and adds
+    /// it to the patched write set.
+    fn replace_ids_for_resource(
+        key: &T::Key,
+        resource: &Arc<T::Value>,
+        layout: &MoveTypeLayout,
+        latest_view: &LatestView<T, S, X>,
+        delayed_field_keys: &HashSet<T::Identifier>,
+        patched_resource_write_set: &mut BTreeMap<T::Key, T::Value>,
+    ) {
+        // If we read creation, we must change it to modification.
+        let value = if resource.is_creation() {
+            Arc::new(resource.as_modification())
+        } else {
+            resource.clone()
+        };
+
+        if let Some(patched_value) =
+            Self::replace_ids_with_values(value, layout, latest_view, &delayed_field_keys)
+        {
+            patched_resource_write_set.insert(key.clone(), patched_value);
+        }
+    }
+
     // For each resource that satisfies the following conditions,
     //     1. Resource is in read set
     //     2. Resource is not in write set
@@ -595,14 +619,14 @@ where
                     }
                     // layout is Some(_) if it contains an delayed field
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                        if let Some(patched_value) = Self::replace_ids_with_values(
-                            value.clone(),
-                            layout,
+                        Self::replace_ids_for_resource(
+                            key,
+                            value,
+                            layout.as_ref(),
                             latest_view,
                             &delayed_field_keys,
-                        ) {
-                            patched_resource_write_set.insert(key.clone(), patched_value);
-                        }
+                            &mut patched_resource_write_set,
+                        );
                     }
                 }
             }
@@ -616,24 +640,24 @@ where
         read_set: RefCell<HashSet<T::Key>>,
         unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>,
         latest_view: &LatestView<T, S, X>,
-    ) -> HashMap<T::Key, T::Value> {
-        let mut patched_resource_write_set = HashMap::new();
+    ) -> BTreeMap<T::Key, T::Value> {
+        let mut patched_resource_write_set = BTreeMap::new();
         if let Some(delayed_field_keys) = delayed_field_keys {
             let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
             for key in read_set.borrow().iter() {
                 if write_set_keys.contains(key) {
                     continue;
                 }
-                // layout is Some(_) if it contains an delayed field
+                // Layout is Some(_) if it contains an delayed field.
                 if let Some((value, Some(layout))) = unsync_map.fetch_data(key) {
-                    if let Some(patched_value) = Self::replace_ids_with_values(
-                        value.clone(),
-                        &layout,
+                    Self::replace_ids_for_resource(
+                        key,
+                        &value,
+                        layout.as_ref(),
                         latest_view,
                         &delayed_field_keys,
-                    ) {
-                        patched_resource_write_set.insert(key.clone(), patched_value);
-                    }
+                        &mut patched_resource_write_set,
+                    );
                 }
             }
         }
