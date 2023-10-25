@@ -7,6 +7,7 @@ use aptos_metrics_core::TimerHelper;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use threadpool::ThreadPool;
 
+#[derive(Debug)]
 pub struct AsyncDropQueue {
     name: &'static str,
     token_tx: Sender<()>,

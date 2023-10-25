@@ -3340,6 +3340,7 @@ dependencies = [
  "aptos-drop-helper",
  "aptos-experimental-runtimes",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "bitvec 1.0.1",
