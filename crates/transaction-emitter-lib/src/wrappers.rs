@@ -161,6 +161,7 @@ pub async fn create_accounts_command(
             .expected_gas_per_txn(create_accounts_args.max_gas_per_txn)
             .max_gas_per_txn(create_accounts_args.max_gas_per_txn)
             .coins_per_account_override(0)
+            .expected_max_txns(0)
             .prompt_before_spending();
     let seed = match &create_accounts_args.account_minter_seed {
         Some(str) => parse_seed(str),
