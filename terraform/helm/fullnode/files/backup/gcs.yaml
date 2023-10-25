@@ -5,12 +5,12 @@ commands:
     FILE_HANDLE="$BACKUP_HANDLE/$FILE_NAME"
     echo "$FILE_HANDLE"
     exec 1>&-  # close stdout
-    gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
-  open_for_read: 'gsutil -q cp "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" - | gzip -cd'
+    gzip -c | gcloud storage cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
+  open_for_read: 'gcloud storage cp "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" - | gzip -cd'
   save_metadata_line: | 
     FILE_HANDLE="metadata/$FILE_NAME"
     echo "$FILE_HANDLE"
     exec 1>&-
-    gzip -c | gsutil -q cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
-  list_metadata_files: '(gsutil -q ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#gs://.*/metadata/#metadata/#p"'
-  backup_metadata_file: 'gsutil mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME'
+    gzip -c | gcloud storage cp - "gs://$BUCKET/$SUB_DIR/$FILE_HANDLE" > /dev/null
+  list_metadata_files: '(gcloud storage ls gs://$BUCKET/$SUB_DIR/metadata/ ||:) | sed -ne "s#gs://.*/metadata/#metadata/#p"'
+  backup_metadata_file: 'gcloud storage mv gs://$BUCKET/$SUB_DIR/metadata/$FILE_NAME gs://$BUCKET/$SUB_DIR/metadata_backup/$FILE_NAME'
