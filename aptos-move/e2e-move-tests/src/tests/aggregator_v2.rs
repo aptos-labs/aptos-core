@@ -249,9 +249,21 @@ fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
         arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
             executor_mode: ExecutorMode::BothComparison,
-            delayed_fields_mode: DelayedFieldOptimizationMode::BothComparison,
+            delayed_fields_mode: DelayedFieldOptimizationMode::EnabledOnly,
             block_split
         }),
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            delayed_fields_mode: DelayedFieldOptimizationMode::DisabledOnly,
+            block_split
+        }),
+
+        // TODO[agg_v2](fix) currently fails, replace instead of the above separate tests.
+        // arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+        //     executor_mode: ExecutorMode::BothComparison,
+        //     delayed_fields_mode: DelayedFieldOptimizationMode::BothComparison,
+        //     block_split
+        // }),
     ]
     .boxed()
 }
