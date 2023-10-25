@@ -70,6 +70,7 @@
 // See https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=795cd4f459f1d4a0005a99650726834b
 #![allow(clippy::while_let_loop)]
 
+pub mod ancestors;
 mod metrics;
 mod node;
 mod updater;
@@ -149,10 +150,12 @@ impl<V: Send + Sync + 'static> BranchTracker<V> {
         self.next = next.map_or_else(Weak::new, Arc::downgrade)
     }
 
+    #[allow(dead_code)]
     fn parent(&self, _locked_family: &MutexGuard<()>) -> Option<Arc<Mutex<Self>>> {
         self.parent.clone()
     }
 
+    #[allow(dead_code)]
     fn head(&self, _locked_family: &MutexGuard<()>) -> Option<Arc<Inner<V>>> {
         // if `head.upgrade()` failed, it's that the head is being dropped.
         //
@@ -187,6 +190,7 @@ struct Inner<V: Send + Sync + 'static> {
     root: SubTree<V>,
     usage: StateStorageUsage,
     links: Mutex<InnerLinks<V>>,
+    family: HashValue,
     generation: u64,
     family_lock: Arc<Mutex<()>>,
 }
@@ -237,12 +241,14 @@ impl<V: Send + Sync + 'static> Drop for Inner<V> {
 
 impl<V: Send + Sync + 'static> Inner<V> {
     fn new(root: SubTree<V>, usage: StateStorageUsage) -> Arc<Self> {
+        let family = HashValue::random();
         let family_lock = Arc::new(Mutex::new(()));
         let branch_tracker = BranchTracker::new_head_unknown(None, &family_lock.lock());
         let me = Arc::new(Self {
             root,
             usage,
             links: InnerLinks::new(branch_tracker.clone()),
+            family,
             generation: 0,
             family_lock,
         });
@@ -275,6 +281,7 @@ impl<V: Send + Sync + 'static> Inner<V> {
             root: child_root,
             usage: child_usage,
             links: InnerLinks::new(branch_tracker),
+            family: self.family,
             generation: self.generation + 1,
             family_lock,
         })
@@ -320,6 +327,7 @@ impl<V: Send + Sync + 'static> Inner<V> {
         child
     }
 
+    #[allow(dead_code)]
     fn get_oldest_ancestor(self: &Arc<Self>) -> Arc<Self> {
         // Under the protection of family_lock, the branching structure won't change,
         // so we can follow the links and find the head of the oldest branch tracker.
@@ -403,22 +411,23 @@ where
         self.root_hash() == other.root_hash()
     }
 
+    #[allow(dead_code)]
     fn get_oldest_ancestor(&self) -> Self {
         Self {
             inner: self.inner.get_oldest_ancestor(),
         }
     }
 
-    pub fn freeze(self) -> FrozenSparseMerkleTree<V> {
-        let base_smt = self.get_oldest_ancestor();
+    pub fn freeze(&self, base_smt: &SparseMerkleTree<V>) -> FrozenSparseMerkleTree<V> {
+        assert!(base_smt.is_family(self));
+
         self.log_generation("freeze");
         base_smt.log_generation("oldest");
-        let base_generation = base_smt.inner.generation;
 
         FrozenSparseMerkleTree {
-            base_smt,
-            base_generation,
-            smt: self,
+            base_smt: base_smt.clone(),
+            base_generation: base_smt.generation(),
+            smt: self.clone(),
         }
     }
 
@@ -446,100 +455,16 @@ where
         self.inner.generation
     }
 
-    fn is_the_same(&self, other: &Self) -> bool {
+    pub fn is_the_same(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    pub fn is_family(&self, other: &Self) -> bool {
+        self.inner.family == other.inner.family
     }
 
     pub fn usage(&self) -> StateStorageUsage {
         self.inner.usage
-    }
-}
-
-/// In tests and benchmark, reference to ancestors are manually managed
-#[cfg(any(feature = "fuzzing", feature = "bench", test))]
-impl<V: Send + Sync + 'static> SparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + Send + Sync + 'static,
-{
-    pub fn batch_update(
-        &self,
-        updates: Vec<(HashValue, Option<&V>)>,
-        proof_reader: &impl ProofRead,
-    ) -> Result<Self, UpdateError> {
-        self.clone()
-            .freeze()
-            .batch_update(updates, StateStorageUsage::zero(), proof_reader)
-            .map(FrozenSparseMerkleTree::unfreeze)
-    }
-
-    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
-        self.clone().freeze().get(key)
-    }
-}
-
-impl<V: Send + Sync + 'static> Default for SparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + Send + Sync + 'static,
-{
-    fn default() -> Self {
-        SparseMerkleTree::new_empty()
-    }
-}
-
-/// `AccountStatus` describes the result of querying an account from this SparseMerkleTree.
-#[derive(Debug, Eq, PartialEq)]
-pub enum StateStoreStatus<V: Send + Sync + 'static> {
-    /// The entry exists in the tree, therefore we can give its value.
-    ExistsInScratchPad(V),
-
-    /// The entry does not exist in the tree, but exists in DB. This happens when the search
-    /// reaches a leaf node that has the requested account, but the node has only the value hash
-    /// because it was loaded into memory as part of a non-inclusion proof. When we go to DB we
-    /// don't need to traverse the tree to find the same leaf, instead we can use the value hash to
-    /// look up the entry content directly.
-    ExistsInDB,
-
-    /// The entry does not exist in either the tree or DB. This happens when the search reaches
-    /// an empty node, or a leaf node that has a different account.
-    DoesNotExist,
-
-    /// We do not know if this entry exists or not and need to go to DB to find out. This happens
-    /// when the search reaches a subtree node.
-    Unknown,
-}
-
-/// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
-/// SMT is held inside.
-#[derive(Clone, Debug)]
-pub struct FrozenSparseMerkleTree<V: Send + Sync + 'static> {
-    base_smt: SparseMerkleTree<V>,
-    base_generation: u64,
-    smt: SparseMerkleTree<V>,
-}
-
-impl<V: Send + Sync + 'static> FrozenSparseMerkleTree<V>
-where
-    V: Clone + CryptoHash + Send + Sync + 'static,
-{
-    fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
-        let smt = SparseMerkleTree {
-            inner: self.smt.inner.spawn(child_root, child_usage),
-        };
-        smt.log_generation("spawn");
-
-        Self {
-            base_smt: self.base_smt.clone(),
-            base_generation: self.base_generation,
-            smt,
-        }
-    }
-
-    pub fn unfreeze(self) -> SparseMerkleTree<V> {
-        self.smt
-    }
-
-    pub fn root_hash(&self) -> HashValue {
-        self.smt.root_hash()
     }
 
     /// Compares an old and a new SMTs and return the newly created node hashes in between.
@@ -554,11 +479,12 @@ where
             .with_label_values(&["new_node_hashes_since"])
             .start_timer();
 
-        assert!(self.base_smt.is_the_same(&since_smt.base_smt));
+        assert!(since_smt.is_family(self));
+
         let mut node_hashes = HashMap::new();
-        let mut subtree = self.smt.root_weak();
+        let mut subtree = self.root_weak();
         let mut pos = NodePosition::with_capacity(HashValue::LENGTH_IN_BITS);
-        let since_generation = since_smt.smt.generation() + 1;
+        let since_generation = since_smt.generation() + 1;
         // Assume 16 shards here.
         // We check the top 4 levels first, if there is any leaf node belongs to the shard we are
         // requesting, we collect that node and return earlier (because there is no nodes below
@@ -598,7 +524,7 @@ where
         }
         Self::new_node_hashes_since_impl(
             subtree,
-            since_smt.smt.generation() + 1,
+            since_smt.generation() + 1,
             &mut pos,
             &mut node_hashes,
         );
@@ -667,6 +593,98 @@ where
         } else {
             None
         }
+    }
+
+    pub(crate) fn is_the_only_ref(&self) -> bool {
+        Arc::strong_count(&self.inner) == 1
+    }
+}
+
+/// In tests and benchmark, reference to ancestors are manually managed
+#[cfg(any(feature = "fuzzing", feature = "bench", test))]
+impl<V> SparseMerkleTree<V>
+where
+    V: Clone + CryptoHash + Send + Sync,
+{
+    pub fn batch_update(
+        &self,
+        updates: Vec<(HashValue, Option<&V>)>,
+        proof_reader: &impl ProofRead,
+    ) -> Result<Self, UpdateError> {
+        self.clone()
+            .freeze(self)
+            .batch_update(updates, StateStorageUsage::Untracked, proof_reader)
+            .map(FrozenSparseMerkleTree::unfreeze)
+    }
+
+    pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
+        self.clone().freeze(self).get(key)
+    }
+}
+
+impl<V> Default for SparseMerkleTree<V>
+where
+    V: Clone + CryptoHash + Send + Sync,
+{
+    fn default() -> Self {
+        SparseMerkleTree::new_empty()
+    }
+}
+
+/// `AccountStatus` describes the result of querying an account from this SparseMerkleTree.
+#[derive(Debug, Eq, PartialEq)]
+pub enum StateStoreStatus<V> {
+    /// The entry exists in the tree, therefore we can give its value.
+    ExistsInScratchPad(V),
+
+    /// The entry does not exist in the tree, but exists in DB. This happens when the search
+    /// reaches a leaf node that has the requested account, but the node has only the value hash
+    /// because it was loaded into memory as part of a non-inclusion proof. When we go to DB we
+    /// don't need to traverse the tree to find the same leaf, instead we can use the value hash to
+    /// look up the entry content directly.
+    ExistsInDB,
+
+    /// The entry does not exist in either the tree or DB. This happens when the search reaches
+    /// an empty node, or a leaf node that has a different account.
+    DoesNotExist,
+
+    /// We do not know if this entry exists or not and need to go to DB to find out. This happens
+    /// when the search reaches a subtree node.
+    Unknown,
+}
+
+/// In the entire lifetime of this, in-mem nodes won't be dropped because a reference to the oldest
+/// SMT is held inside.
+#[derive(Clone, Debug)]
+pub struct FrozenSparseMerkleTree<V: Send + Sync + 'static> {
+    pub base_smt: SparseMerkleTree<V>,
+    pub base_generation: u64,
+    pub smt: SparseMerkleTree<V>,
+}
+
+impl<V> FrozenSparseMerkleTree<V>
+where
+    V: Clone + CryptoHash + Send + Sync + 'static,
+{
+    fn spawn(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Self {
+        let smt = SparseMerkleTree {
+            inner: self.smt.inner.spawn(child_root, child_usage),
+        };
+        smt.log_generation("spawn");
+
+        Self {
+            base_smt: self.base_smt.clone(),
+            base_generation: self.base_generation,
+            smt,
+        }
+    }
+
+    pub fn unfreeze(self) -> SparseMerkleTree<V> {
+        self.smt
+    }
+
+    pub fn root_hash(&self) -> HashValue {
+        self.smt.root_hash()
     }
 
     /// Constructs a new Sparse Merkle Tree by applying `updates`, which are considered to happen

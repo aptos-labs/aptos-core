@@ -9,7 +9,7 @@ use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput, ParsedTransactionOutput, ProofReader,
 };
 use aptos_logger::info;
-use aptos_scratchpad::SparseMerkleTree;
+use aptos_scratchpad::FrozenSparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::{ShardedStateCache, StateCache},
     state_delta::StateDelta,
@@ -95,6 +95,7 @@ impl InMemoryStateCalculatorV2 {
             sharded_state_cache,
             proofs,
         } = state_cache;
+        assert!(frozen_base.smt.is_the_same(&base.current));
 
         let num_txns = to_keep.len();
 
@@ -140,7 +141,7 @@ impl InMemoryStateCalculatorV2 {
         let proof_reader = ProofReader::new(proofs);
         let latest_checkpoint = if let Some(index) = last_checkpoint_index {
             Self::make_checkpoint(
-                base.current.clone(),
+                base.current.freeze(&frozen_base.base_smt),
                 &updates_before_last_checkpoint,
                 if index == num_txns - 1 {
                     usage
@@ -152,7 +153,7 @@ impl InMemoryStateCalculatorV2 {
         } else {
             // If there is no checkpoint in this chunk, the latest checkpoint will be the existing
             // one.
-            base.base.clone()
+            base.base.freeze(&frozen_base.base_smt)
         };
 
         let mut latest_checkpoint_version = base.base_version;
@@ -165,7 +166,7 @@ impl InMemoryStateCalculatorV2 {
         let current_version = first_version + num_txns as u64 - 1;
         // We need to calculate the SMT at the end of the chunk, if it is not already calculated.
         let current_tree = if last_checkpoint_index == Some(num_txns - 1) {
-            latest_checkpoint.clone()
+            latest_checkpoint.smt.clone()
         } else {
             ensure!(!is_block, "Block must have the checkpoint at the end.");
             // The latest tree is either the last checkpoint in current chunk, or the tree at the
@@ -173,7 +174,7 @@ impl InMemoryStateCalculatorV2 {
             let latest_tree = if last_checkpoint_index.is_some() {
                 latest_checkpoint.clone()
             } else {
-                base.current.clone()
+                base.current.freeze(&frozen_base.base_smt)
             };
             Self::make_checkpoint(
                 latest_tree,
@@ -181,6 +182,7 @@ impl InMemoryStateCalculatorV2 {
                 usage,
                 &proof_reader,
             )?
+            .smt
         };
 
         DEFAULT_DROPPER.schedule_drop(frozen_base);
@@ -206,7 +208,7 @@ impl InMemoryStateCalculatorV2 {
         );
 
         let result_state = StateDelta::new(
-            latest_checkpoint.clone(),
+            latest_checkpoint.smt,
             latest_checkpoint_version,
             current_tree,
             Some(current_version),
@@ -341,11 +343,11 @@ impl InMemoryStateCalculatorV2 {
     }
 
     fn make_checkpoint(
-        latest_checkpoint: SparseMerkleTree<StateValue>,
+        latest_checkpoint: FrozenSparseMerkleTree<StateValue>,
         updates: &ShardedStateUpdates,
         usage: StateStorageUsage,
         proof_reader: &ProofReader,
-    ) -> Result<SparseMerkleTree<StateValue>> {
+    ) -> Result<FrozenSparseMerkleTree<StateValue>> {
         let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
             .with_label_values(&["make_checkpoint"])
             .start_timer();
@@ -358,11 +360,8 @@ impl InMemoryStateCalculatorV2 {
             .flatten()
             .map(|(key, value)| (key.hash(), value.as_ref()))
             .collect();
-        let new_checkpoint =
-            latest_checkpoint
-                .freeze()
-                .batch_update(smt_updates, usage, proof_reader)?;
-        Ok(new_checkpoint.unfreeze())
+        let new_checkpoint = latest_checkpoint.batch_update(smt_updates, usage, proof_reader)?;
+        Ok(new_checkpoint)
     }
 
     fn get_epoch_state(

@@ -85,6 +85,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
     DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
@@ -1825,6 +1826,12 @@ impl DbReader for AptosDB {
                 transaction_accumulator,
             );
             Ok(executed_trees)
+        })
+    }
+
+    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
+        gauged_api("get_buffered_state_base", || {
+            self.state_store.get_buffered_state_base()
         })
     }
 
