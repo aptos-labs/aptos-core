@@ -76,11 +76,13 @@ pub enum QcAggregatorType {
 
 impl Default for QcAggregatorType {
     fn default() -> Self {
-        QcAggregatorType::Delayed(DelayedQcAggregatorConfig {
-            max_delay_after_round_start_ms: 700,
-            aggregated_voting_power_pct_to_wait: 90,
-            pct_delay_after_qc_aggregated: 30,
-        })
+        // TODO: Enable the delayed aggregation by default once we have tested it more.
+        // QcAggregatorType::Delayed(DelayedQcAggregatorConfig {
+        //     max_delay_after_round_start_ms: 700,
+        //     aggregated_voting_power_pct_to_wait: 90,
+        //     pct_delay_after_qc_aggregated: 30,
+        // })
+        QcAggregatorType::NoDelay
     }
 }
 
