@@ -46,9 +46,9 @@ TESTNET_RANGES = [
     [483500001, 516281795],
     [516281796, 551052675],
     [551052676, 582481398],
-    [582481399, sys.maxsize],
+    [582481399, 640_000_000],
+    [640_000_001, sys.maxsize],
 ]
-
 
 MAINNET_RANGES = [
     [0, 45_000_000],
@@ -70,14 +70,15 @@ MAINNET_RANGES = [
     [304_000_001, sys.maxsize],
 ]
 
+
 def replay_verify_partition(
-    n: int,
-    N: int,
-    history_start: int,
-    per_partition: int,
-    latest_version: int,
-    txns_to_skip: Tuple[int],
-    backup_config_template_path: str,
+        n: int,
+        N: int,
+        history_start: int,
+        per_partition: int,
+        latest_version: int,
+        txns_to_skip: Tuple[int],
+        backup_config_template_path: str,
 ) -> Tuple[int, int, bytes]:
     """
     Run replay-verify for a partition of the backup, returning a tuple of the (partition number, return code)
@@ -166,7 +167,7 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
         runner_mapping = [[runner_mapping[0][0], runner_mapping[-1][1]]]
 
     assert (
-        runner_no >= 0 and runner_no < runner_cnt
+            runner_no >= 0 and runner_no < runner_cnt
     ), "runner_no must be between 0 and runner_cnt"
 
     TXNS_TO_SKIP = [int(txn) for txn in os.environ["TXNS_TO_SKIP"].split(" ")]
