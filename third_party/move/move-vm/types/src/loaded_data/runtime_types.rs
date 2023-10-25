@@ -190,25 +190,40 @@ pub enum Type {
     U256,
 }
 
-
 // Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
 #[derive(Derivative)]
 #[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct AbilityInfo {
-    #[derivative(PartialEq = "ignore", Hash = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    #[derivative(
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
     base_ability_set: AbilitySet,
 
-    #[derivative(PartialEq = "ignore", Hash = "ignore", Ord = "ignore", PartialOrd = "ignore")]
+    #[derivative(
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
     phantom_ty_args_mask: SmallBitVec,
 }
 
 impl AbilityInfo {
     pub fn struct_(ability: AbilitySet) -> Self {
-        Self { base_ability_set: ability, phantom_ty_args_mask: SmallBitVec::new()}
+        Self {
+            base_ability_set: ability,
+            phantom_ty_args_mask: SmallBitVec::new(),
+        }
     }
 
     pub fn generic_struct(base_ability_set: AbilitySet, phantom_ty_args_mask: SmallBitVec) -> Self {
-        Self { base_ability_set, phantom_ty_args_mask }
+        Self {
+            base_ability_set,
+            phantom_ty_args_mask,
+        }
     }
 }
 
@@ -420,7 +435,11 @@ impl Type {
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
                 ty_args,
-                ability: AbilityInfo { base_ability_set, phantom_ty_args_mask },
+                ability:
+                    AbilityInfo {
+                        base_ability_set,
+                        phantom_ty_args_mask,
+                    },
                 ..
             } => {
                 let type_argument_abilities = ty_args
