@@ -267,7 +267,10 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx);
                     let preprocessed_txn = {
                         let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "preprocess_txn"]);
-                        preprocess_transaction::<AptosVM>(transaction)
+                        preprocess_transaction(
+                            &AptosVM::new_from_state_view(&state_view),
+                            transaction,
+                        )
                     };
                     drop(_pre);
                     let vm_output = {
