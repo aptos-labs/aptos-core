@@ -297,7 +297,8 @@ Move bytecode can be used as dependencies when the Move source code for those de
 
 ## Requirements and limitations
 
-Using local bytecode as dependencies requires bytecode files to be downloaded locally, and the actual address for each named address must be specified in either `Move.toml` or through `--named-addresses`.
+Using local bytecode as dependencies requires bytecode files to be downloaded locally, and the actual address for each named address must be specified in either `Move.toml` or through `--named-addresses`. 
+Users can download the bytecode of packages published on chain using the Aptos CLI command [`aptos move download`](../../tools/aptos-cli/use-cli/use-aptos-cli.md).
 
 Note, both `aptos move prove` and `aptos move test` commands, currently, do not support bytecode as dependencies.
 
