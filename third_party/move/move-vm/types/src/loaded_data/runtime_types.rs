@@ -13,6 +13,7 @@ use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
+use smallbitvec::SmallBitVec;
 use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
@@ -110,11 +111,11 @@ impl DepthFormula {
     }
 }
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct StructType {
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
-    pub phantom_ty_args_mask: Vec<bool>,
+    pub phantom_ty_args_mask: SmallBitVec,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
     pub name: Arc<StructIdentifier>,
@@ -140,7 +141,7 @@ impl StructType {
                 .iter()
                 .zip(struct_handle.type_parameters.iter())
                 .all(|(defined_is_phantom, local_type_parameter)| {
-                    !local_type_parameter.is_phantom || *defined_is_phantom
+                    !local_type_parameter.is_phantom || defined_is_phantom
                 })
         {
             return Err(
@@ -198,16 +199,16 @@ pub struct AbilityInfo {
     base_ability_set: AbilitySet,
 
     #[derivative(PartialEq = "ignore", Hash = "ignore", Ord = "ignore", PartialOrd = "ignore")]
-    phantom_ty_args_mask: Vec<bool>,
+    phantom_ty_args_mask: SmallBitVec,
 }
 
 impl AbilityInfo {
     pub fn struct_(ability: AbilitySet) -> Self {
-        Self { base_ability_set: ability, phantom_ty_args_mask: vec![]}
+        Self { base_ability_set: ability, phantom_ty_args_mask: SmallBitVec::new()}
     }
 
-    pub fn generic_struct(base_ability_set: AbilitySet, phantom_ty_args_mask: Vec<bool>) -> Self {
-        Self { base_ability_set, phantom_ty_args_mask: phantom_ty_args_mask }
+    pub fn generic_struct(base_ability_set: AbilitySet, phantom_ty_args_mask: SmallBitVec) -> Self {
+        Self { base_ability_set, phantom_ty_args_mask }
     }
 }
 
@@ -428,7 +429,7 @@ impl Type {
                     .collect::<PartialVMResult<Vec<_>>>()?;
                 AbilitySet::polymorphic_abilities(
                     *base_ability_set,
-                    phantom_ty_args_mask.iter().copied(),
+                    phantom_ty_args_mask.iter(),
                     type_argument_abilities,
                 )
             },
