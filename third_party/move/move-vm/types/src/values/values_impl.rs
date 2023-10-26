@@ -1517,7 +1517,10 @@ impl IntegerValue {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
             },
         };
-        res.ok_or_else(|| PartialVMError::new(StatusCode::ARITHMETIC_ERROR))
+        res.ok_or_else(|| {
+            PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
+                .with_message("Division by zero error".to_string())
+        })
     }
 
     pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
