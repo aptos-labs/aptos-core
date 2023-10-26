@@ -1176,6 +1176,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-metrics-core",
  "once_cell",
+ "threadpool",
 ]
 
 [[package]]
