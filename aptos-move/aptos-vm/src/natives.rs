@@ -2,6 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
+
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
@@ -78,6 +81,7 @@ impl TAggregatorV1View for AptosBlankStorage {
 #[cfg(feature = "testing")]
 impl TDelayedFieldView for AptosBlankStorage {
     type Identifier = DelayedFieldID;
+    type ResourceKey = StateKey;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         false
@@ -102,6 +106,10 @@ impl TDelayedFieldView for AptosBlankStorage {
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
+    }
+
+    fn get_reads_needing_exchange(&self, _delayed_write_set_keys: &HashSet<Self::Identifier>, _skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+        unimplemented!()
     }
 }
 

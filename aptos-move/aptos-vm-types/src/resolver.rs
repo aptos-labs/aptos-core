@@ -195,7 +195,7 @@ pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
-    + TDelayedFieldView<Identifier = I>
+    + TDelayedFieldView<Identifier = I, ResourceKey = K>
     + StateStorageView
 {
 }
@@ -204,7 +204,7 @@ impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
-        + TDelayedFieldView<Identifier = I>
+        + TDelayedFieldView<Identifier = I, ResourceKey = K>
         + StateStorageView
 {
 }

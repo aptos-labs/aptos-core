@@ -741,6 +741,54 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok((patched_bytes, mapping.into_inner()))
     }
 
+    fn extract_identifiers_from_value(
+        &self,
+        bytes: &Bytes,
+        layout: &MoveTypeLayout,
+    ) -> anyhow::Result<HashSet<T::Identifier>> {
+        let mapping = TemporaryValueToIdentifierMapping::new(self, self.txn_idx);
+        let _patched_value =
+                    deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping)
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Failed to deserialize resource during id replacement")
+                        })?;
+        Ok(mapping.into_inner())
+    }
+
+    fn get_reads_needing_exchange_parallel(&self, read_set: &CapturedReads<T>, delayed_write_set_keys: &HashSet<T::Identifier>, skip: &HashSet<T::Key>) -> BTreeMap<T::Key, (Bytes, Arc<MoveTypeLayout>)> {
+        read_set.get_read_values_with_delayed_fields()
+            .filter(|(key, _)| !skip.contains(key))
+            .flat_map(|(key, data_read)| {
+                if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                    if let Some(bytes) = value.bytes() {
+                        let identifiers_in_read = self.extract_identifiers_from_value(bytes, layout.as_ref()).unwrap();
+                        if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                            return Some((key.clone(), (bytes.clone(), layout.clone())));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    fn get_reads_needing_exchange_sequential(&self, read_set: &HashSet<T::Key>, unsync_map: &UnsyncMap<T::Key, T::Value, X, T::Identifier>, delayed_write_set_keys: &HashSet<T::Identifier>, skip: &HashSet<T::Key>) -> BTreeMap<T::Key, (Bytes, Arc<MoveTypeLayout>)> {
+        read_set.iter()
+            .filter(|key| !skip.contains(key))
+            .flat_map(|key| {
+                if let Some((value, Some(layout))) = unsync_map.fetch_data(key) {
+                    if let Some(bytes) = value.bytes() {
+                        let identifiers_in_read = self.extract_identifiers_from_value(bytes, layout.as_ref()).unwrap();
+                        if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                            return Some((key.clone(), (bytes.clone(), layout.clone())));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
     fn get_resource_state_value_impl(
         &self,
         state_key: &T::Key,
@@ -1106,6 +1154,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     for LatestView<'a, T, S, X>
 {
     type Identifier = T::Identifier;
+    type ResourceKey = T::Key;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         match &self.latest_view {
@@ -1171,6 +1220,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 let id = (*counter as u64).into();
                 *counter += 1;
                 id
+            },
+        }
+    }
+
+    fn get_reads_needing_exchange(&self, delayed_write_set_keys: &HashSet<Self::Identifier>, skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                let captured_reads = state.captured_reads.borrow();
+                self.get_reads_needing_exchange_parallel(&captured_reads, delayed_write_set_keys, skip)
+            },
+            ViewState::Unsync(state) => {
+                let read_set = state.read_set.borrow();
+                self.get_reads_needing_exchange_sequential(&read_set, state.unsync_map, delayed_write_set_keys, skip)
             },
         }
     }

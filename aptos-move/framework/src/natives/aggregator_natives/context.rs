@@ -12,7 +12,9 @@ use aptos_aggregator::{
 };
 use aptos_types::state_store::state_key::StateKey;
 use better_any::{Tid, TidAble};
-use std::{cell::RefCell, collections::HashMap};
+use bytes::Bytes;
+use move_core_types::value::MoveTypeLayout;
+use std::{cell::RefCell, collections::{BTreeMap, HashSet}, sync::Arc};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -29,8 +31,9 @@ pub enum AggregatorChangeV1 {
 /// set can be converted into appropriate `WriteSet` and `DeltaChangeSet` by the
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
-    pub aggregator_v1_changes: HashMap<StateKey, AggregatorChangeV1>,
-    pub delayed_field_changes: HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
+    pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    pub reads_needing_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -77,7 +80,7 @@ impl<'a> NativeAggregatorContext<'a> {
         } = self;
         let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
 
-        let mut aggregator_v1_changes = HashMap::new();
+        let mut aggregator_v1_changes = BTreeMap::new();
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
@@ -107,10 +110,14 @@ impl<'a> NativeAggregatorContext<'a> {
         }
 
         let delayed_field_changes = delayed_field_data.into_inner().into();
-
+        let delayed_write_set_keys = delayed_field_changes.keys().cloned().collect::<HashSet<_>>();
         AggregatorChangeSet {
             aggregator_v1_changes,
-            delayed_field_changes: HashMap::from_iter(delayed_field_changes),
+            delayed_field_changes,
+            // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
+            // are any changes that would require computing reads needing exchange.
+            // TODO[agg_v2](optimize) we only later compute the the write set, so cannot pass the correct skip values here.
+            reads_needing_exchange: if delayed_write_set_keys.is_empty() { BTreeMap::new() } else { self.delayed_field_resolver.get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new()) },
         }
     }
 }

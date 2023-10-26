@@ -211,6 +211,8 @@ pub fn delta_add(v: u128, max_value: u128) -> DeltaOp {
 
 #[cfg(test)]
 mod test {
+    use std::{collections::{HashSet, BTreeMap}, sync::Arc};
+
     use super::*;
     use crate::{
         aggregator_v1_extension::{EADD_OVERFLOW, ESUB_UNDERFLOW},
@@ -222,8 +224,9 @@ mod test {
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
     };
+    use bytes::Bytes;
     use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
-    use move_core_types::vm_status::{StatusCode, VMStatus};
+    use move_core_types::{vm_status::{StatusCode, VMStatus}, value::MoveTypeLayout};
     use once_cell::sync::Lazy;
 
     fn delta_add_with_history(v: u128, max_value: u128, max: u128, min: u128) -> DeltaOp {
@@ -501,6 +504,7 @@ mod test {
 
     impl TDelayedFieldView for BadStorage {
         type Identifier = ();
+        type ResourceKey = ();
 
         fn is_delayed_field_optimization_capable(&self) -> bool {
             unimplemented!("Irrelevant for the test")
@@ -524,6 +528,10 @@ mod test {
         }
 
         fn generate_delayed_field_id(&self) -> Self::Identifier {
+            unimplemented!("Irrelevant for the test")
+        }
+
+        fn get_reads_needing_exchange(&self, _delayed_write_set_keys: &HashSet<Self::Identifier>, _skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
             unimplemented!("Irrelevant for the test")
         }
     }

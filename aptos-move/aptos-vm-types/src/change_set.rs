@@ -14,6 +14,7 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{TransactionWrite, WriteOp, WriteSetMut},
 };
+use bytes::Bytes;
 use claims::assert_none;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
@@ -29,6 +30,7 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// Describes an update to a resource group granularly, with WriteOps to affected
@@ -113,6 +115,7 @@ pub struct VMChangeSet {
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
@@ -141,6 +144,7 @@ impl VMChangeSet {
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
             delayed_field_change_set: BTreeMap::new(),
+            reads_needing_delayed_field_exchange: BTreeMap::new(),
             events: vec![],
         }
     }
@@ -152,6 +156,7 @@ impl VMChangeSet {
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+        reads_needing_delayed_field_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -162,6 +167,7 @@ impl VMChangeSet {
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
             delayed_field_change_set,
+            reads_needing_delayed_field_exchange,
             events,
         };
 
@@ -221,6 +227,7 @@ impl VMChangeSet {
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
             delayed_field_change_set: BTreeMap::new(),
+            reads_needing_delayed_field_exchange: BTreeMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -236,6 +243,7 @@ impl VMChangeSet {
         // that knows how to deal with it.
         assert!(self.delayed_field_change_set().is_empty());
         assert!(self.resource_group_write_set().is_empty());
+        assert!(self.reads_needing_delayed_field_exchange().is_empty());
 
         let Self {
             resource_write_set,
@@ -244,6 +252,7 @@ impl VMChangeSet {
             aggregator_v1_write_set,
             aggregator_v1_delta_set: _,
             delayed_field_change_set: _,
+            reads_needing_delayed_field_exchange: _,
             events,
         } = self;
 
@@ -382,6 +391,12 @@ impl VMChangeSet {
         &self.delayed_field_change_set
     }
 
+    pub fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> &BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)> {
+        &self.reads_needing_delayed_field_exchange
+    }
+
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         &self.events
     }
@@ -399,6 +414,7 @@ impl VMChangeSet {
             mut aggregator_v1_write_set,
             aggregator_v1_delta_set,
             delayed_field_change_set,
+            reads_needing_delayed_field_exchange,
             events,
         } = self;
 
@@ -424,6 +440,7 @@ impl VMChangeSet {
             aggregator_v1_write_set,
             aggregator_v1_delta_set: BTreeMap::new(),
             delayed_field_change_set,
+            reads_needing_delayed_field_exchange,
             events,
         })
     }
@@ -658,6 +675,25 @@ impl VMChangeSet {
         Ok(())
     }
 
+    fn squash_additional_reads_needing_exchange(
+        reads_needing_exchange: &mut BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
+        additional_reads_needing_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
+    ) -> anyhow::Result<(), VMStatus> {
+        for (key, additional_value) in additional_reads_needing_exchange.into_iter() {
+            match reads_needing_exchange.entry(key) {
+                Occupied(entry) => {
+                    // When squashing, reads should always be identical.
+                    // TODO[agg_v2](fix) remove asssertion, as this should always hold.
+                    assert_eq!(entry.get(), &additional_value);
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_value);
+                },
+            }
+        }
+        Ok(())
+    }
+
     pub fn squash_additional_change_set(
         &mut self,
         additional_change_set: Self,
@@ -670,6 +706,7 @@ impl VMChangeSet {
             aggregator_v1_write_set: additional_aggregator_write_set,
             aggregator_v1_delta_set: additional_aggregator_delta_set,
             delayed_field_change_set: additional_delayed_field_change_set,
+            reads_needing_delayed_field_exchange: additional_reads_needing_delayed_field_exchange,
             events: additional_events,
         } = additional_change_set;
 
@@ -678,10 +715,6 @@ impl VMChangeSet {
             &mut self.aggregator_v1_delta_set,
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
-        )?;
-        Self::squash_additional_delayed_field_changes(
-            &mut self.delayed_field_change_set,
-            additional_delayed_field_change_set,
         )?;
         Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
@@ -694,6 +727,14 @@ impl VMChangeSet {
         Self::squash_additional_module_writes(
             &mut self.module_write_set,
             additional_module_write_set,
+        )?;
+        Self::squash_additional_delayed_field_changes(
+            &mut self.delayed_field_change_set,
+            additional_delayed_field_change_set,
+        )?;
+        Self::squash_additional_reads_needing_exchange(
+            &mut self.reads_needing_delayed_field_exchange,
+            additional_reads_needing_delayed_field_exchange,
         )?;
         self.events.extend(additional_events);
 

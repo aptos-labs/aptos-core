@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{collections::{BTreeMap, HashSet}, sync::Arc};
+
 use crate::{
     aggregator_v1_extension::{addition_v1_error, subtraction_v1_error},
     bounded_math::SignedU128,
@@ -18,6 +20,7 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
+use bytes::Bytes;
 use move_binary_format::errors::Location;
 use move_core_types::{
     account_address::AccountAddress,
@@ -25,6 +28,7 @@ use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::{StatusCode, VMStatus},
+    value::MoveTypeLayout,
 };
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
@@ -140,6 +144,7 @@ where
 /// from the state storage.
 pub trait TDelayedFieldView {
     type Identifier;
+    type ResourceKey;
 
     fn is_delayed_field_optimization_capable(&self) -> bool;
 
@@ -174,17 +179,20 @@ pub trait TDelayedFieldView {
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
     fn generate_delayed_field_id(&self) -> Self::Identifier;
+
+    fn get_reads_needing_exchange(&self, delayed_write_set_keys: &HashSet<Self::Identifier>, skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)>;
 }
 
-pub trait DelayedFieldResolver: TDelayedFieldView<Identifier = DelayedFieldID> {}
+pub trait DelayedFieldResolver: TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = StateKey> {}
 
-impl<T> DelayedFieldResolver for T where T: TDelayedFieldView<Identifier = DelayedFieldID> {}
+impl<T> DelayedFieldResolver for T where T: TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = StateKey> {}
 
 impl<S> TDelayedFieldView for S
 where
     S: StateView,
 {
     type Identifier = DelayedFieldID;
+    type ResourceKey = StateKey;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         // For resolvers that are not capable, it cannot be enabled
@@ -212,5 +220,9 @@ where
     /// new aggregator V2.
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         unimplemented!("generate_delayed_field_id not implemented")
+    }
+
+    fn get_reads_needing_exchange(&self, _delayed_write_set_keys: &HashSet<Self::Identifier>, _skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+        unimplemented!("get_reads_needing_exchange not implemented")
     }
 }

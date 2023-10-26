@@ -47,7 +47,7 @@ use move_core_types::{
 };
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet}, sync::Arc,
 };
 
 pub(crate) fn get_resource_group_from_metadata(
@@ -287,6 +287,7 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
 
 impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
+    type ResourceKey = StateKey;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -312,6 +313,10 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.executor_view.generate_delayed_field_id()
+    }
+
+    fn get_reads_needing_exchange(&self, delayed_write_set_keys: &HashSet<Self::Identifier>, skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+        self.executor_view.get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 }
 

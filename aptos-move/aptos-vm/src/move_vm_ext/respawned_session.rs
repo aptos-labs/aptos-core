@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::{sync::Arc, collections::{BTreeMap, HashSet}};
+
 use crate::{
     data_cache::StorageAdapter,
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
@@ -162,6 +164,7 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
 
 impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
+    type ResourceKey = StateKey;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.base_executor_view
@@ -234,6 +237,10 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.base_executor_view.generate_delayed_field_id()
+    }
+
+    fn get_reads_needing_exchange(&self, delayed_write_set_keys: &HashSet<Self::Identifier>, skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+        self.base_executor_view.get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 }
 
