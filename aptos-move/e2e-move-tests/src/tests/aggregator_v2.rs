@@ -333,12 +333,12 @@ proptest! {
         let acc_3 = h.harness.new_account_with_key_pair();
 
         let mut idx_1 = 0;
-        let agg_1_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
-        let agg_2_loc = {
+        let _agg_1_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+        let _agg_2_loc = {
             let (cur_acc, idx_2) = if is_2_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_2.address(), 0)};
             AggregatorLocation::new(*cur_acc, element_type, use_type, idx_2)
         };
-        let agg_3_loc = {
+        let _agg_3_loc = {
             let (cur_acc, idx_3) = if is_3_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_3.address(), 0)};
             AggregatorLocation::new(*cur_acc, element_type, use_type, idx_3)
         };

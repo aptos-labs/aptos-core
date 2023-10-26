@@ -649,7 +649,7 @@ impl FakeExecutor {
         };
 
         let (output, mode) = outputs.remove(0);
-        if outputs.len() > 1 {
+        if !outputs.is_empty() {
             Self::compare_multiple_outputs(&output, mode, &outputs);
         }
 
