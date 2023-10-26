@@ -882,7 +882,7 @@ pub struct AccessSpecifier {
     pub negated: bool,
     /// The resource specifier.
     pub resource: ResourceSpecifier,
-    /// The address where the resource is stored. Other fields can have wildcards.
+    /// The address where the resource is stored.
     pub address: AddressSpecifier,
 }
 
@@ -907,7 +907,7 @@ impl AccessKind {
         }
     }
 
-    /// Tries to join two kinds, returns None of no intersection.
+    /// Tries to join two kinds, returns None if no intersection.
     pub fn try_join(self, other: Self) -> Option<Self> {
         use AccessKind::*;
         match (self, other) {

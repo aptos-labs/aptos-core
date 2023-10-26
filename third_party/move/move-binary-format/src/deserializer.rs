@@ -1778,8 +1778,8 @@ impl SerializedType {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
 pub enum DeprecatedNominalResourceFlag {
-    NOMINAL_RESOURCE = 0x1,
-    NORMAL_STRUCT = 0x2,
+    NOMINAL_RESOURCE    = 0x1,
+    NORMAL_STRUCT       = 0x2,
 }
 
 impl DeprecatedNominalResourceFlag {

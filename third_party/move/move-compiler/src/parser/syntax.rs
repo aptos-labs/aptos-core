@@ -328,12 +328,8 @@ fn parse_leading_name_access_<'a, F: FnOnce() -> &'a str>(
             Ok(sp(loc, LeadingNameAccess_::Name(n)))
         },
         Tok::Star if allow_wildcard => {
-            let loc = current_token_loc(context.tokens);
-            context.tokens.advance()?;
-            Ok(sp(
-                loc,
-                LeadingNameAccess_::Name(Name::new(loc, Symbol::from("*"))),
-            ))
+            let name = advance_wildcard_name(context)?;
+            Ok(sp(name.loc, LeadingNameAccess_::Name(name)))
         },
         Tok::NumValue => {
             let sp!(loc, addr) = parse_address_bytes(context)?;
