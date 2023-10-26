@@ -4,7 +4,7 @@
 use crate::metrics::APTOS_EXECUTOR_OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_drop_helper::DEFAULT_DROP_HELPER;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{
     parsed_transaction_output::TransactionsWithParsedOutput, ParsedTransactionOutput, ProofReader,
 };
@@ -183,7 +183,7 @@ impl InMemoryStateCalculatorV2 {
             )?
         };
 
-        DEFAULT_DROP_HELPER.schedule_drop(frozen_base);
+        DEFAULT_DROPPER.schedule_drop(frozen_base);
 
         let updates_since_latest_checkpoint = if last_checkpoint_index.is_some() {
             updates_after_last_checkpoint
