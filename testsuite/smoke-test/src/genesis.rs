@@ -133,13 +133,13 @@ async fn test_genesis_transaction_flow() {
             use aptos_framework::block;
 
             fun main(vm_signer: &signer, framework_signer: &signer) {{
-                stake::remove_validators(framework_signer, &vector[@0x{:?}]);
+                stake::remove_validators(framework_signer, &vector[@0x{}]);
                 block::emit_writeset_block_event(vm_signer, @0x1);
                 aptos_governance::reconfigure(framework_signer);
             }}
     }}
     "#,
-        first_validator_address
+        first_validator_address.to_hex()
     );
 
     let temp_script_path = TempPath::new();
@@ -271,7 +271,10 @@ async fn test_genesis_transaction_flow() {
         backup_path.path(),
         db_dir.as_path(),
         &[waypoint],
-        node.config().storage.rocksdb_configs.split_ledger_db,
+        node.config()
+            .storage
+            .rocksdb_configs
+            .enable_storage_sharding,
         None,
     );
 

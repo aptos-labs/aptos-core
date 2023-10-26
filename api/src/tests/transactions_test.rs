@@ -255,19 +255,18 @@ async fn test_multi_agent_signed_transaction() {
 async fn test_fee_payer_signed_transaction() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
-    let secondary = context.gen_account();
+    let fee_payer = context.gen_account();
     let factory = context.transaction_factory();
     let mut root_account = context.root_account().await;
 
-    // Create secondary signer account
     context
-        .commit_block(&[context.create_user_account_by(&mut root_account, &secondary)])
+        .commit_block(&[context.create_user_account_by(&mut root_account, &fee_payer)])
         .await;
 
     // Create a new account with a multi-agent signer
     let txn = root_account.sign_fee_payer_with_transaction_builder(
         vec![],
-        &secondary,
+        &fee_payer,
         factory.create_user_account(account.public_key()),
     );
 
@@ -286,7 +285,7 @@ async fn test_fee_payer_signed_transaction() {
             fee_payer_signer,
         } => (sender, secondary_signers, fee_payer_signer),
         _ => panic!(
-            "expecting TransactionAuthenticator::MultiAgent, but got: {:?}",
+            "expecting TransactionAuthenticator::FeePayer, but got: {:?}",
             txn.authenticator()
         ),
     };
@@ -303,7 +302,7 @@ async fn test_fee_payer_signed_transaction() {
             ],
             "secondary_signers": [
             ],
-            "fee_payer_address": secondary.address().to_hex_literal(),
+            "fee_payer_address": fee_payer.address().to_hex_literal(),
             "fee_payer_signer": {
                 "type": "ed25519_signature",
                 "public_key": format!("0x{}",hex::encode(fee_payer_signer.public_key_bytes())),
@@ -313,6 +312,86 @@ async fn test_fee_payer_signed_transaction() {
     );
 
     // ensure fee payer txns can be submitted into mempool by JSON format
+    context
+        .expect_status_code(202)
+        .post("/transactions", resp)
+        .await;
+
+    // Now test for the new format where the fee payer is unset... this also tests account creation
+    let another_account = context.gen_account();
+    let yet_another_account = context.gen_account();
+    let another_raw_txn = another_account
+        .sign_fee_payer_with_transaction_builder(
+            vec![],
+            &fee_payer,
+            factory.create_user_account(yet_another_account.public_key()),
+        )
+        .into_raw_transaction();
+    let another_txn = another_raw_txn
+        .clone()
+        .sign_fee_payer(
+            another_account.private_key(),
+            vec![],
+            vec![],
+            AccountAddress::ZERO,
+            fee_payer.private_key(),
+        )
+        .unwrap();
+
+    let (sender, secondary_signer_addresses, secondary_signers) = match another_txn.authenticator()
+    {
+        TransactionAuthenticator::FeePayer {
+            sender,
+            secondary_signer_addresses,
+            secondary_signers,
+            fee_payer_address: _,
+            fee_payer_signer: _,
+        } => (sender, secondary_signer_addresses, secondary_signers),
+        _ => panic!(
+            "expecting TransactionAuthenticator::FeePayer, but got: {:?}",
+            txn.authenticator()
+        ),
+    };
+
+    let another_txn = another_raw_txn
+        .clone()
+        .sign_fee_payer(
+            another_account.private_key(),
+            vec![],
+            vec![],
+            fee_payer.address(),
+            fee_payer.private_key(),
+        )
+        .unwrap();
+
+    let another_txn = match another_txn.authenticator() {
+        TransactionAuthenticator::FeePayer {
+            sender: _,
+            secondary_signer_addresses: _,
+            secondary_signers: _,
+            fee_payer_address,
+            fee_payer_signer,
+        } => {
+            let auth = TransactionAuthenticator::fee_payer(
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+                fee_payer_address,
+                fee_payer_signer,
+            );
+            SignedTransaction::new_signed_transaction(another_raw_txn, auth)
+        },
+        _ => panic!(
+            "expecting TransactionAuthenticator::FeePayer, but got: {:?}",
+            txn.authenticator()
+        ),
+    };
+
+    let body = bcs::to_bytes(&another_txn).unwrap();
+    let resp = context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", body)
+        .await;
     context
         .expect_status_code(202)
         .post("/transactions", resp)
@@ -329,7 +408,7 @@ async fn test_multi_ed25519_signed_transaction() {
     let auth_key = AuthenticationKey::multi_ed25519(&public_key);
 
     let factory = context.transaction_factory();
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     // TODO: migrate once multi-ed25519 is supported
     let create_account_txn = root_account.sign_with_transaction_builder(
         factory.create_user_account(&Ed25519PrivateKey::generate_for_testing().public_key()),
@@ -337,8 +416,8 @@ async fn test_multi_ed25519_signed_transaction() {
     context.commit_block(&vec![create_account_txn]).await;
 
     let raw_txn = factory
-        .mint(auth_key.derived_address(), 1000)
-        .sender(auth_key.derived_address())
+        .mint(auth_key.account_address(), 1000)
+        .sender(auth_key.account_address())
         .sequence_number(0)
         .expiration_timestamp_secs(u64::MAX) // set timestamp to max to ensure static raw transaction
         .build();
@@ -666,7 +745,7 @@ async fn test_get_account_transactions_filter_transactions_by_limit() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
     let context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
     let txn = root_account.sign_with_transaction_builder(
         context
@@ -881,7 +960,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     let script =
         hex::decode("a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102")
             .unwrap();
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     let txn = root_account.sign_with_transaction_builder(
         context
             .transaction_factory()
@@ -893,7 +972,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
 
 async fn test_submit_entry_function_api_validation(
     mut context: TestContext,
-    mut account: LocalAccount,
+    account: LocalAccount,
     address: &str,
     module_id: &str,
     func: &str,
@@ -937,7 +1016,7 @@ async fn test_submit_entry_function_api_validation(
 
 async fn test_get_txn_execute_failed_by_invalid_entry_function(
     context: TestContext,
-    mut account: LocalAccount,
+    account: LocalAccount,
     address: &str,
     module_id: &str,
     func: &str,
@@ -1187,6 +1266,8 @@ async fn test_gas_estimation_cache() {
     node_config.api.gas_estimation.low_block_history = max_block_history;
     node_config.api.gas_estimation.market_block_history = max_block_history;
     node_config.api.gas_estimation.aggressive_block_history = max_block_history;
+    let sleep_duration =
+        Duration::from_millis(node_config.api.gas_estimation.cache_expiration_ms * 2);
     let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
     let ctx = &mut context;
@@ -1196,6 +1277,8 @@ async fn test_gas_estimation_cache() {
     }
     ctx.get("/estimate_gas_price").await;
     assert_eq!(ctx.last_updated_gas_estimation_cache_size(), 4);
+    // Wait for cache to expire
+    sleep(sleep_duration).await;
 
     // Expect max of 10 entries
     for _i in 0..8 {
@@ -1207,7 +1290,7 @@ async fn test_gas_estimation_cache() {
         max_block_history
     );
     // Wait for cache to expire
-    sleep(Duration::from_secs(1)).await;
+    sleep(sleep_duration).await;
     ctx.get("/estimate_gas_price").await;
     assert_eq!(
         ctx.last_updated_gas_estimation_cache_size(),
@@ -1224,7 +1307,7 @@ async fn test_gas_estimation_cache() {
         max_block_history
     );
     // Wait for cache to expire
-    sleep(Duration::from_secs(1)).await;
+    sleep(sleep_duration).await;
     ctx.get("/estimate_gas_price").await;
     assert_eq!(
         ctx.last_updated_gas_estimation_cache_size(),

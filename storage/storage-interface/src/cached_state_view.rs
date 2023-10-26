@@ -6,6 +6,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
@@ -16,11 +17,11 @@ use aptos_types::{
     transaction::Version,
     write_set::WriteSet,
 };
-use arr_macro::arr;
 use core::fmt;
 use dashmap::DashMap;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator};
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
@@ -35,11 +36,49 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .unwrap()
 });
 
+type StateCacheShard = DashMap<StateKey, (Option<Version>, Option<StateValue>)>;
+
 // Sharded by StateKey.get_shard_id(). The version in the value indicates there is an entry on that
 // version for the given StateKey, and the version is the maximum one which <= the base version. It
 // will be None if the value is None, or we found the value on the speculative tree (in that case
 // we don't know the maximum version).
-pub type ShardedStateCache = [DashMap<StateKey, (Option<Version>, Option<StateValue>)>; 16];
+#[derive(Debug, Default)]
+pub struct ShardedStateCache {
+    shards: [StateCacheShard; 16],
+}
+
+impl ShardedStateCache {
+    pub fn combine(&mut self, rhs: Self) {
+        use rayon::prelude::*;
+        THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+            self.shards
+                .par_iter_mut()
+                .zip_eq(rhs.shards.into_par_iter())
+                .for_each(|(l, r)| {
+                    for (k, (ver, val)) in r.into_iter() {
+                        l.entry(k).or_insert((ver, val));
+                    }
+                })
+        });
+    }
+
+    pub fn shard(&self, shard_id: u8) -> &StateCacheShard {
+        &self.shards[shard_id as usize]
+    }
+
+    pub fn flatten(self) -> DashMap<StateKey, Option<StateValue>> {
+        // TODO(grao): Rethink the strategy for state sync, and optimize this.
+        self.shards
+            .into_iter()
+            .flatten()
+            .map(|(key, (_ver_opt, val_opt))| (key, val_opt))
+            .collect()
+    }
+
+    pub fn par_iter(&self) -> impl IndexedParallelIterator<Item = &StateCacheShard> {
+        self.shards.par_iter()
+    }
+}
 
 /// `CachedStateView` is like a snapshot of the global state comprised of state view at two
 /// levels, persistent storage and memory.
@@ -125,7 +164,7 @@ impl CachedStateView {
             id,
             snapshot,
             speculative_state,
-            sharded_state_cache: arr![DashMap::new(); 16],
+            sharded_state_cache: ShardedStateCache::default(),
             proof_fetcher,
         })
     }
@@ -205,8 +244,10 @@ impl TStateView for CachedStateView {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         let _timer = TIMER.with_label_values(&["get_state_value"]).start_timer();
         // First check if the cache has the state value.
-        if let Some(version_and_value_opt) =
-            self.sharded_state_cache[state_key.get_shard_id() as usize].get(state_key)
+        if let Some(version_and_value_opt) = self
+            .sharded_state_cache
+            .shard(state_key.get_shard_id())
+            .get(state_key)
         {
             // This can return None, which means the value has been deleted from the DB.
             let value_opt = &version_and_value_opt.1;
@@ -215,7 +256,9 @@ impl TStateView for CachedStateView {
         let version_and_state_value_option =
             self.get_version_and_state_value_internal(state_key)?;
         // Update the cache if still empty
-        let new_version_and_value = self.sharded_state_cache[state_key.get_shard_id() as usize]
+        let new_version_and_value = self
+            .sharded_state_cache
+            .shard(state_key.get_shard_id())
             .entry(state_key.clone())
             .or_insert(version_and_state_value_option);
         let value_opt = &new_version_and_value.1;

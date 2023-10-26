@@ -3,24 +3,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    types::{MVDataError, MVDataOutput, TxnIndex},
+    types::{test::KeyType, MVDataError, MVDataOutput, MVGroupError, TxnIndex},
     MVHashMap,
 };
-use crate::unit_tests::KeyType;
-use aptos_aggregator::{
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
-    transaction::AggregatorValue,
-};
+use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
     executable::ExecutableTestType, state_store::state_value::StateValue,
     write_set::TransactionWrite,
 };
+use bytes::Bytes;
+use claims::assert_none;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
     hash::Hash,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 const DEFAULT_TIMEOUT: u64 = 30;
@@ -43,25 +44,41 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
-struct Value<V>(Option<V>);
+#[derive(Debug, Clone)]
+struct Value<V> {
+    maybe_value: Option<V>,
+    maybe_bytes: Option<Bytes>,
+}
+
+impl<V: Into<Vec<u8>> + Clone> Value<V> {
+    fn new(maybe_value: Option<V>) -> Self {
+        let maybe_bytes = maybe_value.clone().map(|v| {
+            let mut bytes = v.into();
+            bytes.resize(16, 0);
+            bytes.into()
+        });
+        Self {
+            maybe_value,
+            maybe_bytes,
+        }
+    }
+}
 
 impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        if self.0.is_none() {
-            None
-        } else {
-            let mut bytes = match self.0.clone().map(|v| v.into()) {
-                Some(v) => v,
-                None => vec![],
-            };
+    fn bytes(&self) -> Option<&Bytes> {
+        self.maybe_bytes.as_ref()
+    }
 
-            bytes.resize(16, 0);
-            Some(bytes)
-        }
+    fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
+        unimplemented!("Irrelevant for the test")
     }
 
     fn as_state_value(&self) -> Option<StateValue> {
-        unimplemented!()
+        unimplemented!("Irrelevant for the test")
+    }
+
+    fn set_bytes(&mut self, bytes: Bytes) {
+        self.maybe_bytes = Some(bytes);
     }
 }
 
@@ -76,13 +93,18 @@ where
     K: Hash + Eq + Clone + Debug,
     V: Clone + Into<Vec<u8>> + Debug + PartialEq,
 {
-    pub fn new(txns: &[(K, Operator<V>)]) -> Self {
+    pub fn new(txns: &[(K, Operator<V>)], ignore_updates: bool) -> Self {
         let mut baseline: HashMap<K, BTreeMap<TxnIndex, Data<V>>> = HashMap::new();
         for (idx, (k, op)) in txns.iter().enumerate() {
             let value_to_update = match op {
-                Operator::Insert(v) => Data::Write(Value(Some(v.clone()))),
-                Operator::Remove => Data::Write(Value(None)),
-                Operator::Update(d) => Data::Delta(*d),
+                Operator::Insert(v) => Data::Write(Value::new(Some(v.clone()))),
+                Operator::Remove => Data::Write(Value::new(None)),
+                Operator::Update(d) => {
+                    if ignore_updates {
+                        continue;
+                    }
+                    Data::Delta(*d)
+                },
                 Operator::Read => continue,
             };
 
@@ -104,30 +126,30 @@ where
                     match data {
                         Data::Write(v) => match acc {
                             Some(d) => {
-                                let maybe_value =
-                                    AggregatorValue::from_write(v).map(|value| value.into());
-                                if maybe_value.is_none() {
-                                    // v must be a deletion.
-                                    assert!(matches!(v, Value(None)));
-                                    return ExpectedOutput::Deleted;
-                                }
-
-                                assert!(!failure); // acc should be none.
-
-                                match d.apply_to(maybe_value.unwrap()) {
-                                    Err(_) => return ExpectedOutput::Failure,
-                                    Ok(i) => return ExpectedOutput::Resolved(i),
+                                match v.as_u128().unwrap() {
+                                    Some(value) => {
+                                        assert!(!failure); // acc should be none.
+                                        match d.apply_to(value) {
+                                            Err(_) => return ExpectedOutput::Failure,
+                                            Ok(i) => return ExpectedOutput::Resolved(i),
+                                        }
+                                    },
+                                    None => {
+                                        // v must be a deletion.
+                                        assert_none!(v.bytes());
+                                        return ExpectedOutput::Deleted;
+                                    },
                                 }
                             },
-                            None => match v {
-                                Value(Some(w)) => {
+                            None => match v.maybe_value.as_ref() {
+                                Some(w) => {
                                     return if failure {
                                         ExpectedOutput::Failure
                                     } else {
                                         ExpectedOutput::Value(w.clone())
                                     };
                                 },
-                                Value(None) => return ExpectedOutput::Deleted,
+                                None => return ExpectedOutput::Deleted,
                             },
                         },
                         Data::Delta(d) => match acc.as_mut() {
@@ -175,9 +197,13 @@ fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V
     ]
 }
 
+// If test group is set, we prop-test the group_data multi-version hashmap: we ignore the
+// Update/Deltas (as only data() MVHashMap deals with AggregatorV1 and even that will get
+// deprecated in favor of the dedicated aggregator MVHashMap for AggregatorV2).
 fn run_and_assert<K, V>(
     universe: Vec<K>,
     transaction_gens: Vec<(Index, Operator<V>)>,
+    test_group: bool,
 ) -> Result<(), TestCaseError>
 where
     K: PartialOrd + Send + Clone + Hash + Eq + Sync + Debug,
@@ -188,9 +214,9 @@ where
         .map(|(idx, op)| (idx.get(&universe).clone(), op))
         .collect::<Vec<_>>();
 
-    let baseline = Baseline::new(transactions.as_slice());
+    let baseline = Baseline::new(transactions.as_slice(), test_group);
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, Value<V>, ExecutableTestType>::new();
+    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -199,14 +225,22 @@ where
         .enumerate()
         .filter_map(|(idx, (key, op))| match op {
             Operator::Read => None,
-            Operator::Insert(_) | Operator::Remove | Operator::Update(_) => {
-                Some((key.clone(), idx))
-            },
+            Operator::Insert(_) | Operator::Remove => Some((key.clone(), idx)),
+            Operator::Update(_) => (!test_group).then_some((key.clone(), idx)),
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.write(KeyType(key.clone()), (idx as TxnIndex, 0), Value(None));
-        map.mark_estimate(&KeyType(key), idx as TxnIndex);
+        let key = KeyType(key);
+        let value = Value::new(None);
+        let idx = idx as TxnIndex;
+        if test_group {
+            map.group_data()
+                .write(key.clone(), idx, 0, vec![(5, value)]);
+            map.group_data().mark_estimate(&key, idx);
+        } else {
+            map.data().write(key.clone(), idx, 0, (value, None));
+            map.data().mark_estimate(&key, idx);
+        }
     }
 
     let current_idx = AtomicUsize::new(0);
@@ -228,52 +262,71 @@ where
                         use MVDataOutput::*;
 
                         let baseline = baseline.get(key, idx as TxnIndex);
+                        let assert_value = |v: Arc<Value<V>>| match v.maybe_value.as_ref() {
+                            Some(w) => {
+                                assert_eq!(baseline, ExpectedOutput::Value(w.clone()), "{:?}", idx);
+                            },
+                            None => {
+                                assert_eq!(baseline, ExpectedOutput::Deleted, "{:?}", idx);
+                            },
+                        };
+
                         let mut retry_attempts = 0;
                         loop {
-                            match map.fetch_data(&KeyType(key.clone()), idx as TxnIndex) {
-                                Ok(Versioned(_, v)) => {
-                                    match &*v {
-                                        Value(Some(w)) => {
-                                            assert_eq!(
-                                                baseline,
-                                                ExpectedOutput::Value(w.clone()),
-                                                "{:?}",
-                                                idx
-                                            );
-                                        },
-                                        Value(None) => {
-                                            assert_eq!(
-                                                baseline,
-                                                ExpectedOutput::Deleted,
-                                                "{:?}",
-                                                idx
-                                            );
-                                        },
-                                    }
-                                    break;
-                                },
-                                Ok(Resolved(v)) => {
-                                    assert_eq!(baseline, ExpectedOutput::Resolved(v), "{:?}", idx);
-                                    break;
-                                },
-                                Err(NotFound) => {
-                                    assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
-                                    break;
-                                },
-                                Err(DeltaApplicationFailure) => {
-                                    assert_eq!(baseline, ExpectedOutput::Failure, "{:?}", idx);
-                                    break;
-                                },
-                                Err(Unresolved(d)) => {
-                                    assert_eq!(
-                                        baseline,
-                                        ExpectedOutput::Unresolved(d),
-                                        "{:?}",
-                                        idx
-                                    );
-                                    break;
-                                },
-                                Err(Dependency(_i)) => (),
+                            if test_group {
+                                match map.group_data().read_from_group(
+                                    &KeyType(key.clone()),
+                                    &5,
+                                    idx as TxnIndex,
+                                ) {
+                                    Ok((_, v, _)) => {
+                                        assert_value(v);
+                                        break;
+                                    },
+                                    Err(MVGroupError::Uninitialized) => {
+                                        assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
+                                        break;
+                                    },
+                                    Err(MVGroupError::Dependency(_i)) => (),
+                                    Err(_) => unreachable!("Unreachable error cases for test"),
+                                }
+                            } else {
+                                match map
+                                    .data()
+                                    .fetch_data(&KeyType(key.clone()), idx as TxnIndex)
+                                {
+                                    Ok(Versioned(_, v, _)) => {
+                                        assert_value(v);
+                                        break;
+                                    },
+                                    Ok(Resolved(v)) => {
+                                        assert_eq!(
+                                            baseline,
+                                            ExpectedOutput::Resolved(v),
+                                            "{:?}",
+                                            idx
+                                        );
+                                        break;
+                                    },
+                                    Err(Uninitialized) => {
+                                        assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
+                                        break;
+                                    },
+                                    Err(DeltaApplicationFailure) => {
+                                        assert_eq!(baseline, ExpectedOutput::Failure, "{:?}", idx);
+                                        break;
+                                    },
+                                    Err(Unresolved(d)) => {
+                                        assert_eq!(
+                                            baseline,
+                                            ExpectedOutput::Unresolved(d),
+                                            "{:?}",
+                                            idx
+                                        );
+                                        break;
+                                    },
+                                    Err(Dependency(_i)) => (),
+                                }
                             }
                             retry_attempts += 1;
                             if retry_attempts > DEFAULT_TIMEOUT {
@@ -283,17 +336,30 @@ where
                         }
                     },
                     Operator::Remove => {
-                        map.write(KeyType(key.clone()), (idx as TxnIndex, 1), Value(None));
+                        let key = KeyType(key.clone());
+                        let value = Value::new(None);
+                        if test_group {
+                            map.group_data()
+                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                        } else {
+                            map.data().write(key, idx as TxnIndex, 1, (value, None));
+                        }
                     },
                     Operator::Insert(v) => {
-                        map.write(
-                            KeyType(key.clone()),
-                            (idx as TxnIndex, 1),
-                            Value(Some(v.clone())),
-                        );
+                        let key = KeyType(key.clone());
+                        let value = Value::new(Some(v.clone()));
+                        if test_group {
+                            map.group_data()
+                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                        } else {
+                            map.data().write(key, idx as TxnIndex, 1, (value, None));
+                        }
                     },
                     Operator::Update(delta) => {
-                        map.add_delta(KeyType(key.clone()), idx as TxnIndex, *delta)
+                        if !test_group {
+                            map.data()
+                                .add_delta(KeyType(key.clone()), idx as TxnIndex, *delta)
+                        }
                     },
                 }
             })
@@ -310,7 +376,7 @@ proptest! {
         universe in vec(any::<[u8; 32]>(), 1),
         transactions in vec((any::<Index>(), operator_strategy::<[u8; 32]>()), 100),
     ) {
-        run_and_assert(universe, transactions)?;
+        run_and_assert(universe, transactions, false)?;
     }
 
     #[test]
@@ -318,7 +384,7 @@ proptest! {
         universe in vec(any::<[u8; 32]>(), 1),
         transactions in vec((any::<Index>(), operator_strategy::<[u8; 32]>()), 2000),
     ) {
-        run_and_assert(universe, transactions)?;
+        run_and_assert(universe, transactions, false)?;
     }
 
     #[test]
@@ -326,6 +392,14 @@ proptest! {
         universe in vec(any::<[u8; 32]>(), 10),
         transactions in vec((any::<Index>(), operator_strategy::<[u8; 32]>()), 100),
     ) {
-        run_and_assert(universe, transactions)?;
+        run_and_assert(universe, transactions, false)?;
+    }
+
+    #[test]
+    fn multi_key_proptest_group(
+        universe in vec(any::<[u8; 32]>(), 3),
+        transactions in vec((any::<Index>(), operator_strategy::<[u8; 32]>()), 200),
+    ) {
+        run_and_assert(universe, transactions, true)?;
     }
 }

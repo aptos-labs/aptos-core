@@ -118,7 +118,7 @@ View the full example for this code [here](https://github.com/aptos-labs/aptos-c
 
 Here's the relevant code that rotates Alice's keys to Bob's:
 ```python title="Python SDK rotate authentication key function"
-:!: static/sdks/python/examples/rotate-key.py rotate_key
+:!: static/sdks/python/examples/rotate_key.py rotate_key
 ```
 Commands to run the example script:
 ```shell title="Navigate to the python SDK directory, install dependencies and run rotate_key.ts"

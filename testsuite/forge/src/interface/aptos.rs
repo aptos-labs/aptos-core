@@ -14,10 +14,7 @@ use aptos_sdk::{
         account_address::AccountAddress,
         account_config::CORE_CODE_ADDRESS,
         chain_id::ChainId,
-        transaction::{
-            authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
-            SignedTransaction,
-        },
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
         LocalAccount,
     },
 };
@@ -156,12 +153,11 @@ impl<'t> AptosPublicInfo<'t> {
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
-        let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
-        let auth_key = AuthenticationKey::from_preimage(&preimage);
+        let auth_key = AuthenticationKey::ed25519(pubkey);
         let create_account_txn =
             self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
-                    aptos_stdlib::aptos_account_create_account(auth_key.derived_address()),
+                    aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
                 ));
         self.rest_client
             .submit_and_wait(&create_account_txn)
@@ -283,7 +279,8 @@ impl<'t> AptosPublicInfo<'t> {
             .unwrap()
             .into_inner()
             .sequence_number();
-        *self.root_account().sequence_number_mut() = root_sequence_number;
+        self.root_account()
+            .set_sequence_number(root_sequence_number);
     }
 }
 

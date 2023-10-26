@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use pprof::ProfilerGuard;
+use regex::Regex;
 use std::{path::PathBuf, thread, time};
 
 pub struct CpuProfiler<'a> {
@@ -32,6 +33,16 @@ impl<'a> CpuProfiler<'a> {
     pub(crate) fn destory_guard(&mut self) -> Result<()> {
         self.guard = None;
         Ok(())
+    }
+
+    fn frames_post_processor() -> impl Fn(&mut pprof::Frames) {
+        let regex = Regex::new(r"^(.*)-(\d*)$").unwrap();
+
+        move |frames| {
+            if let Some((_, [name, _])) = regex.captures(&frames.thread_name).map(|c| c.extract()) {
+                frames.thread_name = name.to_string();
+            }
+        }
     }
 }
 
@@ -59,7 +70,11 @@ impl Profiler for CpuProfiler<'_> {
     /// End profiling
     fn end_profiling(&mut self, _binary_path: &str) -> Result<()> {
         if let Some(guard) = self.guard.take() {
-            if let Ok(report) = guard.report().build() {
+            if let Ok(report) = guard
+                .report()
+                .frames_post_processor(Self::frames_post_processor())
+                .build()
+            {
                 let file = create_file_with_parents(self.svg_result_path.as_path())?;
                 let _result = report.flamegraph(file);
             }

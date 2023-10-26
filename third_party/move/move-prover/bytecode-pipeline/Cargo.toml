@@ -1,0 +1,47 @@
+[package]
+name = "move-prover-bytecode-pipeline"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = "1.0.52"
+move-binary-format = { path = "../../move-binary-format" }
+move-core-types = { path = "../../move-core/types" }
+move-model = { path = "../../move-model" }
+
+# move dependencies
+move-stackless-bytecode = { path = "../../move-model/bytecode" }
+
+# external dependencies
+async-trait = "0.1.42"
+atty = "0.2.14"
+clap = { version = "4.3.9", features = ["derive"] }
+codespan = "0.11.1"
+codespan-reporting = "0.11.1"
+futures = "0.3.12"
+hex = "0.4.3"
+itertools = "0.10.0"
+log = { version = "0.4.14", features = ["serde"] }
+num = "0.4.0"
+once_cell = "1.7.2"
+pretty = "0.10.0"
+rand = "0.8.3"
+serde = { version = "1.0.124", features = ["derive"] }
+serde_json = "1.0.64"
+simplelog = "0.9.0"
+tokio = { version = "1.18.2", features = ["full"] }
+toml = "0.5.8"
+
+[dev-dependencies]
+datatest-stable = "0.1.1"
+move-stackless-bytecode-test-utils = { path = "../../move-model/bytecode-test-utils" }
+shell-words = "1.0.0"
+tempfile = "3.2.0"
+walkdir = "2.3.1"
+
+[[test]]
+name = "testsuite"
+harness = false

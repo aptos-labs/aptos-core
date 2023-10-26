@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::DagConsensusConfig;
 use crate::{
     config::{
-        node_config_loader::NodeConfigLoader, persistable_config::PersistableConfig,
-        utils::RootPath, ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig,
-        IndexerConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
-        NetworkConfig, PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig,
-        StorageConfig,
+        netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
+        persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
+        BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
+        InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
+        PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
     network_id::NetworkId,
 };
@@ -29,11 +30,15 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct NodeConfig {
     #[serde(default)]
+    pub admin_service: AdminServiceConfig,
+    #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
     pub base: BaseConfig,
     #[serde(default)]
     pub consensus: ConsensusConfig,
+    #[serde(default)]
+    pub dag_consensus: DagConsensusConfig,
     #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]
@@ -58,6 +63,8 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
+    #[serde(default)]
+    pub netbench: Option<NetbenchConfig>,
 }
 
 impl NodeConfig {
@@ -134,6 +141,7 @@ impl NodeConfig {
     /// Randomizes the various ports of the node config
     pub fn randomize_ports(&mut self) {
         // Randomize the ports for the services
+        self.admin_service.randomize_ports();
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
@@ -244,6 +252,7 @@ pub fn merge_node_config(
         ))
     })
 }
+
 #[cfg(test)]
 mod test {
     use crate::config::{merge_node_config, Error, NodeConfig, SafetyRulesConfig};

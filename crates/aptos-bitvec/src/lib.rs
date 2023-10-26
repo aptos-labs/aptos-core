@@ -16,7 +16,7 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 
-// Every u8 is used as a bucket of 8 bits. Total max buckets = 65536 / 8 = 8196.
+// Every u8 is used as a bucket of 8 bits. Total max buckets = 65536 / 8 = 8192.
 const BUCKET_SIZE: usize = 8;
 const MAX_BUCKETS: usize = 8192;
 
@@ -64,7 +64,7 @@ const MAX_BUCKETS: usize = 8192;
 /// assert!(intersection.is_set(2));
 /// assert_eq!(false, intersection.is_set(3));
 /// ```
-#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Default, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct BitVec {
     #[serde(with = "serde_bytes")]
     inner: Vec<u8>,

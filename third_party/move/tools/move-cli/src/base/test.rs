@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::reroot_path;
-use crate::NativeFunctionRecord;
-use anyhow::Result;
+use crate::{base::test_validation, NativeFunctionRecord};
+use anyhow::{bail, Result};
 use clap::*;
+use codespan_reporting::term::{termcolor, termcolor::StandardStream};
 use move_command_line_common::files::{FileHash, MOVE_COVERAGE_MAP_EXTENSION};
 use move_compiler::{
     diagnostics::{self, codes::Severity},
@@ -13,8 +14,12 @@ use move_compiler::{
     PASS_CFGIR,
 };
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
-use move_package::{compilation::build_plan::BuildPlan, BuildConfig};
+use move_package::{
+    compilation::{build_plan::BuildPlan, compiled_package::unimplemented_v2_driver},
+    BuildConfig, CompilerConfig,
+};
 use move_unit_test::UnitTestingConfig;
+use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
 use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
 #[cfg(target_family = "unix")]
@@ -159,6 +164,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     let mut test_plan = None;
     build_config.test_mode = true;
     build_config.dev_mode = true;
+    build_config.generate_move_model = test_validation::needs_validation();
 
     // Build the resolution graph (resolution graph diagnostics are only needed for CLI commands so
     // ignore them by passing a vector as the writer)
@@ -199,29 +205,50 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // Move package system, to first grab the compilation env, construct the test plan from it, and
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
-    build_plan.compile_with_driver(writer, None, |compiler| {
-        let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
-        let (_, compiler) =
-            diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
-        let (mut compiler, cfgir) = compiler.into_ast();
-        let compilation_env = compiler.compilation_env();
-        let built_test_plan = construct_test_plan(compilation_env, Some(root_package), &cfgir);
-        if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
-            if unit_test_config.ignore_compile_warnings {
-                Severity::NonblockingError
-            } else {
-                Severity::Warning
-            },
-        ) {
-            diagnostics::report_diagnostics(&files, diags);
+    let (_, model_opt) = build_plan.compile_with_driver(
+        writer,
+        &CompilerConfig::default(),
+        |compiler| {
+            let (files, comments_and_compiler_res) = compiler.run::<PASS_CFGIR>().unwrap();
+            let (_, compiler) =
+                diagnostics::unwrap_or_report_diagnostics(&files, comments_and_compiler_res);
+            let (mut compiler, cfgir) = compiler.into_ast();
+            let compilation_env = compiler.compilation_env();
+            let built_test_plan = construct_test_plan(compilation_env, Some(root_package), &cfgir);
+            if let Err(diags) = compilation_env.check_diags_at_or_above_severity(
+                if unit_test_config.ignore_compile_warnings {
+                    Severity::NonblockingError
+                } else {
+                    Severity::Warning
+                },
+            ) {
+                diagnostics::report_diagnostics(&files, diags);
+            }
+
+            let compilation_result = compiler.at_cfgir(cfgir).build();
+
+            let (units, _) = diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
+            test_plan = Some((built_test_plan, files.clone(), units.clone()));
+            Ok((files, units))
+        },
+        unimplemented_v2_driver,
+    )?;
+
+    // If configured, run extra validation
+    if test_validation::needs_validation() {
+        let model = &model_opt.expect("move model");
+        test_validation::validate(model);
+        let diag_count = model.diag_count(codespan_reporting::diagnostic::Severity::Warning);
+        if diag_count > 0 {
+            model.report_diag(
+                &mut StandardStream::stderr(termcolor::ColorChoice::Auto),
+                codespan_reporting::diagnostic::Severity::Warning,
+            );
+            if model.has_errors() {
+                bail!("compilation failed")
+            }
         }
-
-        let compilation_result = compiler.at_cfgir(cfgir).build();
-
-        let (units, _) = diagnostics::unwrap_or_report_diagnostics(&files, compilation_result);
-        test_plan = Some((built_test_plan, files.clone(), units.clone()));
-        Ok((files, units))
-    })?;
+    }
 
     let (test_plan, mut files, units) = test_plan.unwrap();
     files.extend(dep_file_map);
@@ -260,6 +287,10 @@ pub fn run_move_unit_tests<W: Write + Send>(
 
     // Compute the coverage map. This will be used by other commands after this.
     if compute_coverage && !no_tests {
+        if *TRACING_ENABLED {
+            let buf_writer = &mut *LOGGING_FILE_WRITER.lock().unwrap();
+            buf_writer.flush().unwrap();
+        }
         let coverage_map = CoverageMap::from_trace_file(trace_path);
         output_map_to_file(coverage_map_path, &coverage_map).unwrap();
     }

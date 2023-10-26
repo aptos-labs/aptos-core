@@ -131,7 +131,7 @@ async fn test_db_restore() {
         backup_path.path(),
         db_dir.as_path(),
         &[],
-        node0_config.storage.rocksdb_configs.split_ledger_db,
+        node0_config.storage.rocksdb_configs.enable_storage_sharding,
         None,
     );
 
@@ -241,8 +241,9 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
         .unwrap();
     assert!(
         replay.status.success(),
-        "{}",
-        std::str::from_utf8(&replay.stderr).unwrap()
+        "{}, {}",
+        std::str::from_utf8(&replay.stderr).unwrap(),
+        std::str::from_utf8(&replay.stdout).unwrap(),
     );
 
     info!(
@@ -408,7 +409,7 @@ pub(crate) fn db_restore(
     backup_path: &Path,
     db_path: &Path,
     trusted_waypoints: &[Waypoint],
-    split_ledger_db: bool,
+    enable_storage_sharding: bool,
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
@@ -424,8 +425,8 @@ pub(crate) fn db_restore(
         cmd.arg(&w.to_string());
     });
 
-    if split_ledger_db {
-        cmd.arg("--split-ledger-db");
+    if enable_storage_sharding {
+        cmd.arg("--enable_storage_sharding");
     }
     if let Some(version) = target_verion {
         cmd.arg("--target-version");

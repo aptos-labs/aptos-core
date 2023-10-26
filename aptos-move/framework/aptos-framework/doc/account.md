@@ -19,6 +19,7 @@
 -  [Struct `SignerCapabilityOfferProofChallengeV2`](#0x1_account_SignerCapabilityOfferProofChallengeV2)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_account_initialize)
+-  [Function `create_account_if_does_not_exist`](#0x1_account_create_account_if_does_not_exist)
 -  [Function `create_account`](#0x1_account_create_account)
 -  [Function `create_account_unchecked`](#0x1_account_create_account_unchecked)
 -  [Function `exists_at`](#0x1_account_exists_at)
@@ -53,6 +54,7 @@
 -  [Function `verify_signed_message`](#0x1_account_verify_signed_message)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `create_account_if_does_not_exist`](#@Specification_1_create_account_if_does_not_exist)
     -  [Function `create_account`](#@Specification_1_create_account)
     -  [Function `create_account_unchecked`](#@Specification_1_create_account_unchecked)
     -  [Function `exists_at`](#@Specification_1_exists_at)
@@ -840,6 +842,32 @@ Only called during genesis to initialize system resources for this module.
     <b>move_to</b>(aptos_framework, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
         address_map: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_account_create_account_if_does_not_exist"></a>
+
+## Function `create_account_if_does_not_exist`
+
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_create_account_if_does_not_exist">create_account_if_does_not_exist</a>(account_address: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_create_account_if_does_not_exist">create_account_if_does_not_exist</a>(account_address: <b>address</b>) {
+    <b>if</b> (!<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address)) {
+        <a href="account.md#0x1_account_create_account">create_account</a>(account_address);
+    }
 }
 </code></pre>
 
@@ -2085,6 +2113,30 @@ OriginatingAddress does not exist under <code>@aptos_framework</code> before the
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(aptos_addr);
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(aptos_addr);
+</code></pre>
+
+
+
+<a name="@Specification_1_create_account_if_does_not_exist"></a>
+
+### Function `create_account_if_does_not_exist`
+
+
+<pre><code><b>fun</b> <a href="account.md#0x1_account_create_account_if_does_not_exist">create_account_if_does_not_exist</a>(account_address: <b>address</b>)
+</code></pre>
+
+
+Ensure that the account exists at the end of the call.
+
+
+<pre><code><b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(account_address);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address) && (
+    account_address == @vm_reserved
+    || account_address == @aptos_framework
+    || account_address == @aptos_token
+    || !(len(authentication_key) == 32)
+);
+<b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(account_address);
 </code></pre>
 
 

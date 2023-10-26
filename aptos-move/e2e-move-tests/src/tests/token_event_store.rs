@@ -48,6 +48,8 @@ fn test_token_creation_with_token_events_store() {
     let signed_txn =
         h.create_transaction_payload(&acc, aptos_token_stdlib::token_opt_in_direct_transfer(true));
     let (_, mut events) = h.run_with_events(signed_txn);
+    // First one is always the 0x1::transaction_fee::FeeStatement
+    let _event = events.pop().unwrap();
     let event = events.pop().unwrap();
     assert_eq!(
         "0x3::token_event_store::OptInTransferEvent".to_string(),

@@ -3,6 +3,16 @@
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Fix nested type tag parsing in `Object` types
+
+## 1.20.0 (2023-09-22)
+
+- Add current objects queries support - `getAccountOwnedObjects`
+- Add `burnObject` transaction support in `AptosToken`
+
+## 1.19.0 (2023-08-24)
+
+- Add fungible asset queries support - `getAccountCoinsData`, `getAccountCoinsDataCount`
 
 ## 1.18.0 (2023-08-10)
 

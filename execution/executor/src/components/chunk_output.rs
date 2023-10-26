@@ -7,36 +7,32 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{ExecutedBlock, ExecutedChunk};
-use aptos_infallible::Mutex;
-use aptos_logger::{sample, sample::SampleRate, trace, warn};
+use aptos_executor_service::{
+    local_executor_helper::SHARDED_BLOCK_EXECUTOR,
+    remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
+};
+use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
+use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
+    state_delta::StateDelta,
     ExecutedTrees,
 };
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     block_executor::partitioner::{ExecutableTransactions, PartitionedTransactions},
-    transaction::{ExecutionStatus, Transaction, TransactionOutput, TransactionStatus},
-};
-use aptos_vm::{
-    sharded_block_executor::{
-        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
-        ShardedBlockExecutor,
+    contract_event::ContractEvent,
+    epoch_state::EpochState,
+    transaction::{
+        signature_verified_transaction::{SignatureVerifiedTransaction, TransactionProvider},
+        ExecutionStatus, Transaction, TransactionOutput, TransactionOutputProvider,
+        TransactionStatus,
     },
-    AptosVM, VMExecutor,
 };
+use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use once_cell::sync::Lazy;
 use std::{ops::Deref, sync::Arc, time::Duration};
-
-pub static SHARDED_BLOCK_EXECUTOR: Lazy<
-    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
-> = Lazy::new(|| {
-    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
-    Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
-});
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -70,20 +66,15 @@ impl ChunkOutput {
     }
 
     fn by_transaction_execution_unsharded<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: Vec<SignatureVerifiedTransaction>,
         state_view: CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Self> {
         let transaction_outputs =
-            Self::execute_block::<V>(transactions.clone(), &state_view, maybe_block_gas_limit)?;
-
-        // to print txn output for debugging, uncomment:
-        // println!("{:?}", transaction_outputs.iter().map(|t| t.status() ).collect::<Vec<_>>());
-
-        update_counters_for_processed_chunk(&transactions, &transaction_outputs, "executed");
+            Self::execute_block::<V>(&transactions, &state_view, maybe_block_gas_limit)?;
 
         Ok(Self {
-            transactions,
+            transactions: transactions.into_iter().map(|t| t.into_inner()).collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
@@ -106,11 +97,10 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
-                .map(|t| t.into_txn())
+                .map(|t| t.into_txn().into_inner())
                 .collect(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
@@ -145,38 +135,40 @@ impl ChunkOutput {
     pub fn apply_to_ledger(
         self,
         base_view: &ExecutedTrees,
+        known_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<(ExecutedChunk, Vec<Transaction>, Vec<Transaction>)> {
         fail_point!("executor::apply_to_ledger", |_| {
             Err(anyhow::anyhow!("Injected error in apply_to_ledger."))
         });
-        ApplyChunkOutput::apply_chunk(self, base_view, append_state_checkpoint_to_block)
+        ApplyChunkOutput::apply_chunk(
+            self,
+            base_view,
+            known_state_checkpoint_hashes,
+            append_state_checkpoint_to_block,
+        )
     }
 
-    pub fn apply_to_ledger_for_block(
+    pub fn into_state_checkpoint_output(
         self,
-        base_view: &ExecutedTrees,
+        parent_state: &StateDelta,
         append_state_checkpoint_to_block: Option<HashValue>,
-    ) -> Result<(ExecutedBlock, Vec<Transaction>, Vec<Transaction>)> {
-        fail_point!("executor::apply_to_ledger_for_block", |_| {
+    ) -> Result<(StateDelta, Option<EpochState>, StateCheckpointOutput)> {
+        fail_point!("executor::into_state_checkpoint_output", |_| {
             Err(anyhow::anyhow!(
-                "Injected error in apply_to_ledger_for_block."
+                "Injected error in into_state_checkpoint_output."
             ))
         });
-        ApplyChunkOutput::apply_block(self, base_view, append_state_checkpoint_to_block)
-    }
 
-    pub fn trace_log_transaction_status(&self) {
-        let status: Vec<_> = self
-            .transaction_outputs
-            .iter()
-            .map(TransactionOutput::status)
-            .cloned()
-            .collect();
-
-        if !status.is_empty() {
-            trace!("Execution status: {:?}", status);
-        }
+        // TODO(msmouse): If this code path is only used by block_executor, consider move it to the
+        // caller side.
+        ApplyChunkOutput::calculate_state_checkpoint(
+            self,
+            parent_state,
+            append_state_checkpoint_to_block,
+            None,
+            /*is_block=*/ true,
+        )
     }
 
     fn execute_block_sharded<V: VMExecutor>(
@@ -184,25 +176,34 @@ impl ChunkOutput {
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block_sharded(
-            SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            partitioned_txns,
-            state_view,
-            maybe_block_gas_limit,
-        )?)
+        if !get_remote_addresses().is_empty() {
+            Ok(V::execute_block_sharded(
+                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                maybe_block_gas_limit,
+            )?)
+        } else {
+            Ok(V::execute_block_sharded(
+                SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                maybe_block_gas_limit,
+            )?)
+        }
     }
 
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns
     /// a vector of [TransactionOutput]s.
     #[cfg(not(feature = "consensus-only-perf-test"))]
     fn execute_block<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
         Ok(V::execute_block(
             transactions,
-            &state_view,
+            state_view,
             maybe_block_gas_limit,
         )?)
     }
@@ -213,7 +214,7 @@ impl ChunkOutput {
     /// gas and a [ExecutionStatus::Success] for each of the [Transaction]s.
     #[cfg(feature = "consensus-only-perf-test")]
     fn execute_block<V: VMExecutor>(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &CachedStateView,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
@@ -223,7 +224,7 @@ impl ChunkOutput {
         let transaction_outputs = match state_view.id() {
             // this state view ID implies a genesis block in non-test cases.
             StateViewId::Miscellaneous => {
-                V::execute_block(transactions, &state_view, maybe_block_gas_limit)?
+                V::execute_block(transactions, state_view, maybe_block_gas_limit)?
             },
             _ => transactions
                 .iter()
@@ -231,7 +232,7 @@ impl ChunkOutput {
                     TransactionOutput::new(
                         WriteSet::default(),
                         Vec::new(),
-                        100,
+                        0, // Keep gas zero to match with StateCheckpoint txn output
                         TransactionStatus::Keep(ExecutionStatus::Success),
                     )
                 })
@@ -241,11 +242,14 @@ impl ChunkOutput {
     }
 }
 
-pub fn update_counters_for_processed_chunk(
-    transactions: &[Transaction],
-    transaction_outputs: &[TransactionOutput],
+pub fn update_counters_for_processed_chunk<T, O>(
+    transactions: &[T],
+    transaction_outputs: &[O],
     process_type: &str,
-) {
+) where
+    T: TransactionProvider,
+    O: TransactionOutputProvider,
+{
     let detailed_counters = AptosVM::get_processed_transactions_detailed_counters();
     let detailed_counters_label = if detailed_counters { "true" } else { "false" };
     if transactions.len() != transaction_outputs.len() {
@@ -257,7 +261,7 @@ pub fn update_counters_for_processed_chunk(
     }
 
     for (txn, output) in transactions.iter().zip(transaction_outputs.iter()) {
-        let (state, reason, error_code) = match output.status() {
+        let (state, reason, error_code) = match output.get_transaction_output().status() {
             TransactionStatus::Keep(execution_status) => match execution_status {
                 ExecutionStatus::Success => ("keep_success", "", "".to_string()),
                 ExecutionStatus::OutOfGas => ("keep_rejected", "OutOfGas", "error".to_string()),
@@ -312,11 +316,12 @@ pub fn update_counters_for_processed_chunk(
             TransactionStatus::Retry => ("retry", "", "".to_string()),
         };
 
-        let kind = match txn {
-            Transaction::UserTransaction(_) => "user_transaction",
-            Transaction::GenesisTransaction(_) => "genesis",
-            Transaction::BlockMetadata(_) => "block_metadata",
-            Transaction::StateCheckpoint(_) => "state_checkpoint",
+        let kind = match txn.get_transaction() {
+            Some(Transaction::UserTransaction(_)) => "user_transaction",
+            Some(Transaction::GenesisTransaction(_)) => "genesis",
+            Some(Transaction::BlockMetadata(_)) => "block_metadata",
+            Some(Transaction::StateCheckpoint(_)) => "state_checkpoint",
+            None => "unknown",
         };
 
         metrics::APTOS_PROCESSED_TXNS_COUNT
@@ -335,7 +340,7 @@ pub fn update_counters_for_processed_chunk(
                 .inc();
         }
 
-        if let Transaction::UserTransaction(user_txn) = txn {
+        if let Some(Transaction::UserTransaction(user_txn)) = txn.get_transaction() {
             match user_txn.payload() {
                 aptos_types::transaction::TransactionPayload::Script(_script) => {
                     metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
@@ -389,12 +394,17 @@ pub fn update_counters_for_processed_chunk(
             }
         }
 
-        for event in output.events() {
-            let is_core = event.key().get_creator_address() == CORE_CODE_ADDRESS;
-            let creation_number = if is_core && detailed_counters {
-                event.key().get_creation_number().to_string()
-            } else {
-                "event".to_string()
+        for event in output.get_transaction_output().events() {
+            let (is_core, creation_number) = match event {
+                ContractEvent::V1(v1) => (
+                    v1.key().get_creator_address() == CORE_CODE_ADDRESS,
+                    if detailed_counters {
+                        v1.key().get_creation_number().to_string()
+                    } else {
+                        "event".to_string()
+                    },
+                ),
+                ContractEvent::V2(_v2) => (false, "event".to_string()),
             };
             metrics::APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS
                 .with_label_values(&[

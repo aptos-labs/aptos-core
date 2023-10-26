@@ -8,6 +8,7 @@ use crate::{
     event::{EventHandle, EventKey},
 };
 use anyhow::{format_err, Result};
+use bytes::Bytes;
 use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
@@ -26,6 +27,7 @@ mod execution_config;
 mod gas_schedule;
 mod timed_features;
 mod timestamp;
+mod transaction_fee;
 mod validator_set;
 
 pub use self::{
@@ -35,16 +37,17 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{
-        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
-        ProposerElectionType,
+        ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig,
+        ProposerAndVoterConfig, ProposerElectionType,
     },
     execution_config::{
         ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig, TransactionDeduperType,
         TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
-    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures},
+    timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
+    transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
 };
 
@@ -121,7 +124,7 @@ impl<P: OnChainConfigProvider> OnChainConfigPayload<P> {
 
 /// Trait to be implemented by a storage type from which to read on-chain configs
 pub trait ConfigStorage {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>>;
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes>;
 }
 
 /// Trait to be implemented by a Rust struct representation of an on-chain config

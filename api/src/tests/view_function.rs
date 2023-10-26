@@ -93,7 +93,7 @@ async fn test_view_tuple() {
     //     }
     // }
     let tuple_module = hex::decode("a11ceb0b0500000006010002030205050704070b1b0826200c461900000001000100000203030d5461626c6554657374446174610c72657475726e5f7475706c65000000000000000000000000000000000000000000000000000000000a550c180001000000030601000000000000000602000000000000000200").unwrap();
-    let mut root_account = context.root_account().await;
+    let root_account = context.root_account().await;
     let module_txn = root_account
         .sign_with_transaction_builder(context.transaction_factory().module(tuple_module));
 

@@ -21,8 +21,9 @@ def local_setup():
         "BUCKET": "aptos-testnet-backup-b7b1ad7a",
         "SUB_DIR": "e1",
         "HISTORY_START": "350000000",
-        "TXNS_TO_SKIP": "46874937 151020059",
+        "TXNS_TO_SKIP": "0",  # 46874937 151020059 should be excluded
         "BACKUP_CONFIG_TEMPLATE_PATH": "terraform/helm/fullnode/files/backup/gcs.yaml",
+        "REUSE_BACKUP_ARTIFACTS": "true",
     }
 
     # build backup tools
@@ -44,4 +45,6 @@ def local_setup():
 
 if __name__ == "__main__":
     local_setup()
-    replay_verify.main()
+    replay_verify.main(
+        runner_no=None, runner_cnt=None, start_version=40000000, end_version=200000000
+    )

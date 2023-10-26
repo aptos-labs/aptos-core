@@ -80,7 +80,7 @@ impl NetworkTest for FrameworkUpgrade {
         let mut keygen = KeyGen::from_seed(seed_slice);
         let validator_key = keygen.generate_ed25519_private_key();
         let validator_account =
-            AuthenticationKey::ed25519(&validator_key.public_key()).derived_address();
+            AuthenticationKey::ed25519(&validator_key.public_key()).account_address();
 
         let network_info = aptos_release_builder::validate::NetworkConfig {
             endpoint: ctx.swarm().validators().last().unwrap().rest_api_endpoint(),
@@ -102,10 +102,7 @@ impl NetworkTest for FrameworkUpgrade {
         // Update the sequence number for the root account
         let root_account = ctx.swarm().chain_info().root_account().address();
         // Test the module publishing workflow
-        *ctx.swarm()
-            .chain_info()
-            .root_account()
-            .sequence_number_mut() = runtime
+        let sequence_number = runtime
             .block_on(
                 ctx.swarm()
                     .chain_info()
@@ -115,6 +112,10 @@ impl NetworkTest for FrameworkUpgrade {
             .unwrap()
             .inner()
             .sequence_number;
+        ctx.swarm()
+            .chain_info()
+            .root_account()
+            .set_sequence_number(sequence_number);
 
         // Generate some traffic
         let duration = Duration::from_secs(30);

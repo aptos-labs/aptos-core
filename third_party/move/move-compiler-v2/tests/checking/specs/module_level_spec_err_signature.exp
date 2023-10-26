@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: provided function signature must match function declaration: parameter mismatch
+   ┌─ tests/checking/specs/module_level_spec_err_signature.move:11:10
+   │
+11 │     spec store(s: &signer) {
+   │          ^^^^^^^^^^^^^^^^^
+
+error: unresolved spec target
+   ┌─ tests/checking/specs/module_level_spec_err_signature.move:14:10
+   │
+14 │     spec store_undefined(s: &signer, value: u64) {
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

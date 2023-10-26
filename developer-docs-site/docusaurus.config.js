@@ -192,10 +192,6 @@ const config = {
               to: "nodes/full-node/public-fullnode",
             },
             {
-              label: "Run an Indexer",
-              to: "nodes/indexer-fullnode",
-            },
-            {
               label: "Monitor a Node",
               to: "nodes/measure/measure-index",
             },
@@ -325,6 +321,14 @@ const config = {
       {
         redirects: [
           {
+            to: "/indexer/indexer-landing",
+            from: "/integration/indexing",
+          },
+          {
+            to: "/indexer/indexer-landing",
+            from: "/nodes/indexer-fullnode",
+          },
+          {
             to: "/integration/creating-a-signed-transaction",
             from: "/tutorials/your-first-transaction-sdk",
           },
@@ -335,6 +339,14 @@ const config = {
           {
             to: "/aptos-white-paper",
             from: "/aptos-white-paper/aptos-white-paper-index/",
+          },
+          {
+            to: "/guides/local-development-network",
+            from: "/guides/local-testnet-dev-flow",
+          },
+          {
+            to: "/guides/local-development-network",
+            from: "/nodes/local-testnet/using-cli-to-run-a-local-testnet",
           },
           {
             to: "/guides/system-integrators-guide",

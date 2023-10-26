@@ -10,50 +10,54 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 pub trait RBMessage: Send + Sync + Clone {}
 
 #[async_trait]
-pub trait RBNetworkSender<M: RBMessage>: Send + Sync {
+pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: M,
+        message: Req,
         timeout: Duration,
-    ) -> anyhow::Result<M>;
+    ) -> anyhow::Result<Res>;
 }
 
-pub trait BroadcastStatus<M: RBMessage> {
-    type Ack: Into<M> + TryFrom<M> + Clone;
+pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req> {
+    type Ack: Into<Res> + TryFrom<Res> + Clone;
     type Aggregated;
-    type Message: Into<M> + TryFrom<M> + Clone;
+    type Message: Into<Req> + TryFrom<Req> + Clone;
 
     fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>>;
 }
 
-pub struct ReliableBroadcast<M: RBMessage, TBackoff> {
+pub struct ReliableBroadcast<Req: RBMessage, TBackoff, Res: RBMessage = Req> {
     validators: Vec<Author>,
-    network_sender: Arc<dyn RBNetworkSender<M>>,
+    network_sender: Arc<dyn RBNetworkSender<Req, Res>>,
     backoff_policy: TBackoff,
     time_service: TimeService,
+    rpc_timeout_duration: Duration,
 }
 
-impl<M, TBackoff> ReliableBroadcast<M, TBackoff>
+impl<Req, TBackoff, Res> ReliableBroadcast<Req, TBackoff, Res>
 where
-    M: RBMessage,
+    Req: RBMessage,
     TBackoff: Iterator<Item = Duration> + Clone,
+    Res: RBMessage,
 {
     pub fn new(
         validators: Vec<Author>,
-        network_sender: Arc<dyn RBNetworkSender<M>>,
+        network_sender: Arc<dyn RBNetworkSender<Req, Res>>,
         backoff_policy: TBackoff,
         time_service: TimeService,
+        rpc_timeout_duration: Duration,
     ) -> Self {
         Self {
             validators,
             network_sender,
             backoff_policy,
             time_service,
+            rpc_timeout_duration,
         }
     }
 
-    pub fn broadcast<S: BroadcastStatus<M>>(
+    pub fn broadcast<S: BroadcastStatus<Req, Res>>(
         &self,
         message: S::Message,
         mut aggregating: S,
@@ -61,6 +65,7 @@ where
         let receivers: Vec<_> = self.validators.clone();
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
+        let rpc_timeout_duration = self.rpc_timeout_duration;
         let mut backoff_policies: HashMap<Author, TBackoff> = self
             .validators
             .iter()
@@ -79,12 +84,12 @@ where
                     (
                         receiver,
                         network_sender
-                            .send_rb_rpc(receiver, message, Duration::from_millis(500))
+                            .send_rb_rpc(receiver, message, rpc_timeout_duration)
                             .await,
                     )
                 }
             };
-            let message: M = message.into();
+            let message: Req = message.into();
             for receiver in receivers {
                 fut.push(send_message(receiver, message.clone(), None));
             }

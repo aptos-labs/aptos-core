@@ -11,8 +11,8 @@ Any transaction execution on the Aptos blockchain requires a processing fee. As 
   - It is measured in Gas Units whose price may fluctuate according to the load of the network. This allows execution & io costs to be low when the network is less busy.
 2. Storage fees
   - This covers the cost to persistently store validated record in the distributed blockchain storage.
-  - It is measured in fixed APT prices.
-  - In the future, such fees will evolve into deposits that are refundable, should you choose to delete the data you stored. The refunds can be full or partial, depending on the time frame.
+  - It is measured in fixed APT prices, so the permanent storage cost stays stable even as the gas unit price fluctuates with the network's transient load.
+  - The storage fee can be refunded when the allocated storage space is deleted. The refund amount may be full or partial, based on the size and duration of the storage used.
 
 :::tip
 Conceptually, this fee can be thought of as quite similar to how we pay for our home electric or water utilities.
@@ -28,11 +28,52 @@ See [How Base Gas Works](./base-gas.md) for a detailed description of gas fee ty
 👉 A **unit of gas** is a dimensionless number or a unit that is not associated with any one item such as a coin, expressed as an integer. The total gas units consumed by your transaction depend on the complexity of your transaction. The **gas price**, on the other hand, is expressed in terms of Aptos blockchain’s native coin (Octas). Also see [Transactions and States](txns-states.md) for how a transaction submitted to the Aptos blockchain looks like.
 :::
 
+## The Fee Statement
+
+Starting from Aptos Framework release 1.7, the breakdown of fee charges and refunds relevant to a user transaction is represented by struct `0x1::transaction_fee::FeeStatement` and emitted as a module event.
+
+```Rust
+    #[event]
+    /// Breakdown of fee charge and refund for a transaction.
+    /// The structure is:
+    ///
+    /// - Net charge or refund (not in the statement)
+    ///    - total charge: total_charge_gas_units, matches `gas_used` in the on-chain `TransactionInfo`.
+    ///      This is the sum of the sub-items below. Notice that there's potential precision loss when
+    ///      the conversion between internal and external gas units and between native token and gas
+    ///      units, so it's possible that the numbers don't add up exactly. -- This number is the final
+    ///      charge, while the break down is merely informational.
+    ///        - gas charge for execution (CPU time): `execution_gas_units`
+    ///        - gas charge for IO (storage random access): `io_gas_units`
+    ///        - storage fee charge (storage space): `storage_fee_octas`, to be included in
+    ///          `total_charge_gas_unit`, this number is converted to gas units according to the user
+    ///          specified `gas_unit_price` on the transaction.
+    ///    - storage deletion refund: `storage_fee_refund_octas`, this is not included in `gas_used` or
+    ///      `total_charge_gas_units`, the net charge / refund is calculated by
+    ///      `total_charge_gas_units` * `gas_unit_price` - `storage_fee_refund_octas`.
+    ///
+    /// This is meant to emitted as a module event.
+    struct FeeStatement has drop, store {
+        /// Total gas charge.
+        total_charge_gas_units: u64,
+        /// Execution gas charge.
+        execution_gas_units: u64,
+        /// IO gas charge.
+        io_gas_units: u64,
+        /// Storage fee charge.
+        storage_fee_octas: u64,
+        /// Storage fee refund.
+        storage_fee_refund_octas: u64,
+    }
+```
+
 ## Gas price and prioritizing transactions
 
 In the Aptos network, the Aptos governance sets the absolute minimum gas unit price. However, the market determines how quickly a transaction with a particular gas unit price is processed. See [Ethereum Gas Tracker](https://etherscan.io/gastracker), for example, which shows the market price movements of Ethereum gas price.
 
-By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. As part of consensus, when the leader selects transactions from its mempool to propose as part of the next block, it will prioritize selecting transactions with a higher gas unit price. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
+By specifying a higher gas unit price than the current market price, you can **increase** the priority level for your transaction on the blockchain by paying a larger processing fee. As part of consensus, when the leader selects transactions from its mempool to propose as part of the next block, it will prioritize selecting transactions with a higher gas unit price. Please note that higher gas fees only prioritize transaction selection for the next block.
+
+However, within a block, the order of transaction execution is determined by the system. This order is based on [transaction shuffling](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-27.md), which makes parallel execution more efficient by considering conflict patterns. While in most cases this is unnecessary, if the network is under load this measure can ensure your transaction is processed more quickly. See the `gas_unit_price` entry under [Estimating the gas units via simulation](#estimating-the-gas-units-via-simulation) for details.
 
 :::caution Increasing gas unit price with in-flight transactions
 👉 If you are increasing gas unit price, but have in-flight (uncommitted) transactions for the same account, you should resubmit all of those transactions with the higher gas unit price. This is because transactions within the same account always have to respect sequence number, so effectively the higher gas unit price transaction will increase priority only after the in-flight transactions are included in a block.
@@ -87,6 +128,13 @@ Here is an example. Suppose we have a transaction that costs `100` gas units in 
 - `100 + 5000 / 200 = 125` gas units if the unit price is `200`.
 
 We are aware of the confusion this might create, and plan to present these as separate items in the future. However this will require some changes to the transaction output format and downstream clients, so please be patient while we work hard to make this happen.
+
+## Calculating Storage Deletion Refund
+
+If a transaction deletes state items, a refund is issued to the transaction payer for the released storage slots. Currently, a full refund is issued for the slot's fee, excluding any fees for excess bytes beyond a set quota (e.g., 1KB). However, fees for event emissions are not refundable.
+
+The refund amount is denominated in APT and is not converted to gas units or included in the total `gas_used`. Instead, this refund amount is specifically detailed in the `storage_fee_refund_octas` field of the [`FeeStatement`](#the-fee-statement). As a result, the transaction's net effect on the payer's APT balance is determined by `gas_used * gas_unit_price - storage_refund`. If the result is positive, there is a deduction from the account balance; if negative, there is a deposit. 
+
 
 ## Examples
 

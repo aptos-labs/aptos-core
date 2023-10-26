@@ -129,11 +129,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.parameters[signer_param_cnt..].iter() {
-        let valid = is_valid_txn_arg(
-            session,
-            &ty.subst(&func.type_arguments).unwrap(),
-            allowed_structs,
-        );
+        let valid = is_valid_txn_arg(&ty.subst(&func.type_arguments).unwrap(), allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -186,23 +182,15 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 }
 
 // Return whether the argument is valid/allowed and whether it needs construction.
-pub(crate) fn is_valid_txn_arg(
-    session: &SessionExt,
-    typ: &Type,
-    allowed_structs: &ConstructorMap,
-) -> bool {
+pub(crate) fn is_valid_txn_arg(typ: &Type, allowed_structs: &ConstructorMap) -> bool {
     use move_vm_types::loaded_data::runtime_types::Type::*;
 
     match typ {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
-        Struct(idx) | StructInstantiation(idx, _) => {
-            if let Some(st) = session.get_struct_type(*idx) {
-                let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
-                allowed_structs.contains_key(&full_name)
-            } else {
-                false
-            }
+        Vector(inner) => is_valid_txn_arg(inner, allowed_structs),
+        Struct { name, .. } | StructInstantiation { name, .. } => {
+            let full_name = format!("{}::{}", name.module.short_str_lossless(), name.name);
+            allowed_structs.contains_key(&full_name)
         },
         Signer | Reference(_) | MutableReference(_) | TyParam(_) => false,
     }
@@ -225,7 +213,7 @@ pub(crate) fn construct_args(
     if types.len() != args.len() {
         return Err(invalid_signature());
     }
-    for (ty, arg) in types.iter().zip(args.into_iter()) {
+    for (ty, arg) in types.iter().zip(args) {
         let arg = construct_arg(
             session,
             &ty.subst(ty_args).unwrap(),
@@ -254,7 +242,7 @@ fn construct_arg(
     use move_vm_types::loaded_data::runtime_types::Type::*;
     match ty {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => Ok(arg),
-        Vector(_) | Struct(_) | StructInstantiation(_, _) => {
+        Vector(_) | Struct { .. } | StructInstantiation { .. } => {
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             let mut max_invocations = 10; // Read from config in the future
@@ -322,13 +310,10 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct(idx) | StructInstantiation(idx, _) => {
+        Struct { name, .. } | StructInstantiation { name, .. } => {
             // validate the struct value, we use `expect()` because that check was already
             // performed in `is_valid_txn_arg`
-            let st = session
-                .get_struct_type(*idx)
-                .ok_or_else(invalid_signature)?;
-            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
+            let full_name = format!("{}::{}", name.module.short_str_lossless(), name.name);
             let constructor = allowed_structs
                 .get(&full_name)
                 .ok_or_else(invalid_signature)?;

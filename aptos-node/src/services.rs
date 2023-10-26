@@ -6,12 +6,14 @@ use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
+use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
     PeerMonitoringServiceServer,
@@ -22,7 +24,7 @@ use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Handle, Runtime};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -131,12 +133,22 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     (mempool, consensus_to_mempool_sender)
 }
 
+/// Spawns a new thread for the admin service
+pub fn start_admin_service(node_config: &NodeConfig) {
+    aptos_admin_service::start_admin_service(node_config)
+}
+
 /// Spawns a new thread for the node inspection service
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,
+    aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) {
-    aptos_inspection_service::start_inspection_service(node_config.clone(), peers_and_metadata)
+    aptos_inspection_service::start_inspection_service(
+        node_config.clone(),
+        aptos_data_client,
+        peers_and_metadata,
+    )
 }
 
 /// Starts the peer monitoring service and returns the runtime
@@ -182,6 +194,20 @@ pub fn start_peer_monitoring_service(
 
     // Return the runtime
     peer_monitoring_service_runtime
+}
+
+pub fn start_netbench_service(
+    node_config: &NodeConfig,
+    network_interfaces: ApplicationNetworkInterfaces<NetbenchMessage>,
+    runtime: &Handle,
+) {
+    let network_client = network_interfaces.network_client;
+    runtime.spawn(run_netbench_service(
+        node_config.clone(),
+        network_client,
+        network_interfaces.network_service_events,
+        TimeService::real(),
+    ));
 }
 
 /// Starts the telemetry service and grabs the build information

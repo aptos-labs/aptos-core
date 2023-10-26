@@ -278,9 +278,7 @@ pub trait Signature:
 /// A type family for schemes which know how to generate key material from
 /// a cryptographically-secure [`CryptoRng`][::rand::CryptoRng].
 pub trait Uniform {
-    /// Generate key material from an RNG. This should generally not be used for production
-    /// purposes even with a good source of randomness. When possible use hardware crypto to generate and
-    /// store private keys.
+    /// Generate key material from a cryptographically-secure RNG.
     fn generate<R>(rng: &mut R) -> Self
     where
         R: RngCore + CryptoRng;
@@ -307,7 +305,11 @@ pub trait Genesis: PrivateKey {
 pub(crate) mod private {
     pub trait Sealed {}
 
-    // Implement for the ed25519, multi-ed25519 signatures
+    impl Sealed for crate::bls12381::PrivateKey {}
+    impl Sealed for crate::bls12381::PublicKey {}
+    impl Sealed for crate::bls12381::Signature {}
+    impl Sealed for crate::bls12381::ProofOfPossession {}
+
     impl Sealed for crate::ed25519::Ed25519PrivateKey {}
     impl Sealed for crate::ed25519::Ed25519PublicKey {}
     impl Sealed for crate::ed25519::Ed25519Signature {}
@@ -316,8 +318,11 @@ pub(crate) mod private {
     impl Sealed for crate::multi_ed25519::MultiEd25519PublicKey {}
     impl Sealed for crate::multi_ed25519::MultiEd25519Signature {}
 
-    impl Sealed for crate::bls12381::PrivateKey {}
-    impl Sealed for crate::bls12381::PublicKey {}
-    impl Sealed for crate::bls12381::Signature {}
-    impl Sealed for crate::bls12381::ProofOfPossession {}
+    impl Sealed for crate::p256_ecdsa::P256PrivateKey {}
+    impl Sealed for crate::p256_ecdsa::P256PublicKey {}
+    impl Sealed for crate::p256_ecdsa::P256Signature {}
+
+    impl Sealed for crate::secp256k1_ecdsa::PrivateKey {}
+    impl Sealed for crate::secp256k1_ecdsa::PublicKey {}
+    impl Sealed for crate::secp256k1_ecdsa::Signature {}
 }

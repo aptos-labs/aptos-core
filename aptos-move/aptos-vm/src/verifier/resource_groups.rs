@@ -4,14 +4,16 @@
 use crate::move_vm_ext::SessionExt;
 use aptos_framework::{ResourceGroupScope, RuntimeModuleMetadataV1};
 use move_binary_format::{
+    access::ModuleAccess,
     errors::{Location, PartialVMError, VMError, VMResult},
+    normalized::Struct,
     CompiledModule,
 };
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
     vm_status::StatusCode,
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn metadata_validation_err(msg: &str) -> Result<(), VMError> {
     Err(metadata_validation_error(msg))
@@ -32,12 +34,14 @@ fn metadata_validation_error(msg: &str) -> VMError {
 pub(crate) fn validate_resource_groups(
     session: &mut SessionExt,
     modules: &[CompiledModule],
+    safer_resource_groups: bool,
 ) -> Result<(), VMError> {
     let mut groups = BTreeMap::new();
     let mut members = BTreeMap::new();
 
     for module in modules {
-        let (new_groups, new_members) = validate_module_and_extract_new_entries(session, module)?;
+        let (new_groups, new_members) =
+            validate_module_and_extract_new_entries(session, module, safer_resource_groups)?;
         groups.insert(module.self_id(), new_groups);
         members.insert(module.self_id(), new_members);
     }
@@ -46,7 +50,7 @@ pub(crate) fn validate_resource_groups(
         for value in inner_members.values() {
             let value_module_id = value.module_id();
             if !groups.contains_key(&value_module_id) {
-                let (inner_groups, _) =
+                let (inner_groups, _, _) =
                     extract_resource_group_metadata_from_module(session, &value_module_id)?;
                 groups.insert(value.module_id(), inner_groups);
             }
@@ -75,6 +79,7 @@ pub(crate) fn validate_resource_groups(
 pub(crate) fn validate_module_and_extract_new_entries(
     session: &mut SessionExt,
     module: &CompiledModule,
+    safer_resource_groups: bool,
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
@@ -86,24 +91,51 @@ pub(crate) fn validate_module_and_extract_new_entries(
             (BTreeMap::new(), BTreeMap::new())
         };
 
-    let (original_groups, original_members) =
+    let (original_groups, original_members, mut structs) =
         extract_resource_group_metadata_from_module(session, &module.self_id())?;
 
     for (member, value) in original_members {
         // We don't need to re-validate new_members above.
         if Some(&value) != new_members.remove(&member).as_ref() {
-            metadata_validation_err("Invalid change in resource_group_member")?;
+            metadata_validation_err("Invalid removal of resource_group_member attribute")?;
         }
+
+        // For this to fail is an invariant violation, it means we allow for arbitrary upgrades.
+        structs.remove(&member);
     }
 
     for (group, value) in original_groups {
         // We need groups in case there's cross module dependencies
         if let Some(new_value) = new_groups.get(&group) {
             if value.is_less_strict(new_value) {
-                metadata_validation_err("Invalid change in resource_group")?;
+                metadata_validation_err("Invalid removal of resource_group attribute")?;
             }
         } else {
             metadata_validation_err("Invalid change in resource_group")?;
+        }
+
+        // For this to fail is an invariant violation, it means we allow for arbitrary upgrades.
+        structs.remove(&group);
+    }
+
+    if !safer_resource_groups {
+        return Ok((new_groups, new_members));
+    }
+
+    // At this point, only original structs that do not have resource group affiliation are left.
+    // Note, we do not validate for being both a member and a group, because there are other
+    // checks earlier on, such as, a resource group must have no abilities, while a resource group
+    // member must.
+
+    for group in new_groups.keys() {
+        if structs.remove(group) {
+            metadata_validation_err("Invalid addition of resource_group attribute")?;
+        }
+    }
+
+    for member in new_members.keys() {
+        if structs.remove(member) {
+            metadata_validation_err("Invalid addition of resource_group_member attribute")?;
         }
     }
 
@@ -117,16 +149,34 @@ pub(crate) fn extract_resource_group_metadata_from_module(
 ) -> VMResult<(
     BTreeMap<String, ResourceGroupScope>,
     BTreeMap<String, StructTag>,
+    BTreeSet<String>,
 )> {
-    let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize(&module)
-            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+    let module = session.load_module(module_id).map(|module| {
+        CompiledModule::deserialize_with_config(
+            &module,
+            &session.get_vm_config().deserializer_config,
+        )
     });
-
-    if let Ok(Ok(Some(metadata))) = metadata {
-        extract_resource_group_metadata(&metadata)
+    let (metadata, module) = if let Ok(Ok(module)) = module {
+        (
+            aptos_framework::get_metadata_from_compiled_module(&module),
+            module,
+        )
     } else {
-        Ok((BTreeMap::new(), BTreeMap::new()))
+        // Maintaining backwards compatibility with no validation of deserialization.
+        return Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new()));
+    };
+
+    if let Some(metadata) = metadata {
+        let (groups, members) = extract_resource_group_metadata(&metadata)?;
+        let structs = module
+            .struct_defs()
+            .iter()
+            .map(|d| Struct::new(&module, d).0.into_string())
+            .collect::<BTreeSet<_>>();
+        Ok((groups, members, structs))
+    } else {
+        Ok((BTreeMap::new(), BTreeMap::new(), BTreeSet::new()))
     }
 }
 

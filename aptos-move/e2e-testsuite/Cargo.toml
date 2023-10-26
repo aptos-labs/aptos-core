@@ -30,7 +30,6 @@ aptos-vm = { workspace = true, features = ['failpoints'] }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
-aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 fail = { workspace = true, features = ['failpoints'] }
 itertools = { workspace = true }
@@ -42,4 +41,8 @@ proptest = { workspace = true }
 serde = { workspace = true }
 
 [features]
-default = ["aptos-cached-packages/fuzzing"]
+default = [
+    "aptos-cached-packages/fuzzing",
+    "move-core-types/fuzzing",
+    "aptos-types/fuzzing",
+]

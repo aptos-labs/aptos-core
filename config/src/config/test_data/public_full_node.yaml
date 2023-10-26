@@ -19,9 +19,6 @@ full_node_networks:
       # prevent remote, incoming connections.
       listen_address: "/ip4/127.0.0.1/tcp/6180"
       network_id: "public"
-      # Define the upstream peers to connect to
-      seeds:
-        {}
 
 
 api:

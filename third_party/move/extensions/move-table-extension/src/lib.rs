@@ -8,6 +8,7 @@
 //! See [`README.md`](../README.md) for integration into an adapter.
 
 use better_any::{Tid, TidAble};
+use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
@@ -42,7 +43,7 @@ use std::{
 /// The representation of a table handle. This is created from truncating a sha3-256 based
 /// hash over a transaction hash provided by the environment and a table creation counter
 /// local to the transaction.
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct TableHandle(pub AccountAddress);
 
 impl Display for TableHandle {
@@ -82,17 +83,18 @@ pub struct TableChangeSet {
 
 /// A change of a single table.
 pub struct TableChange {
-    pub entries: BTreeMap<Vec<u8>, Op<Vec<u8>>>,
+    pub entries: BTreeMap<Vec<u8>, Op<Bytes>>,
 }
 
 /// A table resolver which needs to be provided by the environment. This allows to lookup
 /// data in remote storage, as well as retrieve cost of table operations.
 pub trait TableResolver {
-    fn resolve_table_entry(
+    fn resolve_table_entry_bytes_with_layout(
         &self,
         handle: &TableHandle,
         key: &[u8],
-    ) -> Result<Option<Vec<u8>>, anyhow::Error>;
+        maybe_layout: Option<&MoveTypeLayout>,
+    ) -> Result<Option<Bytes>, anyhow::Error>;
 }
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
@@ -176,11 +178,11 @@ impl<'a> NativeTableContext<'a> {
                 match op {
                     Op::New(val) => {
                         let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::New(bytes));
+                        entries.insert(key, Op::New(bytes.into()));
                     },
                     Op::Modify(val) => {
                         let bytes = serialize(&value_layout, &val)?;
-                        entries.insert(key, Op::Modify(bytes));
+                        entries.insert(key, Op::Modify(bytes.into()));
                     },
                     Op::Delete => {
                         entries.insert(key, Op::Delete);
@@ -236,7 +238,7 @@ impl Table {
             Entry::Vacant(entry) => {
                 let (gv, loaded) = match context
                     .resolver
-                    .resolve_table_entry(&self.handle, entry.key())
+                    .resolve_table_entry_bytes_with_layout(&self.handle, entry.key(), None)
                     .map_err(|err| {
                         partial_extension_error(format!("remote table resolver failure: {}", err))
                     })? {

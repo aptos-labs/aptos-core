@@ -106,7 +106,8 @@ If the script above does not work for you, you can install these manually, but i
 1. [Rust](https://www.rust-lang.org/tools/install).
 1. [CMake](https://cmake.org/download/).
 1. [LLVM](https://releases.llvm.org/).
-1. [libssl-dev](https://packages.ubuntu.com/bionic/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/bionic/libclang-dev)
+1. [libssl-dev](https://packages.ubuntu.com/jammy/libssl-dev) and [libclang-dev](https://packages.ubuntu.com/jammy/libclang-dev)
+
 
 </details>
 
@@ -169,8 +170,7 @@ If you installed the Move Prover Tools above then you don't need to skip the pro
 
 Other documentation of specific tools has recommended patterns for `cargo build` and `cargo run`
 
-* [Run a Local Testnet](../nodes/local-testnet/run-a-local-testnet.md)
-* [Indxer](../nodes/indexer-fullnode.md)
+* [Run a Local Development Network](../guides/local-development-network.md)
+* [Indxer](../indexer/legacy/indexer-fullnode.md)
 * [Node Health Checker](../nodes/measure/node-health-checker.md)
-* [Develop in a Local Testnet](local-testnet-dev-flow.md)
 * [Running a Local Multinode Network](running-a-local-multi-node-network.md)

@@ -10,11 +10,11 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use bytes::Bytes;
 use once_cell::sync::OnceCell;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest::{arbitrary::Arbitrary, prelude::*};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 #[derive(
     BCSCryptoHash,
     Clone,
@@ -35,11 +35,20 @@ pub enum StateValueMetadata {
     },
 }
 
+// To avoid nested options when fetching a resource and its metadata.
+pub type StateValueMetadataKind = Option<StateValueMetadata>;
+
 impl StateValueMetadata {
     pub fn new(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
         Self::V0 {
             deposit,
             creation_time_usecs: creation_time_usecs.microseconds,
+        }
+    }
+
+    pub fn deposit(&self) -> u64 {
+        match self {
+            StateValueMetadata::V0 { deposit, .. } => *deposit,
         }
     }
 
@@ -79,10 +88,9 @@ impl Eq for StateValue {}
 )]
 #[serde(rename = "StateValue")]
 pub enum StateValueInner {
-    V0(#[serde(with = "serde_bytes")] Vec<u8>),
+    V0(Bytes),
     WithMetadata {
-        #[serde(with = "serde_bytes")]
-        data: Vec<u8>,
+        data: Bytes,
         metadata: StateValueMetadata,
     },
 }
@@ -93,7 +101,9 @@ impl Arbitrary for StateValue {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>().prop_map(StateValue::new_legacy).boxed()
+        any::<Vec<u8>>()
+            .prop_map(|bytes| StateValue::new_legacy(bytes.into()))
+            .boxed()
     }
 }
 
@@ -118,11 +128,11 @@ impl Serialize for StateValue {
 }
 
 impl StateValue {
-    pub fn new_legacy(bytes: Vec<u8>) -> Self {
+    pub fn new_legacy(bytes: Bytes) -> Self {
         Self::new_impl(StateValueInner::V0(bytes))
     }
 
-    pub fn new_with_metadata(data: Vec<u8>, metadata: StateValueMetadata) -> Self {
+    pub fn new_with_metadata(data: Bytes, metadata: StateValueMetadata) -> Self {
         Self::new_impl(StateValueInner::WithMetadata { data, metadata })
     }
 
@@ -135,16 +145,25 @@ impl StateValue {
         self.bytes().len()
     }
 
-    pub fn bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> &Bytes {
         match &self.inner {
             StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
         }
     }
 
-    pub fn into_bytes(self) -> Vec<u8> {
-        match self.inner {
-            StateValueInner::V0(data) | StateValueInner::WithMetadata { data, .. } => data,
-        }
+    /// Applies a bytes-to-bytes transformation on the state value contents,
+    /// leaving the state value metadata untouched.
+    pub fn map_bytes<F: FnOnce(Bytes) -> anyhow::Result<Bytes>>(
+        self,
+        f: F,
+    ) -> anyhow::Result<StateValue> {
+        Ok(StateValue::new_impl(match self.inner {
+            StateValueInner::V0(data) => StateValueInner::V0(f(data)?),
+            StateValueInner::WithMetadata { data, metadata } => StateValueInner::WithMetadata {
+                data: f(data)?,
+                metadata,
+            },
+        }))
     }
 
     pub fn into_metadata(self) -> Option<StateValueMetadata> {
@@ -153,11 +172,25 @@ impl StateValue {
             StateValueInner::WithMetadata { metadata, .. } => Some(metadata),
         }
     }
+
+    pub fn into(self) -> (Option<StateValueMetadata>, Bytes) {
+        match self.inner {
+            StateValueInner::V0(bytes) => (None, bytes),
+            StateValueInner::WithMetadata { data, metadata } => (Some(metadata), data),
+        }
+    }
+}
+
+// #[cfg(any(test, feature = "fuzzing"))]
+impl From<Vec<u8>> for StateValue {
+    fn from(bytes: Vec<u8>) -> Self {
+        StateValue::new_legacy(bytes.into())
+    }
 }
 
 #[cfg(any(test, feature = "fuzzing"))]
-impl From<Vec<u8>> for StateValue {
-    fn from(bytes: Vec<u8>) -> Self {
+impl From<Bytes> for StateValue {
+    fn from(bytes: Bytes) -> Self {
         StateValue::new_legacy(bytes)
     }
 }

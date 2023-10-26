@@ -44,7 +44,7 @@ use std::{
 async fn test_analyze_validators() {
     let (mut swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_i, _conf, genesis_stake_amount| {
+        .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             *genesis_stake_amount = 100000;
         }))
         .build_with_cli(0)
@@ -198,6 +198,7 @@ async fn test_onchain_config_change() {
             let inner = match genesis_config.consensus_config.clone() {
                 OnChainConsensusConfig::V1(inner) => inner,
                 OnChainConsensusConfig::V2(inner) => inner,
+                _ => unimplemented!(),
             };
 
             let leader_reputation_type =
@@ -255,6 +256,7 @@ async fn test_onchain_config_change() {
     let inner = match current_consensus_config {
         OnChainConsensusConfig::V1(inner) => inner,
         OnChainConsensusConfig::V2(inner) => inner,
+        _ => unimplemented!(),
     };
     let leader_reputation_type =
         if let ProposerElectionType::LeaderReputation(leader_reputation_type) =
@@ -444,7 +446,7 @@ async fn assert_reordering(swarm: &mut dyn Swarm, expected_reordering: bool) {
     let mut accounts = vec![];
     let mut txns = vec![];
     for _ in 0..2 {
-        let mut account = create_and_fund_account(swarm, 10000000000).await;
+        let account = create_and_fund_account(swarm, 10000000000).await;
 
         for _ in 0..5 {
             let txn = account.sign_with_transaction_builder(
@@ -540,7 +542,7 @@ async fn test_large_total_stake() {
     // just barelly below u64::MAX
     const BASE: u64 = 10_000_000_000_000_000_000;
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_init_config(Arc::new(|_, _, genesis_stake_amount| {
+        .with_init_genesis_stake(Arc::new(|_, genesis_stake_amount| {
             // make sure we have quorum
             *genesis_stake_amount = BASE;
         }))
@@ -606,12 +608,13 @@ async fn test_nodes_rewards() {
     const BASE: u64 = 3600u64 * 24 * 365 * 10 * 100;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_init_config(Arc::new(|i, conf, genesis_stake_amount| {
+        .with_init_config(Arc::new(|_, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;
             conf.api.failpoints_enabled = true;
-
+        }))
+        .with_init_genesis_stake(Arc::new(|i, genesis_stake_amount| {
             // make sure we have quorum
             *genesis_stake_amount = if i < 2 { 10 * BASE } else { BASE };
         }))
@@ -1035,10 +1038,12 @@ async fn test_register_and_update_validator() {
 async fn test_join_and_leave_validator() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
+        .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;
+        }))
+        .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             *genesis_stake_amount = 100000;
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
@@ -1197,10 +1202,12 @@ async fn test_join_and_leave_validator() {
 async fn test_owner_create_and_delegate_flow() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
-        .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
+        .with_init_config(Arc::new(|_i, conf, _| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
             conf.consensus.quorum_store_poll_time_ms = 100;
+        }))
+        .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
             // enough for quorum
             *genesis_stake_amount = 5000000;
         }))

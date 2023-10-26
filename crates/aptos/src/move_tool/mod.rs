@@ -8,7 +8,6 @@ mod manifest;
 pub mod package_hooks;
 mod show;
 pub mod stored_package;
-mod transactional_tests_runner;
 
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
@@ -34,29 +33,26 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
-    build_model, docgen::DocgenOptions, extended_checks, natives::code::UpgradePolicy,
-    prover::ProverOptions, BuildOptions, BuiltPackage,
+    docgen::DocgenOptions, extended_checks, natives::code::UpgradePolicy, prover::ProverOptions,
+    BuildOptions, BuiltPackage,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
-use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
 use clap::{Parser, Subcommand, ValueEnum};
-use codespan_reporting::{
-    diagnostic::Severity,
-    term::termcolor::{ColorChoice, StandardStream},
-};
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
+use move_package::{
+    source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig, CompilerVersion,
+};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -69,7 +65,6 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
-use transactional_tests_runner::TransactionalTestOpts;
 
 /// Tool for Move related operations
 ///
@@ -97,7 +92,6 @@ pub enum MoveTool {
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
     Test(TestPackage),
-    TransactionalTest(TransactionalTestOpts),
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
 }
@@ -124,7 +118,6 @@ impl MoveTool {
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
-            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
         }
@@ -318,7 +311,9 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.skip_fetch_latest_git_deps,
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
+                    self.move_options.compiler_version,
                     self.move_options.skip_attribute_checks,
+                    self.move_options.check_test_code,
                 )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -378,7 +373,9 @@ impl CompileScript {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
                 self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
             )
         };
         let package_dir = self.move_options.get_package_path()?;
@@ -456,33 +453,17 @@ impl CliCommand<&'static str> for TestPackage {
             dev_mode: self.move_options.dev,
             additional_named_addresses: self.move_options.named_addresses(),
             test_mode: true,
+            full_model_generation: self.move_options.check_test_code,
             install_dir: self.move_options.output_dir.clone(),
             skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
-            known_attributes: known_attributes.clone(),
-            skip_attribute_checks: self.move_options.skip_attribute_checks,
+            compiler_config: CompilerConfig {
+                known_attributes: known_attributes.clone(),
+                skip_attribute_checks: self.move_options.skip_attribute_checks,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
-        // Build the Move model for extended checks
-        let model = &build_model(
-            self.move_options.dev,
-            self.move_options.get_package_path()?.as_path(),
-            self.move_options.named_addresses(),
-            None,
-            self.move_options.bytecode_version,
-            self.move_options.skip_attribute_checks,
-            known_attributes.clone(),
-        )?;
-        let _ = extended_checks::run_extended_checks(model);
-        if model.diag_count(Severity::Warning) > 0 {
-            let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
-            model.report_diag(&mut error_writer, Severity::Warning);
-            if model.has_errors() {
-                return Err(CliError::MoveCompilationError(
-                    "extended checks failed".to_string(),
-                ));
-            }
-        }
         let path = self.move_options.get_package_path()?;
         let result = move_cli::base::test::run_move_unit_tests(
             path.as_path(),
@@ -524,26 +505,6 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
-    }
-}
-
-#[async_trait]
-impl CliCommand<()> for TransactionalTestOpts {
-    fn command_name(&self) -> &'static str {
-        "TransactionalTest"
-    }
-
-    async fn execute(self) -> CliTypedResult<()> {
-        let root_path = self.root_path.display().to_string();
-
-        let requirements = vec![transactional_tests_runner::Requirements::new(
-            run_aptos_test,
-            "tests".to_string(),
-            root_path,
-            self.pattern.clone(),
-        )];
-
-        transactional_tests_runner::runner(&self, &requirements)
     }
 }
 
@@ -626,7 +587,9 @@ impl CliCommand<&'static str> for DocumentPackage {
             docgen_options: Some(docgen_options),
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
+            compiler_version: move_options.compiler_version,
             skip_attribute_checks: move_options.skip_attribute_checks,
+            check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
         };
         BuiltPackage::build(move_options.get_package_path()?, build_options)?;
@@ -693,7 +656,9 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
                 self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
             );
         let package = BuiltPackage::build(package_path, options)
             .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
@@ -761,7 +726,9 @@ impl IncludedArtifacts {
         skip_fetch_latest_git_deps: bool,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        compiler_version: Option<CompilerVersion>,
         skip_attribute_checks: bool,
+        check_test_code: bool,
     ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
@@ -775,7 +742,9 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
                 skip_attribute_checks,
+                check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
@@ -788,7 +757,9 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
                 skip_attribute_checks,
+                check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
@@ -801,7 +772,9 @@ impl IncludedArtifacts {
                 named_addresses,
                 skip_fetch_latest_git_deps,
                 bytecode_version,
+                compiler_version,
                 skip_attribute_checks,
+                check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
                 ..BuildOptions::default()
             },
@@ -944,7 +917,9 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.skip_fetch_latest_git_deps,
             move_options.named_addresses(),
             move_options.bytecode_version,
+            move_options.compiler_version,
             move_options.skip_attribute_checks,
+            move_options.check_test_code,
         );
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
@@ -1002,6 +977,9 @@ pub struct DownloadPackage {
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
+    /// Print metadata of the package
+    #[clap(long)]
+    pub print_metadata: bool,
 }
 
 #[async_trait]
@@ -1025,6 +1003,9 @@ impl CliCommand<&'static str> for DownloadPackage {
                 since it is not safe to depend on such packages."
                     .to_owned(),
             ));
+        }
+        if self.print_metadata {
+            println!("{}", package);
         }
         let package_path = output_dir.join(package.name());
         package
@@ -1076,7 +1057,9 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.skip_fetch_latest_git_deps,
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
+                self.move_options.compiler_version,
                 self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
             )
         };
         let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
@@ -1718,6 +1701,7 @@ fn txn_arg_parser<T: serde::de::DeserializeOwned>(
 }
 
 /// Identifier of a module member (function or struct).
+/// Duplicated from aptos_types, as we also need to load_account_arg from the CLI.
 #[derive(Debug, Clone)]
 pub struct MemberId {
     pub module_id: ModuleId,

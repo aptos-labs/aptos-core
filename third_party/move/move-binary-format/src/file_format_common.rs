@@ -58,7 +58,8 @@ pub const BYTECODE_INDEX_MAX: u64 = 65535;
 
 pub const LOCAL_INDEX_MAX: u64 = 255;
 
-pub const IDENTIFIER_SIZE_MAX: u64 = 65535;
+pub const LEGACY_IDENTIFIER_SIZE_MAX: u64 = 65535;
+pub const IDENTIFIER_SIZE_MAX: u64 = 255;
 
 pub const CONSTANT_SIZE_MAX: u64 = 65535;
 
@@ -405,8 +406,13 @@ pub const VERSION_5: u32 = 5;
 ///  + u16, u32, u256 integers and corresponding Ld, Cast bytecodes
 pub const VERSION_6: u32 = 6;
 
-// Mark which version is the latest version
+/// Mark which version is the latest version
 pub const VERSION_MAX: u32 = VERSION_6;
+
+/// A unique version value which is used for experimental code which is not allowed in
+/// production. The bytecode deserializer accepts modules with this version only when the
+/// cargo feature `testing` is enabled.
+pub const VERSION_EXPERIMENTAL: u32 = u32::MAX;
 
 // Mark which oldest version is supported.
 // TODO(#145): finish v4 compatibility; as of now, only metadata is implemented
@@ -418,16 +424,22 @@ pub(crate) mod versioned_data {
     use std::io::{Cursor, Read};
     pub struct VersionedBinary<'a> {
         version: u32,
+        max_identifier_size: u64,
         binary: &'a [u8],
     }
 
     pub struct VersionedCursor<'a> {
         version: u32,
+        max_identifier_size: u64,
         cursor: Cursor<&'a [u8]>,
     }
 
     impl<'a> VersionedBinary<'a> {
-        fn new(binary: &'a [u8], max_version: u32) -> BinaryLoaderResult<(Self, Cursor<&'a [u8]>)> {
+        fn new(
+            binary: &'a [u8],
+            max_version: u32,
+            max_identifier_size: u64,
+        ) -> BinaryLoaderResult<(Self, Cursor<&'a [u8]>)> {
             let mut cursor = Cursor::<&'a [u8]>::new(binary);
             let mut magic = [0u8; BinaryConstants::MOVE_MAGIC_SIZE];
             if let Ok(count) = cursor.read(&mut magic) {
@@ -446,10 +458,20 @@ pub(crate) mod versioned_data {
                         .with_message("Bad binary header".to_string()));
                 },
             };
-            if version == 0 || version > u32::min(max_version, VERSION_MAX) {
+            if version == 0
+                || (version > u32::min(max_version, VERSION_MAX)
+                    && !(version == VERSION_EXPERIMENTAL && cfg!(feature = "testing")))
+            {
                 return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION));
             }
-            Ok((Self { version, binary }, cursor))
+            Ok((
+                Self {
+                    version,
+                    max_identifier_size,
+                    binary,
+                },
+                cursor,
+            ))
         }
 
         #[allow(dead_code)]
@@ -457,9 +479,15 @@ pub(crate) mod versioned_data {
             self.version
         }
 
+        #[allow(dead_code)]
+        pub fn max_identifier_size(&self) -> u64 {
+            self.max_identifier_size
+        }
+
         pub fn new_cursor(&self, start: usize, end: usize) -> VersionedCursor<'a> {
             VersionedCursor {
                 version: self.version,
+                max_identifier_size: self.max_identifier_size,
                 cursor: Cursor::new(&self.binary[start..end]),
             }
         }
@@ -472,10 +500,15 @@ pub(crate) mod versioned_data {
     impl<'a> VersionedCursor<'a> {
         /// Verifies the correctness of the "static" part of the binary's header.
         /// If valid, returns a cursor to the binary
-        pub fn new(binary: &'a [u8], max_version: u32) -> BinaryLoaderResult<Self> {
-            let (binary, cursor) = VersionedBinary::new(binary, max_version)?;
+        pub fn new(
+            binary: &'a [u8],
+            max_version: u32,
+            max_identifier_size: u64,
+        ) -> BinaryLoaderResult<Self> {
+            let (binary, cursor) = VersionedBinary::new(binary, max_version, max_identifier_size)?;
             Ok(VersionedCursor {
                 version: binary.version,
+                max_identifier_size,
                 cursor,
             })
         }
@@ -483,6 +516,11 @@ pub(crate) mod versioned_data {
         #[allow(dead_code)]
         pub fn version(&self) -> u32 {
             self.version
+        }
+
+        #[allow(dead_code)]
+        pub fn max_identifier_size(&self) -> u64 {
+            self.max_identifier_size
         }
 
         pub fn position(&self) -> u64 {
@@ -493,6 +531,7 @@ pub(crate) mod versioned_data {
         pub fn binary(&self) -> VersionedBinary<'a> {
             VersionedBinary {
                 version: self.version,
+                max_identifier_size: self.max_identifier_size,
                 binary: self.cursor.get_ref(),
             }
         }
@@ -523,6 +562,7 @@ pub(crate) mod versioned_data {
                     *buffer = tmp_buffer;
                     Ok(VersionedBinary {
                         version: self.version,
+                        max_identifier_size: self.max_identifier_size,
                         binary: buffer,
                     })
                 },
@@ -530,8 +570,16 @@ pub(crate) mod versioned_data {
         }
 
         #[cfg(test)]
-        pub fn new_for_test(version: u32, cursor: Cursor<&'a [u8]>) -> Self {
-            Self { version, cursor }
+        pub fn new_for_test(
+            version: u32,
+            max_identifier_size: u64,
+            cursor: Cursor<&'a [u8]>,
+        ) -> Self {
+            Self {
+                version,
+                max_identifier_size,
+                cursor,
+            }
         }
     }
 

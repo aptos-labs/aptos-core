@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::transaction::TransactionPayload;
+use aptos_types::{move_utils::MemberId, transaction::TransactionPayload};
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
@@ -116,7 +115,9 @@ pub fn get_module_name(
         member_id: _function_id,
     } = str::parse(&format!(
         "0x{}::{}::{}",
-        address, identifier, func_identifier,
+        address.to_hex(),
+        identifier,
+        func_identifier,
     ))
     .unwrap();
 

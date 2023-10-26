@@ -42,7 +42,7 @@ impl InspectionServiceConfig {
 
 impl ConfigSanitizer for InspectionServiceConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
         chain_id: ChainId,
     ) -> Result<(), Error> {
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test_sanitize_valid_service_config() {
         // Create an inspection service config with the configuration endpoint enabled
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             inspection_service: InspectionServiceConfig {
                 expose_configuration: true,
                 ..Default::default()
@@ -199,7 +199,7 @@ mod tests {
 
         // Verify that the configuration is sanitized successfully
         InspectionServiceConfig::sanitize(
-            &mut node_config,
+            &node_config,
             NodeType::PublicFullnode,
             ChainId::mainnet(),
         )
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn test_sanitize_config_mainnet() {
         // Create an inspection service config with the configuration endpoint enabled
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             inspection_service: InspectionServiceConfig {
                 expose_configuration: true,
                 ..Default::default()
@@ -219,7 +219,7 @@ mod tests {
 
         // Verify that sanitization fails for mainnet
         let error = InspectionServiceConfig::sanitize(
-            &mut node_config,
+            &node_config,
             NodeType::Validator,
             ChainId::mainnet(),
         )

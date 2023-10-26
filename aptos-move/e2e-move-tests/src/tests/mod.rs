@@ -3,6 +3,7 @@
 
 mod access_path_test;
 mod aggregator;
+mod aggregator_v2;
 mod attributes;
 mod chain_id;
 mod code_publishing;
@@ -22,6 +23,7 @@ mod memory_quota;
 mod metadata;
 mod mint_nft;
 mod missing_gas_parameter;
+mod module_event;
 mod new_integer_types;
 mod nft_dao;
 mod offer_rotation_capability;
@@ -34,10 +36,10 @@ mod simple_defi;
 mod smart_data_structures;
 mod stake;
 mod state_metadata;
+mod storage_refund;
 mod string_args;
 mod token_event_store;
 mod token_objects;
-mod too_large;
 mod transaction_fee;
 mod type_too_large;
 mod vector_numeric_address;

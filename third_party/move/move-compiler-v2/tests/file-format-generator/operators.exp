@@ -380,7 +380,7 @@ fun operators::order($t0: u64, $t1: u64): bool {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v6
+// Move bytecode v4294967295
 module 42.operators {
 
 
@@ -429,13 +429,13 @@ B1:
 	3: StLoc[2](loc0: bool)
 	4: Branch(7)
 B2:
-	5: LdConst[0](Bool: [0])
+	5: LdFalse
 	6: StLoc[2](loc0: bool)
 B3:
 	7: MoveLoc[2](loc0: bool)
 	8: BrFalse(12)
 B4:
-	9: LdConst[1](Bool: [1])
+	9: LdTrue
 	10: StLoc[3](loc1: bool)
 	11: Branch(20)
 B5:
@@ -447,13 +447,13 @@ B6:
 	16: StLoc[3](loc1: bool)
 	17: Branch(20)
 B7:
-	18: LdConst[0](Bool: [0])
+	18: LdFalse
 	19: StLoc[3](loc1: bool)
 B8:
 	20: MoveLoc[3](loc1: bool)
 	21: BrFalse(25)
 B9:
-	22: LdConst[1](Bool: [1])
+	22: LdTrue
 	23: StLoc[4](loc2: bool)
 	24: Branch(33)
 B10:
@@ -465,13 +465,13 @@ B11:
 	29: StLoc[4](loc2: bool)
 	30: Branch(33)
 B12:
-	31: LdConst[0](Bool: [0])
+	31: LdFalse
 	32: StLoc[4](loc2: bool)
 B13:
 	33: MoveLoc[4](loc2: bool)
 	34: BrFalse(38)
 B14:
-	35: LdConst[1](Bool: [1])
+	35: LdTrue
 	36: StLoc[5](loc3: bool)
 	37: Branch(47)
 B15:
@@ -484,7 +484,7 @@ B16:
 	43: StLoc[5](loc3: bool)
 	44: Branch(47)
 B17:
-	45: LdConst[0](Bool: [0])
+	45: LdFalse
 	46: StLoc[5](loc3: bool)
 B18:
 	47: MoveLoc[5](loc3: bool)
@@ -518,7 +518,7 @@ B1:
 	7: StLoc[2](loc0: bool)
 	8: Branch(11)
 B2:
-	9: LdConst[0](Bool: [0])
+	9: LdFalse
 	10: StLoc[2](loc0: bool)
 B3:
 	11: MoveLoc[2](loc0: bool)
@@ -531,7 +531,7 @@ B4:
 	17: StLoc[3](loc1: bool)
 	18: Branch(21)
 B5:
-	19: LdConst[0](Bool: [0])
+	19: LdFalse
 	20: StLoc[3](loc1: bool)
 B6:
 	21: MoveLoc[3](loc1: bool)
@@ -544,7 +544,7 @@ B7:
 	27: StLoc[4](loc2: bool)
 	28: Branch(31)
 B8:
-	29: LdConst[0](Bool: [0])
+	29: LdFalse
 	30: StLoc[4](loc2: bool)
 B9:
 	31: MoveLoc[4](loc2: bool)

@@ -152,6 +152,13 @@ codes!(
         UnboundVariable: { msg: "unbound variable", severity: BlockingError },
         UnboundField: { msg: "unbound field", severity: BlockingError },
         ReservedName: { msg: "invalid use of reserved name", severity: BlockingError },
+
+        DeprecatedAddressBlock: { msg: "Use of deprecated address block", severity: Warning },
+        DeprecatedModule: { msg: "Use of deprecated module", severity: Warning },
+        DeprecatedMember: { msg: "Use of deprecated member", severity: Warning },
+        DeprecatedStruct: { msg: "Use of deprecated struct", severity: Warning },
+        DeprecatedFunction: { msg: "Use of deprecated function", severity: Warning },
+        DeprecatedConstant: { msg: "Use of deprecated constant", severity: Warning },
     ],
     // errors for typing rules. mostly typing/translate
     TypeSafety: [
@@ -248,6 +255,7 @@ codes!(
         Recursion: { msg: "recursion during function inlining not allowed", severity: BlockingError },
         AfterExpansion: {  msg: "Inlined code invalid in this context", severity: BlockingError },
         Unsupported: { msg: "feature not supported in inlined functions", severity: BlockingError },
+        UnexpectedLambda: { msg: "lambda parameter only permitted as parameter to inlined function", severity: BlockingError },
     ],
 );
 
@@ -300,5 +308,50 @@ impl Severity {
 impl Default for Severity {
     fn default() -> Self {
         Self::MIN
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum DeprecatedItem {
+    Module,
+    Member,
+    Struct,
+    Function,
+    Constant,
+    AddressBlock,
+}
+
+impl DeprecatedItem {
+    pub fn get_string(&self) -> &'static str {
+        match self {
+            DeprecatedItem::Module => "module",
+            DeprecatedItem::Member => "member",
+            DeprecatedItem::Struct => "struct",
+            DeprecatedItem::Function => "function",
+            DeprecatedItem::Constant => "constant",
+            DeprecatedItem::AddressBlock => "address block",
+        }
+    }
+
+    pub fn get_capitalized_string(&self) -> &'static str {
+        match self {
+            DeprecatedItem::Module => "Module",
+            DeprecatedItem::Member => "Member",
+            DeprecatedItem::Struct => "Struct",
+            DeprecatedItem::Function => "Function",
+            DeprecatedItem::Constant => "Constant",
+            DeprecatedItem::AddressBlock => "Address block",
+        }
+    }
+
+    pub fn get_code(&self) -> impl DiagnosticCode {
+        match self {
+            DeprecatedItem::Module => NameResolution::DeprecatedModule,
+            DeprecatedItem::Member => NameResolution::DeprecatedMember,
+            DeprecatedItem::Struct => NameResolution::DeprecatedStruct,
+            DeprecatedItem::Function => NameResolution::DeprecatedFunction,
+            DeprecatedItem::Constant => NameResolution::DeprecatedConstant,
+            DeprecatedItem::AddressBlock => NameResolution::DeprecatedAddressBlock,
+        }
     }
 }

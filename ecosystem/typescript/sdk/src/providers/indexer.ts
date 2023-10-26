@@ -21,6 +21,8 @@ import {
   GetCollectionsWithOwnedTokensQuery,
   GetTokenCurrentOwnerDataQuery,
   GetOwnedTokensByTokenDataQuery,
+  GetAccountCoinsDataCountQuery,
+  GetCurrentObjectsQuery,
 } from "../indexer/generated/operations";
 import {
   GetAccountTokensCount,
@@ -43,6 +45,8 @@ import {
   GetCollectionsWithOwnedTokens,
   GetTokenCurrentOwnerData,
   GetOwnedTokensByTokenData,
+  GetAccountCoinsDataCount,
+  GetCurrentObjects,
 } from "../indexer/generated/queries";
 import { ClientConfig, post } from "../client";
 import { ApiError } from "./aptos_client";
@@ -50,11 +54,13 @@ import {
   Account_Transactions_Order_By,
   Current_Collections_V2_Order_By,
   Current_Collection_Ownership_V2_View_Order_By,
+  Current_Fungible_Asset_Balances_Order_By,
   Current_Token_Datas_V2_Order_By,
   Current_Token_Ownerships_V2_Order_By,
   InputMaybe,
   Token_Activities_V2_Order_By,
   User_Transactions_Order_By,
+  Current_Objects_Order_By,
 } from "../indexer/generated/types";
 
 /**
@@ -311,6 +317,7 @@ export class IndexerClient {
    * @param token token address (v2) or token data id (v1)
    * @returns GetTokenDataQuery response type
    */
+  // :!:>getTokenData
   async getTokenData(
     token: string,
     extraArgs?: {
@@ -339,7 +346,7 @@ export class IndexerClient {
       },
     };
     return this.queryIndexer(graphqlQuery);
-  }
+  } // <:!:getTokenData
 
   /**
    * Queries token owners data by token address (v2) or token data id (v1).
@@ -824,13 +831,79 @@ export class IndexerClient {
    */
   async getAccountCoinsData(
     ownerAddress: MaybeHexString,
-    options?: IndexerPaginationArgs,
+    extraArgs?: {
+      options?: IndexerPaginationArgs;
+      orderBy?: IndexerSortBy<Current_Fungible_Asset_Balances_Order_By>[];
+    },
   ): Promise<GetAccountCoinsDataQuery> {
     const address = HexString.ensure(ownerAddress).hex();
     IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      owner_address: { _eq: address },
+    };
+
     const graphqlQuery = {
       query: GetAccountCoinsData,
-      variables: { owner_address: address, offset: options?.offset, limit: options?.limit },
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+        order_by: extraArgs?.orderBy,
+      },
+    };
+
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account coin data count
+   *
+   * @param ownerAddress Owner address
+   * @returns GetAccountCoinsDataCountQuery response type
+   */
+  async getAccountCoinsDataCount(ownerAddress: MaybeHexString): Promise<GetAccountCoinsDataCountQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const graphqlQuery = {
+      query: GetAccountCoinsDataCount,
+      variables: {
+        address,
+      },
+    };
+
+    return this.queryIndexer(graphqlQuery);
+  }
+
+  /**
+   * Queries an account owned objects
+   *
+   * @param ownerAddress Owner address
+   * @returns GetCurrentObjectsQuery response type
+   */
+  async getAccountOwnedObjects(
+    ownerAddress: MaybeHexString,
+    extraArgs?: {
+      options?: IndexerPaginationArgs;
+      orderBy?: IndexerSortBy<Current_Objects_Order_By>[];
+    },
+  ): Promise<GetCurrentObjectsQuery> {
+    const address = HexString.ensure(ownerAddress).hex();
+    IndexerClient.validateAddress(address);
+
+    const whereCondition: any = {
+      owner_address: { _eq: address },
+    };
+
+    const graphqlQuery = {
+      query: GetCurrentObjects,
+      variables: {
+        where_condition: whereCondition,
+        offset: extraArgs?.options?.offset,
+        limit: extraArgs?.options?.limit,
+        order_by: extraArgs?.orderBy,
+      },
     };
     return this.queryIndexer(graphqlQuery);
   }

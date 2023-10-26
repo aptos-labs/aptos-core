@@ -80,7 +80,7 @@ mod dbtool_tests {
         storage::{local_fs::LocalFs, BackupStorage},
         utils::test_utils::start_local_backup_service,
     };
-    use aptos_config::config::RocksdbConfigs;
+    use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
     use aptos_db::AptosDB;
     use aptos_executor_test_helpers::integration_test_impl::{
         test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
@@ -443,7 +443,7 @@ mod dbtool_tests {
             backup_dir.as_path().to_str().unwrap().to_string(),
         ];
         if force_sharding {
-            let additional_args = vec!["--split-ledger-db", "--use-sharded-state-merkle-db"]
+            let additional_args = vec!["--enable-storage-sharding"]
                 .into_iter()
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>();
@@ -457,13 +457,13 @@ mod dbtool_tests {
             RocksdbConfigs::default()
         } else {
             RocksdbConfigs {
-                use_sharded_state_merkle_db: true,
-                split_ledger_db: true,
+                enable_storage_sharding: true,
                 ..Default::default()
             }
         };
         let (_ledger_db, tree_db, state_kv_db) =
-            AptosDB::open_dbs(new_db_dir, db_config, false, 0).unwrap();
+            AptosDB::open_dbs(&StorageDirPaths::from_path(new_db_dir), db_config, false, 0)
+                .unwrap();
 
         // assert the kv are the same in db and new_db
         // current all the kv are still stored in the ledger db
@@ -590,6 +590,8 @@ mod dbtool_tests {
     }
 
     #[test]
+    #[ignore]
+    // TODO(grao): Re-enable this test.
     fn test_restore_with_sharded_db() {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();

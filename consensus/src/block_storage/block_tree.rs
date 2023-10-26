@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    block_storage::block_store::update_counters_for_committed_blocks,
     counters,
+    counters::update_counters_for_committed_blocks,
     logging::{LogEvent, LogSchema},
     persistent_liveness_storage::PersistentLivenessStorage,
 };

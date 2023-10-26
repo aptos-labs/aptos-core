@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm::MoveVM;
+use bytes::Bytes;
 use move_binary_format::{
     errors::VMResult,
     file_format::{
@@ -21,7 +22,7 @@ use move_core_types::{
     metadata::Metadata,
     resolver::{ModuleResolver, ResourceResolver},
     u256::U256,
-    value::{serialize_values, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -231,7 +232,7 @@ fn make_script_function(signature: Signature) -> (CompiledModule, Identifier) {
 }
 
 struct RemoteStore {
-    modules: HashMap<ModuleId, Vec<u8>>,
+    modules: HashMap<ModuleId, Bytes>,
 }
 
 impl RemoteStore {
@@ -245,7 +246,7 @@ impl RemoteStore {
         let id = compiled_module.self_id();
         let mut bytes = vec![];
         compiled_module.serialize(&mut bytes).unwrap();
-        self.modules.insert(id, bytes);
+        self.modules.insert(id, bytes.into());
     }
 }
 
@@ -254,18 +255,19 @@ impl ModuleResolver for RemoteStore {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Vec<u8>>, anyhow::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
 impl ResourceResolver for RemoteStore {
-    fn get_resource_with_metadata(
+    fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
-    ) -> anyhow::Result<(Option<Vec<u8>>, usize)> {
+        _maybe_layout: Option<&MoveTypeLayout>,
+    ) -> anyhow::Result<(Option<Bytes>, usize)> {
         Ok((None, 0))
     }
 }
@@ -630,7 +632,11 @@ fn check_script() {
             .err()
             .unwrap()
             .major_status();
-        assert_eq!(status, StatusCode::LINKER_ERROR);
+        assert_eq!(
+            status,
+            StatusCode::LINKER_ERROR,
+            "Linker Error: The signature is deprecated"
+        );
     }
 
     //
@@ -813,7 +819,12 @@ fn call_missing_item() {
         )
         .err()
         .unwrap();
-    assert_eq!(error.major_status(), StatusCode::LINKER_ERROR);
+    assert_eq!(
+        error.major_status(),
+        StatusCode::LINKER_ERROR,
+        "Linker Error: Call to item at a non-existent external module {:?}",
+        module
+    );
     assert_eq!(error.status_type(), StatusType::Verification);
     drop(session);
 

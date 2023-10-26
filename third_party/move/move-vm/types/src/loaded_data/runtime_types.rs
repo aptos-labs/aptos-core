@@ -2,17 +2,18 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use derivative::Derivative;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        AbilitySet, SignatureToken, StructDefinitionIndex, StructTypeParameter, TypeParameterIndex,
+        AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
 };
 use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -113,17 +114,43 @@ impl DepthFormula {
 pub struct StructType {
     pub fields: Vec<Type>,
     pub field_names: Vec<Identifier>,
+    pub phantom_ty_args_mask: Vec<bool>,
     pub abilities: AbilitySet,
     pub type_parameters: Vec<StructTypeParameter>,
-    pub name: Identifier,
-    pub module: ModuleId,
-    pub struct_def: StructDefinitionIndex,
-    pub depth: Option<DepthFormula>,
+    pub name: Arc<StructIdentifier>,
 }
 
 impl StructType {
     pub fn type_param_constraints(&self) -> impl ExactSizeIterator<Item = &AbilitySet> {
         self.type_parameters.iter().map(|param| &param.constraints)
+    }
+
+    // Check if the local struct handle is compatible with the defined struct type.
+    pub fn check_compatibility(&self, struct_handle: &StructHandle) -> PartialVMResult<()> {
+        if !struct_handle.abilities.is_subset(self.abilities) {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("Ability definition of module mismatch".to_string()),
+            );
+        }
+
+        if self.phantom_ty_args_mask.len() != struct_handle.type_parameters.len()
+            || !self
+                .phantom_ty_args_mask
+                .iter()
+                .zip(struct_handle.type_parameters.iter())
+                .all(|(defined_is_phantom, local_type_parameter)| {
+                    !local_type_parameter.is_phantom || *defined_is_phantom
+                })
+        {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    "Phantom type parameter definition of module mismatch".to_string(),
+                ),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -131,6 +158,13 @@ impl StructType {
 pub struct CachedStructIndex(pub usize);
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct StructIdentifier {
+    pub module: ModuleId,
+    pub name: Identifier,
+}
+
+#[derive(Derivative, Ord, PartialOrd)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum Type {
     Bool,
     U8,
@@ -139,8 +173,19 @@ pub enum Type {
     Address,
     Signer,
     Vector(Box<Type>),
-    Struct(CachedStructIndex),
-    StructInstantiation(CachedStructIndex, Vec<Type>),
+    Struct {
+        name: Arc<StructIdentifier>,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
+        ability: AbilitySet,
+    },
+    StructInstantiation {
+        name: Arc<StructIdentifier>,
+        ty_args: Arc<Vec<Type>>,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
+        base_ability_set: AbilitySet,
+        #[derivative(PartialEq = "ignore", Hash = "ignore")]
+        phantom_ty_args_mask: Vec<bool>,
+    },
     Reference(Box<Type>),
     MutableReference(Box<Type>),
     TyParam(u16),
@@ -180,13 +225,26 @@ impl Type {
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
             },
-            Type::Struct(def_idx) => Type::Struct(*def_idx),
-            Type::StructInstantiation(def_idx, instantiation) => {
+            Type::Struct { name, ability } => Type::Struct {
+                name: name.clone(),
+                ability: *ability,
+            },
+            Type::StructInstantiation {
+                name,
+                ty_args: instantiation,
+                base_ability_set: base_ability,
+                phantom_ty_args_mask: is_phantom_params,
+            } => {
                 let mut inst = vec![];
-                for ty in instantiation {
+                for ty in instantiation.iter() {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
-                Type::StructInstantiation(*def_idx, inst)
+                Type::StructInstantiation {
+                    name: name.clone(),
+                    ty_args: Arc::new(inst),
+                    base_ability_set: *base_ability,
+                    phantom_ty_args_mask: is_phantom_params.clone(),
+                }
             },
         };
         Ok(res)
@@ -223,8 +281,8 @@ impl Type {
             Vector(ty) | Reference(ty) | MutableReference(ty) => {
                 Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
             },
-            Struct(_) => Self::LEGACY_BASE_MEMORY_SIZE,
-            StructInstantiation(_, tys) => tys
+            Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
+            StructInstantiation { ty_args: tys, .. } => tys
                 .iter()
                 .fold(Self::LEGACY_BASE_MEMORY_SIZE, |acc, ty| acc + ty.size()),
         }
@@ -316,6 +374,50 @@ impl Type {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("VecMutBorrow expects a vector reference".to_string()),
             ),
+        }
+    }
+
+    pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
+        match self {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::Address => Ok(AbilitySet::PRIMITIVES),
+
+            // Technically unreachable but, no point in erroring if we don't have to
+            Type::Reference(_) | Type::MutableReference(_) => Ok(AbilitySet::REFERENCES),
+            Type::Signer => Ok(AbilitySet::SIGNER),
+
+            Type::TyParam(_) => Err(PartialVMError::new(StatusCode::UNREACHABLE).with_message(
+                "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
+            )),
+
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    ty.abilities()?
+                ])
+            },
+            Type::Struct { ability, .. } => Ok(*ability),
+            Type::StructInstantiation {
+                ty_args,
+                base_ability_set: base_ability,
+                phantom_ty_args_mask: is_phantom_params,
+                ..
+            } => {
+                let type_argument_abilities = ty_args
+                    .iter()
+                    .map(|arg| arg.abilities())
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                AbilitySet::polymorphic_abilities(
+                    *base_ability,
+                    is_phantom_params.iter().copied(),
+                    type_argument_abilities,
+                )
+            },
         }
     }
 }

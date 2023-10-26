@@ -143,7 +143,7 @@ impl EventSubscriptionService {
                 .and_modify(|subscriptions| {
                     subscriptions.insert(subscription_id);
                 })
-                .or_insert_with(|| HashSet::from_iter(vec![subscription_id].iter().cloned()));
+                .or_insert_with(|| HashSet::from_iter([subscription_id].iter().cloned()));
         }
 
         Ok(EventNotificationListener {
@@ -201,30 +201,33 @@ impl EventSubscriptionService {
         let mut reconfig_event_found = false;
         let mut event_subscription_ids_to_notify = HashSet::new();
 
+        // TODO(eventv2): This doesn't deal with module events subscriptions.
         for event in events.iter() {
-            let event_key = event.key();
+            if let ContractEvent::V1(v1) = event {
+                let event_key = v1.key();
 
-            // Process all subscriptions for the current event
-            if let Some(subscription_ids) = self.event_key_subscriptions.get(event_key) {
-                // Add the event to the subscription's pending event buffer
-                // and store the subscriptions that will need to notified once all
-                // events have been processed.
-                for subscription_id in subscription_ids.iter() {
-                    if let Some(event_subscription) = self
-                        .subscription_id_to_event_subscription
-                        .get_mut(subscription_id)
-                    {
-                        event_subscription.buffer_event(event.clone());
-                        event_subscription_ids_to_notify.insert(*subscription_id);
-                    } else {
-                        return Err(Error::MissingEventSubscription(*subscription_id));
+                // Process all subscriptions for the current event
+                if let Some(subscription_ids) = self.event_key_subscriptions.get(event_key) {
+                    // Add the event to the subscription's pending event buffer
+                    // and store the subscriptions that will need to notified once all
+                    // events have been processed.
+                    for subscription_id in subscription_ids.iter() {
+                        if let Some(event_subscription) = self
+                            .subscription_id_to_event_subscription
+                            .get_mut(subscription_id)
+                        {
+                            event_subscription.buffer_event(event.clone());
+                            event_subscription_ids_to_notify.insert(*subscription_id);
+                        } else {
+                            return Err(Error::MissingEventSubscription(*subscription_id));
+                        }
                     }
                 }
-            }
 
-            // Take note if a reconfiguration (new epoch) has occurred
-            if *event_key == on_chain_config::new_epoch_event_key() {
-                reconfig_event_found = true;
+                // Take note if a reconfiguration (new epoch) has occurred
+                if *event_key == on_chain_config::new_epoch_event_key() {
+                    reconfig_event_found = true;
+                }
             }
         }
 

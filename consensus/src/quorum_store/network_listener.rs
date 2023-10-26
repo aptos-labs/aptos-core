@@ -71,7 +71,7 @@ impl NetworkListener {
                             idx
                         );
                         self.remote_batch_coordinator_tx[idx]
-                            .send(BatchCoordinatorCommand::NewBatches(batches))
+                            .send(BatchCoordinatorCommand::NewBatches(author, batches))
                             .await
                             .expect("Could not send remote batch");
                     },

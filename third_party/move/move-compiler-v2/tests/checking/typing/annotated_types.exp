@@ -14,4 +14,5 @@ module 0x8675309::M {
         (_, _, M::R{ dummy_field: _ }) = Tuple(0, pack M::S(false), pack M::R(false));
         Tuple()
     }
+    spec fun $t();
 } // end 0x8675309::M

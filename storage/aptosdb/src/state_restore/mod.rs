@@ -5,19 +5,27 @@ use crate::OTHER_TIMERS_SECONDS;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
-use aptos_jellyfish_merkle::{
-    restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value, IO_POOL,
-};
+use aptos_jellyfish_merkle::{restore::JellyfishMerkleRestore, Key, TreeReader, TreeWriter, Value};
 use aptos_storage_interface::StateSnapshotReceiver;
 use aptos_types::{
     proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
+use once_cell::sync::Lazy;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, hash::Hash, str::FromStr, sync::Arc};
 
 #[cfg(test)]
 mod restore_test;
+
+pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
+    ThreadPoolBuilder::new()
+        .num_threads(32)
+        .thread_name(|index| format!("jmt-io-{}", index))
+        .build()
+        .unwrap()
+});
 
 /// Key-Value batch that will be written into db atomically with other batches.
 pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;

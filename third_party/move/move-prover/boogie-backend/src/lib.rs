@@ -29,7 +29,7 @@ use move_model::{
     },
     ty::{PrimitiveType, Type},
 };
-use move_stackless_bytecode::mono_analysis;
+use move_prover_bytecode_pipeline::mono_analysis;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use tera::{Context, Tera};
@@ -190,7 +190,7 @@ pub fn add_prelude(
         .vec_inst
         .iter()
         .map(|ty| TypeInfo::new(env, options, ty, false))
-        .chain(implicit_vec_inst.into_iter())
+        .chain(implicit_vec_inst)
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect_vec();

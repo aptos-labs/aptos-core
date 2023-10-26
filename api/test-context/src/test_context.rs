@@ -10,7 +10,7 @@ use aptos_api_types::{
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{
     config::{
-        NodeConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+        NodeConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     keys::ConfigKey,
@@ -39,7 +39,10 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::{Transaction, TransactionPayload, TransactionStatus},
+    transaction::{
+        signature_verified_transaction::into_signature_verified_block, Transaction,
+        TransactionPayload, TransactionStatus,
+    },
 };
 use aptos_vm::AptosVM;
 use aptos_vm_validator::vm_validator::VMValidator;
@@ -51,7 +54,7 @@ use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, tim
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
-const TRANSFER_AMOUNT: u64 = 10_000_000;
+const TRANSFER_AMOUNT: u64 = 200_000_000;
 
 #[derive(Clone, Debug)]
 pub enum ApiSpecificConfig {
@@ -119,7 +122,7 @@ pub fn new_test_context(
     } else {
         DbReaderWriter::wrap(
             AptosDB::open(
-                &tmp_dir,
+                StorageDirPaths::from_path(&tmp_dir),
                 false,                       /* readonly */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
                 RocksdbConfigs::default(),
@@ -328,7 +331,7 @@ impl TestContext {
     }
 
     pub async fn create_account(&mut self) -> LocalAccount {
-        let mut root = self.root_account().await;
+        let root = self.root_account().await;
         let account = self.gen_account();
         let factory = self.transaction_factory();
         let txn = root.sign_with_transaction_builder(
@@ -351,7 +354,7 @@ impl TestContext {
     }
 
     pub async fn mint_user_account(&self, account: &LocalAccount) -> SignedTransaction {
-        let mut tc = self.root_account().await;
+        let tc = self.root_account().await;
         let factory = self.transaction_factory();
         tc.sign_with_transaction_builder(
             factory
@@ -607,7 +610,11 @@ impl TestContext {
         let parent_id = self.executor.committed_block_id();
         let result = self
             .executor
-            .execute_block((metadata.id(), txns.clone()).into(), parent_id, None)
+            .execute_block(
+                (metadata.id(), into_signature_verified_block(txns.clone())).into(),
+                parent_id,
+                None,
+            )
             .unwrap();
         let mut compute_status = result.compute_status().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
@@ -768,7 +775,7 @@ impl TestContext {
         let mut request = json!({
             "sender": account.address(),
             "sequence_number": account.sequence_number().to_string(),
-            "gas_unit_price": "0",
+            "gas_unit_price": "100",
             "max_gas_amount": "1000000",
             "expiration_timestamp_secs": "16373698888888",
             "payload": payload,
@@ -799,7 +806,7 @@ impl TestContext {
             .post("/transactions", request)
             .await;
         self.commit_mempool_txns(1).await;
-        *account.sequence_number_mut() += 1;
+        account.increment_sequence_number();
     }
 
     pub async fn simulate_multisig_transaction(

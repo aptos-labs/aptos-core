@@ -25,6 +25,43 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+    2:
+      SingleKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: SingleKeyAuthenticator
+    3:
+      MultiKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: MultiKeyAuthenticator
+AnyPublicKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256k1EcdsaPublicKey
+AnySignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - signature:
+              TYPENAME: Secp256k1EcdsaSignature
+BitVec:
+  STRUCT:
+    - inner: BYTES
 BlockMetadata:
   STRUCT:
     - id:
@@ -49,14 +86,23 @@ ChangeSet:
 ContractEvent:
   ENUM:
     0:
-      V0:
+      V1:
         NEWTYPE:
-          TYPENAME: ContractEventV0
-ContractEventV0:
+          TYPENAME: ContractEventV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: ContractEventV2
+ContractEventV1:
   STRUCT:
     - key:
         TYPENAME: EventKey
     - sequence_number: U64
+    - type_tag:
+        TYPENAME: TypeTag
+    - event_data: BYTES
+ContractEventV2:
+  STRUCT:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
@@ -106,6 +152,21 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+MultiKey:
+  STRUCT:
+    - public_keys:
+        SEQ:
+          TYPENAME: AnyPublicKey
+    - signatures_required: U8
+MultiKeyAuthenticator:
+  STRUCT:
+    - public_keys:
+        TYPENAME: MultiKey
+    - signatures:
+        SEQ:
+          TYPENAME: AnySignature
+    - signatures_bitmap:
+        TYPENAME: BitVec
 Multisig:
   STRUCT:
     - multisig_address:
@@ -140,12 +201,24 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
+Secp256k1EcdsaPrivateKey:
+  NEWTYPESTRUCT: BYTES
+Secp256k1EcdsaPublicKey:
+  NEWTYPESTRUCT: BYTES
+Secp256k1EcdsaSignature:
+  NEWTYPESTRUCT: BYTES
 SignedTransaction:
   STRUCT:
     - raw_txn:
         TYPENAME: RawTransaction
     - authenticator:
         TYPENAME: TransactionAuthenticator
+SingleKeyAuthenticator:
+  STRUCT:
+    - public_key:
+        TYPENAME: AnyPublicKey
+    - signature:
+        TYPENAME: AnySignature
 StateKey:
   ENUM:
     0:
@@ -274,6 +347,11 @@ TransactionAuthenticator:
           - fee_payer_address:
               TYPENAME: AccountAddress
           - fee_payer_signer:
+              TYPENAME: AccountAuthenticator
+    4:
+      SingleSender:
+        STRUCT:
+          - sender:
               TYPENAME: AccountAuthenticator
 TransactionPayload:
   ENUM:

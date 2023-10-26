@@ -5,10 +5,14 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::DAGNetworkMessage,
-    logging::LogEvent,
+    dag::{
+        DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
+        TDAGNetworkSender,
+    },
+    experimental::commit_reliable_broadcast::CommitMessage,
+    logging::{LogEvent, LogSchema},
     monitor,
-    network_interface::{ConsensusMsg, ConsensusNetworkClient},
+    network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     quorum_store::types::{Batch, BatchMsg, BatchRequest},
 };
 use anyhow::{anyhow, bail, ensure};
@@ -29,10 +33,12 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
+use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
 };
+use async_trait::async_trait;
 use bytes::Bytes;
 use fail::fail_point;
 use futures::{
@@ -43,10 +49,12 @@ use futures::{
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     mem::{discriminant, Discriminant},
+    sync::Arc,
     time::Duration,
 };
+use tokio::time::timeout;
 
-pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
+pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
@@ -84,10 +92,18 @@ pub struct IncomingDAGRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingCommitRequest {
+    pub req: CommitMessage,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     BlockRetrieval(IncomingBlockRetrievalRequest),
     BatchRetrieval(IncomingBatchRetrievalRequest),
     DAGRequest(IncomingDAGRequest),
+    CommitRequest(IncomingCommitRequest),
 }
 
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
@@ -98,15 +114,14 @@ pub struct NetworkReceivers {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub buffer_manager_messages: aptos_channel::Receiver<
-        (AccountAddress, Discriminant<ConsensusMsg>),
-        (AccountAddress, ConsensusMsg),
-    >,
     pub quorum_store_messages: aptos_channel::Receiver<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    pub rpc_rx: aptos_channel::Receiver<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
+    pub rpc_rx: aptos_channel::Receiver<
+        (AccountAddress, Discriminant<IncomingRpcRequest>),
+        (AccountAddress, IncomingRpcRequest),
+    >,
 }
 
 #[async_trait::async_trait]
@@ -140,9 +155,9 @@ pub struct NetworkSender {
     consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
-    // Note that we do not support self rpc requests as it might cause infinite recursive calls.
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
+    time_service: aptos_time_service::TimeService,
 }
 
 impl NetworkSender {
@@ -157,6 +172,7 @@ impl NetworkSender {
             consensus_network_client,
             self_sender,
             validators,
+            time_service: aptos_time_service::TimeService::real(),
         }
     }
 
@@ -202,6 +218,35 @@ impl NetworkSender {
             })?;
 
         Ok(response)
+    }
+
+    pub async fn send_rpc(
+        &self,
+        receiver: Author,
+        msg: ConsensusMsg,
+        timeout_duration: Duration,
+    ) -> anyhow::Result<ConsensusMsg> {
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc();
+        if receiver == self.author() {
+            let (tx, rx) = oneshot::channel();
+            let protocol = RPC[0];
+            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
+            self.self_sender.clone().send(self_msg).await?;
+            if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
+                Ok(protocol.from_bytes(&bytes)?)
+            } else {
+                bail!("self rpc failed");
+            }
+        } else {
+            Ok(monitor!(
+                "send_rpc",
+                self.consensus_network_client
+                    .send_rpc(receiver, msg, timeout_duration)
+                    .await
+            )?)
+        }
     }
 
     /// Tries to send the given msg to all the participants.
@@ -287,16 +332,16 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_commit_vote(&mut self, commit_vote: CommitVote) {
-        fail_point!("consensus::send::broadcast_commit_vote", |_| ());
-        let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
-        self.broadcast(msg).await
-    }
-
-    pub async fn send_commit_vote(&mut self, commit_vote: CommitVote, recipient: Author) {
-        fail_point!("consensus::send::commit_vote", |_| ());
-        let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
-        self.send(msg, vec![recipient]).await
+    pub async fn send_commit_vote(
+        &self,
+        commit_vote: CommitVote,
+        recipient: Author,
+    ) -> anyhow::Result<()> {
+        fail_point!("consensus::send::commit_vote", |_| Ok(()));
+        let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Vote(commit_vote)));
+        self.send_rpc(recipient, msg, Duration::from_millis(500))
+            .await
+            .map(|_| ())
     }
 
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
@@ -320,7 +365,7 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
-    pub async fn send_epoch_change(&mut self, proof: EpochChangeProof) {
+    pub async fn send_epoch_change(&self, proof: EpochChangeProof) {
         fail_point!("consensus::send::epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
         self.send(msg, vec![self.author]).await
@@ -328,21 +373,17 @@ impl NetworkSender {
 
     /// Sends the ledger info to self buffer manager
     pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
-        fail_point!("consensus::send::commit_proof", |_| ());
-
-        // this requires re-verification of the ledger info we can probably optimize it later
-        let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
-        self.send(msg, vec![self.author]).await
+        fail_point!("consensus::send::commit_decision", |_| ());
+        let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Decision(
+            CommitDecision::new(ledger_info),
+        )));
+        let _ = self
+            .send_rpc(self.author, msg, Duration::from_millis(500))
+            .await;
     }
 
     pub fn author(&self) -> Author {
         self.author
-    }
-
-    pub async fn broadcast_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
-        fail_point!("consensus::send::broadcast_commit_proof", |_| ());
-        let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
-        self.broadcast(msg).await
     }
 }
 
@@ -360,6 +401,7 @@ impl QuorumStoreSender for NetworkSender {
         recipient: Author,
         timeout: Duration,
     ) -> anyhow::Result<Batch> {
+        let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
         let response = self
             .consensus_network_client
@@ -367,7 +409,7 @@ impl QuorumStoreSender for NetworkSender {
             .await?;
         match response {
             ConsensusMsg::BatchResponse(batch) => {
-                batch.verify()?;
+                batch.verify_with_digest(request_digest)?;
                 Ok(*batch)
             },
             _ => Err(anyhow!("Invalid batch response")),
@@ -404,12 +446,72 @@ impl QuorumStoreSender for NetworkSender {
     }
 }
 
+#[async_trait]
+impl TDAGNetworkSender for NetworkSender {
+    async fn send_rpc(
+        &self,
+        receiver: Author,
+        message: DAGMessage,
+        timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        self.send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(TConsensusMsg::from_network_message)
+    }
+
+    /// Given a list of potential responders, sending rpc to get response from any of them and could
+    /// fallback to more in case of failures.
+    async fn send_rpc_with_fallbacks(
+        self: Arc<Self>,
+        responders: Vec<Author>,
+        message: DAGMessage,
+        retry_interval: Duration,
+        rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
+    ) -> RpcWithFallback {
+        RpcWithFallback::new(
+            responders,
+            message,
+            retry_interval,
+            rpc_timeout,
+            self.clone(),
+            self.time_service.clone(),
+            min_concurrent_responders,
+            max_concurrent_responders,
+        )
+    }
+}
+
+#[async_trait]
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: DAGMessage,
+        timeout: Duration,
+    ) -> anyhow::Result<DAGRpcResult> {
+        self.send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(TConsensusMsg::from_network_message)
+    }
+}
+
+#[async_trait]
+impl ProofNotifier for NetworkSender {
+    async fn send_epoch_change(&self, proof: EpochChangeProof) {
+        self.send_epoch_change(proof).await
+    }
+
+    async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
+        self.send_commit_proof(ledger_info).await
+    }
+}
+
 pub struct NetworkTask {
     consensus_messages_tx: aptos_channel::Sender<
-        (AccountAddress, Discriminant<ConsensusMsg>),
-        (AccountAddress, ConsensusMsg),
-    >,
-    buffer_manager_messages_tx: aptos_channel::Sender<
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
@@ -417,7 +519,10 @@ pub struct NetworkTask {
         (AccountAddress, Discriminant<ConsensusMsg>),
         (AccountAddress, ConsensusMsg),
     >,
-    rpc_tx: aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>,
+    rpc_tx: aptos_channel::Sender<
+        (AccountAddress, Discriminant<IncomingRpcRequest>),
+        (AccountAddress, IncomingRpcRequest),
+    >,
     all_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
 }
 
@@ -432,11 +537,6 @@ impl NetworkTask {
             10,
             Some(&counters::CONSENSUS_CHANNEL_MSGS),
         );
-        let (buffer_manager_messages_tx, buffer_manager_messages) = aptos_channel::new(
-            QueueStyle::FIFO,
-            100,
-            Some(&counters::BUFFER_MANAGER_CHANNEL_MSGS),
-        );
         let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
             QueueStyle::FIFO,
             // TODO: tune this value based on quorum store messages with backpressure
@@ -444,7 +544,7 @@ impl NetworkTask {
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
         let (rpc_tx, rpc_rx) =
-            aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::RPC_CHANNEL_MSGS));
+            aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
 
         // Verify the network events have been constructed correctly
         let network_and_events = network_service_events.into_network_and_events();
@@ -462,14 +562,12 @@ impl NetworkTask {
         (
             NetworkTask {
                 consensus_messages_tx,
-                buffer_manager_messages_tx,
                 quorum_store_messages_tx,
                 rpc_tx,
                 all_events,
             },
             NetworkReceivers {
                 consensus_messages,
-                buffer_manager_messages,
                 quorum_store_messages,
                 rpc_rx,
             },
@@ -500,9 +598,6 @@ impl NetworkTask {
                         .with_label_values(&[msg.name()])
                         .inc();
                     match msg {
-                        ConsensusMsg::BatchRequestMsg(_) | ConsensusMsg::BatchResponse(_) => {
-                            warn!("unexpected rpc msg");
-                        },
                         quorum_store_msg @ (ConsensusMsg::SignedBatchInfo(_)
                         | ConsensusMsg::BatchMsg(_)
                         | ConsensusMsg::ProofOfStoreMsg(_)) => {
@@ -512,90 +607,127 @@ impl NetworkTask {
                                 &self.quorum_store_messages_tx,
                             );
                         },
-                        buffer_manager_msg @ (ConsensusMsg::CommitVoteMsg(_)
-                        | ConsensusMsg::CommitDecisionMsg(_)) => {
-                            Self::push_msg(
-                                peer_id,
-                                buffer_manager_msg,
-                                &self.buffer_manager_messages_tx,
-                            );
+                        // Remove after migration to use rpc.
+                        ConsensusMsg::CommitVoteMsg(commit_vote) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback =
+                                IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
+                                    req: CommitMessage::Vote(*commit_vote),
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
                         },
-                        consensus_msg => {
+                        ConsensusMsg::CommitDecisionMsg(commit_decision) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback =
+                                IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
+                                    req: CommitMessage::Decision(*commit_decision),
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
+                        },
+                        consensus_msg @ (ConsensusMsg::ProposalMsg(_)
+                        | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::SyncInfo(_)
+                        | ConsensusMsg::EpochRetrievalRequest(_)
+                        | ConsensusMsg::EpochChangeProof(_)) => {
                             if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
                                 observe_block(
                                     proposal.proposal().timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED,
                                 );
+                                info!(
+                                    LogSchema::new(LogEvent::NetworkReceiveProposal)
+                                        .remote_peer(peer_id),
+                                    block_round = proposal.proposal().round(),
+                                    block_hash = proposal.proposal().id(),
+                                );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
                         },
+                        _ => {
+                            warn!(remote_peer = peer_id, "Unexpected direct send msg");
+                            continue;
+                        },
                     }
                 },
-                Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
-                    ConsensusMsg::BlockRetrievalRequest(request) => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                            .with_label_values(&["BlockRetrievalRequest"])
-                            .inc();
-                        debug!(
-                            remote_peer = peer_id,
-                            event = LogEvent::ReceiveBlockRetrieval,
-                            "{}",
-                            request
-                        );
-                        if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
-                            warn!(
+                Event::RpcRequest(peer_id, msg, protocol, callback) => {
+                    counters::CONSENSUS_RECEIVED_MSGS
+                        .with_label_values(&[msg.name()])
+                        .inc();
+                    let req = match msg {
+                        ConsensusMsg::BlockRetrievalRequest(request) => {
+                            debug!(
                                 remote_peer = peer_id,
-                                "Ignore block retrieval with too many blocks: {}",
-                                request.num_blocks()
+                                event = LogEvent::ReceiveBlockRetrieval,
+                                "{}",
+                                request
                             );
-                            continue;
-                        }
-                        let req_with_callback =
+                            if request.num_blocks() > MAX_BLOCKS_PER_REQUEST {
+                                warn!(
+                                    remote_peer = peer_id,
+                                    "Ignore block retrieval with too many blocks: {}",
+                                    request.num_blocks()
+                                );
+                                continue;
+                            }
                             IncomingRpcRequest::BlockRetrieval(IncomingBlockRetrievalRequest {
                                 req: *request,
                                 protocol,
                                 response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
-                    },
-                    ConsensusMsg::BatchRequestMsg(request) => {
-                        counters::CONSENSUS_RECEIVED_MSGS
-                            .with_label_values(&["BatchRetrievalRequest"])
-                            .inc();
-                        debug!(
-                            remote_peer = peer_id,
-                            event = LogEvent::ReceiveBatchRetrieval,
-                            "{:?}",
-                            request
-                        );
-                        let req_with_callback =
+                            })
+                        },
+                        ConsensusMsg::BatchRequestMsg(request) => {
+                            debug!(
+                                remote_peer = peer_id,
+                                event = LogEvent::ReceiveBatchRetrieval,
+                                "{}",
+                                request
+                            );
                             IncomingRpcRequest::BatchRetrieval(IncomingBatchRetrievalRequest {
                                 req: *request,
                                 protocol,
                                 response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
-                    },
-                    ConsensusMsg::DAGMessage(request) => {
-                        let req_with_callback =
+                            })
+                        },
+                        ConsensusMsg::DAGMessage(req) => {
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
-                                req: request,
+                                req,
                                 sender: peer_id,
                                 protocol,
                                 response_sender: callback,
-                            });
-                        if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req_with_callback)) {
-                            warn!(error = ?e, "aptos channel closed");
-                        }
-                    },
-                    _ => {
-                        warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
-                        continue;
-                    },
+                            })
+                        },
+                        ConsensusMsg::CommitMessage(req) => {
+                            IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
+                                req: *req,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
+                        _ => {
+                            warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
+                            continue;
+                        },
+                    };
+                    if let Err(e) = self
+                        .rpc_tx
+                        .push((peer_id, discriminant(&req)), (peer_id, req))
+                    {
+                        warn!(error = ?e, "aptos channel closed");
+                    };
                 },
                 _ => {
                     // Ignore `NewPeer` and `LostPeer` events

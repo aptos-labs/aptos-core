@@ -38,7 +38,7 @@ impl PhasedTxnMixGenerator {
 impl TransactionGenerator for PhasedTxnMixGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let phase = if self.txn_mix_per_phase.len() == 1 {
@@ -80,11 +80,11 @@ impl PhasedTxnMixGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for PhasedTxnMixGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         let mut txn_mix_per_phase = Vec::<Vec<(Box<dyn TransactionGenerator>, usize)>>::new();
-        for txn_mix_creators in self.txn_mix_per_phase_creators.iter_mut() {
+        for txn_mix_creators in self.txn_mix_per_phase_creators.iter() {
             let mut txn_mix = Vec::<(Box<dyn TransactionGenerator>, usize)>::new();
-            for (generator_creator, weight) in txn_mix_creators.iter_mut() {
+            for (generator_creator, weight) in txn_mix_creators.iter() {
                 txn_mix.push((generator_creator.create_transaction_generator(), *weight));
             }
             txn_mix_per_phase.push(txn_mix);

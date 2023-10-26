@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
         event_accumulator::EventAccumulatorSchema,
@@ -20,7 +21,7 @@ use crate::{
     AptosDB,
 };
 use anyhow::Result;
-use aptos_config::config::RocksdbConfigs;
+use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, ReadOptions, DB};
 use aptos_types::transaction::Version;
 use clap::Parser;
@@ -32,18 +33,18 @@ pub struct Cmd {
     #[clap(long, value_parser)]
     db_dir: PathBuf,
 
-    #[clap(long)]
-    split_ledger_db: bool,
+    #[clap(flatten)]
+    sharding_config: ShardingConfig,
 }
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
         let rocksdb_config = RocksdbConfigs {
-            split_ledger_db: self.split_ledger_db,
+            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
             ..Default::default()
         };
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &self.db_dir,
+            &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,

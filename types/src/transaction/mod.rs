@@ -2,25 +2,30 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::arc_with_non_send_sync)]
+
 use crate::{
     account_address::AccountAddress,
+    aggregator::{TryFromMoveValue, TryIntoMoveValue},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
-    proof::{
-        accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
-    },
+    proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
-    transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    transaction::authenticator::{
+        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
+        TransactionAuthenticator,
+    },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
     ed25519::*,
-    hash::{CryptoHash, EventAccumulatorHasher},
+    hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+    secp256k1_ecdsa,
     traits::{signing_message, SigningKey},
     CryptoMaterialError, HashValue,
 };
@@ -41,8 +46,13 @@ mod change_set;
 mod module;
 mod multisig;
 mod script;
+pub mod signature_verified_transaction;
 mod transaction_argument;
 
+use crate::{
+    contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
+    proof::accumulator::InMemoryEventAccumulator, write_set::TransactionWrite,
+};
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 use move_core_types::vm_status::AbortLocation;
@@ -52,6 +62,7 @@ pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
+use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -340,6 +351,21 @@ impl RawTransaction {
         ))
     }
 
+    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
+    /// into a `SignatureCheckedTransaction`.
+    ///
+    /// For a transaction that has just been signed, its signature is expected to be valid.
+    pub fn sign_secp256k1_ecdsa(
+        self,
+        private_key: &secp256k1_ecdsa::PrivateKey,
+        public_key: secp256k1_ecdsa::PublicKey,
+    ) -> Result<SignatureCheckedTransaction> {
+        let signature = private_key.sign(&self)?;
+        Ok(SignatureCheckedTransaction(
+            SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
+        ))
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn multi_sign_for_testing(
         self,
@@ -555,7 +581,7 @@ impl Deref for SignatureCheckedTransaction {
     }
 }
 
-impl fmt::Debug for SignedTransaction {
+impl Debug for SignedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -570,6 +596,17 @@ impl fmt::Debug for SignedTransaction {
 }
 
 impl SignedTransaction {
+    pub fn new_signed_transaction(
+        raw_txn: RawTransaction,
+        authenticator: TransactionAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            size: OnceCell::new(),
+        }
+    }
+
     pub fn new(
         raw_txn: RawTransaction,
         public_key: Ed25519PublicKey,
@@ -630,6 +667,35 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
+            size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_secp256k1_ecdsa(
+        raw_txn: RawTransaction,
+        public_key: secp256k1_ecdsa::PublicKey,
+        signature: secp256k1_ecdsa::Signature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::single_sender(
+            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+                AnyPublicKey::secp256k1_ecdsa(public_key),
+                AnySignature::secp256k1_ecdsa(signature),
+            )),
+        );
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_single_sender(
+        raw_txn: RawTransaction,
+        authenticator: AccountAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::single_sender(authenticator),
             size: OnceCell::new(),
         }
     }
@@ -704,6 +770,19 @@ impl SignedTransaction {
         Ok(SignatureCheckedTransaction(self))
     }
 
+    /// Special check for fee payer transaction having optional fee payer address in the
+    /// transaction. This will be removed after 1.8 has been fully released.
+    pub fn check_fee_payer_signature(self) -> Result<SignatureCheckedTransaction> {
+        self.authenticator
+            .verify_with_optional_fee_payer(&self.raw_txn)?;
+        Ok(SignatureCheckedTransaction(self))
+    }
+
+    pub fn verify_signature(&self) -> Result<()> {
+        self.authenticator.verify(&self.raw_txn)?;
+        Ok(())
+    }
+
     /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
     /// the signature is valid.
     pub fn signature_is_valid(&self) -> bool {
@@ -711,7 +790,7 @@ impl SignedTransaction {
     }
 
     pub fn contains_duplicate_signers(&self) -> bool {
-        let mut all_signer_addresses = self.authenticator.secondary_signer_addreses();
+        let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
         all_signer_addresses.push(self.sender());
         let mut s = BTreeSet::new();
         all_signer_addresses.iter().any(|a| !s.insert(*a))
@@ -816,8 +895,7 @@ impl TransactionWithProof {
         if let Some(events) = &self.events {
             let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
             let event_root_hash =
-                InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes[..])
-                    .root_hash();
+                InMemoryEventAccumulator::from_leaves(&event_hashes[..]).root_hash();
             ensure!(
                 event_root_hash == self.proof.transaction_info().event_root_hash(),
                 "Event root hash ({}) not expected ({}).",
@@ -1056,6 +1134,15 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    // This is a special function to update the total supply in the write set. 'TransactionOutput'
+    // already has materialized write set, but in case of sharding support for total_supply, we
+    // want to update the total supply in the write set by aggregating the total supply deltas from
+    // each shard. However, is costly to materialize the entire write set again, hence we have this
+    // inplace update hack.
+    pub fn update_total_supply(&mut self, value: u128) {
+        self.write_set.update_total_supply(value);
+    }
+
     pub fn events(&self) -> &[ContractEvent] {
         &self.events
     }
@@ -1123,8 +1210,7 @@ impl TransactionOutput {
             .iter()
             .map(CryptoHash::hash)
             .collect::<Vec<_>>();
-        let event_root_hash =
-            InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash;
+        let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash;
         ensure!(
             event_root_hash == txn_info.event_root_hash(),
             "{}: version:{}, event_root_hash:{:?}, expected:{:?}, events: {:?}, expected(if known): {:?}",
@@ -1137,6 +1223,26 @@ impl TransactionOutput {
         );
 
         Ok(())
+    }
+
+    pub fn try_extract_fee_statement(&self) -> Result<Option<FeeStatement>> {
+        // Look backwards since the fee statement is expected to be the last event.
+        for event in self.events.iter().rev() {
+            if let Some(fee_statement) = event.try_v2_typed(&FEE_STATEMENT_EVENT_TYPE)? {
+                return Ok(Some(fee_statement));
+            }
+        }
+        Ok(None)
+    }
+}
+
+pub trait TransactionOutputProvider {
+    fn get_transaction_output(&self) -> &TransactionOutput;
+}
+
+impl TransactionOutputProvider for TransactionOutput {
+    fn get_transaction_output(&self) -> &TransactionOutput {
+        self
     }
 }
 
@@ -1290,12 +1396,12 @@ impl Display for TransactionInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct TransactionToCommit {
-    transaction: Transaction,
-    transaction_info: TransactionInfo,
-    state_updates: ShardedStateUpdates,
-    write_set: WriteSet,
-    events: Vec<ContractEvent>,
-    is_reconfig: bool,
+    pub transaction: Transaction,
+    pub transaction_info: TransactionInfo,
+    pub state_updates: ShardedStateUpdates,
+    pub write_set: WriteSet,
+    pub events: Vec<ContractEvent>,
+    pub is_reconfig: bool,
 }
 
 impl TransactionToCommit {
@@ -1588,8 +1694,7 @@ fn verify_events_against_root_hash(
     transaction_info: &TransactionInfo,
 ) -> Result<()> {
     let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
-    let event_root_hash =
-        InMemoryAccumulator::<EventAccumulatorHasher>::from_leaves(&event_hashes).root_hash();
+    let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
     ensure!(
         event_root_hash == transaction_info.event_root_hash(),
         "The event root hash calculated doesn't match that carried on the \
@@ -1742,4 +1847,39 @@ impl TryFrom<Transaction> for SignedTransaction {
             _ => Err(format_err!("Not a user transaction.")),
         }
     }
+}
+
+/// Trait that defines a transaction type that can be executed by the block executor. A transaction
+/// transaction will write to a key value storage as their side effect.
+pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
+    type Key: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug;
+    /// Some keys contain multiple "resources" distinguished by a tag. Reading these keys requires
+    /// specifying a tag, and output requires merging all resources together (Note: this may change
+    /// in the future if write-set format changes to be per-resource, could be more performant).
+    /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
+    type Tag: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + DeserializeOwned
+        + Serialize;
+    /// Delayed field identifier type.
+    type Identifier: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + Copy
+        + From<u64>
+        + TryIntoMoveValue
+        + TryFromMoveValue<Hint = ()>;
+    type Value: Send + Sync + Clone + TransactionWrite;
+    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

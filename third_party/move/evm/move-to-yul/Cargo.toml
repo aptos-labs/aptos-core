@@ -17,7 +17,7 @@ move-ir-types = { path = "../../move-ir/types" }
 move-model = { path = "../../move-model" }
 # move dependencies
 move-prover-boogie-backend = { path = "../../move-prover/boogie-backend" }
-move-stackless-bytecode = { path = "../../move-prover/bytecode" }
+move-stackless-bytecode = { path = "../../move-model/bytecode" }
 
 # external dependencies
 anyhow = "1.0.38"

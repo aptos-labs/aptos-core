@@ -31,7 +31,7 @@ impl AccountsPoolWrapperGenerator {
 impl TransactionGenerator for AccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
-        _account: &mut LocalAccount,
+        _account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_burn =
@@ -64,7 +64,7 @@ impl AccountsPoolWrapperCreator {
 }
 
 impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountsPoolWrapperGenerator::new(
             self.creator.create_transaction_generator(),
             self.accounts_pool.clone(),

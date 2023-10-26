@@ -107,7 +107,9 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         }
     }
 
-    pub(crate) fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
+    /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
+    /// (for future incarnation). Will panic if the entry is not in the data-structure.
+    pub fn mark_estimate(&self, key: &K, txn_idx: TxnIndex) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.versioned_map
             .get_mut(&txn_idx)
@@ -115,20 +117,27 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
             .mark_estimate();
     }
 
-    pub(crate) fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
+    /// Versioned write of module at a given key (and version).
+    pub fn write(&self, key: K, txn_idx: TxnIndex, data: V) {
         let mut v = self.values.entry(key).or_default();
         v.versioned_map
             .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
     }
 
-    pub(crate) fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
+    /// Adds a new executable to the multi-version data-structure. The executable is either
+    /// storage-version (and fixed) or uniquely identified by the (cryptographic) hash of the
+    /// module published during the block.
+    pub fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.executables
             .entry(descriptor_hash)
             .or_insert_with(|| Arc::new(executable));
     }
 
-    pub(crate) fn fetch_module(
+    /// Fetches the latest module stored at the given key, either as in an executable form,
+    /// if already cached, or in a raw module format that the VM can convert to an executable.
+    /// The errors are returned if no module is found, or if a dependency is encountered.
+    pub fn fetch_module(
         &self,
         key: &K,
         txn_idx: TxnIndex,
@@ -147,7 +156,9 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
         }
     }
 
-    pub(crate) fn delete(&self, key: &K, txn_idx: TxnIndex) {
+    /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
+    /// if the corresponding entry does not exist.
+    pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert!(

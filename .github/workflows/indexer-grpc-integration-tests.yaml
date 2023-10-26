@@ -19,6 +19,7 @@ concurrency:
 
 jobs:
   permission-check:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -41,6 +42,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Install grpcurl
+        run: curl -sSL "https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz" | sudo tar -xz -C /usr/local/bin
+
       - name: Set up Rust
         uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
         with:
@@ -55,9 +59,14 @@ jobs:
           AWS_DOCKER_ARTIFACT_REPO: ${{ secrets.AWS_DOCKER_ARTIFACT_REPO }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
 
-      - name: Run indexer gRPC dependnencies locally (${{ env.IMAGE_TAG }})
+      - uses: ./.github/actions/python-setup
+        with:
+          pyproject_directory: ./testsuite
+
+      - name: Run indexer gRPC dependencies locally (devnet)
         shell: bash
-        run: ./testsuite/indexer_grpc_local.py --verbose start --no-indexer-grpc
+        working-directory: ./testsuite
+        run: poetry run python indexer_grpc_local.py --verbose start --no-indexer-grpc
 
       - name: Run indexer gRPC integration tests
         shell: bash

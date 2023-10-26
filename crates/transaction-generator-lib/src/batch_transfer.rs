@@ -39,7 +39,7 @@ impl BatchTransferTransactionGenerator {
 impl TransactionGenerator for BatchTransferTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -88,7 +88,7 @@ impl BatchTransferTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for BatchTransferTransactionGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(BatchTransferTransactionGenerator::new(
             StdRng::from_entropy(),
             self.batch_size,

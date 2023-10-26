@@ -34,7 +34,7 @@ impl PublishPackageGenerator {
 impl TransactionGenerator for PublishPackageGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -78,7 +78,7 @@ impl PublishPackageCreator {
 }
 
 impl TransactionGeneratorCreator for PublishPackageCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(PublishPackageGenerator::new(
             StdRng::from_entropy(),
             self.package_handler.clone(),

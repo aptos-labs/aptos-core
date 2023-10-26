@@ -49,9 +49,10 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-io-timeout = { workspace = true }
-tokio-stream = { workspace = true }
+tokio-stream = { workspace = true, features = ["fs"] }
 tokio-util = { workspace = true }
 
 [dev-dependencies]

@@ -3,15 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    compilation::package_layout::CompiledPackageLayout,
+    compilation::{build_plan::CompilerDriverResult, package_layout::CompiledPackageLayout},
     resolution::resolution_graph::{Renaming, ResolvedGraph, ResolvedPackage, ResolvedTable},
     source_package::{
         layout::{SourcePackageLayout, REFERENCE_TEMPLATE_FILENAME},
         parsed_manifest::{FileName, PackageDigest, PackageName},
     },
-    Architecture, BuildConfig,
+    Architecture, BuildConfig, CompilerConfig, CompilerVersion,
 };
-use anyhow::{ensure, Result};
+use anyhow::{bail, ensure, Result};
 use colored::Colorize;
 use itertools::{Either, Itertools};
 use move_abigen::{Abigen, AbigenOptions};
@@ -27,15 +27,15 @@ use move_command_line_common::{
 };
 use move_compiler::{
     attr_derivation,
-    compiled_unit::{
-        self, AnnotatedCompiledUnit, CompiledUnit, NamedCompiledModule, NamedCompiledScript,
-    },
-    diagnostics::FilesSourceText,
+    compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
     shared::{Flags, NamedAddressMap, NumericalAddress, PackagePaths},
     Compiler,
 };
 use move_docgen::{Docgen, DocgenOptions};
-use move_model::{model::GlobalEnv, options::ModelBuilderOptions, run_model_builder_with_options};
+use move_model::{
+    model::GlobalEnv, options::ModelBuilderOptions,
+    run_model_builder_with_options_and_compilation_flags,
+};
 use move_symbol_pool::Symbol;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -43,6 +43,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use termcolor::{ColorChoice, StandardStream};
 
 #[derive(Debug, Clone)]
 pub enum CompilationCachingStatus {
@@ -74,7 +75,7 @@ pub struct CompiledPackageInfo {
 }
 
 /// Represents a compiled package in memory.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct CompiledPackage {
     /// Meta information about the compilation of this `CompiledPackage`
     pub compiled_package_info: CompiledPackageInfo,
@@ -540,13 +541,11 @@ impl CompiledPackage {
             /* address mapping */ &ResolvedTable,
             /* whether source is available */ bool,
         )>,
-        bytecode_version: Option<u32>,
+        config: &CompilerConfig,
         resolution_graph: &ResolvedGraph,
-        mut compiler_driver: impl FnMut(
-            Compiler,
-        )
-            -> Result<(FilesSourceText, Vec<AnnotatedCompiledUnit>)>,
-    ) -> Result<CompiledPackage> {
+        mut compiler_driver_v1: impl FnMut(Compiler) -> CompilerDriverResult,
+        mut compiler_driver_v2: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
+    ) -> Result<(CompiledPackage, Option<GlobalEnv>)> {
         let immediate_dependencies = transitive_dependencies
             .iter()
             .filter(|(_, is_immediate, _, _, _)| *is_immediate)
@@ -581,9 +580,16 @@ impl CompiledPackage {
         } else {
             Flags::empty()
         };
-        let skip_attribute_checks = resolution_graph.build_options.skip_attribute_checks;
+        let skip_attribute_checks = resolution_graph
+            .build_options
+            .compiler_config
+            .skip_attribute_checks;
         flags = flags.set_skip_attribute_checks(skip_attribute_checks);
-        let mut known_attributes = resolution_graph.build_options.known_attributes.clone();
+        let mut known_attributes = resolution_graph
+            .build_options
+            .compiler_config
+            .known_attributes
+            .clone();
         match &resolution_graph.build_options.architecture {
             Some(x) => {
                 match x {
@@ -620,8 +626,53 @@ impl CompiledPackage {
         let mut paths = src_deps;
         paths.push(sources_package_paths.clone());
 
-        let compiler = Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
-        let (file_map, all_compiled_units) = compiler_driver(compiler)?;
+        let (file_map, all_compiled_units) = match config.compiler_version.unwrap_or_default() {
+            CompilerVersion::V1 => {
+                let compiler =
+                    Compiler::from_package_paths(paths, bytecode_deps, flags, &known_attributes);
+                compiler_driver_v1(compiler)?
+            },
+            CompilerVersion::V2 => {
+                let to_str_vec = |ps: &[Symbol]| {
+                    ps.iter()
+                        .map(move |s| s.as_str().to_owned())
+                        .collect::<Vec<_>>()
+                };
+                let mut global_address_map = BTreeMap::new();
+                for pack in paths.iter().chain(bytecode_deps.iter()) {
+                    for (name, val) in &pack.named_address_map {
+                        if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
+                        {
+                            if old != *val {
+                                let pack_name = pack
+                                    .name
+                                    .map(|s| s.as_str().to_owned())
+                                    .unwrap_or_else(|| "<unnamed>".to_owned());
+                                bail!(
+                                    "found remapped address alias `{}` (`{} != {}`) in package `{}`\
+                                    , please use unique address aliases across dependencies",
+                                    name, old, val, pack_name
+                                )
+                            }
+                        }
+                    }
+                }
+
+                let options = move_compiler_v2::Options {
+                    sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+                    dependencies: bytecode_deps
+                        .iter()
+                        .flat_map(|x| to_str_vec(&x.paths))
+                        .collect(),
+                    named_address_mapping: global_address_map
+                        .into_iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect(),
+                    ..Default::default()
+                };
+                compiler_driver_v2(options)?
+            },
+        };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
         for annot_unit in all_compiled_units {
@@ -640,18 +691,30 @@ impl CompiledPackage {
                 deps_compiled_units.push((package_name, unit))
             }
         }
-        let bytecode_version = get_bytecode_version_from_env(bytecode_version);
+        let bytecode_version = get_bytecode_version_from_env(config.bytecode_version);
 
         let mut compiled_docs = None;
         let mut compiled_abis = None;
+        let mut move_model = None;
         if resolution_graph.build_options.generate_docs
             || resolution_graph.build_options.generate_abis
+            || resolution_graph.build_options.generate_move_model
         {
-            let model = run_model_builder_with_options(
+            let mut flags = if resolution_graph.build_options.full_model_generation {
+                Flags::all_functions()
+            } else {
+                // Include verification functions as this has been legacy behavior.
+                Flags::verification()
+            };
+
+            if skip_attribute_checks {
+                flags = flags.set_skip_attribute_checks(true)
+            }
+            let model = run_model_builder_with_options_and_compilation_flags(
                 vec![sources_package_paths],
                 deps_package_paths.into_iter().map(|(p, _)| p).collect_vec(),
                 ModelBuilderOptions::default(),
-                skip_attribute_checks,
+                flags,
                 &known_attributes,
             )?;
 
@@ -671,6 +734,10 @@ impl CompiledPackage {
                     &model,
                     &root_compiled_units,
                 ));
+            }
+
+            if resolution_graph.build_options.generate_move_model {
+                move_model = Some(model)
             }
         };
 
@@ -692,7 +759,7 @@ impl CompiledPackage {
             bytecode_version,
         )?;
 
-        Ok(compiled_package)
+        Ok((compiled_package, move_model))
     }
 
     // We take the (restrictive) view that all filesystems are case insensitive to maximize
@@ -983,4 +1050,30 @@ pub(crate) fn make_source_and_deps_for_compiler(
         named_address_map: root_named_addrs,
     };
     Ok((source_package_paths, deps_package_paths))
+}
+
+/// Stub which can be used if the v2 compiler driver for a particular operation is not available.
+pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerDriverResult {
+    anyhow::bail!("v2 compiler requested but driver not available")
+}
+
+/// Runs the v2 compiler, exiting the process if any errors occurred.
+pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
+    let mut writer = StandardStream::stderr(ColorChoice::Auto);
+    match move_compiler_v2::run_move_compiler(&mut writer, options) {
+        Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units)),
+        Err(_) => {
+            // Error reported, exit
+            std::process::exit(1);
+        },
+    }
+}
+
+/// Runs the v2 compiler, reporting errors and returning an error if compilation fails.
+pub fn build_and_report_no_exit_v2_driver(
+    options: move_compiler_v2::Options,
+) -> CompilerDriverResult {
+    let mut writer = StandardStream::stderr(ColorChoice::Auto);
+    let (env, units) = move_compiler_v2::run_move_compiler(&mut writer, options)?;
+    Ok((move_compiler_v2::make_files_source_text(&env), units))
 }

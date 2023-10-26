@@ -17,6 +17,13 @@ pub const OPTIMISTIC_FETCH_EXPIRE: &str = "optimistic_fetch_expire";
 pub const SUBSCRIPTION_ADD: &str = "subscription_add";
 pub const SUBSCRIPTION_EXPIRE: &str = "subscription_expire";
 pub const SUBSCRIPTION_FAILURE: &str = "subscription_failure";
+pub const SUBSCRIPTION_NEW_STREAM: &str = "subscription_new_stream";
+
+// Latency buckets for request processing latencies (seconds)
+const REQUEST_PROCESSING_LATENCY_BUCKETS_SECS: &[f64] = &[
+    0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0, 15.0, 20.0, 30.0, 40.0,
+    60.0, 120.0, 180.0, 240.0, 300.0,
+];
 
 /// Gauge for tracking the number of actively ignored peers
 pub static IGNORED_PEER_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
@@ -74,7 +81,8 @@ pub static OPTIMISTIC_FETCH_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_service_server_optimistic_fetch_latency",
         "Time it takes to process an optimistic fetch request",
-        &["network_id", "request_type"]
+        &["network_id", "request_type"],
+        REQUEST_PROCESSING_LATENCY_BUCKETS_SECS.to_vec(),
     )
     .unwrap()
 });
@@ -124,7 +132,8 @@ pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(||
     register_histogram_vec!(
         "aptos_storage_service_server_request_latency",
         "Time it takes to process a storage service request",
-        &["network_id", "request_type"]
+        &["network_id", "request_type"],
+        REQUEST_PROCESSING_LATENCY_BUCKETS_SECS.to_vec(),
     )
     .unwrap()
 });
@@ -154,7 +163,8 @@ pub static SUBSCRIPTION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_service_server_subscription_latency",
         "Time it takes to process a subscription request",
-        &["network_id", "request_type"]
+        &["network_id", "request_type"],
+        REQUEST_PROCESSING_LATENCY_BUCKETS_SECS.to_vec(),
     )
     .unwrap()
 });

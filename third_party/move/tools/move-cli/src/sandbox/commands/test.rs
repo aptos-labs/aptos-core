@@ -46,6 +46,10 @@ pub const TEST_ARGS_FILENAME: &str = "args.txt";
 /// enabled in the move VM.
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
 
+/// Name of the environment variable we need to set in order to flush
+/// after every trace call.
+const MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME: &str = "MOVE_VM_TRACE_FLUSH";
+
 /// The default file name (inside the build output dir) for the runtime to
 /// dump the execution trace to. The trace will be used by the coverage tool
 /// if --track-cov is set. If --track-cov is not set, then no trace file will
@@ -266,7 +270,10 @@ pub fn run_one(
                 // then, when running <args-B.txt>, coverage will not be tracked nor printed
                 env::remove_var(MOVE_VM_TRACING_ENV_VAR_NAME);
             },
-            Some(path) => env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str()),
+            Some(path) => {
+                env::set_var(MOVE_VM_TRACING_ENV_VAR_NAME, path.as_os_str());
+                env::set_var(MOVE_VM_TRACING_FLUSH_ENV_VAR_NAME, path.as_os_str());
+            },
         }
 
         let cmd_output = cli_command_template().args(args_iter).output()?;

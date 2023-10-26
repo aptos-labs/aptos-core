@@ -101,12 +101,15 @@
 //!             +-----------------------------+
 //! ```
 
+#[cfg(test)]
+mod tests;
+
 mod access_path_cache;
 #[macro_use]
 pub mod counters;
 pub mod data_cache;
 
-mod adapter_common;
+pub mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
@@ -115,6 +118,7 @@ pub mod move_vm_ext;
 pub mod natives;
 pub mod sharded_block_executor;
 pub mod system_module_names;
+pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
 mod verifier;
@@ -124,7 +128,10 @@ use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBloc
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions,
-    transaction::{SignedTransaction, Transaction, TransactionOutput, VMValidatorResult},
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        TransactionOutput, VMValidatorResult,
+    },
     vm_status::VMStatus,
 };
 use std::{marker::Sync, sync::Arc};
@@ -149,7 +156,7 @@ pub trait VMExecutor: Send + Sync {
 
     /// Executes a block of transactions and returns output for each one of them.
     fn execute_block(
-        transactions: Vec<Transaction>,
+        transactions: &[SignatureVerifiedTransaction],
         state_view: &(impl StateView + Sync),
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus>;

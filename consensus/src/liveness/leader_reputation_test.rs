@@ -322,7 +322,7 @@ fn test_api(use_root_hash: bool) {
             (epoch, 2),
             aptos_db.add_event_with_data(proposers[0], vec![3], vec![])
         );
-        let backend = Box::new(AptosDBBackend::new(1, 4, aptos_db.clone()));
+        let backend = Arc::new(AptosDBBackend::new(1, 4, aptos_db.clone()));
         let leader_reputation = LeaderReputation::new(
             epoch,
             HashMap::from([(epoch, proposers.clone())]),
@@ -440,7 +440,7 @@ impl MockDbReader {
 
         self.events.lock().push(EventWithVersion::new(
             *idx,
-            ContractEvent::new(
+            ContractEvent::new_v1(
                 new_block_event_key(),
                 *idx,
                 TypeTag::Struct(Box::new(NewBlockEvent::struct_tag())),

@@ -1,8 +1,10 @@
+# All processors are migrated to [processor repo](https://github.com/aptos-labs/aptos-indexer-processors)
+
 # Indexer GRPC Parser
 
 Indexer GRPC parser is to indexer data processor that leverages the indexer grpc data.
 
-* __Note: We'll launch an official endpoint soon; stay tuned!__
+
 
 ## Tutorial
 ### Prerequisite

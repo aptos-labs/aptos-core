@@ -610,7 +610,7 @@ impl TxnEmitter {
         let stats = Arc::new(DynamicStatsTracking::new(stats_tracking_phases));
         let tokio_handle = Handle::current();
 
-        let (mut txn_generator_creator, _, _) = create_txn_generator_creator(
+        let (txn_generator_creator, _, _) = create_txn_generator_creator(
             &req.transaction_mix_per_phase,
             &mut all_accounts,
             vec![],
@@ -884,7 +884,7 @@ fn update_seq_num_and_get_num_expired(
                         account.sequence_number(),
                         count
                     );
-                    *account.sequence_number_mut() = *count;
+                    account.set_sequence_number(*count);
                 }
             },
             None => {
@@ -894,7 +894,7 @@ fn update_seq_num_and_get_num_expired(
                     account.sequence_number(),
                     start_seq_num
                 );
-                *account.sequence_number_mut() = *start_seq_num;
+                account.set_sequence_number(*start_seq_num);
             },
         }
     });

@@ -49,8 +49,8 @@ async fn test_gen_resource_group() {
     context.publish_package(&mut admin1, txn).await;
 
     // Read default data
-    let primary = format!("0x{}::{}::{}", admin0.address(), "primary", "Primary");
-    let secondary = format!("0x{}::{}::{}", admin1.address(), "secondary", "Secondary");
+    let primary = format!("{}::{}::{}", admin0.address(), "primary", "Primary");
+    let secondary = format!("{}::{}::{}", admin1.address(), "secondary", "Secondary");
 
     let response = context.gen_resource(&admin0.address(), &primary).await;
     assert_eq!(response.unwrap()["data"]["value"], "3");
@@ -65,7 +65,7 @@ async fn test_gen_resource_group() {
     context
         .api_execute_entry_function(
             &mut user,
-            &format!("0x{}::secondary::init", admin1.address()),
+            &format!("{}::secondary::init", admin1.address()),
             json!([]),
             json!([55]),
         )
@@ -80,7 +80,7 @@ async fn test_gen_resource_group() {
     context
         .api_execute_entry_function(
             &mut user,
-            &format!("0x{}::primary::init", admin0.address()),
+            &format!("{}::primary::init", admin0.address()),
             json!([]),
             json!(["35"]),
         )

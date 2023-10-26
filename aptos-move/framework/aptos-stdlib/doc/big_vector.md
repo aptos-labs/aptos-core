@@ -10,6 +10,7 @@
 -  [Function `empty`](#0x1_big_vector_empty)
 -  [Function `singleton`](#0x1_big_vector_singleton)
 -  [Function `destroy_empty`](#0x1_big_vector_destroy_empty)
+-  [Function `destroy`](#0x1_big_vector_destroy)
 -  [Function `borrow`](#0x1_big_vector_borrow)
 -  [Function `borrow_mut`](#0x1_big_vector_borrow_mut)
 -  [Function `append`](#0x1_big_vector_append)
@@ -212,6 +213,38 @@ Aborts if <code>v</code> is not empty.
 <pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_destroy_empty">destroy_empty</a>&lt;T&gt;(v: <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;) {
     <b>assert</b>!(<a href="big_vector.md#0x1_big_vector_is_empty">is_empty</a>(&v), <a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_vector.md#0x1_big_vector_EVECTOR_NOT_EMPTY">EVECTOR_NOT_EMPTY</a>));
     <b>let</b> <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a> { buckets, end_index: _, bucket_size: _ } = v;
+    <a href="table_with_length.md#0x1_table_with_length_destroy_empty">table_with_length::destroy_empty</a>(buckets);
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x1_big_vector_destroy"></a>
+
+## Function `destroy`
+
+Destroy the vector <code>v</code> if T has <code>drop</code>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_destroy">destroy</a>&lt;T: drop&gt;(v: <a href="big_vector.md#0x1_big_vector_BigVector">big_vector::BigVector</a>&lt;T&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_vector.md#0x1_big_vector_destroy">destroy</a>&lt;T: drop&gt;(v: <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;) {
+    <b>let</b> <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a> { buckets, end_index, bucket_size: _ } = v;
+    <b>let</b> i = 0;
+    <b>while</b> (end_index &gt; 0) {
+        <b>let</b> num_elements = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&<a href="table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> buckets, i));
+        end_index = end_index - num_elements;
+        i = i + 1;
+    };
     <a href="table_with_length.md#0x1_table_with_length_destroy_empty">table_with_length::destroy_empty</a>(buckets);
 }
 </code></pre>

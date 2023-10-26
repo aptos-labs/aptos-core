@@ -74,7 +74,7 @@ fn add_to_sized_pool<T>(
 impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
-        account: &mut LocalAccount,
+        account: &LocalAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
@@ -147,7 +147,7 @@ impl AccountGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
-    fn create_transaction_generator(&mut self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),

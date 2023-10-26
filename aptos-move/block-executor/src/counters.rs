@@ -15,7 +15,7 @@ impl GasType {
     pub const IO_GAS: &'static str = "io_gas";
     pub const NON_STORAGE_GAS: &'static str = "non_storage_gas";
     pub const STORAGE_FEE: &'static str = "storage_in_octas";
-    pub const STORAGE_GAS: &'static str = "storage_in_gas";
+    pub const STORAGE_FEE_REFUND: &'static str = "storage_refund_in_octas";
     pub const TOTAL_GAS: &'static str = "total_gas";
 }
 
@@ -148,17 +148,6 @@ pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static GET_NEXT_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        // metric name
-        "aptos_execution_get_next_task_seconds",
-        // metric description
-        "The time spent in seconds for getting next task from the scheduler",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
-    )
-    .unwrap()
-});
-
 pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_execution_dependency_wait",
@@ -207,16 +196,16 @@ pub(crate) fn update_parallel_block_gas_counters(
     );
     observe_parallel_execution_block_gas(accumulated_fee_statement.io_gas_used(), GasType::IO_GAS);
     observe_parallel_execution_block_gas(
-        accumulated_fee_statement.storage_gas_used(),
-        GasType::STORAGE_GAS,
-    );
-    observe_parallel_execution_block_gas(
         accumulated_fee_statement.execution_gas_used() + accumulated_fee_statement.io_gas_used(),
         GasType::NON_STORAGE_GAS,
     );
     observe_parallel_execution_block_gas(
         accumulated_fee_statement.storage_fee_used(),
         GasType::STORAGE_FEE,
+    );
+    observe_parallel_execution_block_gas(
+        accumulated_fee_statement.storage_fee_refund(),
+        GasType::STORAGE_FEE_REFUND,
     );
     BLOCK_COMMITTED_TXNS
         .with_label_values(&[Mode::PARALLEL])
@@ -231,12 +220,15 @@ pub(crate) fn update_parallel_txn_gas_counters(txn_fee_statements: &Vec<FeeState
             GasType::EXECUTION_GAS,
         );
         observe_parallel_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-        observe_parallel_execution_txn_gas(fee_statement.storage_gas_used(), GasType::STORAGE_GAS);
         observe_parallel_execution_txn_gas(
             fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
             GasType::NON_STORAGE_GAS,
         );
         observe_parallel_execution_txn_gas(fee_statement.storage_fee_used(), GasType::STORAGE_FEE);
+        observe_parallel_execution_txn_gas(
+            fee_statement.storage_fee_refund(),
+            GasType::STORAGE_FEE_REFUND,
+        );
     }
 }
 
@@ -257,16 +249,16 @@ pub(crate) fn update_sequential_block_gas_counters(
         GasType::IO_GAS,
     );
     observe_sequential_execution_block_gas(
-        accumulated_fee_statement.storage_gas_used(),
-        GasType::STORAGE_GAS,
-    );
-    observe_sequential_execution_block_gas(
         accumulated_fee_statement.execution_gas_used() + accumulated_fee_statement.io_gas_used(),
         GasType::NON_STORAGE_GAS,
     );
     observe_sequential_execution_block_gas(
         accumulated_fee_statement.storage_fee_used(),
         GasType::STORAGE_FEE,
+    );
+    observe_sequential_execution_block_gas(
+        accumulated_fee_statement.storage_fee_refund(),
+        GasType::STORAGE_FEE_REFUND,
     );
     BLOCK_COMMITTED_TXNS
         .with_label_values(&[Mode::PARALLEL])
@@ -280,10 +272,13 @@ pub(crate) fn update_sequential_txn_gas_counters(fee_statement: &FeeStatement) {
         GasType::EXECUTION_GAS,
     );
     observe_sequential_execution_txn_gas(fee_statement.io_gas_used(), GasType::IO_GAS);
-    observe_sequential_execution_txn_gas(fee_statement.storage_gas_used(), GasType::STORAGE_GAS);
     observe_sequential_execution_txn_gas(
         fee_statement.execution_gas_used() + fee_statement.io_gas_used(),
         GasType::NON_STORAGE_GAS,
     );
     observe_sequential_execution_txn_gas(fee_statement.storage_fee_used(), GasType::STORAGE_FEE);
+    observe_sequential_execution_txn_gas(
+        fee_statement.storage_fee_refund(),
+        GasType::STORAGE_FEE_REFUND,
+    );
 }

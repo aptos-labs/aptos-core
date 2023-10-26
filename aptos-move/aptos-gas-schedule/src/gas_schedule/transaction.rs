@@ -140,6 +140,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
             10 << 20, // all events from a single transaction are 10MB max
         ],
         [
+            max_write_ops_per_transaction: NumSlots,
+            { 11.. => "max_write_ops_per_transaction" },
+            8192,
+        ],
+        [
             storage_fee_per_state_slot_create: FeePerSlot,
             { 7.. => "storage_fee_per_state_slot_create" },
             50000,
@@ -203,9 +208,23 @@ impl TransactionGasParameters {
         }
     }
 
-    pub fn storage_fee_for_bytes(&self, key: &StateKey, op: &WriteOp) -> Fee {
-        if let Some(data) = op.bytes() {
-            let size = NumBytes::new(key.size() as u64) + NumBytes::new(data.len() as u64);
+    pub fn storage_fee_refund_for_slot(&self, op: &WriteOp) -> Fee {
+        use WriteOp::*;
+
+        match op {
+            DeletionWithMetadata { metadata, .. } => Fee::new(metadata.deposit()),
+            Creation(..)
+            | CreationWithMetadata { .. }
+            | Modification(..)
+            | ModificationWithMetadata { .. }
+            | Deletion => 0.into(),
+        }
+    }
+
+    /// Maybe value size is None for deletion Ops.
+    pub fn storage_fee_for_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee {
+        if let Some(value_size) = maybe_value_size {
+            let size = NumBytes::new(key.size() as u64) + NumBytes::new(value_size);
             if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
                 return excess * self.storage_fee_per_excess_state_byte;
             }

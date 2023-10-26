@@ -1,24 +1,81 @@
 // Copyright © Aptos Foundation
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult};
-use aptos_logger::trace;
+use crate::{
+    remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest,
+    RemoteExecutionResult,
+};
+use aptos_logger::{info, trace};
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
     vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::executor_client::{ExecutorClient, ShardedExecutionOutput};
-use crossbeam_channel::{Receiver, Sender};
-use std::{
-    net::SocketAddr,
-    ops::Deref,
-    sync::{Arc, Mutex},
+use aptos_vm::sharded_block_executor::{
+    executor_client::{ExecutorClient, ShardedExecutionOutput},
+    ShardedBlockExecutor,
 };
+use crossbeam_channel::{Receiver, Sender};
+use once_cell::sync::{Lazy, OnceCell};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::{Arc, Mutex},
+    thread,
+};
+
+pub static COORDINATOR_PORT: u16 = 52200;
+
+static REMOTE_ADDRESSES: OnceCell<Vec<SocketAddr>> = OnceCell::new();
+static COORDINATOR_ADDRESS: OnceCell<SocketAddr> = OnceCell::new();
+
+pub fn set_remote_addresses(addresses: Vec<SocketAddr>) {
+    REMOTE_ADDRESSES.set(addresses).ok();
+}
+
+pub fn get_remote_addresses() -> Vec<SocketAddr> {
+    match REMOTE_ADDRESSES.get() {
+        Some(value) => value.clone(),
+        None => vec![],
+    }
+}
+
+pub fn set_coordinator_address(address: SocketAddr) {
+    COORDINATOR_ADDRESS.set(address).ok();
+}
+
+pub fn get_coordinator_address() -> SocketAddr {
+    match COORDINATOR_ADDRESS.get() {
+        Some(value) => *value,
+        None => SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT),
+    }
+}
+
+pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
+    Arc<
+        aptos_infallible::Mutex<
+            ShardedBlockExecutor<CachedStateView, RemoteExecutorClient<CachedStateView>>,
+        >,
+    >,
+> = Lazy::new(|| {
+    info!("REMOTE_SHARDED_BLOCK_EXECUTOR created");
+    Arc::new(aptos_infallible::Mutex::new(
+        RemoteExecutorClient::create_remote_sharded_block_executor(
+            get_coordinator_address(),
+            get_remote_addresses(),
+            None,
+        ),
+    ))
+});
 
 #[allow(dead_code)]
 pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
+    // The network controller used to create channels to send and receive messages. We want the
+    // network controller to be owned by the executor client so that it is alive for the entire
+    // lifetime of the executor client.
+    network_controller: NetworkController,
+    state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
     command_txs: Arc<Vec<Mutex<Sender<Message>>>>,
     // Channels to receive execution results from the executor shards.
@@ -27,13 +84,14 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     thread_pool: Arc<rayon::ThreadPool>,
 
     phantom: std::marker::PhantomData<S>,
+    _join_handle: Option<thread::JoinHandle<()>>,
 }
 
 #[allow(dead_code)]
 impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
     pub fn new(
         remote_shard_addresses: Vec<SocketAddr>,
-        controller: &mut NetworkController,
+        mut controller: NetworkController,
         num_threads: Option<usize>,
     ) -> Self {
         let num_threads = num_threads.unwrap_or_else(num_cpus::get);
@@ -43,24 +101,61 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 .build()
                 .unwrap(),
         );
+        let controller_mut_ref = &mut controller;
         let (command_txs, result_rxs) = remote_shard_addresses
             .iter()
             .enumerate()
             .map(|(shard_id, address)| {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
-                let command_tx =
-                    Mutex::new(controller.create_outbound_channel(*address, execute_command_type));
-                let result_rx = controller.create_inbound_channel(execute_result_type);
+                let command_tx = Mutex::new(
+                    controller_mut_ref.create_outbound_channel(*address, execute_command_type),
+                );
+                let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
             })
             .unzip();
+
+        let state_view_service = Arc::new(RemoteStateViewService::new(
+            controller_mut_ref,
+            remote_shard_addresses,
+            None,
+        ));
+
+        let state_view_service_clone = state_view_service.clone();
+
+        let join_handle = thread::Builder::new()
+            .name("remote-state_view-service".to_string())
+            .spawn(move || state_view_service_clone.start())
+            .unwrap();
+
+        controller.start();
+
         Self {
+            network_controller: controller,
+            state_view_service,
+            _join_handle: Some(join_handle),
             command_txs: Arc::new(command_txs),
             result_rxs,
             thread_pool,
             phantom: std::marker::PhantomData,
         }
+    }
+
+    pub fn create_remote_sharded_block_executor(
+        coordinator_address: SocketAddr,
+        remote_shard_addresses: Vec<SocketAddr>,
+        num_threads: Option<usize>,
+    ) -> ShardedBlockExecutor<S, RemoteExecutorClient<S>> {
+        ShardedBlockExecutor::new(RemoteExecutorClient::new(
+            remote_shard_addresses,
+            NetworkController::new(
+                "remote-executor-coordinator".to_string(),
+                coordinator_address,
+                5000,
+            ),
+            num_threads,
+        ))
     }
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
@@ -87,37 +182,34 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         concurrency_level_per_shard: usize,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
-        self.thread_pool.scope(|s| {
-            let (block, global_txns) = transactions.into();
-            assert!(
-                global_txns.is_empty(),
-                "Global transactions are not supported yet in remote execution mode."
-            );
-            for (shard_id, sub_blocks) in block.into_iter().enumerate() {
-                let state_view = state_view.clone();
-                let senders = self.command_txs.clone();
-                s.spawn(move |_| {
-                    let execution_request =
-                        RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
-                            sub_blocks,
-                            // TODO(skedia): Instead of serializing the entire state view, we should
-                            // serialize only the state values needed for the shard.
-                            state_view: S::as_in_memory_state_view(state_view.deref()),
-                            concurrency_level: concurrency_level_per_shard,
-                            maybe_block_gas_limit,
-                        });
+        trace!("RemoteExecutorClient Sending block to shards");
+        self.state_view_service.set_state_view(state_view);
+        let (sub_blocks, global_txns) = transactions.into();
+        if !global_txns.is_empty() {
+            panic!("Global transactions are not supported yet");
+        }
+        for (shard_id, sub_blocks) in sub_blocks.into_iter().enumerate() {
+            let senders = self.command_txs.clone();
+            let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
+                sub_blocks,
+                concurrency_level: concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            });
 
-                    senders[shard_id]
-                        .lock()
-                        .unwrap()
-                        .send(Message::new(bcs::to_bytes(&execution_request).unwrap()))
-                        .unwrap()
-                });
-            }
-        });
+            senders[shard_id]
+                .lock()
+                .unwrap()
+                .send(Message::new(bcs::to_bytes(&execution_request).unwrap()))
+                .unwrap();
+        }
 
         let execution_results = self.get_output_from_shards()?;
 
+        self.state_view_service.drop_state_view();
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
+    }
+
+    fn shutdown(&mut self) {
+        self.network_controller.shutdown();
     }
 }

@@ -31,6 +31,13 @@ pub struct ExecutedBlock {
     state_compute_result: StateComputeResult,
 }
 
+impl ExecutedBlock {
+    pub fn replace_result(mut self, result: StateComputeResult) -> Self {
+        self.state_compute_result = result;
+        self
+    }
+}
+
 impl Debug for ExecutedBlock {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self)
@@ -68,7 +75,7 @@ impl ExecutedBlock {
     }
 
     pub fn parent_id(&self) -> HashValue {
-        self.quorum_cert().certified_block().id()
+        self.block.parent_id()
     }
 
     pub fn quorum_cert(&self) -> &QuorumCert {

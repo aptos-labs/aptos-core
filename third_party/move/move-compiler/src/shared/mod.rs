@@ -8,8 +8,10 @@ use crate::{
     naming::ast::ModuleDefinition,
 };
 use clap::*;
+use move_command_line_common::env::read_bool_env_var;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
+use once_cell::sync::Lazy;
 use petgraph::{algo::astar as petgraph_astar, graphmap::DiGraphMap};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -283,6 +285,48 @@ pub fn format_comma<T: fmt::Display, I: IntoIterator<Item = T>>(items: I) -> Str
 // Flags
 //**************************************************************************************************
 
+pub fn debug_compiler_env_var() -> bool {
+    static DEBUG_COMPILER: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
+    *DEBUG_COMPILER
+}
+
+pub fn debug_compiler_env_var_str() -> &'static str {
+    if debug_compiler_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
+    static WARN_OF_DEPRECATION: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE));
+    *WARN_OF_DEPRECATION
+}
+
+pub fn move_compiler_warn_of_deprecation_use_env_var_str() -> &'static str {
+    if move_compiler_warn_of_deprecation_use_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
+    static WARN_OF_DEPRECATION: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
+    *WARN_OF_DEPRECATION
+}
+
+pub fn warn_of_deprecation_use_in_aptos_libs_env_var_str() -> &'static str {
+    if warn_of_deprecation_use_in_aptos_libs_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Flags {
     /// Compile in test mode
@@ -329,7 +373,22 @@ pub struct Flags {
     #[clap(
 	long = cli::SKIP_ATTRIBUTE_CHECKS,
     )]
-    pub skip_attribute_checks: bool,
+    skip_attribute_checks: bool,
+
+    /// Debug compiler by printing out internal information
+    #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
+    debug: bool,
+
+    /// Show warnings about use of deprecated functions, modules, constants, etc.
+    /// Note that current value of this constant is "Wdeprecation"
+    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG, default_value=move_compiler_warn_of_deprecation_use_env_var_str())]
+    warn_of_deprecation_use: bool,
+
+    /// Show warnings about use of deprecated usage in the Aptos libraries,
+    /// which we should generally not bother users with.
+    /// Note that current value of this constant is "Wdeprecation-aptos"
+    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=warn_of_deprecation_use_in_aptos_libs_env_var_str())]
+    warn_of_deprecation_use_in_aptos_libs: bool,
 }
 
 impl Flags {
@@ -342,6 +401,9 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -354,6 +416,24 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
+        }
+    }
+
+    pub fn all_functions() -> Self {
+        Self {
+            test: true,
+            verify: true,
+            shadow: false,
+            flavor: "".to_string(),
+            bytecode_version: None,
+            keep_testing_functions: false,
+            skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -366,6 +446,9 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: false,
             skip_attribute_checks: false,
+            debug: debug_compiler_env_var(),
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -378,6 +461,9 @@ impl Flags {
             bytecode_version: None,
             keep_testing_functions: true,
             skip_attribute_checks: false,
+            debug: false,
+            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
+            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
         }
     }
 
@@ -439,6 +525,32 @@ impl Flags {
             skip_attribute_checks: new_value,
             ..self
         }
+    }
+
+    pub fn warn_of_deprecation_use(&self) -> bool {
+        self.warn_of_deprecation_use
+    }
+
+    pub fn set_warn_of_deprecation_use(self, new_value: bool) -> Self {
+        Self {
+            warn_of_deprecation_use: new_value,
+            ..self
+        }
+    }
+
+    pub fn warn_of_deprecation_use_in_aptos_libs(&self) -> bool {
+        self.warn_of_deprecation_use_in_aptos_libs
+    }
+
+    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
+        Self {
+            warn_of_deprecation_use_in_aptos_libs: new_value,
+            ..self
+        }
+    }
+
+    pub fn debug(&self) -> bool {
+        self.debug
     }
 }
 
@@ -505,7 +617,7 @@ pub mod known_attributes {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum DeprecationAttribute {
-        // Marks deprecated funcitons whose use causes warnings
+        // Marks deprecated functions, types, modules, constants, addresses whose use causes warnings
         Deprecated,
     }
 

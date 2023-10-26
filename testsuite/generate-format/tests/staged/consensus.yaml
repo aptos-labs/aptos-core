@@ -25,6 +25,16 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+    2:
+      SingleKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: SingleKeyAuthenticator
+    3:
+      MultiKey:
+        STRUCT:
+          - authenticator:
+              TYPENAME: MultiKeyAuthenticator
 AggregateSignature:
   STRUCT:
     - validator_bitmask:
@@ -38,6 +48,30 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+AnyPublicKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256k1EcdsaPublicKey
+AnySignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
+    1:
+      Secp256k1Ecdsa:
+        STRUCT:
+          - signature:
+              TYPENAME: Secp256k1EcdsaSignature
 Batch:
   STRUCT:
     - batch_info:
@@ -186,6 +220,19 @@ CommitDecision:
   STRUCT:
     - ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+CommitMessage:
+  ENUM:
+    0:
+      Vote:
+        NEWTYPE:
+          TYPENAME: CommitVote
+    1:
+      Decision:
+        NEWTYPE:
+          TYPENAME: CommitDecision
+    2:
+      Ack:
+        NEWTYPE: UNIT
 CommitVote:
   STRUCT:
     - author:
@@ -256,17 +303,30 @@ ConsensusMsg:
       DAGMessage:
         NEWTYPE:
           TYPENAME: DAGNetworkMessage
+    15:
+      CommitMessage:
+        NEWTYPE:
+          TYPENAME: CommitMessage
 ContractEvent:
   ENUM:
     0:
-      V0:
+      V1:
         NEWTYPE:
-          TYPENAME: ContractEventV0
-ContractEventV0:
+          TYPENAME: ContractEventV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: ContractEventV2
+ContractEventV1:
   STRUCT:
     - key:
         TYPENAME: EventKey
     - sequence_number: U64
+    - type_tag:
+        TYPENAME: TypeTag
+    - event_data: BYTES
+ContractEventV2:
+  STRUCT:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
@@ -353,6 +413,21 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+MultiKey:
+  STRUCT:
+    - public_keys:
+        SEQ:
+          TYPENAME: AnyPublicKey
+    - signatures_required: U8
+MultiKeyAuthenticator:
+  STRUCT:
+    - public_keys:
+        TYPENAME: MultiKey
+    - signatures:
+        SEQ:
+          TYPENAME: AnySignature
+    - signatures_bitmap:
+        TYPENAME: BitVec
 Multisig:
   STRUCT:
     - multisig_address:
@@ -428,6 +503,12 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
+Secp256k1EcdsaPrivateKey:
+  NEWTYPESTRUCT: BYTES
+Secp256k1EcdsaPublicKey:
+  NEWTYPESTRUCT: BYTES
+Secp256k1EcdsaSignature:
+  NEWTYPESTRUCT: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
 SignedBatchInfo:
@@ -449,6 +530,12 @@ SignedTransaction:
         TYPENAME: RawTransaction
     - authenticator:
         TYPENAME: TransactionAuthenticator
+SingleKeyAuthenticator:
+  STRUCT:
+    - public_key:
+        TYPENAME: AnyPublicKey
+    - signature:
+        TYPENAME: AnySignature
 StateKey:
   ENUM:
     0:
@@ -589,6 +676,11 @@ TransactionAuthenticator:
           - fee_payer_address:
               TYPENAME: AccountAddress
           - fee_payer_signer:
+              TYPENAME: AccountAuthenticator
+    4:
+      SingleSender:
+        STRUCT:
+          - sender:
               TYPENAME: AccountAuthenticator
 TransactionPayload:
   ENUM:

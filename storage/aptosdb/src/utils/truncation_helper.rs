@@ -5,7 +5,7 @@
 
 use crate::{
     db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-    ledger_db::LedgerDb,
+    ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
@@ -17,17 +17,20 @@ use crate::{
     },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
+    state_store::MAX_COMMIT_PROGRESS_DIFFERENCE,
     utils::get_progress,
     EventStore, TransactionStore, NUM_STATE_SHARDS,
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
+use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
     ReadOptions, SchemaBatch, DB,
 };
 use aptos_types::{proof::position::Position, transaction::Version};
 use claims::{assert_ge, assert_lt};
+use rayon::prelude::*;
 use status_line::StatusLine;
 use std::{
     fmt::{Display, Formatter},
@@ -61,39 +64,17 @@ pub(crate) fn get_state_merkle_commit_progress(
     )
 }
 
-pub(crate) fn truncate_ledger_db(
-    ledger_db: Arc<LedgerDb>,
-    current_version: Version,
-    target_version: Version,
-    batch_size: usize,
-) -> Result<()> {
-    let status = StatusLine::new(Progress::new(target_version));
-
+pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {
     let event_store = EventStore::new(ledger_db.event_db_arc());
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
-    let mut current_version = current_version;
-    while current_version > target_version {
-        let start_version =
-            std::cmp::max(current_version - batch_size as u64 + 1, target_version + 1);
-        let end_version = current_version + 1;
-        // TODO(grao): Support splitted ledger DBs here.
-        truncate_ledger_db_single_batch(
-            ledger_db.metadata_db(),
-            &event_store,
-            &transaction_store,
-            start_version,
-            end_version,
-        )?;
-        current_version = start_version - 1;
-        status.set_current_version(current_version);
-    }
-    assert_eq!(current_version, target_version);
+    let start_version = target_version + 1;
+    truncate_ledger_db_single_batch(&ledger_db, &event_store, &transaction_store, start_version)?;
     Ok(())
 }
 
 pub(crate) fn truncate_state_kv_db(
-    state_kv_db: Arc<StateKvDb>,
+    state_kv_db: &StateKvDb,
     current_version: Version,
     target_version: Version,
     batch_size: usize,
@@ -106,7 +87,7 @@ pub(crate) fn truncate_state_kv_db(
             std::cmp::max(current_version - batch_size as u64, target_version);
         state_kv_db.write_progress(target_version_for_this_batch)?;
         truncate_state_kv_db_shards(
-            &state_kv_db,
+            state_kv_db,
             target_version_for_this_batch,
             Some(current_version),
         )?;
@@ -122,16 +103,16 @@ pub(crate) fn truncate_state_kv_db_shards(
     target_version: Version,
     expected_current_version: Option<Version>,
 ) -> Result<()> {
-    // TODO(grao): Consider do it in parallel.
-    for shard_id in 0..NUM_STATE_SHARDS {
-        truncate_state_kv_db_single_shard(
-            state_kv_db,
-            shard_id as u8,
-            target_version,
-            expected_current_version,
-        )?;
-    }
-    Ok(())
+    (0..NUM_STATE_SHARDS)
+        .into_par_iter()
+        .try_for_each(|shard_id| {
+            truncate_state_kv_db_single_shard(
+                state_kv_db,
+                shard_id as u8,
+                target_version,
+                expected_current_version,
+            )
+        })
 }
 
 pub(crate) fn truncate_state_kv_db_single_shard(
@@ -188,12 +169,11 @@ pub(crate) fn truncate_state_merkle_db_shards(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    // TODO(grao): Consider do it in parallel.
-    for shard_id in 0..NUM_STATE_SHARDS {
-        truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)?;
-    }
-
-    Ok(())
+    (0..NUM_STATE_SHARDS)
+        .into_par_iter()
+        .try_for_each(|shard_id| {
+            truncate_state_merkle_db_single_shard(state_merkle_db, shard_id as u8, target_version)
+        })
 }
 
 pub(crate) fn truncate_state_merkle_db_single_shard(
@@ -232,22 +212,19 @@ pub(crate) fn num_frozen_nodes_in_accumulator(num_leaves: u64) -> u64 {
 }
 
 fn truncate_transaction_accumulator(
-    ledger_db: &DB,
+    transaction_accumulator_db: &DB,
     start_version: Version,
-    end_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let num_frozen_nodes = num_frozen_nodes_in_accumulator(end_version);
-    let mut iter = ledger_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
+    let mut iter =
+        transaction_accumulator_db.iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
     iter.seek_to_last();
     let (position, _) = iter.next().transpose()?.unwrap();
-    assert_eq!(position.to_postorder_index() + 1, num_frozen_nodes);
+    let num_frozen_nodes = position.to_postorder_index() + 1;
+    let num_frozen_nodes_after = num_frozen_nodes_in_accumulator(start_version);
+    let mut num_nodes_to_delete = num_frozen_nodes - num_frozen_nodes_after;
 
-    let num_frozen_nodes_after_this_batch = num_frozen_nodes_in_accumulator(start_version);
-
-    let mut num_nodes_to_delete = num_frozen_nodes - num_frozen_nodes_after_this_batch;
-
-    let start_position = Position::from_postorder_index(num_frozen_nodes_after_this_batch)?;
+    let start_position = Position::from_postorder_index(num_frozen_nodes_after)?;
     iter.seek(&start_position)?;
 
     for item in iter {
@@ -262,40 +239,61 @@ fn truncate_transaction_accumulator(
 }
 
 fn truncate_ledger_db_single_batch(
-    ledger_db: &DB,
+    ledger_db: &LedgerDb,
     event_store: &EventStore,
     transaction_store: &TransactionStore,
     start_version: Version,
-    end_version: Version,
 ) -> Result<()> {
-    let batch = SchemaBatch::new();
+    let batch = LedgerDbSchemaBatches::new();
 
-    delete_transaction_index_data(transaction_store, start_version, end_version, &batch)?;
-    delete_per_epoch_data(ledger_db, start_version, end_version, &batch)?;
-    delete_per_version_data(start_version, end_version, &batch)?;
+    delete_transaction_index_data(
+        transaction_store,
+        start_version,
+        &batch.transaction_db_batches,
+    )?;
+    delete_per_epoch_data(
+        ledger_db.metadata_db(),
+        start_version,
+        &batch.ledger_metadata_db_batches,
+    )?;
+    delete_per_version_data(ledger_db, start_version, &batch)?;
 
-    event_store.prune_events(start_version, end_version, &batch)?;
+    delete_event_data(event_store, start_version, &batch.event_db_batches)?;
 
-    truncate_transaction_accumulator(ledger_db, start_version, end_version, &batch)?;
+    truncate_transaction_accumulator(
+        ledger_db.transaction_accumulator_db(),
+        start_version,
+        &batch.transaction_accumulator_db_batches,
+    )?;
 
-    batch.put::<DbMetadataSchema>(
+    let progress_batch = SchemaBatch::new();
+    progress_batch.put::<DbMetadataSchema>(
         &DbMetadataKey::LedgerCommitProgress,
         &DbMetadataValue::Version(start_version - 1),
     )?;
+    ledger_db.metadata_db().write_schemas(progress_batch)?;
+
     ledger_db.write_schemas(batch)
 }
 
 fn delete_transaction_index_data(
     transaction_store: &TransactionStore,
     start_version: Version,
-    end_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
     let transactions = transaction_store
-        .get_transaction_iter(start_version, (end_version - start_version) as usize)?
+        .get_transaction_iter(start_version, MAX_COMMIT_PROGRESS_DIFFERENCE as usize * 2)?
         .collect::<Result<Vec<_>>>()?;
-    transaction_store.prune_transaction_by_account(&transactions, batch)?;
-    transaction_store.prune_transaction_by_hash(&transactions, batch)?;
+    let num_txns = transactions.len();
+    if num_txns > 0 {
+        info!(
+            start_version = start_version,
+            latest_version = start_version + num_txns as u64 - 1,
+            "Truncate transaction index data."
+        );
+        transaction_store.prune_transaction_by_account(&transactions, batch)?;
+        transaction_store.prune_transaction_by_hash(&transactions, batch)?;
+    }
 
     Ok(())
 }
@@ -303,15 +301,18 @@ fn delete_transaction_index_data(
 fn delete_per_epoch_data(
     ledger_db: &DB,
     start_version: Version,
-    end_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
     let mut iter = ledger_db.iter::<LedgerInfoSchema>(ReadOptions::default())?;
     iter.seek_to_last();
     if let Some((epoch, ledger_info)) = iter.next().transpose()? {
         let version = ledger_info.commit_info().version();
-        assert_lt!(version, end_version);
         if version >= start_version {
+            info!(
+                version = version,
+                epoch = epoch,
+                "Truncate latest epoch data."
+            );
             batch.delete::<LedgerInfoSchema>(&epoch)?;
         }
     }
@@ -321,7 +322,11 @@ fn delete_per_epoch_data(
 
     for item in iter {
         let (version, epoch) = item?;
-        assert_lt!(version, end_version);
+        info!(
+            version = version,
+            epoch = epoch,
+            "Truncate epoch ending data."
+        );
         batch.delete::<EpochByVersionSchema>(&version)?;
         batch.delete::<LedgerInfoSchema>(&epoch)?;
     }
@@ -330,17 +335,75 @@ fn delete_per_epoch_data(
 }
 
 fn delete_per_version_data(
+    ledger_db: &LedgerDb,
     start_version: Version,
-    end_version: Version,
+    batch: &LedgerDbSchemaBatches,
+) -> Result<()> {
+    delete_per_version_data_impl::<TransactionInfoSchema>(
+        ledger_db.transaction_info_db(),
+        start_version,
+        &batch.transaction_info_db_batches,
+    )?;
+    delete_per_version_data_impl::<TransactionSchema>(
+        ledger_db.transaction_db(),
+        start_version,
+        &batch.transaction_db_batches,
+    )?;
+    delete_per_version_data_impl::<VersionDataSchema>(
+        ledger_db.metadata_db(),
+        start_version,
+        &batch.ledger_metadata_db_batches,
+    )?;
+    delete_per_version_data_impl::<WriteSetSchema>(
+        ledger_db.write_set_db(),
+        start_version,
+        &batch.write_set_db_batches,
+    )?;
+
+    Ok(())
+}
+
+fn delete_per_version_data_impl<S>(
+    ledger_db: &DB,
+    start_version: Version,
+    batch: &SchemaBatch,
+) -> Result<()>
+where
+    S: Schema<Key = Version>,
+{
+    let mut iter = ledger_db.iter::<S>(ReadOptions::default())?;
+    iter.seek_to_last();
+    if let Some((lastest_version, _)) = iter.next().transpose()? {
+        if lastest_version >= start_version {
+            info!(
+                start_version = start_version,
+                latest_version = lastest_version,
+                cf_name = S::COLUMN_FAMILY_NAME,
+                "Truncate per version data."
+            );
+            for version in start_version..=lastest_version {
+                batch.delete::<S>(&version)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn delete_event_data(
+    event_store: &EventStore,
+    start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    for version in start_version..end_version {
-        batch.delete::<TransactionInfoSchema>(&version)?;
-        batch.delete::<TransactionSchema>(&version)?;
-        batch.delete::<VersionDataSchema>(&version)?;
-        batch.delete::<WriteSetSchema>(&version)?;
+    if let Some(latest_version) = event_store.latest_version()? {
+        if latest_version >= start_version {
+            info!(
+                start_version = start_version,
+                latest_version = latest_version,
+                "Truncate event data."
+            );
+            event_store.prune_events(start_version, latest_version + 1, batch)?;
+        }
     }
-
     Ok(())
 }
 

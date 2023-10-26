@@ -9,7 +9,7 @@ use crate::dag::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
-use aptos_logger::error;
+use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -20,15 +20,12 @@ use std::{
 pub enum NodeStatus {
     Unordered(Arc<CertifiedNode>),
     Ordered(Arc<CertifiedNode>),
-    Committed(Arc<CertifiedNode>),
 }
 
 impl NodeStatus {
     pub fn as_node(&self) -> &Arc<CertifiedNode> {
         match self {
-            NodeStatus::Unordered(node)
-            | NodeStatus::Ordered(node)
-            | NodeStatus::Committed(node) => node,
+            NodeStatus::Unordered(node) | NodeStatus::Ordered(node) => node,
         }
     }
 
@@ -37,7 +34,6 @@ impl NodeStatus {
         *self = NodeStatus::Ordered(self.as_node().clone());
     }
 }
-
 /// Data structure that stores the DAG representation, it maintains round based index.
 #[derive(Clone)]
 pub struct Dag {
@@ -45,38 +41,58 @@ pub struct Dag {
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
     storage: Arc<dyn DAGStorage>,
+    start_round: Round,
+    epoch_state: Arc<EpochState>,
+    /// The window we maintain between highest committed round and initial round
+    window_size: u64,
 }
 
 impl Dag {
-    pub fn new(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> Self {
-        let epoch = epoch_state.epoch;
-        let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
-        let num_validators = author_to_index.len();
-        let all_nodes = storage.get_certified_nodes().unwrap_or_default();
-        let mut expired = vec![];
-        let mut nodes_by_round = BTreeMap::new();
+    pub fn new(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        start_round: Round,
+        window_size: u64,
+    ) -> Self {
+        let mut all_nodes = storage.get_certified_nodes().unwrap_or_default();
+        all_nodes.sort_unstable_by_key(|(_, node)| node.round());
+        let mut to_prune = vec![];
+        // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
+        let mut dag = Self::new_empty(epoch_state, storage.clone(), start_round, window_size);
         for (digest, certified_node) in all_nodes {
-            if certified_node.metadata().epoch() == epoch {
-                let arc_node = Arc::new(certified_node);
-                let index = *author_to_index
-                    .get(arc_node.metadata().author())
-                    .expect("Author from certified node should exist");
-                let round = arc_node.metadata().round();
-                nodes_by_round
-                    .entry(round)
-                    .or_insert_with(|| vec![None; num_validators])[index] =
-                    Some(NodeStatus::Unordered(arc_node));
-            } else {
-                expired.push(digest);
+            // TODO: save the storage call in this case
+            if let Err(e) = dag.add_node(certified_node) {
+                debug!("Delete node after bootstrap due to {}", e);
+                to_prune.push(digest);
             }
         }
-        if let Err(e) = storage.delete_certified_nodes(expired) {
+        if let Err(e) = storage.delete_certified_nodes(to_prune) {
             error!("Error deleting expired nodes: {:?}", e);
         }
+        if dag.is_empty() {
+            warn!(
+                "[DAG] Start with empty DAG store at {}, need state sync",
+                dag.start_round
+            );
+        }
+        dag
+    }
+
+    pub fn new_empty(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        start_round: Round,
+        window_size: u64,
+    ) -> Self {
+        let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
+        let nodes_by_round = BTreeMap::new();
         Self {
             nodes_by_round,
             author_to_index,
             storage,
+            start_round,
+            epoch_state,
+            window_size,
         }
     }
 
@@ -85,7 +101,7 @@ impl Dag {
             .nodes_by_round
             .first_key_value()
             .map(|(round, _)| round)
-            .unwrap_or(&0)
+            .unwrap_or(&self.start_round)
     }
 
     pub fn highest_round(&self) -> Round {
@@ -93,10 +109,24 @@ impl Dag {
             .nodes_by_round
             .last_key_value()
             .map(|(round, _)| round)
-            .unwrap_or(&0)
+            .unwrap_or(&self.start_round)
+    }
+
+    /// The highest strong links round is either the highest round or the highest round - 1
+    /// because we ensure all parents (strong links) exist for any nodes in the store
+    pub fn highest_strong_links_round(&self, validator_verifier: &ValidatorVerifier) -> Round {
+        let highest_round = self.highest_round();
+        self.get_strong_links_for_round(highest_round, validator_verifier)
+            .map_or_else(|| highest_round.saturating_sub(1), |_| highest_round)
     }
 
     pub fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+        ensure!(
+            node.epoch() == self.epoch_state.epoch,
+            "different epoch {}, current {}",
+            node.epoch(),
+            self.epoch_state.epoch
+        );
         let node = Arc::new(node);
         let author = node.metadata().author();
         let index = *self
@@ -104,10 +134,22 @@ impl Dag {
             .get(author)
             .ok_or_else(|| anyhow!("unknown author"))?;
         let round = node.metadata().round();
-        ensure!(round >= self.lowest_round(), "round too low");
-        ensure!(round <= self.highest_round() + 1, "round too high");
-        for parent in node.parents() {
-            ensure!(self.exists(parent.metadata()), "parent not exist");
+        ensure!(
+            round >= self.lowest_round(),
+            "round too low {}, lowest in dag {}",
+            round,
+            self.lowest_round()
+        );
+        ensure!(
+            round <= self.highest_round() + 1,
+            "round too high {}, highest in dag {}",
+            round,
+            self.highest_round()
+        );
+        if round > self.lowest_round() {
+            for parent in node.parents() {
+                ensure!(self.exists(parent.metadata()), "parent not exist");
+            }
         }
         let round_ref = self
             .nodes_by_round
@@ -117,6 +159,7 @@ impl Dag {
 
         // mutate after all checks pass
         self.storage.save_certified_node(&node)?;
+        debug!("Added node {}", node.id());
         round_ref[index] = Some(NodeStatus::Unordered(node.clone()));
         Ok(())
     }
@@ -127,6 +170,13 @@ impl Dag {
 
     pub fn all_exists<'a>(&self, nodes: impl Iterator<Item = &'a NodeMetadata>) -> bool {
         self.filter_missing(nodes).next().is_none()
+    }
+
+    pub fn all_exists_by_round_author<'a>(
+        &self,
+        mut nodes: impl Iterator<Item = &'a (Round, Author)>,
+    ) -> bool {
+        nodes.all(|(round, author)| self.get_node_ref(*round, author).is_some())
     }
 
     pub fn filter_missing<'a, 'b>(
@@ -140,10 +190,16 @@ impl Dag {
         self.get_node_ref(metadata.round(), metadata.author())
     }
 
-    fn get_node_ref(&self, round: Round, author: &Author) -> Option<&NodeStatus> {
+    pub fn get_node_ref(&self, round: Round, author: &Author) -> Option<&NodeStatus> {
         let index = self.author_to_index.get(author)?;
         let round_ref = self.nodes_by_round.get(&round)?;
         round_ref[*index].as_ref()
+    }
+
+    pub fn get_node_ref_mut(&mut self, round: Round, author: &Author) -> Option<&mut NodeStatus> {
+        let index = self.author_to_index.get(author)?;
+        let round_ref = self.nodes_by_round.get_mut(&round)?;
+        round_ref[*index].as_mut()
     }
 
     fn get_round_iter(&self, round: Round) -> Option<impl Iterator<Item = &NodeStatus>> {
@@ -189,7 +245,7 @@ impl Dag {
     }
 
     fn reachable_filter(start: Vec<HashValue>) -> impl FnMut(&Arc<CertifiedNode>) -> bool {
-        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start.into_iter());
+        let mut reachable: HashSet<HashValue> = HashSet::from_iter(start);
         move |node| {
             if reachable.contains(&node.digest()) {
                 for parent in node.parents() {
@@ -220,16 +276,16 @@ impl Dag {
             })
     }
 
-    pub fn reachable(
+    pub fn reachable<'a>(
         &self,
-        targets: &[NodeMetadata],
+        targets: impl Iterator<Item = &'a NodeMetadata> + Clone,
         until: Option<Round>,
         // TODO: replace filter with bool to filter unordered
         filter: impl Fn(&NodeStatus) -> bool,
     ) -> impl Iterator<Item = &NodeStatus> {
         let until = until.unwrap_or(self.lowest_round());
-        let initial = targets.iter().map(|t| *t.digest()).collect();
-        let initial_round = targets[0].round();
+        let initial_round = targets.clone().map(|t| t.round()).max().unwrap();
+        let initial = targets.map(|t| *t.digest()).collect();
 
         let mut reachable_filter = Self::reachable_filter(initial);
         self.nodes_by_round
@@ -265,29 +321,71 @@ impl Dag {
         }
     }
 
-    pub fn lowest_incomplete_round(&self) -> Option<Round> {
+    pub fn lowest_incomplete_round(&self) -> Round {
+        if self.nodes_by_round.is_empty() {
+            return self.lowest_round();
+        }
+
         for (round, round_nodes) in &self.nodes_by_round {
             if round_nodes.iter().any(|node| node.is_none()) {
-                return Some(*round);
+                return *round;
+            }
+        }
+
+        self.highest_round() + 1
+    }
+
+    pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
+        let lowest_round = self.lowest_incomplete_round();
+
+        let mut bitmask: Vec<_> = self
+            .nodes_by_round
+            .range(lowest_round..=target_round)
+            .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
+            .collect();
+
+        bitmask.resize((target_round - lowest_round + 1) as usize, vec![
+            false;
+            self.author_to_index
+                .len()
+        ]);
+
+        DagSnapshotBitmask::new(lowest_round, bitmask)
+    }
+
+    pub(super) fn prune(&mut self) {
+        let to_keep = self.nodes_by_round.split_off(&self.start_round);
+        let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);
+        let digests = to_prune
+            .iter()
+            .flat_map(|(_, round_ref)| round_ref.iter().flatten())
+            .map(|node_status| *node_status.as_node().metadata().digest())
+            .collect();
+        if let Err(e) = self.storage.delete_certified_nodes(digests) {
+            error!("Error deleting expired nodes: {:?}", e);
+        }
+    }
+
+    pub fn commit_callback(&mut self, commit_round: Round) {
+        let new_start_round = commit_round.saturating_sub(self.window_size);
+        if new_start_round > self.start_round {
+            self.start_round = new_start_round;
+            self.prune();
+        }
+    }
+
+    pub(super) fn highest_ordered_anchor_round(&self) -> Option<Round> {
+        for (round, round_nodes) in self.nodes_by_round.iter().rev() {
+            for maybe_node_status in round_nodes {
+                if matches!(maybe_node_status, Some(NodeStatus::Ordered(_))) {
+                    return Some(*round);
+                }
             }
         }
         None
     }
 
-    pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
-        let lowest_round = match self.lowest_incomplete_round() {
-            Some(round) => round,
-            None => {
-                return DagSnapshotBitmask::new(self.highest_round() + 1, vec![]);
-            },
-        };
-
-        let bitmask = self
-            .nodes_by_round
-            .range(lowest_round..target_round)
-            .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
-            .collect();
-
-        DagSnapshotBitmask::new(lowest_round, bitmask)
+    pub fn is_empty(&self) -> bool {
+        self.nodes_by_round.is_empty() && self.start_round > 1
     }
 }

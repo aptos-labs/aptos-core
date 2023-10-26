@@ -7,12 +7,13 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::on_chain_config::FeatureFlag;
 use ark_std::iterable::Iterable;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::TypeTag,
     u256,
-    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -166,7 +167,7 @@ fn native_format_impl(
             suffix = "u256";
         },
         MoveTypeLayout::Address => {
-            let addr = val.value_as::<move_core_types::account_address::AccountAddress>()?;
+            let addr = val.value_as::<AccountAddress>()?;
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
@@ -175,13 +176,30 @@ fn native_format_impl(
             write!(out, "@{}", str).unwrap();
         },
         MoveTypeLayout::Signer => {
-            let addr = val.value_as::<move_core_types::account_address::AccountAddress>()?;
+            let fix_enabled = context
+                .context
+                .get_feature_flags()
+                .is_enabled(FeatureFlag::SIGNER_NATIVE_FORMAT_FIX);
+            let addr = if fix_enabled {
+                val.value_as::<Struct>()?
+                    .unpack()?
+                    .next()
+                    .unwrap()
+                    .value_as::<AccountAddress>()?
+            } else {
+                val.value_as::<AccountAddress>()?
+            };
+
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
                 addr.to_hex_literal()
             };
-            write!(out, "signer({})", str).unwrap();
+            if fix_enabled {
+                write!(out, "signer(@{})", str).unwrap();
+            } else {
+                write!(out, "signer({})", str).unwrap();
+            }
         },
         MoveTypeLayout::Vector(ty) => {
             if let MoveTypeLayout::U8 = ty.as_ref() {
@@ -284,6 +302,12 @@ fn native_format_impl(
                 out,
             )?;
             out.push('}');
+        },
+        MoveTypeLayout::Tagged(tag, ty) => match tag {
+            // There is no need to show any lifting information!
+            // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
+            // Can we modify this to print tagging info, or is this something that cannot be changed
+            LayoutTag::IdentifierMapping(_) => native_format_impl(context, ty, val, depth, out)?,
         },
     };
     if context.include_int_type {
@@ -402,7 +426,7 @@ fn native_format_list(
                 match_list_ty(context, list_ty, "Cons")?;
 
                 // We know that the type is a list, so we can safely unwrap
-                let ty_args = if let Type::StructInstantiation(_, ty_args) = list_ty {
+                let ty_args = if let Type::StructInstantiation { ty_args, .. } = list_ty {
                     ty_args
                 } else {
                     unreachable!()

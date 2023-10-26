@@ -25,4 +25,5 @@ move-unit-test = { workspace = true }
 move-vm-runtime = { workspace = true }
 
 [dev-dependencies]
+aptos-framework = { workspace = true, features = ["testing"] }
 tempfile = { workspace = true }

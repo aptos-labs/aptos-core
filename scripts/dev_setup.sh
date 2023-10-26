@@ -25,7 +25,7 @@ VAULT_VERSION=1.5.0
 Z3_VERSION=4.11.2
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=6.0
-BOOGIE_VERSION=2.15.8
+BOOGIE_VERSION=3.0.1
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -294,6 +294,50 @@ function install_awscli {
       "${INSTALL_DIR}"aws --version
     fi
   fi
+}
+
+function install_s5cmd {
+  if command -v s5cmd &> /dev/null; then
+    echo "s5cmd exists, remove before reinstalling."
+    return
+  fi
+
+  if [[ $(uname -s) == "Darwin" ]]; then
+    install_pkg peak/tap/s5cmd brew
+    return
+  fi
+
+  if [[ $(uname -s) == "Linux" ]]; then
+    MACHINE=$(uname -m | tr '[:upper:]' '[:lower]');
+    SUFFIX=""
+    if [[ "$MACHINE" == "x86_64" ]]; then
+      SUFFIX="64bit"
+    elif [[ "$MACHINE" == "i386" ]] || [[ "$MACHINE" == "i686" ]]; then
+      SUFFIX="32bit"
+    elif \
+         [[ "$MACHINE" == "aarch64_be" ]] || \
+         [[ "$MACHINE" == "aarch64" ]] || \
+         [[ "$MACHINE" == "armv8b" ]] || \
+         [[ "$MACHINE" == "armv8l" ]] \
+         ; then
+      SUFFIX="arm64"
+    elif [[ "$MACHINE" == "arm" ]]; then
+      SUFFIX="armv6"
+    fi
+
+    if [[ $SUFFIX != "" ]]; then
+      TMPFILE=$(mktemp)
+      rm "$TMPFILE"
+      mkdir -p "$TMPFILE"/work/
+      curl -sL -o "$TMPFILE"/s5cmd.tar.gz https://github.com/peak/s5cmd/releases/download/v2.2.2/s5cmd_2.2.2_Linux-$SUFFIX.tar.gz
+      tar -C "$TMPFILE"/work -xzvf "$TMPFILE"/s5cmd.tar.gz
+      mv "$TMPFILE"/work/s5cmd "${INSTALL_DIR}"/
+      "${INSTALL_DIR}"s5cmd version
+      return
+    fi
+  fi
+
+  echo No good way to install s5cmd 'install_s5cmd '"$PACKAGE_MANAGER"
 }
 
 function install_pkg {
@@ -606,7 +650,7 @@ function install_xsltproc {
 
 function install_nodejs {
     if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-      curl -fsSL https://deb.nodesource.com/setup_14.x | "${PRE_COMMAND[@]}" bash -
+      curl -fsSL https://deb.nodesource.com/setup_18.x | "${PRE_COMMAND[@]}" bash -
     fi
     install_pkg nodejs "$PACKAGE_MANAGER"
     install_pkg npm "$PACKAGE_MANAGER"
@@ -672,7 +716,7 @@ function install_lld {
 # this is needed for hdpi crate from aptos-ledger
 function install_libudev-dev {
   # Need to install libudev-dev for linux
-  if [[ "$(uname)" == "Linux" ]]; then
+  if [[ "$(uname)" == "Linux" && "$PACKAGE_MANAGER" != "pacman" ]]; then
     install_pkg libudev-dev "$PACKAGE_MANAGER"
   fi
 }
@@ -713,6 +757,7 @@ Operation tools (since -o was provided):
   * kubectl
   * helm
   * aws cli
+  * s5cmd
   * allure
 EOF
   fi
@@ -863,7 +908,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "false" ]] && \
    INSTALL_BUILD_TOOLS="true"
 fi
 
-if [ ! -f rust-toolchain ]; then
+if [ ! -f rust-toolchain.toml ]; then
 	echo "Unknown location. Please run this from the aptos-core repository. Abort."
 	exit 1
 fi
@@ -934,6 +979,7 @@ fi
 
 install_pkg curl "$PACKAGE_MANAGER"
 install_pkg unzip "$PACKAGE_MANAGER"
+install_pkg wget "$PACKAGE_MANAGER"
 
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
@@ -947,7 +993,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_lld
 
   install_rustup "$BATCH_MODE"
-  install_toolchain "$(cat ./rust-toolchain)"
+  install_toolchain "$(grep channel ./rust-toolchain.toml | grep -o '"[^"]\+"' | sed 's/"//g')" # TODO: Fix me. This feels hacky.
   install_rustup_components_and_nightly
 
   install_cargo_sort
@@ -984,6 +1030,7 @@ if [[ "$OPERATIONS" == "true" ]]; then
   install_terraform
   install_kubectl
   install_awscli "$PACKAGE_MANAGER"
+  install_s5cmd "$PACKAGE_MANAGER"
   install_allure
 fi
 
@@ -1034,9 +1081,12 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
 fi
 
 install_python3
-pip3 install pre-commit
-
-install_libudev-dev
+if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
+  pip3 install pre-commit
+  install_libudev-dev
+else
+  install_pkg python-pre-commit "$PACKAGE_MANAGER"
+fi
 
 # For now best effort install, will need to improve later
 if command -v pre-commit; then

@@ -7,10 +7,12 @@ mod resolver;
 mod respawned_session;
 mod session;
 mod vm;
+mod warm_vm_cache;
+pub(crate) mod write_op_converter;
 
 pub use crate::move_vm_ext::{
-    resolver::MoveResolverExt,
+    resolver::{AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver},
     respawned_session::RespawnedSession,
     session::{SessionExt, SessionId},
-    vm::{get_max_binary_format_version, verifier_config, MoveVmExt},
+    vm::{get_max_binary_format_version, get_max_identifier_size, verifier_config, MoveVmExt},
 };

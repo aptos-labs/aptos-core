@@ -5,17 +5,24 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    components::{block_tree::BlockTree, chunk_output::ChunkOutput},
+    components::{
+        apply_chunk_output::ApplyChunkOutput, block_tree::BlockTree, chunk_output::ChunkOutput,
+    },
     logging::{LogEntry, LogSchema},
     metrics::{
         APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS, APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS,
+        APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS, APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS,
         APTOS_EXECUTOR_OTHER_TIMERS_SECONDS, APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS,
         APTOS_EXECUTOR_TRANSACTIONS_SAVED, APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_executor_types::{BlockExecutorTrait, Error, StateComputeResult};
+use aptos_executor_types::{
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
+    BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult,
+};
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_scratchpad::SparseMerkleTree;
@@ -104,18 +111,32 @@ where
         Ok(())
     }
 
-    fn execute_block(
+    fn execute_and_state_checkpoint(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<StateComputeResult, Error> {
+    ) -> ExecutorResult<StateCheckpointOutput> {
         self.maybe_initialize()?;
         self.inner
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .execute_block(block, parent_block_id, maybe_block_gas_limit)
+            .execute_and_state_checkpoint(block, parent_block_id, maybe_block_gas_limit)
+    }
+
+    fn ledger_update(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+        state_checkpoint_output: StateCheckpointOutput,
+    ) -> ExecutorResult<StateComputeResult> {
+        self.maybe_initialize()?;
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .ledger_update(block_id, parent_block_id, state_checkpoint_output)
     }
 
     fn commit_blocks_ext(
@@ -123,7 +144,7 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         self.inner
             .read()
             .as_ref()
@@ -156,13 +177,7 @@ where
     }
 
     fn root_smt(&self) -> SparseMerkleTree<StateValue> {
-        self.block_tree
-            .root_block()
-            .output
-            .result_view
-            .state()
-            .current
-            .clone()
+        self.block_tree.root_block().output.state().current.clone()
     }
 }
 
@@ -174,87 +189,152 @@ where
         self.block_tree.root_block().id
     }
 
-    fn execute_block(
+    fn execute_and_state_checkpoint(
         &self,
         block: ExecutableBlock,
         parent_block_id: HashValue,
         maybe_block_gas_limit: Option<u64>,
-    ) -> Result<StateComputeResult, Error> {
+    ) -> ExecutorResult<StateCheckpointOutput> {
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {
             block_id,
             transactions,
         } = block;
-        let committed_block = self.block_tree.root_block();
         let mut block_vec = self
             .block_tree
             .get_blocks_opt(&[block_id, parent_block_id])?;
         let parent_block = block_vec
             .pop()
             .expect("Must exist.")
-            .ok_or(Error::BlockNotFound(parent_block_id))?;
+            .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
         let parent_output = &parent_block.output;
-        let parent_view = &parent_output.result_view;
-        let parent_accumulator = parent_view.txn_accumulator();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "execute_block"
+        );
+        let committed_block_id = self.committed_block_id();
+        let (state, epoch_state, state_checkpoint_output) =
+            if parent_block_id != committed_block_id && parent_output.has_reconfiguration() {
+                info!(
+                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                    "reconfig_descendant_block_received"
+                );
+                (
+                    parent_output.state().clone(),
+                    parent_output.epoch_state().clone(),
+                    StateCheckpointOutput::default(),
+                )
+            } else {
+                let state_view = {
+                    let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                        .with_label_values(&["verified_state_view"])
+                        .start_timer();
+                    info!("next_version: {}", parent_output.next_version());
+                    CachedStateView::new(
+                        StateViewId::BlockExecution { block_id },
+                        Arc::clone(&self.db.reader),
+                        parent_output.next_version(),
+                        parent_output.state().current.clone(),
+                        Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
+                    )?
+                };
 
-        if let Some(b) = block_vec.pop().expect("Must exist") {
-            // this is a retry
-            parent_block.ensure_has_child(block_id)?;
-            return Ok(b.output.as_state_compute_result(parent_accumulator));
+                let chunk_output = {
+                    let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
+                    fail_point!("executor::vm_execute_block", |_| {
+                        Err(ExecutorError::from(anyhow::anyhow!(
+                            "Injected error in vm_execute_block"
+                        )))
+                    });
+                    V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
+                };
+
+                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+                    .with_label_values(&["state_checkpoint"])
+                    .start_timer();
+
+                THREAD_MANAGER.get_exe_cpu_pool().install(|| {
+                    chunk_output.into_state_checkpoint_output(
+                        parent_output.state(),
+                        maybe_block_gas_limit.map(|_| block_id),
+                    )
+                })?
+            };
+
+        let _ = self.block_tree.add_block(
+            parent_block_id,
+            block_id,
+            ExecutionOutput::new(state, epoch_state),
+        )?;
+        Ok(state_checkpoint_output)
+    }
+
+    fn ledger_update(
+        &self,
+        block_id: HashValue,
+        parent_block_id: HashValue,
+        state_checkpoint_output: StateCheckpointOutput,
+    ) -> ExecutorResult<StateComputeResult> {
+        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
+        info!(
+            LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+            "ledger_update"
+        );
+        let committed_block_id = self.committed_block_id();
+        let mut block_vec = self
+            .block_tree
+            .get_blocks_opt(&[block_id, parent_block_id])?;
+        let parent_block = block_vec
+            .pop()
+            .expect("Must exist.")
+            .ok_or(ExecutorError::BlockNotFound(parent_block_id))?;
+        // At this point of time two things must happen
+        // 1. The block tree must also have the current block id with or without the ledger update output.
+        // 2. We must have the ledger update output of the parent block.
+        let parent_output = parent_block.output.get_ledger_update();
+        let parent_accumulator = parent_output.txn_accumulator();
+        let current_output = block_vec.pop().expect("Must exist").unwrap();
+        parent_block.ensure_has_child(block_id)?;
+        if current_output.output.has_ledger_update() {
+            return Ok(current_output
+                .output
+                .get_ledger_update()
+                .as_state_compute_result(
+                    parent_accumulator,
+                    current_output.output.epoch_state().clone(),
+                ));
         }
 
-        let output = if parent_block_id != committed_block.id && parent_output.has_reconfiguration()
-        {
-            info!(
-                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                "reconfig_descendant_block_received"
-            );
-            parent_output.reconfig_suffix()
-        } else {
-            info!(
-                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
-                "execute_block"
-            );
-            let state_view = {
-                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&["verified_state_view"])
-                    .start_timer();
-                parent_view.verified_state_view(
-                    StateViewId::BlockExecution { block_id },
-                    Arc::clone(&self.db.reader),
-                    Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-                )?
+        let output =
+            if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
+                info!(
+                    LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                    "reconfig_descendant_block_received"
+                );
+                parent_output.reconfig_suffix()
+            } else {
+                let (output, _, _) = THREAD_MANAGER.get_non_exe_cpu_pool().install(|| {
+                    ApplyChunkOutput::calculate_ledger_update(
+                        state_checkpoint_output,
+                        parent_accumulator.clone(),
+                    )
+                })?;
+                output
             };
 
-            let chunk_output = {
-                let _timer = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.start_timer();
-                fail_point!("executor::vm_execute_block", |_| {
-                    Err(Error::from(anyhow::anyhow!(
-                        "Injected error in vm_execute_block"
-                    )))
-                });
-                V::execute_transaction_block(transactions, state_view, maybe_block_gas_limit)?
-            };
-            chunk_output.trace_log_transaction_status();
+        if !current_output.output.has_reconfiguration() {
+            output.ensure_ends_with_state_checkpoint()?;
+        }
 
-            let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                .with_label_values(&["apply_to_ledger"])
-                .start_timer();
-
-            let (output, _, _) = chunk_output
-                .apply_to_ledger_for_block(parent_view, maybe_block_gas_limit.map(|_| block_id))?;
-
-            output
-        };
-        output.ensure_ends_with_state_checkpoint()?;
-
-        let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
+        let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_OTHER_SECONDS
             .with_label_values(&["as_state_compute_result"])
             .start_timer();
-        let block = self
-            .block_tree
-            .add_block(parent_block_id, block_id, output)?;
-        Ok(block.output.as_state_compute_result(parent_accumulator))
+        let state_compute_result = output.as_state_compute_result(
+            parent_accumulator,
+            current_output.output.epoch_state().clone(),
+        );
+        current_output.output.set_ledger_update(output);
+        Ok(state_compute_result)
     }
 
     fn commit_blocks_ext(
@@ -262,7 +342,7 @@ where
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         sync_commit: bool,
-    ) -> Result<(), Error> {
+    ) -> ExecutorResult<()> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
 
         // Ensure the block ids are not empty
@@ -297,17 +377,17 @@ where
 
         let mut first_version = committed_block
             .output
-            .result_view
+            .get_ledger_update()
             .txn_accumulator()
             .num_leaves();
 
         let to_commit = blocks
             .iter()
-            .map(|block| block.output.to_commit.len())
+            .map(|block| block.output.get_ledger_update().to_commit.len())
             .sum();
         let target_version = ledger_info_with_sigs.ledger_info().version();
         if first_version + to_commit as u64 != target_version + 1 {
-            return Err(Error::BadNumTxnsToCommit {
+            return Err(ExecutorError::BadNumTxnsToCommit {
                 first_version,
                 to_commit,
                 target_version,
@@ -318,21 +398,16 @@ where
         });
 
         for (i, block) in blocks.iter().enumerate() {
-            let txns_to_commit: Vec<_> = {
-                let _timer = APTOS_EXECUTOR_OTHER_TIMERS_SECONDS
-                    .with_label_values(&["get_txns_to_commit"])
-                    .start_timer();
-                block.output.transactions_to_commit()
-            };
+            let txns_to_commit = block.output.get_ledger_update().transactions_to_commit();
 
             let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
             APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
-            let result_in_memory_state = block.output.result_view.state().clone();
-            self.db.writer.save_transaction_block(
-                &txns_to_commit,
+            let result_in_memory_state = block.output.state().clone();
+            self.db.writer.save_transactions(
+                txns_to_commit,
                 first_version,
-                committed_block.output.result_view.state().base_version,
+                committed_block.output.state().base_version,
                 if i == blocks.len() - 1 {
                     Some(&ledger_info_with_sigs)
                 } else {
@@ -341,8 +416,12 @@ where
                 sync_commit,
                 result_in_memory_state,
                 // TODO(grao): Avoid this clone.
-                block.output.block_state_updates.clone(),
-                &block.output.sharded_state_cache,
+                block
+                    .output
+                    .get_ledger_update()
+                    .state_updates_until_last_checkpoint
+                    .clone(),
+                Some(&block.output.get_ledger_update().sharded_state_cache),
             )?;
             first_version += txns_to_commit.len() as u64;
             committed_block = block.clone();

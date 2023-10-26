@@ -23,7 +23,7 @@ use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
 use move_core_types::account_address::AccountAddress;
-use move_model::model::GlobalEnv;
+use move_model::model;
 use serde::{Deserialize, Serialize};
 use source_package::layout::SourcePackageLayout;
 use std::{
@@ -114,6 +114,14 @@ pub struct BuildConfig {
     #[clap(name = "generate-abis", long = "abi", global = true)]
     pub generate_abis: bool,
 
+    /// Whether to generate a move model. Used programmatically only.
+    #[clap(skip)]
+    pub generate_move_model: bool,
+
+    /// Whether the generated model shall contain all functions, including test-only ones.
+    #[clap(skip)]
+    pub full_model_generation: bool,
+
     /// Installation directory for compiled artifacts. Defaults to current directory.
     #[clap(long = "install-dir", value_parser, global = true)]
     pub install_dir: Option<PathBuf>,
@@ -137,6 +145,12 @@ pub struct BuildConfig {
     #[clap(long = "skip-fetch-latest-git-deps", global = true)]
     pub skip_fetch_latest_git_deps: bool,
 
+    #[clap(flatten)]
+    pub compiler_config: CompilerConfig,
+}
+
+#[derive(Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default, Debug)]
+pub struct CompilerConfig {
     /// Bytecode version to compile move code
     #[clap(long = "bytecode-version", global = true)]
     pub bytecode_version: Option<u32>,
@@ -148,6 +162,22 @@ pub struct BuildConfig {
     /// Do not complain about an unknown attribute in Move code.
     #[clap(long = SKIP_ATTRIBUTE_CHECKS, default_value = "false")]
     pub skip_attribute_checks: bool,
+
+    /// Compiler version to use
+    #[clap(long = "compiler-version", global = true)]
+    pub compiler_version: Option<CompilerVersion>,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd)]
+pub enum CompilerVersion {
+    V1,
+    V2,
+}
+
+impl Default for CompilerVersion {
+    fn default() -> Self {
+        Self::V1
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -163,10 +193,10 @@ impl BuildConfig {
     /// Compile the package at `path` or the containing Move package. Exit process on warning or
     /// failure.
     pub fn compile_package<W: Write>(self, path: &Path, writer: &mut W) -> Result<CompiledPackage> {
-        let bytecode_version = self.bytecode_version;
+        let config = self.compiler_config.clone(); // Need clone because of mut self
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile(bytecode_version, writer);
+        let ret = BuildPlan::create(resolved_graph)?.compile(&config, writer);
         mutx.unlock();
         ret
     }
@@ -177,11 +207,11 @@ impl BuildConfig {
         self,
         path: &Path,
         writer: &mut W,
-    ) -> Result<CompiledPackage> {
-        let bytecode_version = self.bytecode_version;
+    ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
+        let config = self.compiler_config.clone(); // Need clone because of mut self
         let resolved_graph = self.resolution_graph_for_package(path, writer)?;
         let mutx = PackageLock::lock();
-        let ret = BuildPlan::create(resolved_graph)?.compile_no_exit(bytecode_version, writer);
+        let ret = BuildPlan::create(resolved_graph)?.compile_no_exit(&config, writer);
         mutx.unlock();
         ret
     }
@@ -206,7 +236,7 @@ impl BuildConfig {
         self,
         path: &Path,
         model_config: ModelConfig,
-    ) -> Result<GlobalEnv> {
+    ) -> Result<model::GlobalEnv> {
         // resolution graph diagnostics are only needed for CLI commands so ignore them by passing a
         // vector as the writer
         let resolved_graph = self.resolution_graph_for_package(path, &mut Vec::new())?;
@@ -220,7 +250,7 @@ impl BuildConfig {
         let path = SourcePackageLayout::try_find_root(path)?;
         let toml_manifest =
             self.parse_toml_manifest(path.join(SourcePackageLayout::Manifest.path()))?;
-        let mutx = PackageLock::lock();
+        let mutx = PackageLock::strict_lock();
         // This should be locked as it inspects the environment for `MOVE_HOME` which could
         // possibly be set by a different process in parallel.
         let manifest = manifest_parser::parse_source_manifest(toml_manifest)?;
