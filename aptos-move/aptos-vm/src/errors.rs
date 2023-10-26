@@ -210,7 +210,9 @@ pub fn expect_only_successful_execution(
         e @ VMStatus::Error {
             status_code:
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
-                | StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                | StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
+                // TODO[agg_v2](fix) remove special handling of storage errors here
+                | StatusCode::STORAGE_ERROR,
             ..
         } => e,
         status => {
