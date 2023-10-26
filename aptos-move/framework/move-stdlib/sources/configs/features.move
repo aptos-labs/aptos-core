@@ -253,7 +253,7 @@ module std::features {
 
     /// Whether the fix to reduce the maximum identifer length is enabled.
     /// Lifetime: transient
-    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 33;
+    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
 
     // ============================================================================================
     // Feature Flag Implementation
