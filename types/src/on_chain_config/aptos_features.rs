@@ -40,7 +40,7 @@ pub enum FeatureFlag {
     AGGREGATOR_SNAPSHOTS = 30,
     SAFER_RESOURCE_GROUPS = 31,
     SAFER_METADATA = 32,
-    LIMIT_MAX_IDENTIFIER_LENGTH = 33,
+    LIMIT_MAX_IDENTIFIER_LENGTH = 38,
 }
 
 /// Representation of features on chain as a bitset.
