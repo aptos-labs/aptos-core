@@ -661,15 +661,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    pub(crate) fn read_set_sequential_execution(&self) -> RefCell<HashSet<T::Key>> {
-        match &self.latest_view {
-            ViewState::Sync(_) => unreachable!(
-                "Read set for sequential execution while running in parallel execution mode"
-            ),
-            ViewState::Unsync(state) => state.read_set.clone(),
-        }
-    }
-
     fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key);
 
@@ -739,6 +730,70 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .ok_or_else(|| anyhow::anyhow!("Failed to serialize resource during id replacement"))?
             .into();
         Ok((patched_bytes, mapping.into_inner()))
+    }
+
+    fn extract_identifiers_from_value(
+        &self,
+        bytes: &Bytes,
+        layout: &MoveTypeLayout,
+    ) -> anyhow::Result<HashSet<T::Identifier>> {
+        let mapping = TemporaryExtractIdentifiersMapping::<T>::new();
+        let _patched_value =
+            deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping).ok_or_else(
+                || anyhow::anyhow!("Failed to deserialize resource during id replacement"),
+            )?;
+        Ok(mapping.into_inner())
+    }
+
+    fn get_reads_needing_exchange_parallel(
+        &self,
+        read_set: &CapturedReads<T>,
+        delayed_write_set_keys: &HashSet<T::Identifier>,
+        skip: &HashSet<T::Key>,
+    ) -> BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)> {
+        read_set
+            .get_read_values_with_delayed_fields()
+            .filter(|(key, _)| !skip.contains(key))
+            .flat_map(|(key, data_read)| {
+                if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                    if let Some(bytes) = value.bytes() {
+                        let identifiers_in_read = self
+                            .extract_identifiers_from_value(bytes, layout.as_ref())
+                            .unwrap();
+                        if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                            return Some((key.clone(), (value.as_ref().clone(), layout.clone())));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    fn get_reads_needing_exchange_sequential(
+        &self,
+        read_set: &HashSet<T::Key>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        delayed_write_set_keys: &HashSet<T::Identifier>,
+        skip: &HashSet<T::Key>,
+    ) -> BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)> {
+        read_set
+            .iter()
+            .filter(|key| !skip.contains(key))
+            .flat_map(|key| {
+                if let Some((value, Some(layout))) = unsync_map.fetch_data(key) {
+                    if let Some(bytes) = value.bytes() {
+                        let identifiers_in_read = self
+                            .extract_identifiers_from_value(bytes, layout.as_ref())
+                            .unwrap();
+                        if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                            return Some((key.clone(), (value.as_ref().clone(), layout.clone())));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
     }
 
     fn get_resource_state_value_impl(
@@ -825,48 +880,46 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     },
                     None => {
                         let from_storage = self.get_base_value(state_key)?;
-
-                        Ok(
-                            match (
-                                kind.clone(),
-                                from_storage,
-                                maybe_layout,
-                                state.dynamic_change_set_optimizations_enabled,
-                            ) {
-                                (ReadKind::Value, Some(state_value), Some(layout), true) => {
-                                    let res =
-                                        self.replace_values_with_identifiers(state_value, layout);
-                                    let patched_state_value = match res {
-                                        Ok((patched_state_value, _)) => {
-                                            state.read_set.borrow_mut().insert(state_key.clone());
-                                            state.unsync_map.write(
-                                                state_key.clone(),
-                                                TransactionWrite::from_state_value(Some(
-                                                    patched_state_value.clone(),
-                                                )),
-                                                maybe_layout.map(|layout| Arc::new(layout.clone())),
-                                            );
-                                            Some(patched_state_value)
-                                        },
-                                        Err(err) => {
-                                            let log_context = AdapterLogSchema::new(
-                                                self.base_view.id(),
-                                                self.txn_idx as usize,
-                                            );
-                                            alert!(
+                        let maybe_patched_from_storage = match (
+                            kind.clone(),
+                            from_storage,
+                            maybe_layout,
+                            state.dynamic_change_set_optimizations_enabled,
+                        ) {
+                            (ReadKind::Value, Some(state_value), Some(layout), true) => {
+                                let res = self
+                                    .replace_values_with_identifiers(state_value.clone(), layout);
+                                let patched_state_value = match res {
+                                    Ok((patched_state_value, _)) => {
+                                        state.read_set.borrow_mut().insert(state_key.clone());
+                                        Some(patched_state_value)
+                                    },
+                                    Err(err) => {
+                                        let log_context = AdapterLogSchema::new(
+                                            self.base_view.id(),
+                                            self.txn_idx as usize,
+                                        );
+                                        alert!(
                                             log_context,
                                             "[VM, ResourceView] Error during value to id replacement for {:?}: {}",
                                             state_key,
                                             err
                                         );
-                                            None
-                                        },
-                                    };
-                                    patched_state_value
-                                },
-                                (_, maybe_state_value, _, _) => maybe_state_value,
+                                        None
+                                    },
+                                };
+                                patched_state_value
                             },
-                        )
+                            (_, maybe_state_value, _, _) => maybe_state_value,
+                        };
+
+                        state.unsync_map.write(
+                            state_key.clone(),
+                            TransactionWrite::from_state_value(maybe_patched_from_storage.clone()),
+                            maybe_layout.cloned().map(Arc::new),
+                        );
+
+                        Ok(maybe_patched_from_storage)
                     },
                 };
                 ret.map(|maybe_state_value| match kind {
@@ -1106,6 +1159,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     for LatestView<'a, T, S, X>
 {
     type Identifier = T::Identifier;
+    type ResourceGroupTag = T::Tag;
+    type ResourceKey = T::Key;
+    type ResourceValue = T::Value;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         match &self.latest_view {
@@ -1174,6 +1230,39 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             },
         }
     }
+
+    // TODO - update comment.
+    // For each resource that satisfies the following conditions,
+    //     1. Resource is in read set
+    //     2. Resource is not in write set
+    // replace the delayed field identifiers in the resource with corresponding values.
+    // If any of the delayed field identifiers in the resource are part of delayed_field_write_set,
+    // then include the resource in the write set.
+    fn get_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                let captured_reads = state.captured_reads.borrow();
+                self.get_reads_needing_exchange_parallel(
+                    &captured_reads,
+                    delayed_write_set_keys,
+                    skip,
+                )
+            },
+            ViewState::Unsync(state) => {
+                let read_set = state.read_set.borrow();
+                self.get_reads_needing_exchange_sequential(
+                    &read_set,
+                    state.unsync_map,
+                    delayed_write_set_keys,
+                    skip,
+                )
+            },
+        }
+    }
 }
 
 struct TemporaryValueToIdentifierMapping<
@@ -1205,7 +1294,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
     }
 
     pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_keys.borrow().clone()
+        self.delayed_field_keys.into_inner()
     }
 }
 
@@ -1254,6 +1343,51 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 .expect("Delayed field value for ID must always exist in sequential execution")
                 .try_into_move_value(layout)?),
         }
+    }
+}
+
+struct TemporaryExtractIdentifiersMapping<T: Transaction> {
+    // These are the delayed field keys that were touched when utilizing this mapping
+    // to replace ids with values or values with ids
+    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
+}
+
+impl<T: Transaction> TemporaryExtractIdentifiersMapping<T> {
+    pub fn new() -> Self {
+        Self {
+            delayed_field_keys: RefCell::new(HashSet::new()),
+        }
+    }
+
+    pub fn into_inner(self) -> HashSet<T::Identifier> {
+        self.delayed_field_keys.into_inner()
+    }
+}
+
+impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMapping<T> {
+    fn value_to_identifier(
+        &self,
+        _kind: &IdentifierMappingKind,
+        layout: &MoveTypeLayout,
+        value: Value,
+    ) -> TransformationResult<Value> {
+        let id = T::Identifier::try_from_move_value(layout, value, &())
+            .map_err(|e| TransformationError(format!("{:?}", e)))?;
+        self.delayed_field_keys.borrow_mut().insert(id);
+        id.try_into_move_value(layout)
+            .map_err(|e| TransformationError(format!("{:?}", e)))
+    }
+
+    fn identifier_to_value(
+        &self,
+        layout: &MoveTypeLayout,
+        identifier_value: Value,
+    ) -> TransformationResult<Value> {
+        let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
+            .map_err(|e| TransformationError(format!("{:?}", e)))?;
+        self.delayed_field_keys.borrow_mut().insert(id);
+        id.try_into_move_value(layout)
+            .map_err(|e| TransformationError(format!("{:?}", e)))
     }
 }
 

@@ -23,8 +23,13 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
-    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    language_storage::{ModuleId, StructTag, CORE_CODE_ADDRESS},
+    value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
+};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
 };
 
 /// We differentiate between deprecated way to interact with aggregators (TAggregatorV1View),
@@ -140,6 +145,9 @@ where
 /// from the state storage.
 pub trait TDelayedFieldView {
     type Identifier;
+    type ResourceKey;
+    type ResourceGroupTag;
+    type ResourceValue;
 
     fn is_delayed_field_optimization_capable(&self) -> bool;
 
@@ -174,17 +182,42 @@ pub trait TDelayedFieldView {
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
     fn generate_delayed_field_id(&self) -> Self::Identifier;
+
+    fn get_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>;
 }
 
-pub trait DelayedFieldResolver: TDelayedFieldView<Identifier = DelayedFieldID> {}
+pub trait DelayedFieldResolver:
+    TDelayedFieldView<
+    Identifier = DelayedFieldID,
+    ResourceKey = StateKey,
+    ResourceGroupTag = StructTag,
+    ResourceValue = WriteOp,
+>
+{
+}
 
-impl<T> DelayedFieldResolver for T where T: TDelayedFieldView<Identifier = DelayedFieldID> {}
+impl<T> DelayedFieldResolver for T where
+    T: TDelayedFieldView<
+        Identifier = DelayedFieldID,
+        ResourceKey = StateKey,
+        ResourceGroupTag = StructTag,
+        ResourceValue = WriteOp,
+    >
+{
+}
 
 impl<S> TDelayedFieldView for S
 where
     S: StateView,
 {
     type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
+    type ResourceKey = StateKey;
+    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         // For resolvers that are not capable, it cannot be enabled
@@ -212,5 +245,13 @@ where
     /// new aggregator V2.
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         unimplemented!("generate_delayed_field_id not implemented")
+    }
+
+    fn get_reads_needing_exchange(
+        &self,
+        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+        unimplemented!("get_reads_needing_exchange not implemented")
     }
 }

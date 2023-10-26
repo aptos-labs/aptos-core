@@ -539,6 +539,12 @@ impl AptosVM {
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
+        // TODO[agg_v2](fix): Charge SnapshotDerived (string concat) based on lenght,
+        // as charge below charges based on non-exchanged writes (i.e. identifier being in the read_op)
+        // Do we want to charge delayed field changes also?
+        for (key, (read_op, _)) in change_set.reads_needing_delayed_field_exchange().iter() {
+            gas_meter.charge_io_gas_for_write(key, read_op)?;
+        }
         for (key, group_write) in change_set.resource_group_write_set().iter() {
             gas_meter.charge_io_gas_for_group_write(key, group_write)?;
         }
@@ -552,7 +558,7 @@ impl AptosVM {
             storage_refund = 0.into();
         }
 
-        // TODO(Gas): Charge for aggregator writes
+        // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
     }

@@ -218,7 +218,7 @@ pub(crate) mod test {
     // group base values (used in some tests), and most tests do not care about
     // the kind. Otherwise, there are specific constructors that initialize kind
     // for the tests that care (testing group commit logic in parallel).
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct TestValue {
         bytes: Bytes,
         kind: WriteOpKind,
@@ -291,6 +291,13 @@ pub(crate) mod test {
 
         fn set_bytes(&mut self, bytes: Bytes) {
             self.bytes = bytes;
+        }
+
+        fn from_read_to_modification(&self) -> Option<Self>
+        where
+            Self: Sized,
+        {
+            Some(self.clone())
         }
     }
 

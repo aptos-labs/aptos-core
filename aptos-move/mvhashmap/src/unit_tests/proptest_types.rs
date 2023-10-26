@@ -85,6 +85,14 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.maybe_bytes = Some(bytes);
     }
+
+    fn from_read_to_modification(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        // If we have no bytes, no modification can be created.
+        maybe_bytes.map(|_| self.clone())
+    }
 }
 
 enum Data<V> {

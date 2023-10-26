@@ -181,6 +181,24 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        (
+            <Self::Txn as BlockExecutableTransaction>::Value,
+            Arc<MoveTypeLayout>,
+        ),
+    > {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get reads")
+            .change_set()
+            .reads_needing_delayed_field_exchange()
+            .clone()
+    }
+
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
         self.vm_output
