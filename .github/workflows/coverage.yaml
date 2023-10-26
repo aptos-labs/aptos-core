@@ -1,5 +1,10 @@
-name: Test Coverage
+name: "Test_Coverage"
 on:
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+  push:
+    branches:
+      - main
   workflow_dispatch:
   workflow_call:
 
@@ -15,7 +20,7 @@ concurrency:
 
 jobs:
   rust-unit-coverage:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
     timeout-minutes: 120
     runs-on: high-perf-docker
     steps:
@@ -37,7 +42,7 @@ jobs:
           path: lcov_unit.info
 
   rust-smoke-coverage:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
     timeout-minutes: 120
     runs-on: high-perf-docker
     steps:
@@ -59,7 +64,7 @@ jobs:
           path: lcov_smoke.info
 
   upload-to-codecov:
-    if: (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')) && !cancelled()
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') && !cancelled()
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
     steps:
