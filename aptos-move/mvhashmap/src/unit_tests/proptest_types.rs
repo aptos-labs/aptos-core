@@ -80,6 +80,14 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.maybe_bytes = Some(bytes);
     }
+
+    fn is_creation(&self) -> bool {
+        unimplemented!("Irrelevant for the test")
+    }
+
+    fn as_modification(&self) -> Self {
+        unimplemented!("Irrelevant for the test")
+    }
 }
 
 enum Data<V> {

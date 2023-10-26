@@ -477,7 +477,7 @@ impl FakeExecutor {
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
         let mut outputs = self.execute_block(vec![transaction]).unwrap();
-        assert!(outputs.len() == 1, "transaction outputs size mismatch");
+        assert_eq!(outputs.len(), 1, "transaction outputs size mismatch");
         let output = outputs.pop().unwrap();
         match output.status() {
             TransactionStatus::Keep(status) => {
@@ -514,13 +514,96 @@ impl FakeExecutor {
         )
     }
 
+    fn compare_multiple_outputs(
+        baseline_result: &Result<Vec<TransactionOutput>, VMStatus>,
+        baseline_mode: (ExecutorMode, DelayedFieldOptimizationMode),
+        results: &[(
+            Result<Vec<TransactionOutput>, VMStatus>,
+            (ExecutorMode, DelayedFieldOptimizationMode),
+        )],
+    ) {
+        for (result, mode) in results {
+            // Make more granular comparison, to be able to understand test
+            // failures better.
+            if let (Ok(baseline_outputs), Ok(outputs)) = (baseline_result, result) {
+                assert_eq!(
+                    baseline_outputs.len(),
+                    outputs.len(),
+                    "Transaction outputs size mismatch: {:?} in mode {:?} and {:?} in mode {:?}",
+                    baseline_outputs.len(),
+                    baseline_mode,
+                    outputs.len(),
+                    mode,
+                );
+
+                let paired_outputs = baseline_outputs.iter().zip(outputs.iter()).enumerate();
+                for (idx, (baseline_output, output)) in paired_outputs {
+                    // Gas is usually the problem, so check ot separately to
+                    // have a concise error message.
+                    assert_eq!(
+                        baseline_output.gas_used(),
+                        output.gas_used(),
+                        "Different gas used for modes {:?} and {:?} for transaction outputs at index {}",
+                        baseline_mode,
+                        mode,
+                        idx,
+                    );
+
+                    // Identify differences in write sets, if any.
+                    assert_eq!(
+                        baseline_output.write_set().len(),
+                        output.write_set().len(),
+                        "Transaction outputs at index {} have different write set sizes in modes {:?} and {:?}",
+                        idx,
+                        baseline_mode,
+                        mode,
+                    );
+                    let paired_writes = baseline_output
+                        .write_set()
+                        .iter()
+                        .zip(output.write_set().iter());
+                    let mut differences = vec![];
+                    for ((baseline_key, baseline_write), (key, write)) in paired_writes {
+                        // Keys and writes must have a deterministic ordering.
+                        assert_eq!(baseline_key, key);
+                        if baseline_write != write {
+                            differences.push((baseline_write, write, key));
+                        }
+                    }
+                    assert!(
+                        differences.is_empty(),
+                        "First write op mismatch for transaction output at index {} for key {:?} between modes {:?} and {:?}.\nfirst: {:?}\nsecond: {:?}",
+                        idx,
+                        differences[0].2,
+                        baseline_mode,
+                        mode,
+                        differences[0].0,
+                        differences[0].1,
+                    );
+
+                    // Still perform comparison on all fields in transaction
+                    // outputs to catch other inconsistencies.
+                    assert_eq!(
+                        baseline_output, output,
+                        "First transaction output mismatch at index {}, between modes {:?} and {:?}",
+                        idx,
+                        baseline_mode,
+                        mode,
+                    );
+                }
+            } else {
+                assert_eq!(baseline_result, result);
+            }
+        }
+    }
+
     pub fn execute_transaction_block(
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
-        // dump serialized transaction details before execution, if tracing
+        // Dump serialized transaction details before execution, if tracing.
         if let Some(trace_dir) = &self.trace_dir {
             let trace_data_dir = trace_dir.join(TRACE_DIR_DATA);
             trace_map.0 = Self::trace(trace_data_dir.as_path(), self.get_state_view());
@@ -565,64 +648,16 @@ impl FakeExecutor {
             }
         };
 
+        let (output, mode) = outputs.remove(0);
         if outputs.len() > 1 {
-            let (baseline_output, baseline_mode) = outputs.get(0).unwrap();
-
-            for (output, mode) in &outputs[1..] {
-                // make more granular comparison, to be able to understand test failures better
-                if baseline_output.is_ok() && output.is_ok() {
-                    let baseline_output = baseline_output.as_ref().unwrap();
-                    let output = output.as_ref().unwrap();
-                    assert_eq!(baseline_output.len(), output.len());
-                    for (idx, (baseline_txn_output, txn_output)) in
-                        baseline_output.iter().zip(output.iter()).enumerate()
-                    {
-                        let mut diffs = vec![];
-                        for ((baseline_key, baseline_write), (key, write)) in  baseline_txn_output.write_set().into_iter().zip(txn_output.write_set().into_iter()) {
-                            assert_eq!(baseline_key, key);
-                            if baseline_write != write {
-                                diffs.push((
-                                    baseline_write,
-                                    write,
-                                    key,
-                                ));
-                            }
-                        }
-
-                        for (baseline_write, write, key) in diffs.clone() {
-                            println!("Mismatch: {:?} an {:?}", baseline_txn_output.status(), txn_output.status());
-                            println!(
-                                "{:?} != {:?}\nfirst write op mismatch at index {}, between modes {:?} and {:?}, for key {:?}\n",
-                                baseline_write,
-                                write,
-                                idx,
-                                baseline_mode,
-                                mode,
-                                key,
-                            );
-                        }
-                        assert!(diffs.is_empty());
-                        // assert_eq!(
-                        //     baseline_txn_output, txn_output,
-                        //     "first transaction output mismatch at index {}, between modes {:?} and {:?}",
-                        //     idx,
-                        //     baseline_mode,
-                        //     mode,
-                        // );
-                    }
-                } else {
-                    assert_eq!(baseline_output, output);
-                }
-            }
+            Self::compare_multiple_outputs(&output, mode, &outputs);
         }
-
-        let (output, _) = outputs.remove(0);
 
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:#?}\n", output).as_str());
         }
 
-        // dump serialized transaction output after execution, if tracing
+        // Dump serialized transaction output after execution, if tracing.
         if let Some(trace_dir) = &self.trace_dir {
             match &output {
                 Ok(results) => {

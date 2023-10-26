@@ -249,21 +249,9 @@ fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
     prop_oneof![
         arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
             executor_mode: ExecutorMode::BothComparison,
-            delayed_fields_mode: DelayedFieldOptimizationMode::EnabledOnly,
+            delayed_fields_mode: DelayedFieldOptimizationMode::BothComparison,
             block_split
         }),
-        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
-            executor_mode: ExecutorMode::BothComparison,
-            delayed_fields_mode: DelayedFieldOptimizationMode::DisabledOnly,
-            block_split
-        }),
-
-        // TODO[agg_v2](fix) currently fails, replace instead of the above separate tests.
-        // arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
-        //     executor_mode: ExecutorMode::BothComparison,
-        //     delayed_fields_mode: DelayedFieldOptimizationMode::BothComparison,
-        //     block_split
-        // }),
     ]
     .boxed()
 }
@@ -333,7 +321,7 @@ proptest! {
 
     #[test]
     fn test_multiple_aggregators_and_collocation(
-        test_env in arb_test_env(7),
+        test_env in arb_test_env(24),
         element_type in arb_agg_type(),
         use_type in arb_use_type(),
         is_2_collocated in any::<bool>(),
@@ -354,9 +342,6 @@ proptest! {
             let (cur_acc, idx_3) = if is_3_collocated { idx_1 += 1; (h.account.address(), idx_1) } else { (acc_3.address(), 0)};
             AggregatorLocation::new(*cur_acc, element_type, use_type, idx_3)
         };
-        println!("agg_1_loc: {:?}", agg_1_loc);
-        println!("agg_2_loc: {:?}", agg_2_loc);
-        println!("agg_3_loc: {:?}", agg_3_loc);
 
         let txns = vec![
             (0, init(&mut h.harness, &h.account, use_type, element_type, true)),
@@ -365,28 +350,24 @@ proptest! {
             (0, h.new_add(&agg_1_loc, 10, 5)),
             (0, h.new_add(&agg_2_loc, 10, 5)),
             (0, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
-
-            // TEST
-            (0, h.add_sub(&agg_1_loc, 2, 1)),
-
-            // (0, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
-            // (0, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
-            // (0x02_0001, h.add(&agg_1_loc, 5)), // X
-            // (0, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
-            // (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
-            // (0, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
-            // (0x02_0001, h.add_sub(&agg_1_loc, 3, 3)), // X
-            // (0, h.sub(&agg_1_loc, 3)), // 7, 7, 6
-            // (0, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
-            // (0, h.check(&agg_2_loc, 9)),
-            // (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
-            // (0, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
-            // (0x02_0001, h.add(&agg_2_loc, 1)), // X
-            // (0x02_0001, h.add_and_materialize(&agg_3_loc, 1)), // X
-            // (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
-            // (0, h.check(&agg_1_loc, 7)),
-            // (0, h.check(&agg_2_loc, 10)),
-            // (0, h.check(&agg_3_loc, 10)),
+            (0, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
+            (0, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
+            (0x02_0001, h.add(&agg_1_loc, 5)), // X
+            (0, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
+            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
+            (0, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
+            (0x02_0001, h.add_sub(&agg_1_loc, 3, 3)), // X
+            (0, h.sub(&agg_1_loc, 3)), // 7, 7, 6
+            (0, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
+            (0, h.check(&agg_2_loc, 9)),
+            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
+            (0, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
+            (0x02_0001, h.add(&agg_2_loc, 1)), // X
+            (0x02_0001, h.add_and_materialize(&agg_3_loc, 1)), // X
+            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
+            (0, h.check(&agg_1_loc, 7)),
+            (0, h.check(&agg_2_loc, 10)),
+            (0, h.check(&agg_3_loc, 10)),
         ];
         run_block_in_parts(
             &mut h.harness,

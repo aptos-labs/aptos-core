@@ -319,7 +319,7 @@ impl<K, V, E> MockTransaction<K, V, E> {
 
 impl<
         K: Debug + Hash + Ord + Clone + Send + Sync + ModulePath + 'static,
-        V: Clone + Send + Sync + TransactionWrite + 'static,
+        V: Debug + Clone + Send + Sync + TransactionWrite + 'static,
         E: Debug + Clone + Send + Sync + ReadWriteEvent + 'static,
     > Transaction for MockTransaction<K, V, E>
 {

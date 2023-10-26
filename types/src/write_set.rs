@@ -375,6 +375,11 @@ impl WriteSetV0 {
     }
 
     #[inline]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    #[inline]
     pub fn iter(&self) -> btree_map::Iter<'_, StateKey, WriteOp> {
         self.0.write_set.iter()
     }

@@ -589,7 +589,7 @@ where
         };
 
         if let Some(patched_value) =
-            Self::replace_ids_with_values(value, layout, latest_view, &delayed_field_keys)
+            Self::replace_ids_with_values(value, layout, latest_view, delayed_field_keys)
         {
             patched_resource_write_set.insert(key.clone(), patched_value);
         }

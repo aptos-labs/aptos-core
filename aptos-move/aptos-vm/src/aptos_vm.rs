@@ -553,8 +553,9 @@ impl AptosVM {
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let mut change_set = session.finish(&mut (), change_set_configs)?;
 
-        for (key, op) in change_set.write_set_iter() {
-            gas_meter.charge_io_gas_for_write(key, op)?;
+        for (_key, _op) in change_set.write_set_iter() {
+            // TODO[agg_v2](critical): This does not take into account patched resources!
+            // gas_meter.charge_io_gas_for_write(key, op)?;
         }
         for (key, group_write) in change_set.resource_group_write_set().iter() {
             gas_meter.charge_io_gas_for_group_write(key, group_write)?;
@@ -569,7 +570,7 @@ impl AptosVM {
             storage_refund = 0.into();
         }
 
-        // TODO(Gas): Charge for aggregator writes
+        // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
     }
