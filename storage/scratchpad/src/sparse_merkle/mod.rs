@@ -228,7 +228,7 @@ impl<V: Send + Sync + 'static> Drop for Inner<V> {
         // Send the Arc to multiple threads so that the dropping happens in parallel (specifically,
         // dropping of the SMTs).
         for descendant_arc in processed_descendants {
-            aptos_drop_helper::DEFAULT_DROP_HELPER.schedule_drop(descendant_arc)
+            aptos_drop_helper::DEFAULT_DROPPER.schedule_drop(descendant_arc)
         }
 
         self.log_generation("drop");
