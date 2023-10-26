@@ -4,6 +4,7 @@
 #![deny(unsafe_code)]
 
 pub mod account;
+pub mod ascii;
 pub mod common;
 pub mod config;
 pub mod ffi;
@@ -32,6 +33,8 @@ pub enum Tool {
     #[clap(subcommand)]
     Account(account::AccountTool),
     #[clap(subcommand)]
+    Ascii(ascii::AsciiTool),
+    #[clap(subcommand)]
     Config(config::ConfigTool),
     #[clap(subcommand)]
     Genesis(genesis::GenesisTool),
@@ -57,6 +60,7 @@ impl Tool {
         use Tool::*;
         match self {
             Account(tool) => tool.execute().await,
+            Ascii(tool) => tool.execute().await,
             Config(tool) => tool.execute().await,
             Genesis(tool) => tool.execute().await,
             Governance(tool) => tool.execute().await,

@@ -264,6 +264,7 @@ dependencies = [
  "dirs",
  "futures",
  "hex",
+ "indoc",
  "itertools 0.10.5",
  "jemallocator",
  "maplit",

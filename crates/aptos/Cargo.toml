@@ -62,6 +62,7 @@ diesel-async = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+indoc = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
 move-binary-format = { workspace = true }
