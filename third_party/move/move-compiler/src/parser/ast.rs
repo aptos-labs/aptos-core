@@ -292,6 +292,8 @@ pub struct Function {
     pub visibility: Visibility,
     pub entry: Option<Loc>,
     pub signature: FunctionSignature,
+    /// `None` indicates no specifiers given, `Some([])` indicates the `pure` keyword has been
+    /// used.
     pub access_specifiers: Option<Vec<AccessSpecifier>>,
     pub name: FunctionName,
     pub inline: bool,

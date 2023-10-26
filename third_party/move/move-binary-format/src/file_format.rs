@@ -858,14 +858,14 @@ impl Arbitrary for AbilitySet {
     }
 }
 
-/// An `AccessSpecifier` describes an approximation of resources accessed by a function.
+/// An `AccessSpecifier` describes the resources accessed by a function.
 /// Here are some examples on source level:
 /// ```notest
 ///   // All resources declared at the address
 ///   reads 0xcafe::*;
 ///   // All resources in the module
 ///   reads 0xcafe::my_module::*;
-///   // The given resource in the module, at arbitray address
+///   // The given resource in the module, at arbitrary address
 ///   reads 0xcafe::my_module::R(*);
 ///   // The given resource in the module, at address in dependency of parameter
 ///   reads 0xcafe::my_module::R(object::address_of(function_parameter_name))

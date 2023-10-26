@@ -1919,6 +1919,7 @@ impl SerializedBool {
 }
 
 impl SerializedOption {
+    /// Returns a boolean to indice NONE or SOME (NONE = false)
     fn from_u8(value: u8) -> BinaryLoaderResult<bool> {
         match value {
             0x1 => Ok(false),
