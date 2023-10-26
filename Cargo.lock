@@ -13627,6 +13627,7 @@ dependencies = [
  "rand 0.7.3",
  "regex",
  "reqwest",
+ "serde",
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",

@@ -21,6 +21,7 @@ use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
 use std::{ops::Deref, sync::Arc};
+use aptos_framework::natives::randomness::RandomnessContext;
 
 pub struct MoveVmExt {
     inner: MoveVM,
@@ -162,10 +163,10 @@ impl MoveVmExt {
             .to_vec()
             .try_into()
             .expect("HashValue should convert to [u8; 32]");
-
         extensions.add(NativeTableContext::new(txn_hash, resolver));
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
+        extensions.add(RandomnessContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, resolver));
 
         let script_hash = match session_id {

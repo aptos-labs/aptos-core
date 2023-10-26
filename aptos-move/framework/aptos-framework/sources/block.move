@@ -4,6 +4,7 @@ module aptos_framework::block {
     use std::features;
     use std::vector;
     use std::option;
+    use aptos_std::randomness;
 
     use aptos_framework::account;
     use aptos_framework::dkg;
@@ -186,10 +187,14 @@ module aptos_framework::block {
         timestamp: u64,
         dkg_result_available: bool,
         dkg_result: vector<u8>,
+        randomness_available: bool,
+        randomness: vector<u8>,
     ) acquires BlockResource {
         assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
 
         let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
+
+        randomness::on_new_block(&vm, randomness_available, randomness);
 
         if (dkg::in_progress()) {
             let should_proceed = dkg::update(dkg_result_available, dkg_result);

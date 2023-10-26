@@ -74,6 +74,7 @@ use std::{
 use tempfile::TempDir;
 #[cfg(feature = "cli-framework-test-move")]
 use thiserror::__private::AsDisplay;
+use thiserror::__private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -792,7 +793,7 @@ impl CliTestFramework {
             &source_path.as_display().to_string(),
             hello_blockchain_contents.as_bytes(),
         )
-        .unwrap();
+            .unwrap();
 
         let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/hello_blockchain_test.move");
         let test_path = sources_dir.join("hello_blockchain_test.move");
@@ -801,7 +802,16 @@ impl CliTestFramework {
             &test_path.as_display().to_string(),
             hello_blockchain_test_contents.as_bytes(),
         )
-        .unwrap();
+            .unwrap();
+    }
+
+    pub fn add_file_in_package(&self, rel_path: &str, content: String) {
+        let source_path = self.move_dir().join(rel_path);
+        write_to_file(
+            source_path.as_path(),
+            &source_path.as_display().to_string(),
+            content.as_bytes(),
+        ).unwrap();
     }
 
     pub fn move_dir(&self) -> PathBuf {
@@ -1037,7 +1047,7 @@ impl CliTestFramework {
         .await
     }
 
-    fn aptos_framework_dir() -> PathBuf {
+    pub fn aptos_framework_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..")

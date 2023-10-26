@@ -23,13 +23,13 @@ mod aptos_features;
 mod aptos_version;
 mod chain_id;
 mod consensus_config;
+mod dkg_state;
 mod execution_config;
 mod gas_schedule;
 mod timed_features;
 mod timestamp;
 mod transaction_fee;
 mod validator_set;
-mod dkg_state;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
@@ -41,6 +41,7 @@ pub use self::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
         ProposerElectionType,
     },
+    dkg_state::{DKGSessionState, DKGState},
     execution_config::{
         ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig, TransactionDeduperType,
         TransactionShufflerType,
@@ -50,7 +51,6 @@ pub use self::{
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
-    dkg_state::{DKGSessionState, DKGState},
 };
 
 /// To register an on-chain config in Rust:

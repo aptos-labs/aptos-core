@@ -38,6 +38,7 @@ This module defines a struct storing the metadata of the block and new block eve
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="randomness.md#0x1_randomness">0x1::randomness</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="reconfiguration_v2.md#0x1_reconfiguration_v2">0x1::reconfiguration_v2</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
@@ -475,7 +476,7 @@ Set the metadata for the current block.
 The runtime always runs this before executing the transactions in a block.
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_v2">block_prologue_v2</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, dkg_result_available: bool, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_v2">block_prologue_v2</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, dkg_result_available: bool, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, randomness_available: bool, <a href="randomness.md#0x1_randomness">randomness</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -495,10 +496,14 @@ The runtime always runs this before executing the transactions in a block.
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64,
     dkg_result_available: bool,
     dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    randomness_available: bool,
+    <a href="randomness.md#0x1_randomness">randomness</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_reconfigure_with_dkg_enabled">features::reconfigure_with_dkg_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="block.md#0x1_block_EAPI_DISABLED">EAPI_DISABLED</a>));
 
     <b>let</b> epoch_interval = <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(&vm, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, <a href="timestamp.md#0x1_timestamp">timestamp</a>);
+
+    <a href="randomness.md#0x1_randomness_on_new_block">randomness::on_new_block</a>(&vm, randomness_available, <a href="randomness.md#0x1_randomness">randomness</a>);
 
     <b>if</b> (<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>()) {
         <b>let</b> should_proceed = <a href="dkg.md#0x1_dkg_update">dkg::update</a>(dkg_result_available, dkg_result);

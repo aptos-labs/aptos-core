@@ -118,7 +118,10 @@ impl BlockMetadata {
                 .map(MoveValue::U8)
                 .collect(),
         ));
-        // rand todo: pass in randomness
+        ret.push(MoveValue::Bool(true));//rand todo: capture the false cases.
+        ret.push(MoveValue::Vector(
+            self.randomness.randomness().to_vec().into_iter().map(MoveValue::U8).collect()
+        ));
         ret
     }
 
