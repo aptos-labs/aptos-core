@@ -296,6 +296,17 @@ Lifetime: transient
 
 
 
+<a name="0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH"></a>
+
+Whether the fix to reduce the maximum identifer length is enabled.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH">LIMIT_MAX_IDENTIFIER_LENGTH</a>: u64 = 33;
+</code></pre>
+
+
+
 <a name="0x1_features_MODULE_EVENT"></a>
 
 Whether emit function in <code>event.<b>move</b></code> are enabled for module events.

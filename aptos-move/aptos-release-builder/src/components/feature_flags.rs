@@ -83,6 +83,7 @@ pub enum FeatureFlag {
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
+    LimitMaxIdentifierLength,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -216,6 +217,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
+            FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         }
     }
 }
@@ -272,6 +274,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
+            AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
         }
     }
 }

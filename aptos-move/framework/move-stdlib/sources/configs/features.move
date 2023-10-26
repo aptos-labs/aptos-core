@@ -251,6 +251,10 @@ module std::features {
         is_enabled(AGGREGATOR_SNAPSHOTS)
     }
 
+    /// Whether the fix to reduce the maximum identifer length is enabled.
+    /// Lifetime: transient
+    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 33;
+
     // ============================================================================================
     // Feature Flag Implementation
 
