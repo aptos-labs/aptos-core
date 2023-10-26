@@ -2941,7 +2941,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: &EA::Fields<EA::Exp>,
-    ) -> Option<(QualifiedInstId<StructId>, Vec<(Pattern, ExpData, Loc)>, Vec<ExpData>)> {
+    ) -> Option<(
+        QualifiedInstId<StructId>,
+        Vec<(Pattern, ExpData, Loc)>,
+        Vec<ExpData>,
+    )> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
