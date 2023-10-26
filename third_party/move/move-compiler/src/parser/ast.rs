@@ -249,10 +249,15 @@ pub type AccessSpecifier = Spanned<AccessSpecifier_>;
 /// An address specifier specifies the address at which a resource is accessed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressSpecifier_ {
+    /// Represents that now address was specicied, as in `Resource`
     Empty,
+    /// Represents that the specified address is a wildcard, as in `Resource(*)`.
     Any,
+    /// Represents the precise address.
     Literal(NumericalAddress),
+    /// Represents a parameter name.
     Name(Name),
+    /// Represents a function applied to a parameter name.
     Call(NameAccessChain, Option<Vec<Type>>, Name),
 }
 
@@ -281,10 +286,6 @@ pub enum FunctionBody_ {
 pub type FunctionBody = Spanned<FunctionBody_>;
 
 #[derive(PartialEq, Debug, Clone)]
-// (public?) foo<T1(: copyable?), ..., TN(: copyable?)>(x1: t1, ..., xn: tn): t1 * ... * tn {
-//    body
-//  }
-// (public?) native foo<T1(: copyable?), ..., TN(: copyable?)>(x1: t1, ..., xn: tn): t1 * ... * tn;
 pub struct Function {
     pub attributes: Vec<Attributes>,
     pub loc: Loc,

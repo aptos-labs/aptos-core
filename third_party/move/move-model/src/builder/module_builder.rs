@@ -79,7 +79,7 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Translated function definitions, if we are compiling Move code
     pub fun_defs: BTreeMap<Symbol, Exp>,
     /// Translated access specifiers, if we are compiling Move code
-    pub access_specifiers: BTreeMap<Symbol, Vec<AccessSpecifier>>,
+    pub fun_access_specifiers: BTreeMap<Symbol, Vec<AccessSpecifier>>,
     /// Translated struct specifications.
     pub struct_specs: BTreeMap<Symbol, Spec>,
     /// Translated module spec
@@ -154,7 +154,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             spec_vars: vec![],
             fun_specs: BTreeMap::new(),
             fun_defs: BTreeMap::new(),
-            access_specifiers: BTreeMap::new(),
+            fun_access_specifiers: BTreeMap::new(),
             struct_specs: BTreeMap::new(),
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
@@ -1270,7 +1270,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .is_none());
                 if let Some(specifiers) = access_specifiers {
                     assert!(self
-                        .access_specifiers
+                        .fun_access_specifiers
                         .insert(full_name.symbol, specifiers)
                         .is_none());
                 }
@@ -3600,7 +3600,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             // New function
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);
-            let access_specifiers = self.access_specifiers.remove(&name.symbol);
+            let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
             let data = FunctionData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
