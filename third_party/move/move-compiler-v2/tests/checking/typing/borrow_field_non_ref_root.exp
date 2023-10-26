@@ -7,14 +7,26 @@ module 0x8675309::M {
         Borrow(Immutable)(select M::S.f(s));
         Borrow(Mutable)(select M::S.f(s));
         Borrow(Immutable)(select M::S.f(if cond {
-          pack M::S(0)
+          {
+            let .f: u64 = 0;
+            pack M::S(.f)
+          }
         } else {
-          pack M::S(1)
+          {
+            let .f: u64 = 1;
+            pack M::S(.f)
+          }
         }));
         Borrow(Mutable)(select M::S.f(if cond {
-          pack M::S(0)
+          {
+            let .f: u64 = 0;
+            pack M::S(.f)
+          }
         } else {
-          pack M::S(1)
+          {
+            let .f: u64 = 1;
+            pack M::S(.f)
+          }
         }));
         Tuple()
     }

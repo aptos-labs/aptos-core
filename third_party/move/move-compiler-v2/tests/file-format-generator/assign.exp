@@ -33,14 +33,20 @@ fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
 fun assign::assign_struct($t0: &mut assign::S) {
      var $t1: assign::S
      var $t2: u64
-     var $t3: assign::T
-     var $t4: u64
-  0: $t2 := 42
-  1: $t4 := 42
-  2: $t3 := pack assign::T($t4)
-  3: $t1 := pack assign::S($t2, $t3)
-  4: write_ref($t0, $t1)
-  5: return ()
+     var $t3: u64
+     var $t4: assign::T
+     var $t5: assign::T
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := 42
+  1: $t2 := move($t3)
+  2: $t7 := 42
+  3: $t6 := move($t7)
+  4: $t5 := pack assign::T($t6)
+  5: $t4 := move($t5)
+  6: $t1 := pack assign::S($t2, $t4)
+  7: write_ref($t0, $t1)
+  8: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -88,20 +94,29 @@ fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
 fun assign::assign_struct($t0: &mut assign::S) {
      var $t1: assign::S
      var $t2: u64
-     var $t3: assign::T
-     var $t4: u64
+     var $t3: u64
+     var $t4: assign::T
+     var $t5: assign::T
+     var $t6: u64
+     var $t7: u64
      # live vars: $t0
-  0: $t2 := 42
+  0: $t3 := 42
+     # live vars: $t0, $t3
+  1: $t2 := move($t3)
      # live vars: $t0, $t2
-  1: $t4 := 42
+  2: $t7 := 42
+     # live vars: $t0, $t2, $t7
+  3: $t6 := move($t7)
+     # live vars: $t0, $t2, $t6
+  4: $t5 := pack assign::T($t6)
+     # live vars: $t0, $t2, $t5
+  5: $t4 := move($t5)
      # live vars: $t0, $t2, $t4
-  2: $t3 := pack assign::T($t4)
-     # live vars: $t0, $t2, $t3
-  3: $t1 := pack assign::S($t2, $t3)
+  6: $t1 := pack assign::S($t2, $t4)
      # live vars: $t0, $t1
-  4: write_ref($t0, $t1)
+  7: write_ref($t0, $t1)
      # live vars:
-  5: return ()
+  8: return ()
 }
 
 
@@ -142,13 +157,21 @@ B0:
 	4: Ret
 }
 assign_struct(Arg0: &mut S) {
+L0:	loc1: u64
+L1:	loc2: T
 B0:
 	0: LdU64(42)
-	1: LdU64(42)
-	2: Pack[0](T)
-	3: Pack[1](S)
-	4: MoveLoc[0](Arg0: &mut S)
-	5: WriteRef
-	6: Ret
+	1: StLoc[1](loc0: u64)
+	2: LdU64(42)
+	3: StLoc[2](loc1: u64)
+	4: MoveLoc[2](loc1: u64)
+	5: Pack[0](T)
+	6: StLoc[3](loc2: T)
+	7: MoveLoc[1](loc0: u64)
+	8: MoveLoc[3](loc2: T)
+	9: Pack[1](S)
+	10: MoveLoc[0](Arg0: &mut S)
+	11: WriteRef
+	12: Ret
 }
 }

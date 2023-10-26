@@ -4,7 +4,10 @@ module 0x8675309::M {
         f: u64,
     }
     private fun bar(): M::S {
-        pack M::S(0)
+        {
+          let .f: u64 = 0;
+          pack M::S(.f)
+        }
     }
     private fun foo(): &M::S {
         Abort(0)
@@ -25,7 +28,10 @@ module 0x8675309::M {
         Tuple()
     }
     spec fun $bar(): M::S {
-        pack M::S(0)
+        {
+          let .f: u64 = 0;
+          pack M::S(.f)
+        }
     }
     spec fun $foo(): M::S {
         Abort(0)

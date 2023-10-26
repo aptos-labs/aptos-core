@@ -10,7 +10,10 @@ module 0x8675309::M {
             let x: u64 = 0;
             x;
             {
-              let (x: u64, b: bool, M::R{ f: f: u64 }) = Tuple(0, false, pack M::R(0));
+              let (x: u64, b: bool, M::R{ f: f: u64 }) = Tuple(0, false, {
+                let .f: u64 = 0;
+                pack M::R(.f)
+              });
               x;
               b;
               f;

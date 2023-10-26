@@ -16,12 +16,11 @@ module 0x42::M {
     struct S {
         dummy_field: bool,
     }
-    private fun ex<T>(s: &signer,a1: address)
-        acquires M::Box<M::R>(*)
-        acquires M::Box<#0>(*)
-        acquires M::Pair<M::S, M::R>(*)
-     {
-        MoveTo<M::Box<M::R>>(s, pack M::Box<M::R>(pack M::R(false)));
+    private fun ex<T>(s: &signer,a1: address) {
+        MoveTo<M::Box<M::R>>(s, {
+          let .f: M::R = pack M::R(false);
+          pack M::Box<M::R>(.f)
+        });
         BorrowGlobal(Immutable)<M::Box<T>>(a1);
         BorrowGlobal(Mutable)<M::Box<M::Box<T>>>(a1);
         M::Pair<?11, ?12>{ f1: _, f2: _ } = MoveFrom<M::Pair<M::S, M::R>>(a1);

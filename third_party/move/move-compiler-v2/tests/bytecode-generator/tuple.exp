@@ -4,7 +4,10 @@ module 0x42::tuple {
         f: u64,
     }
     private fun tuple(x: u64): (u64, tuple::S) {
-        Tuple(x, pack tuple::S(Add<u64>(x, 1)))
+        Tuple(x, {
+          let .f: u64 = Add<u64>(x, 1);
+          pack tuple::S(.f)
+        })
     }
     private fun use_tuple(x: u64): u64 {
         {
@@ -13,7 +16,10 @@ module 0x42::tuple {
         }
     }
     spec fun $tuple(x: u64): (u64, tuple::S) {
-        Tuple(x, pack tuple::S(Add(x, 1)))
+        Tuple(x, {
+          let .f: num = Add(x, 1);
+          pack tuple::S(.f)
+        })
     }
     spec fun $use_tuple(x: u64): u64 {
         {
@@ -31,11 +37,13 @@ fun tuple::tuple($t0: u64): (u64, tuple::S) {
      var $t2: tuple::S
      var $t3: u64
      var $t4: u64
+     var $t5: u64
   0: $t1 := move($t0)
-  1: $t4 := 1
-  2: $t3 := +($t0, $t4)
-  3: $t2 := pack tuple::S($t3)
-  4: return ($t1, $t2)
+  1: $t5 := 1
+  2: $t4 := +($t0, $t5)
+  3: $t3 := move($t4)
+  4: $t2 := pack tuple::S($t3)
+  5: return ($t1, $t2)
 }
 
 

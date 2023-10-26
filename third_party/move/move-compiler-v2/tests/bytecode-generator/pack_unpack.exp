@@ -8,7 +8,16 @@ module 0x42::pack_unpack {
         g: pack_unpack::T,
     }
     private fun pack(x: u64,y: u64): pack_unpack::S {
-        pack pack_unpack::S(x, pack pack_unpack::T(y))
+        {
+          let .f: u64 = x;
+          {
+            let .g: pack_unpack::T = {
+              let .h: u64 = y;
+              pack pack_unpack::T(.h)
+            };
+            pack pack_unpack::S(.f, .g)
+          }
+        }
     }
     private fun unpack(s: pack_unpack::S): (u64, u64) {
         {
@@ -17,7 +26,16 @@ module 0x42::pack_unpack {
         }
     }
     spec fun $pack(x: u64,y: u64): pack_unpack::S {
-        pack pack_unpack::S(x, pack pack_unpack::T(y))
+        {
+          let .f: u64 = x;
+          {
+            let .g: pack_unpack::T = {
+              let .h: u64 = y;
+              pack pack_unpack::T(.h)
+            };
+            pack pack_unpack::S(.f, .g)
+          }
+        }
     }
     spec fun $unpack(s: pack_unpack::S): (u64, u64) {
         {
@@ -32,10 +50,16 @@ module 0x42::pack_unpack {
 [variant baseline]
 fun pack_unpack::pack($t0: u64, $t1: u64): pack_unpack::S {
      var $t2: pack_unpack::S
-     var $t3: pack_unpack::T
-  0: $t3 := pack pack_unpack::T($t1)
-  1: $t2 := pack pack_unpack::S($t0, $t3)
-  2: return $t2
+     var $t3: u64
+     var $t4: pack_unpack::T
+     var $t5: pack_unpack::T
+     var $t6: u64
+  0: $t3 := move($t0)
+  1: $t6 := move($t1)
+  2: $t5 := pack pack_unpack::T($t6)
+  3: $t4 := move($t5)
+  4: $t2 := pack pack_unpack::S($t3, $t4)
+  5: return $t2
 }
 
 

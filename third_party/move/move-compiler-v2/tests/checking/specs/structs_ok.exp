@@ -16,10 +16,16 @@ module 0x42::M {
         z: vector<u64>,
     }
     public fun f(r: M::R): M::T {
-        pack M::T(select M::S.x(select M::R.s(r)))
+        {
+          let .x: u64 = select M::S.x(select M::R.s(r));
+          pack M::T(.x)
+        }
     }
     spec fun $f(r: M::R): M::T {
-        pack M::T(select M::S.x(select M::R.s(r)))
+        {
+          let .x: u64 = select M::S.x(select M::R.s(r));
+          pack M::T(.x)
+        }
     }
     spec fun struct_access(s: M::S): u64 {
         select M::S.x(s)
@@ -28,16 +34,46 @@ module 0x42::M {
         select M::S.y(select M::R.s(r))
     }
     spec fun struct_pack(x: u64,y: bool,z: vector<u64>): M::S {
-        pack M::S(x, y, z)
+        {
+          let .x: u64 = x;
+          {
+            let .y: bool = y;
+            {
+              let .z: vector<u64> = z;
+              pack M::S(.x, .y, .z)
+            }
+          }
+        }
     }
     spec fun struct_pack_other_order(x: u64,y: bool,z: vector<u64>): M::S {
-        pack M::S(x, y, z)
+        {
+          let .z: vector<u64> = z;
+          {
+            let .y: bool = y;
+            {
+              let .x: u64 = x;
+              pack M::S(.x, .y, .z)
+            }
+          }
+        }
     }
     spec fun generic_struct_pack(x: u64,y: bool): M::G<u64> {
-        pack M::G<u64>(x, y)
+        {
+          let .x: u64 = x;
+          {
+            let .y: bool = y;
+            pack M::G<u64>(.x, .y)
+          }
+        }
     }
     spec fun generic_struct_pack_instantiated(x: u64,y: bool): M::G<u64> {
-        pack M::G<u64>(x, y)
+        {
+          let .x: u64 = x;
+          {
+            let .y: bool = y;
+            pack M::G<u64>(.x, .y)
+          }
+        }
     }
     spec fun resource_global(addr: address): M::T {
         global<M::T>(addr)

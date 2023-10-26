@@ -30,7 +30,10 @@ module 0x8675309::M {
           s_mut
         }));
         Borrow(Immutable)(select M::S.f({
-          let s: M::S = pack M::S(0);
+          let s: M::S = {
+            let .f: u64 = 0;
+            pack M::S(.f)
+          };
           Borrow(Immutable)(s)
         }));
         Tuple()

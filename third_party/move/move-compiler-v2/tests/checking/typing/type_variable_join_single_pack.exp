@@ -6,10 +6,22 @@ module 0x42::M {
     }
     private fun t0() {
         {
-          let b: M::Box<u64> = pack M::Box<u64>(0, 1);
+          let b: M::Box<u64> = {
+            let .f1: u64 = 0;
+            {
+              let .f2: u64 = 1;
+              pack M::Box<u64>(.f1, .f2)
+            }
+          };
           Deref(Borrow(Immutable)(b));
           {
-            let b2: M::Box<M::Box<u64>> = pack M::Box<M::Box<u64>>(Deref(Borrow(Immutable)(b)), b);
+            let b2: M::Box<M::Box<u64>> = {
+              let .f1: M::Box<u64> = Deref(Borrow(Immutable)(b));
+              {
+                let .f2: M::Box<u64> = b;
+                pack M::Box<M::Box<u64>>(.f1, .f2)
+              }
+            };
             b2;
             Tuple()
           }

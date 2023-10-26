@@ -58,7 +58,13 @@ module 0x8675309::M {
           let x: u64 = 0;
           loop {
             {
-              let M::S{ f: _, b: x: bool } = pack M::S(0, false);
+              let M::S{ f: _, b: x: bool } = {
+                let .f: u64 = 0;
+                {
+                  let .b: bool = false;
+                  pack M::S(.f, .b)
+                }
+              };
               x;
               break
             }

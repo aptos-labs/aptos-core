@@ -12,10 +12,12 @@ fun globals::check($t0: address): bool {
 fun globals::publish($t0: &signer) {
      var $t1: globals::R
      var $t2: u64
-  0: $t2 := 1
-  1: $t1 := pack globals::R($t2)
-  2: move_to<globals::R>($t0, $t1)
-  3: return ()
+     var $t3: u64
+  0: $t3 := 1
+  1: $t2 := move($t3)
+  2: $t1 := pack globals::R($t2)
+  3: move_to<globals::R>($t0, $t1)
+  4: return ()
 }
 
 
@@ -65,14 +67,17 @@ fun globals::check($t0: address): bool {
 fun globals::publish($t0: &signer) {
      var $t1: globals::R
      var $t2: u64
+     var $t3: u64
      # live vars: $t0
-  0: $t2 := 1
+  0: $t3 := 1
+     # live vars: $t0, $t3
+  1: $t2 := move($t3)
      # live vars: $t0, $t2
-  1: $t1 := pack globals::R($t2)
+  2: $t1 := pack globals::R($t2)
      # live vars: $t0, $t1
-  2: move_to<globals::R>($t0, $t1)
+  3: move_to<globals::R>($t0, $t1)
      # live vars:
-  3: return ()
+  4: return ()
 }
 
 
@@ -133,14 +138,17 @@ B0:
 	2: Ret
 }
 publish(Arg0: &signer) {
+L0:	loc1: R
 B0:
 	0: LdU64(1)
-	1: Pack[0](R)
-	2: StLoc[1](loc0: R)
-	3: MoveLoc[0](Arg0: &signer)
-	4: MoveLoc[1](loc0: R)
-	5: MoveTo[0](R)
-	6: Ret
+	1: StLoc[1](loc0: u64)
+	2: MoveLoc[1](loc0: u64)
+	3: Pack[0](R)
+	4: StLoc[2](loc1: R)
+	5: MoveLoc[0](Arg0: &signer)
+	6: MoveLoc[2](loc1: R)
+	7: MoveTo[0](R)
+	8: Ret
 }
 read(Arg0: address): u64 {
 B0:
