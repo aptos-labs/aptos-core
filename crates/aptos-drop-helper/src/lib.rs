@@ -10,7 +10,7 @@ use aptos_metrics_core::TimerHelper;
 use once_cell::sync::Lazy;
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-pub static DEFAULT_DROP_HELPER: Lazy<DropHelper> = Lazy::new(|| DropHelper::new("default", 128));
+pub static DEFAULT_DROP_HELPER: Lazy<DropHelper> = Lazy::new(|| DropHelper::new("default", 32));
 
 /// A helper to send things to a thread pool for asynchronous dropping.
 ///
