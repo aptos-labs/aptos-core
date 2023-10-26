@@ -8,18 +8,20 @@ import type {
   ServiceError,
   UntypedServiceImplementation,
 } from "@grpc/grpc-js";
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 
 export interface NetworkMessage {
   message?: Uint8Array | undefined;
   messageType?: string | undefined;
+  msSinceEpoch?: bigint | undefined;
 }
 
 export interface Empty {
 }
 
 function createBaseNetworkMessage(): NetworkMessage {
-  return { message: new Uint8Array(0), messageType: "" };
+  return { message: new Uint8Array(0), messageType: "", msSinceEpoch: undefined };
 }
 
 export const NetworkMessage = {
@@ -29,6 +31,12 @@ export const NetworkMessage = {
     }
     if (message.messageType !== undefined && message.messageType !== "") {
       writer.uint32(18).string(message.messageType);
+    }
+    if (message.msSinceEpoch !== undefined) {
+      if (BigInt.asUintN(64, message.msSinceEpoch) !== message.msSinceEpoch) {
+        throw new Error("value provided for field message.msSinceEpoch of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.msSinceEpoch.toString());
     }
     return writer;
   },
@@ -53,6 +61,13 @@ export const NetworkMessage = {
           }
 
           message.messageType = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.msSinceEpoch = longToBigint(reader.uint64() as Long);
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -99,6 +114,7 @@ export const NetworkMessage = {
     return {
       message: isSet(object.message) ? bytesFromBase64(object.message) : new Uint8Array(0),
       messageType: isSet(object.messageType) ? globalThis.String(object.messageType) : "",
+      msSinceEpoch: isSet(object.msSinceEpoch) ? BigInt(object.msSinceEpoch) : undefined,
     };
   },
 
@@ -110,6 +126,9 @@ export const NetworkMessage = {
     if (message.messageType !== undefined && message.messageType !== "") {
       obj.messageType = message.messageType;
     }
+    if (message.msSinceEpoch !== undefined) {
+      obj.msSinceEpoch = message.msSinceEpoch.toString();
+    }
     return obj;
   },
 
@@ -120,6 +139,7 @@ export const NetworkMessage = {
     const message = createBaseNetworkMessage();
     message.message = object.message ?? new Uint8Array(0);
     message.messageType = object.messageType ?? "";
+    message.msSinceEpoch = object.msSinceEpoch ?? undefined;
     return message;
   },
 };
@@ -275,6 +295,15 @@ type DeepPartial<T> = T extends Builtin ? T
   : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
   : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
   : Partial<T>;
+
+function longToBigint(long: Long) {
+  return BigInt(long.toString());
+}
+
+if (_m0.util.Long !== Long) {
+  _m0.util.Long = Long as any;
+  _m0.configure();
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

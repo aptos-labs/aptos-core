@@ -87,12 +87,18 @@ impl serde::Serialize for NetworkMessage {
         if !self.message_type.is_empty() {
             len += 1;
         }
+        if self.ms_since_epoch.is_some() {
+            len += 1;
+        }
         let mut struct_ser = serializer.serialize_struct("aptos.remote_executor.v1.NetworkMessage", len)?;
         if !self.message.is_empty() {
             struct_ser.serialize_field("message", pbjson::private::base64::encode(&self.message).as_str())?;
         }
         if !self.message_type.is_empty() {
             struct_ser.serialize_field("messageType", &self.message_type)?;
+        }
+        if let Some(v) = self.ms_since_epoch.as_ref() {
+            struct_ser.serialize_field("msSinceEpoch", ToString::to_string(&v).as_str())?;
         }
         struct_ser.end()
     }
@@ -107,12 +113,15 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
             "message",
             "message_type",
             "messageType",
+            "ms_since_epoch",
+            "msSinceEpoch",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Message,
             MessageType,
+            MsSinceEpoch,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -136,6 +145,7 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                         match value {
                             "message" => Ok(GeneratedField::Message),
                             "messageType" | "message_type" => Ok(GeneratedField::MessageType),
+                            "msSinceEpoch" | "ms_since_epoch" => Ok(GeneratedField::MsSinceEpoch),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -157,6 +167,7 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
             {
                 let mut message__ = None;
                 let mut message_type__ = None;
+                let mut ms_since_epoch__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Message => {
@@ -173,11 +184,20 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                             }
                             message_type__ = Some(map.next_value()?);
                         }
+                        GeneratedField::MsSinceEpoch => {
+                            if ms_since_epoch__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("msSinceEpoch"));
+                            }
+                            ms_since_epoch__ =
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                            ;
+                        }
                     }
                 }
                 Ok(NetworkMessage {
                     message: message__.unwrap_or_default(),
                     message_type: message_type__.unwrap_or_default(),
+                    ms_since_epoch: ms_since_epoch__,
                 })
             }
         }

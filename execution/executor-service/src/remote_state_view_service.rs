@@ -7,12 +7,14 @@ use std::{
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
+use std::time::SystemTime;
 
 extern crate itertools;
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 use aptos_logger::trace;
 use aptos_types::state_store::{StateView, TStateView};
 use itertools::Itertools;
+use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
@@ -80,6 +82,20 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         state_view: Arc<RwLock<Option<Arc<S>>>>,
         kv_tx: Arc<Vec<Sender<Message>>>,
     ) {
+        let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
+        {
+            let curr_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > start_ms_since_epoch {
+                delta = (curr_time - start_ms_since_epoch) as f64;
+            }
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["3_kv_req_coord_handler_st"])
+                .observe(delta);
+        }
         // we don't know the shard id until we deserialize the message, so lets default it to 0
         let _timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_requests"])
@@ -121,7 +137,20 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             shard_id,
             len
         );
-        let message = Message::new(resp);
+        let message = Message::create_with_duration(resp, start_ms_since_epoch);
         kv_tx[shard_id].send(message).unwrap();
+        {
+            let curr_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > start_ms_since_epoch {
+                delta = (curr_time - start_ms_since_epoch) as f64;
+            }
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["4_kv_req_coord_handler_end"])
+                .observe(delta);
+        }
     }
 }

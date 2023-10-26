@@ -15,7 +15,7 @@ use tokio::{runtime, runtime::Runtime, sync::oneshot};
 
 mod error;
 mod inbound_handler;
-pub(crate) mod metrics;
+pub mod metrics;
 mod outbound_handler;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -56,11 +56,19 @@ impl NetworkMessage {
 #[allow(dead_code)]
 pub struct Message {
     pub data: Vec<u8>,
+    pub start_ms_since_epoch: Option<u64>,
 }
 
 impl Message {
     pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
+        Self { data, start_ms_since_epoch: None }
+    }
+
+    pub fn create_with_duration(data: Vec<u8>, start_ms_since_epoch: u64) -> Self {
+        Self {
+            data,
+            start_ms_since_epoch: Some(start_ms_since_epoch),
+        }
     }
 
     pub fn to_bytes(self) -> Vec<u8> {

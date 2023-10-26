@@ -14,11 +14,13 @@ use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
+use std::time::SystemTime;
 use tokio::{runtime::Runtime, sync::oneshot};
 use tonic::{
     transport::{Channel, Server},
     Request, Response, Status,
 };
+use crate::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
 const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 80;
 
@@ -99,8 +101,30 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
             .start_timer();
         let remote_addr = request.remote_addr();
         let network_message = request.into_inner();
-        let msg = Message::new(network_message.message);
+        let msg = match network_message.ms_since_epoch {
+            Some(ms_since_epoch) => Message::create_with_duration(
+                network_message.message,
+                ms_since_epoch
+            ),
+            None => Message::new(network_message.message),
+        };
+
         let message_type = MessageType::new(network_message.message_type);
+
+        if msg.start_ms_since_epoch.is_some() {
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > msg.start_ms_since_epoch.unwrap() {
+                delta = (curr_time - msg.start_ms_since_epoch.unwrap()) as f64;
+            }
+            if message_type.get_type() == "remote_kv_request" {
+                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta);
+            } else if message_type.get_type() == "remote_kv_response" {
+                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["6_kv_resp_shard_grpc_recv"]).observe(delta);
+            }
+        }
 
         if let Some(handler) = self.inbound_handlers.lock().unwrap().get(&message_type) {
             // Send the message to the registered handler
@@ -146,7 +170,24 @@ impl GRPCNetworkMessageServiceClientWrapper {
         let request = tonic::Request::new(NetworkMessage {
             message: message.data,
             message_type: mt.get_type(),
+            ms_since_epoch: message.start_ms_since_epoch,
         });
+
+        if message.start_ms_since_epoch.is_some() {
+            let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > message.start_ms_since_epoch.unwrap() {
+                delta = (curr_time - message.start_ms_since_epoch.unwrap()) as f64;
+            }
+            if mt.get_type() == "remote_kv_request" {
+                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["1_kv_req_grpc_shard_send"]).observe(delta);
+            } else if mt.get_type() == "remote_kv_response" {
+                REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["5_kv_resp_coord_grpc_send"]).observe(delta);
+            }
+        }
+
         // TODO: Retry with exponential backoff on failures
         match self.remote_channel.simple_msg_exchange(request).await {
             Ok(_) => {},

@@ -10,6 +10,7 @@ use std::{
     sync::{Arc, RwLock},
     thread,
 };
+use std::time::SystemTime;
 
 extern crate itertools;
 use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
@@ -22,8 +23,9 @@ use aptos_types::{
 };
 use dashmap::DashMap;
 use rayon::ThreadPool;
+use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
-pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 5000;
+pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
 
 pub struct RemoteStateView {
     state_values: DashMap<StateKey, RemoteStateValue>,
@@ -175,7 +177,10 @@ impl RemoteStateViewClient {
     ) {
         let request = RemoteKVRequest::new(shard_id, state_keys);
         let request_message = bcs::to_bytes(&request).unwrap();
-        sender.send(Message::new(request_message)).unwrap();
+        let duration_since_epoch = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap().as_millis() as u64;
+        sender.send(Message::create_with_duration(request_message, duration_since_epoch)).unwrap();
     }
 }
 
@@ -241,6 +246,21 @@ impl RemoteStateValueReceiver {
         message: Message,
         state_view: Arc<RwLock<RemoteStateView>>,
     ) {
+        let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
+        {
+            let curr_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > start_ms_since_epoch {
+                delta = (curr_time - start_ms_since_epoch) as f64;
+            }
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["7_kv_resp_shard_handler_st"])
+                .observe(delta);
+        }
+
         let _timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&[&shard_id.to_string(), "kv_responses"])
             .start_timer();
@@ -265,5 +285,19 @@ impl RemoteStateValueReceiver {
             .for_each(|(state_key, state_value)| {
                 state_view_lock.set_state_value(&state_key, state_value);
             });
+
+        {
+            let curr_time = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            let mut delta = 0.0;
+            if curr_time > start_ms_since_epoch {
+                delta = (curr_time - start_ms_since_epoch) as f64;
+            }
+            REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                .with_label_values(&["8_kv_resp_shard_handler_end"])
+                .observe(delta);
+        }
     }
 }

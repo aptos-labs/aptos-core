@@ -8,6 +8,7 @@ package aptos.remote_executor.v1;
 message NetworkMessage {
     bytes message = 1;
     string message_type = 2;
+    optional uint64 ms_since_epoch = 3;
 }
 
 message Empty {
