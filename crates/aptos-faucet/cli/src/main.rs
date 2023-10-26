@@ -41,7 +41,7 @@ pub struct FaucetCliArgs {
     /// Address of the account to send transactions from. On testnet, for
     /// example, this is a550c18. If not given, we use the account address
     /// corresponding to the given private key. If you forget to set this
-    /// while still using a root key, it will fail.
+    /// while still using a root key, it will fail. foo
     #[clap(long)]
     pub mint_account_address: Option<AccountAddress>,
 
