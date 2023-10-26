@@ -4,7 +4,8 @@
 use crate::async_concurrent_dropper::AsyncConcurrentDropper;
 use once_cell::sync::Lazy;
 
-mod async_concurrent_dropper;
+pub mod async_concurrent_dropper;
+pub mod async_drop_queue;
 mod metrics;
 
 pub static DEFAULT_DROPPER: Lazy<AsyncConcurrentDropper> =
