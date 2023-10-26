@@ -2808,10 +2808,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         fields: &EA::Fields<EA::Exp>,
         expected_type: &Type,
     ) -> ExpData {
-        if let Some((struct_id, field_args)) =
-            self.translate_fields(loc, maccess, generics, fields, |s, field_ty, exp| {
-                s.translate_exp(exp, field_ty)
-            })
+        if let Some((struct_id, bindings, field_args)) =
+            self.translate_fields_exp(loc, maccess, generics, fields)
         {
             let struct_ty = struct_id.to_type();
             let struct_ty = self.check_type(loc, &struct_ty, expected_type, "");
@@ -2828,11 +2826,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             let id = self.new_node_id_with_type_loc(&struct_ty, loc);
             self.set_node_instantiation(id, struct_id.inst);
-            ExpData::Call(
+            let body = ExpData::Call(
                 id,
                 Operation::Pack(struct_id.module_id, struct_id.id),
                 field_args,
-            )
+            );
+            bindings.into_iter().rev().fold(body, |acc, (x, e, loc)| {
+                self.new_bind_exp(&loc, x, Some(e.into_exp()), acc.into_exp())
+            })
         } else {
             // Error already reported
             self.new_error_exp()
@@ -2911,6 +2912,112 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .map(|(_, value)| value)
                         .collect_vec();
                     Some((struct_id, args))
+                }
+            } else {
+                self.error(
+                    &struct_name_loc,
+                    &format!(
+                        "native struct `{}` cannot be packed or unpacked",
+                        struct_name.display(self.parent.parent.env)
+                    ),
+                );
+                None
+            }
+        } else {
+            self.error(
+                &struct_name_loc,
+                &format!(
+                    "undeclared struct `{}`",
+                    struct_name.display(self.parent.parent.env)
+                ),
+            );
+            None
+        }
+    }
+
+    fn translate_fields_exp(
+        &mut self,
+        loc: &Loc,
+        maccess: &EA::ModuleAccess,
+        generics: &Option<Vec<EA::Type>>,
+        fields: &EA::Fields<EA::Exp>,
+    ) -> Option<(QualifiedInstId<StructId>, Vec<(Pattern, ExpData, Loc)>, Vec<ExpData>)> {
+        let struct_name = self.parent.module_access_to_qualified(maccess);
+        let struct_name_loc = self.to_loc(&maccess.loc);
+        let generics = generics.as_ref().map(|ts| self.translate_types(ts));
+        if let Some(entry) = self.parent.parent.struct_table.get(&struct_name) {
+            let entry = entry.clone();
+            let (instantiation, diag) = self.make_instantiation(entry.type_params.len(), generics);
+            if let Some(msg) = diag {
+                self.error(loc, &msg);
+                return None;
+            }
+
+            if let Some(field_decls) = &entry.fields {
+                let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
+                // Exclude from the covered fields the dummy_field added by legacy compiler
+                fields_not_covered.extend(
+                    field_decls
+                        .keys()
+                        .filter(|s| *s != &self.parent.dummy_field_name()),
+                );
+                let mut args = BTreeMap::new();
+                // maps i to (x_i, e_i) where x_i is a locally fresh var, e_i is the i-th field exp
+                let mut bindings = BTreeMap::new();
+                for (name_loc, name_, (exp_idx, value)) in fields.iter() {
+                    let field_name = self.symbol_pool().make(name_);
+                    if let Some((_, def_idx, field_ty)) = field_decls.get(&field_name) {
+                        // to_string for borrowing issues
+                        let field_name_display = field_name.display(self.symbol_pool()).to_string();
+                        let field_ty = field_ty.instantiate(&instantiation);
+                        // Translate the abstract value of the field, passing in its instantiated
+                        // type.
+                        let translated = self.translate_exp(value, &field_ty);
+                        // starts with . to avoid shadowing
+                        let var_name = self.symbol_pool().make(&format!(".{field_name_display}"));
+                        let var = Pattern::Var(translated.node_id(), var_name);
+                        let arg = ExpData::LocalVar(translated.node_id(), var_name);
+                        args.insert(def_idx, arg);
+                        bindings.insert(exp_idx, (var, translated, self.to_loc(&value.loc)));
+                        fields_not_covered.remove(&field_name);
+                    } else {
+                        self.error(
+                            &self.to_loc(&name_loc),
+                            &format!(
+                                "field `{}` not declared in struct `{}`",
+                                field_name.display(self.symbol_pool()),
+                                struct_name.display(self.parent.parent.env)
+                            ),
+                        );
+                    }
+                }
+                if !fields_not_covered.is_empty() {
+                    self.error(
+                        loc,
+                        &format!(
+                            "missing fields {}",
+                            fields_not_covered
+                                .iter()
+                                .map(|n| format!("`{}`", n.display(self.symbol_pool())))
+                                .join(", ")
+                        ),
+                    );
+                    None
+                } else {
+                    let struct_id = entry
+                        .module_id
+                        .qualified_inst(entry.struct_id, instantiation);
+                    let args = args
+                        .into_iter()
+                        .sorted_by_key(|(i, _)| *i)
+                        .map(|(_, value)| value)
+                        .collect_vec();
+                    let bindings = bindings
+                        .into_iter()
+                        .sorted_by_key(|(i, _)| *i)
+                        .map(|(_, value)| value)
+                        .collect_vec();
+                    Some((struct_id, bindings, args))
                 }
             } else {
                 self.error(
