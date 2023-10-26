@@ -33,7 +33,7 @@ def local_setup():
             "build",
             "--release",
             "-p",
-            "aptos-db-tool",
+            "aptos-debugger",
         ],
         check=True,
     )

@@ -226,7 +226,6 @@ dependencies = [
  "aptos-cli-common",
  "aptos-config",
  "aptos-crypto",
- "aptos-debugger",
  "aptos-faucet-core",
  "aptos-framework",
  "aptos-gas-profiling",
@@ -239,6 +238,7 @@ dependencies = [
  "aptos-keygen",
  "aptos-ledger",
  "aptos-logger",
+ "aptos-move-debugger",
  "aptos-network-checker",
  "aptos-node",
  "aptos-protos 1.1.2",
@@ -1062,23 +1062,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-db-bootstrapper"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-db",
- "aptos-executor",
- "aptos-storage-interface",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "bcs 0.1.4",
- "clap 4.3.21",
-]
-
-[[package]]
 name = "aptos-db-indexer"
 version = "0.1.0"
 dependencies = [
@@ -1118,6 +1101,7 @@ dependencies = [
  "aptos-backup-service",
  "aptos-config",
  "aptos-db",
+ "aptos-executor",
  "aptos-executor-test-helpers",
  "aptos-executor-types",
  "aptos-logger",
@@ -1126,7 +1110,9 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
+ "aptos-vm",
  "async-trait",
+ "bcs 0.1.4",
  "clap 4.3.21",
  "itertools 0.10.5",
  "owo-colors",
@@ -1138,33 +1124,12 @@ name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-crypto",
- "aptos-gas-meter",
- "aptos-gas-profiling",
- "aptos-gas-schedule",
+ "aptos-db-tool",
  "aptos-logger",
- "aptos-memory-usage-tracker",
- "aptos-resource-viewer",
- "aptos-rest-client",
- "aptos-state-view",
- "aptos-table-natives",
- "aptos-types",
- "aptos-validator-interface",
- "aptos-vm",
- "aptos-vm-logging",
- "aptos-vm-types",
- "bcs 0.1.4",
+ "aptos-move-debugger",
+ "aptos-push-metrics",
  "clap 4.3.21",
- "move-binary-format",
- "move-cli",
- "move-compiler",
- "move-core-types",
- "move-resource-viewer",
- "move-vm-runtime",
- "move-vm-test-utils",
- "regex",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -2509,6 +2474,40 @@ dependencies = [
  "anyhow",
  "claims",
  "prometheus",
+]
+
+[[package]]
+name = "aptos-move-debugger"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-gas-meter",
+ "aptos-gas-profiling",
+ "aptos-gas-schedule",
+ "aptos-logger",
+ "aptos-memory-usage-tracker",
+ "aptos-resource-viewer",
+ "aptos-rest-client",
+ "aptos-state-view",
+ "aptos-table-natives",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm",
+ "aptos-vm-logging",
+ "aptos-vm-types",
+ "bcs 0.1.4",
+ "clap 4.3.21",
+ "move-binary-format",
+ "move-cli",
+ "move-compiler",
+ "move-core-types",
+ "move-resource-viewer",
+ "move-vm-runtime",
+ "move-vm-test-utils",
+ "regex",
+ "tokio",
+ "url",
 ]
 
 [[package]]
@@ -13665,7 +13664,6 @@ dependencies = [
  "aptos-config",
  "aptos-consensus",
  "aptos-crypto",
- "aptos-debugger",
  "aptos-faucet-core",
  "aptos-forge",
  "aptos-framework",
@@ -13678,6 +13676,7 @@ dependencies = [
  "aptos-inspection-service",
  "aptos-keygen",
  "aptos-logger",
+ "aptos-move-debugger",
  "aptos-release-builder",
  "aptos-rest-client",
  "aptos-rosetta",

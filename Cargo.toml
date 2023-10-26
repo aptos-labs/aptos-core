@@ -54,6 +54,7 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-debugger",
     "crates/aptos-drop-helper",
     "crates/aptos-enum-conversion-derive",
     "crates/aptos-faucet/cli",
@@ -115,7 +116,6 @@ members = [
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
-    "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
     "execution/executor-service",
@@ -242,13 +242,13 @@ default-members = [
     "aptos-node",
     "consensus/safety-rules",
     "crates/aptos",
+    "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
     "crates/aptos-rate-limiter",
     "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
-    "execution/db-bootstrapper",
     "storage/backup/backup-cli",
     "ecosystem/node-checker",
 ]
@@ -296,7 +296,7 @@ aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
-aptos-debugger = { path = "aptos-move/aptos-debugger" }
+aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
@@ -350,6 +350,7 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
@@ -740,10 +741,6 @@ debug-assertions = true
 [profile.bench]
 debug = true
 
-# This is a temporary workaround to avoid multiple library
-# definitions for LZ4 (caused by rust-rocksdb).
-# This will be removed once our pull requests land.
-# https://github.com/rust-rocksdb/rust-rocksdb/issues/666
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
