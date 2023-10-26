@@ -2831,8 +2831,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Operation::Pack(struct_id.module_id, struct_id.id),
                 field_args,
             );
-            bindings.into_iter().rev().fold(body, |acc, (x, e, loc)| {
-                self.new_bind_exp(&loc, x, Some(e.into_exp()), acc.into_exp())
+            bindings.into_iter().rev().fold(body, |acc, (x, e)| {
+                self.new_bind_exp(loc, x, Some(e.into_exp()), acc.into_exp())
             })
         } else {
             // Error already reported
@@ -2943,7 +2943,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         fields: &EA::Fields<EA::Exp>,
     ) -> Option<(
         QualifiedInstId<StructId>,
-        Vec<(Pattern, ExpData, Loc)>,
+        Vec<(Pattern, ExpData)>,
         Vec<ExpData>,
     )> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
@@ -2982,7 +2982,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         let var = Pattern::Var(translated.node_id(), var_name);
                         let arg = ExpData::LocalVar(translated.node_id(), var_name);
                         args.insert(def_idx, arg);
-                        bindings.insert(exp_idx, (var, translated, self.to_loc(&value.loc)));
+                        bindings.insert(exp_idx, (var, translated));
                         fields_not_covered.remove(&field_name);
                     } else {
                         self.error(
