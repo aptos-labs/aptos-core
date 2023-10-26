@@ -232,6 +232,7 @@ Gets the current time in seconds.
 
 <pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>include</b> <a href="timestamp.md#0x1_timestamp_UpdateGlobalTimeAbortsIf">UpdateGlobalTimeAbortsIf</a>;
+<b>ensures</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 </code></pre>
 
 

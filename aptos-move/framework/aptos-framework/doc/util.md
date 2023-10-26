@@ -10,6 +10,7 @@ Utility functions used by the framework modules.
 -  [Function `address_from_bytes`](#0x1_util_address_from_bytes)
 -  [Specification](#@Specification_0)
     -  [Function `from_bytes`](#@Specification_0_from_bytes)
+    -  [Function `address_from_bytes`](#@Specification_0_address_from_bytes)
 
 
 <pre><code></code></pre>
@@ -95,6 +96,22 @@ owned.
 
 
 <pre><code><b>fun</b> <a href="util.md#0x1_util_spec_from_bytes">spec_from_bytes</a>&lt;T&gt;(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): T;
+</code></pre>
+
+
+
+<a name="@Specification_0_address_from_bytes"></a>
+
+### Function `address_from_bytes`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="util.md#0x1_util_address_from_bytes">address_from_bytes</a>(bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> [abstract] len(bytes) != 32;
 </code></pre>
 
 
