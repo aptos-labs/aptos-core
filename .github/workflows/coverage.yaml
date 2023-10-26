@@ -1,5 +1,10 @@
 name: "Test_Coverage"
 on:
+  # Trigger if any of the conditions
+  #   1. Daily at 12am UTC from the main branch, or
+  #   2. PR with a specific label (see below)
+  schedule:
+    - cron: "0 0 * * *"
   pull_request:
     types: [labeled, opened, synchronize, reopened]
   push:
@@ -20,8 +25,9 @@ concurrency:
 
 jobs:
   rust-unit-coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
-    timeout-minutes: 120
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule'
+    # Note the tests run slowly due to instrutmentation. It takes CI ~8 hrs
+    timeout-minutes: 600
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -33,7 +39,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info
+      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 16 --output-path lcov_unit.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - uses: actions/upload-artifact@v3
@@ -42,8 +48,8 @@ jobs:
           path: lcov_unit.info
 
   rust-smoke-coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
-    timeout-minutes: 120
+    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule'
+    timeout-minutes: 240
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -55,7 +61,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info
+      - run: cargo llvm-cov --ignore-run-fail --package smoke-test --lcov --output-path lcov_smoke.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - uses: actions/upload-artifact@v3
@@ -64,7 +70,7 @@ jobs:
           path: lcov_smoke.info
 
   upload-to-codecov:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') && !cancelled()
+    if: (contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule') && !cancelled()
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest
     steps:
