@@ -192,6 +192,10 @@ pub trait TransactionWrite: Debug {
     }
 
     fn set_bytes(&mut self, bytes: Bytes);
+
+    fn as_modification(&self) -> Option<Self>
+    where
+        Self: Sized;
 }
 
 impl TransactionWrite for WriteOp {
@@ -240,6 +244,20 @@ impl TransactionWrite for WriteOp {
             Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
             Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
             Deletion | DeletionWithMetadata { .. } => (),
+        }
+    }
+
+    fn as_modification(&self) -> Option<Self> {
+        use WriteOp::*;
+
+        match self {
+            Creation(data) | Modification(data) => Some(Modification(data.clone())),
+            CreationWithMetadata { data, metadata }
+            | ModificationWithMetadata { data, metadata } => Some(ModificationWithMetadata {
+                data: data.clone(),
+                metadata: metadata.clone(),
+            }),
+            _ => None,
         }
     }
 }

@@ -14,7 +14,6 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{TransactionWrite, WriteOp, WriteSetMut},
 };
-use bytes::Bytes;
 use claims::assert_none;
 use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
@@ -30,7 +29,6 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
-
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// Describes an update to a resource group granularly, with WriteOps to affected
@@ -115,7 +113,7 @@ pub struct VMChangeSet {
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
+    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
@@ -156,7 +154,7 @@ impl VMChangeSet {
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-        reads_needing_delayed_field_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
+        reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
@@ -373,8 +371,8 @@ impl VMChangeSet {
 
     pub(crate) fn drain_delayed_field_change_set(
         &mut self,
-    ) -> impl Iterator<Item = (DelayedFieldID, DelayedChange<DelayedFieldID>)> + '_ {
-        std::mem::take(&mut self.delayed_field_change_set).into_iter()
+    ) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        std::mem::take(&mut self.delayed_field_change_set)
     }
 
     pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
@@ -393,8 +391,14 @@ impl VMChangeSet {
 
     pub fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> &BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)> {
+    ) -> &BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)> {
         &self.reads_needing_delayed_field_exchange
+    }
+
+    pub(crate) fn drain_reads_needing_delayed_field_exchange(
+        &mut self,
+    ) -> BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)> {
+        std::mem::take(&mut self.reads_needing_delayed_field_exchange)
     }
 
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
@@ -675,11 +679,19 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_reads_needing_exchange(
-        reads_needing_exchange: &mut BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
-        additional_reads_needing_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
+    fn squash_additional_reads_needing_exchange<E>(
+        reads_needing_exchange: &mut BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+        additional_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+        skip: &BTreeMap<StateKey, E>,
     ) -> anyhow::Result<(), VMStatus> {
+        for key in skip.keys() {
+            reads_needing_exchange.remove(key);
+        }
+
         for (key, additional_value) in additional_reads_needing_exchange.into_iter() {
+            if skip.contains_key(&key) {
+                continue;
+            }
             match reads_needing_exchange.entry(key) {
                 Occupied(entry) => {
                     // When squashing, reads should always be identical.
@@ -735,6 +747,7 @@ impl VMChangeSet {
         Self::squash_additional_reads_needing_exchange(
             &mut self.reads_needing_delayed_field_exchange,
             additional_reads_needing_delayed_field_exchange,
+            &self.resource_write_set,
         )?;
         self.events.extend(additional_events);
 

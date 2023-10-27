@@ -10,11 +10,14 @@ use aptos_aggregator::{
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
     types::DelayedFieldID,
 };
-use aptos_types::state_store::state_key::StateKey;
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use better_any::{Tid, TidAble};
-use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
-use std::{cell::RefCell, collections::{BTreeMap, HashSet}, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -33,7 +36,7 @@ pub enum AggregatorChangeV1 {
 pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
     pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    pub reads_needing_exchange: BTreeMap<StateKey, (Bytes, Arc<MoveTypeLayout>)>,
+    pub reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -110,14 +113,22 @@ impl<'a> NativeAggregatorContext<'a> {
         }
 
         let delayed_field_changes = delayed_field_data.into_inner().into();
-        let delayed_write_set_keys = delayed_field_changes.keys().cloned().collect::<HashSet<_>>();
+        let delayed_write_set_keys = delayed_field_changes
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>();
         AggregatorChangeSet {
             aggregator_v1_changes,
             delayed_field_changes,
             // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
             // are any changes that would require computing reads needing exchange.
             // TODO[agg_v2](optimize) we only later compute the the write set, so cannot pass the correct skip values here.
-            reads_needing_exchange: if delayed_write_set_keys.is_empty() { BTreeMap::new() } else { self.delayed_field_resolver.get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new()) },
+            reads_needing_exchange: if delayed_write_set_keys.is_empty() {
+                BTreeMap::new()
+            } else {
+                self.delayed_field_resolver
+                    .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())
+            },
         }
     }
 }

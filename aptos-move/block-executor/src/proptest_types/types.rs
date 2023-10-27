@@ -297,6 +297,13 @@ impl TransactionWrite for ValueType {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.bytes = bytes.into();
     }
+
+    fn as_modification(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        Some(self.clone())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -827,7 +834,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
@@ -1018,6 +1025,16 @@ where
     ) -> BTreeMap<
         <Self::Txn as Transaction>::Identifier,
         DelayedChange<<Self::Txn as Transaction>::Identifier>,
+    > {
+        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        BTreeMap::new()
+    }
+
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
     > {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         BTreeMap::new()

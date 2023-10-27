@@ -85,6 +85,13 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.maybe_bytes = Some(bytes);
     }
+
+    fn as_modification(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        Some(self.clone())
+    }
 }
 
 enum Data<V> {

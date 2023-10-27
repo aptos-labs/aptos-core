@@ -471,7 +471,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
 
         // We need to remove values that are already in the writes.
-        let reads_needing_exchange = aggregator_change_set.reads_needing_exchange.into_iter()
+        let reads_needing_exchange = aggregator_change_set
+            .reads_needing_exchange
+            .into_iter()
             .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
             .collect();
 

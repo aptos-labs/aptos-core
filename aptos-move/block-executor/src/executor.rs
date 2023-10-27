@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    captured_reads::DataRead,
     counters,
     counters::{
         PARALLEL_EXECUTION_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
@@ -606,15 +605,13 @@ where
     fn map_id_to_values_in_write_set(
         resource_write_set: Option<BTreeMap<T::Key, (T::Value, Option<Arc<MoveTypeLayout>>)>>,
         latest_view: &LatestView<T, S, X>,
-    ) -> (BTreeMap<T::Key, T::Value>, HashSet<T::Key>) {
-        let mut write_set_keys = HashSet::new();
+    ) -> BTreeMap<T::Key, T::Value> {
         let mut patched_resource_write_set = BTreeMap::new();
         if let Some(resource_write_set) = resource_write_set {
             for (key, (write_op, layout)) in resource_write_set.iter() {
                 // layout is Some(_) if it contains a delayed field
                 if let Some(layout) = layout {
                     if !write_op.is_deletion() {
-                        write_set_keys.insert(key.clone());
                         let patched_bytes = match latest_view
                             .replace_identifiers_with_values(write_op.bytes().unwrap(), layout)
                         {
@@ -628,103 +625,32 @@ where
                 }
             }
         }
-        (patched_resource_write_set, write_set_keys)
+        patched_resource_write_set
     }
 
     // Parse the input `value` and replace delayed field identifiers with
     // corresponding values
     fn replace_ids_with_values(
-        value: Arc<T::Value>,
+        value: &T::Value,
         layout: &MoveTypeLayout,
         latest_view: &LatestView<T, S, X>,
-        delayed_field_keys: &HashSet<T::Identifier>,
-    ) -> Option<T::Value> {
-        if let Some(value_bytes) = value.bytes() {
-            match latest_view.replace_identifiers_with_values(value_bytes, layout) {
-                Ok((patched_bytes, delayed_field_keys_in_resource)) => {
-                    if !delayed_field_keys.is_disjoint(&delayed_field_keys_in_resource) {
-                        let mut patched_value = value.as_ref().clone();
-                        patched_value.set_bytes(patched_bytes);
-                        Some(patched_value)
-                    } else {
-                        None
-                    }
-                },
-                Err(_) => unreachable!("Failed to replace identifiers with values in read set"),
+    ) -> T::Value {
+        if let Some(mut value) = value.as_modification() {
+            if let Some(value_bytes) = value.bytes() {
+                let (patched_bytes, _) = latest_view
+                    .replace_identifiers_with_values(value_bytes, layout)
+                    .unwrap();
+                value.set_bytes(patched_bytes);
+                value
+            } else {
+                unreachable!("Value to be exchanged doesn't have bytes: {:?}", value)
             }
         } else {
-            // TODO[agg_v2](fix): Is this unreachable?
-            unreachable!("Data read value must exist");
+            unreachable!(
+                "Value to be exchanged cannot be transformed to modification: {:?}",
+                value
+            );
         }
-    }
-
-    // For each resource that satisfies the following conditions,
-    //     1. Resource is in read set
-    //     2. Resource is not in write set
-    // replace the delayed field identifiers in the resource with corresponding values.
-    // If any of the delayed field identifiers in the resource are part of delayed_field_write_set,
-    // then include the resource in the write set.
-    fn map_id_to_values_in_read_set_parallel(
-        txn_idx: TxnIndex,
-        delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
-        write_set_keys: HashSet<T::Key>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        latest_view: &LatestView<T, S, X>,
-    ) -> BTreeMap<T::Key, T::Value> {
-        let mut patched_resource_write_set = BTreeMap::new();
-        if let Some(delayed_field_keys) = delayed_field_keys {
-            let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
-            let read_set = last_input_output.read_set(txn_idx);
-            if let Some(read_set) = read_set {
-                for (key, data_read) in read_set.get_read_values_with_delayed_fields() {
-                    if write_set_keys.contains(key) {
-                        continue;
-                    }
-                    // layout is Some(_) if it contains an delayed field
-                    if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                        if let Some(patched_value) = Self::replace_ids_with_values(
-                            value.clone(),
-                            layout,
-                            latest_view,
-                            &delayed_field_keys,
-                        ) {
-                            patched_resource_write_set.insert(key.clone(), patched_value);
-                        }
-                    }
-                }
-            }
-        }
-        patched_resource_write_set
-    }
-
-    fn map_id_to_values_in_read_set_sequential(
-        delayed_field_keys: Option<impl Iterator<Item = T::Identifier>>,
-        write_set_keys: HashSet<T::Key>,
-        read_set: RefCell<HashSet<T::Key>>,
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        latest_view: &LatestView<T, S, X>,
-    ) -> HashMap<T::Key, T::Value> {
-        let mut patched_resource_write_set = HashMap::new();
-        if let Some(delayed_field_keys) = delayed_field_keys {
-            let delayed_field_keys = delayed_field_keys.collect::<HashSet<_>>();
-            for key in read_set.borrow().iter() {
-                if write_set_keys.contains(key) {
-                    continue;
-                }
-                // layout is Some(_) if it contains an delayed field
-                if let Some((value, Some(layout))) = unsync_map.fetch_data(key) {
-                    if let Some(patched_value) = Self::replace_ids_with_values(
-                        value.clone(),
-                        &layout,
-                        latest_view,
-                        &delayed_field_keys,
-                    ) {
-                        patched_resource_write_set.insert(key.clone(), patched_value);
-                    }
-                }
-            }
-        }
-        patched_resource_write_set
     }
 
     // For each delayed field in the event, replace delayed field identifier with value.
@@ -840,18 +766,21 @@ where
         let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
-        let delayed_field_keys = last_input_output.delayed_field_keys(txn_idx);
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
 
-        let (mut patched_resource_write_set, write_set_keys) =
+        let mut patched_resource_write_set =
             Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
-        patched_resource_write_set.extend(Self::map_id_to_values_in_read_set_parallel(
-            txn_idx,
-            delayed_field_keys,
-            write_set_keys,
-            last_input_output,
-            &latest_view,
-        ));
+
+        if let Some(reads_needing_delayed_field_exchange) =
+            last_input_output.reads_needing_delayed_field_exchange(txn_idx)
+        {
+            for (key, (value, layout)) in reads_needing_delayed_field_exchange.into_iter() {
+                patched_resource_write_set.insert(
+                    key,
+                    Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),
+                );
+            }
+        }
 
         let events = last_input_output.events(txn_idx);
         let patched_events = Self::map_id_to_values_events(events, &latest_view);
@@ -1255,22 +1184,29 @@ where
 
                     if dynamic_change_set_optimizations_enabled {
                         // Replace delayed field id with values in resource write set and read set.
-                        let delayed_field_keys =
-                            Some(output.delayed_field_change_set().into_keys());
                         let resource_change_set = Some(output.resource_write_set());
-                        let (mut patched_resource_write_set, write_set_keys) =
+                        let mut patched_resource_write_set =
                             Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
 
-                        let read_set = latest_view.read_set_sequential_execution();
-                        patched_resource_write_set.extend(
-                            Self::map_id_to_values_in_read_set_sequential(
-                                delayed_field_keys,
-                                write_set_keys,
-                                read_set,
-                                &unsync_map,
-                                &latest_view,
-                            ),
-                        );
+                        for (key, (value, layout)) in
+                            output.reads_needing_delayed_field_exchange().into_iter()
+                        {
+                            if patched_resource_write_set
+                                .insert(
+                                    key,
+                                    Self::replace_ids_with_values(
+                                        &value,
+                                        layout.as_ref(),
+                                        &latest_view,
+                                    ),
+                                )
+                                .is_some()
+                            {
+                                return Err(Error::FallbackToSequential(code_invariant_error(
+                                    "reads_needing_delayed_field_exchange already in the write set for key",
+                                ).into()));
+                            }
+                        }
 
                         // Replace delayed field id with values in events
                         let patched_events = Self::map_id_to_values_events(

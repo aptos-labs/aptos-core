@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{sync::Arc, collections::{BTreeMap, HashSet}};
-
 use crate::{
     data_cache::StorageAdapter,
     move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
@@ -24,7 +22,7 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    write_set::TransactionWrite,
+    write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_types::{
     change_set::VMChangeSet,
@@ -39,6 +37,10 @@ use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
+};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
 };
 
 /// We finish the session after the user transaction is done running to get the change set and
@@ -164,7 +166,9 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
 
 impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
+    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.base_executor_view
@@ -239,8 +243,13 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         self.base_executor_view.generate_delayed_field_id()
     }
 
-    fn get_reads_needing_exchange(&self, delayed_write_set_keys: &HashSet<Self::Identifier>, skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
-        self.base_executor_view.get_reads_needing_exchange(delayed_write_set_keys, skip)
+    fn get_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+        self.base_executor_view
+            .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 }
 
@@ -480,6 +489,7 @@ mod test {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
+            BTreeMap::new(),
             BTreeMap::new(),
             vec![],
             &NoOpChangeSetChecker,

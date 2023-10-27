@@ -184,6 +184,24 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as BlockExecutableTransaction>::Key,
+        (
+            <Self::Txn as BlockExecutableTransaction>::Value,
+            Arc<MoveTypeLayout>,
+        ),
+    > {
+        self.vm_output
+            .lock()
+            .as_ref()
+            .expect("Output to be set to get reads")
+            .change_set()
+            .reads_needing_delayed_field_exchange()
+            .clone()
+    }
+
     /// Should never be called after incorporate_delta_writes, as it
     /// will consume vm_output to prepare an output with deltas.
     fn get_events(&self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {

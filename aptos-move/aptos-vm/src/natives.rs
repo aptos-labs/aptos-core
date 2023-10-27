@@ -2,9 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
-
 #[cfg(feature = "testing")]
 use anyhow::Error;
 #[cfg(feature = "testing")]
@@ -28,6 +25,7 @@ use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
+    write_set::WriteOp,
 };
 #[cfg(feature = "testing")]
 use aptos_types::{
@@ -36,9 +34,14 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
+use move_core_types::language_storage::StructTag;
 #[cfg(feature = "testing")]
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 #[cfg(feature = "testing")]
 use {
     aptos_framework::natives::{
@@ -81,7 +84,9 @@ impl TAggregatorV1View for AptosBlankStorage {
 #[cfg(feature = "testing")]
 impl TDelayedFieldView for AptosBlankStorage {
     type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
+    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         false
@@ -108,7 +113,11 @@ impl TDelayedFieldView for AptosBlankStorage {
         (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
     }
 
-    fn get_reads_needing_exchange(&self, _delayed_write_set_keys: &HashSet<Self::Identifier>, _skip: &HashSet<Self::ResourceKey>) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+    fn get_reads_needing_exchange(
+        &self,
+        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
         unimplemented!()
     }
 }

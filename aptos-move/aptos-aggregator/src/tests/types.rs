@@ -8,10 +8,16 @@ use crate::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{expect_ok, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use bytes::Bytes;
-use move_core_types::value::MoveTypeLayout;
-use std::{cell::RefCell, collections::{HashMap, HashSet, BTreeMap}, sync::Arc};
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    write_set::WriteOp,
+};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+};
 
 pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
     AggregatorID(aggregator_v1_state_key_for_test(key))
@@ -68,7 +74,9 @@ impl TAggregatorV1View for FakeAggregatorView {
 
 impl TDelayedFieldView for FakeAggregatorView {
     type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
+    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         true
@@ -107,8 +115,8 @@ impl TDelayedFieldView for FakeAggregatorView {
     fn get_reads_needing_exchange(
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
-        _skip: &HashSet<Self::ResourceKey>
-    ) -> BTreeMap<Self::ResourceKey, (Bytes, Arc<MoveTypeLayout>)> {
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
         unimplemented!();
     }
 }
