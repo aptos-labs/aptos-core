@@ -4,6 +4,7 @@
 ###
 base:
   role: "full_node"
+  data_dir: "/opt/aptos/data"
   waypoint:
     from_file: "/opt/aptos/genesis/waypoint.txt"
 
