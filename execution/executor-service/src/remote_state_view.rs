@@ -1,15 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{RemoteKVRequest, RemoteKVResponse};
-use aptos_secure_net::network_controller::{Message, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use aptos_types::state_store::state_key::StateKey;
 use aptos_vm::sharded_block_executor::remote_state_value::RemoteStateValue;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::Receiver;
 use std::{
     net::SocketAddr,
     sync::{Arc, RwLock},
     thread,
 };
+use std::sync::Mutex;
 use std::time::SystemTime;
 
 extern crate itertools;
@@ -23,9 +24,11 @@ use aptos_types::{
 };
 use dashmap::DashMap;
 use rayon::ThreadPool;
+use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
 pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
+pub static REMOTE_KV_REQUEST_MSG_TYPE: &str = "remote_kv_request";
 
 pub struct RemoteStateView {
     state_values: DashMap<StateKey, RemoteStateValue>,
@@ -70,7 +73,7 @@ impl RemoteStateView {
 
 pub struct RemoteStateViewClient {
     shard_id: ShardId,
-    kv_tx: Arc<Sender<Message>>,
+    kv_tx: Arc<Mutex<OutboundRpcHelper>>,
     state_view: Arc<RwLock<RemoteStateView>>,
     thread_pool: Arc<rayon::ThreadPool>,
     _join_handle: Option<thread::JoinHandle<()>>,
@@ -89,11 +92,9 @@ impl RemoteStateViewClient {
                 .build()
                 .unwrap(),
         );
-        let kv_request_type = "remote_kv_request";
         let kv_response_type = "remote_kv_response";
         let result_rx = controller.create_inbound_channel(kv_response_type.to_string());
-        let command_tx =
-            controller.create_outbound_channel(coordinator_address, kv_request_type.to_string());
+        let command_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address);
         let state_view = Arc::new(RwLock::new(RemoteStateView::new()));
         let state_value_receiver = RemoteStateValueReceiver::new(
             shard_id,
@@ -109,7 +110,7 @@ impl RemoteStateViewClient {
 
         Self {
             shard_id,
-            kv_tx: Arc::new(command_tx),
+            kv_tx: Arc::new(Mutex::new(command_tx)),
             state_view,
             thread_pool,
             _join_handle: Some(join_handle),
@@ -127,7 +128,7 @@ impl RemoteStateViewClient {
     fn insert_keys_and_fetch_values(
         state_view_clone: Arc<RwLock<RemoteStateView>>,
         thread_pool: Arc<ThreadPool>,
-        kv_tx: Arc<Sender<Message>>,
+        kv_tx: Arc<Mutex<OutboundRpcHelper>>,
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
     ) {
@@ -172,7 +173,7 @@ impl RemoteStateViewClient {
 
     fn send_state_value_request(
         shard_id: ShardId,
-        sender: Arc<Sender<Message>>,
+        sender: Arc<Mutex<OutboundRpcHelper>>,
         state_keys: Vec<StateKey>,
     ) {
         let request = RemoteKVRequest::new(shard_id, state_keys);
@@ -180,7 +181,8 @@ impl RemoteStateViewClient {
         let duration_since_epoch = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap().as_millis() as u64;
-        sender.send(Message::create_with_duration(request_message, duration_since_epoch)).unwrap();
+        sender.lock().unwrap().send(Message::create_with_duration(request_message, duration_since_epoch),
+                            &MessageType::new(REMOTE_KV_REQUEST_MSG_TYPE.to_string()));
     }
 }
 
