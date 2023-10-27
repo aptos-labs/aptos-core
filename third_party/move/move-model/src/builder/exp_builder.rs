@@ -2871,7 +2871,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         generics: &Option<Vec<EA::Type>>,
         fields: &EA::Fields<T>,
         init: S,
-        // translator, acc, field_name, exp_idx, def_idx, field_ty, value
+        // used to fold results when iterating over the fields
+        // the args are: translator, acc, field_name, exp_idx, def_idx, field_ty, value
         mut combine: impl FnMut(&mut Self, &mut S, &Symbol, usize, usize, &Type, &T),
     ) -> Option<(QualifiedInstId<StructId>, S)> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
