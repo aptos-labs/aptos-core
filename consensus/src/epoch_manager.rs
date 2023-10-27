@@ -614,6 +614,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop DAG bootstrapper");
+            debug!("[EpochManager] DAG bootstrapper has shutdown");
         }
         self.dag_shutdown_tx = None;
 
@@ -630,6 +631,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
+            debug!("[EpochManager] Buffer manager has shutdown");
         }
 
         // Shutdown the block retrieval task by dropping the sender
@@ -646,6 +648,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
 
         self.commit_state_computer.end_epoch();
+        debug!("[EpochManager] shutdown current processor complete");
     }
 
     async fn start_recovery_manager(

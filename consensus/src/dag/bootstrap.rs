@@ -384,6 +384,8 @@ impl DagBootstrapper {
                             // Wait for epoch manager to signal shutdown
                             if let Ok(ack_tx) = shutdown_rx.await {
                                 let _ = ack_tx.send(());
+                            } else {
+                                panic!("did not receive shutdown signal");
                             }
                             return;
                         },
