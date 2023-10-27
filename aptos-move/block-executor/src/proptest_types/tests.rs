@@ -564,7 +564,7 @@ fn non_empty_group(
             NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
             ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool.clone(), None, None)
-        .execute_transactions_sequential((), &transactions, &data_view, true);
+        .execute_transactions_sequential((), &transactions, &data_view);
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(&transactions, None).assert_output(&output);

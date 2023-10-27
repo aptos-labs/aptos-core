@@ -43,11 +43,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
+        is_direct_write_set_allowed: bool,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         // TODO[agg_v2](fix) look at whether it is enabled, not just capable.
         // if it is disabled, no need to fallback.
-        if txn.is_valid() && executor_with_group_view.is_delayed_field_optimization_capable() {
+        if txn.is_valid() && !is_direct_write_set_allowed {
             if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
             {
                 // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization is enabled

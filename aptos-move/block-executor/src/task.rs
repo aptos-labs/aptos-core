@@ -74,6 +74,7 @@ pub trait ExecutorTask: Sync {
         >),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
+        is_direct_write_set_allowed: bool,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
 }

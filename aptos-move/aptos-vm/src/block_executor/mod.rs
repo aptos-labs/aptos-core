@@ -315,6 +315,11 @@ impl BlockAptosVM {
                     e
                 )
             },
+            Err(Error::DirectWriteSetTransactionNotAlone) => {
+                unreachable!(
+                    "[Execution]: Must not be called with Direct WriteSetPayload not being only transaction"
+                )
+            },
             Err(Error::UserError(err)) => Err(err),
         }
     }
