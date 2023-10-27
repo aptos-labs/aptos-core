@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod outbound_rpc_helper;
+
 use crate::network_controller::{metrics::NETWORK_HANDLER_TIMER, Message, MessageType};
 use aptos_logger::{error, info};
 use aptos_protos::remote_executor::v1::{

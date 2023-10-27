@@ -1,12 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{RemoteKVRequest, RemoteKVResponse};
-use aptos_secure_net::network_controller::{Message, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use crossbeam_channel::{Receiver, Sender};
 use std::{
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
+use std::ops::DerefMut;
 use std::time::SystemTime;
 
 extern crate itertools;
@@ -14,11 +15,13 @@ use crate::metrics::REMOTE_EXECUTOR_TIMER;
 use aptos_logger::trace;
 use aptos_types::state_store::{StateView, TStateView};
 use itertools::Itertools;
+use std::sync::Mutex;
+use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
-    kv_tx: Arc<Vec<Sender<Message>>>,
+    kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
 }
@@ -43,7 +46,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let command_txs = remote_shard_addresses
             .iter()
             .map(|address| {
-                controller.create_outbound_channel(*address, kv_response_type.to_string())
+                //controller.create_outbound_channel(*address, kv_response_type.to_string())
+                Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address))
             })
             .collect_vec();
         Self {
@@ -80,7 +84,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn handle_message(
         message: Message,
         state_view: Arc<RwLock<Option<Arc<S>>>>,
-        kv_tx: Arc<Vec<Sender<Message>>>,
+        kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
     ) {
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
         {
@@ -138,7 +142,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             len
         );
         let message = Message::create_with_duration(resp, start_ms_since_epoch);
-        kv_tx[shard_id].send(message).unwrap();
+        kv_tx[shard_id].lock().unwrap().send(message, &MessageType::new("remote_kv_response".to_string()));
         {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

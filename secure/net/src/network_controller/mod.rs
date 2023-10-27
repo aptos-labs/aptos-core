@@ -119,6 +119,10 @@ impl NetworkController {
         }
     }
 
+    pub fn get_self_addr(&self) -> SocketAddr {
+        self.listen_addr
+    }
+
     pub fn create_outbound_channel(
         &mut self,
         remote_peer_addr: SocketAddr,
