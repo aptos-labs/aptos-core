@@ -6,7 +6,7 @@ use crate::{
         dag_fetcher::{FetchRequestHandler, FetchWaiter},
         dag_network::RpcHandler,
         dag_state_sync::{StateSyncStatus, StateSyncTrigger},
-        errors::{DAGError, DAGRpcError, DagDriverError, NodeBroadcastHandleError},
+        errors::{DAGError, DAGRpcError, DagDriverError, NodeBroadcastHandleError, FetchRequestHandleError},
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
         CertifiedNode, Node,
@@ -153,8 +153,8 @@ impl NetworkHandler {
                         .await
                         .map(|r| r.into())
                         .map_err(|err| {
-                            err.downcast::<DagDriverError>()
-                                .map_or(DAGError::Unknown, DAGError::DagDriverError)
+                            err.downcast::<FetchRequestHandleError>()
+                                .map_or(DAGError::Unknown, DAGError::FetchRequestHandleError)
                         }),
                     _ => unreachable!("verification must catch this error"),
                 },
