@@ -1990,9 +1990,6 @@ fn changing_working_quorum_test_helper(
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
             if use_chain_backoff {
-                // Generally if we are stress testing the consensus, we don't want to slow it down.
-                chain_health_backoff = vec![];
-            } else {
                 for (i, item) in chain_health_backoff.iter_mut().enumerate() {
                     // as we have lower TPS, make limits smaller
                     item.max_sending_block_txns_override =
@@ -2001,6 +1998,9 @@ fn changing_working_quorum_test_helper(
                     // as we have fewer nodes, make backoff triggered earlier:
                     item.backoff_if_below_participating_voting_power_percentage = 90 - i * 5;
                 }
+            } else {
+                // Generally if we are stress testing the consensus, we don't want to slow it down.
+                chain_health_backoff = vec![];
             }
             config.consensus.quorum_store.sender_max_batch_txns = min_block_txns as usize;
             config.consensus.quorum_store.receiver_max_batch_txns = min_block_txns as usize;
