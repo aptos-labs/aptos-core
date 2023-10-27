@@ -1,75 +1,54 @@
 ---
 remote_endpoint: ~
-name: "v1.7"
+name: "v1.8"
 proposals:
-  - name: step_1_enable_module_event
+  - name: upgrade_framework
     metadata:
-      title: "Enable module event"
-      description: "AIP-44: The new module event framework associates every event stream with a static struct type instead of an EventHandle of current event system."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/200"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - module_event
-  - name: step_2_upgrade_framework
-    metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.7"
-      description: "This includes changes outlined in https://github.com/aptos-labs/aptos-core/releases/aptos-node-v1.7.2"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.8"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.8"
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
-      - FeatureFlag:
-          enabled:
-            - safer_resource_groups
-            - safer_metadata
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: step_3_enable_signature_checker_v2_fix
+  - name: add_secp256k1_support_and_introduce_single_sender_authenticator
     metadata:
-      title: "Enable a fix signature checker v2"
-      description: "Fixing a counting bug"
+      title: "AIP-49: secp256k1 ECDSA for Transaction Authentication, and AIP-55: Generalize Transaction Authentication and Support Arbitrary K-of-N MultiKey Accounts"
+      description: "AIP-49: secp256k1 ECDSA for Transaction Authentication (Discussion URL: https://github.com/aptos-foundation/AIPs/issues/247), and AIP-55: Generalize Transaction Authentication and Support Arbitrary K-of-N MultiKey Accounts (Discussion URL: https://github.com/aptos-foundation/AIPs/issues/267)."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/247"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - signature_checker_v2_script_fix
-  - name: step_4_enable_block_gas_limit_and_transaction_shuffling
+            - single_sender_authenticator
+  - name: enable_automatic_sponsored_account_creation
     metadata:
-      title: "Enable Block Gas Limit and Transaction Shuffling"
-      description: "AIP-33: The block gas limit is a feature that terminates block execution when the gas consumed by the committed prefix of transactions exceeds the limit, thus providing predictable latency.
-                    AIP-27: Sender Aware Transaction Shuffling"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/132
-                       https://github.com/aptos-foundation/AIPs/issues/109"
-    execution_mode: MultiStep
-    update_sequence:
-      - Execution:
-          V3:
-            transaction_shuffler_type:
-              sender_aware_v2: 32
-            block_gas_limit: 35000
-            transaction_deduper_type: txn_hash_and_authenticator_v1
-  - name: step_5_enable_bulletproofs
-    metadata:
-      title: "Enable Bulletproofs Module"
-      description: "AIP-46: New modules for ElGamal, Pedersen and Bulletproofs over Ristretto255"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/222"
+      title: "AIP-52: Automated Account Creation for Sponsored Transactions"
+      description: "AIP-52: Automated Account Creation for Sponsored Transactions."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/258"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - bulletproofs_natives
-  - name: step_6_enable_storage_deletion_refund
+            - sponsored_automatic_account_creation
+  - name: allow_optional_fee_payer
     metadata:
-      title: "Enable Storage Deletion Refund"
-      description: "AIP-32: Storage Deletion Refund. A refund for the slot allocation fee is issued on the deletion of a global state item."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/127"
+      title: "AIP-53: Make Fee Payer Address Optional in Transactions Authenticator"
+      description: "AIP-53: Make Fee Payer Address Optional in Transactions Authenticator."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/257"
     execution_mode: MultiStep
     update_sequence:
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_32_initialization.move
       - FeatureFlag:
           enabled:
-            - storage_slot_metadata
-            - emit_fee_statement
-            - storage_deletion_refund
+            - fee_payer_account_optional
+  - name: reduce_ident_size_max
+    metadata:
+      title: "Reduce the maximum identifier size"
+      description: "This reduces the maximum identifier size for (de)serializer of Move binary format"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/pull/10502"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - limit_max_identifier_length
