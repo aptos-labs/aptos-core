@@ -185,7 +185,15 @@ impl RemoteStateViewClient {
         let duration_since_epoch = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap().as_millis() as u64;
-        sender.lock().unwrap().send(Message::create_with_duration(request_message, duration_since_epoch),
+        let mut sender_lk = sender.lock().unwrap();
+        let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+        let mut delta = 0.0;
+        if curr_time > duration_since_epoch {
+            delta = (curr_time - duration_since_epoch) as f64;
+        }
+        REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+            .with_label_values(&["0_kv_req_grpc_shard_send_1_lock_acquired"]).observe(delta);
+        sender_lk.send(Message::create_with_duration(request_message, duration_since_epoch),
                             &MessageType::new(REMOTE_KV_REQUEST_MSG_TYPE.to_string()));
     }
 }
