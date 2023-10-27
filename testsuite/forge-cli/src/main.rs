@@ -23,7 +23,7 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::aptos_stdlib,
-    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, DagConsensusConfigV1},
 };
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
@@ -1765,22 +1765,24 @@ fn realistic_env_max_load_test(
 
     // Create the test
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(num_fullnodes)
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        // .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
+                    mempool_backlog: 100000,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(if ha_proxy { 4600 } else { 6800 }),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            let onchain_consensus_config = OnChainConsensusConfig::DagV1(DagConsensusConfigV1::default());
+
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default()).expect("must serialize");
+                serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
