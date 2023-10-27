@@ -1032,10 +1032,10 @@ impl AptosDB {
             .with_label_values(&["commit_transactions"])
             .start_timer();
         let chunk_size = 512;
-        txns_to_commit
+        let batches = txns_to_commit
             .par_chunks(chunk_size)
             .enumerate()
-            .try_for_each(|(chunk_index, txns_in_chunk)| -> Result<()> {
+            .map(|(chunk_index, txns_in_chunk)| -> Result<SchemaBatch> {
                 let batch = SchemaBatch::new();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
                 txns_in_chunk.iter().enumerate().try_for_each(
@@ -1050,11 +1050,22 @@ impl AptosDB {
                         Ok(())
                     },
                 )?;
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["commit_transactions___commit"])
-                    .start_timer();
-                self.ledger_db.transaction_db().write_schemas(batch)
+                Ok(batch)
             })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Commit batches one by one for now because committing them in parallel will cause gaps. Although
+        // it might be acceptable because we are writing the progress, we want to play on the safer
+        // side unless this really becomes the bottleneck on production.
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["commit_transactions___commit"])
+                .start_timer();
+
+            batches
+                .into_iter()
+                .try_for_each(|batch| self.ledger_db.transaction_db().write_schemas(batch))
+        }
     }
 
     fn commit_transaction_accumulator(
