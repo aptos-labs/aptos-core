@@ -87,8 +87,8 @@ impl RemoteStateViewClient {
     ) -> Self {
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                .thread_name(move |index| format!("remote-state-view-shard-{}-{}", shard_id, index))
-                .num_threads(num_cpus::get())
+                .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
+                .num_threads(num_cpus::get() / 2)
                 .build()
                 .unwrap(),
         );
@@ -100,7 +100,11 @@ impl RemoteStateViewClient {
             shard_id,
             state_view.clone(),
             result_rx,
-            thread_pool.clone(),
+            rayon::ThreadPoolBuilder::new()
+                .thread_name(move |index| format!("remote-state-view-shard-recv-resp-{}-{}", shard_id, index))
+                .num_threads(num_cpus::get() / 2)
+                .build()
+                .unwrap(),
         );
 
         let join_handle = thread::Builder::new()
@@ -215,7 +219,7 @@ struct RemoteStateValueReceiver {
     shard_id: ShardId,
     state_view: Arc<RwLock<RemoteStateView>>,
     kv_rx: Receiver<Message>,
-    thread_pool: Arc<rayon::ThreadPool>,
+    thread_pool: rayon::ThreadPool,
 }
 
 impl RemoteStateValueReceiver {
@@ -223,7 +227,7 @@ impl RemoteStateValueReceiver {
         shard_id: ShardId,
         state_view: Arc<RwLock<RemoteStateView>>,
         kv_rx: Receiver<Message>,
-        thread_pool: Arc<rayon::ThreadPool>,
+        thread_pool: rayon::ThreadPool,
     ) -> Self {
         Self {
             shard_id,
