@@ -7,6 +7,7 @@ server_config:
       data_service_grpc_listen_address: 0.0.0.0:50053
       cert_path: /opt/aptos/certs/data-service-grpc-server.crt
       key_path: /opt/aptos/certs/data-service-grpc-server.key
+  disable_auth_check: true
   whitelisted_auth_tokens: []
   file_store_config:
     file_store_type: LocalFileStore
