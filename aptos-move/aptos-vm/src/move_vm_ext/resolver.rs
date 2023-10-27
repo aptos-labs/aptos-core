@@ -29,8 +29,17 @@ pub trait AptosMoveResolver:
 }
 
 pub trait ResourceGroupResolver {
-    fn release_resource_group_cache(&self)
-        -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>;
+    /// If the option is Some, then it contains contents of the resource group
+    /// cache with all resources in it, and the VM must use this to prepare the
+    /// output as a combined group write as a part of normal resource writes (V0
+    /// behavior). When None is returned, the V1 resource group behavior must be
+    /// triggered, preparing more granular GroupWrite output (with individual
+    /// writes to affected resources within the group). If the bool is true, then
+    /// the gas should be charged in the V1 / granular fashion (AsSum), even if
+    /// the output is being prepared in the V0 way (i.e. Option is set / Some).
+    fn release_resource_group_cache(
+        &self,
+    ) -> (Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>, bool);
 
     fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64>;
 

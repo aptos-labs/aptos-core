@@ -94,6 +94,7 @@ impl<'r> WriteOpConverter<'r> {
         &self,
         state_key: &StateKey,
         group_changes: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+        maybe_combined_op: Option<WriteOp>,
     ) -> Result<GroupWrite, VMStatus> {
         // Resource group metadata is stored at the group StateKey, and can be obtained via the
         // same interfaces at for a resource at a given StateKey.
@@ -191,6 +192,7 @@ impl<'r> WriteOpConverter<'r> {
             self.convert(state_value_metadata_result, metadata_op, false)?,
             post_group_size,
             inner_ops,
+            maybe_combined_op,
         ))
     }
 
@@ -516,9 +518,10 @@ mod tests {
 
         // Deletion should still contain the metadata - for storage refunds.
         assert_eq!(group_write.metadata_op().metadata(), Some(&metadata));
-        assert_eq!(group_write.metadata_op(), &WriteOp::DeletionWithMetadata {
-            metadata
-        });
+        assert_eq!(
+            group_write.metadata_op(),
+            &WriteOp::DeletionWithMetadata { metadata }
+        );
         assert_none!(group_write.metadata_op().bytes());
     }
 }

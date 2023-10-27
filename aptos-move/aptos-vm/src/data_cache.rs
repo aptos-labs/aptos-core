@@ -193,7 +193,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
     fn release_resource_group_cache(
         &self,
-    ) -> Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>> {
+    ) -> (Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>, bool) {
         self.resource_group_view.release_group_cache()
     }
 

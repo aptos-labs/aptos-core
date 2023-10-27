@@ -24,32 +24,133 @@ use aptos_types::{
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use bytes::Bytes;
+use claims::assert_none;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
+    vm_status::{err_msg, StatusCode, VMStatus},
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
 
-pub(crate) enum ResourceGroupChangeSet {
-    // Merged resource groups op.
-    V0(BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>),
-    // Granular ops to individual resources within a group.
-    V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
-}
 type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
 type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
+
+pub(crate) struct ResourceGroupChangeSet {
+    maybe_released_cache: Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>,
+    charge_as_sum: bool,
+
+    // Merged resource groups op.
+    combined_changes: BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
+
+    // For V1 changes or AsSum gas charging, ops to individual resources in a group.
+    granular_changes:
+        BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>,
+}
+
+impl ResourceGroupChangeSet {
+    fn new(
+        maybe_released_cache: Option<HashMap<StateKey, BTreeMap<StructTag, Bytes>>>,
+        charge_as_sum: bool,
+    ) -> Self {
+        Self {
+            maybe_released_cache,
+            charge_as_sum,
+            combined_changes: BTreeMap::new(),
+            granular_changes: BTreeMap::new(),
+        }
+    }
+
+    fn need_granular(&self) -> bool {
+        self.maybe_released_cache.is_none() || self.charge_as_sum
+    }
+
+    fn into(
+        self,
+    ) -> (
+        Option<BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>>,
+        Option<BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>>,
+    ) {
+        let need_granular = self.need_granular();
+
+        (
+            // If released cache was set, then VM output requires combined changes.
+            self.maybe_released_cache.map(|_| self.combined_changes),
+            // If granular output is needed (as VM output or gas charging), provide granular changes.
+            need_granular.then_some(self.granular_changes),
+        )
+    }
+
+    fn populate_combined(
+        &mut self,
+        state_key: &StateKey,
+        resources: &BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+    ) -> VMResult<()> {
+        let mut source_data = match &mut self.maybe_released_cache {
+            Some(ref mut released_cache) => released_cache.remove(state_key).unwrap_or_default(),
+            None => {
+                // No need to populate combined group ops.
+                return Ok(());
+            },
+        };
+
+        let common_error = || {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("populate v0 resource group change set error".to_string())
+                .finish(Location::Undefined)
+        };
+
+        let create = source_data.is_empty();
+
+        for (struct_tag, current_op) in resources.clone() {
+            match current_op {
+                MoveStorageOp::Delete => {
+                    source_data.remove(&struct_tag).ok_or_else(common_error)?;
+                },
+                MoveStorageOp::Modify((new_data, _)) => {
+                    let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
+                    *data = new_data;
+                },
+                MoveStorageOp::New((data, _)) => {
+                    let data = source_data.insert(struct_tag, data);
+                    if data.is_some() {
+                        return Err(common_error());
+                    }
+                },
+            }
+        }
+
+        let op = if source_data.is_empty() {
+            MoveStorageOp::Delete
+        } else if create {
+            MoveStorageOp::New((
+                bcs::to_bytes(&source_data)
+                    .map_err(|_| common_error())?
+                    .into(),
+                None,
+            ))
+        } else {
+            MoveStorageOp::Modify((
+                bcs::to_bytes(&source_data)
+                    .map_err(|_| common_error())?
+                    .into(),
+                None,
+            ))
+        };
+        self.combined_changes.insert(state_key.clone(), op);
+        Ok(())
+    }
+}
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -218,59 +319,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         ctx.requested_module_bundle.take()
     }
 
-    fn populate_v0_resource_group_change_set(
-        change_set: &mut BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
-        state_key: StateKey,
-        mut source_data: BTreeMap<StructTag, Bytes>,
-        resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
-    ) -> VMResult<()> {
-        let common_error = || {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("populate v0 resource group change set error".to_string())
-                .finish(Location::Undefined)
-        };
-
-        let create = source_data.is_empty();
-
-        for (struct_tag, current_op) in resources {
-            match current_op {
-                MoveStorageOp::Delete => {
-                    source_data.remove(&struct_tag).ok_or_else(common_error)?;
-                },
-                MoveStorageOp::Modify((new_data, _)) => {
-                    let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
-                    *data = new_data;
-                },
-                MoveStorageOp::New((data, _)) => {
-                    let data = source_data.insert(struct_tag, data);
-                    if data.is_some() {
-                        return Err(common_error());
-                    }
-                },
-            }
-        }
-
-        let op = if source_data.is_empty() {
-            MoveStorageOp::Delete
-        } else if create {
-            MoveStorageOp::New((
-                bcs::to_bytes(&source_data)
-                    .map_err(|_| common_error())?
-                    .into(),
-                None,
-            ))
-        } else {
-            MoveStorageOp::Modify((
-                bcs::to_bytes(&source_data)
-                    .map_err(|_| common_error())?
-                    .into(),
-                None,
-            ))
-        };
-        change_set.insert(state_key, op);
-        Ok(())
-    }
-
     /// * Separate the resource groups from the non-resource.
     /// * non-resource groups are kept as is
     /// * resource groups are merged into the correct format as deltas to the source data
@@ -308,16 +356,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         };
         let mut change_set_filtered = ChangeSet::new();
 
-        let mut maybe_resource_group_cache = remote.release_resource_group_cache().map(|v| {
-            v.into_iter()
-                .map(|(k, v)| (k, v.into_iter().collect::<BTreeMap<_, _>>()))
-                .collect::<BTreeMap<_, _>>()
-        });
-        let mut resource_group_change_set = if maybe_resource_group_cache.is_some() {
-            ResourceGroupChangeSet::V0(BTreeMap::new())
-        } else {
-            ResourceGroupChangeSet::V1(BTreeMap::new())
-        };
+        let (maybe_released_cache, charge_as_sum) = remote.release_resource_group_cache();
+        let mut resource_group_change_set =
+            ResourceGroupChangeSet::new(maybe_released_cache, charge_as_sum);
+
         for (addr, account_changeset) in change_set.into_inner() {
             let mut resource_groups: BTreeMap<
                 StructTag,
@@ -357,35 +399,24 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 let state_key = StateKey::access_path(
                     ap_cache.get_resource_group_path(addr, resource_group_tag),
                 );
-                match &mut resource_group_change_set {
-                    ResourceGroupChangeSet::V0(v0_changes) => {
-                        let source_data = maybe_resource_group_cache
-                            .as_mut()
-                            .expect("V0 cache must be set")
-                            .remove(&state_key)
-                            .unwrap_or_default();
-                        Self::populate_v0_resource_group_change_set(
-                            v0_changes,
-                            state_key,
-                            source_data,
-                            resources,
-                        )?;
-                    },
-                    ResourceGroupChangeSet::V1(v1_changes) => {
-                        // Maintain the behavior of failing the transaction on resource
-                        // group member existence invariants.
-                        for (struct_tag, current_op) in resources.iter() {
-                            let exists = remote
-                                .resource_exists_in_group(&state_key, struct_tag)
-                                .map_err(|_| common_error())?;
-                            if matches!(current_op, MoveStorageOp::New(_)) == exists {
-                                // Deletion and Modification require resource to exist,
-                                // while creation requires the resource to not exist.
-                                return Err(common_error());
-                            }
+
+                resource_group_change_set.populate_combined(&state_key, &resources)?;
+                if resource_group_change_set.need_granular() {
+                    // Maintain the behavior of failing the transaction on resource
+                    // group member existence invariants.
+                    for (struct_tag, current_op) in resources.iter() {
+                        let exists = remote
+                            .resource_exists_in_group(&state_key, struct_tag)
+                            .map_err(|_| common_error())?;
+                        if matches!(current_op, MoveStorageOp::New(_)) == exists {
+                            // Deletion and Modification require resource to exist,
+                            // while creation requires the resource to not exist.
+                            return Err(common_error());
                         }
-                        v1_changes.insert(state_key, resources);
-                    },
+                    }
+                    resource_group_change_set
+                        .granular_changes
+                        .insert(state_key, resources);
                 }
             }
         }
@@ -431,19 +462,54 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        match resource_group_change_set {
-            ResourceGroupChangeSet::V0(v0_changes) => {
-                for (state_key, blob_op) in v0_changes {
+        // Resource group handling.
+        let (maybe_combined_changes, maybe_granular_changes) = resource_group_change_set.into();
+        if let Some(granular_changes) = maybe_granular_changes {
+            for (state_key, resources) in granular_changes {
+                let maybe_combined_op = if let Some(combined_changes) = &maybe_combined_changes {
+                    // Granular ops & GroupWrite is just for gas charging, need combined op for
+                    // final VM change set.
+                    combined_changes
+                        .get(&state_key)
+                        .ok_or_else(|| {
+                            VMStatus::error(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                err_msg("Resource group combined change must be populated"),
+                            )
+                        })
+                        .map(|op| Some(op.clone()))?
+                } else {
+                    None
+                };
+
+                let maybe_combined_op = match maybe_combined_op {
+                    Some(op) => {
+                        let converted = woc.convert_resource(&state_key, op, false)?;
+                        assert_none!(
+                            converted.1,
+                            "Resource group combined write may not have a layout"
+                        );
+                        Some(converted.0)
+                    },
+                    None => None,
+                };
+
+                let group_write =
+                    woc.convert_resource_group_v1(&state_key, resources, maybe_combined_op)?;
+                resource_group_write_set.insert(state_key, group_write);
+            }
+        } else {
+            if let Some(combined_changes) = maybe_combined_changes {
+                for (state_key, blob_op) in combined_changes {
                     let op = woc.convert_resource(&state_key, blob_op, false)?;
                     resource_write_set.insert(state_key, op);
                 }
-            },
-            ResourceGroupChangeSet::V1(v1_changes) => {
-                for (state_key, resources) in v1_changes {
-                    let group_write = woc.convert_resource_group_v1(&state_key, resources)?;
-                    resource_group_write_set.insert(state_key, group_write);
-                }
-            },
+            } else {
+                return Err(VMStatus::error(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    err_msg("Must have either granular or combined resource group changes"),
+                ));
+            }
         }
 
         for (handle, change) in table_change_set.changes {

@@ -125,17 +125,12 @@ pub trait TResourceGroupView {
             .map(|maybe_bytes| maybe_bytes.is_some())
     }
 
-    /// Executor view may internally implement a naive resource group cache when:
-    /// - ExecutorView is not based on block executor, such as ExecutorViewBase
-    /// - providing backwards compatibility (older gas versions) in storage adapter.
-    ///
-    /// The trait allows releasing the cache in such cases. Otherwise (default behavior),
-    /// if naive cache is not implemeneted (e.g. in block executor), None is returned.
     fn release_group_cache(
         &self,
-    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
-        None
-    }
+    ) -> (
+        Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>>,
+        bool,
+    );
 }
 
 /// Allows to query modules from the state.

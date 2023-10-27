@@ -175,15 +175,10 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
 
     fn release_group_cache(
         &self,
-    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
-        // TODO[agg_v2](fix) - when is_resource_group_split_in_change_set_enabled is false,
-        // but self.group_size_kind == GroupSizeKind::AsSum, we need to special-case it.
-        // We need to return an indicator here that will force the VM to produce
-        // V0 resource group change set but charge as V1
-        // Potentially - I'm thinking to turn V0/V1 enum into struct there and prepare both,
-        // shouldn't be too complex and well-testable) - we can do that next as one of the
-        // preconditions for enabling group feature flag -> aggr2 feature flag.
-
+    ) -> (
+        Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>>,
+        bool,
+    ) {
         if self.is_resource_group_split_in_change_set_enabled()
             && self.group_size_kind == GroupSizeKind::AsSum
         {
@@ -191,16 +186,19 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
             // the VMChangeSet prepared in a new, granular format that the block executor
             // can handle (combined as a group update at the end).
             self.group_cache.borrow_mut().clear();
-            None
+            (None, true)
         } else {
             // Returning the contents to the caller leads to preparing the VMChangeSet in the
             // backwards compatible way (containing the whole group update).
-            Some(
-                self.group_cache
-                    .borrow_mut()
-                    .drain()
-                    .map(|(k, v)| (k, v.0))
-                    .collect(),
+            (
+                Some(
+                    self.group_cache
+                        .borrow_mut()
+                        .drain()
+                        .map(|(k, v)| (k, v.0))
+                        .collect(),
+                ),
+                self.group_size_kind == GroupSizeKind::AsSum,
             )
         }
     }

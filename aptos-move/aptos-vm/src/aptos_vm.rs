@@ -569,6 +569,8 @@ impl AptosVM {
             storage_refund = 0.into();
         }
 
+        change_set.maybe_combine_group_ops();
+
         // TODO(Gas): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
