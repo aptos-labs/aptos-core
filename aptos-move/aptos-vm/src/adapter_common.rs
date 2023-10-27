@@ -29,7 +29,7 @@ pub trait VMAdapter {
 
     /// Checks the signature of the given signed transaction and returns
     /// `Ok(SignatureCheckedTransaction)` if the signature is valid.
-    fn check_signature(txn: SignedTransaction) -> Result<SignatureCheckedTransaction>;
+    fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction>;
 
     /// Check if the transaction format is supported.
     fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus>;
@@ -92,12 +92,15 @@ pub enum PreprocessedTransaction {
 /// is a PreprocessedTransaction, where a user transaction is translated to a
 /// SignatureCheckedTransaction and also categorized into either a UserTransaction
 /// or a WriteSet transaction.
-pub fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> PreprocessedTransaction {
+pub fn preprocess_transaction<A: VMAdapter>(
+    adapter: &A,
+    txn: Transaction,
+) -> PreprocessedTransaction {
     match txn {
         Transaction::BlockMetadata(b) => PreprocessedTransaction::BlockMetadata(b),
         Transaction::GenesisTransaction(ws) => PreprocessedTransaction::WaypointWriteSet(ws),
         Transaction::UserTransaction(txn) => {
-            let checked_txn = match A::check_signature(txn) {
+            let checked_txn = match adapter.check_signature(txn) {
                 Ok(checked_txn) => checked_txn,
                 _ => {
                     return PreprocessedTransaction::InvalidSignature;

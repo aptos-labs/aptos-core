@@ -428,6 +428,9 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::AGGREGATOR_SNAPSHOTS,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
         FeatureFlag::SAFER_METADATA,
+        FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
+        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
+        FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
     ]
 }
 
@@ -752,7 +755,7 @@ impl TestValidator {
     fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let owner_address = auth_key.derived_address();
+        let owner_address = auth_key.account_address();
         let consensus_key = bls12381::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)

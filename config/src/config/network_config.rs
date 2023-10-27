@@ -296,7 +296,7 @@ impl NetworkConfig {
         } else {
             AuthenticationKey::try_from(identity_key.public_key().as_slice())
                 .unwrap()
-                .derived_address()
+                .account_address()
         };
         self.identity = Identity::from_config(identity_key, peer_id);
     }

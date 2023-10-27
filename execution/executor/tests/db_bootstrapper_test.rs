@@ -113,12 +113,12 @@ fn get_demo_accounts() -> (
     let privkey1 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey1 = privkey1.public_key();
     let account1_auth_key = AuthenticationKey::ed25519(&pubkey1);
-    let account1 = account1_auth_key.derived_address();
+    let account1 = account1_auth_key.account_address();
 
     let privkey2 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey2 = privkey2.public_key();
     let account2_auth_key = AuthenticationKey::ed25519(&pubkey2);
-    let account2 = account2_auth_key.derived_address();
+    let account2 = account2_auth_key.account_address();
 
     (account1, privkey1, account2, privkey2)
 }

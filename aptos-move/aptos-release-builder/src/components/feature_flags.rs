@@ -83,6 +83,9 @@ pub enum FeatureFlag {
     SignatureCheckerV2ScriptFix,
     SaferResourceGroups,
     SaferMetadata,
+    SingleSenderAuthenticator,
+    SponsoredAutomaticAccountCreation,
+    FeePayerAccountOptional,
     LimitMaxIdentifierLength,
 }
 
@@ -217,6 +220,11 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::SaferResourceGroups => AptosFeatureFlag::SAFER_RESOURCE_GROUPS,
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
+            FeatureFlag::SingleSenderAuthenticator => AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
+            FeatureFlag::SponsoredAutomaticAccountCreation => {
+                AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
+            },
+            FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         }
     }
@@ -274,6 +282,11 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
+            AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR => FeatureFlag::SingleSenderAuthenticator,
+            AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
+                FeatureFlag::SponsoredAutomaticAccountCreation
+            },
+            AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
         }
     }

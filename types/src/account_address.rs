@@ -130,7 +130,7 @@ impl<'de> Deserialize<'de> for AccountAddressWithChecks {
 }
 
 pub fn from_public_key(public_key: &Ed25519PublicKey) -> AccountAddress {
-    AuthenticationKey::ed25519(public_key).derived_address()
+    AuthenticationKey::ed25519(public_key).account_address()
 }
 
 // Note: This is inconsistent with current types because AccountAddress is derived
