@@ -179,7 +179,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
                             // We ensure that the latest state is always reflected in exactly one of
                             // the hashmaps, by possibly removing an element from the other Hashmap.
-                            for (k, v) in incarnation_behaviors[last_incarnation].writes.iter() {
+                            for (k, (v, _)) in incarnation_behaviors[last_incarnation].writes.iter() {
                                 current_world
                                     .insert(k.clone(), BaselineValue::GenericWrite(v.clone()));
                             }

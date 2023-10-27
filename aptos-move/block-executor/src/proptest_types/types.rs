@@ -9,7 +9,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
-    types::DelayedFieldID, delayed_field_extension,
+    types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::{StateViewId, TStateView};
@@ -319,7 +319,7 @@ pub(crate) struct TransactionGenParams {
 
 #[derive(Arbitrary, Debug, Clone)]
 #[proptest(params = "TransactionGenParams")]
-pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
+pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static, E: Arbitrary> {
     /// Generate keys for possible read-sets of the transaction based on the above parameters.
     #[proptest(
         strategy = "vec(vec(any::<Index>(), 1..params.read_size), params.incarnation_alternatives)"
@@ -349,7 +349,7 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
     #[proptest(
         strategy = "vec(vec(vec(any::<Index>(), 0..params.type_layout_size), 1..params.event_size),  params.incarnation_alternatives)"
     )]
-    event_event_layouts: Vec<Vec<Vec<Index>>>,
+    event_type_layouts: Vec<Vec<Vec<Index>>>,
     
     /// Generate gas for different incarnations of the transactions.
     #[proptest(strategy = "vec(any::<Index>(), params.incarnation_alternatives)")]
@@ -361,22 +361,6 @@ pub(crate) struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + 
         strategy = "vec((any::<Index>(), any::<Index>(), any::<Index>()), params.incarnation_alternatives)"
     )]
     group_size_indicators: Vec<(Index, Index, Index)>,
-}
-
-/// Mock implementation for MoveTypeLayout.
-/// Instead of describing an entire type layout, the mock implementation specifies only the
-/// list of delayed field identifiers present in the resource/event.
-#[derive(Clone, Debug)]
-pub(crate) struct MockTypeLayout {
-    pub(crate) delayed_field_keys: Vec<DelayedFieldID>
-}
-
-impl MockTypeLayout {
-    pub fn new(delayed_field_keys: Vec<DelayedFieldID>) -> Self {
-        Self {
-            delayed_field_keys
-        }
-    }
 }
 
 /// Mock implementation for MoveTypeLayout.
@@ -535,7 +519,7 @@ impl Default for TransactionGenParams {
 // TODO: move generation to separate file.
 // TODO: consider adding writes to reads (read-before-write). Similar behavior to the Move-VM
 // and may force more testing (since we check read results).
-impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
+impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send, E: Debug + Clone + ReadWriteEvent + Arbitrary> TransactionGen<V, E> {
     
     fn writes_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         key_universe: &[K],
@@ -668,7 +652,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .collect()
     }
 
-    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord, E: Debug + Clone + ReadWriteEvent>(
+    fn new_mock_write_txn<K: Clone + Hash + Debug + Eq + Ord>(
         self,
         key_universe: &[K],
         module_read_fn: &dyn Fn(usize) -> bool,
@@ -721,8 +705,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     }
 
     pub(crate) fn materialize<
-        K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
+        K: Clone + Hash + Debug + Eq + Ord
     >(
         self,
         universe: &[K],
@@ -748,7 +731,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     // operations. Last 3 keys of the universe are used as group keys.
     pub(crate) fn materialize_groups<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
         self,
         universe: &[K],
@@ -804,7 +786,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             let mut writes = vec![];
             let mut group_writes = vec![];
             let mut inner_ops = vec![HashMap::new(); 3];
-            for (write_key, value) in behavior.writes.clone() {
+            for (write_key, (value, _)) in behavior.writes.clone() {
                 match key_to_group(&write_key) {
                     Some((key_idx, tag)) => {
                         if tag != RESERVED_TAG || !value.is_deletion() {
@@ -855,7 +837,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize_with_deltas<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
         self,
         universe: &[K],
@@ -893,7 +874,6 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     pub(crate) fn materialize_disjoint_module_rw<
         K: Clone + Hash + Debug + Eq + Ord,
-        E: Send + Sync + Debug + Clone + ReadWriteEvent,
     >(
         self,
         universe: &[K],
@@ -1089,11 +1069,11 @@ pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
 
 #[derive(Debug)]
 pub(crate) struct MockOutput<K, E> {
-    pub(crate) writes: Vec<(K, ValueType)>,
+    pub(crate) writes: Vec<(K, (ValueType, Option<Arc<MockTypeLayout>>))>,
     // Key, metadata_op, inner_ops
     pub(crate) group_writes: Vec<(K, ValueType, HashMap<u32, ValueType>)>,
     pub(crate) deltas: Vec<(K, DeltaOp)>,
-    pub(crate) events: Vec<E>,
+    pub(crate) events: Vec<(E, Option<Arc<MockTypeLayout>>)>,
     pub(crate) read_results: Vec<Option<Vec<u8>>>,
     pub(crate) read_group_sizes: Vec<(K, u64)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
@@ -1229,5 +1209,26 @@ impl ReadWriteEvent for MockEvent {
 
     fn update_event_data(&mut self, event_data: Vec<u8>) {
         self.event_data = event_data;
+    }
+}
+
+impl Arbitrary for MockEvent {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (
+            any::<EventKey>(),
+            any::<u64>(),
+            any::<TypeTag>(),
+            vec(any::<u8>(), 0..100),
+        )
+            .prop_map(|(key, sequence_number, type_tag, event_data)| Self {
+                key,
+                sequence_number,
+                type_tag,
+                event_data,
+            })
+            .boxed()
     }
 }

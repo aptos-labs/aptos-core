@@ -93,7 +93,7 @@ where
             .current();
 
         let transaction_gens = vec(
-            any_with::<TransactionGen<V>>(transaction_params),
+            any_with::<TransactionGen<V, E>>(transaction_params),
             num_transactions,
         )
         .new_tree(&mut runner)

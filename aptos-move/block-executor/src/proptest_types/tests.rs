@@ -32,7 +32,7 @@ use test_case::test_case;
 
 fn run_transactions<K, V, E>(
     key_universe: &[K],
-    transaction_gens: Vec<TransactionGen<V>>,
+    transaction_gens: Vec<TransactionGen<V, E>>,
     abort_transactions: Vec<Index>,
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
@@ -41,7 +41,7 @@ fn run_transactions<K, V, E>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + ReadWriteEvent + Arbitrary + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
@@ -106,7 +106,7 @@ proptest! {
     #[test]
     fn no_early_termination(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
@@ -116,7 +116,7 @@ proptest! {
     #[test]
     fn abort_only(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
@@ -126,7 +126,7 @@ proptest! {
     #[test]
     fn skip_rest_only(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
@@ -136,7 +136,7 @@ proptest! {
     #[test]
     fn mixed_transactions(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
@@ -146,7 +146,7 @@ proptest! {
     #[test]
     fn dynamic_read_writes_mixed(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any_with::<TransactionGen<[u8;32]>>(TransactionGenParams::new_dynamic()), 3000).no_shrink(),
+        transaction_gen in vec(any_with::<TransactionGen<[u8;32], MockEvent>>(TransactionGenParams::new_dynamic()), 3000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
@@ -162,7 +162,7 @@ fn dynamic_read_writes_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .expect("creating a new value should succeed")
         .current();
     let transaction_gen = vec(
-        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        any_with::<TransactionGen<[u8; 32], MockEvent>>(TransactionGenParams::new_dynamic()),
         num_txns,
     )
     .new_tree(&mut runner)
@@ -645,7 +645,7 @@ proptest! {
     #[test]
     fn no_early_termination_with_block_gas_limit(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
@@ -655,7 +655,7 @@ proptest! {
     #[test]
     fn abort_only_with_block_gas_limit(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 10).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 10).no_shrink(),
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
@@ -665,7 +665,7 @@ proptest! {
     #[test]
     fn skip_rest_only_with_block_gas_limit(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
@@ -675,7 +675,7 @@ proptest! {
     #[test]
     fn mixed_transactions_with_block_gas_limit(
         universe in vec(any::<[u8; 32]>(), 100),
-        transaction_gen in vec(any::<TransactionGen<[u8;32]>>(), 5000).no_shrink(),
+        transaction_gen in vec(any::<TransactionGen<[u8;32], MockEvent>>(), 5000).no_shrink(),
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
