@@ -333,9 +333,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-config",
+ "aptos-consensus",
+ "aptos-consensus-types",
+ "aptos-crypto",
+ "aptos-infallible",
  "aptos-logger",
  "aptos-profiler",
  "aptos-runtimes",
+ "aptos-storage-interface",
+ "aptos-types",
  "async-mutex",
  "futures",
  "http",
@@ -344,6 +350,7 @@ dependencies = [
  "mime",
  "pprof",
  "tokio",
+ "tokio-scoped",
  "url",
 ]
 
@@ -14478,6 +14485,16 @@ checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
 dependencies = [
  "rustls 0.21.7",
  "tokio",
+]
+
+[[package]]
+name = "tokio-scoped"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4beb8ba13bc53ac53ce1d52b42f02e5d8060f0f42138862869beb769722b256"
+dependencies = [
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

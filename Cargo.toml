@@ -646,6 +646,7 @@ tokio = { version = "1.21.0", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
+tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }

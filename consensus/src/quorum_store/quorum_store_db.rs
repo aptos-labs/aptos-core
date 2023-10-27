@@ -15,7 +15,7 @@ use aptos_logger::prelude::*;
 use aptos_schemadb::{Options, ReadOptions, SchemaBatch, DB};
 use std::{collections::HashMap, path::Path, time::Instant};
 
-pub(crate) trait QuorumStoreStorage: Sync + Send {
+pub trait QuorumStoreStorage: Sync + Send {
     fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError>;
 
     fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>>;
