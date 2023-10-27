@@ -90,8 +90,8 @@ impl Default for DagFetcherConfig {
         Self {
             retry_interval_ms: 500,
             rpc_timeout_ms: 1000,
-            min_concurrent_responders: 1,
-            max_concurrent_responders: 4,
+            min_concurrent_responders: 2,
+            max_concurrent_responders: 10,
         }
     }
 }
