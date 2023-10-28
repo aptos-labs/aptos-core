@@ -129,6 +129,20 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
         }
 
         if let Some(handler) = self.inbound_handlers.lock().unwrap().get(&message_type) {
+            if msg.start_ms_since_epoch.is_some() {
+                let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+                let mut delta = 0.0;
+                if curr_time > msg.start_ms_since_epoch.unwrap() {
+                    delta = (curr_time - msg.start_ms_since_epoch.unwrap()) as f64;
+                }
+                if message_type.get_type() == "remote_kv_request" {
+                    REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta);
+                } else if message_type.get_type() == "remote_kv_response" {
+                    REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["6_kv_resp_shard_grpc_recv_got_inbound_lock"]).observe(delta);
+                }
+            }
             // Send the message to the registered handler
             handler.send(msg).unwrap();
         } else {

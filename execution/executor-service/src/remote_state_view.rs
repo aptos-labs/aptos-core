@@ -23,6 +23,8 @@ use aptos_types::{
     },
 };
 use dashmap::DashMap;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use rayon::ThreadPool;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
@@ -73,7 +75,7 @@ impl RemoteStateView {
 
 pub struct RemoteStateViewClient {
     shard_id: ShardId,
-    kv_tx: Arc<Mutex<OutboundRpcHelper>>,
+    kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
     state_view: Arc<RwLock<RemoteStateView>>,
     thread_pool: Arc<rayon::ThreadPool>,
     _join_handle: Option<thread::JoinHandle<()>>,
@@ -85,16 +87,20 @@ impl RemoteStateViewClient {
         controller: &mut NetworkController,
         coordinator_address: SocketAddr,
     ) -> Self {
+        let num_kv_req_threads = num_cpus::get() / 2;
         let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .thread_name(move |index| format!("remote-state-view-shard-send-request-{}-{}", shard_id, index))
-                .num_threads(num_cpus::get() / 2)
+                .num_threads(num_kv_req_threads)
                 .build()
                 .unwrap(),
         );
         let kv_response_type = "remote_kv_response";
         let result_rx = controller.create_inbound_channel(kv_response_type.to_string());
-        let command_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address);
+        let mut command_tx = vec![];
+        for _ in 0..num_kv_req_threads {
+            command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address)));
+        }
         let state_view = Arc::new(RwLock::new(RemoteStateView::new()));
         let state_value_receiver = RemoteStateValueReceiver::new(
             shard_id,
@@ -114,7 +120,7 @@ impl RemoteStateViewClient {
 
         Self {
             shard_id,
-            kv_tx: Arc::new(Mutex::new(command_tx)),
+            kv_tx: Arc::new(command_tx),
             state_view,
             thread_pool,
             _join_handle: Some(join_handle),
@@ -132,7 +138,7 @@ impl RemoteStateViewClient {
     fn insert_keys_and_fetch_values(
         state_view_clone: Arc<RwLock<RemoteStateView>>,
         thread_pool: Arc<ThreadPool>,
-        kv_tx: Arc<Mutex<OutboundRpcHelper>>,
+        kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
         shard_id: ShardId,
         state_keys: Vec<StateKey>,
     ) {
@@ -145,7 +151,9 @@ impl RemoteStateViewClient {
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
                 thread_pool.spawn(move || {
-                    Self::send_state_value_request(shard_id, sender, state_keys);
+                    let mut rng = StdRng::from_entropy();
+                    let rand_send_thread_idx = rng.gen_range(0, sender.len());
+                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx);
                 });
             });
     }
@@ -177,15 +185,17 @@ impl RemoteStateViewClient {
 
     fn send_state_value_request(
         shard_id: ShardId,
-        sender: Arc<Mutex<OutboundRpcHelper>>,
+        sender: Arc<Vec<Mutex<OutboundRpcHelper>>>,
         state_keys: Vec<StateKey>,
+        rand_send_thread_idx: usize,
     ) {
         let request = RemoteKVRequest::new(shard_id, state_keys);
         let request_message = bcs::to_bytes(&request).unwrap();
         let duration_since_epoch = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap().as_millis() as u64;
-        let mut sender_lk = sender.lock().unwrap();
+
+        let mut sender_lk = sender[rand_send_thread_idx].lock().unwrap();
         let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
         let mut delta = 0.0;
         if curr_time > duration_since_epoch {
