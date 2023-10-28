@@ -79,16 +79,33 @@ impl StateComputer for OrderingStateComputer {
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
 
+        for (index, block) in blocks.iter().enumerate() {
+            if index == blocks.len() - 1 {
+                break;
+            }
+        
+            if self
+                .executor_channel
+                .clone()
+                .send(OrderedBlocks {
+                    ordered_blocks: vec![(**block).clone()],
+                    ordered_proof: finality_proof.clone(),
+                    callback: None,
+                })
+                .await
+                .is_err()
+            {
+                debug!("Failed to send to buffer manager, maybe epoch ends");
+            }
+        }
+
         if self
             .executor_channel
             .clone()
             .send(OrderedBlocks {
-                ordered_blocks: blocks
-                    .iter()
-                    .map(|b| (**b).clone())
-                    .collect::<Vec<ExecutedBlock>>(),
-                ordered_proof: finality_proof,
-                callback,
+                ordered_blocks: vec![(**blocks.last().unwrap()).clone()],
+                ordered_proof: finality_proof.clone(),
+                callback: Some(callback),
             })
             .await
             .is_err()

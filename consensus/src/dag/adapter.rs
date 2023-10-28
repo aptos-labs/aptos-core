@@ -163,7 +163,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 LedgerInfo::new(block_info, anchor.digest()),
                 AggregateSignature::empty(),
             ),
-            callback: Box::new(
+            callback: Some(Box::new(
                 move |committed_blocks: &[Arc<ExecutedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
                     dag.write()
@@ -173,7 +173,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                         .notify_commit_proof(commit_decision);
                     update_counters_for_committed_blocks(committed_blocks);
                 },
-            ),
+            )),
         };
         if self
             .executor_channel

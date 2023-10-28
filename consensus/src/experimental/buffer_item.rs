@@ -58,7 +58,7 @@ fn generate_executed_item_from_ordered(
     commit_info: BlockInfo,
     executed_blocks: Vec<ExecutedBlock>,
     verified_signatures: PartialSignatures,
-    callback: StateComputerCommitCallBackType,
+    callback: Option<StateComputerCommitCallBackType>,
     ordered_proof: LedgerInfoWithSignatures,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
@@ -93,7 +93,7 @@ pub struct OrderedItem {
     // This can happen in the fast forward sync path, where we can receive the commit proof
     // from peers.
     pub commit_proof: Option<LedgerInfoWithSignatures>,
-    pub callback: StateComputerCommitCallBackType,
+    pub callback: Option<StateComputerCommitCallBackType>,
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
@@ -101,7 +101,7 @@ pub struct OrderedItem {
 pub struct ExecutedItem {
     pub executed_blocks: Vec<ExecutedBlock>,
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
-    pub callback: StateComputerCommitCallBackType,
+    pub callback: Option<StateComputerCommitCallBackType>,
     pub commit_info: BlockInfo,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
@@ -109,7 +109,7 @@ pub struct ExecutedItem {
 pub struct SignedItem {
     pub executed_blocks: Vec<ExecutedBlock>,
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
-    pub callback: StateComputerCommitCallBackType,
+    pub callback: Option<StateComputerCommitCallBackType>,
     pub commit_vote: CommitVote,
     pub rb_handle: Option<(Instant, DropGuard)>,
 }
@@ -117,7 +117,7 @@ pub struct SignedItem {
 pub struct AggregatedItem {
     pub executed_blocks: Vec<ExecutedBlock>,
     pub commit_proof: LedgerInfoWithSignatures,
-    pub callback: StateComputerCommitCallBackType,
+    pub callback: Option<StateComputerCommitCallBackType>,
 }
 
 pub enum BufferItem {
@@ -139,7 +139,7 @@ impl BufferItem {
     pub fn new_ordered(
         ordered_blocks: Vec<ExecutedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
-        callback: StateComputerCommitCallBackType,
+        callback: Option<StateComputerCommitCallBackType>,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
             unverified_signatures: PartialSignatures::empty(),

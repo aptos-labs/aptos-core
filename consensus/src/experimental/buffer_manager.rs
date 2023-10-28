@@ -62,7 +62,7 @@ pub struct ResetRequest {
 pub struct OrderedBlocks {
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
-    pub callback: StateComputerCommitCallBackType,
+    pub callback: Option<StateComputerCommitCallBackType>,
 }
 
 pub type BufferItemRootType = Cursor;

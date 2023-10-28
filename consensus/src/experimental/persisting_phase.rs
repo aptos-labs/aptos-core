@@ -23,7 +23,7 @@ use std::{
 pub struct PersistingRequest {
     pub blocks: Vec<Arc<ExecutedBlock>>,
     pub commit_ledger_info: LedgerInfoWithSignatures,
-    pub callback: StateComputerCommitCallBackType,
+    pub callback: Option<StateComputerCommitCallBackType>,
 }
 
 impl Debug for PersistingRequest {
@@ -68,8 +68,12 @@ impl StatelessPipeline for PersistingPhase {
             callback,
         } = req;
 
-        self.persisting_handle
-            .commit(&blocks, commit_ledger_info, callback)
-            .await
+        if let Some(callback) = callback {
+            self.persisting_handle
+                .commit(&blocks, commit_ledger_info, callback)
+                .await
+        } else {
+            Ok(())
+        }
     }
 }
