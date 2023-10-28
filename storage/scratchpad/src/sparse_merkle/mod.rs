@@ -71,17 +71,18 @@
 #![allow(clippy::while_let_loop)]
 
 pub mod ancestors;
+mod dropper;
 mod metrics;
 mod node;
-mod updater;
-pub mod utils;
-
 #[cfg(test)]
 mod sparse_merkle_test;
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
 pub mod test_utils;
+mod updater;
+pub mod utils;
 
 use crate::sparse_merkle::{
+    dropper::SUBTREE_DROPPER,
     metrics::{GENERATION, TIMER},
     node::{NodeInner, SubTree},
     updater::SubTreeUpdater,
@@ -187,7 +188,7 @@ impl<V: Send + Sync + 'static> InnerLinks<V> {
 /// INNER of it can still live if referenced by a previous version.
 #[derive(Debug)]
 struct Inner<V: Send + Sync + 'static> {
-    root: SubTree<V>,
+    root: Option<SubTree<V>>,
     usage: StateStorageUsage,
     links: Mutex<InnerLinks<V>>,
     family: HashValue,
@@ -197,6 +198,9 @@ struct Inner<V: Send + Sync + 'static> {
 
 impl<V: Send + Sync + 'static> Drop for Inner<V> {
     fn drop(&mut self) {
+        // Drop the root in a different thread, because that's the slowest part.
+        SUBTREE_DROPPER.schedule_drop(self.root.take());
+
         // To prevent recursively locking the family, buffer all descendants outside.
         let mut processed_descendants = Vec::new();
 
@@ -228,12 +232,7 @@ impl<V: Send + Sync + 'static> Drop for Inner<V> {
         };
         // Now that the lock is released, those in `processed_descendants` can be dropped if
         // applicable.
-        //
-        // Send the Arc to multiple threads so that the dropping happens in parallel (specifically,
-        // dropping of the SMTs).
-        for descendant_arc in processed_descendants {
-            aptos_drop_helper::DEFAULT_DROPPER.schedule_drop(descendant_arc)
-        }
+        drop(processed_descendants);
 
         self.log_generation("drop");
     }
@@ -245,7 +244,7 @@ impl<V: Send + Sync + 'static> Inner<V> {
         let family_lock = Arc::new(Mutex::new(()));
         let branch_tracker = BranchTracker::new_head_unknown(None, &family_lock.lock());
         let me = Arc::new(Self {
-            root,
+            root: Some(root),
             usage,
             links: InnerLinks::new(branch_tracker.clone()),
             family,
@@ -255,6 +254,11 @@ impl<V: Send + Sync + 'static> Inner<V> {
         branch_tracker.lock().head = Arc::downgrade(&me);
 
         me
+    }
+
+    fn root(&self) -> &SubTree<V> {
+        // root only goes away during Drop
+        self.root.as_ref().expect("Root must exist.")
     }
 
     fn become_oldest(self: Arc<Self>, locked_family: &MutexGuard<()>) -> Arc<Self> {
@@ -278,7 +282,7 @@ impl<V: Send + Sync + 'static> Inner<V> {
         family_lock: Arc<Mutex<()>>,
     ) -> Arc<Self> {
         Arc::new(Self {
-            root: child_root,
+            root: Some(child_root),
             usage: child_usage,
             links: InnerLinks::new(branch_tracker),
             family: self.family,
@@ -443,12 +447,12 @@ where
     }
 
     fn root_weak(&self) -> SubTree<V> {
-        self.inner.root.weak()
+        self.inner.root().weak()
     }
 
     /// Returns the root hash of this tree.
     pub fn root_hash(&self) -> HashValue {
-        self.inner.root.hash()
+        self.inner.root().hash()
     }
 
     fn generation(&self) -> u64 {
