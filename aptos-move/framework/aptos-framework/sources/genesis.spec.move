@@ -34,11 +34,13 @@ spec aptos_framework::genesis {
     spec create_initialize_validators_with_commission {
         include stake::ResourceRequirement;
         include CompareTimeRequires;
+        include aptos_coin::ExistsAptosCoin;
     }
 
     spec create_initialize_validators {
         include stake::ResourceRequirement;
         include CompareTimeRequires;
+        include aptos_coin::ExistsAptosCoin;
     }
 
     spec create_initialize_validator {

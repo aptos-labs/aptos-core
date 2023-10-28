@@ -52,7 +52,7 @@ pub struct ProverOptions {
     #[clap(long, default_value_t = 40)]
     pub vc_timeout: usize,
 
-    /// Whether to disable global timeout overwrite
+    /// Whether to disable global timeout overwrite.
     /// With this flag set to true, the value set by "--vc-timeout" will be used globally
     #[clap(long, default_value_t = false)]
     pub disallow_global_timeout_to_be_overwritten: bool,
