@@ -2,6 +2,7 @@
 
 use super::{types::DAGMessage, DAGRpcResult};
 use aptos_consensus_types::common::Author;
+use aptos_logger::debug;
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use async_trait::async_trait;
@@ -141,6 +142,7 @@ impl Stream for RpcWithFallback {
         if self.futures.is_empty() || timeout {
             // try to find more responders and queue futures
             if let Some(peers) = Pin::new(&mut self.responders).next_to_request() {
+                debug!("sending rpc to additional peers: {:?}", peers);
                 for peer in peers {
                     let future = Box::pin(send_rpc(
                         self.sender.clone(),
