@@ -76,16 +76,30 @@ impl<'r> ResourceGroupAdapter<'r> {
         gas_feature_version: u64,
         resource_group_charge_as_size_sum_enabled: bool,
     ) -> Self {
+        // TODO[agg_v2](fix) - when is_resource_group_split_in_change_set_capable is false,
+        // but resource_group_charge_as_size_sum_enabled is true, we still don't set
+        // group_size_kind to GroupSizeKind::AsSum, meaning that
+        // is_resource_group_split_in_change_set_capable affects gas charging. make sure that is correct
+
         let group_size_kind = GroupSizeKind::from_gas_feature_version(
             gas_feature_version,
-            resource_group_charge_as_size_sum_enabled,
+            // Even if flag is enabled, if we are in non-capable context, we cannot use AsSum,
+            // and split resource groups in the VMChangeSet.
+            // We are not capable if:
+            // - Block contains single PayloadWriteSet::Direct transaction
+            // - we are not executing blocks for a live network in a gas charging context
+            //     (outside of BlockExecutor) i.e. unit tests, view functions, etc.
+            //     In this case, disabled will lead to a different gas behavior,
+            //     but gas is not relevant for those contexts.
+            resource_group_charge_as_size_sum_enabled
+                && maybe_resource_group_view
+                    .map_or(false, |v| v.is_resource_group_split_in_change_set_capable()),
         );
 
         Self {
-            maybe_resource_group_view: maybe_resource_group_view.filter(|view| {
-                view.is_resource_group_split_in_change_set_enabled()
-                    && group_size_kind == GroupSizeKind::AsSum
-            }),
+            maybe_resource_group_view: (group_size_kind == GroupSizeKind::AsSum)
+                .then_some(maybe_resource_group_view)
+                .flatten(),
             resource_view,
             group_size_kind,
             group_cache: RefCell::new(HashMap::new()),
@@ -176,17 +190,7 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
     fn release_group_cache(
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
-        // TODO[agg_v2](fix) - when is_resource_group_split_in_change_set_enabled is false,
-        // but self.group_size_kind == GroupSizeKind::AsSum, we need to special-case it.
-        // We need to return an indicator here that will force the VM to produce
-        // V0 resource group change set but charge as V1
-        // Potentially - I'm thinking to turn V0/V1 enum into struct there and prepare both,
-        // shouldn't be too complex and well-testable) - we can do that next as one of the
-        // preconditions for enabling group feature flag -> aggr2 feature flag.
-
-        if self.is_resource_group_split_in_change_set_enabled()
-            && self.group_size_kind == GroupSizeKind::AsSum
-        {
+        if self.group_size_kind == GroupSizeKind::AsSum {
             // Clear the cache, but do not return the contents to the caller. This leads to
             // the VMChangeSet prepared in a new, granular format that the block executor
             // can handle (combined as a group update at the end).

@@ -1307,7 +1307,7 @@ where
                         output.incorporate_materialized_txn_output(
                             vec![],
                             BTreeMap::new(),
-                            vec![],
+                            output.get_events().into_iter().map(|(e, _)| e).collect(),
                             serialized_groups,
                         );
                     }
@@ -1479,6 +1479,8 @@ where
         // If after trying available fallbacks, we still are askign to do a fallback,
         // something unrecoverable went wrong.
         if let Err(Error::FallbackToSequential(e)) = &ret {
+            // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
+            // this error often when something that should never happen goes wrong
             panic!("Sequential execution failed with {:?}", e);
         }
 
