@@ -52,7 +52,7 @@ impl ConfigSanitizer for GasEstimationConfig {
     fn sanitize(
         node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let gas_estimation_config = &node_config.api.gas_estimation;

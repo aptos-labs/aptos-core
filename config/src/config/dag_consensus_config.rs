@@ -32,7 +32,7 @@ impl ConfigSanitizer for DagPayloadConfig {
     fn sanitize(
         node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let dag_node_payload_config = &node_config.dag_consensus.node_payload_config;
@@ -144,7 +144,7 @@ impl ConfigSanitizer for DagConsensusConfig {
     fn sanitize(
         node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         DagPayloadConfig::sanitize(node_config, node_type, chain_id)?;
 
