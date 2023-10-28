@@ -1852,6 +1852,9 @@ impl VMAdapter for AptosVM {
                         },
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
+                        // Ignore Storage Error as currently it sometimes wraps speculative errors
+                        // TODO[agg_v2](fix) propagate SPECULATIVE_EXECUTION_ABORT_ERROR correctly, and remove storage from valid errors here.
+                        StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.
