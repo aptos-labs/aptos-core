@@ -25,7 +25,7 @@ make test
 ## E2E testing and Using the Aptos CLI
 
 * Download the [Aptos CLI](https://aptos.dev/tools/aptos-cli/install-cli/).
-* Set the environment variable `APTOS_CLI_PATH` to the full path the the CLI.
+* Set the environment variable `APTOS_CLI_PATH` to the full path of the CLI.
 * `make examples_cli`
 
 We of course allow you to do this a bit more manually by:
