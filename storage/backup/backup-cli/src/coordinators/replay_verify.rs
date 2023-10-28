@@ -177,7 +177,11 @@ impl ReplayVerifyCoordinator {
             }
         }
 
-        let txn_manifests = transactions.into_iter().map(|b| b.manifest).collect();
+        let txn_manifests = transactions
+            .into_iter()
+            .filter(|b| b.last_version >= next_txn_version)
+            .map(|b| b.manifest)
+            .collect();
         TransactionRestoreBatchController::new(
             global_opt,
             self.storage,
