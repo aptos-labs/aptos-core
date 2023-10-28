@@ -365,17 +365,16 @@ impl DagBootstrapper {
 
                             let sync_future = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone(), highest_committed_anchor_round);
 
-                            select! {
-                                result = sync_future => {
-                                    match result {
-                                        Ok(_) => debug!("Sync finishes"),
-                                        Err(e) => error!(error = ?e, "unable to sync"),
-                                    }
-                                },
-                                Ok(ack_tx) = &mut shutdown_rx => {
-                                    let _ = ack_tx.send(());
-                                    return;
-                                }
+                            let result = sync_future.await;
+                            match result {
+                                Ok(_) => debug!("Sync finishes"),
+                                Err(e) => error!(error = ?e, "unable to sync"),
+                            }
+
+                            if let Ok(Some(ack_tx)) = (&mut shutdown_rx).try_recv() {
+                                debug!("aborting rebootstrap. shutting down bootstrapper");
+                                let _ = ack_tx.send(());
+                                return;
                             }
 
                             debug!("going to rebootstrap.");
