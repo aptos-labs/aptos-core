@@ -227,7 +227,7 @@ impl StateDb {
 
 impl DbReader for StateStore {
     fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        Ok(self.smt_ancestors.lock().get_youngest()?)
+        Ok(self.smt_ancestors.lock().get_youngest())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
