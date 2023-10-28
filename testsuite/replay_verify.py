@@ -203,7 +203,7 @@ def main(runner_no=None, runner_cnt=None, start_version=None, end_version=None):
         runner_end = end_version
 
     # run replay-verify in parallel
-    N = 16
+    N = 1
     PER_PARTITION = (runner_end - runner_start) // N
 
     with Pool(N) as p:
