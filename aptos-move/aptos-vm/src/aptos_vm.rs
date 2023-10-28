@@ -1722,17 +1722,13 @@ impl VMAdapter for AptosVM {
     }
 
     fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
-        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
-            ..
-        } = &txn.authenticator_ref()
-        {
-            if self
+        if txn.is_fee_payer()
+            && self
                 .0
                 .get_features()
                 .is_enabled(FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL)
-            {
-                return txn.check_fee_payer_signature();
-            }
+        {
+            return txn.check_fee_payer_signature();
         }
         txn.check_signature()
     }
