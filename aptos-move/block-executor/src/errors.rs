@@ -23,11 +23,6 @@ pub enum Error<E> {
     /// Execution of a thread yields a non-recoverable error, such error will be propagated back to
     /// the caller (leading to the block execution getting aborted). TODO: revisit name (UserError).
     UserError(E),
-    // WriteSetPayload::Direct cannot be handled if not alone in a block, because:
-    // * delayed fields do value->identifier exchange on reads, and identifier->value exhcangs in materiallization.
-    // * resource groups split on reads, and merge in materiallization
-    // WriteSetPayload::Direct cannot be processed to do so, as we get outputs directly.
-    DirectWriteSetTransactionNotAlone,
 }
 
 pub type Result<T, E> = ::std::result::Result<T, Error<E>>;

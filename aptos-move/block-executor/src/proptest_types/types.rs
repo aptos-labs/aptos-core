@@ -838,7 +838,6 @@ where
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,
-        _is_direct_write_set_allowed: bool,
         _materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error> {
         match txn {
@@ -963,6 +962,10 @@ where
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
+
+    fn is_transaction_dynamic_change_set_capable(_txn: &Self::Txn) -> bool {
+        true
+    }
 }
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadataKind {
@@ -1086,6 +1089,10 @@ where
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
+    }
+
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        // TODO[agg_v2](tests): anything to be added here for tests?
     }
 
     fn fee_statement(&self) -> FeeStatement {

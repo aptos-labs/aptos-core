@@ -359,9 +359,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert_eq!(*idx, self.read_values.len());
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
-            Err(BlockExecutorError::DirectWriteSetTransactionNotAlone) => {
-                unimplemented!("not tested here DirectWriteSetTransactionNotAlone")
-            },
             Err(BlockExecutorError::FallbackToSequential(e)) => {
                 unimplemented!("not tested here FallbackToSequential({:?})", e)
             },
