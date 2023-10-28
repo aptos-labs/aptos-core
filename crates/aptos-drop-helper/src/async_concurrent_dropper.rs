@@ -28,7 +28,7 @@ impl AsyncConcurrentDropper {
         Self {
             name,
             num_tasks_tracker: Arc::new(NumTasksTracker::new(max_tasks)),
-            thread_pool: ThreadPool::new(num_threads),
+            thread_pool: ThreadPool::with_name(format!("{}_conc_dropper", name), num_threads),
         }
     }
 

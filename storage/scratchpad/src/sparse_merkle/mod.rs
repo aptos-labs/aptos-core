@@ -598,10 +598,6 @@ where
             None
         }
     }
-
-    pub(crate) fn is_the_only_ref(&self) -> bool {
-        Arc::strong_count(&self.inner) == 1
-    }
 }
 
 /// In tests and benchmark, reference to ancestors are manually managed

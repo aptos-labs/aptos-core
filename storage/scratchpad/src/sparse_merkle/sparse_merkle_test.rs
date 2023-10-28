@@ -400,6 +400,7 @@ fn test_update() {
 
     // Now prune smt1.
     drop(smt1);
+    SUBTREE_DROPPER.wait_for_backlog_drop(0);
 
     // Verify oldest ancestor
     assert_eq_pointee(&smt2.get_oldest_ancestor(), &smt2);
