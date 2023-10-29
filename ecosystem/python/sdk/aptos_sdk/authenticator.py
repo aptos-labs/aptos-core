@@ -6,7 +6,7 @@ from __future__ import annotations
 import typing
 from typing import List
 
-from . import asymmetric_crypto, ed25519
+from . import asymmetric_crypto, asymmetric_crypto_wrapper, ed25519
 from .account_address import AccountAddress
 from .bcs import Deserializer, Serializer
 
@@ -23,6 +23,7 @@ class Authenticator:
     MULTI_ED25519: int = 1
     MULTI_AGENT: int = 2
     FEE_PAYER: int = 3
+    SINGLE_SENDER: int = 4
 
     variant: int
     authenticator: typing.Any
@@ -36,6 +37,8 @@ class Authenticator:
             self.variant = Authenticator.MULTI_AGENT
         elif isinstance(authenticator, FeePayerAuthenticator):
             self.variant = Authenticator.FEE_PAYER
+        elif isinstance(authenticator, SingleSenderAuthenticator):
+            self.variant = Authenticator.SINGLE_SENDER
         else:
             raise Exception("Invalid type")
         self.authenticator = authenticator
@@ -73,10 +76,65 @@ class Authenticator:
             authenticator = MultiAgentAuthenticator.deserialize(deserializer)
         elif variant == Authenticator.FEE_PAYER:
             authenticator = FeePayerAuthenticator.deserialize(deserializer)
+        elif variant == Authenticator.SINGLE_SENDER:
+            authenticator = SingleSenderAuthenticator.deserialize(deserializer)
         else:
             raise Exception(f"Invalid type: {variant}")
 
         return Authenticator(authenticator)
+
+    def serialize(self, serializer: Serializer):
+        serializer.uleb128(self.variant)
+        serializer.struct(self.authenticator)
+
+
+class AccountAuthenticator:
+    ED25519: int = 0
+    MULTI_ED25519: int = 1
+    SINGLE_KEY: int = 2
+    MULTI_KEY: int = 3
+
+    variant: int
+    authenticator: typing.Any
+
+    def __init__(self, authenticator: typing.Any):
+        if isinstance(authenticator, Ed25519Authenticator):
+            self.variant = AccountAuthenticator.ED25519
+        elif isinstance(authenticator, MultiEd25519Authenticator):
+            self.variant = AccountAuthenticator.MULTI_ED25519
+        elif isinstance(authenticator, SingleKeyAuthenticator):
+            self.variant = AccountAuthenticator.SINGLE_KEY
+        else:
+            raise Exception("Invalid type")
+        self.authenticator = authenticator
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AccountAuthenticator):
+            return NotImplemented
+        return (
+            self.variant == other.variant and self.authenticator == other.authenticator
+        )
+
+    def __str__(self) -> str:
+        return self.authenticator.__str__()
+
+    def verify(self, data: bytes) -> bool:
+        return self.authenticator.verify(data)
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> AccountAuthenticator:
+        variant = deserializer.uleb128()
+
+        if variant == AccountAuthenticator.ED25519:
+            authenticator: typing.Any = Ed25519Authenticator.deserialize(deserializer)
+        elif variant == AccountAuthenticator.MULTI_ED25519:
+            authenticator = MultiEd25519Authenticator.deserialize(deserializer)
+        elif variant == AccountAuthenticator.SINGLE_KEY:
+            authenticator = SingleKeyAuthenticator.deserialize(deserializer)
+        else:
+            raise Exception(f"Invalid type: {variant}")
+
+        return AccountAuthenticator(authenticator)
 
     def serialize(self, serializer: Serializer):
         serializer.uleb128(self.variant)
@@ -115,15 +173,15 @@ class Ed25519Authenticator:
 
 
 class FeePayerAuthenticator:
-    sender: Authenticator
-    secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]]
-    fee_payer: typing.Tuple[AccountAddress, Authenticator]
+    sender: AccountAuthenticator
+    secondary_signers: List[typing.Tuple[AccountAddress, AccountAuthenticator]]
+    fee_payer: typing.Tuple[AccountAddress, AccountAuthenticator]
 
     def __init__(
         self,
-        sender: Authenticator,
-        secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]],
-        fee_payer: typing.Tuple[AccountAddress, Authenticator],
+        sender: AccountAuthenticator,
+        secondary_signers: List[typing.Tuple[AccountAddress, AccountAuthenticator]],
+        fee_payer: typing.Tuple[AccountAddress, AccountAuthenticator],
     ):
         self.sender = sender
         self.secondary_signers = secondary_signers
@@ -153,11 +211,13 @@ class FeePayerAuthenticator:
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> FeePayerAuthenticator:
-        sender = deserializer.struct(Authenticator)
+        sender = deserializer.struct(AccountAuthenticator)
         secondary_addresses = deserializer.sequence(AccountAddress.deserialize)
-        secondary_authenticators = deserializer.sequence(Authenticator.deserialize)
+        secondary_authenticators = deserializer.sequence(
+            AccountAuthenticator.deserialize
+        )
         fee_payer_address = deserializer.struct(AccountAddress)
-        fee_payer_authenticator = deserializer.struct(Authenticator)
+        fee_payer_authenticator = deserializer.struct(AccountAuthenticator)
         return FeePayerAuthenticator(
             sender,
             list(zip(secondary_addresses, secondary_authenticators)),
@@ -173,13 +233,13 @@ class FeePayerAuthenticator:
 
 
 class MultiAgentAuthenticator:
-    sender: Authenticator
-    secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]]
+    sender: AccountAuthenticator
+    secondary_signers: List[typing.Tuple[AccountAddress, AccountAuthenticator]]
 
     def __init__(
         self,
-        sender: Authenticator,
-        secondary_signers: List[typing.Tuple[AccountAddress, Authenticator]],
+        sender: AccountAuthenticator,
+        secondary_signers: List[typing.Tuple[AccountAddress, AccountAuthenticator]],
     ):
         self.sender = sender
         self.secondary_signers = secondary_signers
@@ -202,9 +262,11 @@ class MultiAgentAuthenticator:
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> MultiAgentAuthenticator:
-        sender = deserializer.struct(Authenticator)
+        sender = deserializer.struct(AccountAuthenticator)
         secondary_addresses = deserializer.sequence(AccountAddress.deserialize)
-        secondary_authenticators = deserializer.sequence(Authenticator.deserialize)
+        secondary_authenticators = deserializer.sequence(
+            AccountAuthenticator.deserialize
+        )
         return MultiAgentAuthenticator(
             sender, list(zip(secondary_addresses, secondary_authenticators))
         )
@@ -229,6 +291,65 @@ class MultiEd25519Authenticator:
     @staticmethod
     def deserialize(deserializer: Deserializer) -> MultiEd25519Authenticator:
         raise NotImplementedError
+
+    def serialize(self, serializer: Serializer):
+        serializer.struct(self.public_key)
+        serializer.struct(self.signature)
+
+
+class SingleSenderAuthenticator:
+    sender: AccountAuthenticator
+
+    def __init__(
+        self,
+        sender: AccountAuthenticator,
+    ):
+        self.sender = sender
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SingleSenderAuthenticator):
+            return NotImplemented
+        return self.sender == other.sender
+
+    def verify(self, data: bytes) -> bool:
+        return self.sender.verify(data)
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> SingleSenderAuthenticator:
+        sender = deserializer.struct(AccountAuthenticator)
+        return SingleSenderAuthenticator(sender)
+
+    def serialize(self, serializer: Serializer):
+        serializer.struct(self.sender)
+
+
+class SingleKeyAuthenticator:
+    public_key: asymmetric_crypto_wrapper.PublicKey
+    signature: asymmetric_crypto_wrapper.Signature
+
+    def __init__(
+        self,
+        public_key: asymmetric_crypto.PublicKey,
+        signature: asymmetric_crypto.Signature,
+    ):
+        if isinstance(public_key, asymmetric_crypto_wrapper.PublicKey):
+            self.public_key = public_key
+        else:
+            self.public_key = asymmetric_crypto_wrapper.PublicKey(public_key)
+
+        if isinstance(signature, asymmetric_crypto_wrapper.Signature):
+            self.signature = signature
+        else:
+            self.signature = asymmetric_crypto_wrapper.Signature(signature)
+
+    def verify(self, data: bytes) -> bool:
+        return self.public_key.verify(data, self.signature.signature)
+
+    @staticmethod
+    def deserialize(deserializer: Deserializer) -> SingleKeyAuthenticator:
+        public_key = deserializer.struct(asymmetric_crypto_wrapper.PublicKey)
+        signature = deserializer.struct(asymmetric_crypto_wrapper.Signature)
+        return SingleKeyAuthenticator(public_key, signature)
 
     def serialize(self, serializer: Serializer):
         serializer.struct(self.public_key)

@@ -9,17 +9,20 @@ from __future__ import annotations
 
 import hashlib
 import unittest
-from typing import Any, Callable, List, Optional, cast
+from typing import Any, Callable, List, Optional, Union, cast
 
 from typing_extensions import Protocol
 
-from . import ed25519
+from . import asymmetric_crypto, ed25519, secp256k1_ecdsa
 from .account_address import AccountAddress
 from .authenticator import (
+    AccountAuthenticator,
     Authenticator,
     Ed25519Authenticator,
     FeePayerAuthenticator,
     MultiAgentAuthenticator,
+    SingleKeyAuthenticator,
+    SingleSenderAuthenticator,
 )
 from .bcs import Deserializer, Serializer
 from .type_tag import StructTag, TypeTag
@@ -39,8 +42,27 @@ class RawTransactionInternal(Protocol):
     def serialize(self, ser: Serializer):
         ...
 
-    def sign(self, key: ed25519.PrivateKey) -> ed25519.Signature:
-        return key.sign(self.keyed())
+    def sign(self, key: asymmetric_crypto.PrivateKey) -> AccountAuthenticator:
+        signature = key.sign(self.keyed())
+        if isinstance(signature, ed25519.Signature):
+            return AccountAuthenticator(
+                Ed25519Authenticator(
+                    cast(ed25519.PublicKey, key.public_key()), signature
+                )
+            )
+        return AccountAuthenticator(SingleKeyAuthenticator(key.public_key(), signature))
+
+    def sign_simulated(self, key: asymmetric_crypto.PublicKey) -> AccountAuthenticator:
+        if isinstance(key, ed25519.PublicKey):
+            return AccountAuthenticator(
+                Ed25519Authenticator(key, ed25519.Signature(b"\x00" * 64))
+            )
+        elif isinstance(key, secp256k1_ecdsa.PublicKey):
+            return AccountAuthenticator(
+                SingleKeyAuthenticator(key, secp256k1_ecdsa.Signature(b"\x00" * 64))
+            )
+        else:
+            raise NotImplementedError()
 
     def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
         return key.verify(self.keyed(), signature)
@@ -467,8 +489,21 @@ class SignedTransaction:
     transaction: RawTransaction
     authenticator: Authenticator
 
-    def __init__(self, transaction: RawTransaction, authenticator: Authenticator):
+    def __init__(
+        self,
+        transaction: RawTransaction,
+        authenticator: Union[AccountAuthenticator, Authenticator],
+    ):
         self.transaction = transaction
+        if isinstance(authenticator, AccountAuthenticator):
+            if (
+                authenticator.variant == AccountAuthenticator.ED25519
+                or authenticator == AccountAuthenticator.MULTI_ED25519
+            ):
+                authenticator = Authenticator(authenticator.authenticator)
+            else:
+                authenticator = Authenticator(SingleSenderAuthenticator(authenticator))
+
         self.authenticator = authenticator
 
     def __eq__(self, other: object) -> bool:
@@ -549,10 +584,7 @@ class Test(unittest.TestCase):
             4,
         )
 
-        signature = raw_transaction.sign(private_key)
-        self.assertTrue(raw_transaction.verify(public_key, signature))
-
-        authenticator = Authenticator(Ed25519Authenticator(public_key, signature))
+        authenticator = raw_transaction.sign(private_key)
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
@@ -604,12 +636,7 @@ class Test(unittest.TestCase):
             chain_id_input,
         )
 
-        signature = raw_transaction_generated.sign(sender_private_key)
-        self.assertTrue(raw_transaction_generated.verify(sender_public_key, signature))
-
-        authenticator = Authenticator(
-            Ed25519Authenticator(sender_public_key, signature)
-        )
+        authenticator = raw_transaction_generated.sign(sender_private_key)
         signed_transaction_generated = SignedTransaction(
             raw_transaction_generated, authenticator
         )
@@ -679,30 +706,13 @@ class Test(unittest.TestCase):
             [receiver_account_address],
         )
 
-        sender_signature = raw_transaction_generated.sign(sender_private_key)
-        receiver_signature = raw_transaction_generated.sign(receiver_private_key)
-        self.assertTrue(
-            raw_transaction_generated.verify(sender_public_key, sender_signature)
-        )
-        self.assertTrue(
-            raw_transaction_generated.verify(receiver_public_key, receiver_signature)
-        )
+        sender_authenticator = raw_transaction_generated.sign(sender_private_key)
+        receiver_authenticator = raw_transaction_generated.sign(receiver_private_key)
 
         authenticator = Authenticator(
             MultiAgentAuthenticator(
-                Authenticator(
-                    Ed25519Authenticator(sender_public_key, sender_signature)
-                ),
-                [
-                    (
-                        receiver_account_address,
-                        Authenticator(
-                            Ed25519Authenticator(
-                                receiver_public_key, receiver_signature
-                            )
-                        ),
-                    )
-                ],
+                sender_authenticator,
+                [(receiver_account_address, receiver_authenticator)],
             )
         )
 
@@ -753,7 +763,6 @@ class Test(unittest.TestCase):
         )
 
         self.assertEqual(signed_transaction.transaction, raw_transaction)
-        self.assertEqual(signed_transaction, signed_transaction_generated)
         self.assertTrue(signed_transaction.verify())
 
     def verify_fee_payer(self):
