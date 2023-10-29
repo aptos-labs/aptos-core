@@ -938,15 +938,12 @@ impl Substitution {
             match &c {
                 Constraint::SomeNumber(options) => match ty {
                     Type::Primitive(prim) if options.contains(prim) => Ok(()),
-                    _ => {
-                        println!("mismatch {:?} {:?} {:?}", ty, order, c);
-                        Err(TypeUnificationError::ConstraintUnsatisfied(
-                            loc.clone(),
-                            ty.clone(),
-                            order,
-                            c,
-                        ))
-                    },
+                    _ => Err(TypeUnificationError::ConstraintUnsatisfied(
+                        loc.clone(),
+                        ty.clone(),
+                        order,
+                        c,
+                    )),
                 },
                 Constraint::SomeReference(inner_type) => match ty {
                     Type::Reference(_, target_type) => {

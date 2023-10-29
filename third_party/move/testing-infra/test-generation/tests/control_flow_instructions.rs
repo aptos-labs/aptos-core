@@ -31,6 +31,7 @@ fn generate_module_with_function() -> CompiledModule {
         parameters: SignatureIndex::new(1),
         return_: SignatureIndex::new(2),
         type_parameters: vec![],
+        access_specifiers: None,
     }];
     module
 }

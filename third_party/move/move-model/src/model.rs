@@ -17,8 +17,9 @@
 
 use crate::{
     ast::{
-        Address, Attribute, ConditionKind, Exp, ExpData, GlobalInvariant, ModuleName, PropertyBag,
-        PropertyValue, Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
+        GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec,
+        SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -46,8 +47,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     file_format::{
-        Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
-        FunctionHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        AccessKind, Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex,
+        FunctionDefinitionIndex, FunctionHandleIndex, SignatureIndex, SignatureToken,
+        StructDefinitionIndex,
     },
     normalized::Type as MType,
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
@@ -1914,6 +1916,54 @@ impl GlobalEnv {
             }
             for fun in module.get_functions() {
                 emit!(writer, "{}", fun.get_header_string());
+                if let Some(specs) = fun.get_access_specifiers() {
+                    emitln!(writer);
+                    writer.indent();
+                    for spec in specs {
+                        if spec.negated {
+                            emit!(writer, "!")
+                        }
+                        match &spec.kind {
+                            AccessKind::Reads => emit!(writer, "reads "),
+                            AccessKind::Writes => emit!(writer, "writes "),
+                            AccessKind::Acquires => emit!(writer, "acquires "),
+                        }
+                        match &spec.resource.1 {
+                            ResourceSpecifier::Any => emit!(writer, "*"),
+                            ResourceSpecifier::DeclaredAtAddress(addr) => {
+                                emit!(
+                                    writer,
+                                    "0x{}::*",
+                                    addr.expect_numerical().short_str_lossless()
+                                )
+                            },
+                            ResourceSpecifier::DeclaredInModule(mid) => {
+                                emit!(writer, "{}::*", self.get_module(*mid).get_full_name_str())
+                            },
+                            ResourceSpecifier::Resource(sid) => {
+                                emit!(writer, "{}", sid.to_type().display(tctx))
+                            },
+                        }
+                        emit!(writer, "(");
+                        match &spec.address.1 {
+                            AddressSpecifier::Any => emit!(writer, "*"),
+                            AddressSpecifier::Address(addr) => {
+                                emit!(writer, "0x{}", addr.expect_numerical().short_str_lossless())
+                            },
+                            AddressSpecifier::Parameter(sym) => {
+                                emit!(writer, "{}", sym.display(self.symbol_pool()))
+                            },
+                            AddressSpecifier::Call(fun, sym) => emit!(
+                                writer,
+                                "{}({})",
+                                self.get_function(fun.to_qualified_id()).get_full_name_str(),
+                                sym.display(self.symbol_pool())
+                            ),
+                        }
+                        emitln!(writer, ")")
+                    }
+                    writer.unindent()
+                }
                 if let Some(exp) = fun.get_def() {
                     emitln!(writer, " {");
                     writer.indent();
@@ -3176,6 +3226,9 @@ pub struct FunctionData {
     /// Result type of the function, uses `Type::Tuple` for multiple values.
     pub(crate) result_type: Type,
 
+    /// Access specifiers.
+    pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
+
     /// Specification associated with this function.
     pub(crate) spec: RefCell<Spec>,
 
@@ -3611,6 +3664,16 @@ impl<'env> FunctionEnv<'env> {
         } else {
             1
         }
+    }
+
+    /// Returns the access specifiers of this function.
+    /// If this is `None`, all accesses are allowed. If the list is empty,
+    /// no accesses are allowed. Otherwise the list is divided into _inclusions_ and _exclusions_,
+    /// the later being negated specifiers. Access is allowed if (a) any of the inclusion
+    /// specifiers allows it (union of inclusion specifiers) (b) none of the exclusions
+    /// specifiers disallows it (intersection of exclusion specifiers).
+    pub fn get_access_specifiers(&self) -> Option<&[AccessSpecifier]> {
+        self.data.access_specifiers.as_deref()
     }
 
     /// Get the name to be used for a local by index, if a compiled module and source map

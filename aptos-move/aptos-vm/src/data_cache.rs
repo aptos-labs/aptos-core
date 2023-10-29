@@ -91,7 +91,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         features: &Features,
         maybe_resource_group_view: Option<&'e dyn ResourceGroupView>,
     ) -> Self {
-        let max_binary_version = get_max_binary_format_version(features, gas_feature_version);
+        let max_binary_version = get_max_binary_format_version(features, Some(gas_feature_version));
         let max_identifier_size = get_max_identifier_size(features);
         let resource_group_adapter = ResourceGroupAdapter::new(
             maybe_resource_group_view,
@@ -332,7 +332,8 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let config_view = ConfigAdapter(self);
         let (_, gas_feature_version) = gas_config(&config_view);
         let features = Features::fetch_config(&config_view).unwrap_or_default();
-        let max_binary_version = get_max_binary_format_version(&features, gas_feature_version);
+        let max_binary_version =
+            get_max_binary_format_version(&features, Some(gas_feature_version));
         let resource_group_adapter = ResourceGroupAdapter::new(None, self, gas_feature_version);
         let max_identifier_size = get_max_identifier_size(&features);
         StorageAdapter::new(

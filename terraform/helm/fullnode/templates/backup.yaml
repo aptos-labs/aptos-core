@@ -43,8 +43,9 @@ spec:
         imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
         resources:
           {{- toYaml .Values.backup.resources | nindent 10 }}
-        command: ["/usr/local/bin/aptos-db-tool"]
+        command: ["/usr/local/bin/aptos-debugger"]
         args:
+        - "aptos-db"
         - "backup"
         - "continuously"
         - "--metadata-cache-dir"

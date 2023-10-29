@@ -22,7 +22,6 @@ aptos-cached-packages = { workspace = true }
 aptos-cli-common = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-debugger = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-profiling = { workspace = true }
@@ -35,6 +34,7 @@ aptos-indexer-grpc-utils = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
 aptos-node = { workspace = true }
 aptos-protos = { workspace = true }
