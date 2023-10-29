@@ -118,13 +118,12 @@ impl ImageOptimizer {
         }
     }
 
-    /// Checks if image has transparent pixels
+    /// Checks if an image has any transparent pixels
     fn has_transparent_pixels(img: &DynamicImage) -> bool {
         let (width, height) = img.dimensions();
         for x in 0..width {
             for y in 0..height {
-                let pixel = img.get_pixel(x, y);
-                if pixel[3] < 255 {
+                if img.get_pixel(x, y)[3] < 255 {
                     return true;
                 }
             }
