@@ -78,3 +78,42 @@ impl ConfigSanitizer for IndexerGrpcConfig {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::StorageConfig;
+
+    #[test]
+    fn test_sanitize_enable_indexer() {
+        // Create a storage config and disable the storage indexer
+        let mut storage_config = StorageConfig::default();
+        storage_config.enable_indexer = false;
+
+        // Create a node config with the indexer enabled, but the storage indexer disabled
+        let mut node_config = NodeConfig {
+            storage: storage_config,
+            indexer_grpc: IndexerGrpcConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = IndexerGrpcConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Enable the storage indexer
+        node_config.storage.enable_indexer = true;
+
+        // Sanitize the config and verify that it now succeeds
+        IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+            .unwrap();
+    }
+}

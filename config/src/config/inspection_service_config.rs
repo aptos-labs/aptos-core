@@ -85,6 +85,11 @@ impl ConfigOptimizer for InspectionServiceConfig {
                     modified_config = true;
                 }
 
+                if local_inspection_config_yaml["expose_peer_information"].is_null() {
+                    inspection_service_config.expose_peer_information = true;
+                    modified_config = true;
+                }
+
                 if local_inspection_config_yaml["expose_system_information"].is_null() {
                     inspection_service_config.expose_system_information = true;
                     modified_config = true;
@@ -106,6 +111,7 @@ mod tests {
         let mut node_config = NodeConfig {
             inspection_service: InspectionServiceConfig {
                 expose_configuration: false,
+                expose_peer_information: false,
                 expose_system_information: false,
                 ..Default::default()
             },
@@ -122,8 +128,9 @@ mod tests {
         .unwrap();
         assert!(!modified_config);
 
-        // Verify both endpoints are still disabled
+        // Verify all endpoints are still disabled
         assert!(!node_config.inspection_service.expose_configuration);
+        assert!(!node_config.inspection_service.expose_peer_information);
         assert!(!node_config.inspection_service.expose_system_information);
     }
 
@@ -133,6 +140,7 @@ mod tests {
         let mut node_config = NodeConfig {
             inspection_service: InspectionServiceConfig {
                 expose_configuration: false,
+                expose_peer_information: false,
                 expose_system_information: false,
                 ..Default::default()
             },
@@ -149,8 +157,9 @@ mod tests {
         .unwrap();
         assert!(modified_config);
 
-        // Verify both endpoints are now enabled
+        // Verify all endpoints are now enabled
         assert!(node_config.inspection_service.expose_configuration);
+        assert!(node_config.inspection_service.expose_peer_information);
         assert!(node_config.inspection_service.expose_system_information);
     }
 
@@ -160,6 +169,7 @@ mod tests {
         let mut node_config = NodeConfig {
             inspection_service: InspectionServiceConfig {
                 expose_configuration: false,
+                expose_peer_information: false,
                 expose_system_information: false,
                 ..Default::default()
             },
@@ -187,6 +197,7 @@ mod tests {
 
         // Verify only the system information endpoint is now enabled
         assert!(!node_config.inspection_service.expose_configuration);
+        assert!(node_config.inspection_service.expose_peer_information);
         assert!(node_config.inspection_service.expose_system_information);
     }
 
