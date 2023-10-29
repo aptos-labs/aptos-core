@@ -47,6 +47,7 @@ pub enum FeatureFlag {
     CONCURRENT_ASSETS = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
+    VM_BINARY_FORMAT_V7 = 40,
 }
 
 /// Representation of features on chain as a bitset.
@@ -59,6 +60,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
+            // TODO: for gods sake, make this based on the enum above
             features: vec![0b00100000, 0b00100000, 0b10001100, 0b01100000, 0b00000000],
         }
     }

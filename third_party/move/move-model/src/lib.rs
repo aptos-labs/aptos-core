@@ -511,6 +511,7 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
         parameters: script.parameters,
         return_: return_sig_idx,
         type_parameters: script.type_parameters,
+        access_specifiers: None, // TODO: access specifiers for script functions
     });
 
     // Create a function definition for the main function.
@@ -717,6 +718,7 @@ fn retrospective_lambda_lifting(
             },
             entry: None,
             acquires: vec![], // TODO: might need inference here
+            access_specifiers: None,
             body: new_body,
             specs: BTreeMap::new(),
         };

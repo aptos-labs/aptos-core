@@ -9,7 +9,9 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
-    move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
+    move_vm_ext::{
+        get_max_binary_format_version, AptosMoveResolver, RespawnedSession, SessionExt, SessionId,
+    },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -855,15 +857,7 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = if self
-            .0
-            .get_features()
-            .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6)
-        {
-            6
-        } else {
-            5
-        };
+        let max_version = get_max_binary_format_version(self.0.get_features(), None);
         let max_identifier_size = if self
             .0
             .get_features()
