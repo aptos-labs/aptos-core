@@ -51,7 +51,7 @@ pub struct AptosNodeArgs {
         short = 'f',
         long,
         value_parser,
-        required_unless_present_any = ["test", "info"],
+        required_unless_present_any = ["test", "info", "stacktrace"],
     )]
     config: Option<PathBuf>,
 
@@ -91,11 +91,27 @@ pub struct AptosNodeArgs {
     /// Display information about the build of this node
     #[clap(long)]
     info: bool,
+
+    #[cfg(target_os = "linux")]
+    /// Start as a child process to collect thread dump.
+    /// See rstack-self crate for more details.
+    #[clap(long)]
+    stacktrace: bool,
 }
 
 impl AptosNodeArgs {
     /// Runs an Aptos node based on the given command line arguments and config flags
     pub fn run(self) {
+        #[cfg(target_os = "linux")]
+        // https://sfackler.github.io/rstack/doc/rstack_self/index.html
+        //
+        // TODO(grao): I don't like this way, but I didn't find other existing solution in Rust.
+        // Maybe try to use libc directly?
+        if self.stacktrace {
+            let _ = rstack_self::child();
+            return;
+        }
+
         if self.info {
             let build_information = build_information!();
             println!(

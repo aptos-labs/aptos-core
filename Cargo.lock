@@ -196,6 +196,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "antidote"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34fde25430d87a9388dadbe6e34d7f72a462c8b43ac8d309b42b0a8505d7e2a5"
+
+[[package]]
 name = "anyhow"
 version = "1.0.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -349,6 +355,7 @@ dependencies = [
  "lazy_static",
  "mime",
  "pprof",
+ "rstack-self",
  "tokio",
  "tokio-scoped",
  "url",
@@ -2866,6 +2873,7 @@ dependencies = [
  "maplit",
  "rand 0.7.3",
  "rayon",
+ "rstack-self",
  "serde",
  "serde_json",
  "serde_yaml 0.8.26",
@@ -6514,6 +6522,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 
 [[package]]
+name = "dw"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef0ed82b765c2ab79fb48e4bf2c95bd583202f4078a702bc714cc6e6f3ca80c3"
+dependencies = [
+ "dw-sys",
+ "foreign-types 0.5.0",
+ "libc",
+]
+
+[[package]]
+name = "dw-sys"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14eb35c87ff6626cd1021bb32bc7d9a5372ea72547e1eaf0343a841d9d55a973"
+dependencies = [
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
@@ -7185,7 +7214,28 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
 dependencies = [
- "foreign-types-shared",
+ "foreign-types-shared 0.1.1",
+]
+
+[[package]]
+name = "foreign-types"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d737d9aa519fb7b749cbc3b962edcf310a8dd1f4b67c91c4f83975dbdd17d965"
+dependencies = [
+ "foreign-types-macros",
+ "foreign-types-shared 0.3.1",
+]
+
+[[package]]
+name = "foreign-types-macros"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a5c6c585bc94aaf2c7b51dd4c2ba22680844aba4c687be581871a6f518c5742"
+dependencies = [
+ "proc-macro2 1.0.64",
+ "quote 1.0.29",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -7193,6 +7243,12 @@ name = "foreign-types-shared"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
+
+[[package]]
+name = "foreign-types-shared"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "form_urlencoded"
@@ -10874,7 +10930,7 @@ checksum = "729b745ad4a5575dd06a3e1af1414bd330ee561c01b3899eb584baeaa8def17e"
 dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
- "foreign-types",
+ "foreign-types 0.3.2",
  "libc",
  "once_cell",
  "openssl-macros",
@@ -12697,6 +12753,34 @@ dependencies = [
  "smallvec",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "rstack"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7df9d3ebd4f17b52e6134efe2fa20021c80688cbe823d481a729a993b730493"
+dependencies = [
+ "cfg-if",
+ "dw",
+ "lazy_static",
+ "libc",
+ "log",
+]
+
+[[package]]
+name = "rstack-self"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dd5030da3aba0ec731502f74ec38e63798eea6bc8b8ba5972129afe3eababd2"
+dependencies = [
+ "antidote",
+ "backtrace",
+ "bincode",
+ "lazy_static",
+ "libc",
+ "rstack",
+ "serde",
 ]
 
 [[package]]
