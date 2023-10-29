@@ -5,6 +5,7 @@
 Provides a test harness for treating examples as integration tests.
 """
 
+import asyncio
 import os
 import unittest
 from typing import Optional
@@ -16,11 +17,10 @@ from aptos_sdk.aptos_cli_wrapper import AptosCLIWrapper, AptosInstance
 class Test(unittest.IsolatedAsyncioTestCase):
     _node: Optional[AptosInstance] = None
 
-    async def asyncSetUp(self):
+    @classmethod
+    def setUpClass(self):
         self._node = AptosCLIWrapper.start_node()
-        print("THERE")
-        operational = await self._node.wait_until_operational()
-        print("HERE")
+        operational = asyncio.run(self._node.wait_until_operational())
         if not operational:
             raise Exception("".join(self._node.errors()))
 
@@ -63,6 +63,11 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
         await rotate_key.main()
 
+    async def test_secp256k1_ecdsa_transfer_coin(self):
+        from . import secp256k1_ecdsa_transfer_coin
+
+        await secp256k1_ecdsa_transfer_coin.main()
+
     async def test_simple_nft(self):
         from . import simple_nft
 
@@ -94,7 +99,8 @@ class Test(unittest.IsolatedAsyncioTestCase):
         )
         await your_coin.main(moon_coin_path)
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(self):
         self._node.stop()
 
 
