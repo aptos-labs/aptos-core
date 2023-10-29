@@ -71,3 +71,129 @@ impl ConfigOptimizer for AdminServiceConfig {
         Ok(modified_config)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_optimize_admin_service_disabled() {
+        // Create a node config with the admin service disabled
+        let mut node_config = NodeConfig {
+            admin_service: AdminServiceConfig {
+                enabled: Some(false),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config and verify that it succeeds
+        let modified_config = AdminServiceConfig::optimize(
+            &mut node_config,
+            &Value::Null,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+
+        // Verify that the admin service is disabled and that the config was not modified
+        assert_eq!(node_config.admin_service.enabled, Some(false));
+        assert!(!modified_config);
+    }
+
+    #[test]
+    fn test_optimize_admin_service_enabled() {
+        // Create a node config with the admin service enabled
+        let mut node_config = NodeConfig {
+            admin_service: AdminServiceConfig {
+                enabled: Some(true),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config and verify that it succeeds
+        let modified_config = AdminServiceConfig::optimize(
+            &mut node_config,
+            &Value::Null,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+
+        // Verify that the admin service is enabled and and that the config was not modified
+        assert_eq!(node_config.admin_service.enabled, Some(true));
+        assert!(!modified_config);
+    }
+
+    #[test]
+    fn test_optimize_admin_service_not_set_mainnet() {
+        // Create a node config with the admin service not specified
+        let mut node_config = NodeConfig {
+            admin_service: AdminServiceConfig {
+                enabled: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config (for mainnet) and verify that it succeeds
+        let modified_config = AdminServiceConfig::optimize(
+            &mut node_config,
+            &Value::Null,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+
+        // Verify that the admin service is disabled and that the config was modified
+        assert_eq!(node_config.admin_service.enabled, Some(false));
+        assert!(modified_config);
+    }
+
+    #[test]
+    fn test_optimize_admin_service_not_set_testnet() {
+        // Create a node config with the admin service not specified
+        let mut node_config = NodeConfig {
+            admin_service: AdminServiceConfig {
+                enabled: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config (for testnet) and verify that it succeeds
+        let modified_config = AdminServiceConfig::optimize(
+            &mut node_config,
+            &Value::Null,
+            NodeType::Validator,
+            Some(ChainId::testnet()),
+        )
+        .unwrap();
+
+        // Verify that the admin service is enabled and that the config was modified
+        assert_eq!(node_config.admin_service.enabled, Some(true));
+        assert!(modified_config);
+    }
+
+    #[test]
+    fn test_optimize_admin_service_not_set_unknown() {
+        // Create a node config with the admin service not specified
+        let mut node_config = NodeConfig {
+            admin_service: AdminServiceConfig {
+                enabled: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the config (for an unknown network) and verify that it succeeds
+        let modified_config =
+            AdminServiceConfig::optimize(&mut node_config, &Value::Null, NodeType::Validator, None)
+                .unwrap();
+
+        // Verify that the admin service is disabled and that the config was modified
+        assert_eq!(node_config.admin_service.enabled, Some(false));
+        assert!(modified_config);
+    }
+}

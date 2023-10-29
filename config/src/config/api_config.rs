@@ -165,6 +165,7 @@ impl ConfigSanitizer for ApiConfig {
             ));
         }
 
+        // Sanitize the gas estimation config
         GasEstimationConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
@@ -209,6 +210,12 @@ mod tests {
             ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Sanitize the config for a different network and verify that it succeeds
+        ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::testnet())).unwrap();
+
+        // Sanitize the config for an unknown network and verify that it succeeds
+        ApiConfig::sanitize(&node_config, NodeType::Validator, None).unwrap();
     }
 
     #[test]
