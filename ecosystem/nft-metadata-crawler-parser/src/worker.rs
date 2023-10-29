@@ -6,13 +6,13 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        constants::{MAX_RETRY_TIME_SECONDS, URI_SKIP_LIST},
+        constants::URI_SKIP_LIST,
         counters::{
             DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
             DUPLICATE_RAW_IMAGE_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
             PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT, PARSER_SUCCESSES_COUNT,
-            PARSE_URI_TYPE_COUNT, PUBSUB_ACK_SUCCESS_COUNT, PUBSUB_STREAM_RESET_COUNT,
-            SKIP_URI_COUNT, UNABLE_TO_GET_CONNECTION_COUNT,
+            PARSE_URI_TYPE_COUNT, PUBSUB_ACK_SUCCESS_COUNT, SKIP_URI_COUNT,
+            UNABLE_TO_GET_CONNECTION_COUNT,
         },
         database::{
             check_or_update_chain_id, establish_connection_pool, run_migrations, upsert_uris,
@@ -20,28 +20,23 @@ use crate::{
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
+        pubsub::{AppContext, PubSubBody},
         uri_parser::URIParser,
     },
 };
-use anyhow::Context;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
 };
-use futures::{future::join_all, StreamExt};
-use google_cloud_pubsub::{
-    client::{Client as PubsubClient, ClientConfig as PubsubClientConfig},
-    subscription::{MessageStream, Subscription},
-};
 use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClientConfig};
 use image::ImageFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::{Duration, Instant};
-use tokio::task::JoinHandle;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 use url::Url;
+use warp::Filter;
 
 /// Structs to hold config from YAML
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -49,107 +44,79 @@ use url::Url;
 pub struct ParserConfig {
     pub google_application_credentials: Option<String>,
     pub bucket: String,
-    pub subscription_name: String,
     pub database_url: String,
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
-    pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
     pub ack_parsed_uris: Option<bool>,
+    pub server_port: u16,
 }
 
 /// Repeatedly pulls workers from Channel and perform parsing operations
 async fn spawn_parser(
     parser_config: ParserConfig,
+    msg_base64: String,
     pool: Pool<ConnectionManager<PgConnection>>,
-    subscription: Subscription,
     gcs_client: GCSClient,
-    ack_parsed_uris: bool,
 ) {
-    let mut db_chain_id = None;
-    let mut stream = get_new_subscription_stream(&subscription).await;
-    while let Some(msg) = stream.next().await {
-        PARSER_INVOCATIONS_COUNT.inc();
-        let start_time = Instant::now();
-        let pubsub_message = String::from_utf8(msg.message.clone().data).unwrap_or_else(|e| {
-            error!(
-                error = ?e,
-                "[NFT Metadata Crawler] Failed to parse PubSub message"
-            );
-            panic!();
-        });
-
-        info!(
-            pubsub_message = pubsub_message,
-            "[NFT Metadata Crawler] Received message from PubSub"
+    PARSER_INVOCATIONS_COUNT.inc();
+    let pubsub_message = String::from_utf8(base64::decode(msg_base64).unwrap_or_else(|e| {
+        error!(
+            error = ?e,
+            "[NFT Metadata Crawler] Invalid base64 encoding in PubSub message"
         );
+        panic!();
+    }))
+    .unwrap_or_else(|e| {
+        error!(
+            error = ?e,
+            "[NFT Metadata Crawler] Failed to parse PubSub message"
+        );
+        panic!();
+    });
 
-        // Skips message if it does not have 5 commas (likely malformed URI)
-        if pubsub_message.matches(',').count() != 5 {
-            // Sends ack to PubSub only if ack_parsed_uris flag is true
-            info!("[NFT Metadata Crawler] More than 5 commas, skipping message");
-            SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
-            if ack_parsed_uris {
-                info!(
-                    pubsub_message = pubsub_message,
-                    time_elapsed = start_time.elapsed().as_secs_f64(),
-                    "[NFT Metadata Crawler] Received worker, acking message"
-                );
-                if let Err(e) = send_ack(&subscription, msg.ack_id()).await {
-                    warn!(
-                        pubsub_message = pubsub_message,
-                        error = ?e,
-                        "[NFT Metadata Crawler] Resetting stream"
-                    );
-                    stream = get_new_subscription_stream(&subscription).await;
-                    continue;
-                }
-                PUBSUB_ACK_SUCCESS_COUNT.inc();
-            }
-            continue;
-        }
+    info!(
+        pubsub_message = pubsub_message,
+        "[NFT Metadata Crawler] Received message from PubSub"
+    );
 
-        // Parse PubSub message
-        let parts: Vec<&str> = pubsub_message.split(',').collect();
+    // Skips message if it does not have 5 commas (likely malformed URI)
+    if pubsub_message.matches(',').count() != 5 {
+        // Sends ack to PubSub only if ack_parsed_uris flag is true
+        info!("[NFT Metadata Crawler] More than 5 commas, skipping message");
+        SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
+        return;
+    }
 
-        // Perform chain id check
-        // If chain id is not set, set it
-        let mut conn = pool.get().unwrap_or_else(|e| {
-            error!(
+    // Parse PubSub message
+    let parts: Vec<&str> = pubsub_message.split(',').collect();
+
+    // Perform chain id check
+    // If chain id is not set, set it
+    let mut conn = pool.get().unwrap_or_else(|e| {
+        error!(
                 pubsub_message = pubsub_message,
                 error = ?e,
                 "[NFT Metadata Crawler] Failed to get DB connection from pool");
-            UNABLE_TO_GET_CONNECTION_COUNT.inc();
-            panic!();
-        });
-        GOT_CONNECTION_COUNT.inc();
+        UNABLE_TO_GET_CONNECTION_COUNT.inc();
+        panic!();
+    });
+    GOT_CONNECTION_COUNT.inc();
 
-        let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
-            error!(
-                error = ?e,
-                "[NFT Metadata Crawler] Failed to parse chain id from PubSub message"
-            );
-            panic!();
-        });
-        if let Some(existing_id) = db_chain_id {
-            if grpc_chain_id != existing_id {
-                error!(
-                    chain_id = grpc_chain_id,
-                    existing_id = existing_id,
-                    "[NFT Metadata Crawler] Stream somehow changed chain id!",
-                );
-                panic!("[NFT Metadata Crawler] Stream somehow changed chain id!");
-            }
-        } else {
-            db_chain_id = Some(
-                check_or_update_chain_id(&mut conn, grpc_chain_id as i64)
-                    .expect("Chain id should match"),
-            );
-        }
+    let grpc_chain_id = parts[4].parse::<u64>().unwrap_or_else(|e| {
+        error!(
+            error = ?e,
+            "[NFT Metadata Crawler] Failed to parse chain id from PubSub message"
+        );
+        panic!();
+    });
 
-        // Spawn worker
-        let mut worker = Worker::new(
+    // Panic if chain id of PubSub message does not match chain id in DB
+    check_or_update_chain_id(&mut conn, grpc_chain_id as i64).expect("Chain id should match");
+
+    // Spawn worker
+    let mut worker = Worker::new(
             parser_config.clone(),
             conn,
         gcs_client.clone(),
@@ -177,67 +144,52 @@ async fn spawn_parser(
             parts[5].parse::<bool>().unwrap_or(false),
         );
 
-        // Sends ack to PubSub only if ack_parsed_uris flag is true
-        if ack_parsed_uris {
-            info!(
-                pubsub_message = pubsub_message,
-                time_elapsed = start_time.elapsed().as_secs_f64(),
-                "[NFT Metadata Crawler] Received worker, acking message"
-            );
-            if let Err(e) = send_ack(&subscription, msg.ack_id()).await {
-                warn!(
-                    pubsub_message = pubsub_message,
-                    error = ?e,
-                    "[NFT Metadata Crawler] Resetting stream"
-                );
-                stream = get_new_subscription_stream(&subscription).await;
-                continue;
-            }
-            PUBSUB_ACK_SUCCESS_COUNT.inc();
-        }
+    info!(
+        pubsub_message = pubsub_message,
+        "[NFT Metadata Crawler] Starting worker"
+    );
 
-        info!(
+    if let Err(e) = worker.parse().await {
+        warn!(
             pubsub_message = pubsub_message,
-            "[NFT Metadata Crawler] Starting worker"
-        );
-
-        if let Err(e) = worker.parse().await {
-            warn!(
-                pubsub_message = pubsub_message,
-                error = ?e,
-                "[NFT Metadata Crawler] Parsing failed"
-            );
-            PARSER_FAIL_COUNT.inc();
-        }
-
-        info!(
-            pubsub_message = pubsub_message,
-            "[NFT Metadata Crawler] Worker finished"
-        );
-    }
-}
-
-/// Returns a new stream from a PubSub subscription
-async fn get_new_subscription_stream(subscription: &Subscription) -> MessageStream {
-    PUBSUB_STREAM_RESET_COUNT.inc();
-    subscription.subscribe(None).await.unwrap_or_else(|e| {
-        error!(
             error = ?e,
-            "[NFT Metadata Crawler] Failed to get stream from PubSub subscription"
+            "[NFT Metadata Crawler] Parsing failed"
         );
-        panic!();
-    })
+        PARSER_FAIL_COUNT.inc();
+    }
+
+    info!(
+        pubsub_message = pubsub_message,
+        "[NFT Metadata Crawler] Worker finished"
+    );
 }
 
-/// Sends ack to PubSub, times out after MAX_RETRY_TIME_SECONDS
-async fn send_ack(subscription: &Subscription, ack_id: &str) -> anyhow::Result<()> {
-    let ack = ack_id.to_string();
-    tokio::time::timeout(
-        Duration::from_secs(MAX_RETRY_TIME_SECONDS),
-        subscription.ack(vec![ack.to_string()]),
+/// Handles calling parser for the root endpoint
+async fn handle_root(
+    msg: PubSubBody,
+    context: Arc<AppContext>,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
+    spawn_parser(
+        context.parser_config.clone(),
+        msg.message.data.clone(),
+        context.pool.clone(),
+        context.gcs_client.clone(),
     )
-    .await?
-    .context("Failed to ack message to PubSub")
+    .await;
+
+    if !to_ack {
+        return Ok(warp::reply::with_status(
+            warp::reply(),
+            warp::http::StatusCode::BAD_REQUEST,
+        ));
+    }
+
+    PUBSUB_ACK_SUCCESS_COUNT.inc();
+    Ok(warp::reply::with_status(
+        warp::reply(),
+        warp::http::StatusCode::OK,
+    ))
 }
 
 #[async_trait::async_trait]
@@ -264,26 +216,6 @@ impl RunnableConfig for ParserConfig {
             );
         }
 
-        // Establish PubSub client
-        let pubsub_config = PubsubClientConfig::default()
-            .with_auth()
-            .await
-            .unwrap_or_else(|e| {
-                error!(
-                    error = ?e,
-                    "[NFT Metadata Crawler] Failed to create PubSub client config"
-                );
-                panic!();
-            });
-        let pubsub_client = PubsubClient::new(pubsub_config).await.unwrap_or_else(|e| {
-            error!(
-                error = ?e,
-                "[NFT Metadata Crawler] Failed to create PubSub client"
-            );
-            panic!();
-        });
-        let subscription = pubsub_client.subscription(&self.subscription_name);
-
         // Establish GCS client
         let gcs_config = GCSClientConfig::default()
             .with_auth()
@@ -295,23 +227,24 @@ impl RunnableConfig for ParserConfig {
                 );
                 panic!();
             });
-        let gcs_client = GCSClient::new(gcs_config);
 
-        // Spawns workers
-        let mut workers: Vec<JoinHandle<()>> = Vec::new();
-        for _ in 0..self.num_parsers {
-            let worker = tokio::spawn(spawn_parser(
-                self.clone(),
-                pool.clone(),
-                subscription.clone(),
-                gcs_client.clone(),
-                self.ack_parsed_uris.unwrap_or(false),
-            ));
+        // Create request context
+        let context = Arc::new(AppContext {
+            parser_config: self.clone(),
+            pool,
+            gcs_client: GCSClient::new(gcs_config),
+        });
 
-            workers.push(worker);
-        }
+        // Create web server
+        let route = warp::post()
+            .and(warp::path::end())
+            .and(warp::body::json())
+            .and(warp::any().map(move || context.clone()))
+            .and_then(handle_root);
 
-        join_all(workers).await;
+        warp::serve(route)
+            .run(([0, 0, 0, 0], self.server_port))
+            .await;
         Ok(())
     }
 

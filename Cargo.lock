@@ -2883,7 +2883,6 @@ dependencies = [
  "diesel_migrations",
  "field_count",
  "futures",
- "google-cloud-pubsub",
  "google-cloud-storage",
  "image",
  "once_cell",
@@ -2894,6 +2893,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "warp",
 ]
 
 [[package]]

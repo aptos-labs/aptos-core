@@ -6,4 +6,5 @@ pub mod database;
 pub mod gcs;
 pub mod image_optimizer;
 pub mod json_parser;
+pub mod pubsub;
 pub mod uri_parser;
