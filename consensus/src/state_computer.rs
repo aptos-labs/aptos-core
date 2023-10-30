@@ -11,6 +11,7 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
+    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -63,6 +64,7 @@ pub struct ExecutionProxy {
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
+    transaction_filter: Arc<dyn TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
 }
 
@@ -72,6 +74,7 @@ impl ExecutionProxy {
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
+        txn_filter: Arc<dyn TransactionFilter>,
     ) -> Self {
         let (tx, mut rx) =
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
@@ -100,6 +103,7 @@ impl ExecutionProxy {
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
+            transaction_filter: txn_filter,
             execution_pipeline,
         }
     }
@@ -131,7 +135,8 @@ impl StateComputer for ExecutionProxy {
             Err(err) => return Box::pin(async move { Err(err) }),
         };
 
-        let deduped_txns = txn_deduper.dedup(txns);
+        let filtered_txns = self.transaction_filter.filter(block_id, txns);
+        let deduped_txns = txn_deduper.dedup(filtered_txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
         let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
@@ -209,7 +214,8 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
-            let deduped_txns = txn_deduper.dedup(signed_txns);
+            let filtered_txns = self.transaction_filter.filter(block.id(), signed_txns);
+            let deduped_txns = txn_deduper.dedup(filtered_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
             txns.extend(block.transactions_to_commit(
@@ -336,8 +342,10 @@ impl StateComputer for ExecutionProxy {
 async fn test_commit_sync_race() {
     use crate::{
         error::MempoolError, transaction_deduper::create_transaction_deduper,
+        transaction_filter::create_transaction_filter,
         transaction_shuffler::create_transaction_shuffler,
     };
+    use aptos_config::config::TransactionFilterType;
     use aptos_consensus_notifications::Error;
     use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_types::{
@@ -460,6 +468,7 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
+        create_transaction_filter(TransactionFilterType::default()),
     );
     executor.new_epoch(
         &EpochState::empty(),

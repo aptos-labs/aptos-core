@@ -6,9 +6,11 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, utils::RootPath, Error,
     NodeConfig,
 };
-use aptos_types::{chain_id::ChainId, transaction::Transaction};
+use aptos_crypto::HashValue;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId, transaction::Transaction};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fs::File,
     io::{Read, Write},
     path::PathBuf,
@@ -34,6 +36,30 @@ pub struct ExecutionConfig {
     pub paranoid_hot_potato_verification: bool,
     /// Enables enhanced metrics around processed transactions
     pub processed_transactions_detailed_counters: bool,
+    /// Enables filtering of transactions before they are sent to execution
+    pub transaction_filter: TransactionFilterType,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum TransactionFilterType {
+    #[default]
+    NoFilter,
+    // Filters out all user transactions - only system transactions are allowed
+    AllTransactions,
+    // Filters out all user transactions for a set of block ids.
+    BlockListedBlockIdBased(HashSet<HashValue>),
+    // Filters out user transactions which correspond to a set of transaction hashes.
+    BlockListedTransactionHashBased(HashSet<HashValue>),
+    // Filters out user transactions which correspond to a set of senders.
+    BlockListedSenderBased(HashSet<AccountAddress>),
+    // Only allow user transactions which corresponds to a set of entry functions.
+    AllowListEntryFunctions(HashSet<(AccountAddress, String, String)>),
+    // Filters out all user transactions which corresponds to a set of entry functions.
+    BlockListEntryFunctions(HashSet<(AccountAddress, String, String)>),
+    // Only allow user transactions which corresponds to a set of module addresses.
+    AllowListModuleAddresses(HashSet<AccountAddress>),
+    // Filters out all user transactions which corresponds to a set of module addresses.
+    BlockListModuleAddresses(HashSet<AccountAddress>),
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -63,6 +89,7 @@ impl Default for ExecutionConfig {
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
             processed_transactions_detailed_counters: false,
+            transaction_filter: TransactionFilterType::default(),
         }
     }
 }
