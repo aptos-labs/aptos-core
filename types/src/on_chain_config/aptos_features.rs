@@ -48,7 +48,7 @@ pub enum FeatureFlag {
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
-    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 40,
+    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
 }
 
 /// Representation of features on chain as a bitset.

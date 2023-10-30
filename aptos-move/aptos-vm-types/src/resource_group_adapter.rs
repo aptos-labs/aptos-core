@@ -92,8 +92,10 @@ impl<'r> ResourceGroupAdapter<'r> {
             //     In this case, disabled will lead to a different gas behavior,
             //     but gas is not relevant for those contexts.
             resource_group_charge_as_size_sum_enabled
-                && maybe_resource_group_view
-                    .map_or(false, |v| v.is_resource_group_split_in_change_set_capable()),
+            // TODO[agg_v2][fix] : Gate based on view.is_resource_group_split_in_change_set_capable(),
+            // when that gets connected.
+            // && maybe_resource_group_view
+            //     .map_or(false, |v| v.is_resource_group_split_in_change_set_capable()),
         );
 
         Self {
