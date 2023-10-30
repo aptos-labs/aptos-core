@@ -6,6 +6,8 @@ set -e
 PROFILE=${PROFILE:-release}
 FEATURES=${FEATURES:-""}
 
+FEATURES="tokio-console $FEATURES"
+
 echo "Building aptos-node"
 echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"

@@ -52,7 +52,7 @@ impl Default for LoggerConfig {
             // This is the default port used by tokio-console.
             // Setting this to None will disable tokio-console
             // even if the "tokio-console" feature is enabled.
-            tokio_console_port: Some(8090),
+            tokio_console_port: None,
         }
     }
 }
