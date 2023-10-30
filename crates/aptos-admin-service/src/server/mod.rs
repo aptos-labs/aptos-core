@@ -23,6 +23,8 @@ use tokio::runtime::Runtime;
 mod consensus;
 #[cfg(target_os = "linux")]
 mod profiling;
+#[cfg(target_os = "linux")]
+mod thread_dump;
 mod utils;
 
 #[derive(Default)]
@@ -132,6 +134,8 @@ impl AdminService {
         match (req.method().clone(), req.uri().path()) {
             #[cfg(target_os = "linux")]
             (hyper::Method::GET, "/profilez") => profiling::handle_cpu_profiling_request(req).await,
+            #[cfg(target_os = "linux")]
+            (hyper::Method::GET, "/threadz") => thread_dump::handle_thread_dump_request(req).await,
             (hyper::Method::GET, "/debug/consensus/consensusdb") => {
                 let consensus_db = context.consensus_db.read().clone();
                 if let Some(consensus_db) = consensus_db {

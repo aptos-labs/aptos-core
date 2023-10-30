@@ -713,6 +713,13 @@ function install_lld {
   fi
 }
 
+function install_libdw {
+  # Right now, only install libdw for linux
+  if [[ "$(uname)" == "Linux" ]]; then
+    install_pkg libdw-dev "$PACKAGE_MANAGER"
+  fi
+}
+
 # this is needed for hdpi crate from aptos-ledger
 function install_libudev-dev {
   # Need to install libudev-dev for linux
@@ -991,6 +998,7 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_pkg_config "$PACKAGE_MANAGER"
 
   install_lld
+  install_libdw
 
   install_rustup "$BATCH_MODE"
   install_toolchain "$(grep channel ./rust-toolchain.toml | grep -o '"[^"]\+"' | sed 's/"//g')" # TODO: Fix me. This feels hacky.
