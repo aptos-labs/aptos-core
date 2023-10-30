@@ -60,6 +60,8 @@ impl AptosTransactionOutput {
     fn take_output(mut self) -> TransactionOutput {
         match self.committed_output.take() {
             Some(output) => output,
+            // TODO: revisit whether we should always get it via committed, or o.w. create a
+            // dedicated API without creating empty data structures.
             None => self
                 .vm_output
                 .lock()
@@ -92,7 +94,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get resource group writes")
             .change_set()
             .resource_group_write_set()
             .iter()
@@ -116,7 +118,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get metadata ops")
             .change_set()
             .resource_group_write_set()
             .iter()
@@ -129,7 +131,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get resource writes")
             .change_set()
             .resource_write_set()
             .clone()
@@ -140,7 +142,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get module writes")
             .change_set()
             .module_write_set()
             .clone()
@@ -151,7 +153,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get writes")
+            .expect("Output must be set to get aggregator V1 writes")
             .change_set()
             .aggregator_v1_write_set()
             .clone()
@@ -162,7 +164,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get deltas")
+            .expect("Output must be set to get deltas")
             .change_set()
             .aggregator_v1_delta_set()
             .clone()
@@ -173,7 +175,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get aggregator change set")
+            .expect("Output must be set to get aggregator change set")
             .change_set()
             .delayed_field_change_set()
             .clone()
@@ -184,7 +186,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         self.vm_output
             .lock()
             .as_ref()
-            .expect("Output to be set to get events")
+            .expect("Output must be set to get events")
             .change_set()
             .events()
             .to_vec()

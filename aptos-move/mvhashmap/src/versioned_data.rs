@@ -296,7 +296,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         };
     }
 
-    /// Versioned write of data at ag given key (and version).
+    /// Versioned write of data at a given key (and version).
     pub fn write(
         &self,
         key: K,

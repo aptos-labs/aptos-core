@@ -74,7 +74,7 @@ impl GroupReadResult {
     pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
         match self {
             GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
-            _ => unreachable!("Expected bytes"),
+            _ => unreachable!("Expected a value"),
         }
     }
 
@@ -214,11 +214,11 @@ pub(crate) mod test {
         }
     }
 
-    #[derive(Debug, PartialEq, Eq)]
     // Kind is set to Creation by default as that makes sense for providing
     // group base values (used in some tests), and most tests do not care about
     // the kind. Otherwise, there are specific constructors that initialize kind
     // for the tests that care (testing group commit logic in parallel).
+    #[derive(Debug, PartialEq, Eq)]
     pub(crate) struct TestValue {
         bytes: Bytes,
         kind: WriteOpKind,
