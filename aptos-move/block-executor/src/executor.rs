@@ -1417,7 +1417,7 @@ where
                 let can_use_dynamic_change_set_optimizations = match e {
                     PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
                         debug!("[Execution]: Module read & written, sequential fallback");
-                        false
+                        true
                     },
                     PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction)
                     | PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError) => false,
