@@ -25,6 +25,7 @@ use crate::{
     },
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
+use aptos_runtimes::spawn_named_runtime;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
@@ -33,7 +34,7 @@ use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClien
 use image::ImageFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::Arc;
+use std::{process, sync::Arc};
 use tracing::{error, info, warn};
 use url::Url;
 use warp::Filter;
@@ -47,6 +48,7 @@ pub struct ParserConfig {
     pub database_url: String,
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
+    pub num_parsers: usize,
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
     pub ack_parsed_uris: Option<bool>,
@@ -236,15 +238,25 @@ impl RunnableConfig for ParserConfig {
         });
 
         // Create web server
-        let route = warp::post()
-            .and(warp::path::end())
-            .and(warp::body::json())
-            .and(warp::any().map(move || context.clone()))
-            .and_then(handle_root);
+        let runtime = spawn_named_runtime(self.get_server_name(), Some(self.num_parsers));
+        let server_port = self.server_port;
+        let server_handler = runtime.spawn(async move {
+            let route = warp::post()
+                .and(warp::path::end())
+                .and(warp::body::json())
+                .and(warp::any().map(move || context.clone()))
+                .and_then(handle_root);
+            warp::serve(route).run(([0, 0, 0, 0], server_port)).await;
+        });
 
-        warp::serve(route)
-            .run(([0, 0, 0, 0], self.server_port))
-            .await;
+        tokio::select! {
+            res = server_handler => {
+                if let Err(e) = res {
+                    error!(error = ?e, "[NFT Metadata Crawler] Warp server panicked or was shut down");
+                    process::exit(1);
+                }
+            },
+        }
         Ok(())
     }
 

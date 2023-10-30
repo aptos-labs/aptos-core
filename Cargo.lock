@@ -2873,6 +2873,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-server-framework",
  "aptos-metrics-core",
+ "aptos-runtimes",
  "async-trait",
  "backoff",
  "base64 0.13.0",
