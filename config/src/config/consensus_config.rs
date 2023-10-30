@@ -68,9 +68,8 @@ pub struct ConsensusConfig {
     pub qc_aggregator_type: QcAggregatorType,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum QcAggregatorType {
-    #[default]
     NoDelay,
     Delayed(DelayedQcAggregatorConfig),
 }
@@ -79,6 +78,12 @@ impl QcAggregatorType {
     pub fn default_delayed() -> Self {
         // TODO: Enable the delayed aggregation by default once we have tested it more.
         Self::Delayed(DelayedQcAggregatorConfig::default())
+    }
+}
+
+impl Default for QcAggregatorType {
+    fn default() -> Self {
+        Self::default_delayed()
     }
 }
 
