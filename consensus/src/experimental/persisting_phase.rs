@@ -8,6 +8,7 @@ use crate::{
 };
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_executor_types::ExecutorResult;
+use aptos_logger::debug;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use async_trait::async_trait;
 use std::{
@@ -67,9 +68,14 @@ impl StatelessPipeline for PersistingPhase {
             commit_ledger_info,
             callback,
         } = req;
+        let log = commit_ledger_info.commit_info().clone();
+        debug!("Receive Persist request for {}", log);
 
-        self.persisting_handle
+        let result = self
+            .persisting_handle
             .commit(&blocks, commit_ledger_info, callback)
-            .await
+            .await;
+        debug!("Finish Persist request for {}", log,);
+        result
     }
 }

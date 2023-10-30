@@ -345,6 +345,10 @@ impl BufferManager {
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
                 }
+                debug!(
+                    "Send Persist request for {}",
+                    aggregated_item.commit_proof.commit_info()
+                );
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
