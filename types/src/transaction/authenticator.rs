@@ -149,64 +149,6 @@ impl TransactionAuthenticator {
                 fee_payer_address,
                 fee_payer_signer,
             } => {
-                let message = RawTransactionWithData::new_fee_payer(
-                    raw_txn.clone(),
-                    secondary_signer_addresses.clone(),
-                    *fee_payer_address,
-                );
-                sender.verify(&message)?;
-                for signer in secondary_signers {
-                    signer.verify(&message)?;
-                }
-                fee_payer_signer.verify(&message)?;
-                Ok(())
-            },
-            Self::MultiEd25519 {
-                public_key,
-                signature,
-            } => signature.verify(raw_txn, public_key),
-            Self::MultiAgent {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            } => {
-                let message = RawTransactionWithData::new_multi_agent(
-                    raw_txn.clone(),
-                    secondary_signer_addresses.clone(),
-                );
-                sender.verify(&message)?;
-                for signer in secondary_signers {
-                    signer.verify(&message)?;
-                }
-                Ok(())
-            },
-            Self::SingleSender { sender } => sender.verify(raw_txn),
-        }
-    }
-
-    /// Return Ok if all AccountAuthenticator's public keys match their signatures, Err otherwise
-    /// Special check for fee payer transaction having optional fee payer address in the
-    /// transaction. This will be removed after 1.8 has been fully released.
-    pub fn verify_with_optional_fee_payer(&self, raw_txn: &RawTransaction) -> Result<()> {
-        match self {
-            Self::FeePayer {
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-                fee_payer_address,
-                fee_payer_signer,
-            } => {
-                // Some checks duplicated here to so we don't need to repeat checks.
-                let num_sigs: usize = self.sender().number_of_signatures()
-                    + self
-                        .secondary_signers()
-                        .iter()
-                        .map(|auth| auth.number_of_signatures())
-                        .sum::<usize>();
-                if num_sigs > MAX_NUM_OF_SIGS {
-                    return Err(Error::new(AuthenticationError::MaxSignaturesExceeded));
-                }
-
                 // In the fee payer model, the fee payer address can be optionally signed. We
                 // realized when we designed the fee payer model, that we made it too restrictive
                 // by requiring the signature over the fee payer address. So now we need to live in
@@ -246,7 +188,26 @@ impl TransactionAuthenticator {
 
                 Ok(())
             },
-            _ => self.verify(raw_txn),
+            Self::MultiEd25519 {
+                public_key,
+                signature,
+            } => signature.verify(raw_txn, public_key),
+            Self::MultiAgent {
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+            } => {
+                let message = RawTransactionWithData::new_multi_agent(
+                    raw_txn.clone(),
+                    secondary_signer_addresses.clone(),
+                );
+                sender.verify(&message)?;
+                for signer in secondary_signers {
+                    signer.verify(&message)?;
+                }
+                Ok(())
+            },
+            Self::SingleSender { sender } => sender.verify(raw_txn),
         }
     }
 
@@ -1141,9 +1102,6 @@ mod tests {
     fn verify_fee_payer_with_optional_fee_payer_address() {
         // This massive test basically verifies that various combinations of signatures work
         // with the appropriate verifiers:
-        // verify -- only works with properly set fee payer address
-        // verify_with_optional_fee_payer -- works with either fee payer address or zero
-        // both of them reject anything else
         let sender = Ed25519PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();
         let sender_auth = AuthenticationKey::ed25519(&sender_pub);
@@ -1188,10 +1146,6 @@ mod tests {
             .unwrap()
             .into_inner();
         original_fee_payer.clone().check_signature().unwrap();
-        original_fee_payer
-            .clone()
-            .check_fee_payer_signature()
-            .unwrap();
 
         let (_sender_actual, second_signers_actual, fee_payer_signer_actual) =
             match original_fee_payer.authenticator_ref() {
@@ -1217,7 +1171,6 @@ mod tests {
             .unwrap()
             .into_inner();
         new_fee_payer.clone().check_signature().unwrap();
-        new_fee_payer.clone().check_fee_payer_signature().unwrap();
 
         let (sender_zero, second_signers_zero, fee_payer_signer_zero) =
             match new_fee_payer.authenticator_ref() {
@@ -1262,14 +1215,7 @@ mod tests {
             fee_payer_addr,
             fee_payer_signer_zero.clone(),
         );
-        fee_payer_unset_at_signing
-            .clone()
-            .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap_err();
-        fee_payer_unset_at_signing
-            .clone()
-            .verify(&raw_txn)
-            .unwrap_err();
+        fee_payer_unset_at_signing.verify(&raw_txn).unwrap_err();
 
         let fee_payer_partial_at_signing_0 = TransactionAuthenticator::fee_payer(
             sender_zero.clone(),
@@ -1278,14 +1224,7 @@ mod tests {
             fee_payer_addr,
             fee_payer_signer_actual.clone(),
         );
-        fee_payer_partial_at_signing_0
-            .clone()
-            .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap();
-        fee_payer_partial_at_signing_0
-            .clone()
-            .verify(&raw_txn)
-            .unwrap_err();
+        fee_payer_partial_at_signing_0.verify(&raw_txn).unwrap();
 
         let fee_payer_partial_at_signing_1 = TransactionAuthenticator::fee_payer(
             sender_zero.clone(),
@@ -1294,11 +1233,7 @@ mod tests {
             fee_payer_addr,
             fee_payer_signer_actual.clone(),
         );
-        fee_payer_partial_at_signing_1
-            .clone()
-            .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap();
-        fee_payer_partial_at_signing_1.verify(&raw_txn).unwrap_err();
+        fee_payer_partial_at_signing_1.verify(&raw_txn).unwrap();
 
         let fee_payer_bad_0 = TransactionAuthenticator::fee_payer(
             sender_bad.clone(),
@@ -1307,11 +1242,7 @@ mod tests {
             fee_payer_addr,
             fee_payer_signer_actual.clone(),
         );
-        fee_payer_bad_0
-            .clone()
-            .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap_err();
-        fee_payer_bad_0.clone().verify(&raw_txn).unwrap_err();
+        fee_payer_bad_0.verify(&raw_txn).unwrap_err();
 
         let fee_payer_bad_1 = TransactionAuthenticator::fee_payer(
             sender_zero.clone(),
@@ -1320,11 +1251,7 @@ mod tests {
             fee_payer_addr,
             fee_payer_signer_actual.clone(),
         );
-        fee_payer_bad_1
-            .clone()
-            .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap_err();
-        fee_payer_bad_1.clone().verify(&raw_txn).unwrap_err();
+        fee_payer_bad_1.verify(&raw_txn).unwrap_err();
 
         let fee_payer_bad_2 = TransactionAuthenticator::fee_payer(
             sender_zero.clone(),
@@ -1333,10 +1260,6 @@ mod tests {
             fee_payer_addr,
             fee_payer_signer_bad.clone(),
         );
-        fee_payer_bad_2
-            .clone()
-            .verify_with_optional_fee_payer(&raw_txn)
-            .unwrap_err();
-        fee_payer_bad_2.clone().verify(&raw_txn).unwrap_err();
+        fee_payer_bad_2.verify(&raw_txn).unwrap_err();
     }
 }
