@@ -27,7 +27,7 @@ use crate::{
     StaleNodeIndexSchema, StateKvPrunerManager, StateMerklePrunerManager, TransactionStore,
     NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
-use anyhow::{ensure, format_err, Context, Result};
+use anyhow::{bail, ensure, format_err, Context, Result};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
@@ -197,8 +197,7 @@ impl DbReader for StateDb {
                 {
                     Some(data) => data.get_state_storage_usage(),
                     None => {
-                        ensure!(self.skip_usage, "VersionData at {version} is missing.");
-                        StateStorageUsage::new_untracked()
+                        bail!("VersionData at {version} is missing.");
                     },
                 },
             )
