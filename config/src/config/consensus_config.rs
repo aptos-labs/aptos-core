@@ -65,6 +65,40 @@ pub struct ConsensusConfig {
     // must match one of the CHAIN_HEALTH_WINDOW_SIZES values.
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
+    pub qc_aggregator_type: QcAggregatorType,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum QcAggregatorType {
+    #[default]
+    NoDelay,
+    // TODO: Enable the delayed aggregation by default once we have tested it more.
+    // QcAggregatorType::Delayed(DelayedQcAggregatorConfig {
+    //     max_delay_after_round_start_ms: 700,
+    //     aggregated_voting_power_pct_to_wait: 90,
+    //     pct_delay_after_qc_aggregated: 30,
+    // })
+    Delayed(DelayedQcAggregatorConfig),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DelayedQcAggregatorConfig {
+    // Maximum Delay for a QC to be aggregated after round start (in milliseconds). This assumes that
+    // we have enough voting power to form a QC. If we don't have enough voting power, we will wait
+    // until we have enough voting power to form a QC.
+    pub max_delay_after_round_start_ms: u64,
+    // Percentage of aggregated voting power to wait for before aggregating a QC. For example, if this
+    // is set to 95% then, a QC is formed as soon as we have 95% of the voting power aggregated without
+    // any additional waiting.
+    pub aggregated_voting_power_pct_to_wait: usize,
+    // This knob control what is the % of the time (as compared to time between round start and time when we
+    // have enough voting power to form a QC) we wait after we have enough voting power to form a QC. In a sense,
+    // this knobs controls how much slower we are willing to make consensus to wait for more votes.
+    pub pct_delay_after_qc_aggregated: usize,
+    // In summary, let's denote the time we have enough voting power (2f + 1) to form a QC as T1 and
+    // the time we have aggregated `aggregated_voting_power_pct_to_wait` as T2. Then, we wait for
+    // min((T1 + `pct_delay_after_qc_aggregated` * T1 / 100), `max_delay_after_round_start_ms`, T2)
+    // before forming a QC.
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -205,6 +239,8 @@ impl Default for ConsensusConfig {
                     backoff_proposal_delay_ms: 300,
                 },
             ],
+
+            qc_aggregator_type: QcAggregatorType::default(),
         }
     }
 }
