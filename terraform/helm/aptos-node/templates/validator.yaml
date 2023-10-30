@@ -123,6 +123,8 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
+        - containerPort: 8090
+          name: tokio-console
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           runAsUser: 0
