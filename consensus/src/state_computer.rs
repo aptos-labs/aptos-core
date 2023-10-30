@@ -188,7 +188,10 @@ impl StateComputer for ExecutionProxy {
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
+        let log = finality_proof.commit_info().clone();
+        debug!("Commit {} before lock", log);
         let mut latest_logical_time = self.write_mutex.lock().await;
+        debug!("Commit {} after lock", log);
 
         let mut block_ids = Vec::new();
         let mut txns = Vec::new();
@@ -225,6 +228,7 @@ impl StateComputer for ExecutionProxy {
             ));
             reconfig_events.extend(block.reconfig_event());
         }
+        debug!("Commit {} after constructing txns", log);
 
         let executor = self.executor.clone();
         let proof = finality_proof.clone();
@@ -243,6 +247,7 @@ impl StateComputer for ExecutionProxy {
         let wrapped_callback = move || {
             callback(&blocks, finality_proof);
         };
+        debug!("Commit {} after commit", log);
         self.async_state_sync_notifier
             .clone()
             .send((Box::new(wrapped_callback), txns, reconfig_events))
@@ -253,6 +258,7 @@ impl StateComputer for ExecutionProxy {
         payload_manager
             .notify_commit(block_timestamp, payloads)
             .await;
+        debug!("Commit {} after notify commit", log);
         Ok(())
     }
 
