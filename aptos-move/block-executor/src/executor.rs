@@ -241,6 +241,7 @@ where
                 ExecutionStatus::Abort(Error::UserError(err))
             },
             ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
+                // TODO[agg_v2](fix) decide how to handle/propagate.
                 panic!("PayloadWriteSet::Direct transaction not alone in a block");
             },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
@@ -533,28 +534,18 @@ where
                     Ok(finalized_group) => {
                         // finalize_group already applies the deletions.
                         if finalized_group.is_empty() != metadata_op.is_deletion() {
-                            error!(
+                            maybe_err =
+                                Some(Error::FallbackToSequential(resource_group_error(format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
                                 finalized_group.is_empty(),
                                 metadata_op.is_deletion()
-                            );
-                            maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
-                                IntentionalFallbackToSequential::ResourceGroupError(format!(
-                                    "Group is empty = {} but op is deletion = {} in parallel execution",
-                                    finalized_group.is_empty(),
-                                    metadata_op.is_deletion()
-                                )),
-                            )));
+                            ))));
                         }
                         finalized_groups.push((group_key, metadata_op, finalized_group));
                     },
                     Err(e) => {
-                        error!("Error committing resource group {:?}", e);
-                        maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
-                            IntentionalFallbackToSequential::ResourceGroupError(format!(
-                                "Error committing resource group {:?}",
-                                e
-                            )),
+                        maybe_err = Some(Error::FallbackToSequential(resource_group_error(
+                            format!("Error committing resource group {:?}", e),
                         )));
                     },
                 };
@@ -760,9 +751,7 @@ where
 
                 bcs::to_bytes(&btree)
                     .map_err(|e| {
-                        PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError(
-                            format!("Unexpected resource group error {:?}", e),
-                        ))
+                        resource_group_error(format!("Unexpected resource group error {:?}", e))
                     })
                     .map(|group_bytes| {
                         metadata_op.set_bytes(group_bytes.into());
@@ -1068,9 +1057,7 @@ where
                 unsync_map
                     .insert_group_op(&group_key, value_tag, group_op)
                     .map_err(|e| {
-                        PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError(
-                            format!("Unexpected resource group error {:?}", e),
-                        ))
+                        resource_group_error(format!("Unexpected resource group error {:?}", e))
                     })?;
             }
         }
@@ -1179,7 +1166,7 @@ where
                     counters::update_sequential_txn_gas_counters(&fee_statement);
 
                     // Apply the writes.
-                    // TODO: return code invariant error if dynamic change set optimizations disabled.
+                    // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
                     Self::apply_output_sequential(&unsync_map, &output)?;
 
                     if dynamic_change_set_optimizations_enabled {
@@ -1188,19 +1175,13 @@ where
                         for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
                             let finalized_group = unsync_map.finalize_group(&group_key);
                             if finalized_group.is_empty() != group_metadata_op.is_deletion() {
-                                error!(
+                                // TODO[agg_v2](fix): code invariant error if dynamic change set optimizations disabled.
+                                // TODO[agg_v2](fix): make sure this cannot be triggered by an user transaction
+                                return Err(resource_group_error(format!(
                                     "Group is empty = {} but op is deletion = {} in sequential execution",
                                     finalized_group.is_empty(),
                                     group_metadata_op.is_deletion()
-                                );
-                                // TODO: code invariant error if dynamic change set optimizations disabled.
-                                return Err(PanicOr::Or(
-                                    IntentionalFallbackToSequential::ResourceGroupError(format!(
-                                        "Group is empty = {} but op is deletion = {} in sequential execution",
-                                        finalized_group.is_empty(),
-                                        group_metadata_op.is_deletion()
-                                    )),
-                                ).into());
+                                )).into());
                             }
                             finalized_groups.push((group_key, group_metadata_op, finalized_group));
                         }
@@ -1398,6 +1379,11 @@ where
 
         ret
     }
+}
+
+fn resource_group_error(err_msg: String) -> PanicOr<IntentionalFallbackToSequential> {
+    error!("resource_group_error: {:?}", err_msg);
+    PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError(err_msg))
 }
 
 fn gen_id_start_value(sequential: bool) -> u32 {

@@ -45,10 +45,11 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        if executor_with_group_view.is_delayed_field_optimization_capable()
-            || executor_with_group_view.is_resource_group_split_in_change_set_capable()
+        if (executor_with_group_view.is_delayed_field_optimization_capable()
+            || executor_with_group_view.is_resource_group_split_in_change_set_capable())
+            && !Self::is_transaction_dynamic_change_set_capable(txn)
         {
-            assert!(Self::is_transaction_dynamic_change_set_capable(txn));
+            return ExecutionStatus::DirectWriteSetTransactionNotCapableError;
         }
 
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);

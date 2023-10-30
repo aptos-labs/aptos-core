@@ -92,14 +92,13 @@ impl<'r> ResourceGroupAdapter<'r> {
             //     In this case, disabled will lead to a different gas behavior,
             //     but gas is not relevant for those contexts.
             resource_group_charge_as_size_sum_enabled
-            && maybe_resource_group_view
-                .map_or(false, |v| v.is_resource_group_split_in_change_set_capable()),
+                && maybe_resource_group_view
+                    .map_or(false, |v| v.is_resource_group_split_in_change_set_capable()),
         );
 
         Self {
-            maybe_resource_group_view: (group_size_kind == GroupSizeKind::AsSum)
-                .then_some(maybe_resource_group_view)
-                .flatten(),
+            maybe_resource_group_view: maybe_resource_group_view
+                .filter(|_| group_size_kind == GroupSizeKind::AsSum),
             resource_view,
             group_size_kind,
             group_cache: RefCell::new(HashMap::new()),
@@ -147,6 +146,10 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
     type GroupKey = StateKey;
     type Layout = MoveTypeLayout;
     type ResourceTag = StructTag;
+
+    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+        self.group_size_kind == GroupSizeKind::AsSum
+    }
 
     fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64> {
         if self.group_size_kind == GroupSizeKind::None {
@@ -220,9 +223,11 @@ mod tests {
     };
     use claims::{assert_gt, assert_lt, assert_none, assert_ok_eq, assert_some, assert_some_eq};
     use std::cmp::max;
+    use test_case::test_case;
 
     struct MockGroup {
         blob: Vec<u8>,
+        contents: BTreeMap<StructTag, Vec<u8>>,
         size_as_sum: usize,
     }
 
@@ -236,7 +241,11 @@ mod tests {
             }
             let blob = bcs::to_bytes(&contents).unwrap();
 
-            Self { blob, size_as_sum }
+            Self {
+                blob,
+                contents,
+                size_as_sum,
+            }
         }
     }
 
@@ -277,6 +286,58 @@ mod tests {
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
             unimplemented!();
+        }
+    }
+
+    impl TResourceGroupView for MockStateView {
+        type GroupKey = StateKey;
+        type Layout = MoveTypeLayout;
+        type ResourceTag = StructTag;
+
+        fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+            true
+        }
+
+        fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<u64> {
+            Ok(self
+                .group
+                .get(group_key)
+                .map(|entry| entry.size_as_sum as u64)
+                .unwrap_or(0))
+        }
+
+        fn get_resource_from_group(
+            &self,
+            group_key: &Self::GroupKey,
+            resource_tag: &Self::ResourceTag,
+            _maybe_layout: Option<&Self::Layout>,
+        ) -> anyhow::Result<Option<Bytes>> {
+            Ok(self
+                .group
+                .get(group_key)
+                .and_then(|entry| entry.contents.get(resource_tag).cloned().map(Into::into)))
+        }
+
+        fn resource_size_in_group(
+            &self,
+            _group_key: &Self::GroupKey,
+            _resource_tag: &Self::ResourceTag,
+        ) -> anyhow::Result<u64> {
+            unimplemented!("Currently resolved by ResourceGroupAdapter");
+        }
+
+        fn resource_exists_in_group(
+            &self,
+            _group_key: &Self::GroupKey,
+            _resource_tag: &Self::ResourceTag,
+        ) -> anyhow::Result<bool> {
+            unimplemented!("Currently resolved by ResourceGroupAdapter");
+        }
+
+        fn release_group_cache(
+            &self,
+        ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
+            unimplemented!("Currently resolved by ResourceGroupAdapter");
         }
     }
 
@@ -376,10 +437,16 @@ mod tests {
         assert_eq!(bcs::to_bytes(&cache_key_1_contents).unwrap(), *key_1_blob);
     }
 
-    #[test]
-    fn size_as_blob_len() {
+    #[test_case(9, false)]
+    #[test_case(12, true)] // Without view, this falls back to as_blob
+    fn size_as_blob_len(gas_feature_version: u64, resource_group_charge_as_size_sum_enabled: bool) {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 9, false);
+        let adapter = ResourceGroupAdapter::new(
+            None,
+            &state_view,
+            gas_feature_version,
+            resource_group_charge_as_size_sum_enabled,
+        );
         assert_eq!(adapter.group_size_kind, GroupSizeKind::AsBlob);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -410,7 +477,8 @@ mod tests {
     #[test]
     fn set_group_view_forwarding() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 12, true);
+        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view, 12, true);
+        assert_some!(adapter.maybe_resource_group_view);
         let adapter_with_forwarding =
             ResourceGroupAdapter::new(Some(&adapter), &state_view, 12, true);
         assert_some!(adapter_with_forwarding.maybe_resource_group_view);
@@ -419,7 +487,7 @@ mod tests {
     #[test]
     fn size_as_sum() {
         let state_view = MockStateView::new();
-        let adapter = ResourceGroupAdapter::new(None, &state_view, 12, true);
+        let adapter = ResourceGroupAdapter::new(Some(&state_view), &state_view, 12, true);
         assert_eq!(adapter.group_size_kind, GroupSizeKind::AsSum);
 
         let key_0 = StateKey::raw(vec![0]);
@@ -431,22 +499,12 @@ mod tests {
 
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_size_as_sum);
 
-        // Test the contents of the cache.
-        assert_eq!(adapter.group_cache.borrow().len(), 1);
-        assert_some!(adapter.group_cache.borrow().get(&key_1));
-        // Release the cache - should clear the cache but return None.
-        assert_none!(adapter.release_group_cache());
         assert_eq!(adapter.group_cache.borrow().len(), 0);
 
         assert_ok_eq!(adapter.resource_group_size(&key_0), key_0_size_as_sum);
         assert_ok_eq!(adapter.resource_group_size(&key_1), key_1_size_as_sum);
         assert_ok_eq!(adapter.resource_group_size(&key_2), 0);
 
-        assert_eq!(adapter.group_cache.borrow().len(), 3);
-        assert_some!(adapter.group_cache.borrow().get(&key_0));
-        assert_some!(adapter.group_cache.borrow().get(&key_1));
-        assert_some!(adapter.group_cache.borrow().get(&key_2));
-        assert_none!(adapter.release_group_cache());
         assert_eq!(adapter.group_cache.borrow().len(), 0);
 
         // Sanity check the size numbers, at the time of writing the test 1582 and 1587.
