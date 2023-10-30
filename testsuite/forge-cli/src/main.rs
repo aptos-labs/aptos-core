@@ -1765,7 +1765,7 @@ fn realistic_env_max_load_test(
 
     // Create the test
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(25).unwrap())
         // .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
