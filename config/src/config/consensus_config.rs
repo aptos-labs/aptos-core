@@ -72,13 +72,14 @@ pub struct ConsensusConfig {
 pub enum QcAggregatorType {
     #[default]
     NoDelay,
-    // TODO: Enable the delayed aggregation by default once we have tested it more.
-    // QcAggregatorType::Delayed(DelayedQcAggregatorConfig {
-    //     max_delay_after_round_start_ms: 700,
-    //     aggregated_voting_power_pct_to_wait: 90,
-    //     pct_delay_after_qc_aggregated: 30,
-    // })
     Delayed(DelayedQcAggregatorConfig),
+}
+
+impl QcAggregatorType {
+    pub fn default_delayed() -> Self {
+        // TODO: Enable the delayed aggregation by default once we have tested it more.
+        Self::Delayed(DelayedQcAggregatorConfig::default())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -99,6 +100,16 @@ pub struct DelayedQcAggregatorConfig {
     // the time we have aggregated `aggregated_voting_power_pct_to_wait` as T2. Then, we wait for
     // min((T1 + `pct_delay_after_qc_aggregated` * T1 / 100), `max_delay_after_round_start_ms`, T2)
     // before forming a QC.
+}
+
+impl Default for DelayedQcAggregatorConfig {
+    fn default() -> Self {
+        Self {
+            max_delay_after_round_start_ms: 700,
+            aggregated_voting_power_pct_to_wait: 90,
+            pct_delay_after_qc_aggregated: 30,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
