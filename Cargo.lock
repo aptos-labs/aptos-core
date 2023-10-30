@@ -2598,6 +2598,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-types",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "bytes",
  "claims",
