@@ -182,7 +182,7 @@ class MultiAgentRawTransaction(RawTransactionWithData):
         serializer.sequence(self.secondary_signers, Serializer.struct)
 
 
-class FeePayerRawTransaction:
+class FeePayerRawTransaction(RawTransactionWithData):
     secondary_signers: List[AccountAddress]
     fee_payer: Optional[AccountAddress]
 

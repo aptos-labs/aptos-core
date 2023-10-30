@@ -27,6 +27,11 @@ class Test(unittest.IsolatedAsyncioTestCase):
         os.environ["APTOS_NODE_URL"] = "http://127.0.0.1:8080/v1"
         os.environ["APTOS_FAUCET_URL"] = "http://127.0.0.1:8081"
 
+    async def test_fee_payer_transfer_coin(self):
+        from . import fee_payer_transfer_coin
+
+        await fee_payer_transfer_coin.main()
+
     async def test_hello_blockchain(self):
         from . import hello_blockchain
 

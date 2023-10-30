@@ -115,6 +115,9 @@ class AccountAuthenticator:
             self.variant == other.variant and self.authenticator == other.authenticator
         )
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def __str__(self) -> str:
         return self.authenticator.__str__()
 
@@ -195,6 +198,9 @@ class FeePayerAuthenticator:
             and self.secondary_signers == other.secondary_signers
             and self.fee_payer == other.fee_payer
         )
+
+    def __str__(self) -> str:
+        return f"FeePayer: \n\tSender: {self.sender}\n\tSecondary Signers: {self.secondary_signers}\n\t{self.fee_payer}"
 
     def fee_payer_address(self) -> AccountAddress:
         return self.fee_payer[0]
