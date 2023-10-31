@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::utils::counters::{PARSE_URI_INVOCATION_COUNT, PARSE_URI_TYPE_COUNT};
-use regex::Regex;
+use regex::{Captures, Regex};
 use url::Url;
 
 pub struct URIParser;
@@ -22,27 +22,35 @@ impl URIParser {
             uri
         };
 
-        // Expects the following format for provided URIs `ipfs/{CID}/{path}`
         let re = Regex::new(r"^(ipfs/)(?P<cid>[a-zA-Z0-9]+)(?P<path>/.*)?$")?;
+        let redir_re = Regex::new(r"https:\/\/(?P<cid>[^\.]+)\.ipfs\.[^\/]+(?P<path>\/.+)?")?;
 
         let path = Url::parse(&modified_uri)?
             .path_segments()
-            .map(|segments| segments.collect::<Vec<_>>().join("/"));
+            .map(|segments| segments.collect::<Vec<_>>().join("/"))
+            .unwrap_or_default();
 
-        if let Some(captures) = re.captures(&path.unwrap_or_default()) {
-            let cid = captures["cid"].to_string();
-            let path = captures.name("path").map(|m| m.as_str().to_string());
-
-            PARSE_URI_TYPE_COUNT.with_label_values(&["ipfs"]).inc();
-            Ok(format!(
-                "{}{}{}",
-                ipfs_prefix,
-                cid,
-                path.unwrap_or_default()
-            ))
-        } else {
-            Err(anyhow::anyhow!("Invalid IPFS URI"))
+        if let Some(captures) = re
+            .captures(&path)
+            .or_else(|| redir_re.captures(&modified_uri))
+        {
+            return Self::format_capture(captures, ipfs_prefix);
         }
+        Err(anyhow::anyhow!("Invalid IPFS URI"))
+    }
+
+    /// Formats a capture group into a URI.
+    fn format_capture(captures: Captures<'_>, ipfs_prefix: String) -> anyhow::Result<String> {
+        let cid = captures["cid"].to_string();
+        let path = captures.name("path").map(|m| m.as_str().to_string());
+
+        PARSE_URI_TYPE_COUNT.with_label_values(&["ipfs"]).inc();
+        Ok(format!(
+            "{}{}{}",
+            ipfs_prefix,
+            cid,
+            path.unwrap_or_default()
+        ))
     }
 }
 
@@ -83,6 +91,11 @@ mod tests {
         let parsed_uri =
             URIParser::parse(IPFS_PREFIX.to_string(), test_public_gateway_uri_no_path).unwrap();
         assert_eq!(parsed_uri, format!("{}{}/{}", IPFS_PREFIX, CID, ""));
+
+        // Some submitted URIs are in the redirected format
+        let test_ipfs_redirect = format!("https://{}.ipfs.re.dir.io/{}", CID, PATH);
+        let parsed_uri = URIParser::parse(IPFS_PREFIX.to_string(), test_ipfs_redirect).unwrap();
+        assert_eq!(parsed_uri, format!("{IPFS_PREFIX}{CID}/{PATH}"));
 
         // Public gateway URIs must contain a CID, expect error here
         let test_public_gateway_uri_no_cid = format!("https://ipfs.io/ipfs/{}/{}", "", PATH);
