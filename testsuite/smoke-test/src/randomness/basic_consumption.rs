@@ -5,8 +5,9 @@ use std::sync::Arc;
 use aptos_logger::info;
 use std::collections::BTreeMap;
 use aptos::move_tool::MemberId;
-use aptos_forge::{Node, Swarm};
+use aptos_forge::{Node, Swarm, SwarmExt};
 use std::str::FromStr;
+use std::time::Duration;
 use aptos::test::CliTestFramework;
 use crate::smoke_test_environment::SwarmBuilder;
 
@@ -31,6 +32,10 @@ async fn basic_consumption() {
         }))
         .build_with_cli(0)
         .await;
+
+
+    info!("Wait for epoch 2. Epoch 1 does not have randomness.");
+    swarm.wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2)).await.expect("Epoch 2 taking too long to arrive!");
 
     let root_address = swarm.chain_info().root_account().address();
     info!("Root account: {}", root_address);

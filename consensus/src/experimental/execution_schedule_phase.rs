@@ -3,7 +3,7 @@
 
 use crate::{
     experimental::{execution_wait_phase::ExecutionWaitRequest, pipeline_phase::StatelessPipeline},
-    state_replication::StateComputer, 
+    state_replication::StateComputer,
 };
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
@@ -69,7 +69,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         for b in &ordered_blocks {
             let fut = self
                 .execution_proxy
-                .schedule_compute(b.block(), b.parent_id(), b.randomness())
+                .schedule_compute(b.block(), b.parent_id(), b.randomness.clone())
                 .await;
             futs.push(fut)
         }

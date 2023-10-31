@@ -175,7 +175,6 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 },
             ),
             maybe_randomness: None,  // rand todo: optimistic commit add rand decision
-            timed_drop_guard: None,
         };
         if self
             .executor_channel

@@ -29,7 +29,7 @@ pub struct BlockMetadata {
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
     maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-    randomness: Randomness,
+    randomness: Option<Randomness>,
 }
 
 impl BlockMetadata {
@@ -42,7 +42,7 @@ impl BlockMetadata {
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Randomness,
+        randomness: Option<Randomness>,
     ) -> Self {
         Self {
             id,
@@ -118,10 +118,16 @@ impl BlockMetadata {
                 .map(MoveValue::U8)
                 .collect(),
         ));
-        ret.push(MoveValue::Bool(true));//rand todo: capture the false cases.
-        ret.push(MoveValue::Vector(
-            self.randomness.randomness().to_vec().into_iter().map(MoveValue::U8).collect()
-        ));
+
+        if let Some(r) = &self.randomness {
+            ret.push(MoveValue::Bool(true));
+            ret.push(MoveValue::Vector(
+                r.randomness().to_vec().into_iter().map(MoveValue::U8).collect()
+            ));
+        } else {
+            ret.push(MoveValue::Bool(false));
+            ret.push(MoveValue::Vector(vec![]));
+        }
         ret
     }
 
@@ -151,9 +157,5 @@ impl BlockMetadata {
 
     pub fn maybe_dkg_transcript(&self) -> &Option<DKGTranscriptWrapper> {
         &self.maybe_dkg_transcript
-    }
-
-    pub fn randomness(&self) -> &Randomness {
-        &self.randomness
     }
 }

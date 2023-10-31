@@ -67,7 +67,7 @@ impl StateComputer for OrderingStateComputer {
         _block: &Block,
         // The parent block id.
         _parent_block_id: HashValue,
-        _randomness: Randomness,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<StateComputeResult> {
         // Return dummy block and bypass the execution phase.
         // This will break the e2e smoke test (for now because
@@ -97,7 +97,6 @@ impl StateComputer for OrderingStateComputer {
                 ordered_proof: finality_proof,
                 callback,
                 maybe_randomness: None, // rand todo: pass in optimistic randomness
-                timed_drop_guard: None,
             })
             .await
             .is_err()
@@ -191,7 +190,7 @@ impl StateComputer for DagStateSyncComputer {
         _block: &Block,
         // The parent block root hash.
         _parent_block_id: HashValue,
-        _randomness: Randomness,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<StateComputeResult> {
         unimplemented!("method not supported")
     }

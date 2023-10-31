@@ -25,7 +25,7 @@ use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult, StateComputeResult};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, randomness::Randomness};
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
@@ -370,7 +370,7 @@ impl BlockStore {
         // because we may inject a block prologue transaction.
         let state_compute_result = self
             .state_computer
-            .compute(&block, block.parent_id(), Randomness::default())
+            .compute(&block, block.parent_id(), None)
             .await?;
 
         Ok(ExecutedBlock::new(block, state_compute_result, None))

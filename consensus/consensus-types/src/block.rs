@@ -382,7 +382,7 @@ impl Block {
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Randomness,
+        randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         if block_gas_limit.is_some() {
             // After the per-block gas limit change, StateCheckpoint txn
@@ -420,7 +420,7 @@ impl Block {
         &self,
         validators: &[AccountAddress],
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Randomness,
+        randomness: Option<Randomness>,
     ) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),

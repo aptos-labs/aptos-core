@@ -31,7 +31,7 @@ pub struct ExecutedBlock {
     /// the tree. The execution results are not persisted: they're recalculated again for the
     /// pending blocks upon restart.
     state_compute_result: StateComputeResult,
-    randomness: Option<Randomness>,
+    pub randomness: Option<Randomness>,
 }
 
 impl ExecutedBlock {
@@ -40,9 +40,8 @@ impl ExecutedBlock {
         self
     }
 
-    pub fn replace_randomness(mut self, randomness: Randomness) -> Self {
+    pub fn update_randomness(&mut self, randomness: Randomness) {
         self.randomness = Some(randomness);
-        self
     }
 }
 
@@ -107,12 +106,6 @@ impl ExecutedBlock {
         &self.state_compute_result
     }
 
-    pub fn randomness(&self) -> Randomness {
-        self.randomness
-            .clone()
-            .expect("Randomness should be set when block is executed")
-    }
-
     pub fn has_randomness(&self) -> bool {
         self.randomness.is_some()
     }
@@ -140,7 +133,7 @@ impl ExecutedBlock {
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
         maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Randomness,
+        randomness: Option<Randomness>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
 

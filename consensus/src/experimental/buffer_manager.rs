@@ -27,7 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, epoch_change::EpochChangeProof, validator_verifier::ValidatorVerifier, randomness::Randomness,
+    account_address::AccountAddress, epoch_change::EpochChangeProof, validator_verifier::ValidatorVerifier,
 };
 use futures::{
     channel::{
@@ -220,28 +220,17 @@ impl BufferManager {
             ordered_blocks,
             ordered_proof,
             callback,
-            randomness,
         } = blocks;
-
         info!(
             "Receive ordered block {}, the queue size is {}",
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
+        for block in ordered_blocks.iter() {
+            observe_block(block.timestamp_usecs(), BlockStage::RAND_READY);
+        }
 
-        info!("[Randomness] round {:?} randomness {:?}", ordered_blocks.last().unwrap().round(), randomness);
-
-        observe_block(ordered_blocks.last().unwrap().timestamp_usecs(), BlockStage::RAND_READY);
-
-        // rand todo: replace with real randomness below
-        // use dummy randomness for now since blocks may not be aligned
-        
-        let rand_ready_blocks: Vec<ExecutedBlock> = ordered_blocks.into_iter()
-        .map(|block| block.replace_randomness(Randomness::default()))
-        .collect();
-        // let rand_ready_blocks: Vec<ExecutedBlock> = ordered_blocks.into_iter()
-        //     .map(|block| block.replace_randomness(randomness.clone()))
-        //     .collect();
+        let rand_ready_blocks = ordered_blocks;
 
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: rand_ready_blocks.clone(),
@@ -436,8 +425,6 @@ impl BufferManager {
                 return;
             },
         };
-
-        assert!(executed_blocks.iter().all(|block| block.has_randomness()));
 
         info!(
             "Receive executed response {}",

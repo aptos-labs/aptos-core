@@ -10,74 +10,61 @@ use tokio::time::Instant;
 
 use crate::{state_replication::StateComputerCommitCallBackType, experimental::commit_reliable_broadcast::DropGuard};
 
+/// Sent from consensus to RandManager.
+/// May contains a randomness if sent from DAG consensus.
 pub struct OrderedBlocks {
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub maybe_randomness: Option<Randomness>,
-    pub timed_drop_guard: Option<(Instant, DropGuard)>,
 }
 
+/// Sent from RandManager to BufferManager.
 pub struct RandReadyBlocks {
     pub ordered_blocks: Vec<ExecutedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
-    pub randomness: Randomness,
 }
 
-pub enum BlockQueueItem {
-    Ordered(Box<OrderedBlocks>),
-    RandReady(Box<RandReadyBlocks>),
+pub struct BlockQueueItem {
+    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub offsets_by_round: BTreeMap<Round, usize>,
+    pub ordered_proof: LedgerInfoWithSignatures,
+    pub callback: StateComputerCommitCallBackType,
+    pub num_undecided_blocks: usize,
+    pub timed_drop_guards: Vec<Option<(Instant, DropGuard)>>,
 }
 
 impl fmt::Debug for BlockQueueItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BlockQueueItem::Ordered(_) => write!(f, "Ordered "),
-            BlockQueueItem::RandReady(_) => write!(f, "RandReady "),
-        }
+        write!(f, "BlockQueueItem ")
     }
 }
 
 impl BlockQueueItem {
-    pub fn is_ordered(&self) -> bool {
-        match self {
-            BlockQueueItem::Ordered(_) => true,
-            BlockQueueItem::RandReady(_) => false,
-        }
+    pub fn num_blocks(&self) -> usize {
+        self.ordered_blocks.len()
     }
 
-    pub fn epoch(&self) -> u64 {
-        match self {
-            BlockQueueItem::Ordered(ordered) => ordered.ordered_blocks.last().unwrap().block().epoch(),
-            BlockQueueItem::RandReady(rand_ready) => rand_ready.ordered_blocks.last().unwrap().block().epoch(),
-        }
+    pub fn first_round(&self) -> u64 {
+        self.ordered_blocks.first().unwrap().block().round()
     }
 
-    pub fn round(&self) -> u64 {
-        match self {
-            BlockQueueItem::Ordered(ordered) => ordered.ordered_blocks.last().unwrap().block().round(),
-            BlockQueueItem::RandReady(rand_ready) => rand_ready.ordered_blocks.last().unwrap().block().round(),
-        }
+    pub fn offset(&self, round: Round) -> usize {
+        *self.offsets_by_round.get(&round).unwrap()
+    }
+    pub fn update_drop_guard(&mut self, round: Round, drop_guard: DropGuard) {
+        let offset = self.offset(round);
+        self.timed_drop_guards[offset] = Some((Instant::now(), drop_guard));
     }
 
-    pub fn update_drop_guard(&mut self, drop_guard: DropGuard) {
-        match self {
-            BlockQueueItem::Ordered(ordered) => ordered.timed_drop_guard = Some((Instant::now(), drop_guard)),
-            BlockQueueItem::RandReady(_) => (),
-        }    
-    }
-    
-    pub fn rand_metadata(&self) -> RandMetadata {
-        let block = match self {
-            BlockQueueItem::Ordered(ordered) => ordered.ordered_blocks.last().unwrap().block(),
-            BlockQueueItem::RandReady(rand_ready) => rand_ready.ordered_blocks.last().unwrap().block(),
-        };
+    pub fn rand_metadata(&self, round: Round) -> RandMetadata {
+        let block = self.ordered_blocks[self.offset(round)].block();
         RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs())
     }
 }
 
-// Make it thread safe if needed
+// rand todo: Make it thread safe if needed
 pub struct BlockQueue {
     queue: BTreeMap<Round, BlockQueueItem>,
 }
@@ -98,54 +85,54 @@ impl BlockQueue {
         //     // Round numbers must be consecutive after dag
         //     assert!(item.round() == *round + 1);
         // }
-        self.queue.insert(item.round(), item);
+        self.queue.insert(item.first_round(), item);
     }
 
     // dequeue the rand ready prefix
     pub fn dequeue_rand_ready_prefix(&mut self) -> Vec<RandReadyBlocks> {
         let mut rand_ready_prefix = vec![];
-        while let Some((_, item)) = self.queue.pop_first() {
-            match item {
-                BlockQueueItem::Ordered(_) => {
-                    self.queue.insert(item.round(), item);
-                    break;
-                }
-                BlockQueueItem::RandReady(rand_ready) => {
-                    rand_ready_prefix.push(*rand_ready);
-                }
+        while let Some((_starting_round, item)) = self.queue.first_key_value() {
+            if item.num_undecided_blocks == 0 {
+                let (_, item) = self.queue.pop_first().unwrap();
+                let BlockQueueItem {
+                    ordered_blocks,
+                    ordered_proof,
+                    callback,
+                    ..
+                } = item;
+                let rand_ready_blocks = RandReadyBlocks {
+                    ordered_blocks,
+                    ordered_proof,
+                    callback,
+                };
+                rand_ready_prefix.push(rand_ready_blocks);
+            } else {
+                break;
             }
         }
         rand_ready_prefix
     }
 
-    pub fn get_item_mut(&mut self, round: Round) -> Option<&mut BlockQueueItem> {
-        self.queue.get_mut(&round)
-    }
-
-    pub fn take_ordered_item(&mut self, round: Round) -> Option<BlockQueueItem> {
-        self.queue.remove(&round).filter(|item| item.is_ordered())
+    /// Return the `BlockQueueItem` that contains the given round, if exists.
+    pub fn item_mut(&mut self, round: Round) -> Option<&mut BlockQueueItem> {
+        self.queue.range_mut(0..=round).last()
+            .map(|(_, item)| item)
+            .filter(|item| item.offsets_by_round.contains_key(&round))
     }
 
     pub fn update_guard(&mut self, round: Round, drop_guard: DropGuard) {
-        if let Some(item) = self.get_item_mut(round) {
-            item.update_drop_guard(drop_guard);
+        if let Some(item) = self.item_mut(round) {
+            item.update_drop_guard(round, drop_guard);
         }
     }
 
     pub fn update_randomness(&mut self, round: Round, randomness: Randomness) -> anyhow::Result<()> {
-        if let Some(item) = self.take_ordered_item(round) {
-            if let BlockQueueItem::Ordered(ordered) = item {
-                let rand_ready = RandReadyBlocks {
-                    ordered_blocks: ordered.ordered_blocks,
-                    ordered_proof: ordered.ordered_proof,
-                    callback: ordered.callback,
-                    randomness,
-                };
-                self.queue.insert(round, BlockQueueItem::RandReady(Box::new(rand_ready)));
-                return Ok(());
-            } else {
-                bail!("[BlockQueue] update_decision failed: epoch {} round {} item is not ordered", item.epoch(), round);
-            }
+        if let Some(item) = self.item_mut(round) {
+            let offset = item.offset(round);
+            assert!(item.ordered_blocks[offset].randomness.is_none());
+            item.ordered_blocks[offset].randomness = Some(randomness);
+            item.num_undecided_blocks -= 1;
+            Ok(())
         } else {
             bail!("[BlockQueue] update_decision failed: epoch {} round {} item not found", randomness.epoch(), round);
         }

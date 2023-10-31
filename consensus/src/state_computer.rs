@@ -117,7 +117,7 @@ impl StateComputer for ExecutionProxy {
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
-        randomness: Randomness,
+        randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         let block_id = block.id();
         debug!(
@@ -237,7 +237,7 @@ impl StateComputer for ExecutionProxy {
                 shuffled_txns,
                 block_gas_limit,
                 dkg_transcript,
-                block.randomness(),
+                block.randomness.clone(),
             ));
             reconfig_events.extend(block.reconfig_event());
             dkg_events.extend(block.dkg_event());
@@ -271,7 +271,7 @@ impl StateComputer for ExecutionProxy {
             let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();
             dkg_manager_wrapper.start_dkg(dkg_events).await;
         }
-        
+
         // finish dkg when the aggregated transcript is committed
         if has_dkg_payloads {
             let dkg_manager_wrapper = self.dkg_manager_wrapper.lock().as_ref().unwrap().clone();

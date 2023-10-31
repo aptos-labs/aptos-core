@@ -40,10 +40,6 @@ impl RandItem {
         }
     }
 
-    pub fn weight(&self) -> usize {
-        self.weight
-    }
-
     pub fn shares(&self) -> &HashMap<Author, RandShare> {
         &self.shares
     }
@@ -182,19 +178,24 @@ impl RandStore {
     }
 
     pub fn rebroadcast_rounds(&self, duration: Duration) -> Vec<Round> {
-        self
-            .block_queue()
-            .iter()
-            .filter_map(|(round, item)| {
-                if let BlockQueueItem::Ordered(ordered) = item {
-                    ordered
-                        .timed_drop_guard
-                        .as_ref()
-                        .filter(|(start_time, _)| start_time.elapsed() > duration)
-                        .map(|_| *round)
-                } else {
-                    None
-                }
+        self.block_queue().iter()
+            .flat_map(|(_, item)| {
+                item.ordered_blocks.iter().zip(item.timed_drop_guards.iter())
+                    .filter_map(|(block, timed_drop_guard)| {
+                        if !block.has_randomness() {
+                            if let Some((a, _)) = timed_drop_guard {
+                                if a.elapsed() > duration {
+                                    Some(block.round())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
             })
             .collect()
     }
@@ -241,16 +242,20 @@ impl RandStore {
         self.block_queue.dequeue_rand_ready_prefix()
     }
 
-    pub fn add_block(&mut self, block: BlockQueueItem) -> anyhow::Result<(Option<RandDecision>, AddDecisionResult)> {
-        let round = block.round();
-        let metadata = block.rand_metadata();
-        self.block_queue.push_back(block);
-        
-        match self.try_aggregate_shares(round, Some(metadata)) {
-            Ok(Some(decision)) => Ok((Some(decision.clone()), self.add_decision(decision)?)),
-            Ok(None) => Ok((None, AddDecisionResult::None)),
-            Err(e) => bail!("{:?}", e),
-        }
+    pub fn add_item(&mut self, item: BlockQueueItem) -> anyhow::Result<Vec<AddDecisionResult>> {
+        let metadata_objs: Vec<RandMetadata> = item.ordered_blocks.iter()
+            .map(|b| item.rand_metadata(b.round()))
+            .collect();
+        self.block_queue.push_back(item);
+
+        let add_decision_results: Vec<AddDecisionResult> = metadata_objs.into_iter().map(|metadata| {
+            let maybe_decision = self.try_aggregate_shares(metadata.round, Some(metadata)).unwrap();
+            if maybe_decision.is_none() { return AddDecisionResult::None; }
+            let decision = maybe_decision.unwrap();
+            self.add_decision(decision).unwrap()
+        }).collect();
+
+        Ok(add_decision_results)
     }
 
     pub fn update_guard(&mut self, round: Round, drop_guard: DropGuard) {
@@ -312,12 +317,15 @@ impl RandStore {
 
         observe_block(share.timestamp(), BlockStage::RAND_ADD_SHARE);
 
-        debug!("[RandStore] Added share for epoch {} round {} from {:?}, weight {} threshold {}", share.epoch(), share.round(), share.author(), rand_item.weight(), rand_config.th_f());
-
-        match self.try_aggregate_shares(share.round(), None) {
-            Ok(Some(decision)) => Ok((ShareAck::new(Some(decision.clone()), missing_apk), self.add_decision(decision)?)),
-            Ok(None) => Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None)),
-            Err(e) => bail!("{:?}", e),
+        match self.try_aggregate_shares(share.round(), None)? {
+            Some(decision) => {
+                let ack = ShareAck::new(Some(decision.clone()), missing_apk);
+                let add_decision_result = self.add_decision(decision)?;
+                Ok((ack, add_decision_result))
+            },
+            None => {
+                Ok((ShareAck::new(None, missing_apk), AddDecisionResult::None))
+            },
         }
     }
 
@@ -326,7 +334,7 @@ impl RandStore {
         self.check_rounds(decision.round())?;
 
         let rand_item = self.rand_map.entry(decision.round()).or_insert_with(RandItem::new);
-        
+
         if rand_item.decision().is_some() {
             return Ok(AddDecisionResult::None);
         }
@@ -335,19 +343,15 @@ impl RandStore {
 
         rand_item.add_decision(decision.clone())?;
 
-        debug!("[RandStore] Added decision for epoch {} round {}", decision.epoch(), decision.round());
-
         log_rand_event(LogEvent::AddFirstRandDecision, self.author, None, decision.block_id(), decision.round());
 
         observe_block(decision.timestamp(), BlockStage::RAND_ADD_FIRST_DECISION);
 
         match self.block_queue.update_randomness(decision.round(), decision.randomness().clone()) {
-            Err(e) => {
-                debug!("{:?}", e);
+            Err(_e) => {
                 Ok(AddDecisionResult::None)
             }
             Ok(()) => {
-                debug!("[RandStore] Updated block with decision for epoch {} round {}", decision.epoch(), decision.round());
                 Ok(AddDecisionResult::NewRandReadyBlock)
             }
         }

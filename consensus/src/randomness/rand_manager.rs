@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::{
@@ -24,14 +25,13 @@ use aptos_network::protocols::network::RpcError;
 use aptos_reliable_broadcast::{ReliableBroadcast, RBNetworkSender};
 use aptos_time_service::TimeService;
 use aptos_types::{
-    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Randomness, Mode, RandMetadata, Delta, WVUF},
+    account_address::AccountAddress, validator_verifier::ValidatorVerifier, randomness::{RandDecision, RandConfig, Mode, RandMetadata, Delta, WVUF},
 };
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     future::{AbortHandle, Abortable},
     FutureExt, SinkExt, StreamExt,
 };
-use itertools::Itertools;
 use tokio::time::{Duration, Instant};
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -170,7 +170,7 @@ impl RandManager {
         observe_block(decision.timestamp(), BlockStage::RAND_RCV_ACK_DECISION);
 
         debug!(
-            "[RandManager] Received acked decision for epoch {} round {}",
+            "[RandManager] process_acked_decision, epoch={} round={}",
             self.epoch,
             decision.round(),
         );
@@ -251,7 +251,7 @@ impl RandManager {
     async fn process_ordered_blocks(&mut self, blocks: OrderedBlocks) {
         // Note: We assume the randomness is built on top of dag,
         // so execution pipeline should process a single block every time and there is no NIL block
-        
+
         // let mut maybe_randomness = blocks.maybe_randomness;
         // if maybe_randomness.is_none() {
         //     maybe_randomness = self.rand_store.get_randomness(&blocks.ordered_blocks.last().unwrap().round()).cloned();
@@ -264,67 +264,76 @@ impl RandManager {
         //     debug!("[RandManager] Round {} received blocks with optimistic rand", maybe_randomness.as_ref().unwrap().round());
         // }
 
-        observe_block(blocks.ordered_blocks.last().unwrap().timestamp_usecs(), BlockStage::RAND_ENTER);
-        
-        let maybe_randomness = blocks.maybe_randomness.or_else(|| {
-            self.rand_store.get_randomness(&blocks.ordered_blocks.last()?.round()).cloned()
-        });
-        
-        let block = match maybe_randomness {
-            Some(randomness) => {
-                let blocks = RandReadyBlocks {
-                    ordered_blocks: blocks.ordered_blocks,
-                    ordered_proof: blocks.ordered_proof,
-                    callback: blocks.callback,
-                    randomness,
-                };
-                BlockQueueItem::RandReady(Box::new(blocks))
-            },
-            None => {
-                if self.rand_store.rand_config().is_none() {
-                    // If no rand_config, generate a dummy randomness
-                    // It happens only on first epoch which has no DKG
-                    // rand todo: hard code DKG for the first epoch on forge
-                    debug!("[RandManager] No rand_config, generate a dummy randomness for epoch {} round {} block", self.epoch, blocks.ordered_blocks.last().unwrap().round()); 
-                    let blocks = RandReadyBlocks {
-                        ordered_blocks: blocks.ordered_blocks,
-                        ordered_proof: blocks.ordered_proof,
-                        callback: blocks.callback,
-                        randomness: Randomness::default(),
-                    };
-                    BlockQueueItem::RandReady(Box::new(blocks))
-                } else {
-                    let block = blocks.ordered_blocks.last().unwrap();
-                    let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());
-                    let ask = &self.rand_store.rand_config().as_ref().unwrap().keys_f.ask;
-                    let proof = <WVUF as WeightedVUF>::create_share(&ask, metadata.to_bytes().as_slice());
-                    let mut apk_delta = None;
-                    if block.round() <= 1 {
-                        // Sending apk_delta along with the share for the first round
-                        // If a node has no apk_delta, it will send MissingDelta in ShareAck
-                        apk_delta = self.rand_store.rand_config().unwrap().get_delta(&self.rand_store.rand_config().unwrap().author, &Mode::Fallback).cloned();
-                    }
-                    let share = RandShare::new(self.author, Mode::Fallback, metadata, proof, apk_delta);
+        let OrderedBlocks {
+            mut ordered_blocks,
+            ordered_proof,
+            callback,
+            maybe_randomness,
+        } = blocks;
 
-                    observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
-                    log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());
+        let rounds: Vec<Round> = ordered_blocks.iter().map(|b|b.round()).collect();
+        debug!("[RandManager] process_ordered_blocks, epoch={}, rounds={:?}", self.epoch, rounds);
 
-                    let drop_guard = self.do_reliable_broadcast(share);
-                    let blocks = OrderedBlocks {
-                        ordered_blocks: blocks.ordered_blocks,
-                        ordered_proof: blocks.ordered_proof,
-                        callback: blocks.callback,
-                        maybe_randomness: None,
-                        timed_drop_guard: Some((Instant::now(), drop_guard)),
-                    };
+        let num_blocks = ordered_blocks.len();
 
-                    BlockQueueItem::Ordered(Box::new(blocks))
-                }
-            },
+        let optimistic_rands = if maybe_randomness.is_some() {
+            // If optimistic randomness is present, it must be from DAG consensus, which also ensures `num_blocks==1`.
+            assert_eq!(1, num_blocks);
+            vec![maybe_randomness]
+        } else {
+            vec![None; num_blocks]
         };
-        let mut try_dequeue = !block.is_ordered();
-        match self.rand_store.add_block(block) {
-            Ok((_, AddDecisionResult::NewRandReadyBlock)) => {
+
+        let mut num_undecided_blocks = num_blocks;
+        let mut timed_drop_guards: Vec<Option<(Instant, DropGuard)>> = (0..num_blocks).map(|_|None).collect();
+
+        for (idx, (block, optimistic_rand)) in ordered_blocks.iter_mut().zip(optimistic_rands.into_iter()).enumerate() {
+            observe_block(block.timestamp_usecs(), BlockStage::RAND_ENTER);
+            let round = block.round();
+            let fallback_rand = self.rand_store.get_randomness(&round).map(|r|r.clone());
+            assert!(block.randomness.is_none());
+            if let Some(r) = optimistic_rand.or(fallback_rand) {
+                num_undecided_blocks -= 1;
+                block.update_randomness(r);
+            } else if let Some(rand_config) = self.rand_store.rand_config.as_ref() {
+                let ask = &rand_config.keys_f.ask;
+                let metadata = RandMetadata::new(block.epoch(), block.round(), block.id(), block.timestamp_usecs());
+                let proof = <WVUF as WeightedVUF>::create_share(&ask, metadata.to_bytes().as_slice());
+                let mut apk_delta = None;
+                if block.round() <= 1 {
+                    // Sending apk_delta along with the share for the first round
+                    // If a node has no apk_delta, it will send MissingDelta in ShareAck
+                    apk_delta = rand_config.get_delta(&rand_config.author, &Mode::Fallback).cloned();
+                }
+                let share = RandShare::new(self.author, Mode::Fallback, metadata, proof, apk_delta);
+
+                observe_block(share.timestamp(), BlockStage::RAND_BC_SHARE);
+                log_rand_event(LogEvent::BroadcastRandShare, self.author, None, share.id(), share.round());
+
+                let drop_guard = self.do_reliable_broadcast(share);
+                timed_drop_guards[idx] = Some((Instant::now(), drop_guard));
+            } else {
+                // If no rand_config, generate a dummy randomness
+                // It happens only on first epoch which has no DKG
+                // rand todo: hard code DKG for the first epoch on forge
+                debug!("[RandManager] No randomness for round {} and no rand_config to create one. Give up.", round);
+                num_undecided_blocks -= 1;
+            }
+        }
+
+        let offsets_by_round: BTreeMap<Round, usize> = rounds.iter().enumerate().map(|(idx, round)| (*round, idx)).collect();
+        let item = BlockQueueItem {
+            ordered_blocks,
+            offsets_by_round,
+            ordered_proof,
+            callback,
+            num_undecided_blocks,
+            timed_drop_guards,
+        };
+
+        let mut try_dequeue = item.num_undecided_blocks == 0;
+        match self.rand_store.add_item(item) {
+            Ok(results) if results.iter().any(|result| matches!(result, &AddDecisionResult::NewRandReadyBlock)) => {
                 try_dequeue = true;
             },
             Ok(_) => (),
@@ -343,8 +352,9 @@ impl RandManager {
             return;
         }
         self.previous_dequeue_time = Instant::now();
-        debug!("[RandManager] Dequeue {} blocks of epoch {} and rounds {:?}, block_queue: {:?}", rand_ready_blocks.len(), self.epoch, rand_ready_blocks.iter().map(|blocks| blocks.ordered_blocks.last().unwrap().round()).collect_vec(), self.rand_store.block_queue());
         for block in rand_ready_blocks {
+            let rounds: Vec<Round> = block.ordered_blocks.iter().map(|b|b.round()).collect();
+            debug!("[RandManager] Dequeuing, epoch={}, rounds={:?}", self.epoch, rounds);
             self.rand_ready_block_tx
                 .send(block)
                 .await
@@ -400,10 +410,8 @@ impl RandManager {
         let mut pending_rand_ready = 0;
 
         for (_, item) in self.rand_store.block_queue() {
-            match item {
-                BlockQueueItem::Ordered(_) => pending_ordered += 1,
-                BlockQueueItem::RandReady(_) => pending_rand_ready += 1,
-            }
+            pending_ordered += item.num_undecided_blocks;
+            pending_rand_ready += item.num_blocks() - item.num_undecided_blocks;
         }
 
         counters::NUM_BLOCKS_IN_PIPELINE
@@ -480,7 +488,7 @@ impl RandManager {
                     },
                     _ = rebroadcast_interval.tick().fuse() => {
                         self.print_rand_store();
-    
+
                         monitor!("rand_manager_process_rebroadcast_interval_tick", {
                         self.update_rand_manager_metrics();
                         self.rebroadcast_rand_shares().await
