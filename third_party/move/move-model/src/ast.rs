@@ -388,6 +388,20 @@ pub struct UseDecl {
 }
 
 // =================================================================================================
+/// # Friend Declarations
+
+/// Represents a `friend` declaration in the source.
+#[derive(Debug, Clone)]
+pub struct FriendDecl {
+    /// Location covered by this declaration.
+    pub loc: Loc,
+    /// The name of the friend module.
+    pub module_name: ModuleName,
+    /// The resolved module id, if it is known.
+    pub module_id: Option<ModuleId>,
+}
+
+// =================================================================================================
 /// # Access Specifiers
 
 /// Access specifier
