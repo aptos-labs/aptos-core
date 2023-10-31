@@ -27,9 +27,12 @@ fn initial_aptos_version() {
     executor.execute_and_apply(txn);
 
     let new_vm = AptosVM::new_from_state_view(executor.get_state_view());
-    assert_eq!(new_vm.internals().version().unwrap(), Version {
-        major: version.major + 1
-    });
+    assert_eq!(
+        new_vm.internals().version().unwrap(),
+        Version {
+            major: version.major + 1
+        }
+    );
 }
 
 #[test]

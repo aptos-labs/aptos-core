@@ -37,7 +37,9 @@ fn test_execution_strategies() {
         let big_block = (0..NUM_TXNS).map(txn).collect();
         let mut exec = BasicExecutor::new();
         exec.execute_block(big_block).unwrap();
-        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED
+            .get_metric_with_label_values(&["success"])
+            .unwrap();
         assert!(success_cnt.get() == NUM_TXNS);
     }
 
@@ -49,7 +51,9 @@ fn test_execution_strategies() {
         let big_block = (0..NUM_TXNS).map(txn).collect();
         let mut exec = RandomExecutor::from_os_rng();
         exec.execute_block(big_block).unwrap();
-        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED
+            .get_metric_with_label_values(&["success"])
+            .unwrap();
         assert!(success_cnt.get() == NUM_TXNS);
     }
 
@@ -81,14 +85,17 @@ fn test_execution_strategies() {
         let mut exec = GuidedExecutor::new(PartitionedGuidedStrategy);
         exec.execute_block(block1).unwrap();
 
-        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED
+            .get_metric_with_label_values(&["success"])
+            .unwrap();
         assert!(success_cnt.get() == 42);
-
     }
 
     {
         USER_TRANSACTIONS_EXECUTED.reset();
-        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED
+            .get_metric_with_label_values(&["success"])
+            .unwrap();
         assert!(success_cnt.get() == 0);
 
         println!("===========================================================================");
@@ -118,7 +125,9 @@ fn test_execution_strategies() {
         exec.add_executor(GuidedExecutor::new(UnPartitionedGuidedStrategy));
         exec.execute_block(block1).unwrap();
 
-        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED
+            .get_metric_with_label_values(&["success"])
+            .unwrap();
         assert!(success_cnt.get() == 42 * 2);
     }
 
@@ -136,8 +145,9 @@ fn test_execution_strategies() {
         exec.add_executor(RandomExecutor::from_os_rng());
         exec.execute_block(block).unwrap();
 
-        let success_cnt = USER_TRANSACTIONS_EXECUTED.get_metric_with_label_values(&["success"]).unwrap();
+        let success_cnt = USER_TRANSACTIONS_EXECUTED
+            .get_metric_with_label_values(&["success"])
+            .unwrap();
         assert!(success_cnt.get() == NUM_TXNS * 3);
-
     }
 }

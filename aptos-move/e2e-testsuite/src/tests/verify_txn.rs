@@ -378,9 +378,11 @@ fn verify_simple_payment() {
     let txn = sender
         .account()
         .transaction()
-        .script(Script::new(empty_script.clone(), vec![], vec![
-            TransactionArgument::U8(42),
-        ]))
+        .script(Script::new(
+            empty_script.clone(),
+            vec![],
+            vec![TransactionArgument::U8(42)],
+        ))
         .sequence_number(10)
         .max_gas_amount(100_000)
         .gas_unit_price(1)
