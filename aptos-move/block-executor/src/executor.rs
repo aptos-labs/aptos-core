@@ -643,7 +643,7 @@ where
         layout: &MoveTypeLayout,
         latest_view: &LatestView<T, S, X>,
     ) -> T::Value {
-        if let Some(mut value) = value.from_read_to_modification() {
+        if let Some(mut value) = value.convert_read_to_modification() {
             if let Some(value_bytes) = value.bytes() {
                 let (patched_bytes, _) = latest_view
                     .replace_identifiers_with_values(value_bytes, layout)

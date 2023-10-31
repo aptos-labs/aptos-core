@@ -196,7 +196,7 @@ pub trait TransactionWrite: Debug {
     /// Convert a `self`, which was read (containing DelayedField exchanges) in a current
     /// transaction, to a modification write, in which we can then exchange DelayedField
     /// identifiers into their final values, to produce a write operation.
-    fn from_read_to_modification(&self) -> Option<Self>
+    fn convert_read_to_modification(&self) -> Option<Self>
     where
         Self: Sized;
 }
@@ -250,7 +250,7 @@ impl TransactionWrite for WriteOp {
         }
     }
 
-    fn from_read_to_modification(&self) -> Option<Self> {
+    fn convert_read_to_modification(&self) -> Option<Self> {
         use WriteOp::*;
 
         match self {

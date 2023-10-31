@@ -219,6 +219,7 @@ mod test {
         FakeAggregatorView,
     };
     use aptos_types::{
+        aggregator::PanicError,
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
     };
@@ -541,7 +542,10 @@ mod test {
             &self,
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
-        ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+        ) -> Result<
+            BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>,
+            PanicError,
+        > {
             unimplemented!("Irrelevant for the test")
         }
     }

@@ -86,12 +86,12 @@ impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
         self.maybe_bytes = Some(bytes);
     }
 
-    fn from_read_to_modification(&self) -> Option<Self>
+    fn convert_read_to_modification(&self) -> Option<Self>
     where
         Self: Sized,
     {
         // If we have no bytes, no modification can be created.
-        maybe_bytes.map(|_| self.clone())
+        self.maybe_bytes.as_ref().map(|_| self.clone())
     }
 }
 

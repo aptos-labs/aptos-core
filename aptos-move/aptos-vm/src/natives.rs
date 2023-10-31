@@ -24,6 +24,7 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
+    aggregator::PanicError,
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
     write_set::WriteOp,
 };
@@ -34,6 +35,7 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
+#[cfg(feature = "testing")]
 use move_core_types::language_storage::StructTag;
 #[cfg(feature = "testing")]
 use move_core_types::value::MoveTypeLayout;
@@ -117,7 +119,8 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
+    {
         unimplemented!()
     }
 }

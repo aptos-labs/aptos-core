@@ -19,6 +19,7 @@ use aptos_aggregator::{
 use aptos_gas_algebra::Fee;
 use aptos_state_view::StateViewId;
 use aptos_types::{
+    aggregator::PanicError,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
@@ -247,7 +248,8 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
+    {
         self.base_executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }

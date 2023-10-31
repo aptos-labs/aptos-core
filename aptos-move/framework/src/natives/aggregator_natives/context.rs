@@ -10,7 +10,7 @@ use aptos_aggregator::{
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
     types::DelayedFieldID,
 };
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{aggregator::PanicError, state_store::state_key::StateKey, write_set::WriteOp};
 use better_any::{Tid, TidAble};
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -75,7 +75,7 @@ impl<'a> NativeAggregatorContext<'a> {
 
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
-    pub fn into_change_set(self) -> AggregatorChangeSet {
+    pub fn into_change_set(self) -> Result<AggregatorChangeSet, PanicError> {
         let NativeAggregatorContext {
             aggregator_v1_data,
             delayed_field_data,
@@ -117,7 +117,7 @@ impl<'a> NativeAggregatorContext<'a> {
             .keys()
             .cloned()
             .collect::<HashSet<_>>();
-        AggregatorChangeSet {
+        Ok(AggregatorChangeSet {
             aggregator_v1_changes,
             delayed_field_changes,
             // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
@@ -127,9 +127,17 @@ impl<'a> NativeAggregatorContext<'a> {
                 BTreeMap::new()
             } else {
                 self.delayed_field_resolver
-                    .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())
+                    .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
             },
-        }
+        })
+    }
+
+    #[cfg(test)]
+    fn into_delayed_fields(self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        let NativeAggregatorContext {
+            delayed_field_data, ..
+        } = self;
+        delayed_field_data.into_inner().into()
     }
 }
 
@@ -211,7 +219,7 @@ mod test {
         let AggregatorChangeSet {
             aggregator_v1_changes,
             ..
-        } = context.into_change_set();
+        } = context.into_change_set().unwrap();
 
         assert!(!aggregator_v1_changes.contains_key(&aggregator_v1_state_key_for_test(100)));
         assert_matches!(
@@ -436,10 +444,7 @@ mod test {
         let resolver = get_test_resolver_v2();
         let context = NativeAggregatorContext::new([0; 32], &resolver, &resolver);
         test_set_up_v2(&context);
-        let AggregatorChangeSet {
-            delayed_field_changes,
-            ..
-        } = context.into_change_set();
+        let delayed_field_changes = context.into_delayed_fields();
         assert!(!delayed_field_changes.contains_key(&DelayedFieldID::new(1000)));
         assert_some_eq!(
             delayed_field_changes.get(&DelayedFieldID::new(900)),

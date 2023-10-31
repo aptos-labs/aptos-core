@@ -293,7 +293,7 @@ pub(crate) mod test {
             self.bytes = bytes;
         }
 
-        fn from_read_to_modification(&self) -> Option<Self>
+        fn convert_read_to_modification(&self) -> Option<Self>
         where
             Self: Sized,
         {

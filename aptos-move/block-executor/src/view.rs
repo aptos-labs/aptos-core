@@ -29,6 +29,7 @@ use aptos_mvhashmap::{
 };
 use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
+    aggregator::PanicError,
     executable::{Executable, ModulePath},
     state_store::{
         state_storage_usage::StateStorageUsage,
@@ -732,12 +733,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok((patched_bytes, mapping.into_inner()))
     }
 
+    // Given a bytes, where values were already exchanged with idnetifiers,
+    // return a list of identifiers present in it.
     fn extract_identifiers_from_value(
         &self,
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<HashSet<T::Identifier>> {
         let mapping = TemporaryExtractIdentifiersMapping::<T>::new();
+        // TODO[agg_v2](cleanup) rename deserialize_and_replace_values_with_ids to not be specific to mapping trait implementation
+        // TODO[agg_v2](cleanup) provide traversal method, that doesn't create unnecessary patched value.
         let _patched_value =
             deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping).ok_or_else(
                 || anyhow::anyhow!("Failed to deserialize resource during id replacement"),
@@ -745,25 +750,47 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok(mapping.into_inner())
     }
 
+    fn does_value_need_exchange(
+        &self,
+        value: &T::Value,
+        layout: &Arc<MoveTypeLayout>,
+        delayed_write_set_keys: &HashSet<T::Identifier>,
+        key: &T::Key,
+    ) -> Option<Result<(T::Key, (T::Value, Arc<MoveTypeLayout>)), PanicError>> {
+        if let Some(bytes) = value.bytes() {
+            let identifiers_in_read_result = self.extract_identifiers_from_value(bytes, layout);
+
+            match identifiers_in_read_result {
+                Ok(identifiers_in_read) => {
+                    if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                        return Some(Ok((key.clone(), (value.clone(), layout.clone()))));
+                    }
+                },
+                Err(e) => {
+                    return Some(Err(code_invariant_error(format!("Cannot extract identifiers from value that identifiers were exchanged into before {:?}", e))))
+                }
+            }
+        }
+        None
+    }
+
     fn get_reads_needing_exchange_parallel(
         &self,
         read_set: &CapturedReads<T>,
         delayed_write_set_keys: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
-    ) -> BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)> {
+    ) -> Result<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>, PanicError> {
         read_set
             .get_read_values_with_delayed_fields()
             .filter(|(key, _)| !skip.contains(key))
             .flat_map(|(key, data_read)| {
                 if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                    if let Some(bytes) = value.bytes() {
-                        let identifiers_in_read = self
-                            .extract_identifiers_from_value(bytes, layout.as_ref())
-                            .unwrap();
-                        if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                            return Some((key.clone(), (value.as_ref().clone(), layout.clone())));
-                        }
-                    }
+                    return self.does_value_need_exchange(
+                        value,
+                        layout,
+                        delayed_write_set_keys,
+                        key,
+                    );
                 }
                 None
             })
@@ -776,20 +803,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         delayed_write_set_keys: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
-    ) -> BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)> {
+    ) -> Result<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>, PanicError> {
         read_set
             .iter()
             .filter(|key| !skip.contains(key))
             .flat_map(|key| {
                 if let Some((value, Some(layout))) = unsync_map.fetch_data(key) {
-                    if let Some(bytes) = value.bytes() {
-                        let identifiers_in_read = self
-                            .extract_identifiers_from_value(bytes, layout.as_ref())
-                            .unwrap();
-                        if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                            return Some((key.clone(), (value.as_ref().clone(), layout.clone())));
-                        }
-                    }
+                    return self.does_value_need_exchange(
+                        &value,
+                        &layout,
+                        delayed_write_set_keys,
+                        key,
+                    );
                 }
                 None
             })
@@ -1242,7 +1267,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
+    {
         match &self.latest_view {
             ViewState::Sync(state) => {
                 let captured_reads = state.captured_reads.borrow();

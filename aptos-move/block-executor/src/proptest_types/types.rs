@@ -298,7 +298,7 @@ impl TransactionWrite for ValueType {
         self.bytes = bytes.into();
     }
 
-    fn from_read_to_modification(&self) -> Option<Self>
+    fn convert_read_to_modification(&self) -> Option<Self>
     where
         Self: Sized,
     {

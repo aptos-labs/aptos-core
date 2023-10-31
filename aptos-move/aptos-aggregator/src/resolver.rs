@@ -12,6 +12,7 @@ use crate::{
 };
 use aptos_state_view::StateView;
 use aptos_types::{
+    aggregator::PanicError,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadataKind},
@@ -187,7 +188,7 @@ pub trait TDelayedFieldView {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>;
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>;
 }
 
 pub trait DelayedFieldResolver:
@@ -251,7 +252,8 @@ where
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
+    {
         unimplemented!("get_reads_needing_exchange not implemented")
     }
 }
