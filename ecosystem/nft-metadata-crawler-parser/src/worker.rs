@@ -34,7 +34,7 @@ use google_cloud_storage::client::{Client as GCSClient, ClientConfig as GCSClien
 use image::ImageFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{process, sync::Arc};
+use std::sync::Arc;
 use tracing::{error, info, warn};
 use url::Url;
 use warp::Filter;
@@ -253,7 +253,7 @@ impl RunnableConfig for ParserConfig {
             res = server_handler => {
                 if let Err(e) = res {
                     error!(error = ?e, "[NFT Metadata Crawler] Warp server panicked or was shut down");
-                    process::exit(1);
+                    panic!();
                 }
             },
         }

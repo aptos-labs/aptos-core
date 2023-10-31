@@ -45,7 +45,8 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        retry(backoff, &mut op).expect("Querying asset_uri should not fail")
+        retry(backoff, &mut op)
+            .expect(format!("Querying asset_uri should not fail: {}", asset_uri).as_str())
     }
 
     pub fn get_by_raw_image_uri(
@@ -67,7 +68,8 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        retry(backoff, &mut op).expect("Querying raw_image_uri should not fail")
+        retry(backoff, &mut op)
+            .expect(format!("Querying raw_image_uri should not fail: {}", raw_image_uri).as_str())
     }
 
     pub fn get_by_raw_animation_uri(
@@ -89,6 +91,12 @@ impl NFTMetadataCrawlerURIsQuery {
             ..Default::default()
         };
 
-        retry(backoff, &mut op).expect("Querying raw_animation_uri should not fail")
+        retry(backoff, &mut op).expect(
+            format!(
+                "Querying raw_animation_uri should not fail: {}",
+                raw_animation_uri
+            )
+            .as_str(),
+        )
     }
 }
