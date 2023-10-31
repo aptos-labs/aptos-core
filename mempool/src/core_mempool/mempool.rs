@@ -237,30 +237,27 @@ impl Mempool {
         mut exclude_transactions: Vec<TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
+        let exclude_size = exclude_transactions.len();
         // Sort, so per TxnPointer the highest gas will be in the map
         if include_gas_upgraded {
             exclude_transactions.sort();
         }
         let sort_end_time = start_time.elapsed();
         let sort_time = sort_end_time;
-        let mut seen: HashMap<TxnPointer, u64> = exclude_transactions
-            .iter()
-            .map(|txn| (txn.summary, txn.gas_unit_price))
-            .collect();
+        let mut seen = HashMap::new();
         let map_end_time = start_time.elapsed();
         let map_time = map_end_time.saturating_sub(sort_end_time);
+        let mut upgraded = HashSet::new();
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
-            let mut seen_and_upgraded = vec![];
             for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns() {
-                if let Some(gas) = seen.get(txn_pointer) {
-                    if *new_gas > *gas {
-                        seen_and_upgraded.push(txn_pointer);
+                if let Ok(index) = exclude_transactions
+                    .binary_search_by_key(txn_pointer, |txn_in_progress| txn_in_progress.summary)
+                {
+                    if *new_gas > exclude_transactions[index].gas_unit_price {
+                        upgraded.insert(txn_pointer);
                     }
                 }
-            }
-            for txn_pointer in seen_and_upgraded {
-                seen.remove(txn_pointer);
             }
         }
         let gas_end_time = start_time.elapsed();
@@ -275,18 +272,37 @@ impl Mempool {
         // `skipped` DS and rechecked once it's ancestor becomes available
         let mut skipped = HashSet::new();
         let mut total_bytes = 0;
-        let seen_size = seen.len();
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
-            if seen.contains_key(&TxnPointer::from(txn)) {
+            let txn_pointer = TxnPointer::from(txn);
+            if seen.contains_key(&txn_pointer)
+                || (!upgraded.contains(&txn_pointer)
+                    && exclude_transactions
+                        .binary_search_by_key(&txn_pointer, |txn_in_progress| {
+                            txn_in_progress.summary
+                        })
+                        .is_ok())
+            {
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
-            let seen_previous =
-                tx_seq > 0 && seen.contains_key(&TxnPointer::new(txn.address, tx_seq - 1));
+            let seen_previous = {
+                if tx_seq == 0 {
+                    false
+                } else {
+                    let prev_pointer = TxnPointer::new(txn.address, tx_seq - 1);
+                    seen.contains_key(&prev_pointer)
+                        || (!upgraded.contains(&prev_pointer)
+                            && exclude_transactions
+                                .binary_search_by_key(&prev_pointer, |txn_in_progress| {
+                                    txn_in_progress.summary
+                                })
+                                .is_ok())
+                }
+            };
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
             if seen_previous || account_sequence_number == Some(&tx_seq) {
@@ -344,7 +360,7 @@ impl Mempool {
         if result_size > 0 {
             debug!(
                 LogSchema::new(LogEntry::GetBlock),
-                seen_consensus = seen_size,
+                seen_consensus = exclude_size,
                 walked = txn_walked,
                 seen_after = seen.len(),
                 // before size and non full check
@@ -364,7 +380,7 @@ impl Mempool {
                 SampleRate::Duration(Duration::from_secs(1)),
                 debug!(
                     LogSchema::new(LogEntry::GetBlock),
-                    seen_consensus = seen_size,
+                    seen_consensus = exclude_size,
                     walked = txn_walked,
                     seen_after = seen.len(),
                     // before size and non full check
