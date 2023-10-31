@@ -34,10 +34,14 @@ aptos-writeset-generator = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
+memory-stats = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-test-utils = { workspace = true }
+move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 project-root = { workspace = true }
 proptest = { workspace = true }

@@ -23,6 +23,7 @@ mod memory_quota;
 mod metadata;
 mod mint_nft;
 mod missing_gas_parameter;
+mod module_bomb;
 mod module_event;
 mod new_integer_types;
 mod nft_dao;

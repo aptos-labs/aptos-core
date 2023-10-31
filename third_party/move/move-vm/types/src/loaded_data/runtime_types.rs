@@ -12,7 +12,7 @@ use move_core_types::{
     gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
     vm_status::StatusCode,
 };
-use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use std::{cmp::max, collections::BTreeMap, fmt::Debug, sync::Arc};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -138,9 +138,9 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(Box<Type>),
+    Vector(Arc<Type>),
     Struct(CachedStructIndex),
-    StructInstantiation(CachedStructIndex, Vec<Type>),
+    StructInstantiation(CachedStructIndex, Arc<Vec<Type>>),
     Reference(Box<Type>),
     MutableReference(Box<Type>),
     TyParam(u16),
@@ -175,7 +175,7 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(Box::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => Type::Vector(Arc::new(ty.apply_subst(subst, depth + 1)?)),
             Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
@@ -183,10 +183,10 @@ impl Type {
             Type::Struct(def_idx) => Type::Struct(*def_idx),
             Type::StructInstantiation(def_idx, instantiation) => {
                 let mut inst = vec![];
-                for ty in instantiation {
+                for ty in &**instantiation {
                     inst.push(ty.apply_subst(subst, depth + 1)?)
                 }
-                Type::StructInstantiation(*def_idx, inst)
+                Type::StructInstantiation(*def_idx, Arc::new(inst))
             },
         };
         Ok(res)
@@ -220,9 +220,8 @@ impl Type {
             TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
                 Self::LEGACY_BASE_MEMORY_SIZE
             },
-            Vector(ty) | Reference(ty) | MutableReference(ty) => {
-                Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
-            },
+            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
+            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
             Struct(_) => Self::LEGACY_BASE_MEMORY_SIZE,
             StructInstantiation(_, tys) => tys
                 .iter()
@@ -243,7 +242,7 @@ impl Type {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(Box::new(Self::from_const_signature(inner)?)),
+            S::Vector(inner) => L::Vector(Arc::new(Self::from_const_signature(inner)?)),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(
