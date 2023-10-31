@@ -22,16 +22,18 @@ impl URIParser {
             uri
         };
 
+        // Expects the following format for provided URIs `ipfs/{CID}/{path}`
         let re = Regex::new(r"^(ipfs/)(?P<cid>[a-zA-Z0-9]+)(?P<path>/.*)?$")?;
+
+        // Expects the following format for provided URIs `https://{CID}.ipfs.com/{path}`
         let redir_re = Regex::new(r"https:\/\/(?P<cid>[^\.]+)\.ipfs\.[^\/]+(?P<path>\/.+)?")?;
 
         let path = Url::parse(&modified_uri)?
             .path_segments()
-            .map(|segments| segments.collect::<Vec<_>>().join("/"))
-            .unwrap_or_default();
+            .map(|segments| segments.collect::<Vec<_>>().join("/"));
 
         if let Some(captures) = re
-            .captures(&path)
+            .captures(&path.unwrap_or_default())
             .or_else(|| redir_re.captures(&modified_uri))
         {
             return Self::format_capture(captures, ipfs_prefix);
