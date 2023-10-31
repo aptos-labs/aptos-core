@@ -19,6 +19,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
+use itertools::Itertools;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -118,6 +119,7 @@ impl BatchGenerator {
                 },
                 gas_unit_price: txn.gas_unit_price(),
             })
+            .sorted()
             .collect();
         self.batches_in_progress.insert(batch_id, txns_in_progress);
         self.batch_expirations.add_item(batch_id, expiry_time);
