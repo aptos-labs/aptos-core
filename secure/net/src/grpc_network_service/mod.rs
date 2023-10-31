@@ -104,9 +104,11 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
         let remote_addr = request.remote_addr();
         let network_message = request.into_inner();
         let msg = match network_message.ms_since_epoch {
-            Some(ms_since_epoch) => Message::create_with_duration(
+            Some(ms_since_epoch) => Message::create_with_metadata(
                 network_message.message,
-                ms_since_epoch
+                ms_since_epoch,
+                network_message.seq_no.unwrap(),
+                network_message.shard_id.unwrap(),
             ),
             None => Message::new(network_message.message),
         };
@@ -187,6 +189,8 @@ impl GRPCNetworkMessageServiceClientWrapper {
             message: message.data,
             message_type: mt.get_type(),
             ms_since_epoch: message.start_ms_since_epoch,
+            seq_no: message.seq_num,
+            shard_id: message.shard_id,
         });
 
         if message.start_ms_since_epoch.is_some() {

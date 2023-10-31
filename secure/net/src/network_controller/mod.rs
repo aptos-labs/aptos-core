@@ -57,17 +57,21 @@ impl NetworkMessage {
 pub struct Message {
     pub data: Vec<u8>,
     pub start_ms_since_epoch: Option<u64>,
+    pub seq_num: Option<u64>,
+    pub shard_id: Option<u64>,
 }
 
 impl Message {
     pub fn new(data: Vec<u8>) -> Self {
-        Self { data, start_ms_since_epoch: None }
+        Self { data, start_ms_since_epoch: None, seq_num:None, shard_id:None }
     }
 
-    pub fn create_with_duration(data: Vec<u8>, start_ms_since_epoch: u64) -> Self {
+    pub fn create_with_metadata(data: Vec<u8>, start_ms_since_epoch: u64, seq_num: u64, shard_id: u64) -> Self {
         Self {
             data,
             start_ms_since_epoch: Some(start_ms_since_epoch),
+            seq_num: Some(seq_num),
+            shard_id: Some(shard_id),
         }
     }
 
