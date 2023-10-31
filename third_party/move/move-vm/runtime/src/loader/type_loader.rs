@@ -26,7 +26,7 @@ pub fn intern_type(
         SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
         SignatureToken::Vector(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
-            Type::Vector(Box::new(inner_type))
+            Type::Vector(Arc::new(inner_type))
         },
         SignatureToken::Reference(inner_tok) => {
             let inner_type = intern_type(module, inner_tok, struct_name_table)?;
