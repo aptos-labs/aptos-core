@@ -20,12 +20,13 @@ use crate::{
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
-        pubsub::{AppContext, PubSubBody},
+        pubsub::AppContext,
         uri_parser::URIParser,
     },
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_runtimes::spawn_named_runtime;
+use bytes::Bytes;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
@@ -58,19 +59,12 @@ pub struct ParserConfig {
 /// Repeatedly pulls workers from Channel and perform parsing operations
 async fn spawn_parser(
     parser_config: ParserConfig,
-    msg_base64: String,
+    msg_base64: Bytes,
     pool: Pool<ConnectionManager<PgConnection>>,
     gcs_client: GCSClient,
 ) {
     PARSER_INVOCATIONS_COUNT.inc();
-    let pubsub_message = String::from_utf8(base64::decode(msg_base64).unwrap_or_else(|e| {
-        error!(
-            error = ?e,
-            "[NFT Metadata Crawler] Invalid base64 encoding in PubSub message"
-        );
-        panic!();
-    }))
-    .unwrap_or_else(|e| {
+    let pubsub_message = String::from_utf8(msg_base64.to_vec()).unwrap_or_else(|e| {
         error!(
             error = ?e,
             "[NFT Metadata Crawler] Failed to parse PubSub message"
@@ -168,13 +162,13 @@ async fn spawn_parser(
 
 /// Handles calling parser for the root endpoint
 async fn handle_root(
-    msg: PubSubBody,
+    msg: Bytes,
     context: Arc<AppContext>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
     spawn_parser(
         context.parser_config.clone(),
-        msg.message.data.clone(),
+        msg,
         context.pool.clone(),
         context.gcs_client.clone(),
     )
@@ -243,7 +237,7 @@ impl RunnableConfig for ParserConfig {
         let server_handler = runtime.spawn(async move {
             let route = warp::post()
                 .and(warp::path::end())
-                .and(warp::body::json())
+                .and(warp::body::bytes())
                 .and(warp::any().map(move || context.clone()))
                 .and_then(handle_root);
             warp::serve(route).run(([0, 0, 0, 0], server_port)).await;
