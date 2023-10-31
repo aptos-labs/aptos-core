@@ -1928,7 +1928,7 @@ impl VMSimulator for AptosVM {
         state_view: &(impl StateView + Sync),
     ) -> Result<TransactionOutput, VMStatus> {
         // The caller must ensure that the signature is not invalid, as otherwise
-        // this can be an attack.
+        // a malicious actor could execute the transaction without their knowledge.
         let txn =
             SignatureVerifiedTransaction::valid_for_simulation(transaction).ok_or_else(|| {
                 VMStatus::error(
