@@ -18,8 +18,8 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
-        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier, Spec,
-        SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
+        Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
