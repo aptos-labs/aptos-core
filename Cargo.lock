@@ -10460,7 +10460,6 @@ dependencies = [
  "proptest",
  "serde",
  "sha3 0.9.1",
- "smallbitvec",
  "tracing",
 ]
 
@@ -10497,7 +10496,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "serde",
- "smallbitvec",
  "smallvec",
 ]
 
@@ -13760,12 +13758,6 @@ dependencies = [
  "futures-core",
  "futures-io",
 ]
-
-[[package]]
-name = "smallbitvec"
-version = "2.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75ce4f9dc4a41b4c3476cc925f1efb11b66df373a8fde5d4b8915fa91b5d995e"
 
 [[package]]
 name = "smallvec"
