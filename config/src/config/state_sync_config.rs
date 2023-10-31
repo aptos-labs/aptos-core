@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 // The maximum message size per state sync message
-const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+const MAX_MESSAGE_SIZE: usize = 60 * 1024 * 1024; /* 60 MiB */
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 20_000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 20_000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
@@ -127,16 +127,16 @@ pub struct StateSyncDriverConfig {
 impl Default for StateSyncDriverConfig {
     fn default() -> Self {
         Self {
-            bootstrapping_mode: BootstrappingMode::ExecuteOrApplyFromGenesis,
+            bootstrapping_mode: BootstrappingMode::ExecuteTransactionsFromGenesis,
             commit_notification_timeout_ms: 5000,
-            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
+            continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactions,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
             progress_check_interval_ms: 50,
             max_connection_deadline_secs: 10,
-            max_consecutive_stream_notifications: 10,
+            max_consecutive_stream_notifications: 100,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 100,
+            max_pending_data_chunks: 500,
             max_stream_wait_time_ms: 5000,
             mempool_commit_ack_timeout_ms: 5000, // 5 seconds
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -188,10 +188,10 @@ impl Default for StorageServiceConfig {
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: MAX_MESSAGE_SIZE as u64,
-            max_num_active_subscriptions: 30,
-            max_optimistic_fetch_period_ms: 5000, // 5 seconds
+            max_num_active_subscriptions: 40,
+            max_optimistic_fetch_period_ms: 10_000, // 10 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_period_ms: 30_000, // 30 seconds
+            max_subscription_period_ms: 60_000, // 60 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
@@ -243,7 +243,7 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
-            enable_subscription_streaming: true,
+            enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
@@ -337,17 +337,17 @@ impl Default for AptosDataClientConfig {
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_lag_secs: 30, // 30 seconds
-            max_response_timeout_ms: 60_000,   // 60 seconds
+            max_optimistic_fetch_lag_secs: 120, // 120 seconds
+            max_response_timeout_ms: 240_000,   // 240 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_lag_secs: 30, // 30 seconds
+            max_subscription_lag_secs: 120, // 120 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
             min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
-            optimistic_fetch_timeout_ms: 5000,   // 5 seconds
-            response_timeout_ms: 10_000,         // 10 seconds
-            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
+            optimistic_fetch_timeout_ms: 10_000, // 10 seconds
+            response_timeout_ms: 120_000,        // 120 seconds
+            subscription_response_timeout_ms: 60_000, // 60 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
     }
