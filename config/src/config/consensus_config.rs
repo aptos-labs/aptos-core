@@ -11,7 +11,7 @@ use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
+pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 30_000;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -150,12 +150,11 @@ impl Default for ConsensusConfig {
             // defaulting to under 0.5s to broadcast the proposal to 100 validators
             // over 1gbps link
             max_sending_block_bytes: 600 * 1024, // 600 KB
-            max_sending_block_bytes_quorum_store_override: 5 * 1024 * 1024, // 5MB
+            max_sending_block_bytes_quorum_store_override: 10 * 1024 * 1024,
             max_receiving_block_txns: 10000,
-            max_receiving_block_txns_quorum_store_override: 10000
-                .max(2 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE),
+            max_receiving_block_txns_quorum_store_override: 40_000,
             max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
-            max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
+            max_receiving_block_bytes_quorum_store_override: 12 * 1024 * 1024,
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -167,11 +166,11 @@ impl Default for ConsensusConfig {
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded
-            quorum_store_pull_timeout_ms: 400,
+            quorum_store_pull_timeout_ms: 200,
             quorum_store_poll_time_ms: 300,
             // disable wait_for_full until fully tested
             // We never go above 20-30 pending blocks, so this disables it
-            wait_for_full_blocks_above_pending_blocks: 100,
+            wait_for_full_blocks_above_pending_blocks: 8,
             // Max is 1, so 1.1 disables it.
             wait_for_full_blocks_above_recent_fill_threshold: 1.1,
             intra_consensus_channel_buffer_size: 10,
@@ -180,81 +179,9 @@ impl Default for ConsensusConfig {
             // Voting backpressure is only used as a backup, to make sure pending rounds don't
             // increase uncontrollably, and we know when to go to state sync.
             vote_back_pressure_limit: 30,
-            pipeline_backpressure: vec![
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 100,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 200,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2500,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 4000,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~1000 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 500,
-                    // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-            ],
+            pipeline_backpressure: vec![],
             window_for_chain_health: 100,
-            chain_health_backoff: vec![
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 80,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backoff_proposal_delay_ms: 150,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 77,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 75,
-                    max_sending_block_txns_override: 1000,
-                    // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_override: 500,
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 69,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~500 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 250,
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backoff_proposal_delay_ms: 300,
-                },
-            ],
+            chain_health_backoff: vec![],
 
             qc_aggregator_type: QcAggregatorType::default(),
         }
