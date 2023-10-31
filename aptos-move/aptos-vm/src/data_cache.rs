@@ -21,12 +21,14 @@ use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
+    aggregator::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
+    write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
@@ -48,6 +50,7 @@ use move_core_types::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
 };
 
 pub(crate) fn get_resource_group_from_metadata(
@@ -287,6 +290,9 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
 
 impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
+    type ResourceKey = StateKey;
+    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -312,6 +318,16 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.executor_view.generate_delayed_field_id()
+    }
+
+    fn get_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
+    {
+        self.executor_view
+            .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
 }
 

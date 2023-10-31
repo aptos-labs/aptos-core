@@ -192,6 +192,13 @@ pub trait TransactionWrite: Debug {
     }
 
     fn set_bytes(&mut self, bytes: Bytes);
+
+    /// Convert a `self`, which was read (containing DelayedField exchanges) in a current
+    /// transaction, to a modification write, in which we can then exchange DelayedField
+    /// identifiers into their final values, to produce a write operation.
+    fn convert_read_to_modification(&self) -> Option<Self>
+    where
+        Self: Sized;
 }
 
 impl TransactionWrite for WriteOp {
@@ -240,6 +247,21 @@ impl TransactionWrite for WriteOp {
             Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
             Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
             Deletion | DeletionWithMetadata { .. } => (),
+        }
+    }
+
+    fn convert_read_to_modification(&self) -> Option<Self> {
+        use WriteOp::*;
+
+        match self {
+            Creation(data) | Modification(data) => Some(Modification(data.clone())),
+            CreationWithMetadata { data, metadata }
+            | ModificationWithMetadata { data, metadata } => Some(ModificationWithMetadata {
+                data: data.clone(),
+                metadata: metadata.clone(),
+            }),
+            // Deletion don't have data to become modification.
+            Deletion | DeletionWithMetadata { .. } => None,
         }
     }
 }

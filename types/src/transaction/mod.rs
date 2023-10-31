@@ -1872,6 +1872,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + From<u64>
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
-    type Value: Send + Sync + Clone + TransactionWrite;
+    type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

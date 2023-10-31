@@ -66,6 +66,7 @@ pub trait ExecutorTask: Sync {
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
             <Self::Txn as Transaction>::Identifier,
+            <Self::Txn as Transaction>::Value,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
@@ -111,6 +112,13 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> BTreeMap<
         <Self::Txn as Transaction>::Identifier,
         DelayedChange<<Self::Txn as Transaction>::Identifier>,
+    >;
+
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
     >;
 
     /// Get the events of a transaction from its output.
