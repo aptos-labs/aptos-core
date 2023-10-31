@@ -469,8 +469,10 @@ impl Loader {
             },
             // Recursive types we need to recurse the matching types
             (Type::Reference(ret_inner), Type::Reference(expected_inner))
-            | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner))
-            | (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
+            | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner)) => {
+                Self::match_return_type(ret_inner, expected_inner, map)
+            },
+            (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
                 Self::match_return_type(ret_inner, expected_inner, map)
             },
             // Abilities should not contribute to the equality check as they just serve for caching computations.
@@ -790,7 +792,7 @@ impl Loader {
             TypeTag::U256 => Type::U256,
             TypeTag::Address => Type::Address,
             TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(tt) => Type::Vector(Box::new(self.load_type(tt, data_store)?)),
+            TypeTag::Vector(tt) => Type::Vector(Arc::new(self.load_type(tt, data_store)?)),
             TypeTag::Struct(struct_tag) => {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store)?;
@@ -1937,7 +1939,11 @@ impl Loader {
         let mut result = 0;
         while let Some(ty) = todo.pop() {
             match ty {
-                Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
+                Type::Vector(ty) => {
+                    result += 1;
+                    todo.push(ty);
+                },
+                Type::Reference(ty) | Type::MutableReference(ty) => {
                     result += 1;
                     todo.push(ty);
                 },
@@ -2284,7 +2290,12 @@ impl Loader {
             | Type::U16
             | Type::U32
             | Type::U256 => DepthFormula::constant(1),
-            Type::Vector(ty) | Type::Reference(ty) | Type::MutableReference(ty) => {
+            Type::Vector(ty) => {
+                let mut inner = self.calculate_depth_of_type(ty)?;
+                inner.scale(1);
+                inner
+            },
+            Type::Reference(ty) | Type::MutableReference(ty) => {
                 let mut inner = self.calculate_depth_of_type(ty)?;
                 inner.scale(1);
                 inner

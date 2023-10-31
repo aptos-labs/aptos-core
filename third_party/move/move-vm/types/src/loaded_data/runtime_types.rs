@@ -174,7 +174,7 @@ pub enum Type {
     U128,
     Address,
     Signer,
-    Vector(Box<Type>),
+    Vector(Arc<Type>),
     Struct {
         idx: StructNameIndex,
         ability: AbilityInfo,
@@ -255,7 +255,7 @@ impl Type {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Vector(ty) => Type::Vector(Box::new(ty.apply_subst(subst, depth + 1)?)),
+            Type::Vector(ty) => Type::Vector(Arc::new(ty.apply_subst(subst, depth + 1)?)),
             Type::Reference(ty) => Type::Reference(Box::new(ty.apply_subst(subst, depth + 1)?)),
             Type::MutableReference(ty) => {
                 Type::MutableReference(Box::new(ty.apply_subst(subst, depth + 1)?))
@@ -311,9 +311,8 @@ impl Type {
             TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
                 Self::LEGACY_BASE_MEMORY_SIZE
             },
-            Vector(ty) | Reference(ty) | MutableReference(ty) => {
-                Self::LEGACY_BASE_MEMORY_SIZE + ty.size()
-            },
+            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
+            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
             Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
             StructInstantiation { ty_args: tys, .. } => tys
                 .iter()
@@ -334,7 +333,7 @@ impl Type {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(Box::new(Self::from_const_signature(inner)?)),
+            S::Vector(inner) => L::Vector(Arc::new(Self::from_const_signature(inner)?)),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(

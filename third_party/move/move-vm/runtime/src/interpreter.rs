@@ -1053,9 +1053,10 @@ fn check_depth_of_type_impl(
         | Type::Signer => check_depth!(0),
         // Even though this is recursive this is OK since the depth of this recursion is
         // bounded by the depth of the type arguments, which we have already checked.
-        Type::Reference(ty) | Type::MutableReference(ty) | Type::Vector(ty) => {
+        Type::Reference(ty) | Type::MutableReference(ty) => {
             check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
         },
+        Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
         Type::Struct { idx: name, .. } => {
             let formula = resolver.loader().calculate_depth_of_struct(*name)?;
             check_depth!(formula.solve(&[]))
@@ -1655,7 +1656,7 @@ impl Frame {
                 }
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Vector(Box::new(ty)))?;
+                    .push_ty(Type::Vector(Arc::new(ty)))?;
             },
             Bytecode::VecLen(si) => {
                 let ty = resolver.instantiate_single_type(*si, ty_args)?;
