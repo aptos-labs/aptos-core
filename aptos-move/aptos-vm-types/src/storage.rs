@@ -215,7 +215,7 @@ impl StoragePricingV3 {
         key: &StateKey,
         group_write: &GroupWrite,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        match group_write.encoded_group_size() {
+        match group_write.maybe_group_op_size() {
             Some(group_op_size) => Either::Left(
                 STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
                     + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, group_op_size),

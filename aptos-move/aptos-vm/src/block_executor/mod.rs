@@ -88,8 +88,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 
     // TODO: get rid of the cloning data-structures in the following APIs.
 
-    /// Should never be called after incorporate_additional_writes, as it
-    /// will consume vm_output to prepare an output with deltas.
+    /// Should never be called after incorporating materialized output, as that consumes vm_output.
     fn resource_group_write_set(&self) -> Vec<(StateKey, WriteOp, BTreeMap<StructTag, WriteOp>)> {
         self.vm_output
             .lock()
@@ -200,7 +199,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             <Self::Txn as BlockExecutableTransaction>::Value,
         >,
         patched_events: Vec<<Self::Txn as BlockExecutableTransaction>::Event>,
-        combined_groups: Vec<(
+        serialized_groups: Vec<(
             <Self::Txn as BlockExecutableTransaction>::Key,
             <Self::Txn as BlockExecutableTransaction>::Value,
         )>,
@@ -216,7 +215,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                             aggregator_v1_writes,
                             patched_resource_write_set,
                             patched_events,
-                            combined_groups,
+                            serialized_groups,
                         ),
                 )
                 .is_ok(),

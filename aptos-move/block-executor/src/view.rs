@@ -883,11 +883,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> anyhow::Result<()> {
-        let base_group: BTreeMap<T::Tag, Bytes> = match self.get_base_value(group_key)? {
-            Some(state_value) => bcs::from_bytes(state_value.bytes())
-                .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
-            None => BTreeMap::new(),
-        };
+        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
+            match self.get_base_value(group_key)? {
+                Some(state_value) => (
+                    bcs::from_bytes(state_value.bytes())
+                        .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
+                    TransactionWrite::from_state_value(Some(state_value)),
+                ),
+                None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
+            };
         let base_group_sentinel_ops = base_group.into_iter().map(|(t, bytes)| {
             (
                 t,
@@ -896,13 +900,22 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         });
 
         match &self.latest_view {
-            ViewState::Sync(state) => state
-                .versioned_map
-                .group_data()
-                .set_base_values(group_key.clone(), base_group_sentinel_ops),
-            ViewState::Unsync(state) => state
-                .unsync_map
-                .set_group_base_values(group_key.clone(), base_group_sentinel_ops),
+            ViewState::Sync(state) => {
+                state
+                    .versioned_map
+                    .group_data()
+                    .set_base_values(group_key.clone(), base_group_sentinel_ops);
+                state
+                    .versioned_map
+                    .data()
+                    .set_base_value(group_key.clone(), metadata_op, None);
+            },
+            ViewState::Unsync(state) => {
+                state
+                    .unsync_map
+                    .set_group_base_values(group_key.clone(), base_group_sentinel_ops);
+                state.unsync_map.write(group_key.clone(), metadata_op, None);
+            },
         };
         Ok(())
     }

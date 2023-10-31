@@ -1123,15 +1123,16 @@ where
             unsync_map.write(key, write_op, layout);
         }
 
-        // TODO[agg_v2](fix): provide layouts
-        for (group_key, _, group_ops) in output.resource_group_write_set().into_iter() {
+        for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
             for (value_tag, group_op) in group_ops.into_iter() {
+                // TODO[agg_v2](fix): provide layouts
                 unsync_map
                     .insert_group_op(&group_key, value_tag, group_op)
                     .map_err(|_| {
                         PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError)
                     })?;
             }
+            unsync_map.write(group_key, metadata_op, None);
         }
 
         for (key, write_op) in output

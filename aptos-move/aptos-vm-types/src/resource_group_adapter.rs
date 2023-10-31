@@ -98,9 +98,8 @@ impl<'r> ResourceGroupAdapter<'r> {
         );
 
         Self {
-            maybe_resource_group_view: (group_size_kind == GroupSizeKind::AsSum)
-                .then_some(maybe_resource_group_view)
-                .flatten(),
+            maybe_resource_group_view: maybe_resource_group_view
+                .filter(|_| group_size_kind == GroupSizeKind::AsSum),
             resource_view,
             group_size_kind,
             group_cache: RefCell::new(HashMap::new()),

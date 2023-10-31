@@ -189,8 +189,8 @@ impl<'r> WriteOpConverter<'r> {
         };
         Ok(GroupWrite::new(
             self.convert(state_value_metadata_result, metadata_op, false)?,
-            post_group_size,
             inner_ops,
+            post_group_size,
         ))
     }
 
