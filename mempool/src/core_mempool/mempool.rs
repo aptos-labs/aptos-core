@@ -236,17 +236,19 @@ impl Mempool {
         include_gas_upgraded: bool,
         mut exclude_transactions: Vec<TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
-        let mut start_time = Instant::now();
+        let start_time = Instant::now();
         // Sort, so per TxnPointer the highest gas will be in the map
         if include_gas_upgraded {
             exclude_transactions.sort();
         }
-        let sort_time = start_time.elapsed();
+        let sort_start_time = start_time.elapsed();
+        let sort_time = sort_start_time;
         let mut seen: HashMap<TxnPointer, u64> = exclude_transactions
             .iter()
             .map(|txn| (txn.summary, txn.gas_unit_price))
             .collect();
-        let map_time = start_time.elapsed().saturating_sub(sort_time);
+        let map_start_time = start_time.elapsed();
+        let map_time = map_start_time.saturating_sub(sort_start_time);
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
             let mut seen_and_upgraded = vec![];
@@ -261,7 +263,8 @@ impl Mempool {
                 seen.remove(txn_pointer);
             }
         }
-        let gas_time = start_time.elapsed().saturating_sub(map_time);
+        let gas_start_time = start_time.elapsed();
+        let gas_time = gas_start_time.saturating_sub(map_start_time);
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -310,7 +313,8 @@ impl Mempool {
             }
         }
         let result_size = result.len();
-        let result_time = start_time.elapsed().saturating_sub(gas_time);
+        let result_start_time = start_time.elapsed();
+        let result_time = result_start_time.saturating_sub(gas_start_time);
 
         let mut block = Vec::with_capacity(result_size);
         let mut full_bytes = false;
@@ -334,7 +338,8 @@ impl Mempool {
                 );
             }
         }
-        let block_time = start_time.elapsed().saturating_sub(result_time);
+        let block_start_time = start_time.elapsed();
+        let block_time = block_start_time.saturating_sub(result_time);
 
         if result_size > 0 {
             debug!(
