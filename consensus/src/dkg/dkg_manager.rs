@@ -299,6 +299,10 @@ impl DKGManager {
 
     // Will be called by the state computer
     pub fn finish_dkg(&self) {
+        if self.dkg_store.lock().is_none() {
+            debug!("[RandManager] DKGStore is not initialized when finish_dkg.");
+            return;
+        }
         observe_dkg(self.get_start_time(), DKGStage::DKG_FINISH);
         // terminate the ongoing broadcast when the DKG aggregated node is committed
         if let Some(handle) = self.set_rb_abort_handle(None) {
