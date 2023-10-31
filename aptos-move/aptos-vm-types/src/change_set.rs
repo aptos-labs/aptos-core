@@ -115,8 +115,6 @@ pub struct VMChangeSet {
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-    // TODO[agg_v2](fix): GroupWrite uses Option<Arc<MoveTypeLayout>> for inner ops.
-    // Should I create another struct similar to GroupWrite but using Arc<MoveTypeLayout> instead?
     group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, GroupWrite>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
