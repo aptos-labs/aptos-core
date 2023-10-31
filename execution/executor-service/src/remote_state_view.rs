@@ -145,15 +145,20 @@ impl RemoteStateViewClient {
         state_keys.clone().into_iter().for_each(|state_key| {
             state_view_clone.read().unwrap().insert_state_key(state_key);
         });
+        let mut seq_num = 0;
+
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
+                if state_keys.len() > 1 {
+                    seq_num += 1;
+                }
                 thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, sender.len());
-                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx);
+                    Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx, seq_num);
                 });
             });
     }
@@ -188,6 +193,7 @@ impl RemoteStateViewClient {
         sender: Arc<Vec<Mutex<OutboundRpcHelper>>>,
         state_keys: Vec<StateKey>,
         rand_send_thread_idx: usize,
+        seq_num: u64,
     ) {
         let request = RemoteKVRequest::new(shard_id, state_keys);
         let request_message = bcs::to_bytes(&request).unwrap();
@@ -203,8 +209,8 @@ impl RemoteStateViewClient {
         }
         REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
             .with_label_values(&["0_kv_req_grpc_shard_send_1_lock_acquired"]).observe(delta);
-        sender_lk.send(Message::create_with_duration(request_message, duration_since_epoch),
-                            &MessageType::new(REMOTE_KV_REQUEST_MSG_TYPE.to_string()));
+        sender_lk.send(Message::create_with_metadata(request_message, duration_since_epoch, seq_num, shard_id as u64),
+                       &MessageType::new(REMOTE_KV_REQUEST_MSG_TYPE.to_string()));
     }
 }
 

@@ -15,13 +15,15 @@ export interface NetworkMessage {
   message?: Uint8Array | undefined;
   messageType?: string | undefined;
   msSinceEpoch?: bigint | undefined;
+  seqNo?: bigint | undefined;
+  shardId?: bigint | undefined;
 }
 
 export interface Empty {
 }
 
 function createBaseNetworkMessage(): NetworkMessage {
-  return { message: new Uint8Array(0), messageType: "", msSinceEpoch: undefined };
+  return { message: new Uint8Array(0), messageType: "", msSinceEpoch: undefined, seqNo: undefined, shardId: undefined };
 }
 
 export const NetworkMessage = {
@@ -37,6 +39,18 @@ export const NetworkMessage = {
         throw new Error("value provided for field message.msSinceEpoch of type uint64 too large");
       }
       writer.uint32(24).uint64(message.msSinceEpoch.toString());
+    }
+    if (message.seqNo !== undefined) {
+      if (BigInt.asUintN(64, message.seqNo) !== message.seqNo) {
+        throw new Error("value provided for field message.seqNo of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.seqNo.toString());
+    }
+    if (message.shardId !== undefined) {
+      if (BigInt.asUintN(64, message.shardId) !== message.shardId) {
+        throw new Error("value provided for field message.shardId of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.shardId.toString());
     }
     return writer;
   },
@@ -68,6 +82,20 @@ export const NetworkMessage = {
           }
 
           message.msSinceEpoch = longToBigint(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.seqNo = longToBigint(reader.uint64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.shardId = longToBigint(reader.uint64() as Long);
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -115,6 +143,8 @@ export const NetworkMessage = {
       message: isSet(object.message) ? bytesFromBase64(object.message) : new Uint8Array(0),
       messageType: isSet(object.messageType) ? globalThis.String(object.messageType) : "",
       msSinceEpoch: isSet(object.msSinceEpoch) ? BigInt(object.msSinceEpoch) : undefined,
+      seqNo: isSet(object.seqNo) ? BigInt(object.seqNo) : undefined,
+      shardId: isSet(object.shardId) ? BigInt(object.shardId) : undefined,
     };
   },
 
@@ -129,6 +159,12 @@ export const NetworkMessage = {
     if (message.msSinceEpoch !== undefined) {
       obj.msSinceEpoch = message.msSinceEpoch.toString();
     }
+    if (message.seqNo !== undefined) {
+      obj.seqNo = message.seqNo.toString();
+    }
+    if (message.shardId !== undefined) {
+      obj.shardId = message.shardId.toString();
+    }
     return obj;
   },
 
@@ -140,6 +176,8 @@ export const NetworkMessage = {
     message.message = object.message ?? new Uint8Array(0);
     message.messageType = object.messageType ?? "";
     message.msSinceEpoch = object.msSinceEpoch ?? undefined;
+    message.seqNo = object.seqNo ?? undefined;
+    message.shardId = object.shardId ?? undefined;
     return message;
   },
 };
