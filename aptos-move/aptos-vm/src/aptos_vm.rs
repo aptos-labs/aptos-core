@@ -135,7 +135,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn for_simulation(mut self) -> Self {
+    pub fn for_simulation(mut self) -> Self {
         self.is_simulation = true;
         self
     }
@@ -1924,30 +1924,28 @@ impl VMValidator for AptosVM {
 
 impl VMSimulator for AptosVM {
     fn simulate_signed_transaction(
-        transaction: SignedTransaction,
+        &self,
+        transaction: &SignedTransaction,
         state_view: &(impl StateView + Sync),
     ) -> Result<TransactionOutput, VMStatus> {
+        assert!(self.is_simulation, "VM has to be created for simulation");
+
         // The caller must ensure that the signature is not invalid, as otherwise
         // a malicious actor could execute the transaction without their knowledge.
-        let txn =
-            SignatureVerifiedTransaction::valid_for_simulation(transaction).ok_or_else(|| {
-                VMStatus::error(
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    Some("Simulated transaction should not have a valid signature".to_string()),
-                )
-            })?;
-        Ok(BlockAptosVM::simulate_block::<
-            _,
-            NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>,
-        >(
-            Arc::clone(&RAYON_EXEC_POOL),
-            std::slice::from_ref(&txn),
-            state_view,
-            /*concurrency_level=*/ 1,
-            /*maybe_block_gas_limit=*/ None,
-            /*transaction_commit_listener=*/ None,
-        )?
-        .pop()
-        .expect("There should be 1 output for 1 simulated transaction"))
+        if transaction.verify_signature().is_ok() {
+            return Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                Some("Simulated transaction should not have a valid signature".to_string()),
+            ));
+        }
+
+        let resolver = state_view.as_move_resolver();
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
+        let (vm_status, vm_output) = self.execute_user_transaction(&resolver, transaction, &log_context);
+        match vm_status {
+            VMStatus::Executed => vm_output.try_into_transaction_output(&resolver),
+            vm_status => Err(vm_status),
+        }
     }
 }

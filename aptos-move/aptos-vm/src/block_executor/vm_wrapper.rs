@@ -20,18 +20,13 @@ pub(crate) struct AptosExecutorTask<'a, S> {
 }
 
 impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
-    type Argument = (&'a S, bool);
+    type Argument = &'a S;
     type Error = VMStatus;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
     fn init(argument: (&'a S, bool)) -> Self {
-        let (base_view, is_simulation) = argument;
-        let mut vm = AptosVM::new(&base_view.as_move_resolver());
-        if is_simulation {
-            vm = vm.for_simulation();
-        }
-
+        let mut vm = AptosVM::new(&argument.as_move_resolver());
         Self { vm, base_view }
     }
 

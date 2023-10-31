@@ -57,14 +57,6 @@ impl SignatureVerifiedTransaction {
             SignatureVerifiedTransaction::Invalid(_) => panic!("Expected valid transaction"),
         }
     }
-
-    pub fn valid_for_simulation(txn: SignedTransaction) -> Option<Self> {
-        // Simulation transactions should not carry valid signatures, otherwise
-        // malicious full nodes may execute them without user's explicit permission.
-        txn.verify_signature()
-            .err()
-            .map(|_| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)))
-    }
 }
 
 impl BlockExecutableTransaction for SignatureVerifiedTransaction {

@@ -1187,7 +1187,10 @@ impl TransactionsApi {
 
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
-        let output = AptosVM::simulate_signed_transaction(txn.clone(), &state_view).map_err(
+        // TODO: avoid re-initializing the VM.
+        let vm = AptosVM::new(&state_view).for_simulation();
+
+        let output = vm.simulate_signed_transaction(&txn, &state_view).map_err(
             |vm_status| {
                 SubmitTransactionError::internal_with_code(
                     format!("Failed to simulate a transaction: {}", vm_status),
