@@ -20,7 +20,6 @@ use crate::{
         gcs::{write_image_to_gcs, write_json_to_gcs},
         image_optimizer::ImageOptimizer,
         json_parser::JSONParser,
-        pubsub::AppContext,
         uri_parser::URIParser,
     },
 };
@@ -54,6 +53,14 @@ pub struct ParserConfig {
     pub image_quality: u8, // Quality up to 100
     pub ack_parsed_uris: Option<bool>,
     pub server_port: u16,
+}
+
+/// Struct to hold context required for parsing
+#[derive(Clone)]
+pub struct ServerContext {
+    pub parser_config: ParserConfig,
+    pub pool: Pool<ConnectionManager<PgConnection>>,
+    pub gcs_client: GCSClient,
 }
 
 /// Repeatedly pulls workers from Channel and perform parsing operations
@@ -163,7 +170,7 @@ async fn spawn_parser(
 /// Handles calling parser for the root endpoint
 async fn handle_root(
     msg: Bytes,
-    context: Arc<AppContext>,
+    context: Arc<ServerContext>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
     spawn_parser(
@@ -225,7 +232,7 @@ impl RunnableConfig for ParserConfig {
             });
 
         // Create request context
-        let context = Arc::new(AppContext {
+        let context = Arc::new(ServerContext {
             parser_config: self.clone(),
             pool,
             gcs_client: GCSClient::new(gcs_config),
