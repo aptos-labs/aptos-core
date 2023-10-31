@@ -665,24 +665,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    // pub(crate) fn resource_read_set_sequential_execution(&self) -> RefCell<HashSet<T::Key>> {
-    //     match &self.latest_view {
-    //         ViewState::Sync(_) => unreachable!(
-    //             "Accessing resource read set for sequential execution while running in parallel execution mode"
-    //         ),
-    //         ViewState::Unsync(state) => state.resource_read_set.clone(),
-    //     }
-    // }
-
-    // pub(crate) fn group_read_set_sequential_execution(&self) -> RefCell<HashSet<T::Key>> {
-    //     match &self.latest_view {
-    //         ViewState::Sync(_) => unreachable!(
-    //             "Accessing group read set for sequential execution while running in parallel execution mode"
-    //         ),
-    //         ViewState::Unsync(state) => state.group_read_set.clone(),
-    //     }
-    // }
-
     fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key);
 
