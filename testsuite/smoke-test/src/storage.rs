@@ -29,7 +29,7 @@ async fn test_db_restore() {
     // pre-build tools
     ::aptos_logger::Logger::new().init();
     info!("---------- 0. test_db_restore started.");
-    workspace_builder::get_bin("aptos-db-tool");
+    workspace_builder::get_bin("aptos-debugger");
     info!("---------- 1. pre-building finished.");
 
     let mut swarm = SwarmBuilder::new_local(4).with_aptos().build().await;
@@ -179,15 +179,15 @@ async fn test_db_restore() {
 }
 
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
-    info!("---------- running aptos-db-tool backup-verify");
+    info!("---------- running aptos-debugger aptos-db backup-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-db-tool");
+    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
     let mut cmd = Command::new(bin_path.as_path());
-    cmd.args(["backup", "verify"]);
+    cmd.args(["aptos-db", "backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());
@@ -212,14 +212,14 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
 fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("---------- running replay-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-db-tool");
+    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
     let target_db_dir = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
     let mut cmd = Command::new(bin_path.as_path());
-    cmd.arg("replay-verify");
+    cmd.args(["aptos-db", "replay-verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());
@@ -302,6 +302,7 @@ fn get_backup_storage_state(
     let output = Command::new(bin_path)
         .current_dir(workspace_root())
         .args([
+            "aptos-db",
             "backup",
             "query",
             "backup-storage-state",
@@ -327,7 +328,7 @@ pub(crate) fn db_backup(
 ) -> (TempPath, Version) {
     info!("---------- running aptos db tool backup");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-db-tool");
+    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path1 = TempPath::new();
     let metadata_cache_path2 = TempPath::new();
     let backup_path = TempPath::new();
@@ -344,6 +345,7 @@ pub(crate) fn db_backup(
     let mut backup_coordinator = Command::new(bin_path.as_path())
         .current_dir(workspace_root())
         .args([
+            "aptos-db",
             "backup",
             "continuously",
             "--backup-service-address",
@@ -377,6 +379,7 @@ pub(crate) fn db_backup(
     let compaction = Command::new(bin_path.as_path())
         .current_dir(workspace_root())
         .args([
+            "aptos-db",
             "backup-maintenance",
             "compact",
             "--epoch-ending-file-compact-factor",
@@ -413,13 +416,13 @@ pub(crate) fn db_restore(
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-db-tool");
+    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
     let mut cmd = Command::new(bin_path.as_path());
-    cmd.args(["restore", "bootstrap-db"]);
+    cmd.args(["aptos-db", "restore", "bootstrap-db"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
         cmd.arg(&w.to_string());

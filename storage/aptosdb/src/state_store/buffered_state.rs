@@ -9,9 +9,10 @@ use crate::{
 };
 use anyhow::{ensure, Result};
 use aptos_logger::info;
+use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
 use aptos_types::{
-    state_store::{combine_sharded_state_updates, ShardedStateUpdates},
+    state_store::{combine_sharded_state_updates, state_value::StateValue, ShardedStateUpdates},
     transaction::Version,
 };
 use std::{
@@ -54,15 +55,21 @@ impl BufferedState {
         state_db: &Arc<StateDb>,
         state_after_checkpoint: StateDelta,
         target_items: usize,
-    ) -> Self {
+    ) -> (Self, SmtAncestors<StateValue>) {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_db = Arc::clone(state_db);
+        let smt_ancestors = SmtAncestors::new(state_after_checkpoint.base.clone());
+        let smt_ancestors_clone = smt_ancestors.clone();
         // Create a new thread with receiver subscribing to state commit changes
         let join_handle = std::thread::Builder::new()
             .name("state-committer".to_string())
             .spawn(move || {
-                let committer = StateSnapshotCommitter::new(arc_state_db, state_commit_receiver);
+                let committer = StateSnapshotCommitter::new(
+                    arc_state_db,
+                    state_commit_receiver,
+                    smt_ancestors_clone,
+                );
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");
@@ -75,7 +82,7 @@ impl BufferedState {
             join_handle: Some(join_handle),
         };
         myself.report_latest_committed_version();
-        myself
+        (myself, smt_ancestors)
     }
 
     pub fn current_state(&self) -> &StateDelta {
@@ -152,6 +159,9 @@ impl BufferedState {
         new_state_after_checkpoint: StateDelta,
         sync_commit: bool,
     ) -> Result<()> {
+        assert!(new_state_after_checkpoint
+            .current
+            .is_family(&self.state_after_checkpoint.current));
         ensure!(
             new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
         );

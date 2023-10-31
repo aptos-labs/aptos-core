@@ -63,6 +63,12 @@ pub trait TResourceGroupView {
     type ResourceTag;
     type Layout;
 
+    /// Some resolvers might not be capable of the optimization, and should return false.
+    /// Others might return based on the config or the run paramaters.
+    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+        false
+    }
+
     /// The size of the resource group, based on the sizes of the latest entries at observed
     /// tags. During parallel execution, this is an estimated value that will get validated,
     /// but as long as it is assumed correct, the transaction can deterministically derive

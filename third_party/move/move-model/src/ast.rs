@@ -16,7 +16,10 @@ use crate::{
 };
 use internment::LocalIntern;
 use itertools::Itertools;
-use move_binary_format::file_format::{CodeOffset, Visibility};
+use move_binary_format::{
+    file_format,
+    file_format::{CodeOffset, Visibility},
+};
 use move_core_types::account_address::AccountAddress;
 use num::BigInt;
 use std::{
@@ -382,6 +385,35 @@ pub struct UseDecl {
     pub alias: Option<Symbol>,
     /// A list of member uses, with optional aliasing.
     pub members: Vec<(Loc, Symbol, Option<Symbol>)>,
+}
+
+// =================================================================================================
+/// # Access Specifiers
+
+/// Access specifier
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AccessSpecifier {
+    pub loc: Loc,
+    pub kind: file_format::AccessKind,
+    pub negated: bool,
+    pub resource: (Loc, ResourceSpecifier),
+    pub address: (Loc, AddressSpecifier),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ResourceSpecifier {
+    Any,
+    DeclaredAtAddress(Address),
+    DeclaredInModule(ModuleId),
+    Resource(QualifiedInstId<StructId>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AddressSpecifier {
+    Any,
+    Address(Address),
+    Parameter(Symbol),
+    Call(QualifiedInstId<FunId>, Symbol),
 }
 
 // =================================================================================================

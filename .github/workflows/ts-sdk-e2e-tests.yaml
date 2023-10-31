@@ -17,6 +17,12 @@ permissions:
   contents: read
   id-token: write # Required for GCP Workload Identity federation which we use to login into Google Artifact Registry
 
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   # Note on the job-level `if` conditions:
   # This workflow is designed such that we run subsequent jobs only when a 'push'

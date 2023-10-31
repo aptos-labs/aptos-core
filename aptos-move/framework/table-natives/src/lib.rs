@@ -69,12 +69,12 @@ struct TableData {
     tables: BTreeMap<TableHandle, Table>,
 }
 
-/// A structure containing information about the layout of a value
-/// stored in a table. Needed in order to lift aggregator and snapshot
-/// values from the value and replacing them with identifiers.
+/// A structure containing information about the layout of a value stored in a
+/// table. Needed in order to replace aggregator and snapshot values with
+/// identifiers.
 struct LayoutInfo {
     layout: Arc<MoveTypeLayout>,
-    has_aggregator_lifting: bool,
+    has_identifier_mappings: bool,
 }
 
 /// A structure representing a single table.
@@ -141,14 +141,14 @@ impl<'a> NativeTableContext<'a> {
                     Op::New(val) => {
                         let bytes = serialize(&value_layout_info.layout, &val)?;
                         let layout = value_layout_info
-                            .has_aggregator_lifting
+                            .has_identifier_mappings
                             .then(|| value_layout_info.layout.clone());
                         entries.insert(key, Op::New((bytes.into(), layout)));
                     },
                     Op::Modify(val) => {
                         let bytes = serialize(&value_layout_info.layout, &val)?;
                         let layout = value_layout_info
-                            .has_aggregator_lifting
+                            .has_identifier_mappings
                             .then(|| value_layout_info.layout.clone());
                         entries.insert(key, Op::Modify((bytes.into(), layout)));
                     },
@@ -198,11 +198,11 @@ impl TableData {
 
 impl LayoutInfo {
     fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
-        let (layout, has_aggregator_lifting) =
-            context.type_to_type_layout_with_aggregator_lifting(value_ty)?;
+        let (layout, has_identifier_mappings) =
+            context.type_to_type_layout_with_identifier_mappings(value_ty)?;
         Ok(Self {
             layout: Arc::new(layout),
-            has_aggregator_lifting,
+            has_identifier_mappings,
         })
     }
 }
@@ -215,12 +215,12 @@ impl Table {
     ) -> PartialVMResult<(&mut GlobalValue, Option<Option<NumBytes>>)> {
         Ok(match self.content.entry(key) {
             Entry::Vacant(entry) => {
-                // If there is an aggregator lifting: need to pass layout to ensure
-                // it gets recorded.
+                // If there is an identifier mapping, we need to pass layout to
+                // ensure it gets recorded.
                 let resolved_data = context.resolver.resolve_table_entry_bytes_with_layout(
                     &self.handle,
                     entry.key(),
-                    if self.value_layout_info.has_aggregator_lifting {
+                    if self.value_layout_info.has_identifier_mappings {
                         Some(&self.value_layout_info.layout)
                     } else {
                         None

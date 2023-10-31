@@ -272,6 +272,8 @@ pub struct Scheduler {
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
 
+    has_halted: CachePadded<AtomicBool>,
+
     queueing_commits_lock: CachePadded<ArmedLock>,
 
     commit_queue: ConcurrentQueue<u32>,
@@ -300,6 +302,7 @@ impl Scheduler {
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
+            has_halted: CachePadded::new(AtomicBool::new(false)),
             queueing_commits_lock: CachePadded::new(ArmedLock::new()),
             commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
@@ -528,12 +531,12 @@ impl Scheduler {
     }
 
     pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) {
-        // we have exclusivity on this transaction
+        // We have exclusivity on this transaction.
 
         self.wake_dependencies_after_execution(txn_idx);
 
-        // we skipped decreasing validation index when invalidating,
-        // as we were executing it immediately, and are doing so now. (unconditionally)
+        // We skipped decreasing validation index when invalidating, as we were
+        // executing it immediately, and are doing so now (unconditionally).
         self.decrease_validation_idx(txn_idx + 1);
     }
 
@@ -558,7 +561,7 @@ impl Scheduler {
             // re-executed first).
             self.decrease_validation_idx(txn_idx + 1);
 
-            // can release the lock early.
+            // Can release the lock early.
         }
 
         // txn_idx must be re-executed, and if execution_idx is lower, it will be.
@@ -596,9 +599,9 @@ impl Scheduler {
             for txn_idx in 0..self.num_txns {
                 self.halt_transaction_execution(txn_idx);
             }
-            return true;
         }
-        false
+
+        !self.has_halted.swap(true, Ordering::SeqCst)
     }
 }
 

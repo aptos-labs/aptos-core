@@ -3025,7 +3025,7 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                     },
 
                     // Note: this includes cases where vector types are tagged. Instead,
-                    // on should tag only the outer vector layout.
+                    // one should tag only the outer vector layout.
                     (layout, container) => Err(invariant_violation::<S>(format!(
                         "cannot serialize container {:?} as {:?}",
                         container, layout
@@ -3696,7 +3696,7 @@ impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         use MoveTypeLayout as L;
 
-        // Make sure to strip all marks from the type layout.
+        // Make sure to strip all tags from the type layout.
         if let L::Tagged(LayoutTag::IdentifierMapping(_), layout) = layout {
             return self.as_move_value(layout.as_ref());
         }

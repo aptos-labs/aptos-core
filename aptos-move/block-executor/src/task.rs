@@ -23,13 +23,13 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
-    /// There is a DirectWriteTransaction with resolver not capable to handle it
+    /// There is a DirectWriteTransaction with resolver not capable to handle it.
     DirectWriteSetTransactionNotCapableError,
-    /// During transaction execution, it detected that it is in inconsistent state
-    /// due to speculative reads it did, and needs to be re-executed
+    /// Transaction detected that it is in inconsistent state due to speculative
+    /// reads it did, and needs to be re-executed.
     SpeculativeExecutionAbortError(String),
-    /// During transaction execution, it detected code invariant error
-    /// Which can only be caused by the bug in the code.
+    /// Code invariant error was detected during transaction execution, which
+    /// can only be caused by the bug in the code.
     DelayedFieldsCodeInvariantError(String),
 }
 
@@ -116,12 +116,32 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
 
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+        BTreeMap<<Self::Txn as Transaction>::Tag, <Self::Txn as Transaction>::Value>,
+    )>;
+
+    fn resource_group_metadata_ops(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, op, _)| (key, op))
+            .collect()
+    }
+
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
 
-    /// In parallel execution, will be called once per transaction when the output is
-    /// ready to be committed. In sequential execution, won't be called (deltas are
-    /// materialized and incorporated during execution).
+    /// Will be called once per transaction when the output is ready to be committed.
+    /// Ensures that any writes corresponding to materialized deltas and group updates
+    /// (recorded in output separately) are incorporated into the transaction output.
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
@@ -130,6 +150,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
             <Self::Txn as Transaction>::Value,
         >,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
+        combined_groups: Vec<(
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        )>,
     );
 
     /// Return the fee statement of the transaction.

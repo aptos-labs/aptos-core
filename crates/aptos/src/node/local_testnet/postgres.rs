@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    docker::{
+        create_volume, delete_container, delete_volume, get_docker, pull_docker_image,
+        setup_docker_logging, StopContainerShutdownStep,
+    },
     health_checker::HealthChecker,
     traits::{ServiceManager, ShutdownStep},
-    utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
-};
-use crate::node::local_testnet::utils::{
-    get_docker, setup_docker_logging, StopContainerShutdownStep,
 };
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -24,6 +24,7 @@ use std::{collections::HashSet, path::PathBuf};
 use tracing::{info, warn};
 
 const POSTGRES_CONTAINER_NAME: &str = "local-testnet-postgres";
+const POSTGRES_VOLUME_NAME: &str = "local-testnet-postgres-data";
 const POSTGRES_IMAGE: &str = "postgres:14.9";
 const DATA_PATH_IN_CONTAINER: &str = "/var/lib/mydata";
 const POSTGRES_DEFAULT_PORT: u16 = 5432;
@@ -161,11 +162,11 @@ impl ServiceManager for PostgresManager {
                 self.recreate_host_database().await?;
             }
         } else {
+            // Confirm Docker is available.
+            get_docker().await?;
+
             // Kill any existing container we find.
             delete_container(POSTGRES_CONTAINER_NAME).await?;
-
-            // Confirm Docker is available.
-            confirm_docker_available().await?;
 
             // Pull the image here so it is not subject to the startup timeout for
             // `run_service`.
@@ -194,6 +195,20 @@ impl ServiceManager for PostgresManager {
         // Let the user know where to go to see logs for postgres.
         setup_docker_logging(&self.test_dir, "postgres", POSTGRES_CONTAINER_NAME)?;
 
+        let docker = get_docker().await?;
+
+        // If we're starting afresh, delete any existing volume.
+        if self.force_restart {
+            delete_volume(POSTGRES_VOLUME_NAME)
+                .await
+                .context("Failed to delete volume for postgres")?;
+        }
+
+        // Create a volume for the postgres instance to use.
+        create_volume(POSTGRES_VOLUME_NAME)
+            .await
+            .context("Failed to create volume for postgres")?;
+
         let options = Some(CreateContainerOptions {
             name: POSTGRES_CONTAINER_NAME,
             ..Default::default()
@@ -208,12 +223,11 @@ impl ServiceManager for PostgresManager {
                     host_port: Some(port),
                 }]),
             }),
-            // We mount a directory into the container in which the DB will store its
-            // data.
+            // Mount the volume in to the container. We use a volume because they are
+            // more performant and easier to manage via the Docker API.
             binds: Some(vec![format!(
                 "{}:{}",
-                self.test_dir.join("postgres").join("data").display(),
-                DATA_PATH_IN_CONTAINER,
+                POSTGRES_VOLUME_NAME, DATA_PATH_IN_CONTAINER,
             )]),
             ..Default::default()
         });
@@ -239,8 +253,6 @@ impl ServiceManager for PostgresManager {
         };
 
         info!("Starting postgres with this config: {:?}", config);
-
-        let docker = get_docker()?;
 
         let id = docker
             .create_container(options, config)

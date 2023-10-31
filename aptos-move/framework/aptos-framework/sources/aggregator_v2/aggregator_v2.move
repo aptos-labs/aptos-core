@@ -194,6 +194,7 @@ module aptos_framework::aggregator_v2 {
         create_unbounded_aggregator<u8>();
     }
 
+    #[test]
     fun test_aggregator_valid_type() {
         create_unbounded_aggregator<u64>();
         create_unbounded_aggregator<u128>();

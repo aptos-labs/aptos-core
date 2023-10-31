@@ -33,6 +33,9 @@ module aptos_framework::delegation_pool_integration_tests {
     const DELEGATION_POOLS: u64 = 11;
 
     #[test_only]
+    const MODULE_EVENT: u64 = 26;
+
+    #[test_only]
     public fun initialize_for_test(aptos_framework: &signer) {
         initialize_for_test_custom(
             aptos_framework,
@@ -76,7 +79,7 @@ module aptos_framework::delegation_pool_integration_tests {
             voting_power_increase_limit
         );
         reconfiguration::initialize_for_test(aptos_framework);
-        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS], vector[]);
+        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT], vector[]);
     }
 
     #[test_only]

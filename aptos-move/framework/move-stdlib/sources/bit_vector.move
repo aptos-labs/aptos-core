@@ -142,12 +142,32 @@ module std::bit_vector {
         let index = start_index;
 
         // Find the greatest index in the vector such that all indices less than it are set.
-        while (index < bitvector.length) {
+        while ({
+            spec {
+                invariant index >= start_index;
+                invariant index == start_index || is_index_set(bitvector, index - 1);
+                invariant index == start_index || index - 1 < vector::length(bitvector.bit_field);
+                invariant forall j in start_index..index: is_index_set(bitvector, j);
+                invariant forall j in start_index..index: j < vector::length(bitvector.bit_field);
+            };
+            index < bitvector.length
+        }) {
+            spec {
+                assert index < bitvector.length;
+            };
             if (!is_index_set(bitvector, index)) break;
             index = index + 1;
         };
 
         index - start_index
+    }
+
+    spec longest_set_sequence_starting_at(bitvector: &BitVector, start_index: u64): u64 {
+        aborts_if start_index >= bitvector.length;
+        aborts_if exists i in start_index..bitvector.length:
+            (forall j in start_index..i: is_index_set(bitvector, j) && j < vector::length(bitvector.bit_field)) &&
+                i >= vector::length(bitvector.bit_field);
+        ensures forall i in start_index..result: is_index_set(bitvector, i);
     }
 
     #[test_only]

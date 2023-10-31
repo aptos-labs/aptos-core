@@ -16,6 +16,7 @@ use std::{
 /// where we can prove that there will be no concurrent access to the
 /// underlying object (or its elements).  Use with caution - only when
 /// the safety can be proven.
+#[derive(Debug)]
 pub struct ExplicitSyncWrapper<T> {
     value: UnsafeCell<T>,
 }

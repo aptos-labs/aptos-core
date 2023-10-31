@@ -7,7 +7,6 @@ pub mod delayed_change;
 pub mod delayed_field_extension;
 pub mod delta_change_set;
 pub mod delta_math;
-mod module;
 pub mod resolver;
 pub mod types;
 pub mod utils;

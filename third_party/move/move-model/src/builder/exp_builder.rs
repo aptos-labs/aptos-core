@@ -4,8 +4,8 @@
 
 use crate::{
     ast::{
-        Address, Exp, ExpData, ModuleName, Operation, Pattern, QualifiedSymbol, QuantKind, Spec,
-        Value,
+        AccessSpecifier, Address, AddressSpecifier, Exp, ExpData, ModuleName, Operation, Pattern,
+        QualifiedSymbol, QuantKind, ResourceSpecifier, Spec, Value,
     },
     builder::{
         model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry},
@@ -24,10 +24,7 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_compiler::{
-    expansion::{
-        ast as EA,
-        ast::{ModuleAccess_, SpecBlock, SpecId},
-    },
+    expansion::ast as EA,
     hlir::ast as HA,
     naming::ast as NA,
     parser::ast as PA,
@@ -75,7 +72,7 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// Set containing all the functions called during translation.
     pub called_spec_funs: BTreeSet<(ModuleId, SpecFunId)>,
     /// A mapping from SpecId to SpecBlock (expansion ast)
-    pub spec_block_map: BTreeMap<SpecId, SpecBlock>,
+    pub spec_block_map: BTreeMap<EA::SpecId, EA::SpecBlock>,
 }
 
 /// Mode of translation
@@ -136,7 +133,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         et
     }
 
-    pub fn set_spec_block_map(&mut self, map: BTreeMap<SpecId, SpecBlock>) {
+    pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
         self.spec_block_map = map
     }
 
@@ -849,6 +846,174 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 }
 
+/// # Access Specifier Translation
+
+impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
+    pub(crate) fn translate_access_specifiers(
+        &mut self,
+        specifiers: &Option<Vec<EA::AccessSpecifier>>,
+    ) -> Option<Vec<AccessSpecifier>> {
+        specifiers.as_ref().map(|v| {
+            v.iter()
+                .map(|s| self.translate_access_specifier(s))
+                .collect()
+        })
+    }
+
+    fn translate_access_specifier(&mut self, specifier: &EA::AccessSpecifier) -> AccessSpecifier {
+        fn is_wildcard(name: &Name) -> bool {
+            name.value.as_str() == "*"
+        }
+        let loc = self.to_loc(&specifier.loc);
+        let EA::AccessSpecifier_ {
+            kind,
+            negated,
+            module_address,
+            module_name,
+            resource_name,
+            type_args,
+            address,
+        } = &specifier.value;
+        let resource = match (module_address, module_name, resource_name) {
+            (None, None, None) => {
+                // This stems from a  specifier of the form `acquires *(0x1)`
+                ResourceSpecifier::Any
+            },
+            (Some(address), None, None) => {
+                ResourceSpecifier::DeclaredAtAddress(self.translate_address(&loc, address))
+            },
+            (Some(address), Some(module), None) if is_wildcard(&module.0) => {
+                ResourceSpecifier::DeclaredAtAddress(self.translate_address(&loc, address))
+            },
+            (Some(address), Some(module), Some(resource))
+                if is_wildcard(&module.0) && is_wildcard(resource) =>
+            {
+                ResourceSpecifier::DeclaredAtAddress(self.translate_address(&loc, address))
+            },
+            (Some(address), Some(module), Some(resource)) if !is_wildcard(&module.0) => {
+                let module_name = ModuleName::new(
+                    self.translate_address(&loc, address),
+                    self.symbol_pool().make(module.0.value.as_str()),
+                );
+                let module_id = if self.parent.module_name == module_name {
+                    self.parent.module_id
+                } else if let Some(module_env) = self.parent.parent.env.find_module(&module_name) {
+                    module_env.get_id()
+                } else {
+                    self.error(&loc, &format!("undeclared module `{}`", module));
+                    self.parent.module_id
+                };
+                if is_wildcard(resource) {
+                    ResourceSpecifier::DeclaredInModule(module_id)
+                } else {
+                    // Construct an expansion type so we can feed it through the standard translation
+                    // process.
+                    let mident = sp(specifier.loc, EA::ModuleIdent_ {
+                        address: *address,
+                        module: *module,
+                    });
+                    let maccess = sp(
+                        specifier.loc,
+                        EA::ModuleAccess_::ModuleAccess(mident, *resource),
+                    );
+                    let ety = sp(
+                        specifier.loc,
+                        EA::Type_::Apply(maccess, type_args.as_ref().cloned().unwrap_or_default()),
+                    );
+                    let ty = self.translate_type(&ety);
+                    if let Type::Struct(mid, sid, inst) = ty {
+                        ResourceSpecifier::Resource(mid.qualified_inst(sid, inst))
+                    } else {
+                        // errors reported
+                        debug_assert!(self.parent.parent.env.has_errors());
+                        ResourceSpecifier::Any
+                    }
+                }
+            },
+            (Some(_), Some(module), Some(resource))
+                if is_wildcard(&module.0) && !is_wildcard(resource) =>
+            {
+                self.error(&loc, "invalid access specifier: a wildcard cannot be followed by a non-wildcard name component");
+                ResourceSpecifier::Any
+            },
+            _ => {
+                self.error(&loc, "invalid access specifier");
+                ResourceSpecifier::Any
+            },
+        };
+        let address = self.translate_address_specifier(address);
+        AccessSpecifier {
+            loc: loc.clone(),
+            kind: *kind,
+            negated: *negated,
+            resource: (loc, resource),
+            address,
+        }
+    }
+
+    fn translate_address_specifier(
+        &mut self,
+        specifier: &EA::AddressSpecifier,
+    ) -> (Loc, AddressSpecifier) {
+        let loc = self.to_loc(&specifier.loc);
+        match &specifier.value {
+            EA::AddressSpecifier_::Any => (loc, AddressSpecifier::Any),
+            EA::AddressSpecifier_::Literal(addr) => (
+                loc,
+                AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
+            ),
+            EA::AddressSpecifier_::Name(name) => {
+                // Construct an expansion name exp for regular type check
+                let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
+                self.translate_name(
+                    &self.to_loc(&name.loc),
+                    &maccess,
+                    None,
+                    &Type::new_prim(PrimitiveType::Address),
+                );
+                (
+                    loc,
+                    AddressSpecifier::Parameter(self.symbol_pool().make(name.value.as_str())),
+                )
+            },
+            EA::AddressSpecifier_::Call(maccess, type_args, name) => {
+                // Construct an expansion function call for regular type check
+                let name_exp = sp(
+                    name.loc,
+                    EA::Exp_::Name(sp(name.loc, EA::ModuleAccess_::Name(*name)), None),
+                );
+                if let ExpData::Call(id, Operation::MoveFunction(mid, fid), _) = self
+                    .translate_fun_call(
+                        &Type::new_prim(PrimitiveType::Address),
+                        &loc,
+                        maccess,
+                        type_args.as_ref().map(|v| v.as_slice()),
+                        &[&name_exp],
+                    )
+                {
+                    let inst = self.parent.parent.env.get_node_instantiation(id);
+                    (
+                        loc,
+                        AddressSpecifier::Call(
+                            mid.qualified_inst(fid, inst),
+                            self.symbol_pool().make(name.value.as_str()),
+                        ),
+                    )
+                } else {
+                    // Error reported
+                    debug_assert!(self.parent.parent.env.has_errors());
+                    (loc, AddressSpecifier::Any)
+                }
+            },
+        }
+    }
+
+    fn translate_address(&mut self, loc: &Loc, addr: &EA::Address) -> Address {
+        let x = self.parent.parent.resolve_address(loc, addr);
+        Address::Numerical(x.into_inner())
+    }
+}
+
 /// # Expression Translation
 
 impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'module_translator> {
@@ -1202,7 +1367,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Translates a specification block embedded in an expression, and returns the
     /// model representation of it.
-    fn translate_spec_block(&mut self, loc: &Loc, block: &SpecBlock) -> Spec {
+    fn translate_spec_block(&mut self, loc: &Loc, block: &EA::SpecBlock) -> Spec {
         let fun_name = if let Some(name) = &self.fun_name {
             name.clone()
         } else {
@@ -3002,7 +3167,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if type_args.is_some() {
             self.error(loc, "macro invocation cannot have type arguments");
             self.new_error_exp()
-        } else if let ModuleAccess_::Name(name) = &maccess.value {
+        } else if let EA::ModuleAccess_::Name(name) = &maccess.value {
             let name_sym = self.symbol_pool().make(name.value.as_str());
             if self.mode == ExpTranslationMode::TryImplAsSpec
                 && name_sym == self.parent.parent.assert_symbol()

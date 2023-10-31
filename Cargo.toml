@@ -54,6 +54,7 @@ members = [
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
+    "crates/aptos-debugger",
     "crates/aptos-drop-helper",
     "crates/aptos-enum-conversion-derive",
     "crates/aptos-faucet/cli",
@@ -115,7 +116,6 @@ members = [
     "ecosystem/node-checker",
     "ecosystem/node-checker/fn-check-client",
     "execution/block-partitioner",
-    "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",
     "execution/executor-service",
@@ -242,13 +242,13 @@ default-members = [
     "aptos-node",
     "consensus/safety-rules",
     "crates/aptos",
+    "crates/aptos-debugger",
     "crates/aptos-faucet/service",
     "crates/aptos-keygen",
     "crates/aptos-rate-limiter",
     "crates/aptos-rosetta",
     "crates/transaction-emitter",
     "aptos-move/framework",
-    "execution/db-bootstrapper",
     "storage/backup/backup-cli",
     "ecosystem/node-checker",
 ]
@@ -296,7 +296,7 @@ aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
-aptos-debugger = { path = "aptos-move/aptos-debugger" }
+aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
@@ -350,6 +350,7 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
@@ -542,6 +543,7 @@ lz4 = "1.24.0"
 maplit = "1.0.2"
 merlin = "3"
 mime = "0.3.16"
+mini-moka = { version = "0.10.2", features = ["sync"] }
 mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
@@ -600,6 +602,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
+rstack-self =  { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 scopeguard = "1.2.0"
@@ -645,18 +648,19 @@ tokio = { version = "1.21.0", features = ["full"] }
 tokio-io-timeout = "1.2.0"
 tokio-metrics = "0.1.0"
 tokio-retry = "0.3.0"
+tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.10.0", features = [
+tonic = { version = "0.10.2", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
 ] }
-tonic-reflection = "0.10.0"
+tonic-reflection = "0.10.2"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
@@ -667,7 +671,7 @@ walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
-x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", rev = "b9cdbaf36bf2a83438d9f660e5a708c82ed60d8e" }
+x25519-dalek = "1.2.0"
 
 # MOVE DEPENDENCIES
 move-abigen = { path = "third_party/move/move-prover/move-abigen" }
@@ -739,10 +743,6 @@ debug-assertions = true
 [profile.bench]
 debug = true
 
-# This is a temporary workaround to avoid multiple library
-# definitions for LZ4 (caused by rust-rocksdb).
-# This will be removed once our pull requests land.
-# https://github.com/rust-rocksdb/rust-rocksdb/issues/666
 [patch.crates-io]
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }

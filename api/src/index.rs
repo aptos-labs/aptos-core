@@ -4,7 +4,7 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::Context,
+    context::{api_spawn_blocking, Context},
     response::{BasicResponse, BasicResponseStatus, BasicResult},
     ApiTags,
 };
@@ -36,7 +36,7 @@ impl IndexApi {
 
         let node_role = self.context.node_role();
 
-        match accept_type {
+        api_spawn_blocking(move || match accept_type {
             AcceptType::Json => {
                 let index_response = IndexResponse::new(
                     ledger_info.clone(),
@@ -53,6 +53,7 @@ impl IndexApi {
                 let index_response = IndexResponseBcs::new(ledger_info.clone(), node_role);
                 BasicResponse::try_from_bcs((index_response, &ledger_info, BasicResponseStatus::Ok))
             },
-        }
+        })
+        .await
     }
 }

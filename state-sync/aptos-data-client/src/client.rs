@@ -183,14 +183,15 @@ impl AptosDataClient {
         Ok(())
     }
 
-    /// Chooses the peer with the lowest latency from the given set of serviceable peers
-    fn choose_lowest_latency_peer(
+    /// Chooses the peer with the lowest distance from the validator set
+    /// and measured latency (using the given set of serviceable peers).
+    fn choose_lowest_distance_and_latency_peer(
         &self,
         request: &StorageServiceRequest,
         serviceable_peers: HashSet<PeerNetworkId>,
     ) -> Result<PeerNetworkId, Error> {
-        // Choose the peer with the lowest latency
-        if let Some(peer) = utils::choose_lowest_latency_peer(
+        // Choose the peer with the lowest distance and latency
+        if let Some(peer) = utils::choose_lowest_distance_and_latency_peer(
             serviceable_peers.clone(),
             self.get_peers_and_metadata(),
         ) {
@@ -222,8 +223,8 @@ impl AptosDataClient {
             // Choose a peer to handle the subscription request
             self.choose_peer_for_subscription_request(request, serviceable_peers)
         } else if request.data_request.is_optimistic_fetch() {
-            // Choose the peer with the lowest latency for the optimistic fetch
-            self.choose_lowest_latency_peer(request, serviceable_peers)
+            // Choose the peer with the lowest distance and latency for the optimistic fetch
+            self.choose_lowest_distance_and_latency_peer(request, serviceable_peers)
         } else {
             // Choose the peer randomly weighted by latency
             self.choose_random_peer_by_latency(request, serviceable_peers)
@@ -281,7 +282,8 @@ impl AptosDataClient {
         }
 
         // Otherwise, we need to choose a new peer and update the subscription state
-        let peer_network_id = self.choose_lowest_latency_peer(request, serviceable_peers)?;
+        let peer_network_id =
+            self.choose_lowest_distance_and_latency_peer(request, serviceable_peers)?;
         let subscription_state = SubscriptionState::new(peer_network_id, request_stream_id);
         *active_subscription_state = Some(subscription_state);
 

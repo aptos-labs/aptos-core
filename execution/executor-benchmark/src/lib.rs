@@ -19,7 +19,7 @@ use crate::{
     db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
     transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
 };
-use aptos_block_executor::counters as block_executor_counters;
+use aptos_block_executor::counters::{self as block_executor_counters, GasType};
 use aptos_block_partitioner::v2::counters::BLOCK_PARTITIONING_SECONDS;
 use aptos_config::config::{NodeConfig, PrunerConfig};
 use aptos_db::AptosDB;
@@ -191,7 +191,7 @@ pub fn run_benchmark<V>(
     );
 
     let mut start_time = Instant::now();
-    let start_gas_measurement = GasMesurement::start();
+    let start_gas_measurement = GasMeasuring::start();
 
     let start_partitioning_total = BLOCK_PARTITIONING_SECONDS.get_sample_sum();
     let start_execution_total = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.get_sample_sum();
@@ -248,7 +248,7 @@ pub fn run_benchmark<V>(
 
     let elapsed = start_time.elapsed().as_secs_f64();
     let delta_v = (db.reader.get_latest_version().unwrap() - version) as f64;
-    let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+    let delta_gas = start_gas_measurement.end();
 
     let delta_vm_time = APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS.get_sample_sum() - start_vm_time;
     info!(
@@ -266,10 +266,15 @@ pub fn run_benchmark<V>(
         }
     );
     info!("Overall TPS: {} txn/s", delta_v / elapsed);
-    info!("Overall GPS: {} gas/s", delta_gas / elapsed);
+    info!("Overall GPS: {} gas/s", delta_gas.gas / elapsed);
+    info!("Overall ioGPS: {} gas/s", delta_gas.io_gas / elapsed);
+    info!(
+        "Overall executionGPS: {} gas/s",
+        delta_gas.execution_gas / elapsed
+    );
     info!(
         "Overall GPT: {} gas/txn",
-        delta_gas / (delta_gas_count as f64).max(1.0)
+        delta_gas.gas / (delta_gas.gas_count as f64).max(1.0)
     );
 
     let time_in_partitioning =
@@ -494,46 +499,66 @@ fn add_accounts_impl<V>(
     );
 }
 
-struct GasMesurement {
-    start_gas: f64,
-    start_gas_count: u64,
+struct GasMeasurement {
+    pub gas: f64,
+
+    pub io_gas: f64,
+    pub execution_gas: f64,
+
+    pub gas_count: u64,
 }
 
-impl GasMesurement {
-    pub fn sequential_gas_counter() -> Histogram {
-        block_executor_counters::TXN_GAS.with_label_values(&[
-            block_executor_counters::Mode::SEQUENTIAL,
-            block_executor_counters::GasType::NON_STORAGE_GAS,
-        ])
+impl GasMeasurement {
+    pub fn sequential_gas_counter(gas_type: &str) -> Histogram {
+        block_executor_counters::TXN_GAS
+            .with_label_values(&[block_executor_counters::Mode::SEQUENTIAL, gas_type])
     }
 
-    pub fn parallel_gas_counter() -> Histogram {
-        block_executor_counters::TXN_GAS.with_label_values(&[
-            block_executor_counters::Mode::PARALLEL,
-            block_executor_counters::GasType::NON_STORAGE_GAS,
-        ])
+    pub fn parallel_gas_counter(gas_type: &str) -> Histogram {
+        block_executor_counters::TXN_GAS
+            .with_label_values(&[block_executor_counters::Mode::PARALLEL, gas_type])
     }
 
-    pub fn start() -> Self {
-        let start_gas = Self::sequential_gas_counter().get_sample_sum()
-            + Self::parallel_gas_counter().get_sample_sum();
-        let start_gas_count = Self::sequential_gas_counter().get_sample_count()
-            + Self::parallel_gas_counter().get_sample_count();
+    pub fn now() -> GasMeasurement {
+        let gas = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum()
+            + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_sum();
+        let io_gas = Self::sequential_gas_counter(GasType::IO_GAS).get_sample_sum()
+            + Self::parallel_gas_counter(GasType::IO_GAS).get_sample_sum();
+        let execution_gas = Self::sequential_gas_counter(GasType::EXECUTION_GAS).get_sample_sum()
+            + Self::parallel_gas_counter(GasType::EXECUTION_GAS).get_sample_sum();
+
+        let gas_count = Self::sequential_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count()
+            + Self::parallel_gas_counter(GasType::NON_STORAGE_GAS).get_sample_count();
 
         Self {
-            start_gas,
-            start_gas_count,
+            gas,
+            io_gas,
+            execution_gas,
+            gas_count,
+        }
+    }
+}
+
+struct GasMeasuring {
+    start: GasMeasurement,
+}
+
+impl GasMeasuring {
+    pub fn start() -> Self {
+        Self {
+            start: GasMeasurement::now(),
         }
     }
 
-    pub fn end(self) -> (f64, u64) {
-        let delta_gas = (Self::sequential_gas_counter().get_sample_sum()
-            + Self::parallel_gas_counter().get_sample_sum())
-            - self.start_gas;
-        let delta_gas_count = (Self::sequential_gas_counter().get_sample_count()
-            + Self::parallel_gas_counter().get_sample_count())
-            - self.start_gas_count;
-        (delta_gas, delta_gas_count)
+    pub fn end(self) -> GasMeasurement {
+        let end = GasMeasurement::now();
+
+        GasMeasurement {
+            gas: end.gas - self.start.gas,
+            io_gas: end.io_gas - self.start.io_gas,
+            execution_gas: end.execution_gas - self.start.execution_gas,
+            gas_count: end.gas_count - self.start.gas_count,
+        }
     }
 }
 

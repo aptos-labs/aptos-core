@@ -8,6 +8,7 @@ spec aptos_framework::timestamp {
         use aptos_framework::chain_status;
         requires chain_status::is_operating();
         include UpdateGlobalTimeAbortsIf;
+        ensures (proposer != @vm_reserved) ==> (spec_now_microseconds() == timestamp);
     }
 
     spec schema UpdateGlobalTimeAbortsIf {
