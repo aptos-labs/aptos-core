@@ -96,7 +96,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             drop(bcs_deser_timer);
 
             let shard_id = req.shard_id;
-            self.thread_pool[shard_id].spawn(move || {
+            self.thread_pool[shard_id].spawn_fifo(move || {
                 Self::handle_message(message, req, state_view, kv_txs);
             });
         }
