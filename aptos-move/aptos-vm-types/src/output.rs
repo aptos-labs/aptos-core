@@ -170,6 +170,9 @@ impl VMOutput {
         // TODO[agg_v2](cleanup) move drain to happen when getting what to materialize.
         let _ = self.change_set.drain_delayed_field_change_set();
         let _ = self.change_set.drain_reads_needing_delayed_field_exchange();
+        let _ = self
+            .change_set
+            .drain_group_reads_needing_delayed_field_exchange();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set

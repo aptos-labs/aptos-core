@@ -585,7 +585,8 @@ where
             Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
             total_refund += refund;
 
-            let bytes_fee = self.storage_fee_for_state_bytes(key, group_write.encoded_group_size());
+            let bytes_fee =
+                self.storage_fee_for_state_bytes(key, group_write.maybe_group_op_size());
 
             let fee = slot_fee + bytes_fee;
             // TODO: should we distringuish group writes.

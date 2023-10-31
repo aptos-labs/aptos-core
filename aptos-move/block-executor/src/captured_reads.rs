@@ -154,11 +154,11 @@ impl<V: TransactionWrite> DataRead<V> {
 /// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-struct GroupRead<T: Transaction> {
+pub(crate) struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
-    collected_size: Option<u64>,
+    pub(crate) collected_size: Option<u64>,
     /// Reads to individual resources in the group, keyed by a tag.
-    inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
+    pub(crate) inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
 }
 
 /// Defines different ways `DelayedFieldResolver` can be used to read its values
@@ -317,6 +317,19 @@ impl<T: Transaction> CapturedReads<T> {
         self.data_reads
             .iter()
             .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
+    }
+
+    // Return an iterator over the captured group reads
+    // that contain a delayed field
+    pub(crate) fn get_group_read_values_with_delayed_fields(
+        &self,
+    ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
+        self.group_reads.iter().filter(|(_, group_read)| {
+            group_read
+                .inner_reads
+                .iter()
+                .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
+        })
     }
 
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks

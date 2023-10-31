@@ -548,6 +548,12 @@ impl AptosVM {
         for (key, group_write) in change_set.resource_group_write_set().iter() {
             gas_meter.charge_io_gas_for_group_write(key, group_write)?;
         }
+        for (key, group_write) in change_set
+            .group_reads_needing_delayed_field_exchange()
+            .iter()
+        {
+            gas_meter.charge_io_gas_for_group_write(key, group_write)?;
+        }
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(
             &mut change_set,
@@ -1336,10 +1342,9 @@ impl AptosVM {
                 .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
         }
         for (state_key, group_write) in change_set.resource_group_write_set().iter() {
-            for tag in group_write.inner_ops().keys() {
-                // TODO: Typelayout is set to None. Is this correct?
+            for (tag, (_, maybe_layout)) in group_write.inner_ops() {
                 resource_group_view
-                    .get_resource_from_group(state_key, tag, None)
+                    .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
                     .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
             }
         }

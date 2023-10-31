@@ -1040,18 +1040,48 @@ where
         BTreeMap::new()
     }
 
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (
+            <Self::Txn as Transaction>::Value,
+            Vec<(
+                <Self::Txn as Transaction>::Tag,
+                (
+                    <Self::Txn as Transaction>::Value,
+                    Option<Arc<MoveTypeLayout>>,
+                ),
+            )>,
+        ),
+    > {
+        // TODO[agg_v2](tests): add aggregators V2 to the proptest?
+        BTreeMap::new()
+    }
+
     // TODO[agg_v2](tests): Currently, appending None to all events, which means none of the
     // events have aggregators. Test it with aggregators as well.
     fn get_events(&self) -> Vec<(E, Option<MoveTypeLayout>)> {
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    fn resource_group_write_set(&self) -> Vec<(K, ValueType, BTreeMap<u32, ValueType>)> {
+    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        K,
+        ValueType,
+        BTreeMap<u32, (ValueType, Option<Arc<MoveTypeLayout>>)>,
+    )> {
         self.group_writes
             .iter()
             .cloned()
             .map(|(group_key, metadata_v, inner_ops)| {
-                (group_key, metadata_v, inner_ops.into_iter().collect())
+                (
+                    group_key,
+                    metadata_v,
+                    inner_ops.into_iter().map(|(k, v)| (k, (v, None))).collect(),
+                )
             })
             .collect()
     }

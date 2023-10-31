@@ -158,6 +158,7 @@ pub(crate) fn build_change_set(
         BTreeMap::from_iter(delayed_field_change_set),
         // TODO[agg_v2](fix) add to the caller.
         BTreeMap::new(),
+        BTreeMap::new(),
         vec![],
         &MockChangeSetChecker,
     )

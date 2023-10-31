@@ -54,10 +54,11 @@ pub(crate) struct VersionedGroupValue<T, V> {
     /// Note: if we do not garbage collect final idx_to_update contents until the end of
     /// block execution (lifetime of the data-structure), then we can have other structures
     /// hold raw pointers to the values as an optimization.
-    idx_to_update: BTreeMap<ShiftedTxnIndex, CachePadded<HashMap<T, Arc<V>>>>,
+    idx_to_update:
+        BTreeMap<ShiftedTxnIndex, CachePadded<HashMap<T, (Arc<V>, Option<Arc<MoveTypeLayout>>)>>>,
 
     /// Group contents corresponding to the latest committed version.
-    committed_group: HashMap<T, Arc<V>>,
+    committed_group: HashMap<T, (Arc<V>, Option<Arc<MoveTypeLayout>>)>,
 }
 
 /// Maps each key (access path) to an internal VersionedValue.
@@ -81,8 +82,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     fn set_base_values(
         &mut self,
         shifted_idx: ShiftedTxnIndex,
-        // TODO[agg_v2](fix) add layout to values
-        values: impl IntoIterator<Item = (T, V)>,
+        values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
     ) {
         match self.idx_to_update.get(&shifted_idx) {
             Some(previous) => {
@@ -94,8 +94,9 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 // If maybe_layout is None, they are required to be identical
                 // If maybe_layout is Some, there might have been an exchange
                 // Assert the length of bytes for efficiency (instead of full equality)
-                for (tag, v) in values.into_iter() {
-                    let prev_v = previous
+                // TODO[agg_v2] Ignoring layout here. Should we do anything?
+                for (tag, (v, _)) in values.into_iter() {
+                    let (prev_v, _) = previous
                         .get(&tag)
                         .expect("Reading twice from storage must be consistent");
                     assert!(v.bytes().map(|b| b.len()) == prev_v.bytes().map(|b| b.len()));
@@ -112,8 +113,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         &mut self,
         shifted_idx: ShiftedTxnIndex,
         incarnation: Incarnation,
-        // TODO[agg_v2](fix) add layout to values
-        values: impl IntoIterator<Item = (T, V)>,
+        values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
     ) -> bool {
         let zero_idx = ShiftedTxnIndex::zero();
         let at_base_version = shifted_idx == zero_idx;
@@ -124,7 +124,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
         let arc_map = values
             .into_iter()
-            .map(|(tag, v)| {
+            .map(|(tag, (v, maybe_layout))| {
                 if !prev_tags.contains(&tag) {
                     writes_outside = true;
                 }
@@ -135,11 +135,14 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 let tag_entry = self.versioned_map.entry(tag.clone()).or_default();
                 tag_entry.insert(
                     shifted_idx.clone(),
-                    // TODO[agg_v2](fix) layout shouldn't be none
-                    CachePadded::new(GroupEntry::new(incarnation, arc_v.clone(), None)),
+                    CachePadded::new(GroupEntry::new(
+                        incarnation,
+                        arc_v.clone(),
+                        maybe_layout.clone(),
+                    )),
                 );
 
-                (tag, arc_v)
+                (tag, (arc_v, maybe_layout))
             })
             .collect();
 
@@ -208,16 +211,16 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .idx_to_update
             .get(&shifted_idx)
             .expect("Group updates must exist at the index to commit");
-        for (tag, v) in idx_updates.iter() {
+        for (tag, (v, maybe_layout)) in idx_updates.iter() {
             match (self.committed_group.entry(tag.clone()), v.write_op_kind()) {
                 (Occupied(entry), Deletion) => {
                     entry.remove();
                 },
                 (Occupied(mut entry), Modification) => {
-                    entry.insert(v.clone());
+                    entry.insert((v.clone(), maybe_layout.clone()));
                 },
                 (Vacant(entry), Creation) => {
-                    entry.insert(v.clone());
+                    entry.insert((v.clone(), maybe_layout.clone()));
                 },
                 (_, _) => {
                     bail!(
@@ -232,7 +235,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
         Ok(())
     }
 
-    fn get_committed_group(&self) -> Vec<(T, Arc<V>)> {
+    fn get_committed_group(&self) -> Vec<(T, (Arc<V>, Option<Arc<MoveTypeLayout>>))> {
         self.committed_group.clone().into_iter().collect()
     }
 
@@ -324,7 +327,11 @@ impl<
         }
     }
 
-    pub fn set_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
+    pub fn set_base_values(
+        &self,
+        key: K,
+        base_values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
+    ) {
         // Incarnation is irrelevant for storage version, set to 0.
         self.group_values
             .entry(key)
@@ -337,7 +344,7 @@ impl<
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        values: impl IntoIterator<Item = (T, V)>,
+        values: impl IntoIterator<Item = (T, (V, Option<Arc<MoveTypeLayout>>))>,
     ) -> bool {
         self.group_values.entry(key).or_default().write(
             ShiftedTxnIndex::new(txn_idx),
@@ -403,7 +410,11 @@ impl<
     /// The method checks that each committed write op kind is consistent with the existence of
     /// a previous value of the resource (must be creation iff no previous value, deletion or
     /// modification otherwise). When consistent, the output is Ok(..).
-    pub fn finalize_group(&self, key: &K, txn_idx: TxnIndex) -> anyhow::Result<Vec<(T, Arc<V>)>> {
+    pub fn finalize_group(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> anyhow::Result<Vec<(T, (Arc<V>, Option<Arc<MoveTypeLayout>>))>> {
         let mut v = self.group_values.get_mut(key).expect("Path must exist");
 
         v.commit_idx(ShiftedTxnIndex::new(txn_idx))?;
@@ -460,7 +471,7 @@ mod test {
             3,
             1,
             // tags 0, 1, 2.
-            (0..2).map(|i| (i, TestValue::creation_with_len(1))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(1), None))),
         );
 
         // Size should be uninitialized even if the output of lower txn is stored
@@ -495,7 +506,7 @@ mod test {
             4,
             0,
             // tags 1, 2.
-            (1..3).map(|i| (i, TestValue::creation_with_len(4))),
+            (1..3).map(|i| (i, (TestValue::creation_with_len(4), None))),
         );
         assert_matches!(
             map.read_from_group(&ap_2, &2, 4),
@@ -504,7 +515,7 @@ mod test {
         map.set_base_values(
             ap_2.clone(),
             // base tags 0, 1.
-            (0..2).map(|i| (i, TestValue::creation_with_len(2))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
         );
 
         // Tag not found vs not initialized,
@@ -542,7 +553,7 @@ mod test {
             5,
             3,
             // tags 0, 1, values are derived from [txn_idx, incarnation] seed.
-            (0..2).map(|i| (i, TestValue::new(vec![5, 3]))),
+            (0..2).map(|i| (i, (TestValue::new(vec![5, 3]), None))),
         );
         assert_eq!(
             map.read_from_group(&ap, &1, 12).unwrap(),
@@ -553,7 +564,7 @@ mod test {
             10,
             1,
             // tags 1, 2, values are derived from [txn_idx, incarnation] seed.
-            (1..3).map(|i| (i, TestValue::new(vec![10, 1]))),
+            (1..3).map(|i| (i, (TestValue::new(vec![10, 1]), None))),
         );
         assert_eq!(
             map.read_from_group(&ap, &1, 12).unwrap(),
@@ -591,14 +602,14 @@ mod test {
             5,
             3,
             // tags 0, 1
-            (0..2).map(|i| (i, TestValue::creation_with_len(2))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(2), None))),
         );
         assert_matches!(map.get_group_size(&ap, 12), Err(Uninitialized));
 
         map.set_base_values(
             ap.clone(),
             // base tag 1, 2, 3, 4
-            (1..5).map(|i| (i, TestValue::creation_with_len(1))),
+            (1..5).map(|i| (i, (TestValue::creation_with_len(1), None))),
         );
 
         let tag: usize = 5;
@@ -615,7 +626,7 @@ mod test {
             10,
             1,
             // tags 4, 5
-            (4..6).map(|i| (i, TestValue::creation_with_len(3))),
+            (4..6).map(|i| (i, (TestValue::creation_with_len(3), None))),
         );
         let exp_size_12 = exp_size + 2 * three_entry_len + tag_len - one_entry_len;
         assert_ok_eq!(map.get_group_size(&ap, 12), exp_size_12 as u64);
@@ -630,7 +641,7 @@ mod test {
             ap.clone(),
             6,
             1,
-            (0..2).map(|i| (i, TestValue::creation_with_len(4))),
+            (0..2).map(|i| (i, (TestValue::creation_with_len(4), None))),
         );
         let exp_size_7 = 2 * four_entry_len + 3 * one_entry_len + 5 * tag_len;
         assert_ok_eq!(map.get_group_size(&ap, 7), exp_size_7 as u64);
@@ -644,7 +655,7 @@ mod test {
         map: &VersionedGroupData<KeyType<Vec<u8>>, usize, TestValue>,
         key: &KeyType<Vec<u8>>,
         idx: TxnIndex,
-    ) -> HashMap<usize, Arc<TestValue>> {
+    ) -> HashMap<usize, (Arc<TestValue>, Option<Arc<MoveTypeLayout>>)> {
         map.finalize_group(key, idx).unwrap().into_iter().collect()
     }
 
@@ -656,7 +667,7 @@ mod test {
         map.set_base_values(
             ap.clone(),
             // base tag 1, 2, 3
-            (1..4).map(|i| (i, TestValue::with_kind(i, true))),
+            (1..4).map(|i| (i, (TestValue::with_kind(i, true), None))),
         );
         map.write(
             ap.clone(),
@@ -664,8 +675,8 @@ mod test {
             3,
             // insert at 0, remove at 1.
             vec![
-                (0, TestValue::with_kind(100, true)),
-                (1, TestValue::deletion()),
+                (0, (TestValue::with_kind(100, true), None)),
+                (1, (TestValue::deletion(), None)),
             ],
         );
         map.write(
@@ -673,7 +684,7 @@ mod test {
             3,
             0,
             // tags 2, 3
-            (2..4).map(|i| (i, TestValue::with_kind(200 + i, false))),
+            (2..4).map(|i| (i, (TestValue::with_kind(200 + i, false), None))),
         );
         let committed_3 = finalize_group_as_hashmap(&map, &ap, 3);
         // The value at tag 1 is from base, while 2 and 3 are from txn 3.
@@ -681,58 +692,58 @@ mod test {
         assert_eq!(committed_3.len(), 3);
         assert_some_eq!(
             committed_3.get(&1),
-            &Arc::new(TestValue::with_kind(1, true))
+            &(Arc::new(TestValue::with_kind(1, true)), None)
         );
         assert_some_eq!(
             committed_3.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed_3.get(&3),
-            &Arc::new(TestValue::with_kind(203, false))
+            &(Arc::new(TestValue::with_kind(203, false)), None)
         );
 
         map.write(ap.clone(), 5, 3, vec![
-            (3, TestValue::with_kind(303, false)),
-            (4, TestValue::with_kind(304, true)),
+            (3, (TestValue::with_kind(303, false), None)),
+            (4, (TestValue::with_kind(304, true), None)),
         ]);
         let committed_5 = finalize_group_as_hashmap(&map, &ap, 5);
         assert_eq!(committed_5.len(), 4);
         assert_some_eq!(
             committed_5.get(&1),
-            &Arc::new(TestValue::with_kind(1, true))
+            &(Arc::new(TestValue::with_kind(1, true)), None)
         );
         assert_some_eq!(
             committed_5.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed_5.get(&3),
-            &Arc::new(TestValue::with_kind(303, false))
+            &(Arc::new(TestValue::with_kind(303, false)), None)
         );
         assert_some_eq!(
             committed_5.get(&4),
-            &Arc::new(TestValue::with_kind(304, true))
+            &(Arc::new(TestValue::with_kind(304, true)), None)
         );
 
         let committed_7 = finalize_group_as_hashmap(&map, &ap, 7);
         assert_eq!(committed_7.len(), 4);
         assert_some_eq!(
             committed_7.get(&0),
-            &Arc::new(TestValue::with_kind(100, true))
+            &(Arc::new(TestValue::with_kind(100, true)), None)
         );
         assert_none!(committed_7.get(&1));
         assert_some_eq!(
             committed_7.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed_7.get(&3),
-            &Arc::new(TestValue::with_kind(303, false))
+            &(Arc::new(TestValue::with_kind(303, false)), None)
         );
         assert_some_eq!(
             committed_7.get(&4),
-            &Arc::new(TestValue::with_kind(304, true))
+            &(Arc::new(TestValue::with_kind(304, true)), None)
         );
 
         map.write(
@@ -741,21 +752,22 @@ mod test {
             0,
             // re-insert at 1, remove everything else
             vec![
-                (0, TestValue::deletion()),
-                (1, TestValue::with_kind(400, true)),
-                (2, TestValue::deletion()),
-                (3, TestValue::deletion()),
-                (4, TestValue::deletion()),
+                (0, (TestValue::deletion(), None)),
+                (1, (TestValue::with_kind(400, true), None)),
+                (2, (TestValue::deletion(), None)),
+                (3, (TestValue::deletion(), None)),
+                (4, (TestValue::deletion(), None)),
             ],
         );
         let committed_8 = finalize_group_as_hashmap(&map, &ap, 8);
         assert_eq!(committed_8.len(), 1);
         assert_some_eq!(
             committed_8.get(&1),
-            &Arc::new(TestValue::with_kind(400, true))
+            &(Arc::new(TestValue::with_kind(400, true)), None)
         );
     }
 
+    // TODO[agg_v2](test) Test with non trivial layout.
     #[test]
     fn group_commit_op_kind_checks() {
         let ap = KeyType(b"/foo/f".to_vec());
@@ -764,14 +776,14 @@ mod test {
         map.set_base_values(
             ap.clone(),
             // base tag 1, 2, 3
-            (1..4).map(|i| (i, TestValue::with_kind(i, true))),
+            (1..4).map(|i| (i, (TestValue::with_kind(i, true), None))),
         );
         map.write(
             ap.clone(),
             3,
             2,
             // remove at 0, must fail commit.
-            vec![(0, TestValue::deletion())],
+            vec![(0, (TestValue::deletion(), None))],
         );
         assert_err!(map.finalize_group(&ap, 3));
 
@@ -780,7 +792,7 @@ mod test {
             3,
             2,
             // modify at 0, must fail commit.
-            vec![(0, TestValue::with_kind(100, false))],
+            vec![(0, (TestValue::with_kind(100, false), None))],
         );
         assert_err!(map.finalize_group(&ap, 3));
 
@@ -789,7 +801,7 @@ mod test {
             3,
             2,
             // create at 1, must fail commit
-            vec![(1, TestValue::with_kind(101, true))],
+            vec![(1, (TestValue::with_kind(101, true), None))],
         );
         assert_err!(map.finalize_group(&ap, 3));
 
@@ -800,20 +812,26 @@ mod test {
             2,
             // modify at 0, must fail commit.
             vec![
-                (0, TestValue::with_kind(100, true)),
-                (1, TestValue::with_kind(101, false)),
+                (0, (TestValue::with_kind(100, true), None)),
+                (1, (TestValue::with_kind(101, false), None)),
             ],
         );
         let committed = finalize_group_as_hashmap(&map, &ap, 3);
         assert_some_eq!(
             committed.get(&0),
-            &Arc::new(TestValue::with_kind(100, true))
+            &(Arc::new(TestValue::with_kind(100, true)), None)
         );
         assert_some_eq!(
             committed.get(&1),
-            &Arc::new(TestValue::with_kind(101, false))
+            &(Arc::new(TestValue::with_kind(101, false)), None)
         );
-        assert_some_eq!(committed.get(&2), &Arc::new(TestValue::with_kind(2, true)));
-        assert_some_eq!(committed.get(&3), &Arc::new(TestValue::with_kind(3, true)));
+        assert_some_eq!(
+            committed.get(&2),
+            &(Arc::new(TestValue::with_kind(2, true)), None)
+        );
+        assert_some_eq!(
+            committed.get(&3),
+            &(Arc::new(TestValue::with_kind(3, true)), None)
+        );
     }
 }

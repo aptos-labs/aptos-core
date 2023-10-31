@@ -121,6 +121,22 @@ pub trait TransactionOutput: Send + Sync + Debug {
         (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
     >;
 
+    fn group_reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (
+            <Self::Txn as Transaction>::Value,
+            Vec<(
+                <Self::Txn as Transaction>::Tag,
+                (
+                    <Self::Txn as Transaction>::Value,
+                    Option<Arc<MoveTypeLayout>>,
+                ),
+            )>,
+        ),
+    >;
+
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
 
@@ -129,7 +145,13 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
         <Self::Txn as Transaction>::Value,
-        BTreeMap<<Self::Txn as Transaction>::Tag, <Self::Txn as Transaction>::Value>,
+        BTreeMap<
+            <Self::Txn as Transaction>::Tag,
+            (
+                <Self::Txn as Transaction>::Value,
+                Option<Arc<MoveTypeLayout>>,
+            ),
+        >,
     )>;
 
     fn resource_group_metadata_ops(

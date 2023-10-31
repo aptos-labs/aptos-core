@@ -12,7 +12,7 @@ use aptos_aggregator::{
 };
 use aptos_types::{aggregator::PanicError, state_store::state_key::StateKey, write_set::WriteOp};
 use better_any::{Tid, TidAble};
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashSet},
@@ -37,6 +37,14 @@ pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
     pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     pub reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+    pub group_reads_needing_exchange: BTreeMap<
+        StateKey,
+        (
+            WriteOp,
+            Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+            u64,
+        ),
+    >,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -128,6 +136,12 @@ impl<'a> NativeAggregatorContext<'a> {
             } else {
                 self.delayed_field_resolver
                     .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
+            },
+            group_reads_needing_exchange: if delayed_write_set_keys.is_empty() {
+                BTreeMap::new()
+            } else {
+                self.delayed_field_resolver
+                    .get_group_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
             },
         })
     }

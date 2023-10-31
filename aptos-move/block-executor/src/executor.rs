@@ -523,7 +523,7 @@ where
             }
 
             let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
-            let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
+            let mut finalized_group_writes = Vec::with_capacity(group_metadata_ops.len());
             let mut maybe_err = None;
             for (group_key, metadata_op) in group_metadata_ops.into_iter() {
                 // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
@@ -543,7 +543,7 @@ where
                                 IntentionalFallbackToSequential::ResourceGroupError,
                             )));
                         }
-                        finalized_groups.push((group_key, metadata_op, finalized_group));
+                        finalized_group_writes.push((group_key, metadata_op, finalized_group));
                     },
                     Err(e) => {
                         error!("Error committing resource group {:?}", e);
@@ -557,7 +557,7 @@ where
                     break;
                 }
             }
-            last_input_output.record_finalized_group(txn_idx, finalized_groups);
+            last_input_output.record_finalized_group(txn_idx, finalized_group_writes);
 
             maybe_err = maybe_err.or_else(|| last_input_output.maybe_execution_error(txn_idx));
 
@@ -634,6 +634,41 @@ where
             }
         }
         patched_resource_write_set
+    }
+
+    fn map_id_to_values_in_group_writes(
+        finalized_group_writes: Vec<(
+            T::Key,
+            T::Value,
+            Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
+        )>,
+        latest_view: &LatestView<T, S, X>,
+    ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)> {
+        let mut patched_finalized_group_writes = Vec::new();
+        for (group_key, group_metadata_op, resource_vec) in finalized_group_writes.into_iter() {
+            let mut patched_resource_vec = Vec::new();
+            for (tag, (value, maybe_layout)) in resource_vec.into_iter() {
+                // maybe_layout is Some(_) if it contains a delayed field
+                if let Some(layout) = maybe_layout {
+                    patched_resource_vec.push((
+                        tag,
+                        Arc::new(Self::replace_ids_with_values(
+                            &value,
+                            layout.as_ref(),
+                            latest_view,
+                        )),
+                    ));
+                } else {
+                    patched_resource_vec.push((tag, value.clone()));
+                }
+            }
+            patched_finalized_group_writes.push((
+                group_key,
+                group_metadata_op,
+                patched_resource_vec,
+            ));
+        }
+        patched_finalized_group_writes
     }
 
     // Parse the input `value` and replace delayed field identifiers with
@@ -736,14 +771,15 @@ where
     }
 
     fn serialize_groups(
-        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
+        finalized_group_writes: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
     ) -> ::std::result::Result<Vec<(T::Key, T::Value)>, PanicOr<IntentionalFallbackToSequential>>
     {
-        finalized_groups
+        finalized_group_writes
             .into_iter()
             .map(|(group_key, mut metadata_op, finalized_group)| {
                 let btree: BTreeMap<T::Tag, Bytes> = finalized_group
                     .into_iter()
+                    // TODO[agg_v2](fix): Should anything be done using the layout here?
                     .map(|(resource_tag, arc_v)| {
                         let bytes = arc_v
                             .extract_raw_bytes()
@@ -775,7 +811,7 @@ where
         let parallel_state = ParallelState::<T, X>::new(versioned_cache, scheduler, shared_counter);
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let resource_write_set = last_input_output.resource_write_set(txn_idx);
-        let finalized_groups = last_input_output.take_finalized_group(txn_idx);
+        let finalized_group_writes = last_input_output.take_finalized_group(txn_idx);
 
         let mut patched_resource_write_set =
             Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
@@ -791,6 +827,39 @@ where
             }
         }
 
+        let mut patched_finalized_group_writes =
+            Self::map_id_to_values_in_group_writes(finalized_group_writes, &latest_view);
+
+        if let Some(group_reads_needing_delayed_field_exchange) =
+            last_input_output.group_reads_needing_delayed_field_exchange(txn_idx)
+        {
+            for (key, (metadata, resource_map)) in
+                group_reads_needing_delayed_field_exchange.into_iter()
+            {
+                patched_finalized_group_writes.push((
+                    key,
+                    metadata,
+                    resource_map
+                        .into_iter()
+                        .map(|(tag, (value, maybe_layout))| {
+                            (
+                                tag,
+                                if let Some(layout) = maybe_layout {
+                                    Arc::new(Self::replace_ids_with_values(
+                                        &value,
+                                        layout.as_ref(),
+                                        &latest_view,
+                                    ))
+                                } else {
+                                    Arc::new(value)
+                                },
+                            )
+                        })
+                        .collect(),
+                ));
+            }
+        }
+
         let events = last_input_output.events(txn_idx);
         let patched_events = Self::map_id_to_values_events(events, &latest_view);
         let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
@@ -800,8 +869,7 @@ where
             base_view,
         );
 
-        // TODO[agg_v2]: patch group writes in finalized groups
-        let serialized_groups = Self::serialize_groups(finalized_groups)?;
+        let serialized_groups = Self::serialize_groups(patched_finalized_group_writes)?;
 
         last_input_output.record_materialized_txn_output(
             txn_idx,
@@ -1052,15 +1120,16 @@ where
             unsync_map.write(key, write_op, layout);
         }
 
-        // TODO[agg_v2](fix): provide layouts
-        for (group_key, _, group_ops) in output.resource_group_write_set().into_iter() {
+        for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
             for (value_tag, group_op) in group_ops.into_iter() {
+                // TODO[agg_v2](fix): provide layouts
                 unsync_map
-                    .insert_group_op(&group_key, value_tag, group_op)
+                    .insert_group_op(&group_key, value_tag, group_op.0, group_op.1)
                     .map_err(|_| {
                         PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError)
                     })?;
             }
+            unsync_map.write(group_key, metadata_op, None);
         }
 
         for (key, write_op) in output
@@ -1145,7 +1214,8 @@ where
                 ViewState::Unsync(SequentialState {
                     unsync_map: &unsync_map,
                     counter: &counter,
-                    read_set: RefCell::new(HashSet::new()),
+                    resource_read_set: RefCell::new(HashSet::new()),
+                    group_read_set: RefCell::new(HashSet::new()),
                     dynamic_change_set_optimizations_enabled,
                 }),
                 idx as TxnIndex,
@@ -1171,9 +1241,10 @@ where
                     Self::apply_output_sequential(&unsync_map, &output)
                         .map_err(Error::FallbackToSequential)?;
 
-                    let group_metadata_ops = output.resource_group_metadata_ops();
-                    let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
-                    for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
+                    let mut finalized_group_writes = vec![];
+                    for (group_key, group_metadata_op) in
+                        output.resource_group_metadata_ops().into_iter()
+                    {
                         let finalized_group = unsync_map.finalize_group(&group_key);
                         if finalized_group.is_empty() != group_metadata_op.is_deletion() {
                             error!(
@@ -1186,7 +1257,11 @@ where
                                 IntentionalFallbackToSequential::ResourceGroupError,
                             )));
                         }
-                        finalized_groups.push((group_key, group_metadata_op, finalized_group));
+                        finalized_group_writes.push((
+                            group_key,
+                            group_metadata_op,
+                            finalized_group,
+                        ));
                     }
 
                     if dynamic_change_set_optimizations_enabled {
@@ -1215,15 +1290,46 @@ where
                             }
                         }
 
+                        let mut patched_finalized_group_writes =
+                            Self::map_id_to_values_in_group_writes(
+                                finalized_group_writes,
+                                &latest_view,
+                            );
+                        for (key, (metadata, resource_map)) in
+                            output.group_reads_needing_delayed_field_exchange()
+                        {
+                            patched_finalized_group_writes.push((
+                                key,
+                                metadata,
+                                resource_map
+                                    .into_iter()
+                                    .map(|(tag, (value, maybe_layout))| {
+                                        (
+                                            tag,
+                                            if let Some(layout) = maybe_layout {
+                                                Arc::new(Self::replace_ids_with_values(
+                                                    &value,
+                                                    layout.as_ref(),
+                                                    &latest_view,
+                                                ))
+                                            } else {
+                                                Arc::new(value)
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                            ));
+                        }
+
                         // Replace delayed field id with values in events
                         let patched_events = Self::map_id_to_values_events(
                             Box::new(output.get_events().into_iter()),
                             &latest_view,
                         );
 
-                        // TODO[agg_v2]: patch group writes in finalized groups
-                        let serialized_groups = Self::serialize_groups(finalized_groups)
-                            .map_err(Error::FallbackToSequential)?;
+                        let serialized_groups =
+                            Self::serialize_groups(patched_finalized_group_writes)
+                                .map_err(Error::FallbackToSequential)?;
 
                         // TODO[agg_v2] patch resources in groups and provide explicitly
                         output.incorporate_materialized_txn_output(
@@ -1237,8 +1343,22 @@ where
                         assert!(output.delayed_field_change_set().is_empty());
 
                         // TODO[agg_v2]: fallback to no resource group capability instead of unwrap.
-                        let serialized_groups = Self::serialize_groups(finalized_groups)
-                            .map_err(Error::FallbackToSequential)?;
+                        let patched_finalized_group_writes = finalized_group_writes
+                            .into_iter()
+                            .map(|(k, metadata, inner_ops)| {
+                                (
+                                    k,
+                                    metadata,
+                                    inner_ops
+                                        .into_iter()
+                                        .map(|(tag, (value, _))| (tag, value))
+                                        .collect(),
+                                )
+                            })
+                            .collect();
+                        let serialized_groups =
+                            Self::serialize_groups(patched_finalized_group_writes)
+                                .map_err(Error::FallbackToSequential)?;
 
                         output.incorporate_materialized_txn_output(
                             vec![],

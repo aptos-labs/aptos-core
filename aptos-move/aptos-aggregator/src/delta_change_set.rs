@@ -548,6 +548,27 @@ mod test {
         > {
             unimplemented!("Irrelevant for the test")
         }
+
+        fn get_group_reads_needing_exchange(
+            &self,
+            _delayed_write_set_keys: &HashSet<Self::Identifier>,
+            _skip: &HashSet<Self::ResourceKey>,
+        ) -> Result<
+            BTreeMap<
+                Self::ResourceKey,
+                (
+                    Self::ResourceValue,
+                    Vec<(
+                        Self::ResourceGroupTag,
+                        (Self::ResourceValue, Option<Arc<MoveTypeLayout>>),
+                    )>,
+                    u64,
+                ),
+            >,
+            PanicError,
+        > {
+            unimplemented!("Irrelevant for the test")
+        }
     }
 
     #[test]

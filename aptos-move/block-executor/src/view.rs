@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    captured_reads::{CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, ReadKind},
+    captured_reads::{
+        CapturedReads, DataRead, DelayedFieldRead, DelayedFieldReadKind, GroupRead, ReadKind,
+    },
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
 };
@@ -608,7 +610,8 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
 
 pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-    pub(crate) read_set: RefCell<HashSet<T::Key>>,
+    pub(crate) resource_read_set: RefCell<HashSet<T::Key>>,
+    pub(crate) group_read_set: RefCell<HashSet<T::Key>>,
     pub(crate) counter: &'a RefCell<u32>,
     pub(crate) dynamic_change_set_optimizations_enabled: bool,
 }
@@ -661,6 +664,24 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             },
         }
     }
+
+    // pub(crate) fn resource_read_set_sequential_execution(&self) -> RefCell<HashSet<T::Key>> {
+    //     match &self.latest_view {
+    //         ViewState::Sync(_) => unreachable!(
+    //             "Accessing resource read set for sequential execution while running in parallel execution mode"
+    //         ),
+    //         ViewState::Unsync(state) => state.resource_read_set.clone(),
+    //     }
+    // }
+
+    // pub(crate) fn group_read_set_sequential_execution(&self) -> RefCell<HashSet<T::Key>> {
+    //     match &self.latest_view {
+    //         ViewState::Sync(_) => unreachable!(
+    //             "Accessing group read set for sequential execution while running in parallel execution mode"
+    //         ),
+    //         ViewState::Unsync(state) => state.group_read_set.clone(),
+    //     }
+    // }
 
     fn get_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
         let ret = self.base_view.get_state_value(state_key);
@@ -821,6 +842,142 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .collect()
     }
 
+    fn get_group_reads_needing_exchange_parallel(
+        &self,
+        parallel_state: &ParallelState<'a, T, X>,
+        delayed_write_set_keys: &HashSet<T::Identifier>,
+        skip: &HashSet<T::Key>,
+    ) -> Result<
+        BTreeMap<
+            T::Key,
+            (
+                T::Value,
+                Vec<(T::Tag, (T::Value, Option<Arc<MoveTypeLayout>>))>,
+                u64,
+            ),
+        >,
+        PanicError,
+    > {
+        parallel_state
+            .captured_reads
+            .borrow()
+            .get_group_read_values_with_delayed_fields()
+            .filter(|(key, _)| !skip.contains(key))
+            .flat_map(|(key, group_read)| {
+                let GroupRead { inner_reads, .. } = group_read;
+                let mut resources_needing_delayed_field_exchange = vec![];
+                for (tag, data_read) in inner_reads {
+                    if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                        if let Some(bytes) = value.bytes() {
+                            let identifiers_in_read = self
+                                .extract_identifiers_from_value(bytes, layout.as_ref())
+                                .unwrap();
+                            if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                                // TODO[agg_v2](optimize): Is it possible to avoid clones here?
+                                resources_needing_delayed_field_exchange.push((
+                                    tag.clone(),
+                                    (value.as_ref().clone(), Some(layout.clone())),
+                                ));
+                            }
+                        }
+                    }
+                }
+                if resources_needing_delayed_field_exchange.is_empty() {
+                    return None;
+                }
+                if let Ok(MVDataOutput::Versioned(_version, metadata, _maybe_layout)) =
+                    parallel_state
+                        .versioned_map
+                        .data()
+                        .fetch_data(key, self.txn_idx)
+                {
+                    if let Some(group_size) = parallel_state.captured_reads.borrow().group_size(key)
+                    {
+                        return Some(Ok((
+                            key.clone(),
+                            (
+                                metadata.as_ref().clone(),
+                                resources_needing_delayed_field_exchange,
+                                group_size,
+                            ),
+                        )));
+                    }
+                }
+                // TODO[agg_v2](fix): Is this a code invariant error?
+                Some(Err(code_invariant_error(format!(
+                    "Cannot metdata op for the group read {:?}",
+                    key
+                ))))
+            })
+            .collect()
+    }
+
+    fn get_group_reads_needing_exchange_sequential(
+        &self,
+        group_read_set: &HashSet<T::Key>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        delayed_write_set_keys: &HashSet<T::Identifier>,
+        skip: &HashSet<T::Key>,
+    ) -> Result<
+        BTreeMap<
+            T::Key,
+            (
+                T::Value,
+                Vec<(T::Tag, (T::Value, Option<Arc<MoveTypeLayout>>))>,
+                u64,
+            ),
+        >,
+        PanicError,
+    > {
+        group_read_set
+            .iter()
+            .filter(|key| !skip.contains(key))
+            .flat_map(|key| {
+                if let Some(value_vec) = unsync_map.fetch_group_data(key) {
+                    let mut resources_needing_delayed_field_exchange = vec![];
+                    for (tag, (value, maybe_layout)) in value_vec {
+                        if let Some(layout) = maybe_layout {
+                            if let Some(bytes) = value.bytes() {
+                                let identifiers_in_read = self
+                                    .extract_identifiers_from_value(bytes, layout.as_ref())
+                                    .unwrap();
+                                if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
+                                    resources_needing_delayed_field_exchange.push((
+                                        tag.as_ref().clone(),
+                                        (value.as_ref().clone(), Some(layout.clone())),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                    if resources_needing_delayed_field_exchange.is_empty() {
+                        return None;
+                    }
+                    if let Some((metadata, _maybe_layout)) = unsync_map.fetch_data(key) {
+                        if let Ok(GroupReadResult::Size(group_size)) =
+                            unsync_map.get_group_size(key)
+                        {
+                            return Some(Ok((
+                                key.clone(),
+                                (
+                                    metadata.as_ref().clone(),
+                                    resources_needing_delayed_field_exchange,
+                                    group_size,
+                                ),
+                            )));
+                        }
+                    }
+                    // TODO[agg_v2](fix): Is this a code invariant error?
+                    return Some(Err(code_invariant_error(format!(
+                        "Cannot metdata op for the group read {:?}",
+                        key
+                    ))));
+                }
+                None
+            })
+            .collect()
+    }
+
     fn get_resource_state_value_impl(
         &self,
         state_key: &T::Key,
@@ -900,7 +1057,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 let ret = match state.unsync_map.fetch_data(state_key) {
                     // TODO[agg_v2](fix): Add a check that layout matches from the one from fetch_data
                     Some((v, _)) => {
-                        state.read_set.borrow_mut().insert(state_key.clone());
+                        state
+                            .resource_read_set
+                            .borrow_mut()
+                            .insert(state_key.clone());
                         Ok(v.as_state_value())
                     },
                     None => {
@@ -916,7 +1076,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                     .replace_values_with_identifiers(state_value.clone(), layout);
                                 let patched_state_value = match res {
                                     Ok((patched_state_value, _)) => {
-                                        state.read_set.borrow_mut().insert(state_key.clone());
+                                        state
+                                            .resource_read_set
+                                            .borrow_mut()
+                                            .insert(state_key.clone());
+                                        state.unsync_map.write(
+                                            state_key.clone(),
+                                            TransactionWrite::from_state_value(Some(
+                                                patched_state_value.clone(),
+                                            )),
+                                            maybe_layout.map(|layout| Arc::new(layout.clone())),
+                                        );
                                         Some(patched_state_value)
                                     },
                                     Err(err) => {
@@ -961,26 +1131,42 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> anyhow::Result<()> {
-        let base_group: BTreeMap<T::Tag, Bytes> = match self.get_base_value(group_key)? {
-            Some(state_value) => bcs::from_bytes(state_value.bytes())
-                .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
-            None => BTreeMap::new(),
-        };
+        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
+            match self.get_base_value(group_key)? {
+                Some(state_value) => (
+                    bcs::from_bytes(state_value.bytes())
+                        .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
+                    TransactionWrite::from_state_value(Some(state_value)),
+                ),
+                None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
+            };
         let base_group_sentinel_ops = base_group.into_iter().map(|(t, bytes)| {
             (
                 t,
-                TransactionWrite::from_state_value(Some(StateValue::new_legacy(bytes))),
+                (
+                    TransactionWrite::from_state_value(Some(StateValue::new_legacy(bytes))),
+                    None,
+                ),
             )
         });
 
         match &self.latest_view {
-            ViewState::Sync(state) => state
-                .versioned_map
-                .group_data()
-                .set_base_values(group_key.clone(), base_group_sentinel_ops),
-            ViewState::Unsync(state) => state
-                .unsync_map
-                .set_group_base_values(group_key.clone(), base_group_sentinel_ops),
+            ViewState::Sync(state) => {
+                state
+                    .versioned_map
+                    .group_data()
+                    .set_base_values(group_key.clone(), base_group_sentinel_ops);
+                state
+                    .versioned_map
+                    .data()
+                    .set_base_value(group_key.clone(), metadata_op, None);
+            },
+            ViewState::Unsync(state) => {
+                state
+                    .unsync_map
+                    .set_group_base_values(group_key.clone(), base_group_sentinel_ops);
+                state.unsync_map.write(group_key.clone(), metadata_op, None);
+            },
         };
         Ok(())
     }
@@ -1065,14 +1251,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         _maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        // TODO[agg_v2]: support layouts.
+        // TODO[agg_v2](fix): Don't see anywhere in this function where
+        // _maybe_layout input could be useful
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => {
                 state.read_from_group(group_key, resource_tag, self.txn_idx)?
             },
-            ViewState::Unsync(state) => state
-                .unsync_map
-                .get_value_from_group(group_key, resource_tag),
+            ViewState::Unsync(state) => {
+                // TODO[agg_v2](fix): Should we push the group key into read set
+                // irresepctive of whether the read operation succeeds?
+                state.group_read_set.borrow_mut().insert(group_key.clone());
+                state.unsync_map.read_from_group(group_key, resource_tag)
+            },
         };
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
@@ -1082,9 +1272,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 ViewState::Sync(state) => {
                     state.read_from_group(group_key, resource_tag, self.txn_idx)?
                 },
-                ViewState::Unsync(state) => state
-                    .unsync_map
-                    .get_value_from_group(group_key, resource_tag),
+                ViewState::Unsync(state) => {
+                    state.unsync_map.read_from_group(group_key, resource_tag)
+                },
             };
         };
 
@@ -1279,9 +1469,43 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
                 )
             },
             ViewState::Unsync(state) => {
-                let read_set = state.read_set.borrow();
+                let resource_read_set = state.resource_read_set.borrow();
                 self.get_reads_needing_exchange_sequential(
-                    &read_set,
+                    &resource_read_set,
+                    state.unsync_map,
+                    delayed_write_set_keys,
+                    skip,
+                )
+            },
+        }
+    }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<
+        BTreeMap<
+            Self::ResourceKey,
+            (
+                Self::ResourceValue,
+                Vec<(
+                    Self::ResourceGroupTag,
+                    (Self::ResourceValue, Option<Arc<MoveTypeLayout>>),
+                )>,
+                u64,
+            ),
+        >,
+        PanicError,
+    > {
+        match &self.latest_view {
+            ViewState::Sync(state) => {
+                self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_keys, skip)
+            },
+            ViewState::Unsync(state) => {
+                let group_read_set = state.group_read_set.borrow();
+                self.get_group_reads_needing_exchange_sequential(
+                    &group_read_set,
                     state.unsync_map,
                     delayed_write_set_keys,
                     skip,
@@ -2025,10 +2249,11 @@ mod test {
         let base_view = MockStateView::new(HashMap::new());
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            ViewState::Unsync(SequentialState {
+            super::ViewState::Unsync(SequentialState {
                 unsync_map: &unsync_map,
                 counter: &counter,
-                read_set: RefCell::new(HashSet::new()),
+                resource_read_set: RefCell::new(HashSet::new()),
+                group_read_set: RefCell::new(HashSet::new()),
                 dynamic_change_set_optimizations_enabled: true,
             }),
             1,

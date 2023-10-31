@@ -22,7 +22,10 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{SignatureCheckedTransaction, SignedTransaction},
 };
-use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::{GroupWrite, VMChangeSet},
+    storage::ChangeSetConfigs,
+};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
 use move_core_types::{
@@ -479,6 +482,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
             .collect();
 
+        let group_reads_needing_change = aggregator_change_set
+            .group_reads_needing_exchange
+            .into_iter()
+            .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
+            .map(|(state_key, (metadata_op, inner_ops, group_size))| {
+                (
+                    state_key,
+                    GroupWrite::new(metadata_op, inner_ops, group_size),
+                )
+            })
+            .collect();
+
         VMChangeSet::new(
             resource_write_set,
             resource_group_write_set,
@@ -487,6 +502,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             aggregator_v1_delta_set,
             aggregator_change_set.delayed_field_changes,
             reads_needing_exchange,
+            group_reads_needing_change,
             events,
             configs,
         )

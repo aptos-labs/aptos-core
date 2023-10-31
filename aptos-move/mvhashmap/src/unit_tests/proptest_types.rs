@@ -248,7 +248,7 @@ where
         let idx = idx as TxnIndex;
         if test_group {
             map.group_data()
-                .write(key.clone(), idx, 0, vec![(5, value)]);
+                .write(key.clone(), idx, 0, vec![(5, (value, None))]);
             map.group_data().mark_estimate(&key, idx);
         } else {
             map.data().write(key.clone(), idx, 0, (value, None));
@@ -353,7 +353,7 @@ where
                         let value = Value::new(None);
                         if test_group {
                             map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
                         } else {
                             map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
@@ -363,7 +363,7 @@ where
                         let value = Value::new(Some(v.clone()));
                         if test_group {
                             map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                                .write(key, idx as TxnIndex, 1, vec![(5, (value, None))]);
                         } else {
                             map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
