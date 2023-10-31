@@ -1844,9 +1844,9 @@ fn realistic_env_max_load_test(
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // THE MOST COMMONLY USED TUNE-ABLES:
-    const USE_CRAZY_MACHINES: bool = false;
+    const USE_CRAZY_MACHINES: bool = true;
     const ENABLE_VFNS: bool = true;
-    const VALIDATOR_COUNT: usize = 12;
+    const VALIDATOR_COUNT: usize = 100;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
