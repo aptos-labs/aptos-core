@@ -150,7 +150,7 @@ impl RemoteStateViewClient {
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
                 let sender = kv_tx.clone();
-                thread_pool.spawn(move || {
+                thread_pool.spawn_fifo(move || {
                     let mut rng = StdRng::from_entropy();
                     let rand_send_thread_idx = rng.gen_range(0, sender.len());
                     Self::send_state_value_request(shard_id, sender, state_keys, rand_send_thread_idx);
@@ -179,7 +179,7 @@ impl RemoteStateViewClient {
             // remote state view.
             insert_and_fetch();
         } else {
-            self.thread_pool.spawn(insert_and_fetch);
+            self.thread_pool.spawn_fifo(insert_and_fetch);
         }
     }
 
@@ -259,7 +259,7 @@ impl RemoteStateValueReceiver {
         while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();
             let shard_id = self.shard_id;
-            self.thread_pool.spawn(move || {
+            self.thread_pool.spawn_fifo(move || {
                 Self::handle_message(shard_id, message, state_view);
             });
         }
