@@ -3,7 +3,6 @@
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_types::chain_id::ChainId;
@@ -26,14 +25,14 @@ impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
             // QS will be backpressured if the remaining total txns is more than this number
-            backlog_txn_limit_count: MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE * 4,
+            backlog_txn_limit_count: 200_000,
             // QS will create batches at the max rate until this number is reached
-            backlog_per_validator_batch_limit_count: 4,
+            backlog_per_validator_batch_limit_count: 50,
             decrease_duration_ms: 1000,
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
-            dynamic_min_txn_per_s: 160,
-            dynamic_max_txn_per_s: 2000,
+            dynamic_min_txn_per_s: 2_000,
+            dynamic_max_txn_per_s: 8_000,
         }
     }
 }
@@ -79,16 +78,16 @@ impl Default for QuorumStoreConfig {
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
-            sender_max_batch_txns: 250,
-            sender_max_batch_bytes: 1024 * 1024,
-            sender_max_num_batches: 20,
-            sender_max_total_txns: 2000,
-            sender_max_total_bytes: 4 * 1024 * 1024,
-            receiver_max_batch_txns: 250,
-            receiver_max_batch_bytes: 1024 * 1024,
-            receiver_max_num_batches: 20,
-            receiver_max_total_txns: 2000,
-            receiver_max_total_bytes: 4 * 1024 * 1024,
+            sender_max_batch_txns: 1_000,
+            sender_max_batch_bytes: 4 * 1024 * 1024,
+            sender_max_num_batches: 100,
+            sender_max_total_txns: 4_000,
+            sender_max_total_bytes: 8 * 1024 * 1024,
+            receiver_max_batch_txns: 1_000,
+            receiver_max_batch_bytes: 4 * 1024 * 1024,
+            receiver_max_num_batches: 100,
+            receiver_max_total_txns: 4000,
+            receiver_max_total_bytes: 8 * 1024 * 1024,
             batch_request_num_peers: 5,
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 1000,
