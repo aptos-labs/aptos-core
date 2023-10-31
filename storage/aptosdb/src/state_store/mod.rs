@@ -313,7 +313,7 @@ impl StateStore {
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
     ) -> Self {
-        if !hack_for_tests {
+        if !hack_for_tests && !empty_buffered_state_for_restore {
             Self::sync_commit_progress(
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
