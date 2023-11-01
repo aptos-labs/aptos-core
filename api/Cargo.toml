@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
+aptos-bcs-utils = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
