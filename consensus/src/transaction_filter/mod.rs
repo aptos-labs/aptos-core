@@ -2,196 +2,38 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::TransactionFilterType;
+use aptos_config::config::transaction_filter_type::Filter;
 use aptos_crypto::HashValue;
-use aptos_types::transaction::{SignedTransaction, TransactionPayload};
-use move_core_types::account_address::AccountAddress;
-use std::{collections::HashSet, sync::Arc};
+use aptos_types::transaction::SignedTransaction;
 
-pub trait TransactionFilter: Send + Sync {
-    fn filter(&self, block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction>;
+pub struct TransactionFilter {
+    filter: Filter,
 }
 
-pub fn create_transaction_filter(
-    transaction_filter_type: TransactionFilterType,
-) -> Arc<dyn TransactionFilter> {
-    match transaction_filter_type {
-        TransactionFilterType::NoFilter => Arc::new(NoTransactionFilter {}),
-        TransactionFilterType::AllTransactions => Arc::new(AllTransactionsFilter {}),
-        TransactionFilterType::BlockListedBlockIdBased(block_id) => {
-            Arc::new(BlockListedBlockIdsFilter { block_id })
-        },
-        TransactionFilterType::BlockListedTransactionHashBased(transaction_hash) => {
-            Arc::new(BlockListedTransactionHashesFilter { transaction_hash })
-        },
-        TransactionFilterType::BlockListedSenderBased(blocked_senders) => {
-            Arc::new(BlockListedSendersFilter { blocked_senders })
-        },
-        TransactionFilterType::AllowListEntryFunctions(allowed_entry_functions) => {
-            Arc::new(AllowListEntryFunctionFilter {
-                allowed_entry_functions,
-            })
-        },
-        TransactionFilterType::BlockListEntryFunctions(blocked_entry_functions) => {
-            Arc::new(BlockListEntryFunctionFilter {
-                blocked_entry_functions,
-            })
-        },
-        TransactionFilterType::AllowListModuleAddresses(allowed_module_addresses) => {
-            Arc::new(AllowListModuleAddressFilter {
-                allowed_module_addresses,
-            })
-        },
-        TransactionFilterType::BlockListModuleAddresses(blocked_module_addresses) => {
-            Arc::new(BlockListModuleAddressFilter {
-                blocked_module_addresses,
-            })
-        },
+impl TransactionFilter {
+    pub(crate) fn new(filter: Filter) -> Self {
+        Self { filter }
     }
-}
 
-struct NoTransactionFilter {}
-
-impl TransactionFilter for NoTransactionFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        txns
-    }
-}
-
-/// A filter that filters out all user transactions.
-struct AllTransactionsFilter {}
-
-impl TransactionFilter for AllTransactionsFilter {
-    fn filter(
+    pub fn filter(
         &self,
         _block_id: HashValue,
-        _txns: Vec<SignedTransaction>,
+        txns: Vec<SignedTransaction>,
     ) -> Vec<SignedTransaction> {
-        vec![]
-    }
-}
-
-struct BlockListedBlockIdsFilter {
-    block_id: HashSet<HashValue>,
-}
-
-impl TransactionFilter for BlockListedBlockIdsFilter {
-    fn filter(&self, block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        if self.block_id.contains(&block_id) {
-            vec![]
-        } else {
-            txns
+        // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
+        if self.filter.is_empty() {
+            return txns;
         }
-    }
-}
-
-struct BlockListedTransactionHashesFilter {
-    transaction_hash: HashSet<HashValue>,
-}
-
-impl TransactionFilter for BlockListedTransactionHashesFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
         txns.into_iter()
-            .filter(|txn| {
-                !self
-                    .transaction_hash
-                    .contains(&txn.clone().committed_hash())
-            })
-            .collect()
-    }
-}
-
-struct BlockListedSendersFilter {
-    blocked_senders: HashSet<AccountAddress>,
-}
-
-impl TransactionFilter for BlockListedSendersFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        txns.into_iter()
-            .filter(|txn| !self.blocked_senders.contains(&txn.sender()))
-            .collect()
-    }
-}
-
-struct AllowListEntryFunctionFilter {
-    allowed_entry_functions: HashSet<(AccountAddress, String, String)>,
-}
-
-impl TransactionFilter for AllowListEntryFunctionFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        txns.into_iter()
-            .filter(|txn| match txn.payload() {
-                TransactionPayload::EntryFunction(entry_function) => {
-                    self.allowed_entry_functions.contains(&(
-                        *entry_function.module().address(),
-                        entry_function.module().name().to_string(),
-                        entry_function.function().to_string(),
-                    ))
-                },
-                _ => false,
-            })
-            .collect()
-    }
-}
-
-struct BlockListEntryFunctionFilter {
-    blocked_entry_functions: HashSet<(AccountAddress, String, String)>,
-}
-
-impl TransactionFilter for BlockListEntryFunctionFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        txns.into_iter()
-            .filter(|txn| match txn.payload() {
-                TransactionPayload::EntryFunction(entry_function) => {
-                    !self.blocked_entry_functions.contains(&(
-                        *entry_function.module().address(),
-                        entry_function.module().name().to_string(),
-                        entry_function.function().to_string(),
-                    ))
-                },
-                _ => true,
-            })
-            .collect()
-    }
-}
-
-struct AllowListModuleAddressFilter {
-    allowed_module_addresses: HashSet<AccountAddress>,
-}
-
-impl TransactionFilter for AllowListModuleAddressFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        txns.into_iter()
-            .filter(|txn| match txn.payload() {
-                TransactionPayload::EntryFunction(entry_function) => self
-                    .allowed_module_addresses
-                    .contains(entry_function.module().address()),
-                _ => false,
-            })
-            .collect()
-    }
-}
-
-struct BlockListModuleAddressFilter {
-    blocked_module_addresses: HashSet<AccountAddress>,
-}
-
-impl TransactionFilter for BlockListModuleAddressFilter {
-    fn filter(&self, _block_id: HashValue, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        txns.into_iter()
-            .filter(|txn| match txn.payload() {
-                TransactionPayload::EntryFunction(entry_function) => !self
-                    .blocked_module_addresses
-                    .contains(entry_function.module().address()),
-                _ => true,
-            })
+            .filter(|txn| self.filter.matches(_block_id, txn))
             .collect()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use aptos_config::config::TransactionFilterType;
+    use crate::transaction_filter::TransactionFilter;
+    use aptos_config::config::transaction_filter_type::Filter;
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         chain_id::ChainId,
@@ -199,7 +41,6 @@ mod test {
         transaction::{EntryFunction, RawTransaction, SignedTransaction, TransactionPayload},
     };
     use move_core_types::account_address::AccountAddress;
-    use std::collections::HashSet;
 
     fn create_signed_transaction(function: MemberId) -> SignedTransaction {
         let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -264,7 +105,7 @@ mod test {
     fn test_no_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let no_filter = super::create_transaction_filter(TransactionFilterType::NoFilter);
+        let no_filter = TransactionFilter::new(Filter::empty());
         let filtered_txns = no_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns);
     }
@@ -273,7 +114,7 @@ mod test {
     fn test_all_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let all_filter = super::create_transaction_filter(TransactionFilterType::AllTransactions);
+        let all_filter = TransactionFilter::new(Filter::empty().add_deny_all());
         let filtered_txns = all_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, vec![]);
     }
@@ -282,15 +123,10 @@ mod test {
     fn test_block_id_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let mut block_id_set = HashSet::new();
-        block_id_set.insert(block_id);
-        let block_id_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListedBlockIdBased(block_id_set),
-        );
+        let block_id_filter = TransactionFilter::new(Filter::empty().add_deny_block_id(block_id));
 
         let filtered_txns = block_id_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, vec![]);
-
         let block_id = HashValue::random();
         let filtered_txns = block_id_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns);
@@ -300,144 +136,138 @@ mod test {
     fn test_transaction_hash_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let mut transaction_hash_set = HashSet::new();
-        transaction_hash_set.insert(txns[0].clone().committed_hash());
-        let transaction_hash_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListedTransactionHashBased(transaction_hash_set),
+        let transaction_hash_filter = TransactionFilter::new(
+            Filter::empty().add_deny_transaction_id(txns[0].clone().committed_hash()),
         );
         let filtered_txns = transaction_hash_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns[1..].to_vec());
-
-        let mut transaction_hash_set = HashSet::new();
-        transaction_hash_set.insert(HashValue::random());
-        let transaction_hash_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListedTransactionHashBased(transaction_hash_set),
-        );
-        let filtered_txns = transaction_hash_filter.filter(block_id, txns.clone());
-        assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_sender_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let mut blocked_senders = HashSet::new();
-        blocked_senders.insert(txns[0].sender());
-        blocked_senders.insert(txns[1].sender());
-        let block_list_sender_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListedSenderBased(blocked_senders),
+        let block_list_sender_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_deny_sender(txns[0].sender())
+                .add_deny_sender(txns[1].sender()),
         );
         let filtered_txns = block_list_sender_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns[2..].to_vec());
-
-        let blocked_senders = HashSet::new();
-        let block_list_sender_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListedSenderBased(blocked_senders),
-        );
-        let filtered_txns = block_list_sender_filter.filter(block_id, txns.clone());
-        assert_eq!(filtered_txns, txns);
     }
 
     #[test]
-    fn test_allow_list_entry_function_filter() {
+    fn test_entry_function_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let mut allowed_entry_functions = HashSet::new();
-
-        allowed_entry_functions.insert((
-            get_module_address(&txns[0]),
-            get_module_name(&txns[0]),
-            get_function_name(&txns[0]),
-        ));
-        allowed_entry_functions.insert((
-            get_module_address(&txns[1]),
-            get_module_name(&txns[1]),
-            get_function_name(&txns[1]),
-        ));
-
-        let allow_list_entry_function_filter = super::create_transaction_filter(
-            TransactionFilterType::AllowListEntryFunctions(allowed_entry_functions),
+        let allow_list_entry_function_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_allow_entry_function(
+                    get_module_address(&txns[0]),
+                    get_module_name(&txns[0]),
+                    get_function_name(&txns[0]),
+                )
+                .add_allow_entry_function(
+                    get_module_address(&txns[1]),
+                    get_module_name(&txns[1]),
+                    get_function_name(&txns[1]),
+                )
+                .add_deny_all(),
         );
         let filtered_txns = allow_list_entry_function_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns[0..2].to_vec());
 
-        let allowed_entry_functions = HashSet::new();
-        let allow_list_entry_function_filter = super::create_transaction_filter(
-            TransactionFilterType::AllowListEntryFunctions(allowed_entry_functions),
+        let deny_list_entry_function_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_deny_entry_function(
+                    get_module_address(&txns[0]),
+                    get_module_name(&txns[0]),
+                    get_function_name(&txns[0]),
+                )
+                .add_deny_entry_function(
+                    get_module_address(&txns[1]),
+                    get_module_name(&txns[1]),
+                    get_function_name(&txns[1]),
+                ),
         );
-        let filtered_txns = allow_list_entry_function_filter.filter(block_id, txns.clone());
-        assert_eq!(filtered_txns, vec![]);
-    }
-
-    #[test]
-    fn test_block_list_entry_function_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let mut blocked_entry_functions = HashSet::new();
-        blocked_entry_functions.insert((
-            get_module_address(&txns[0]),
-            get_module_name(&txns[0]),
-            get_function_name(&txns[0]),
-        ));
-
-        blocked_entry_functions.insert((
-            get_module_address(&txns[1]),
-            get_module_name(&txns[1]),
-            get_function_name(&txns[1]),
-        ));
-
-        let block_list_entry_function_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListEntryFunctions(blocked_entry_functions),
-        );
-        let filtered_txns = block_list_entry_function_filter.filter(block_id, txns.clone());
+        let filtered_txns = deny_list_entry_function_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns[2..].to_vec());
-
-        let blocked_entry_functions = HashSet::new();
-        let block_list_entry_function_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListEntryFunctions(blocked_entry_functions),
-        );
-        let filtered_txns = block_list_entry_function_filter.filter(block_id, txns.clone());
-        assert_eq!(filtered_txns, txns);
     }
 
     #[test]
     fn test_allow_list_module_address_filter() {
         let txns = get_transactions();
         let block_id = HashValue::random();
-        let mut allowed_module_addresses = HashSet::new();
-        allowed_module_addresses.insert(get_module_address(&txns[0])); // Only 0x1 is allowed
-        let allow_list_module_address_filter = super::create_transaction_filter(
-            TransactionFilterType::AllowListModuleAddresses(allowed_module_addresses),
+        let allow_list_module_address_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_allow_module_address(get_module_address(&txns[0]))
+                .add_allow_module_address(get_module_address(&txns[1]))
+                .add_deny_all(),
         );
         let filtered_txns = allow_list_module_address_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns[0..4].to_vec());
 
-        let allowed_module_addresses = HashSet::new();
-        let allow_list_module_address_filter = super::create_transaction_filter(
-            TransactionFilterType::AllowListModuleAddresses(allowed_module_addresses),
-        );
-        let filtered_txns = allow_list_module_address_filter.filter(block_id, txns.clone());
-        assert_eq!(filtered_txns, vec![]);
-    }
-
-    #[test]
-    fn test_block_list_module_address_filter() {
-        let txns = get_transactions();
-        let block_id = HashValue::random();
-        let mut blocked_module_addresses = HashSet::new();
-        blocked_module_addresses.insert(get_module_address(&txns[0])); // 0x1 is blocked
-
-        let block_list_module_address_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListModuleAddresses(blocked_module_addresses),
+        let block_list_module_address_filter = TransactionFilter::new(
+            Filter::empty()
+                .add_deny_module_address(get_module_address(&txns[0]))
+                .add_deny_module_address(get_module_address(&txns[1])),
         );
         let filtered_txns = block_list_module_address_filter.filter(block_id, txns.clone());
         assert_eq!(filtered_txns, txns[4..].to_vec());
+    }
 
-        let blocked_module_addresses = HashSet::new();
-        let block_list_module_address_filter = super::create_transaction_filter(
-            TransactionFilterType::BlockListModuleAddresses(blocked_module_addresses),
-        );
-        let filtered_txns = block_list_module_address_filter.filter(block_id, txns.clone());
-        assert_eq!(filtered_txns, txns);
+    #[test]
+    fn test_composite_allow_list_filter() {
+        let txns = get_transactions();
+        let block_id = HashValue::random();
+        let filter = serde_yaml::from_str::<Filter>(r#"
+            rules:
+                - Allow:
+                    Sender: f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a
+                - Allow:
+                    ModuleAddress: "0000000000000000000000000000000000000000000000000000000000000001"
+                - Allow:
+                    EntryFunction:
+                        - "0000000000000000000000000000000000000000000000000000000000000001"
+                        - test
+                        - check
+                - Allow:
+                    EntryFunction:
+                        - "0000000000000000000000000000000000000000000000000000000000000001"
+                        - test
+                        - new
+                - Deny: All
+              "#).unwrap();
+
+        let allow_list_filter = TransactionFilter::new(filter);
+        let filtered_txns = allow_list_filter.filter(block_id, txns.clone());
+        assert_eq!(filtered_txns, txns[0..4].to_vec());
+    }
+
+    #[test]
+    fn test_composite_block_list_filter() {
+        let txns = get_transactions();
+        let block_id = HashValue::random();
+        let filter = serde_yaml::from_str::<Filter>(r#"
+            rules:
+                - Deny:
+                    Sender: f8871acf2c827d40e23b71f6ff2b9accef8dbb17709b88bd9eb95e6bb748c25a
+                - Deny:
+                    ModuleAddress: "0000000000000000000000000000000000000000000000000000000000000001"
+                - Deny:
+                    EntryFunction:
+                        - "0000000000000000000000000000000000000000000000000000000000000001"
+                        - test
+                        - check
+                - Deny:
+                    EntryFunction:
+                        - "0000000000000000000000000000000000000000000000000000000000000001"
+                        - test
+                        - new
+              "#).unwrap();
+
+        let allow_list_filter = TransactionFilter::new(filter);
+        let filtered_txns = allow_list_filter.filter(block_id, txns.clone());
+        assert_eq!(filtered_txns, txns[4..].to_vec());
     }
 }

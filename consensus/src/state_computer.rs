@@ -64,7 +64,7 @@ pub struct ExecutionProxy {
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
-    transaction_filter: Arc<dyn TransactionFilter>,
+    transaction_filter: TransactionFilter,
     execution_pipeline: ExecutionPipeline,
 }
 
@@ -74,7 +74,7 @@ impl ExecutionProxy {
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
-        txn_filter: Arc<dyn TransactionFilter>,
+        txn_filter: TransactionFilter,
     ) -> Self {
         let (tx, mut rx) =
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
@@ -342,10 +342,9 @@ impl StateComputer for ExecutionProxy {
 async fn test_commit_sync_race() {
     use crate::{
         error::MempoolError, transaction_deduper::create_transaction_deduper,
-        transaction_filter::create_transaction_filter,
         transaction_shuffler::create_transaction_shuffler,
     };
-    use aptos_config::config::TransactionFilterType;
+    use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
     use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_types::{
@@ -468,7 +467,7 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
-        create_transaction_filter(TransactionFilterType::default()),
+        TransactionFilter::new(Filter::empty()),
     );
     executor.new_epoch(
         &EpochState::empty(),
