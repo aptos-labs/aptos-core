@@ -1,11 +1,12 @@
 // Copyright Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-module 0xABCD::vector_picture {
+module 0xABCD::smart_table_picture {
     use std::error;
     use std::signer;
     use std::vector;
     use aptos_std::object;
+    use aptos_std::smart_table::{Self, SmartTable};
 
     /// The caller tried to mutate an item outside the bounds of the vector.
     const E_INDEX_OUT_OF_BOUNDS: u64 = 1;
@@ -19,13 +20,7 @@ module 0xABCD::vector_picture {
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct Palette has key {
-        vec: vector<Color>,
-    }
-
-    struct Color has copy, drop, store {
-        r: u8,
-        g: u8,
-        b: u8,
+        pixels: SmartTable<u32, u8>,
     }
 
     fun init_module(publisher: &signer) {
@@ -40,26 +35,10 @@ module 0xABCD::vector_picture {
     /// Create a new Palette
     public entry fun create(
         caller: &signer,
-        // Length of the vector to create.
-        length: u64,
     ) acquires AllPalettes {
         let caller_addr = signer::address_of(caller);
 
-        // Just a dummy color.
-        let color = Color {
-            r: 124,
-            g: 213,
-            b: 37,
-        };
-
-        // Build vec and palette.
-        let vec = vector::empty();
-        let i = 0;
-        while (i < length) {
-            vector::push_back(&mut vec, color);
-            i = i + 1;
-        };
-        let palette = Palette { vec };
+        let palette = Palette { pixels: smart_table::new() };
 
         // Create the object we'll store the Palette in.
         let constructor_ref = object::create_object(caller_addr);
@@ -78,21 +57,29 @@ module 0xABCD::vector_picture {
     public entry fun update(
         palette_addr: address,
         palette_index: u64,
-        index: u64,
-        r: u8,
-        g: u8,
-        b: u8,
+        indices: vector<u64>,
+        colors: vector<u8>,
     ) acquires Palette, AllPalettes {
         let all_palettes = borrow_global<AllPalettes>(palette_addr);
         let palette_addr = vector::borrow(&all_palettes.all, palette_index);
 
         let palette_ = borrow_global_mut<Palette>(*palette_addr);
 
-        // Confirm the index is not out of bounds.
-        assert!(index < vector::length(&palette_.vec), error::invalid_argument(E_INDEX_OUT_OF_BOUNDS));
+        assert!(
+            vector::length(&indices) == vector::length(&colors),
+            E_INDEX_OUT_OF_BOUNDS,
+        );
 
-        // Write the pixel.
-        let color = Color { r, g, b };
-        *vector::borrow_mut(&mut palette_.vec, index) = color;
+        let i = 0;
+        let len = vector::length(&indices);
+        while (i < len) {
+            assert!(!vector::is_empty(&indices), E_INDEX_OUT_OF_BOUNDS);
+            let index = (vector::pop_back(&mut indices) as u32);
+            assert!(!vector::is_empty(&colors), E_INDEX_OUT_OF_BOUNDS);
+            let color = vector::pop_back(&mut colors);
+
+            smart_table::upsert(&mut palette_.pixels, index, color);
+            i = i + 1;
+        };
     }
 }
