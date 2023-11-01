@@ -218,15 +218,15 @@ impl TStateView for RemoteStateViewClient {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&self.shard_id.to_string(), "get_state_value"])
+            .start_timer();
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
             return state_view_reader.get_state_value(state_key);
         }
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
-        let _timer = REMOTE_EXECUTOR_TIMER
-            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_wait"])
-            .start_timer();
         REMOTE_EXECUTOR_REMOTE_KV_COUNT
             .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_kv"])
             .inc();
