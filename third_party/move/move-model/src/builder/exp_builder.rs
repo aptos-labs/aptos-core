@@ -8,7 +8,7 @@ use crate::{
         QualifiedSymbol, QuantKind, ResourceSpecifier, Spec, Value,
     },
     builder::{
-        model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry},
+        model_builder::{AnyFunEntry, ConstEntry, EntryVisibility, LocalVarEntry, StructEntry},
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
     model::{
@@ -2839,6 +2839,106 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn get_struct_with_diag(
+        &mut self,
+        struct_name: &QualifiedSymbol,
+        struct_name_loc: &Loc,
+        msg: &str,
+    ) -> Option<StructEntry> {
+        if let Some(entry) = self.parent.parent.struct_table.get(struct_name) {
+            Some(entry.clone())
+        } else {
+            self.error(&struct_name_loc, msg);
+            None
+        }
+    }
+
+    fn get_struct_report_undeclared(
+        &mut self,
+        struct_name: &QualifiedSymbol,
+        struct_name_loc: &Loc,
+    ) -> Option<StructEntry> {
+        self.get_struct_with_diag(
+            struct_name,
+            struct_name_loc,
+            &format!(
+                "undeclared struct `{}`",
+                struct_name.display(self.parent.parent.env)
+            ),
+        )
+    }
+
+    fn get_field_decls_for_pack_unpack<'a>(
+        &'a mut self,
+        s: &'a StructEntry,
+        struct_name: &QualifiedSymbol,
+        struct_name_loc: &Loc,
+    ) -> Option<&BTreeMap<Symbol, (Loc, usize, Type)>> {
+        if let Some(field_decls) = &s.fields {
+            Some(field_decls)
+        } else {
+            self.error(
+                &struct_name_loc,
+                &format!(
+                    "native struct `{}` cannot be packed or unpacked",
+                    struct_name.display(self.parent.parent.env)
+                ),
+            );
+            None
+        }
+    }
+
+    fn check_missing_or_undeclared_fields<T>(
+        &mut self,
+        loc: &Loc,
+        struct_name: QualifiedSymbol,
+        field_decls: &BTreeMap<Symbol, (Loc, usize, Type)>,
+        fields: &EA::Fields<T>,
+    ) -> Option<()> {
+        let mut succeed = true;
+        let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
+        // Exclude from the covered fields the dummy_field added by legacy compiler
+        fields_not_covered.extend(
+            field_decls
+                .keys()
+                .filter(|s| *s != &self.parent.dummy_field_name()),
+        );
+        for (name_loc, name, (_, _)) in fields.iter() {
+            let field_name = self.symbol_pool().make(name);
+            if let Some((_, _, _)) = field_decls.get(&field_name) {
+                fields_not_covered.remove(&field_name);
+            } else {
+                self.error(
+                    &self.to_loc(&name_loc),
+                    &format!(
+                        "field `{}` not declared in struct `{}`",
+                        field_name.display(self.symbol_pool()),
+                        struct_name.display(self.parent.parent.env)
+                    ),
+                );
+                succeed = false;
+            }
+        }
+        if !fields_not_covered.is_empty() {
+            self.error(
+                loc,
+                &format!(
+                    "missing fields {}",
+                    fields_not_covered
+                        .iter()
+                        .map(|n| format!("`{}`", n.display(self.symbol_pool())))
+                        .join(", ")
+                ),
+            );
+            succeed = false;
+        }
+        if succeed {
+            Some(())
+        } else {
+            None
+        }
+    }
+
     // given pack<S>{ f_p(1): e_1, ... }, where p is a permutation of the fields
     // return the struct id of S,
     // (.f_p(1), e_1'), (.f_p(1), e_2') ... where e_i' is e_i translated
@@ -2858,100 +2958,53 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
-        if let Some(entry) = self.parent.parent.struct_table.get(&struct_name) {
-            let entry = entry.clone();
-            let (instantiation, diag) = self.make_instantiation(entry.type_params.len(), generics);
-            if let Some(msg) = diag {
-                self.error(loc, &msg);
-                return None;
-            }
+        let entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
 
-            if let Some(field_decls) = &entry.fields {
-                let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
-                // Exclude from the covered fields the dummy_field added by legacy compiler
-                fields_not_covered.extend(
-                    field_decls
-                        .keys()
-                        .filter(|s| *s != &self.parent.dummy_field_name()),
-                );
-                // maps i to (x_i, e_i) where i is the expression idx, i.e., idx of the field exp in the pack exp
-                let mut bindings = BTreeMap::new();
-                // maps i to x_i where i is the field definition idx, i.e., idx of the field in the struct definition
-                let mut args = BTreeMap::new();
-                for (name_loc, name, (exp_idx, field_exp)) in fields.iter() {
-                    let field_name = self.symbol_pool().make(name);
-                    if let Some((_, def_idx, field_ty)) = field_decls.get(&field_name) {
-                        let field_ty = field_ty.instantiate(&instantiation);
-                        let translated_field_exp = self.translate_exp(field_exp, &field_ty);
-                        // starts with . to avoid shadowing
-                        let var_name = self
-                            .symbol_pool()
-                            .make(&format!(".{}", field_name.display(self.symbol_pool())));
-                        let var = Pattern::Var(translated_field_exp.node_id(), var_name);
-                        let arg = ExpData::LocalVar(translated_field_exp.node_id(), var_name);
-                        args.insert(*def_idx, arg);
-                        bindings.insert(*exp_idx, (var, translated_field_exp));
-                        fields_not_covered.remove(&field_name);
-                    } else {
-                        self.error(
-                            &self.to_loc(&name_loc),
-                            &format!(
-                                "field `{}` not declared in struct `{}`",
-                                field_name.display(self.symbol_pool()),
-                                struct_name.display(self.parent.parent.env)
-                            ),
-                        );
-                    }
-                }
-
-                if !fields_not_covered.is_empty() {
-                    self.error(
-                        loc,
-                        &format!(
-                            "missing fields {}",
-                            fields_not_covered
-                                .iter()
-                                .map(|n| format!("`{}`", n.display(self.symbol_pool())))
-                                .join(", ")
-                        ),
-                    );
-                    None
-                } else {
-                    let struct_id = entry
-                        .module_id
-                        .qualified_inst(entry.struct_id, instantiation);
-                    let bindings = bindings
-                        .into_iter()
-                        .sorted_by_key(|(i, _)| *i)
-                        .map(|(_, value)| value)
-                        .collect_vec();
-                    let args = args
-                        .into_iter()
-                        .sorted_by_key(|(i, _)| *i)
-                        .map(|(_, value)| value)
-                        .collect_vec();
-                    Some((struct_id, bindings, args))
-                }
-            } else {
-                self.error(
-                    &struct_name_loc,
-                    &format!(
-                        "native struct `{}` cannot be packed or unpacked",
-                        struct_name.display(self.parent.parent.env)
-                    ),
-                );
-                None
-            }
-        } else {
-            self.error(
-                &struct_name_loc,
-                &format!(
-                    "undeclared struct `{}`",
-                    struct_name.display(self.parent.parent.env)
-                ),
-            );
-            None
+        let (instantiation, diag) = self.make_instantiation(entry.type_params.len(), generics);
+        if let Some(msg) = diag {
+            self.error(loc, &msg);
+            return None;
         }
+
+        let field_decls = self
+            .get_field_decls_for_pack_unpack(&entry, &struct_name, &struct_name_loc)?
+            .clone();
+        self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
+
+        // maps i to (x_i, e_i) where i is the expression idx, i.e., idx of the field exp in the pack exp
+        let mut bindings = BTreeMap::new();
+        // maps i to x_i where i is the field definition idx, i.e., idx of the field in the struct definition
+        let mut args = BTreeMap::new();
+        for (_, name, (exp_idx, field_exp)) in fields.iter() {
+            let field_name = self.symbol_pool().make(name);
+            let (_, def_idx, field_ty) = field_decls.get(&field_name).unwrap();
+            let field_ty = field_ty.instantiate(&instantiation);
+            let translated_field_exp = self.translate_exp(field_exp, &field_ty);
+            // starts with . to avoid shadowing
+            let var_name = self
+                .symbol_pool()
+                .make(&format!(".{}", field_name.display(self.symbol_pool())));
+            let var = Pattern::Var(translated_field_exp.node_id(), var_name);
+            let arg = ExpData::LocalVar(translated_field_exp.node_id(), var_name);
+            args.insert(*def_idx, arg);
+            bindings.insert(*exp_idx, (var, translated_field_exp));
+
+        }
+
+        let struct_id = entry
+            .module_id
+            .qualified_inst(entry.struct_id, instantiation);
+        let bindings = bindings
+            .into_iter()
+            .sorted_by_key(|(i, _)| *i)
+            .map(|(_, value)| value)
+            .collect_vec();
+        let args = args
+            .into_iter()
+            .sorted_by_key(|(i, _)| *i)
+            .map(|(_, value)| value)
+            .collect_vec();
+        Some((struct_id, bindings, args))
     }
 
     fn translate_lvalue_fields(
