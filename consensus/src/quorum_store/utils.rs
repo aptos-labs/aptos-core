@@ -104,7 +104,7 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
-        exclude_txns: Vec<TransactionInProgress>,
+        exclude_transactions_sorted: Vec<TransactionInProgress>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
@@ -112,7 +112,7 @@ impl MempoolProxy {
             max_bytes,
             true,
             true,
-            exclude_txns,
+            exclude_transactions_sorted,
             callback,
         );
         self.mempool_tx
@@ -129,12 +129,12 @@ impl MempoolProxy {
             .await
         ) {
             Err(_) => Err(anyhow::anyhow!(
-                "[direct_mempool_quorum_store] did not receive GetBatchResponse on time"
+                "[quorum_store] did not receive GetBatchResponse on time"
             )),
             Ok(resp) => match resp.map_err(anyhow::Error::from)?? {
                 QuorumStoreResponse::GetBatchResponse(txns) => Ok(txns),
                 _ => Err(anyhow::anyhow!(
-                    "[direct_mempool_quorum_store] did not receive expected GetBatchResponse"
+                    "[quorum_store] did not receive expected GetBatchResponse"
                 )),
             },
         }

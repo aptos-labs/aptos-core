@@ -234,11 +234,10 @@ impl Mempool {
         max_bytes: u64,
         return_non_full: bool,
         include_gas_upgraded: bool,
-        // TODO: how to put in the API that this is sorted?
-        exclude_transactions: Vec<TransactionInProgress>,
+        exclude_transactions_sorted: Vec<TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
-        let exclude_size = exclude_transactions.len();
+        let exclude_size = exclude_transactions_sorted.len();
         let sort_end_time = start_time.elapsed();
         let sort_time = sort_end_time;
         let mut seen = HashMap::new();
@@ -248,10 +247,10 @@ impl Mempool {
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
             for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns() {
-                if let Ok(index) = exclude_transactions
+                if let Ok(index) = exclude_transactions_sorted
                     .binary_search_by_key(txn_pointer, |txn_in_progress| txn_in_progress.summary)
                 {
-                    if *new_gas > exclude_transactions[index].gas_unit_price {
+                    if *new_gas > exclude_transactions_sorted[index].gas_unit_price {
                         upgraded.insert(txn_pointer);
                     }
                 }
@@ -276,7 +275,7 @@ impl Mempool {
             let txn_pointer = TxnPointer::from(txn);
             if seen.contains_key(&txn_pointer)
                 || (!upgraded.contains(&txn_pointer)
-                    && exclude_transactions
+                    && exclude_transactions_sorted
                         .binary_search_by_key(&txn_pointer, |txn_in_progress| {
                             txn_in_progress.summary
                         })
@@ -293,7 +292,7 @@ impl Mempool {
                     let prev_pointer = TxnPointer::new(txn.address, tx_seq - 1);
                     seen.contains_key(&prev_pointer)
                         || (!upgraded.contains(&prev_pointer)
-                            && exclude_transactions
+                            && exclude_transactions_sorted
                                 .binary_search_by_key(&prev_pointer, |txn_in_progress| {
                                     txn_in_progress.summary
                                 })

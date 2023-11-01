@@ -263,14 +263,18 @@ impl BatchGenerator {
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
         if !batches.is_empty() {
-            // TODO: make this spawn_blocking
-            self.txns_in_progress_sorted = self
+            let mut transactions: Vec<_> = self
                 .batches_in_progress
                 .values()
                 .flatten()
                 .cloned()
-                .sorted()
                 .collect();
+            self.txns_in_progress_sorted = tokio::task::spawn_blocking(move || {
+                transactions.sort();
+                transactions
+            })
+            .await
+            .unwrap();
         }
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
@@ -354,7 +358,7 @@ impl BatchGenerator {
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
                             network_sender.broadcast_batch_msg(batches).await;
-                        } else if tick_start.elapsed() > interval.period().checked_div(2); {
+                        } else if tick_start.elapsed() > interval.period().checked_div(2).unwrap_or(Duration::ZERO) {
                             // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.
                             last_non_empty_pull = tick_start;
                             sample!(
