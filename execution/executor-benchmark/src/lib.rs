@@ -585,10 +585,10 @@ mod tests {
         println!("db_generator::create_db_with_accounts");
 
         crate::db_generator::create_db_with_accounts::<E>(
-            100, /* num_accounts */
+            500, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000, /* init_account_balance */
-            5,           /* block_size */
+            50,           /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             verify_sequence_numbers,
@@ -599,15 +599,15 @@ mod tests {
         println!("run_benchmark");
 
         super::run_benchmark::<E>(
-            6, /* block_size */
-            5, /* num_blocks */
-            transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
-            2,     /* transactions per sender */
+            50, /* block_size */
+            4, /* num_blocks */
+            transaction_type.map(|t| vec![(t.materialize(1, false), 1)]),
+            1,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
             None,  /* maybe_hotspot_probability */
-            25,    /* num_main_signer_accounts */
-            30,    /* num_dst_pool_accounts */
+            250,    /* num_main_signer_accounts */
+            250,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
