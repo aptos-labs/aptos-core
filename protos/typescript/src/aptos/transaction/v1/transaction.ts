@@ -773,7 +773,10 @@ export interface Signature {
   ed25519?: Ed25519Signature | undefined;
   multiEd25519?: MultiEd25519Signature | undefined;
   multiAgent?: MultiAgentSignature | undefined;
-  feePayer?: FeePayerSignature | undefined;
+  feePayer?:
+    | FeePayerSignature
+    | undefined;
+  /** 6 is reserved. */
   singleSender?: SingleSender | undefined;
 }
 
@@ -783,7 +786,7 @@ export enum Signature_Type {
   TYPE_MULTI_ED25519 = 2,
   TYPE_MULTI_AGENT = 3,
   TYPE_FEE_PAYER = 4,
-  TYPE_SINGLE_SENDER = 5,
+  TYPE_SINGLE_SENDER = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -804,7 +807,7 @@ export function signature_TypeFromJSON(object: any): Signature_Type {
     case 4:
     case "TYPE_FEE_PAYER":
       return Signature_Type.TYPE_FEE_PAYER;
-    case 5:
+    case 6:
     case "TYPE_SINGLE_SENDER":
       return Signature_Type.TYPE_SINGLE_SENDER;
     case -1:
@@ -971,7 +974,10 @@ export interface SingleSender {
 export interface AccountSignature {
   type?: AccountSignature_Type | undefined;
   ed25519?: Ed25519Signature | undefined;
-  multiEd25519?: MultiEd25519Signature | undefined;
+  multiEd25519?:
+    | MultiEd25519Signature
+    | undefined;
+  /** 4 is reserved. */
   singleKeySignature?: SingleKeySignature | undefined;
   multiKeySignature?: MultiKeySignature | undefined;
 }
@@ -980,8 +986,8 @@ export enum AccountSignature_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ED25519 = 1,
   TYPE_MULTI_ED25519 = 2,
-  TYPE_SINGLE_KEY = 3,
-  TYPE_MULTI_KEY = 4,
+  TYPE_SINGLE_KEY = 4,
+  TYPE_MULTI_KEY = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -996,10 +1002,10 @@ export function accountSignature_TypeFromJSON(object: any): AccountSignature_Typ
     case 2:
     case "TYPE_MULTI_ED25519":
       return AccountSignature_Type.TYPE_MULTI_ED25519;
-    case 3:
+    case 4:
     case "TYPE_SINGLE_KEY":
       return AccountSignature_Type.TYPE_SINGLE_KEY;
-    case 4:
+    case 5:
     case "TYPE_MULTI_KEY":
       return AccountSignature_Type.TYPE_MULTI_KEY;
     case -1:
@@ -6847,7 +6853,7 @@ export const Signature = {
       FeePayerSignature.encode(message.feePayer, writer.uint32(42).fork()).ldelim();
     }
     if (message.singleSender !== undefined) {
-      SingleSender.encode(message.singleSender, writer.uint32(50).fork()).ldelim();
+      SingleSender.encode(message.singleSender, writer.uint32(58).fork()).ldelim();
     }
     return writer;
   },
@@ -6894,8 +6900,8 @@ export const Signature = {
 
           message.feePayer = FeePayerSignature.decode(reader, reader.uint32());
           continue;
-        case 6:
-          if (tag !== 50) {
+        case 7:
+          if (tag !== 58) {
             break;
           }
 
@@ -8245,10 +8251,10 @@ export const AccountSignature = {
       MultiEd25519Signature.encode(message.multiEd25519, writer.uint32(26).fork()).ldelim();
     }
     if (message.singleKeySignature !== undefined) {
-      SingleKeySignature.encode(message.singleKeySignature, writer.uint32(34).fork()).ldelim();
+      SingleKeySignature.encode(message.singleKeySignature, writer.uint32(42).fork()).ldelim();
     }
     if (message.multiKeySignature !== undefined) {
-      MultiKeySignature.encode(message.multiKeySignature, writer.uint32(42).fork()).ldelim();
+      MultiKeySignature.encode(message.multiKeySignature, writer.uint32(50).fork()).ldelim();
     }
     return writer;
   },
@@ -8281,15 +8287,15 @@ export const AccountSignature = {
 
           message.multiEd25519 = MultiEd25519Signature.decode(reader, reader.uint32());
           continue;
-        case 4:
-          if (tag !== 34) {
+        case 5:
+          if (tag !== 42) {
             break;
           }
 
           message.singleKeySignature = SingleKeySignature.decode(reader, reader.uint32());
           continue;
-        case 5:
-          if (tag !== 42) {
+        case 6:
+          if (tag !== 50) {
             break;
           }
 

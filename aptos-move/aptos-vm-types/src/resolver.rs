@@ -6,10 +6,13 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_state_view::{StateView, StateViewId};
-use aptos_types::state_store::{
-    state_key::StateKey,
-    state_storage_usage::StateStorageUsage,
-    state_value::{StateValue, StateValueMetadataKind},
+use aptos_types::{
+    state_store::{
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadataKind},
+    },
+    write_set::WriteOp,
 };
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
@@ -191,28 +194,31 @@ pub trait StateStorageView {
 /// TODO: audit and reconsider the default implementation (e.g. should not
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
-pub trait TExecutorView<K, T, L, I>:
+pub trait TExecutorView<K, T, L, I, V>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
-    + TDelayedFieldView<Identifier = I>
+    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
     + StateStorageView
 {
 }
 
-impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
+impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
-        + TDelayedFieldView<Identifier = I>
+        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
         + StateStorageView
 {
 }
 
-pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID> {}
+pub trait ExecutorView:
+    TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
+{
+}
 
 impl<T> ExecutorView for T where
-    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID>
+    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
 {
 }
 

@@ -286,6 +286,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
+    pub(crate) fn reads_needing_delayed_field_exchange(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>> {
+        self.outputs[txn_idx as usize]
+            .load()
+            .as_ref()
+            .and_then(|txn_output| match &txn_output.output_status {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
+                    Some(t.reads_needing_delayed_field_exchange())
+                },
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
+            })
+    }
+
     pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             vec![],

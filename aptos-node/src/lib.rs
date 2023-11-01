@@ -51,8 +51,9 @@ pub struct AptosNodeArgs {
         short = 'f',
         long,
         value_parser,
-        required_unless_present_any = ["test", "info", "stacktrace"],
+        required_unless_present_any = ["test", "info"],
     )]
+    #[cfg_attr(target_os = "linux", clap(required_unless_present_any = ["stacktrace"]))]
     config: Option<PathBuf>,
 
     /// Directory to run the test mode in.
