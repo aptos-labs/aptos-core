@@ -2783,6 +2783,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    fn make_instantiation_or_report(
+        &mut self,
+        param_count: usize,
+        user_args: Option<Vec<Type>>,
+    ) -> Option<Vec<Type>> {
+        let (instantiation, diag) = self.make_instantiation(param_count, user_args);
+        if let Some(msg) = diag {
+            self.error(loc, &msg);
+            None
+        } else {
+            Some(instantiation)
+        }
+    }
+
     /// Adds the constraints to the provided types, reporting errors if the types cannot satisfy
     /// the constraints.
     fn add_constraints(
@@ -2958,17 +2972,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
-        let entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
-
-        let (instantiation, diag) = self.make_instantiation(entry.type_params.len(), generics);
-        if let Some(msg) = diag {
-            self.error(loc, &msg);
-            return None;
-        }
-
+        let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
+        let instantiation = self.make_instantiation_or_report(struct_entry.type_params.len(), generics)?;
         let field_decls = self
-            .get_field_decls_for_pack_unpack(&entry, &struct_name, &struct_name_loc)?
+            .get_field_decls_for_pack_unpack(&struct_entry, &struct_name, &struct_name_loc)?
             .clone();
+
         self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
 
         // maps i to (x_i, e_i) where i is the expression idx, i.e., idx of the field exp in the pack exp
@@ -2988,12 +2997,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let arg = ExpData::LocalVar(translated_field_exp.node_id(), var_name);
             args.insert(*def_idx, arg);
             bindings.insert(*exp_idx, (var, translated_field_exp));
-
         }
 
-        let struct_id = entry
+        let struct_id = struct_entry
             .module_id
-            .qualified_inst(entry.struct_id, instantiation);
+            .qualified_inst(struct_entry.struct_id, instantiation);
         let bindings = bindings
             .into_iter()
             .sorted_by_key(|(i, _)| *i)
@@ -3023,96 +3031,39 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
-        if let Some(entry) = self.parent.parent.struct_table.get(&struct_name) {
-            let entry = entry.clone();
-            let (instantiation, diag) = self.make_instantiation(entry.type_params.len(), generics);
-            if let Some(msg) = diag {
-                self.error(loc, &msg);
-                return None;
-            }
+        let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
+        let instantiation = self.make_instantiation_or_report(struct_entry.type_params.len(), generics)?;
+        let field_decls = self
+            .get_field_decls_for_pack_unpack(&struct_entry, &struct_name, &struct_name_loc)?
+            .clone();
 
-            if let Some(field_decls) = &entry.fields {
-                let mut fields_not_covered: BTreeSet<Symbol> = BTreeSet::new();
-                // Exclude from the covered fields the dummy_field added by legacy compiler
-                fields_not_covered.extend(
-                    field_decls
-                        .keys()
-                        .filter(|s| *s != &self.parent.dummy_field_name()),
-                );
+        self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
 
-                let mut args = BTreeMap::new();
-                for (name_loc, name, (_, value)) in fields.iter() {
-                    let field_name = self.symbol_pool().make(name);
-                    if let Some((_, def_idx, field_ty)) = field_decls.get(&field_name) {
-                        let field_ty = field_ty.instantiate(&instantiation);
-                        let expected_field_ty = if let Some(kind) = ref_expected {
-                            Type::Reference(kind, Box::new(field_ty.clone()))
-                        } else {
-                            field_ty.clone()
-                        };
-                        let translated = self.translate_lvalue(
-                            value,
-                            &expected_field_ty,
-                            expected_order,
-                            match_locals,
-                        );
-                        args.insert(def_idx, translated);
-                        fields_not_covered.remove(&field_name);
-                    } else {
-                        self.error(
-                            &self.to_loc(&name_loc),
-                            &format!(
-                                "field `{}` not declared in struct `{}`",
-                                field_name.display(self.symbol_pool()),
-                                struct_name.display(self.parent.parent.env)
-                            ),
-                        );
-                    }
-                }
-
-                if !fields_not_covered.is_empty() {
-                    self.error(
-                        loc,
-                        &format!(
-                            "missing fields {}",
-                            fields_not_covered
-                                .iter()
-                                .map(|n| format!("`{}`", n.display(self.symbol_pool())))
-                                .join(", ")
-                        ),
-                    );
-                    None
+        let mut args = BTreeMap::new();
+        for (_, name, (_, value)) in fields.iter() {
+            let field_name = self.symbol_pool().make(name);
+            if let Some((_, def_idx, field_ty)) = field_decls.get(&field_name) {
+                let field_ty = field_ty.instantiate(&instantiation);
+                let expected_field_ty = if let Some(kind) = ref_expected {
+                    Type::Reference(kind, Box::new(field_ty.clone()))
                 } else {
-                    let struct_id = entry
-                        .module_id
-                        .qualified_inst(entry.struct_id, instantiation);
-                    let args = args
-                        .into_iter()
-                        .sorted_by_key(|(i, _)| *i)
-                        .map(|(_, value)| value)
-                        .collect_vec();
-                    Some((struct_id, args))
-                }
-            } else {
-                self.error(
-                    &struct_name_loc,
-                    &format!(
-                        "native struct `{}` cannot be packed or unpacked",
-                        struct_name.display(self.parent.parent.env)
-                    ),
-                );
-                None
+                    field_ty.clone()
+                };
+                let translated =
+                    self.translate_lvalue(value, &expected_field_ty, expected_order, match_locals);
+                args.insert(def_idx, translated);
             }
-        } else {
-            self.error(
-                &struct_name_loc,
-                &format!(
-                    "undeclared struct `{}`",
-                    struct_name.display(self.parent.parent.env)
-                ),
-            );
-            None
         }
+
+        let struct_id = struct_entry
+            .module_id
+            .qualified_inst(struct_entry.struct_id, instantiation);
+        let args = args
+            .into_iter()
+            .sorted_by_key(|(i, _)| *i)
+            .map(|(_, value)| value)
+            .collect_vec();
+        Some((struct_id, args))
     }
 
     fn translate_lambda(
