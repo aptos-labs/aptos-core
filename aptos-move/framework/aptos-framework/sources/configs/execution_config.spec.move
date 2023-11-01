@@ -15,13 +15,12 @@ spec aptos_framework::execution_config {
         use aptos_framework::stake;
         use aptos_framework::staking_config;
         use aptos_framework::aptos_coin;
+        use aptos_framework::reconfiguration;
 
-        // It caused 51s to verified in the local environment
-        // However it failed in the github unit test (about 120s)
-        pragma verify_duration_estimate = 120;
+        // It caused 25s to verified in the local environment and timeout in the github unit test
         let addr = signer::address_of(account);
-
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        include reconfiguration::ReconfigureEnsures;
         requires chain_status::is_operating();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
@@ -30,5 +29,7 @@ spec aptos_framework::execution_config {
         include features::spec_collect_and_distribute_gas_fees_enabled() ==> aptos_coin::ExistsAptosCoin;
         requires system_addresses::is_aptos_framework_address(addr);
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
+
+        ensures exists<ExecutionConfig>(@aptos_framework);
     }
 }
