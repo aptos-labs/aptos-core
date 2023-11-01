@@ -308,12 +308,12 @@ impl BatchGenerator {
                 },
                 _ = interval.tick() => monitor!("batch_generator_handle_tick", {
 
-                    let now = Instant::now();
+                    let tick_start = Instant::now();
                     // TODO: refactor back_pressure logic into its own function
                     if self.back_pressure.txn_count {
                         // multiplicative decrease, every second
                         if back_pressure_decrease_latest.elapsed() >= back_pressure_decrease_duration {
-                            back_pressure_decrease_latest = now;
+                            back_pressure_decrease_latest = tick_start;
                             dynamic_pull_txn_per_s = std::cmp::max(
                                 (dynamic_pull_txn_per_s as f64 * self.config.back_pressure.decrease_fraction) as u64,
                                 self.config.back_pressure.dynamic_min_txn_per_s,
@@ -325,7 +325,7 @@ impl BatchGenerator {
                     } else {
                         // additive increase, every second
                         if back_pressure_increase_latest.elapsed() >= back_pressure_increase_duration {
-                            back_pressure_increase_latest = now;
+                            back_pressure_increase_latest = tick_start;
                             dynamic_pull_txn_per_s = std::cmp::min(
                                 dynamic_pull_txn_per_s + self.config.back_pressure.dynamic_min_txn_per_s,
                                 self.config.back_pressure.dynamic_max_txn_per_s,
@@ -341,7 +341,7 @@ impl BatchGenerator {
                         counters::QS_BACKPRESSURE_PROOF_COUNT.observe(0.0);
                     }
                     let since_last_non_empty_pull_ms = std::cmp::min(
-                        now.duration_since(last_non_empty_pull).as_millis(),
+                        tick_start.duration_since(last_non_empty_pull).as_millis(),
                         self.config.batch_generation_max_interval_ms as u128
                     ) as usize;
                     if (!self.back_pressure.proof_count
@@ -352,8 +352,18 @@ impl BatchGenerator {
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         let batches = self.handle_scheduled_pull(dynamic_pull_max_txn).await;
                         if !batches.is_empty() {
-                            last_non_empty_pull = now;
+                            last_non_empty_pull = tick_start;
                             network_sender.broadcast_batch_msg(batches).await;
+                        } else if tick_start.elapsed() > interval.period().checked_div(2); {
+                            // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.
+                            last_non_empty_pull = tick_start;
+                            sample!(
+                                SampleRate::Duration(Duration::from_secs(1)),
+                                info!(
+                                    "QS: pull took a long time, {} ms",
+                                    tick_start.elapsed().as_millis()
+                                )
+                            );
                         }
                     }
                 }),
