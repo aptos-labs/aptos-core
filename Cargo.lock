@@ -387,6 +387,7 @@ dependencies = [
  "anyhow",
  "aptos-api-test-context",
  "aptos-api-types",
+ "aptos-bcs-utils",
  "aptos-build-info",
  "aptos-cached-packages",
  "aptos-config",
@@ -599,6 +600,14 @@ dependencies = [
  "serde",
  "tokio",
  "warp",
+]
+
+[[package]]
+name = "aptos-bcs-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
 ]
 
 [[package]]
