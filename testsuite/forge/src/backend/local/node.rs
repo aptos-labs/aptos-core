@@ -157,6 +157,10 @@ impl LocalNode {
             self.name, self.config.inspection_service.port
         );
         info!(
+            "Node {}: Admin service is listening at http://127.0.0.1:{}",
+            self.name, self.config.admin_service.port
+        );
+        info!(
             "Node {}: Backup service is listening at http://127.0.0.1:{}",
             self.name,
             self.config.storage.backup_service_address.port()
