@@ -151,6 +151,21 @@ impl StateValue {
         }
     }
 
+    /// Applies a bytes-to-bytes transformation on the state value contents,
+    /// leaving the state value metadata untouched.
+    pub fn map_bytes<F: FnOnce(Bytes) -> anyhow::Result<Bytes>>(
+        self,
+        f: F,
+    ) -> anyhow::Result<StateValue> {
+        Ok(StateValue::new_impl(match self.inner {
+            StateValueInner::V0(data) => StateValueInner::V0(f(data)?),
+            StateValueInner::WithMetadata { data, metadata } => StateValueInner::WithMetadata {
+                data: f(data)?,
+                metadata,
+            },
+        }))
+    }
+
     pub fn into_metadata(self) -> Option<StateValueMetadata> {
         match self.inner {
             StateValueInner::V0(_) => None,

@@ -6,6 +6,7 @@
 
 use crate::{
     account_address::AccountAddress,
+    aggregator::{TryFromMoveValue, TryIntoMoveValue},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
@@ -769,18 +770,6 @@ impl SignedTransaction {
         Ok(SignatureCheckedTransaction(self))
     }
 
-    /// Special check for fee payer transaction having optional fee payer address in the
-    /// transaction. This will be removed after 1.8 has been fully released.
-    pub fn check_fee_payer_signature(self) -> Result<SignatureCheckedTransaction> {
-        self.authenticator
-            .verify_with_optional_fee_payer(&self.raw_txn)?;
-        Ok(SignatureCheckedTransaction(self))
-    }
-
-    /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
-    /// the signature is valid.
-    /// Verifies is the signature of given transaction is valid.
-    /// Returns `Ok(())` if so.
     pub fn verify_signature(&self) -> Result<()> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(())
@@ -1864,8 +1853,19 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + DeserializeOwned
         + Serialize;
-    /// AggregatorV2 identifier type.
-    type Identifier: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + Debug;
-    type Value: Send + Sync + Clone + TransactionWrite;
+    /// Delayed field identifier type.
+    type Identifier: PartialOrd
+        + Ord
+        + Send
+        + Sync
+        + Clone
+        + Hash
+        + Eq
+        + Debug
+        + Copy
+        + From<u64>
+        + TryIntoMoveValue
+        + TryFromMoveValue<Hint = ()>;
+    type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

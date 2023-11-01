@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 pub fn initialize(path: PathBuf) -> (MoveHarness, Account) {
     // Aggregator tests should use parallel execution.
-    let executor = FakeExecutor::from_head_genesis().set_parallel();
+    let executor = FakeExecutor::from_head_genesis();
 
     let mut harness = MoveHarness::new_with_executor(executor);
     let account = harness.new_account_at(AccountAddress::ONE);

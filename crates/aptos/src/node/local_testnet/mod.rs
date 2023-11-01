@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod docker;
 mod faucet;
 mod health_checker;
 mod indexer_api;
@@ -34,7 +35,7 @@ use crate::{
         processors::ProcessorManager, ready_server::ReadyServerManager, traits::ShutdownStep,
     },
 };
-use anyhow::Context;
+use anyhow::{Context, Result};
 use aptos_indexer_grpc_server_framework::setup_logging;
 use async_trait::async_trait;
 use clap::Parser;
@@ -178,6 +179,10 @@ impl CliCommand<()> for RunLocalTestnet {
     }
 
     async fn execute(mut self) -> CliTypedResult<()> {
+        if self.log_to_stdout {
+            setup_logging(None);
+        }
+
         let global_config = GlobalConfig::load().context("Failed to load global config")?;
         let test_dir = match &self.test_dir {
             Some(test_dir) => test_dir.clone(),
@@ -206,9 +211,8 @@ impl CliCommand<()> for RunLocalTestnet {
             info!("Created test directory: {:?}", test_dir);
         }
 
-        if self.log_to_stdout {
-            setup_logging(None);
-        } else {
+        // We set up directory based logging after we have created test_dir.
+        if !self.log_to_stdout {
             // Set up logging for anything that uses tracing. These logs will go to
             // different directories based on the name of the runtime.
             let td = test_dir.clone();
@@ -328,8 +332,28 @@ impl CliCommand<()> for RunLocalTestnet {
             join_set.spawn(manager.run());
         }
 
-        // Wait for all the services to start up.
-        self.wait_for_startup(&health_checkers, &test_dir).await?;
+        // Wait for all the services to start up. While doing so we also wait for any
+        // of the services to end. This is not meant to ever happen (except for ctrl-c,
+        // which we don't catch yet, so the process will just abort). So if it does
+        // happen, it means one of the services failed to start up, in which case we
+        // stop waiting for the rest of the services and error out.
+        tokio::select! {
+            res = self.wait_for_startup(&health_checkers, &test_dir) => {
+                res?
+            },
+            res = join_set.join_next() => {
+                eprintln!("\nOne of the services failed to start up, running shutdown steps...");
+                run_shutdown_steps(shutdown_steps).await?;
+                eprintln!("Ran shutdown steps");
+                return Err(CliError::UnexpectedError(format!(
+                    "\nOne of the services crashed on startup:\n{:#?}\nPlease check the logs in {}",
+                    // We can unwrap because we know for certain that the JoinSet is
+                    // not empty.
+                    res.unwrap(),
+                    test_dir.display(),
+                )));
+            }
+        }
 
         eprintln!("\nApplying post startup steps...");
 
@@ -388,13 +412,8 @@ impl CliCommand<()> for RunLocalTestnet {
             std::process::exit(1);
         });
 
-        // Run shutdown steps, if any.
-        for shutdown_step in shutdown_steps {
-            shutdown_step
-                .run()
-                .await
-                .context("Failed to run shutdown step")?;
-        }
+        // Run post shutdown steps, if any.
+        run_shutdown_steps(shutdown_steps).await?;
 
         eprintln!("Done, goodbye!");
 
@@ -406,4 +425,14 @@ impl CliCommand<()> for RunLocalTestnet {
             ))),
         }
     }
+}
+
+async fn run_shutdown_steps(shutdown_steps: Vec<Box<dyn ShutdownStep>>) -> Result<()> {
+    for shutdown_step in shutdown_steps {
+        shutdown_step
+            .run()
+            .await
+            .context("Failed to run shutdown step")?;
+    }
+    Ok(())
 }

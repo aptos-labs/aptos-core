@@ -3,8 +3,10 @@
 
 use crate::check_change_set::CheckChangeSet;
 use aptos_aggregator::{
+    delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
-    resolver::{AggregatorReadMode, AggregatorResolver},
+    resolver::AggregatorV1Resolver,
+    types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
     contract_event::ContractEvent,
@@ -13,12 +15,20 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteSetMut},
 };
 use claims::assert_none;
-use move_binary_format::errors::Location;
+use move_binary_format::errors::{Location, PartialVMError};
 use move_core_types::{
     language_storage::StructTag,
+    value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use std::{collections::BTreeMap, hash::Hash};
+use std::{
+    collections::{
+        btree_map::Entry::{Occupied, Vacant},
+        BTreeMap,
+    },
+    hash::Hash,
+    sync::Arc,
+};
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// Describes an update to a resource group granularly, with WriteOps to affected
@@ -38,7 +48,7 @@ pub struct GroupWrite {
     /// exist in the group. Note: During parallel block execution, due to speculative
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    inner_ops: BTreeMap<StructTag, WriteOp>,
+    inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
 }
 
 impl GroupWrite {
@@ -48,9 +58,9 @@ impl GroupWrite {
     pub fn new(
         mut metadata_op: WriteOp,
         group_size: u64,
-        inner_ops: BTreeMap<StructTag, WriteOp>,
+        inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     ) -> Self {
-        for v in inner_ops.values() {
+        for (v, _layout) in inner_ops.values() {
             assert_none!(v.metadata());
         }
 
@@ -84,7 +94,7 @@ impl GroupWrite {
         &self.metadata_op
     }
 
-    pub fn inner_ops(&self) -> &BTreeMap<StructTag, WriteOp> {
+    pub fn inner_ops(&self) -> &BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         &self.inner_ops
     }
 }
@@ -95,14 +105,16 @@ impl GroupWrite {
 /// VM. For storage backends, use `ChangeSet`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
-    resource_write_set: BTreeMap<StateKey, WriteOp>,
+    resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     // Prior to adding a dedicated write-set for resource groups, all resource group
     // updates are merged into a single WriteOp included in the resource_write_set.
     resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
     module_write_set: BTreeMap<StateKey, WriteOp>,
-    aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-    aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
-    events: Vec<ContractEvent>,
+    aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+    aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+    delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
 macro_rules! squash_writes_pair {
@@ -127,27 +139,33 @@ impl VMChangeSet {
             resource_write_set: BTreeMap::new(),
             resource_group_write_set: BTreeMap::new(),
             module_write_set: BTreeMap::new(),
-            aggregator_write_set: BTreeMap::new(),
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_v1_write_set: BTreeMap::new(),
+            aggregator_v1_delta_set: BTreeMap::new(),
+            delayed_field_change_set: BTreeMap::new(),
+            reads_needing_delayed_field_exchange: BTreeMap::new(),
             events: vec![],
         }
     }
 
     pub fn new(
-        resource_write_set: BTreeMap<StateKey, WriteOp>,
+        resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
         module_write_set: BTreeMap<StateKey, WriteOp>,
-        aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
-        events: Vec<ContractEvent>,
+        aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+        delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+        reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> anyhow::Result<Self, VMStatus> {
         let change_set = Self {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            delayed_field_change_set,
+            reads_needing_delayed_field_exchange,
             events,
         };
 
@@ -167,7 +185,14 @@ impl VMChangeSet {
     pub fn try_from_storage_change_set(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
+        // Pass in within which resolver context are we creating this change set.
+        // Used to eagerly reject changes created in an incompatible way.
+        is_delayed_field_optimization_capable: bool,
     ) -> anyhow::Result<Self, VMStatus> {
+        assert!(
+            !is_delayed_field_optimization_capable,
+            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
+
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -179,19 +204,28 @@ impl VMChangeSet {
             if matches!(state_key.inner(), StateKeyInner::AccessPath(ap) if ap.is_code()) {
                 module_write_set.insert(state_key, write_op);
             } else {
-                // TODO(aggregator) While everything else must be a resource, first
+                // TODO[agg_v1](fix) While everything else must be a resource, first
                 // version of aggregators is implemented as a table item. Revisit when
                 // we split MVHashMap into data and aggregators.
-                resource_write_set.insert(state_key, write_op);
+
+                // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+                resource_write_set.insert(state_key, (write_op, None));
             }
         }
 
+        // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
+        let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
             resource_write_set,
+            // TODO[agg_v2](fix): do we use same or different capable flag for resource groups?
+            // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_capable
+            // context (i.e. if dynamic_change_set_optimizations_enabled is disabled)
             resource_group_write_set: BTreeMap::new(),
             module_write_set,
-            aggregator_write_set: BTreeMap::new(),
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_v1_write_set: BTreeMap::new(),
+            aggregator_v1_delta_set: BTreeMap::new(),
+            delayed_field_change_set: BTreeMap::new(),
+            reads_needing_delayed_field_exchange: BTreeMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
@@ -199,20 +233,33 @@ impl VMChangeSet {
     }
 
     pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
+        // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
+        // be done here only if dynamic_change_set_optimizations have not been used/produced
+        // data into the output.
+        // If they (DelayedField or ResourceGroup) have added data into the write set, translation
+        // into output is more complicated, and needs to be done within BlockExecutor context
+        // that knows how to deal with it.
+        assert!(self.delayed_field_change_set().is_empty());
+        assert!(self.resource_group_write_set().is_empty());
+        assert!(self.reads_needing_delayed_field_exchange().is_empty());
+
         let Self {
             resource_write_set,
             resource_group_write_set: _,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set: _,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set: _,
+            delayed_field_change_set: _,
+            reads_needing_delayed_field_exchange: _,
             events,
         } = self;
 
         let mut write_set_mut = WriteSetMut::default();
-        write_set_mut.extend(resource_write_set);
+        write_set_mut.extend(resource_write_set.into_iter().map(|(k, (v, _))| (k, v)));
         write_set_mut.extend(module_write_set);
-        write_set_mut.extend(aggregator_write_set);
+        write_set_mut.extend(aggregator_v1_write_set);
 
+        let events = events.into_iter().map(|(e, _)| e).collect();
         let write_set = write_set_mut
             .freeze()
             .expect("Freezing a WriteSet does not fail.");
@@ -224,11 +271,19 @@ impl VMChangeSet {
     /// - deltas are not materialized.
     /// - resource group writes are not (combined &) converted to resource writes.
     pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_delta_set.is_empty() {
+        if !self.aggregator_v1_delta_set.is_empty() {
             return Err(VMStatus::error(
                 StatusCode::DATA_FORMAT_ERROR,
                 err_msg(
-                    "Cannot convert from VMChangeSet with non-materialized deltas to ChangeSet.",
+                    "Cannot convert from VMChangeSet with non-materialized Aggregator V1 deltas to ChangeSet.",
+                ),
+            ));
+        }
+        if !self.delayed_field_change_set.is_empty() {
+            return Err(VMStatus::error(
+                StatusCode::DATA_FORMAT_ERROR,
+                err_msg(
+                    "Cannot convert from VMChangeSet with non-materialized Delayed Field changes to ChangeSet.",
                 ),
             ));
         }
@@ -246,6 +301,7 @@ impl VMChangeSet {
     pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
         self.resource_write_set()
             .iter()
+            .map(|(k, (v, _))| (k, v))
             .chain(self.module_write_set().iter())
             .chain(self.aggregator_v1_write_set().iter())
     }
@@ -259,8 +315,9 @@ impl VMChangeSet {
     pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, &mut WriteOp)> {
         self.resource_write_set
             .iter_mut()
+            .map(|(k, (v, _))| (k, v))
             .chain(self.module_write_set.iter_mut())
-            .chain(self.aggregator_write_set.iter_mut())
+            .chain(self.aggregator_v1_write_set.iter_mut())
     }
 
     pub fn group_write_set_iter_mut(
@@ -269,7 +326,9 @@ impl VMChangeSet {
         self.resource_group_write_set.iter_mut()
     }
 
-    pub fn resource_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+    pub fn resource_write_set(
+        &self,
+    ) -> &BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
         &self.resource_write_set
     }
 
@@ -281,39 +340,85 @@ impl VMChangeSet {
         &self.module_write_set
     }
 
-    // Called by `try_into_transaction_output_with_materialized_writes` only.
-    pub(crate) fn extend_aggregator_write_set(
+    // Called by `into_transaction_output_with_materialized_writes` only.
+    pub(crate) fn extend_aggregator_v1_write_set(
         &mut self,
         additional_aggregator_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) {
-        self.aggregator_write_set
+        self.aggregator_v1_write_set
             .extend(additional_aggregator_writes)
     }
 
+    // Called by `into_transaction_output_with_materialized_writes` only.
+    pub(crate) fn extend_resource_write_set(
+        &mut self,
+        patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        finalized_group_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+    ) {
+        self.resource_write_set.extend(
+            patched_resource_writes
+                .chain(finalized_group_writes)
+                .map(|(k, v)| (k, (v, None))),
+        );
+    }
+
+    /// The events are set to the input events.
+    pub(crate) fn set_events(&mut self, patched_events: impl Iterator<Item = ContractEvent>) {
+        self.events = patched_events
+            .map(|event| (event, None))
+            .collect::<Vec<_>>();
+    }
+
+    pub(crate) fn drain_delayed_field_change_set(
+        &mut self,
+    ) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        std::mem::take(&mut self.delayed_field_change_set)
+    }
+
     pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
-        &self.aggregator_write_set
+        &self.aggregator_v1_write_set
     }
 
     pub fn aggregator_v1_delta_set(&self) -> &BTreeMap<StateKey, DeltaOp> {
-        &self.aggregator_delta_set
+        &self.aggregator_v1_delta_set
     }
 
-    pub fn events(&self) -> &[ContractEvent] {
+    pub fn delayed_field_change_set(
+        &self,
+    ) -> &BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        &self.delayed_field_change_set
+    }
+
+    pub fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> &BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)> {
+        &self.reads_needing_delayed_field_exchange
+    }
+
+    pub(crate) fn drain_reads_needing_delayed_field_exchange(
+        &mut self,
+    ) -> BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)> {
+        std::mem::take(&mut self.reads_needing_delayed_field_exchange)
+    }
+
+    pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         &self.events
     }
 
-    /// Materializes this change set: all deltas are converted into writes and
-    /// are combined with existing aggregator writes.
-    pub fn try_materialize(
+    /// Materializes this change set: all aggregator v1 deltas are converted into writes and
+    /// are combined with existing aggregator writes. The aggregator v2 changeset is not touched.
+    pub fn try_materialize_aggregator_v1_delta_set(
         self,
-        resolver: &impl AggregatorResolver,
+        resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            mut aggregator_write_set,
-            aggregator_delta_set,
+            mut aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+            delayed_field_change_set,
+            reads_needing_delayed_field_exchange,
             events,
         } = self;
 
@@ -322,39 +427,39 @@ impl VMChangeSet {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta, AggregatorReadMode::Precise)?;
+                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
                 Ok((state_key, write))
             };
 
-        let materialized_aggregator_delta_set =
-            aggregator_delta_set
-                .into_iter()
-                .map(into_write)
-                .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
-        aggregator_write_set.extend(materialized_aggregator_delta_set);
+        let materialized_aggregator_delta_set = aggregator_v1_delta_set
+            .into_iter()
+            .map(into_write)
+            .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
+        aggregator_v1_write_set.extend(materialized_aggregator_delta_set);
 
         Ok(Self {
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_write_set,
-            aggregator_delta_set: BTreeMap::new(),
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set: BTreeMap::new(),
+            delayed_field_change_set,
+            reads_needing_delayed_field_exchange,
             events,
         })
     }
 
-    fn squash_additional_aggregator_changes(
-        aggregator_write_set: &mut BTreeMap<StateKey, WriteOp>,
-        aggregator_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
-        additional_aggregator_write_set: BTreeMap<StateKey, WriteOp>,
-        additional_aggregator_delta_set: BTreeMap<StateKey, DeltaOp>,
+    fn squash_additional_aggregator_v1_changes(
+        aggregator_v1_write_set: &mut BTreeMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
+        additional_aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+        additional_aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     ) -> anyhow::Result<(), VMStatus> {
-        use std::collections::btree_map::Entry::{Occupied, Vacant};
         use WriteOp::*;
 
         // First, squash deltas.
-        for (state_key, additional_delta_op) in additional_aggregator_delta_set {
-            if let Some(write_op) = aggregator_write_set.get_mut(&state_key) {
+        for (state_key, additional_delta_op) in additional_aggregator_v1_delta_set {
+            if let Some(write_op) = aggregator_v1_write_set.get_mut(&state_key) {
                 // In this case, delta follows a write op.
                 match write_op {
                     Creation(data)
@@ -362,12 +467,13 @@ impl VMChangeSet {
                     | CreationWithMetadata { data, .. }
                     | ModificationWithMetadata { data, .. } => {
                         // Apply delta on top of creation or modification.
-                        // TODO(aggregator): This will not be needed anymore once aggregator
+                        // TODO[agg_v1](cleanup): This will not be needed anymore once aggregator
                         // change sets carry non-serialized information.
                         let base: u128 = bcs::from_bytes(data)
                             .expect("Deserializing into an aggregator value always succeeds");
                         let value = additional_delta_op
                             .apply_to(base)
+                            .map_err(PartialVMError::from)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                         *data = serialize(&value).into();
                     },
@@ -384,13 +490,14 @@ impl VMChangeSet {
             } else {
                 // Otherwise, this is a either a new delta or an additional delta
                 // for the same state key.
-                match aggregator_delta_set.entry(state_key) {
+                match aggregator_v1_delta_set.entry(state_key) {
                     Occupied(entry) => {
                         // In this case, we need to merge the new incoming delta
                         // to the existing delta, ensuring the strict ordering.
                         entry
                             .into_mut()
                             .merge_with_next_delta(additional_delta_op)
+                            .map_err(PartialVMError::from)
                             .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                     },
                     Vacant(entry) => {
@@ -403,8 +510,8 @@ impl VMChangeSet {
         }
 
         // Next, squash write ops.
-        for (state_key, additional_write_op) in additional_aggregator_write_set {
-            match aggregator_write_set.entry(state_key) {
+        for (state_key, additional_write_op) in additional_aggregator_v1_write_set {
+            match aggregator_v1_write_set.entry(state_key) {
                 Occupied(mut entry) => {
                     squash_writes_pair!(entry, additional_write_op);
                 },
@@ -412,7 +519,7 @@ impl VMChangeSet {
                     // This is a new write op. It can overwrite a delta so we
                     // have to make sure we remove such a delta from the set in
                     // this case.
-                    let removed_delta = aggregator_delta_set.remove(entry.key());
+                    let removed_delta = aggregator_v1_delta_set.remove(entry.key());
 
                     // We cannot create after modification with a delta!
                     if removed_delta.is_some() && additional_write_op.is_creation() {
@@ -430,12 +537,51 @@ impl VMChangeSet {
         Ok(())
     }
 
-    fn squash_additional_writes<K: Hash + Eq + PartialEq + Ord>(
-        write_set: &mut BTreeMap<K, WriteOp>,
-        additional_write_set: BTreeMap<K, WriteOp>,
+    fn squash_additional_delayed_field_changes(
+        change_set: &mut BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+        additional_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     ) -> anyhow::Result<(), VMStatus> {
-        use std::collections::btree_map::Entry::{Occupied, Vacant};
+        let merged_changes = additional_change_set
+            .into_iter()
+            .map(|(id, additional_change)| {
+                let prev_change =
+                    if let Some(dependent_id) = additional_change.get_merge_dependent_id() {
+                        if change_set.contains_key(&id) {
+                            return (
+                                id,
+                                Err(code_invariant_error(format!(
+                                "Aggregator change set contains both {:?} and its dependent {:?}",
+                                id, dependent_id
+                            ))
+                                .into()),
+                            );
+                        }
+                        change_set.get(&dependent_id)
+                    } else {
+                        change_set.get(&id)
+                    };
+                (
+                    id,
+                    DelayedChange::merge_two_changes(prev_change, &additional_change),
+                )
+            })
+            .collect::<Vec<_>>();
 
+        for (id, merged_change) in merged_changes.into_iter() {
+            change_set.insert(
+                id,
+                merged_change
+                    .map_err(PartialVMError::from)
+                    .map_err(|e| e.finish(Location::Undefined).into_vm_status())?,
+            );
+        }
+        Ok(())
+    }
+
+    fn squash_additional_module_writes(
+        write_set: &mut BTreeMap<StateKey, WriteOp>,
+        additional_write_set: BTreeMap<StateKey, WriteOp>,
+    ) -> anyhow::Result<(), VMStatus> {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
@@ -453,8 +599,6 @@ impl VMChangeSet {
         write_set: &mut BTreeMap<StateKey, GroupWrite>,
         additional_write_set: BTreeMap<StateKey, GroupWrite>,
     ) -> anyhow::Result<(), VMStatus> {
-        use std::collections::btree_map::Entry::{Occupied, Vacant};
-
         for (key, additional_update) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut group_entry) => {
@@ -481,7 +625,7 @@ impl VMChangeSet {
                     if noop {
                         group_entry.remove();
                     } else {
-                        Self::squash_additional_writes(
+                        Self::squash_additional_resource_writes(
                             &mut group_entry.get_mut().inner_ops,
                             additional_inner_ops,
                         )?;
@@ -489,6 +633,73 @@ impl VMChangeSet {
                 },
                 Vacant(entry) => {
                     entry.insert(additional_update);
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn squash_additional_resource_writes<
+        K: Hash + Eq + PartialEq + Ord + Clone + std::fmt::Debug,
+    >(
+        write_set: &mut BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+        additional_write_set: BTreeMap<K, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    ) -> anyhow::Result<(), VMStatus> {
+        for (key, additional_entry) in additional_write_set.into_iter() {
+            match write_set.entry(key.clone()) {
+                Occupied(mut entry) => {
+                    // Squash entry and addtional entries if type layouts match
+                    let (additional_write_op, additional_type_layout) = additional_entry;
+                    let (write_op, type_layout) = entry.get_mut();
+                    if *type_layout != additional_type_layout {
+                        return Err(VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            err_msg(format!(
+                                "Cannot squash two writes with different type layouts.
+                                key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
+                                key, type_layout, additional_type_layout
+                            )),
+                        ));
+                    }
+                    let noop = !WriteOp::squash(write_op, additional_write_op).map_err(|e| {
+                        VMStatus::error(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            err_msg(format!("Error while squashing two write ops: {}.", e)),
+                        )
+                    })?;
+                    if noop {
+                        entry.remove();
+                    }
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_entry);
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn squash_additional_reads_needing_exchange<E>(
+        reads_needing_exchange: &mut BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+        additional_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
+        skip: &BTreeMap<StateKey, E>,
+    ) -> anyhow::Result<(), VMStatus> {
+        for key in skip.keys() {
+            reads_needing_exchange.remove(key);
+        }
+
+        for (key, additional_value) in additional_reads_needing_exchange.into_iter() {
+            if skip.contains_key(&key) {
+                continue;
+            }
+            match reads_needing_exchange.entry(key) {
+                Occupied(entry) => {
+                    // When squashing, reads should always be identical.
+                    // TODO[agg_v2](fix) remove asssertion, as this should always hold.
+                    assert_eq!(entry.get(), &additional_value);
+                },
+                Vacant(entry) => {
+                    entry.insert(additional_value);
                 },
             }
         }
@@ -504,18 +715,20 @@ impl VMChangeSet {
             resource_write_set: additional_resource_write_set,
             resource_group_write_set: additional_resource_group_write_set,
             module_write_set: additional_module_write_set,
-            aggregator_write_set: additional_aggregator_write_set,
-            aggregator_delta_set: additional_aggregator_delta_set,
+            aggregator_v1_write_set: additional_aggregator_write_set,
+            aggregator_v1_delta_set: additional_aggregator_delta_set,
+            delayed_field_change_set: additional_delayed_field_change_set,
+            reads_needing_delayed_field_exchange: additional_reads_needing_delayed_field_exchange,
             events: additional_events,
         } = additional_change_set;
 
-        Self::squash_additional_aggregator_changes(
-            &mut self.aggregator_write_set,
-            &mut self.aggregator_delta_set,
+        Self::squash_additional_aggregator_v1_changes(
+            &mut self.aggregator_v1_write_set,
+            &mut self.aggregator_v1_delta_set,
             additional_aggregator_write_set,
             additional_aggregator_delta_set,
         )?;
-        Self::squash_additional_writes(
+        Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
         )?;
@@ -523,7 +736,19 @@ impl VMChangeSet {
             &mut self.resource_group_write_set,
             additional_resource_group_write_set,
         )?;
-        Self::squash_additional_writes(&mut self.module_write_set, additional_module_write_set)?;
+        Self::squash_additional_module_writes(
+            &mut self.module_write_set,
+            additional_module_write_set,
+        )?;
+        Self::squash_additional_delayed_field_changes(
+            &mut self.delayed_field_change_set,
+            additional_delayed_field_change_set,
+        )?;
+        Self::squash_additional_reads_needing_exchange(
+            &mut self.reads_needing_delayed_field_exchange,
+            additional_reads_needing_delayed_field_exchange,
+            &self.resource_write_set,
+        )?;
         self.events.extend(additional_events);
 
         checker.check_change_set(self)
@@ -706,35 +931,36 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
+        // TODO: Harcoding type layout to None. Test with layout = Some(..)
         base_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 100),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Creation(vec![100].into())),
-                (mock_tag_2(), WriteOp::Modification(vec![2].into())),
+                (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
+                (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
             ]),
         });
         additional_update.insert(key_1.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Modification(vec![0].into())),
-                (mock_tag_1(), WriteOp::Modification(vec![1].into())),
+                (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
+                (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
             ]),
         });
 
         base_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 100),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Deletion),
-                (mock_tag_1(), WriteOp::Modification(vec![2].into())),
-                (mock_tag_2(), WriteOp::Creation(vec![2].into())),
+                (mock_tag_0(), (WriteOp::Deletion, None)),
+                (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
+                (mock_tag_2(), (WriteOp::Creation(vec![2].into()), None)),
             ]),
         });
         additional_update.insert(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
             inner_ops: BTreeMap::from([
-                (mock_tag_0(), WriteOp::Creation(vec![0].into())),
-                (mock_tag_1(), WriteOp::Deletion),
-                (mock_tag_2(), WriteOp::Deletion),
+                (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
+                (mock_tag_1(), (WriteOp::Deletion, None)),
+                (mock_tag_2(), (WriteOp::Deletion, None)),
             ]),
         });
 
@@ -747,27 +973,27 @@ mod tests {
         assert_eq!(inner_ops_1.len(), 3);
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_0()),
-            &WriteOp::Creation(vec![0].into())
+            &(WriteOp::Creation(vec![0].into()), None)
         );
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_1()),
-            &WriteOp::Modification(vec![1].into())
+            &(WriteOp::Modification(vec![1].into()), None)
         );
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_2()),
-            &WriteOp::Modification(vec![2].into())
+            &(WriteOp::Modification(vec![2].into()), None)
         );
         let inner_ops_2 = &base_update.get(&key_2).unwrap().inner_ops;
         assert_eq!(inner_ops_2.len(), 2);
         assert_some_eq!(
             inner_ops_2.get(&mock_tag_0()),
-            &WriteOp::Modification(vec![0].into())
+            &(WriteOp::Modification(vec![0].into()), None)
         );
-        assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &WriteOp::Deletion);
+        assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &(WriteOp::Deletion, None));
 
         let additional_update = BTreeMap::from([(key_2.clone(), GroupWrite {
             metadata_op: write_op_with_metadata(1, 200),
-            inner_ops: BTreeMap::from([(mock_tag_1(), WriteOp::Deletion)]),
+            inner_ops: BTreeMap::from([(mock_tag_1(), (WriteOp::Deletion, None))]),
         })]);
         assert_err!(VMChangeSet::squash_group_writes(
             &mut base_update,

@@ -15,7 +15,7 @@ from collections import deque
 from verify_core.common import clear_artifacts, query_backup_latest_version
 
 # This script runs the replay-verify from the root of aptos-core
-# It assumes the aptos-db-tool binary is already built with the release profile
+# It assumes the aptos-debugger binary is already built with the release profile
 
 
 # The key is the runner's number and the value is the range of txns that the runner is responsible for
@@ -64,10 +64,10 @@ MAINNET_RANGES = [
     [235_000_001, 246_000_000],
     [246_000_001, 260_000_000],
     [260_000_001, 275_000_000],
-    [275_000_001, 290_000_000],
-    [290_000_001, 300_000_000],
-    [300_000_001, 305_000_000],
-    [305_000_001, sys.maxsize],
+    [275_000_001, 291_000_000],
+    [291_000_001, 301_000_000],
+    [301_000_001, 304_000_000],
+    [304_000_001, sys.maxsize],
 ]
 
 
@@ -109,7 +109,8 @@ def replay_verify_partition(
     # run and print output
     process = subprocess.Popen(
         [
-            "target/release/aptos-db-tool",
+            "target/release/aptos-debugger",
+            "aptos-db",
             "replay-verify",
             *txns_to_skip_args,
             "--concurrent-downloads",

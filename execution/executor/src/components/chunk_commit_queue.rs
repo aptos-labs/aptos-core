@@ -144,6 +144,9 @@ impl ChunkCommitQueue {
         );
         self.to_commit.pop_front();
         self.persisted_state = latest_state;
+        self.persisted_state
+            .current
+            .log_generation("commit_queue_base");
         Ok(())
     }
 }

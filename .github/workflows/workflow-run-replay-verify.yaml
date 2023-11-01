@@ -103,7 +103,7 @@ jobs:
 
       - name: Build CLI binaries in release mode
         shell: bash
-        run: cargo build --release -p aptos-db-tool
+        run: cargo build --release -p aptos-debugger
 
       - name: Run replay-verify in parallel
         shell: bash

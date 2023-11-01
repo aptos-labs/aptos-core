@@ -4,6 +4,18 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [2.3.0] - 2023/10/25
+### Added
+- Added `--node-api-key`. This lets you set an API key for the purpose of not being ratelimited.
+
+### Updated
+- Made the local testnet exit more quickly if a service fails to start.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to bcba94c26c8a6372056d2b69ce411c5719f98965.
+
+### Fixed
+- Fixed an infrequent bug that caused startup failures for the local testnet with `--force-restart` + `--with-indexer-api` by using a Docker volume rather than a bind mount for the postgres storage.
+- Fixed an issue where the CLI could not find the Docker socket with some Docker Desktop configurations.
+
 ## [2.2.2] - 2023/10/16
 ### Updated
 - Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to d6f55d4baba32960ea7be60878552e73ffbe8b7e.

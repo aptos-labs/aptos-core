@@ -127,11 +127,32 @@ pub static STORAGE_RESPONSES_SENT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Time it takes to fetch a storage service response
+pub static STORAGE_FETCH_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_storage_service_server_fetch_processing_latency",
+        "Time it takes to fetch a storage service response",
+        &["network_id", "request_type"],
+    )
+    .unwrap()
+});
+
 /// Time it takes to process a storage request
 pub static STORAGE_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_storage_service_server_request_latency",
         "Time it takes to process a storage service request",
+        &["network_id", "request_type"],
+        REQUEST_PROCESSING_LATENCY_BUCKETS_SECS.to_vec(),
+    )
+    .unwrap()
+});
+
+/// Time it takes to validate a storage request
+pub static STORAGE_REQUEST_VALIDATION_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_storage_service_server_request_validation_latency",
+        "Time it takes to validate a storage service request",
         &["network_id", "request_type"],
         REQUEST_PROCESSING_LATENCY_BUCKETS_SECS.to_vec(),
     )
