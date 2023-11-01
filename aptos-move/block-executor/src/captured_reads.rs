@@ -324,6 +324,8 @@ impl<T: Transaction> CapturedReads<T> {
     pub(crate) fn get_group_read_values_with_delayed_fields(
         &self,
     ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
+        // TODO[agg_v2](optimize) - We could potentially filter out inner_reads
+        // to only contain those that have Some(layout)
         self.group_reads.iter().filter(|(_, group_read)| {
             group_read
                 .inner_reads
