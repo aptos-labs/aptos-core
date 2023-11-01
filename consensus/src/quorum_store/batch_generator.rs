@@ -221,6 +221,21 @@ impl BatchGenerator {
         batches
     }
 
+    async fn update_txns_in_progress_sorted(&mut self) {
+        let mut transactions: Vec<_> = self
+            .batches_in_progress
+            .values()
+            .flatten()
+            .cloned()
+            .collect();
+        self.txns_in_progress_sorted = tokio::task::spawn_blocking(move || {
+            transactions.sort();
+            transactions
+        })
+        .await
+        .unwrap();
+    }
+
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
         trace!(
@@ -263,18 +278,7 @@ impl BatchGenerator {
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
         if !batches.is_empty() {
-            let mut transactions: Vec<_> = self
-                .batches_in_progress
-                .values()
-                .flatten()
-                .cloned()
-                .collect();
-            self.txns_in_progress_sorted = tokio::task::spawn_blocking(move || {
-                transactions.sort();
-                transactions
-            })
-            .await
-            .unwrap();
+            self.update_txns_in_progress_sorted().await;
         }
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
@@ -383,10 +387,13 @@ impl BatchGenerator {
                                 "Decreasing block timestamp"
                             );
                             self.latest_block_timestamp = block_timestamp;
+
+                            let mut batches_committed: u64 = 0;
                             // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
                             for batch_id in self.batch_expirations.expire(block_timestamp) {
                                 if self.batches_in_progress.remove(&batch_id).is_some() {
+                                    batches_committed += 1;
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
                                         batch_id,
@@ -394,30 +401,25 @@ impl BatchGenerator {
                                     );
                                 }
                             }
-                            self.txns_in_progress_sorted = self
-                                .batches_in_progress
-                                .values()
-                                .flatten()
-                                .cloned()
-                                .sorted()
-                                .collect();
+                            if batches_committed > 0 {
+                                self.update_txns_in_progress_sorted().await;
+                            }
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
+                            let mut batches_expired: u64 = 0;
                             for batch_id in batch_ids {
                                 debug!(
                                     "QS: received timeout for proof of store, batch id = {}",
                                     batch_id
                                 );
                                 // Not able to gather the proof, allow transactions to be polled again.
-                                self.batches_in_progress.remove(&batch_id);
+                                if self.batches_in_progress.remove(&batch_id).is_some() {
+                                    batches_expired += 1;
+                                }
                             }
-                            self.txns_in_progress_sorted = self
-                                .batches_in_progress
-                                .values()
-                                .flatten()
-                                .cloned()
-                                .sorted()
-                                .collect();
+                            if batches_expired > 0 {
+                                self.update_txns_in_progress_sorted().await;
+                            }
                         }
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
