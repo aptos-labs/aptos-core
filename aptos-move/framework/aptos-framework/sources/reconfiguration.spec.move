@@ -88,6 +88,8 @@ spec aptos_framework::reconfiguration {
         pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
         requires exists<stake::ValidatorFees>(@aptos_framework);
 
+        let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
+            && timestamp::spec_now_microseconds() != global<Configuration>(@aptos_framework).last_reconfiguration_time;
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
         include success ==> aptos_coin::ExistsAptosCoin;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
