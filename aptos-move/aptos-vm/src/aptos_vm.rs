@@ -233,7 +233,7 @@ impl AptosVM {
             .change_set()
             .events()
             .iter()
-            .any(|event| event.event_key() == Some(&new_epoch_event_key))
+            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
 
     pub fn internals(&self) -> AptosVMInternals {
@@ -869,7 +869,7 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = get_max_binary_format_version(self.0.get_features(), None);
+        let max_version = get_max_binary_format_version(self.vm_impl.get_features(), None);
         let max_identifier_size = if self
             .vm_impl
             .get_features()
