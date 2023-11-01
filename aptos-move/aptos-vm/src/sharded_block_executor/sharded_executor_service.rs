@@ -171,7 +171,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         block_on(callback_receiver).unwrap()
     }
 
-    fn execute_block(
+    pub(crate) fn execute_block(
         &self,
         transactions: SubBlocksForShard<AnalyzedTransaction>,
         state_view: &S,

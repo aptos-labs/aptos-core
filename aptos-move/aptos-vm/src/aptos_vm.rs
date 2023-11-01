@@ -871,7 +871,7 @@ impl AptosVM {
             5
         };
         let max_identifier_size = if self
-            .0
+            .vm_impl
             .get_features()
             .is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH)
         {
@@ -1926,7 +1926,7 @@ impl VMSimulator for AptosVM {
     fn simulate_signed_transaction(
         &self,
         transaction: &SignedTransaction,
-        state_view: &(impl StateView + Sync),
+        state_view: &impl StateView,
     ) -> Result<TransactionOutput, VMStatus> {
         assert!(self.is_simulation, "VM has to be created for simulation");
 
@@ -1942,7 +1942,8 @@ impl VMSimulator for AptosVM {
         let resolver = state_view.as_move_resolver();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        let (vm_status, vm_output) = self.execute_user_transaction(&resolver, transaction, &log_context);
+        let (vm_status, vm_output) =
+            self.execute_user_transaction(&resolver, transaction, &log_context);
         match vm_status {
             VMStatus::Executed => vm_output.try_into_transaction_output(&resolver),
             vm_status => Err(vm_status),

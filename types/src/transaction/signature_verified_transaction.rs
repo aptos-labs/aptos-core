@@ -5,7 +5,7 @@ use crate::{
     aggregator::AggregatorID,
     contract_event::ContractEvent,
     state_store::state_key::StateKey,
-    transaction::{BlockExecutableTransaction, SignedTransaction, Transaction},
+    transaction::{BlockExecutableTransaction, Transaction},
     write_set::WriteOp,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};

@@ -25,9 +25,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(argument: (&'a S, bool)) -> Self {
-        let mut vm = AptosVM::new(&argument.as_move_resolver());
-        Self { vm, base_view }
+    fn init(argument: &'a S) -> Self {
+        let vm = AptosVM::new(&argument.as_move_resolver());
+        Self {
+            vm,
+            base_view: argument,
+        }
     }
 
     // This function is called by the BlockExecutor for each transaction is intends

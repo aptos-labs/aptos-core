@@ -168,7 +168,10 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
 pub struct BlockAptosVM();
 
 impl BlockAptosVM {
-    fn execute_block<S: StateView + Sync, L: TransactionCommitHook<Output = AptosTransactionOutput>>(
+    pub fn execute_block<
+        S: StateView + Sync,
+        L: TransactionCommitHook<Output = AptosTransactionOutput>,
+    >(
         executor_thread_pool: Arc<ThreadPool>,
         signature_verified_block: &[SignatureVerifiedTransaction],
         state_view: &S,
@@ -198,11 +201,7 @@ impl BlockAptosVM {
             transaction_commit_listener,
         );
 
-        let ret = executor.execute_block(
-            state_view,
-            signature_verified_block,
-            state_view,
-        );
+        let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
             Ok(outputs) => {
                 let output_vec: Vec<TransactionOutput> = outputs
