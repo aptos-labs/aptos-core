@@ -238,11 +238,7 @@ impl Mempool {
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions_sorted.len();
-        let sort_end_time = start_time.elapsed();
-        let sort_time = sort_end_time;
         let mut seen = HashMap::new();
-        let map_end_time = start_time.elapsed();
-        let map_time = map_end_time.saturating_sub(sort_end_time);
         let mut upgraded = HashSet::new();
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
@@ -257,7 +253,7 @@ impl Mempool {
             }
         }
         let gas_end_time = start_time.elapsed();
-        let gas_time = gas_end_time.saturating_sub(map_end_time);
+        let gas_time = gas_end_time;
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -365,8 +361,6 @@ impl Mempool {
                 byte_size = total_bytes,
                 block_size = block.len(),
                 return_non_full = return_non_full,
-                sort_time_ms = sort_time.as_millis(),
-                map_time_ms = map_time.as_millis(),
                 gas_time_ms = gas_time.as_millis(),
                 result_time_ms = result_time.as_millis(),
                 block_time_ms = block_time.as_millis(),
@@ -385,8 +379,6 @@ impl Mempool {
                     byte_size = total_bytes,
                     block_size = block.len(),
                     return_non_full = return_non_full,
-                    sort_time_ms = sort_time.as_millis(),
-                    map_time_ms = map_time.as_millis(),
                     gas_time_ms = gas_time.as_millis(),
                     result_time_ms = result_time.as_millis(),
                     block_time_ms = block_time.as_millis(),
