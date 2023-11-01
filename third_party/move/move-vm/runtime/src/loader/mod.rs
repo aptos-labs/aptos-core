@@ -27,7 +27,9 @@ use move_core_types::{
     value::{IdentifierMappingKind, LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{DepthFormula, StructIdentifier, StructType, Type};
+use move_vm_types::loaded_data::runtime_types::{
+    AbilityInfo, DepthFormula, StructIdentifier, StructType, Type,
+};
 use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
@@ -751,7 +753,7 @@ impl Loader {
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
                     Type::Struct {
                         name: struct_type.name.clone(),
-                        ability: struct_type.abilities,
+                        ability: AbilityInfo::struct_(struct_type.abilities),
                     }
                 } else {
                     let mut type_params = vec![];
@@ -763,8 +765,10 @@ impl Loader {
                     Type::StructInstantiation {
                         name: struct_type.name.clone(),
                         ty_args: Arc::new(type_params),
-                        base_ability_set: struct_type.abilities,
-                        phantom_ty_args_mask: struct_type.phantom_ty_args_mask.clone(),
+                        ability: AbilityInfo::generic_struct(
+                            struct_type.abilities,
+                            struct_type.phantom_ty_args_mask.clone(),
+                        ),
                     }
                 }
             },
@@ -1288,7 +1292,7 @@ impl<'a> Resolver<'a> {
         };
         Ok(Type::Struct {
             name: struct_def.name.clone(),
-            ability: struct_def.abilities,
+            ability: AbilityInfo::struct_(struct_def.abilities),
         })
     }
 
@@ -1324,8 +1328,10 @@ impl<'a> Resolver<'a> {
                     .map(|ty| self.subst(ty, ty_args))
                     .collect::<PartialVMResult<_>>()?,
             ),
-            base_ability_set: struct_.abilities,
-            phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
+            ability: AbilityInfo::generic_struct(
+                struct_.abilities,
+                struct_.phantom_ty_args_mask.clone(),
+            ),
         })
     }
 
@@ -1454,7 +1460,7 @@ impl<'a> Resolver<'a> {
                 let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
                 Ok(Type::Struct {
                     name: struct_.name.clone(),
-                    ability: struct_.abilities,
+                    ability: AbilityInfo::struct_(struct_.abilities),
                 })
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
@@ -1478,8 +1484,10 @@ impl<'a> Resolver<'a> {
                             .map(|ty| ty.subst(args))
                             .collect::<PartialVMResult<Vec<_>>>()?,
                     ),
-                    base_ability_set: struct_.abilities,
-                    phantom_ty_args_mask: struct_.phantom_ty_args_mask.clone(),
+                    ability: AbilityInfo::generic_struct(
+                        struct_.abilities,
+                        struct_.phantom_ty_args_mask.clone(),
+                    ),
                 })
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),

@@ -38,9 +38,9 @@ GRPC_DATA_SERVICE_TLS_URL = "localhost:50053"
 GRPC_IS_READY_MESSAGE = f"""
     ======================================
     Transaction Stream Service(indexer grpc) is ready to serve!
-    
+
     You can use grpcurl to test it out:
-    
+
     - For non-TLS:
         grpcurl -plaintext -d '{{ "starting_version": 0 }}' \\
             -H "x-aptos-data-authorization:dummy_token" \\
@@ -244,7 +244,7 @@ def wait_for_indexer_grpc_progress(context: SystemContext) -> None:
                     "-H",
                     "x-aptos-data-authorization:dummy_token",
                     "-import-path",
-                    "crates/aptos-protos/proto",
+                    "protos/proto",
                     "-proto",
                     "aptos/indexer/v1/raw_data.proto",
                     "-plaintext",

@@ -28,6 +28,7 @@ spec aptos_framework::version {
 
         let old_major = global<Version>(@aptos_framework).major;
         aborts_if !(old_major < major);
+
         ensures global<Version>(@aptos_framework).major == major;
     }
 

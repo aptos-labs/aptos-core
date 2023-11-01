@@ -4,7 +4,7 @@
 use super::RETRY_POLICY;
 use anyhow::{Context, Result};
 use aptos_logger::{debug, sample, sample::SampleRate, warn};
-use aptos_rest_client::{error::RestError, Client as RestClient};
+use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
     move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
 };
@@ -238,6 +238,13 @@ async fn submit_and_check(
     Ok(())
 }
 
+fn is_account_not_found(error: &RestError) -> bool {
+    match error {
+        RestError::Api(error) => matches!(error.error.error_code, AptosErrorCode::AccountNotFound),
+        _ => false,
+    }
+}
+
 #[async_trait]
 impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     async fn get_account_balance(&self, account_address: AccountAddress) -> Result<u64> {
@@ -252,11 +259,19 @@ impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     }
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64> {
-        Ok(RETRY_POLICY
-            .retry(move || self.random_rest_client().get_account_bcs(account_address))
-            .await?
-            .into_inner()
-            .sequence_number())
+        let result = RETRY_POLICY
+            .retry_if(
+                move || self.random_rest_client().get_account_bcs(account_address),
+                |error: &RestError| !is_account_not_found(error),
+            )
+            .await;
+        match result {
+            Ok(account) => Ok(account.into_inner().sequence_number()),
+            Err(error) => match is_account_not_found(&error) {
+                true => Ok(0),
+                false => Err(error.into()),
+            },
+        }
     }
 
     async fn execute_transactions_with_counter(

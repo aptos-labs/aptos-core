@@ -71,7 +71,7 @@ spec aptos_framework::transaction_fee {
 
         let amount_to_burn = (burn_percentage * coin::value(coin)) / 100;
         // include (amount_to_burn > 0) ==> coin::AbortsIfNotExistCoinInfo<AptosCoin>;
-        include amount_to_burn > 0 ==> coin::AbortsIfAggregator<AptosCoin>{ coin: Coin<AptosCoin>{ value: amount_to_burn } };
+        include amount_to_burn > 0 ==> coin::CoinSubAbortsIf<AptosCoin>{ amount: amount_to_burn };
         ensures coin.value == old(coin).value - amount_to_burn;
     }
 
@@ -182,6 +182,8 @@ spec aptos_framework::transaction_fee {
 
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
         modifies global<CoinInfo<AptosCoin>>(aptos_addr);
+        aborts_if (refund != 0) && !exists<CoinInfo<AptosCoin>>(aptos_addr);
+        include coin::CoinAddAbortsIf<AptosCoin> { amount: refund };
 
         aborts_if !exists<CoinStore<AptosCoin>>(account);
         modifies global<CoinStore<AptosCoin>>(account);

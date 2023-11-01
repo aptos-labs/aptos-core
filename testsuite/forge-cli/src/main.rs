@@ -7,7 +7,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
     BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
-    NodeConfig, StateSyncConfig,
+    NodeConfig, QcAggregatorType, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
@@ -20,7 +20,11 @@ use aptos_forge::{
 };
 use aptos_logger::{info, Level};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
+use aptos_sdk::{
+    move_types::account_address::AccountAddress,
+    transaction_builder::aptos_stdlib,
+    types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig},
+};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -1775,6 +1779,11 @@ fn realistic_env_max_load_test(
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
                 (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default()).expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
@@ -1824,11 +1833,7 @@ fn realistic_env_max_load_test(
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
-    // TO ACHIEVE MAXIMUM THROUGHPUT, OVERRIDE THESE ON-CHAIN CONFIGS:
-    //     block_gas_limit: None
-    //     conflict_window_size: 256
-
-    // ALSO THESE ARE THE MOST COMMONLY USED TUNE-ABLES:
+    // THE MOST COMMONLY USED TUNE-ABLES:
     const USE_CRAZY_MACHINES: bool = false;
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 12;
@@ -1853,9 +1858,21 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
 
+            // Experimental delayed QC aggregation
+            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
+
             if USE_CRAZY_MACHINES {
                 config.execution.concurrency_level = 48;
             }
+        }))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"]["V3"]["block_gas_limit"] =
+                serde_yaml::Value::Null;
+            helm_values["chain"]["on_chain_execution_config"]["V3"]["transaction_shuffler_type"]
+                ["sender_aware_v2"] = 256.into();
         }));
 
     if ENABLE_VFNS {
@@ -1880,16 +1897,17 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             .with_success_criteria(
                 SuccessCriteria::new(25000)
                     .add_no_restarts()
-                    .add_wait_for_catchup_s(60), /* Doesn't work with out event indices
-                                                 .add_chain_progress(StateProgressThreshold {
-                                                     max_no_progress_secs: 10.0,
-                                                     max_round_gap: 4,
-                                                 }),
-                                                  */
+                    .add_wait_for_catchup_s(60),
+                /* Doesn't work with out event indices
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+                 */
             );
     } else {
         forge_config = forge_config.with_success_criteria(
-            SuccessCriteria::new(8800)
+            SuccessCriteria::new(12000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(60)
                 .add_system_metrics_threshold(SystemMetricsThreshold::new(
@@ -1899,12 +1917,13 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     MetricsThreshold::new(14.0, 30),
                     // Check that we don't use more than 10 GB of memory for 30% of the time.
                     MetricsThreshold::new_gb(10.0, 30),
-                )), /* Doens't work without event indices
-                    .add_chain_progress(StateProgressThreshold {
-                        max_no_progress_secs: 10.0,
-                        max_round_gap: 4,
-                    }),
-                    */
+                )),
+            /* Doens't work without event indices
+            .add_chain_progress(StateProgressThreshold {
+                max_no_progress_secs: 10.0,
+                max_round_gap: 4,
+            }),
+            */
         );
     }
 

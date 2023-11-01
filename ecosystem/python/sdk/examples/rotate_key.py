@@ -1,5 +1,5 @@
 import asyncio
-from typing import List
+from typing import List, cast
 
 import aptos_sdk.asymmetric_crypto as asymmetric_crypto
 import aptos_sdk.ed25519 as ed25519
@@ -67,7 +67,7 @@ async def rotate_auth_key_multi_ed_25519_payload(
         map(lambda private_key: Account.load_key(private_key.hex()), private_keys)
     )
     public_keys = list(map(lambda account: account.public_key(), to_accounts))
-    public_key = ed25519.MultiPublicKey(public_keys, 1)
+    public_key = ed25519.MultiPublicKey(cast(List[ed25519.PublicKey], public_keys), 1)
 
     rotation_proof_challenge = RotationProofChallenge(
         sequence_number=await rest_client.account_sequence_number(
@@ -83,9 +83,12 @@ async def rotate_auth_key_multi_ed_25519_payload(
     rotation_proof_challenge_bcs = serializer.output()
 
     from_signature = from_account.sign(rotation_proof_challenge_bcs)
-    to_signature = to_accounts[0].sign(rotation_proof_challenge_bcs)
+    to_signature = cast(
+        ed25519.Signature, to_accounts[0].sign(rotation_proof_challenge_bcs)
+    )
     multi_to_signature = ed25519.MultiSignature.from_key_map(
-        public_key, [(to_accounts[0].public_key(), to_signature)]
+        public_key,
+        [(cast(ed25519.PublicKey, to_accounts[0].public_key()), to_signature)],
     )
 
     return rotation_payload(

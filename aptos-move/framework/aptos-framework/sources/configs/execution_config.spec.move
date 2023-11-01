@@ -26,7 +26,7 @@ spec aptos_framework::execution_config {
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         requires len(config) > 0;
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
-        include features::spec_collect_and_distribute_gas_fees_enabled() ==> aptos_coin::ExistsAptosCoin;
+        include aptos_coin::ExistsAptosCoin;
         requires system_addresses::is_aptos_framework_address(addr);
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
 

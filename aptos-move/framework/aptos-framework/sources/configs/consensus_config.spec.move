@@ -12,6 +12,7 @@ spec aptos_framework::consensus_config {
         aborts_if !system_addresses::is_aptos_framework_address(addr);
         aborts_if exists<ConsensusConfig>(@aptos_framework);
         aborts_if !(len(config) > 0);
+        ensures  exists<ConsensusConfig>(@aptos_framework);
         ensures @aptos_framework == addr;
         ensures global<ConsensusConfig>(addr) == ConsensusConfig { config };
     }
@@ -45,5 +46,6 @@ spec aptos_framework::consensus_config {
 
         ensures @aptos_framework == addr;
         ensures exists<ConsensusConfig>(@aptos_framework);
+        ensures global<ConsensusConfig>(@aptos_framework).config == config;
     }
 }

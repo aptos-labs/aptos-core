@@ -3,7 +3,7 @@
 
 use crate::{
     block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
-    metrics::NUM_TXNS, GasMesurement, TransactionCommitter, TransactionExecutor,
+    metrics::NUM_TXNS, GasMeasuring, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
@@ -143,7 +143,7 @@ where
                 start_execution_rx.map(|rx| rx.recv());
                 let start_time = Instant::now();
                 let mut executed = 0;
-                let start_gas_measurement = GasMesurement::start();
+                let start_gas_measurement = GasMeasuring::start();
                 while let Ok(msg) = executable_block_receiver.recv() {
                     let ExecuteBlockMessage {
                         current_block_start_time,
@@ -160,7 +160,7 @@ where
                     info!("Finished executing block");
                 }
 
-                let (delta_gas, delta_gas_count) = start_gas_measurement.end();
+                let delta_gas = start_gas_measurement.end();
 
                 let elapsed = start_time.elapsed().as_secs_f64();
                 info!(
@@ -171,12 +171,22 @@ where
                 );
                 info!(
                     "Overall execution GPS: {} gas/s (over {} txns)",
-                    delta_gas / elapsed,
+                    delta_gas.gas / elapsed,
+                    executed
+                );
+                info!(
+                    "Overall execution ioGPS: {} gas/s (over {} txns)",
+                    delta_gas.io_gas / elapsed,
+                    executed
+                );
+                info!(
+                    "Overall execution executionGPS: {} gas/s (over {} txns)",
+                    delta_gas.execution_gas / elapsed,
                     executed
                 );
                 info!(
                     "Overall execution GPT: {} gas/txn (over {} txns)",
-                    delta_gas / (delta_gas_count as f64).max(1.0),
+                    delta_gas.gas / (delta_gas.gas_count as f64).max(1.0),
                     executed
                 );
 

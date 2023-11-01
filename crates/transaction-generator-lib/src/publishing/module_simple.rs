@@ -168,6 +168,13 @@ pub enum EntryPoints {
     TokenV1MintAndTransferFT,
 
     TokenV2AmbassadorMint,
+
+    InitializeVectorPicture {
+        length: u64,
+    },
+    VectorPicture {
+        length: u64,
+    },
 }
 
 impl EntryPoints {
@@ -201,6 +208,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+            EntryPoints::InitializeVectorPicture { .. } | EntryPoints::VectorPicture { .. } => {
+                "complex"
+            },
         }
     }
 
@@ -234,6 +244,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
             EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::InitializeVectorPicture { .. } | EntryPoints::VectorPicture { .. } => {
+                "vector_picture"
+            },
         }
     }
 
@@ -373,6 +386,22 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::InitializeVectorPicture { length } => {
+                get_payload(module_id, ident_str!("create").to_owned(), vec![
+                    bcs::to_bytes(&length).unwrap(), // length
+                ])
+            },
+            EntryPoints::VectorPicture { length } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(module_id, ident_str!("update").to_owned(), vec![
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&0u64).unwrap(), // palette_index
+                    bcs::to_bytes(&rng.gen_range(0u64, length)).unwrap(), // index
+                    bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color R
+                    bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color G
+                    bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color B
+                ])
+            },
         }
     }
 
@@ -385,6 +414,9 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
+            },
+            EntryPoints::VectorPicture { length } => {
+                Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
             _ => None,
         }

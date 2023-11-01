@@ -26,6 +26,7 @@ use aptos_types::{
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
+    write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -433,7 +434,6 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
-        FeatureFlag::CONCURRENT_ASSETS,
     ]
 }
 

@@ -17,3 +17,4 @@ aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-metrics-core = { workspace = true }
 once_cell = { workspace = true }
+threadpool = { workspace = true }

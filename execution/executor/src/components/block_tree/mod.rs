@@ -11,7 +11,7 @@ use crate::logging::{LogEntry, LogSchema};
 use anyhow::{anyhow, ensure, Result};
 use aptos_consensus_types::block::Block as ConsensusBlock;
 use aptos_crypto::HashValue;
-use aptos_drop_helper::DEFAULT_DROP_HELPER;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_executor_types::{execution_output::ExecutionOutput, ExecutorError, LedgerUpdateOutput};
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
@@ -270,6 +270,10 @@ impl BlockTree {
             );
             last_committed_block
         };
+        root.output
+            .state()
+            .current
+            .log_generation("block_tree_base");
         let old_root = {
             let mut root_locked = self.root.lock();
             // send old root to async task to drop it
@@ -277,7 +281,8 @@ impl BlockTree {
             *root_locked = root;
             old_root
         };
-        Ok(DEFAULT_DROP_HELPER.schedule_drop_with_waiter(old_root))
+
+        Ok(DEFAULT_DROPPER.schedule_drop_with_waiter(old_root))
     }
 
     pub fn add_block(
