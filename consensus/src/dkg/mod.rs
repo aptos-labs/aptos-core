@@ -25,6 +25,10 @@ pub fn build_dkg_pvss_config(
         .map(|vi| vi.consensus_voting_power())
         .collect();
 
+    // // For mainnet-like testing
+    // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
+    // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
+
     let dkg_rounding = DKGRounding::new(
         validator_stakes.clone(),
         dkg_rounding::STAKE_GAP_THRESHOLD,
