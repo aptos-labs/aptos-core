@@ -367,7 +367,7 @@ impl Mempool {
             );
         } else {
             sample!(
-                SampleRate::Duration(Duration::from_secs(1)),
+                SampleRate::Duration(Duration::from_secs(60)),
                 debug!(
                     LogSchema::new(LogEntry::GetBlock),
                     seen_consensus = exclude_size,
