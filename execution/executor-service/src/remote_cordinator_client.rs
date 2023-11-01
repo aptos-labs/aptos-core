@@ -56,7 +56,7 @@ impl RemoteCoordinatorClient {
             .flat_map(|sub_block| {
                 sub_block
                     .transactions
-                    .par_iter()
+                    .iter()
                     .map(|txn| {
                         let mut state_keys = vec![];
                         for storage_location in txn

@@ -108,6 +108,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
             let priority = message.seq_num.unwrap();
             self.kv_unprocessed_pq.push(message, priority);
+            REMOTE_EXECUTOR_TIMER
+                .with_label_values(&["0", "kv_req_pq_size"])
+                .observe(self.kv_unprocessed_pq.len() as f64);
         }
     }
 
