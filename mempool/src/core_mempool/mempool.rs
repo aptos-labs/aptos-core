@@ -234,14 +234,11 @@ impl Mempool {
         max_bytes: u64,
         return_non_full: bool,
         include_gas_upgraded: bool,
-        mut exclude_transactions: Vec<TransactionInProgress>,
+        // TODO: how to put in the API that this is sorted?
+        exclude_transactions: Vec<TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();
-        // Sort, so per TxnPointer the highest gas will be in the map
-        if include_gas_upgraded {
-            exclude_transactions.sort();
-        }
         let sort_end_time = start_time.elapsed();
         let sort_time = sort_end_time;
         let mut seen = HashMap::new();

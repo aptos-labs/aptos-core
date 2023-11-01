@@ -48,6 +48,7 @@ pub struct BatchGenerator {
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
+    txns_in_progress_sorted: Vec<TransactionInProgress>,
     batch_expirations: TimeExpirations<BatchId>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
@@ -88,6 +89,7 @@ impl BatchGenerator {
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
+            txns_in_progress_sorted: vec![],
             batch_expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
             last_end_batch_time: Instant::now(),
@@ -220,21 +222,18 @@ impl BatchGenerator {
     }
 
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
-        let exclude_txns: Vec<_> = self
-            .batches_in_progress
-            .values()
-            .flatten()
-            .cloned()
-            .collect();
-        counters::BATCH_PULL_EXCLUDED_TXNS.observe(exclude_txns.len() as f64);
-        trace!("QS: excluding txs len: {:?}", exclude_txns.len());
+        counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
+        trace!(
+            "QS: excluding txs len: {:?}",
+            self.txns_in_progress_sorted.len()
+        );
 
         let mut pulled_txns = self
             .mempool_proxy
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
-                exclude_txns,
+                self.txns_in_progress_sorted.clone(),
             )
             .await
             .unwrap_or_default();
@@ -263,8 +262,18 @@ impl BatchGenerator {
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
-        counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
+        if !batches.is_empty() {
+            // TODO: make this spawn_blocking
+            self.txns_in_progress_sorted = self
+                .batches_in_progress
+                .values()
+                .flatten()
+                .cloned()
+                .sorted()
+                .collect();
+        }
         self.last_end_batch_time = Instant::now();
+        counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 
         batches
     }
@@ -371,6 +380,13 @@ impl BatchGenerator {
                                     );
                                 }
                             }
+                            self.txns_in_progress_sorted = self
+                                .batches_in_progress
+                                .values()
+                                .flatten()
+                                .cloned()
+                                .sorted()
+                                .collect();
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
                             for batch_id in batch_ids {
@@ -381,6 +397,13 @@ impl BatchGenerator {
                                 // Not able to gather the proof, allow transactions to be polled again.
                                 self.batches_in_progress.remove(&batch_id);
                             }
+                            self.txns_in_progress_sorted = self
+                                .batches_in_progress
+                                .values()
+                                .flatten()
+                                .cloned()
+                                .sorted()
+                                .collect();
                         }
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx

@@ -43,7 +43,7 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TransactionInProgress {
     pub summary: TransactionSummary,
     pub gas_unit_price: u64,

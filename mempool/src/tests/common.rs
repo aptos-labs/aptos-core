@@ -17,6 +17,7 @@ use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{RawTransaction, Script, SignedTransaction},
 };
+use itertools::Itertools;
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -160,7 +161,7 @@ pub(crate) fn batch_add_signed_txn(
 }
 
 // Helper struct that keeps state between `.get_block` calls. Imitates work of Consensus.
-pub struct ConsensusMock(HashSet<TxnPointer>);
+pub struct ConsensusMock(HashSet<TransactionInProgress>);
 
 impl ConsensusMock {
     pub(crate) fn new() -> Self {
@@ -173,21 +174,17 @@ impl ConsensusMock {
         max_txns: u64,
         max_bytes: u64,
     ) -> Vec<SignedTransaction> {
-        let exclude_transactions: Vec<_> = self
-            .0
-            .iter()
-            .map(|txn| TransactionInProgress {
-                summary: *txn,
-                gas_unit_price: 0,
-            })
-            .collect();
-        let block = mempool.get_batch(max_txns, max_bytes, true, false, exclude_transactions);
+        let exclude_transactions: Vec<_> = self.0.iter().cloned().sorted().collect();
+        let block = mempool.get_batch(max_txns, max_bytes, true, true, exclude_transactions);
         self.0 = self
             .0
             .union(
                 &block
                     .iter()
-                    .map(|t| TxnPointer::new(t.sender(), t.sequence_number()))
+                    .map(|t| TransactionInProgress {
+                        summary: TxnPointer::new(t.sender(), t.sequence_number()),
+                        gas_unit_price: t.gas_unit_price(),
+                    })
                     .collect(),
             )
             .cloned()

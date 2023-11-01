@@ -898,22 +898,11 @@ fn test_include_gas_upgraded() {
     let batch = pool.get_batch(10, 10240, true, false, vec![high_gas_txn.clone()]);
     assert_eq!(batch.len(), 0);
 
-    let batch = pool.get_batch(10, 10240, true, true, vec![
-        low_gas_txn.clone(),
-        high_gas_txn.clone(),
-    ]);
-    assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, false, vec![
-        low_gas_txn.clone(),
-        high_gas_txn.clone(),
-    ]);
-    assert_eq!(batch.len(), 0);
+    let mut exclude_transactions_sorted = vec![low_gas_txn.clone(), high_gas_txn.clone()];
+    exclude_transactions_sorted.sort();
 
-    let batch = pool.get_batch(10, 10240, true, false, vec![
-        high_gas_txn.clone(),
-        low_gas_txn.clone(),
-    ]);
+    let batch = pool.get_batch(10, 10240, true, true, exclude_transactions_sorted.clone());
     assert_eq!(batch.len(), 0);
-    let batch = pool.get_batch(10, 10240, true, true, vec![high_gas_txn, low_gas_txn]);
+    let batch = pool.get_batch(10, 10240, true, false, exclude_transactions_sorted.clone());
     assert_eq!(batch.len(), 0);
 }
