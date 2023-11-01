@@ -2960,8 +2960,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         maccess: &EA::ModuleAccess,
         generics: &Option<Vec<EA::Type>>,
         fields: &EA::Fields<EA::LValue>,
+        // whether matching against a reference value
         ref_expected: Option<ReferenceKind>,
+        // pack { f_i : t_i }, should the type of f_i >: t_i or <: t_i
         expected_order: WideningOrder,
+        // whether the pattern vars are already bound
         match_locals: bool,
     ) -> Option<(QualifiedInstId<StructId>, Vec<Pattern>)> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
