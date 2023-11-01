@@ -1324,6 +1324,7 @@ dependencies = [
  "aptos-vm",
  "bcs 0.1.4",
  "clap 4.3.21",
+ "cpq",
  "crossbeam-channel",
  "ctrlc",
  "dashmap",
@@ -5793,6 +5794,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee34052ee3d93d6d8f3e6f81d85c47921f6653a19a7b70e939e3e602d893a674"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "cpq"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b80f252bbbe574043aa38a998f969ff8ab5d1935f7eeb062cf79952f574c611"
+dependencies = [
+ "parking_lot 0.12.1",
 ]
 
 [[package]]
