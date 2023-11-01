@@ -27,6 +27,7 @@ aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
+cpq = "0.2.0"
 crossbeam-channel = { workspace = true }
 ctrlc = "3.4.0"
 dashmap = { workspace = true }
