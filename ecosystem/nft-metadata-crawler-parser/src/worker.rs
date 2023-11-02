@@ -24,7 +24,6 @@ use crate::{
     },
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use aptos_runtimes::spawn_named_runtime;
 use bytes::Bytes;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
@@ -173,15 +172,17 @@ async fn handle_root(
     context: Arc<ServerContext>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
-    spawn_parser(
+
+    // Use spawn_blocking to run the function on a separate thread.
+    let result = tokio::spawn(spawn_parser(
         context.parser_config.clone(),
         msg,
         context.pool.clone(),
         context.gcs_client.clone(),
-    )
+    ))
     .await;
 
-    if !to_ack {
+    if !to_ack || result.is_err() {
         return Ok(warp::reply::with_status(
             warp::reply(),
             warp::http::StatusCode::BAD_REQUEST,
@@ -239,25 +240,14 @@ impl RunnableConfig for ParserConfig {
         });
 
         // Create web server
-        let runtime = spawn_named_runtime(self.get_server_name(), Some(self.num_parsers));
-        let server_port = self.server_port;
-        let server_handler = runtime.spawn(async move {
-            let route = warp::post()
-                .and(warp::path::end())
-                .and(warp::body::bytes())
-                .and(warp::any().map(move || context.clone()))
-                .and_then(handle_root);
-            warp::serve(route).run(([0, 0, 0, 0], server_port)).await;
-        });
-
-        tokio::select! {
-            res = server_handler => {
-                if let Err(e) = res {
-                    error!(error = ?e, "[NFT Metadata Crawler] Warp server panicked or was shut down");
-                    panic!();
-                }
-            },
-        }
+        let route = warp::post()
+            .and(warp::path::end())
+            .and(warp::body::bytes())
+            .and(warp::any().map(move || context.clone()))
+            .and_then(handle_root);
+        warp::serve(route)
+            .run(([0, 0, 0, 0], self.server_port))
+            .await;
         Ok(())
     }
 
