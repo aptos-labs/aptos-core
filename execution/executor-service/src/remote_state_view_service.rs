@@ -14,6 +14,7 @@ use aptos_types::state_store::{StateView, TStateView};
 use itertools::Itertools;
 use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
 
@@ -198,7 +199,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "kv_resp_ser"])
             .start_timer();
-        let resp = bcs::to_bytes(&resp).unwrap();
+        let resp_serialized = bcs::to_bytes(&resp).unwrap();
         drop(bcs_ser_timer);
         trace!(
             "remote state view service - sending response for shard {} with {} keys",
@@ -206,9 +207,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             len
         );
         let seq_num = message.seq_num.unwrap();
+
+        DEFAULT_DROPPER.schedule_drop(resp);
+        DEFAULT_DROPPER.schedule_drop(message);
        // info!("Processing message with seq_num: {}", seq_num);
-        let message = Message::create_with_metadata(resp, start_ms_since_epoch, seq_num, shard_id as u64);
-        kv_tx[shard_id].lock().unwrap().send(message, &MessageType::new("remote_kv_response".to_string()));
+        let resp_message = Message::create_with_metadata(resp_serialized, start_ms_since_epoch, seq_num, shard_id as u64);
+        kv_tx[shard_id].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

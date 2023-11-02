@@ -15,6 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
+aptos-drop-helper = { workspace = true }
+aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }

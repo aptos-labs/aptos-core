@@ -1432,6 +1432,8 @@ version = "0.1.0"
 dependencies = [
  "aptos-block-partitioner",
  "aptos-config",
+ "aptos-drop-helper",
+ "aptos-executor-types",
  "aptos-infallible",
  "aptos-language-e2e-tests",
  "aptos-logger",
