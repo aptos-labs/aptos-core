@@ -39,6 +39,8 @@ spec aptos_framework::version {
         aborts_if signer::address_of(aptos_framework) != @aptos_framework;
         aborts_if exists<Version>(@aptos_framework);
         aborts_if exists<SetVersionCapability>(@aptos_framework);
+        ensures exists<Version>(@aptos_framework);
+        ensures exists<SetVersionCapability>(@aptos_framework);
         ensures global<Version>(@aptos_framework) == Version { major: initial_version };
         ensures global<SetVersionCapability>(@aptos_framework) == SetVersionCapability {};
     }

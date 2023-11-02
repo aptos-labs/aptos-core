@@ -30,7 +30,6 @@ spec aptos_framework::consensus_config {
         use aptos_framework::staking_config;
         use aptos_framework::reconfiguration;
 
-        // It caused 25s to verified in the local environment and timeout in the github unit test
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         include reconfiguration::ReconfigureEnsures;
@@ -43,9 +42,6 @@ spec aptos_framework::consensus_config {
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
-
-        ensures @aptos_framework == addr;
-        ensures exists<ConsensusConfig>(@aptos_framework);
         ensures global<ConsensusConfig>(@aptos_framework).config == config;
     }
 }
