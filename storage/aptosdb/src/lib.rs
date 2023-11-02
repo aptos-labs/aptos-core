@@ -85,6 +85,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, state_delta::StateDelta, state_view::DbStateView,
     DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
@@ -1096,10 +1097,10 @@ impl AptosDB {
             .with_label_values(&["commit_transactions"])
             .start_timer();
         let chunk_size = 512;
-        txns_to_commit
+        let batches = txns_to_commit
             .par_chunks(chunk_size)
             .enumerate()
-            .try_for_each(|(chunk_index, txns_in_chunk)| -> Result<()> {
+            .map(|(chunk_index, txns_in_chunk)| -> Result<SchemaBatch> {
                 let batch = SchemaBatch::new();
                 let chunk_first_version = first_version + (chunk_size * chunk_index) as u64;
                 txns_in_chunk.iter().enumerate().try_for_each(
@@ -1114,11 +1115,22 @@ impl AptosDB {
                         Ok(())
                     },
                 )?;
-                let _timer = OTHER_TIMERS_SECONDS
-                    .with_label_values(&["commit_transactions___commit"])
-                    .start_timer();
-                self.ledger_db.transaction_db().write_schemas(batch)
+                Ok(batch)
             })
+            .collect::<Result<Vec<_>>>()?;
+
+        // Commit batches one by one for now because committing them in parallel will cause gaps. Although
+        // it might be acceptable because we are writing the progress, we want to play on the safer
+        // side unless this really becomes the bottleneck on production.
+        {
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["commit_transactions___commit"])
+                .start_timer();
+
+            batches
+                .into_iter()
+                .try_for_each(|batch| self.ledger_db.transaction_db().write_schemas(batch))
+        }
     }
 
     fn commit_transaction_accumulator(
@@ -1817,6 +1829,12 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
+        gauged_api("get_buffered_state_base", || {
+            self.state_store.get_buffered_state_base()
+        })
+    }
+
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
@@ -2054,6 +2072,8 @@ impl DbWriter for AptosDB {
                 .ledger_commit_lock
                 .try_lock()
                 .expect("Concurrent committing detected.");
+
+            latest_in_memory_state.current.log_generation("db_save");
 
             // For reconfig suffix.
             if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {

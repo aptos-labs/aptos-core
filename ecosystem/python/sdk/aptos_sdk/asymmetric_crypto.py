@@ -9,6 +9,9 @@ from .bcs import Deserializable, Serializable
 
 
 class PrivateKey(Deserializable, Serializable, Protocol):
+    def hex(self) -> str:
+        ...
+
     def public_key(self) -> PublicKey:
         ...
 

@@ -8,7 +8,7 @@ use crate::{
         baseline::BaselineOutput,
         types::{
             EmptyDataView, KeyType, MockOutput, MockTask, MockTransaction, TransactionGen,
-            TransactionGenParams, ValueType,
+            TransactionGenParams,
         },
     },
     txn_commit_hook::NoOpTransactionCommitHook,
@@ -36,8 +36,8 @@ pub(crate) struct BencherState<
     K: Hash + Clone + Debug + Eq + PartialOrd + Ord,
     E: Send + Sync + Debug + Clone + ReadWriteEvent,
 > {
-    transactions: Vec<MockTransaction<KeyType<K>, ValueType, E>>,
-    baseline_output: BaselineOutput<KeyType<K>, ValueType>,
+    transactions: Vec<MockTransaction<KeyType<K>, E>>,
+    baseline_output: BaselineOutput<KeyType<K>>,
 }
 
 impl<K, V, E> Bencher<K, V, E>
@@ -114,7 +114,7 @@ where
     }
 
     pub(crate) fn run(self) {
-        let data_view = EmptyDataView::<KeyType<K>, ValueType> {
+        let data_view = EmptyDataView::<KeyType<K>> {
             phantom: PhantomData,
         };
 
@@ -126,10 +126,10 @@ where
         );
 
         let output = BlockExecutor::<
-            MockTransaction<KeyType<K>, ValueType, E>,
-            MockTask<KeyType<K>, ValueType, E>,
-            EmptyDataView<KeyType<K>, ValueType>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<K>, ValueType, E>, usize>,
+            MockTransaction<KeyType<K>, E>,
+            MockTask<KeyType<K>, E>,
+            EmptyDataView<KeyType<K>>,
+            NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
             ExecutableTestType,
         >::new(num_cpus::get(), executor_thread_pool, None, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);

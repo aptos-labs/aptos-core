@@ -253,11 +253,19 @@ module std::features {
         is_enabled(AGGREGATOR_V2_API)
     }
 
+    // Backed by same flag as get_aggregator_v2_api_feature
+    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_V2_API }
+
+    // Backed by same flag as aggregator_v2_api_enabled
+    public fun aggregator_snapshots_enabled(): bool acquires Features {
+        is_enabled(AGGREGATOR_V2_API)
+    }
+
     const SAFER_RESOURCE_GROUPS: u64 = 31;
 
     const SAFER_METADATA: u64 = 32;
 
-    const SECP256K1_ECDSA_AUTHENTICATOR: u64 = 33;
+    const SINGLE_SENDER_AUTHENTICATOR: u64 = 33;
 
     /// Whether the automatic creation of accounts is enabled for sponsored transactions.
     /// Lifetime: transient
@@ -287,7 +295,19 @@ module std::features {
         is_enabled(CONCURRENT_ASSETS)
     }
 
-    const RECONFIGURE_WITH_DKG: u64 = 38;
+    const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
+
+    /// Whether allow changing beneficiaries for operators.
+    /// Lifetime: transient
+    const OPERATOR_BENEFICIARY_CHANGE: u64 = 39;
+
+    public fun get_operator_beneficiary_change_feature(): u64 { OPERATOR_BENEFICIARY_CHANGE }
+
+    public fun operator_beneficiary_change_enabled(): bool acquires Features {
+        is_enabled(OPERATOR_BENEFICIARY_CHANGE)
+    }
+
+    const RECONFIGURE_WITH_DKG: u64 = 42;
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
         is_enabled(RECONFIGURE_WITH_DKG)

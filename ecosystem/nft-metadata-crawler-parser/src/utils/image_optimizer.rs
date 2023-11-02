@@ -15,7 +15,7 @@ use backoff::{future::retry, ExponentialBackoff};
 use futures::FutureExt;
 use image::{
     imageops::{resize, FilterType},
-    DynamicImage, ImageBuffer, ImageFormat, ImageOutputFormat,
+    DynamicImage, GenericImageView, ImageBuffer, ImageFormat, ImageOutputFormat,
 };
 use reqwest::Client;
 use std::{io::Cursor, time::Duration};
@@ -74,8 +74,8 @@ impl ImageOptimizer {
                         let (nwidth, nheight) =
                             Self::calculate_dimensions_with_ration(512, img.width(), img.height());
                         let resized_image =
-                            resize(&img.to_rgb8(), nwidth, nheight, FilterType::Gaussian);
-                        Ok((Self::to_jpeg_bytes(resized_image, image_quality)?, format))
+                            resize(&img.to_rgba8(), nwidth, nheight, FilterType::Gaussian);
+                        Ok(Self::to_image_bytes(resized_image, image_quality)?)
                     },
                 }
             }
@@ -118,15 +118,35 @@ impl ImageOptimizer {
         }
     }
 
-    /// Converts image to JPEG bytes vector
-    fn to_jpeg_bytes(
-        image_buffer: ImageBuffer<image::Rgb<u8>, Vec<u8>>,
+    /// Checks if an image has any transparent pixels
+    fn has_transparent_pixels(img: &DynamicImage) -> bool {
+        let (width, height) = img.dimensions();
+        for x in 0..width {
+            for y in 0..height {
+                if img.get_pixel(x, y)[3] < 255 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Converts image to image bytes vector
+    fn to_image_bytes(
+        image_buffer: ImageBuffer<image::Rgba<u8>, Vec<u8>>,
         image_quality: u8,
-    ) -> anyhow::Result<Vec<u8>> {
-        let dynamic_image = DynamicImage::ImageRgb8(image_buffer);
+    ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
+        let dynamic_image = DynamicImage::ImageRgba8(image_buffer);
         let mut byte_store = Cursor::new(Vec::new());
-        match dynamic_image.write_to(&mut byte_store, ImageOutputFormat::Jpeg(image_quality)) {
-            Ok(_) => Ok(byte_store.into_inner()),
+        let mut encode_format = ImageOutputFormat::Jpeg(image_quality);
+        let mut output_format = ImageFormat::Jpeg;
+        if Self::has_transparent_pixels(&dynamic_image) {
+            encode_format = ImageOutputFormat::Png;
+            output_format = ImageFormat::Png;
+        }
+
+        match dynamic_image.write_to(&mut byte_store, encode_format) {
+            Ok(_) => Ok((byte_store.into_inner(), output_format)),
             Err(e) => {
                 warn!(error = ?e, "[NFT Metadata Crawler] Error converting image to bytes: {} bytes", dynamic_image.as_bytes().len());
                 Err(anyhow::anyhow!(e))

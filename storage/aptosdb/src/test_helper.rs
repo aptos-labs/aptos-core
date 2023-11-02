@@ -10,7 +10,6 @@ use crate::{
 use aptos_crypto::hash::CryptoHash;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
-use aptos_scratchpad::SparseMerkleTree;
 use aptos_temppath::TempPath;
 use aptos_types::{
     contract_event::ContractEvent,
@@ -109,8 +108,6 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
         if txn_to_commit.is_state_checkpoint() {
             state.current = state
                 .current
-                .clone()
-                .freeze()
                 .batch_update(
                     state
                         .updates_since_base
@@ -118,11 +115,9 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                         .flatten()
                         .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
-                    StateStorageUsage::new_untracked(),
                     &ProofReader::new_empty(),
                 )
-                .unwrap()
-                .unfreeze();
+                .unwrap();
             state.current_version = next_version.checked_sub(1);
             state.base = state.current.clone();
             state.base_version = state.current_version;
@@ -135,8 +130,6 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
     if next_version.checked_sub(1) != state.current_version {
         state.current = state
             .current
-            .clone()
-            .freeze()
             .batch_update(
                 state
                     .updates_since_base
@@ -144,11 +137,9 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     .flatten()
                     .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
-                StateStorageUsage::new_untracked(),
                 &ProofReader::new_empty(),
             )
-            .unwrap()
-            .unfreeze();
+            .unwrap();
         state.current_version = next_version.checked_sub(1);
     }
 }
@@ -173,7 +164,7 @@ prop_compose! {
         let mut result = Vec::new();
 
         let mut in_memory_state = StateDelta::new_empty();
-        let _ancester = in_memory_state.current.clone().freeze();
+        let _ancester = in_memory_state.current.clone();
 
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
@@ -359,6 +350,7 @@ pub fn test_save_blocks_impl(
         .current_state()
         .clone();
     let _ancester = in_memory_state.current.clone();
+    let _usage = _ancester.usage();
     let num_batches = input.len();
     let mut cur_ver: Version = 0;
     let mut all_committed_txns = vec![];
@@ -907,7 +899,9 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .metadata_db()
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
-    let smt = SparseMerkleTree::<StateValue>::default()
+    let smt = db
+        .get_buffered_state_base()
+        .unwrap()
         .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
     db.state_kv_db

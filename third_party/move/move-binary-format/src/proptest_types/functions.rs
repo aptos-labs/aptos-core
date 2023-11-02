@@ -4,12 +4,12 @@
 
 use crate::{
     file_format::{
-        AbilitySet, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex, FieldHandle,
-        FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex, FunctionDefinition,
-        FunctionHandle, FunctionHandleIndex, FunctionInstantiation, FunctionInstantiationIndex,
-        IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiation, StructDefInstantiationIndex, StructDefinition,
-        StructDefinitionIndex, StructHandle, TableIndex, Visibility,
+        AbilitySet, AccessSpecifier, Bytecode, CodeOffset, CodeUnit, ConstantPoolIndex,
+        FieldHandle, FieldHandleIndex, FieldInstantiation, FieldInstantiationIndex,
+        FunctionDefinition, FunctionHandle, FunctionHandleIndex, FunctionInstantiation,
+        FunctionInstantiationIndex, IdentifierIndex, LocalIndex, ModuleHandleIndex, Signature,
+        SignatureIndex, SignatureToken, StructDefInstantiation, StructDefInstantiationIndex,
+        StructDefinition, StructDefinitionIndex, StructHandle, TableIndex, Visibility,
     },
     internals::ModuleIndex,
     proptest_types::{
@@ -21,6 +21,7 @@ use crate::{
 use move_core_types::u256::U256;
 use proptest::{
     collection::{vec, SizeRange},
+    option::of,
     prelude::*,
     sample::{select, Index as PropIndex},
 };
@@ -170,6 +171,7 @@ pub struct FunctionHandleGen {
     parameters: SignatureGen,
     return_: SignatureGen,
     type_parameters: Vec<AbilitySetGen>,
+    access_specifiers: Option<Vec<AccessSpecifier>>,
 }
 
 impl FunctionHandleGen {
@@ -177,6 +179,7 @@ impl FunctionHandleGen {
         param_count: impl Into<SizeRange>,
         return_count: impl Into<SizeRange>,
         type_parameter_count: impl Into<SizeRange>,
+        access_specifiers_count: impl Into<SizeRange>,
     ) -> impl Strategy<Value = Self> {
         let return_count = return_count.into();
         let param_count = param_count.into();
@@ -186,14 +189,16 @@ impl FunctionHandleGen {
             SignatureGen::strategy(param_count),
             SignatureGen::strategy(return_count),
             vec(AbilitySetGen::strategy(), type_parameter_count),
+            of(vec(any::<AccessSpecifier>(), access_specifiers_count)),
         )
             .prop_map(
-                |(module, name, parameters, return_, type_parameters)| Self {
+                |(module, name, parameters, return_, type_parameters, access_specifiers)| Self {
                     module,
                     name,
                     parameters,
                     return_,
                     type_parameters,
+                    access_specifiers,
                 },
             )
     }
@@ -225,6 +230,7 @@ impl FunctionHandleGen {
             parameters: params_idx,
             return_: return_idx,
             type_parameters,
+            access_specifiers: self.access_specifiers,
         })
     }
 }
@@ -417,6 +423,7 @@ impl FunctionDefinitionGen {
             parameters: params_idx,
             return_: return_idx,
             type_parameters: vec![],
+            access_specifiers: None,
         };
         let function_handle = state.add_function_handle(handle);
         let mut acquires_set = BTreeSet::new();

@@ -36,6 +36,7 @@ fn mk_module(vis: u8) -> normalized::Module {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
         ],
         function_defs: vec![

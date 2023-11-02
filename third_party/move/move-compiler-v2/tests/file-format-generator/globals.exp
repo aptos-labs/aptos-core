@@ -120,7 +120,7 @@ fun globals::write($t0: address, $t1: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v4294967295
+// Move bytecode v7
 module 42.globals {
 struct R has store {
 	f: u64
@@ -134,7 +134,7 @@ B0:
 }
 publish(Arg0: &signer) {
 B0:
-	0: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(1)
 	1: Pack[0](R)
 	2: StLoc[1](loc0: R)
 	3: MoveLoc[0](Arg0: &signer)
@@ -157,11 +157,11 @@ B0:
 	0: MoveLoc[0](Arg0: address)
 	1: MutBorrowGlobal[0](R)
 	2: StLoc[2](loc0: &mut R)
-	3: LdConst[1](U64: [2, 0, 0, 0, 0, 0, 0, 0])
+	3: LdU64(2)
 	4: MoveLoc[2](loc0: &mut R)
 	5: MutBorrowField[0](R.f: u64)
 	6: WriteRef
-	7: LdConst[2](U64: [9, 0, 0, 0, 0, 0, 0, 0])
+	7: LdU64(9)
 	8: Ret
 }
 }

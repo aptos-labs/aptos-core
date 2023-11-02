@@ -9,6 +9,6 @@ mod sparse_merkle;
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
 pub use crate::sparse_merkle::test_utils;
 pub use crate::sparse_merkle::{
-    utils::get_state_shard_id, FrozenSparseMerkleTree, ProofRead, SparseMerkleTree,
-    StateStoreStatus,
+    ancestors::SmtAncestors, utils::get_state_shard_id, FrozenSparseMerkleTree, ProofRead,
+    SparseMerkleTree, StateStoreStatus,
 };

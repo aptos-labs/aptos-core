@@ -3,14 +3,18 @@
 
 use crate::dag::{
     dag_fetcher::TFetchRequester,
-    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
-    rb_handler::{NodeBroadcastHandleError, NodeBroadcastHandler},
+    errors::NodeBroadcastHandleError,
+    rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
-    tests::{dag_test::MockStorage, helpers::new_node},
+    tests::{
+        dag_test::MockStorage,
+        helpers::{new_node, TEST_DAG_WINDOW},
+    },
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
 };
+use aptos_config::config::DagPayloadConfig;
 use aptos_infallible::RwLock;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState,
@@ -47,7 +51,7 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch_state.clone(),
         storage.clone(),
         0,
-        DAG_WINDOW,
+        TEST_DAG_WINDOW,
     )));
 
     let wellformed_node = new_node(1, 10, signers[0].author(), vec![]);
@@ -61,6 +65,7 @@ async fn test_node_broadcast_receiver_succeed() {
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockFetchRequester {}),
+        DagPayloadConfig::default(),
     );
 
     let expected_result = Vote::new(
@@ -95,7 +100,7 @@ async fn test_node_broadcast_receiver_failure() {
                 epoch_state.clone(),
                 storage.clone(),
                 0,
-                DAG_WINDOW,
+                TEST_DAG_WINDOW,
             )));
 
             NodeBroadcastHandler::new(
@@ -104,6 +109,7 @@ async fn test_node_broadcast_receiver_failure() {
                 epoch_state.clone(),
                 storage,
                 Arc::new(MockFetchRequester {}),
+                DagPayloadConfig::default(),
             )
         })
         .collect();
@@ -173,7 +179,7 @@ async fn test_node_broadcast_receiver_storage() {
         epoch_state.clone(),
         storage.clone(),
         0,
-        DAG_WINDOW,
+        TEST_DAG_WINDOW,
     )));
 
     let node = new_node(1, 10, signers[0].author(), vec![]);
@@ -184,6 +190,7 @@ async fn test_node_broadcast_receiver_storage() {
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockFetchRequester {}),
+        DagPayloadConfig::default(),
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -198,6 +205,7 @@ async fn test_node_broadcast_receiver_storage() {
         epoch_state,
         storage.clone(),
         Arc::new(MockFetchRequester {}),
+        DagPayloadConfig::default(),
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);

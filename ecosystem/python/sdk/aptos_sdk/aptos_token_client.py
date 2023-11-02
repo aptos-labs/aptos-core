@@ -321,7 +321,7 @@ class ReadObject:
 
 
 class AptosTokenClient:
-    """A wrapper around reading and mutating AptosTokens also known as Token Objects"""
+    """A wrapper around reading and mutating Digital Assets also known as Token Objects"""
 
     client: RestClient
 

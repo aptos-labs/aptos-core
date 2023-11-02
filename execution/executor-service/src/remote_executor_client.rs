@@ -5,23 +5,76 @@ use crate::{
     remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest,
     RemoteExecutionResult,
 };
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_state_view::StateView;
+use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::partitioner::PartitionedTransactions, transaction::TransactionOutput,
     vm_status::VMStatus,
 };
-use aptos_vm::sharded_block_executor::executor_client::{ExecutorClient, ShardedExecutionOutput};
+use aptos_vm::sharded_block_executor::{
+    executor_client::{ExecutorClient, ShardedExecutionOutput},
+    ShardedBlockExecutor,
+};
 use crossbeam_channel::{Receiver, Sender};
+use once_cell::sync::{Lazy, OnceCell};
 use std::{
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{Arc, Mutex},
     thread,
 };
 
+pub static COORDINATOR_PORT: u16 = 52200;
+
+static REMOTE_ADDRESSES: OnceCell<Vec<SocketAddr>> = OnceCell::new();
+static COORDINATOR_ADDRESS: OnceCell<SocketAddr> = OnceCell::new();
+
+pub fn set_remote_addresses(addresses: Vec<SocketAddr>) {
+    REMOTE_ADDRESSES.set(addresses).ok();
+}
+
+pub fn get_remote_addresses() -> Vec<SocketAddr> {
+    match REMOTE_ADDRESSES.get() {
+        Some(value) => value.clone(),
+        None => vec![],
+    }
+}
+
+pub fn set_coordinator_address(address: SocketAddr) {
+    COORDINATOR_ADDRESS.set(address).ok();
+}
+
+pub fn get_coordinator_address() -> SocketAddr {
+    match COORDINATOR_ADDRESS.get() {
+        Some(value) => *value,
+        None => SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), COORDINATOR_PORT),
+    }
+}
+
+pub static REMOTE_SHARDED_BLOCK_EXECUTOR: Lazy<
+    Arc<
+        aptos_infallible::Mutex<
+            ShardedBlockExecutor<CachedStateView, RemoteExecutorClient<CachedStateView>>,
+        >,
+    >,
+> = Lazy::new(|| {
+    info!("REMOTE_SHARDED_BLOCK_EXECUTOR created");
+    Arc::new(aptos_infallible::Mutex::new(
+        RemoteExecutorClient::create_remote_sharded_block_executor(
+            get_coordinator_address(),
+            get_remote_addresses(),
+            None,
+        ),
+    ))
+});
+
 #[allow(dead_code)]
 pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
+    // The network controller used to create channels to send and receive messages. We want the
+    // network controller to be owned by the executor client so that it is alive for the entire
+    // lifetime of the executor client.
+    network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
     command_txs: Arc<Vec<Mutex<Sender<Message>>>>,
@@ -38,7 +91,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
 impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
     pub fn new(
         remote_shard_addresses: Vec<SocketAddr>,
-        controller: &mut NetworkController,
+        mut controller: NetworkController,
         num_threads: Option<usize>,
     ) -> Self {
         let num_threads = num_threads.unwrap_or_else(num_cpus::get);
@@ -48,21 +101,23 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 .build()
                 .unwrap(),
         );
+        let controller_mut_ref = &mut controller;
         let (command_txs, result_rxs) = remote_shard_addresses
             .iter()
             .enumerate()
             .map(|(shard_id, address)| {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
-                let command_tx =
-                    Mutex::new(controller.create_outbound_channel(*address, execute_command_type));
-                let result_rx = controller.create_inbound_channel(execute_result_type);
+                let command_tx = Mutex::new(
+                    controller_mut_ref.create_outbound_channel(*address, execute_command_type),
+                );
+                let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
             })
             .unzip();
 
         let state_view_service = Arc::new(RemoteStateViewService::new(
-            controller,
+            controller_mut_ref,
             remote_shard_addresses,
             None,
         ));
@@ -74,7 +129,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             .spawn(move || state_view_service_clone.start())
             .unwrap();
 
+        controller.start();
+
         Self {
+            network_controller: controller,
             state_view_service,
             _join_handle: Some(join_handle),
             command_txs: Arc::new(command_txs),
@@ -82,6 +140,22 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
             thread_pool,
             phantom: std::marker::PhantomData,
         }
+    }
+
+    pub fn create_remote_sharded_block_executor(
+        coordinator_address: SocketAddr,
+        remote_shard_addresses: Vec<SocketAddr>,
+        num_threads: Option<usize>,
+    ) -> ShardedBlockExecutor<S, RemoteExecutorClient<S>> {
+        ShardedBlockExecutor::new(RemoteExecutorClient::new(
+            remote_shard_addresses,
+            NetworkController::new(
+                "remote-executor-coordinator".to_string(),
+                coordinator_address,
+                5000,
+            ),
+            num_threads,
+        ))
     }
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
@@ -131,6 +205,11 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
 
         let execution_results = self.get_output_from_shards()?;
 
+        self.state_view_service.drop_state_view();
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
+    }
+
+    fn shutdown(&mut self) {
+        self.network_controller.shutdown();
     }
 }

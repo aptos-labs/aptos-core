@@ -91,7 +91,7 @@ impl WarmVmCache {
         // used for prologue, epilogue and transfer functionality.
         let _ = vm.load_module(
             &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
-            &resolver,
+            resolver,
         );
     }
 }

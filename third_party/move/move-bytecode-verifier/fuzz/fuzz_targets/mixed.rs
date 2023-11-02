@@ -39,6 +39,7 @@ fuzz_target!(|mix: Mixed| {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(1),
         type_parameters: vec![],
+        access_specifiers: None,
     };
 
     module.function_handles.push(fun_handle);

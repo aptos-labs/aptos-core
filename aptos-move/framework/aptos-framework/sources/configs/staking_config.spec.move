@@ -2,7 +2,7 @@ spec aptos_framework::staking_config {
     spec module {
         use aptos_framework::chain_status;
         invariant chain_status::is_operating() ==> exists<StakingConfig>(@aptos_framework);
-        pragma verify = ture;
+        pragma verify = true;
         pragma aborts_if_is_strict;
     }
 
@@ -51,6 +51,7 @@ spec aptos_framework::staking_config {
         aborts_if rewards_rate > MAX_REWARDS_RATE;
         aborts_if rewards_rate > rewards_rate_denominator;
         aborts_if exists<StakingConfig>(addr);
+        ensures exists<StakingConfig>(addr);
     }
 
     /// Caller must be @aptos_framework.
@@ -72,6 +73,7 @@ spec aptos_framework::staking_config {
         aborts_if last_rewards_rate_period_start_in_secs > timestamp::spec_now_seconds();
         include StakingRewardsConfigValidationAbortsIf;
         aborts_if exists<StakingRewardsConfig>(addr);
+        ensures exists<StakingRewardsConfig>(addr);
     }
 
     spec get(): StakingConfig {
@@ -156,7 +158,7 @@ spec aptos_framework::staking_config {
         use std::signer;
         include StakingRewardsConfigRequirement;
         let addr = signer::address_of(aptos_framework);
-        let staking_reward_config = borrow_global<StakingRewardsConfig>(@aptos_framework);
+        let staking_reward_config = global<StakingRewardsConfig>(@aptos_framework);
 
         aborts_if addr != @aptos_framework;
         aborts_if staking_reward_config.rewards_rate_period_in_secs != rewards_rate_period_in_secs;

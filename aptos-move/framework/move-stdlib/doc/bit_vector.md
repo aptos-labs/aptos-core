@@ -19,6 +19,7 @@
     -  [Function `set`](#@Specification_1_set)
     -  [Function `unset`](#@Specification_1_unset)
     -  [Function `is_index_set`](#@Specification_1_is_index_set)
+    -  [Function `longest_set_sequence_starting_at`](#@Specification_1_longest_set_sequence_starting_at)
 
 
 <pre><code></code></pre>
@@ -320,7 +321,19 @@ sequence, then <code>0</code> is returned.
     <b>let</b> index = start_index;
 
     // Find the greatest index in the <a href="vector.md#0x1_vector">vector</a> such that all indices less than it are set.
-    <b>while</b> (index &lt; bitvector.length) {
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> index &gt;= start_index;
+            <b>invariant</b> index == start_index || <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, index - 1);
+            <b>invariant</b> index == start_index || index - 1 &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(bitvector.bit_field);
+            <b>invariant</b> <b>forall</b> j in start_index..index: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, j);
+            <b>invariant</b> <b>forall</b> j in start_index..index: j &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(bitvector.bit_field);
+        };
+        index &lt; bitvector.length
+    }) {
+        <b>spec</b> {
+            <b>assert</b> index &lt; bitvector.length;
+        };
         <b>if</b> (!<a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, index)) <b>break</b>;
         index = index + 1;
     };
@@ -470,6 +483,26 @@ sequence, then <code>0</code> is returned.
        bitvector.bit_field[bit_index]
    }
 }
+</code></pre>
+
+
+
+<a name="@Specification_1_longest_set_sequence_starting_at"></a>
+
+### Function `longest_set_sequence_starting_at`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="bit_vector.md#0x1_bit_vector_longest_set_sequence_starting_at">longest_set_sequence_starting_at</a>(bitvector: &<a href="bit_vector.md#0x1_bit_vector_BitVector">bit_vector::BitVector</a>, start_index: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> start_index &gt;= bitvector.length;
+<b>aborts_if</b> <b>exists</b> i in start_index..bitvector.length:
+    (<b>forall</b> j in start_index..i: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, j) && j &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(bitvector.bit_field)) &&
+        i &gt;= <a href="vector.md#0x1_vector_length">vector::length</a>(bitvector.bit_field);
+<b>ensures</b> <b>forall</b> i in start_index..result: <a href="bit_vector.md#0x1_bit_vector_is_index_set">is_index_set</a>(bitvector, i);
 </code></pre>
 
 

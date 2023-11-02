@@ -34,6 +34,7 @@ fn mk_script_function_module() -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
             // fun g_fn<T>()
             FunctionHandle {
@@ -42,6 +43,7 @@ fn mk_script_function_module() -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY],
+                access_specifiers: None,
             },
         ],
         function_defs: vec![
@@ -124,6 +126,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
             // 0::M::fn()
             FunctionHandle {
@@ -132,6 +135,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
             // 0::M::g_fn<T>()
             FunctionHandle {
@@ -140,6 +144,7 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY],
+                access_specifiers: None,
             },
         ],
         // 0::M::g_fn<u64>()
@@ -208,6 +213,7 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
             // 0::M::g_fn<T>()
             FunctionHandle {
@@ -216,6 +222,7 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY],
+                access_specifiers: None,
             },
         ],
         // 0::M::g_fn<u64>()

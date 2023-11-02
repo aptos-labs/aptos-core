@@ -2,17 +2,12 @@
 name: "Windows CLI Build"
 
 on:
-  # Allow triggering manually
   workflow_dispatch:
-
-  # Run every day at 12pm UTC
-  schedule:
-    - cron: "0 12 * * 3" # This runs once a week at 12pm UTC.
-
-  # Run if a pull request touches this file
   pull_request:
-    paths:
-      - ".github/workflows/windows-build.yaml"
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  push:
+    branches:
+      - main
 
 jobs:
   windows-build:
@@ -22,6 +17,12 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v3
+
+      # This action will cache ~/.cargo and ./target (or the equivalent on Windows in
+      # this case). See more here:
+      # https://github.com/Swatinem/rust-cache#cache-details
+      - name: Run cargo cache
+        uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
 
       - name: Install the developer tools
         run: PowerShell -ExecutionPolicy Bypass -File scripts/windows_dev_setup.ps1
@@ -38,15 +39,3 @@ jobs:
 
       - name: Run the Aptos CLI help command
         run: cargo run -p aptos -- --help
-
-      - name: Post to a Slack channel on failure
-        if: failure()
-        id: slack
-        uses: slackapi/slack-github-action@936158bbe252e9a6062e793ea4609642c966e302 # pin@v1.21.0
-        with:
-          payload: |
-            {
-              "text": "${{ ':x:' }} `${{ inputs.TEST_NAME  }}`: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

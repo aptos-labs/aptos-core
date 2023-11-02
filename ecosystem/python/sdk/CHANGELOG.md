@@ -2,6 +2,12 @@
 
 All notable changes to the Aptos Python SDK will be captured in this file. This changelog is written by hand for now.
 
+## 0.8.0
+- Add support for SingleKeyAuthenicatoin component of AIP-55
+- Add support for Secp256k1 Ecdsa of AIP-49
+- Add support for Sponsored transactions of AIP-39 and AIP-53
+- Improved support for MultiEd25519
+
 ## 0.7.0
 - **[Breaking Change]**: The `from_str` function on `AccountAddress` has been updated to conform to the strict parsing described by [AIP-40](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md). For the relaxed parsing behavior of this function prior to this change, use `AccountAddress.from_str_relaxed`.
 - **[Breaking Change]**: Rewrote the large package publisher to support large modules too

@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::DagConsensusConfig;
 use crate::{
     config::{
         netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
-        persistable_config::PersistableConfig, utils::RootPath, ApiConfig, BaseConfig,
-        ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
+        persistable_config::PersistableConfig, utils::RootPath, AdminServiceConfig, ApiConfig,
+        BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig, IndexerGrpcConfig,
         InspectionServiceConfig, LoggerConfig, MempoolConfig, NetworkConfig,
         PeerMonitoringServiceConfig, SafetyRulesTestConfig, StateSyncConfig, StorageConfig,
     },
@@ -29,11 +30,15 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct NodeConfig {
     #[serde(default)]
+    pub admin_service: AdminServiceConfig,
+    #[serde(default)]
     pub api: ApiConfig,
     #[serde(default)]
     pub base: BaseConfig,
     #[serde(default)]
     pub consensus: ConsensusConfig,
+    #[serde(default)]
+    pub dag_consensus: DagConsensusConfig,
     #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]
@@ -136,6 +141,7 @@ impl NodeConfig {
     /// Randomizes the various ports of the node config
     pub fn randomize_ports(&mut self) {
         // Randomize the ports for the services
+        self.admin_service.randomize_ports();
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();

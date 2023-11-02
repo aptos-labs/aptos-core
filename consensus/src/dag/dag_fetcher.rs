@@ -1,29 +1,32 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_network::RpcWithFallback, types::NodeMetadata, RpcHandler};
+use super::DAGRpcResult;
 use crate::dag::{
-    dag_network::TDAGNetworkSender,
+    dag_network::{RpcWithFallback, TDAGNetworkSender},
     dag_store::Dag,
+    errors::{DAGError, FetchRequestHandleError},
     observability::logging::{LogEvent, LogSchema},
-    types::{CertifiedNode, FetchResponse, Node, RemoteFetchRequest},
+    types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
+    RpcHandler,
 };
 use anyhow::{anyhow, ensure};
-use aptos_consensus_types::common::{Author, Round};
+use aptos_config::config::DagFetcherConfig;
+use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, Stream, StreamExt};
 use std::{
     collections::HashMap,
+    ops::Deref,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
-use thiserror::Error as ThisError;
 use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
@@ -139,6 +142,7 @@ impl DagFetcherService {
         network: Arc<dyn TDAGNetworkSender>,
         dag: Arc<RwLock<Dag>>,
         time_service: TimeService,
+        config: DagFetcherConfig,
     ) -> (
         Self,
         FetchRequester,
@@ -151,7 +155,7 @@ impl DagFetcherService {
         let ordered_authors = epoch_state.verifier.get_ordered_account_addresses();
         (
             Self {
-                inner: DagFetcher::new(epoch_state, network, time_service),
+                inner: DagFetcher::new(epoch_state, network, time_service, config),
                 dag,
                 request_rx,
                 ordered_authors,
@@ -230,6 +234,7 @@ pub(crate) struct DagFetcher {
     network: Arc<dyn TDAGNetworkSender>,
     time_service: TimeService,
     epoch_state: Arc<EpochState>,
+    config: DagFetcherConfig,
 }
 
 impl DagFetcher {
@@ -237,11 +242,13 @@ impl DagFetcher {
         epoch_state: Arc<EpochState>,
         network: Arc<dyn TDAGNetworkSender>,
         time_service: TimeService,
+        config: DagFetcherConfig,
     ) -> Self {
         Self {
             network,
             time_service,
             epoch_state,
+            config,
         }
     }
 }
@@ -264,46 +271,69 @@ impl TDagFetcher for DagFetcher {
         let mut rpc = RpcWithFallback::new(
             responders,
             remote_request.clone().into(),
-            Duration::from_millis(500),
-            Duration::from_secs(1),
+            Duration::from_millis(self.config.retry_interval_ms),
+            Duration::from_millis(self.config.rpc_timeout_ms),
             self.network.clone(),
             self.time_service.clone(),
+            self.config.min_concurrent_responders,
+            self.config.max_concurrent_responders,
         );
 
         while let Some(response) = rpc.next().await {
-            match response
-                .and_then(FetchResponse::try_from)
-                .and_then(|response| response.verify(&remote_request, &self.epoch_state.verifier))
-            {
-                Ok(response) => {
-                    let certified_nodes = response.certified_nodes();
-                    // TODO: support chunk response or fallback to state sync
-                    {
-                        let mut dag_writer = dag.write();
-                        for node in certified_nodes.into_iter().rev() {
-                            if let Err(e) = dag_writer.add_node(node) {
-                                error!("Failed to add node {}", e);
+            match response {
+                Ok(DAGRpcResult(Ok(response))) => {
+                    match FetchResponse::try_from(response).and_then(|response| {
+                        response.verify(&remote_request, &self.epoch_state.verifier)
+                    }) {
+                        Ok(fetch_response) => {
+                            let certified_nodes = fetch_response.certified_nodes();
+                            // TODO: support chunk response or fallback to state sync
+                            {
+                                let mut dag_writer = dag.write();
+                                for node in certified_nodes.into_iter().rev() {
+                                    if let Err(e) = dag_writer.add_node(node) {
+                                        error!("Failed to add node {}", e);
+                                    }
+                                }
                             }
+
+                            if dag.read().all_exists(remote_request.targets()) {
+                                return Ok(());
+                            }
+                        },
+                        Err(err) => {
+                            info!(error = ?err, "unable to parse fetch response");
+                        },
+                    };
+                },
+                Ok(DAGRpcResult(Err(dag_rpc_error))) => {
+                    info!(error = ?dag_rpc_error, "responder returned error");
+                    if let DAGError::FetchRequestHandleError(err) = dag_rpc_error.deref() {
+                        match err {
+                            FetchRequestHandleError::TargetsMissing => {
+                                // TODO: add who the responder is
+                                info!("responder is missing target nodes to serve")
+                            },
+                            FetchRequestHandleError::GarbageCollected(
+                                requested_round,
+                                lowest_round,
+                            ) => {
+                                info!(
+                                    "fetch error. requested: {}, lowest_round: {}",
+                                    requested_round, lowest_round
+                                )
+                            },
                         }
                     }
-
-                    if dag.read().all_exists(remote_request.targets()) {
-                        return Ok(());
-                    }
                 },
-                Err(err) => error!("Fetch rpc failed {}", err),
+                Err(err) => {
+                    // TODO: add who responder is
+                    info!(error = ?err, "error issuing RPC");
+                },
             }
         }
         Err(anyhow!("Fetch with fallback failed"))
     }
-}
-
-#[derive(Debug, ThisError)]
-pub enum FetchRequestHandleError {
-    #[error("target nodes are missing")]
-    TargetsMissing,
-    #[error("garbage collected, request round {0}, lowest round {1}")]
-    GarbageCollected(Round, Round),
 }
 
 pub struct FetchRequestHandler {

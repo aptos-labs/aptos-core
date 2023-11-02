@@ -5,5 +5,5 @@ error[E01002]: unexpected token
   │                         ^^
   │                         │
   │                         Unexpected 'X2'
-  │                         Expected ','
+  │                         Expected '{'
 

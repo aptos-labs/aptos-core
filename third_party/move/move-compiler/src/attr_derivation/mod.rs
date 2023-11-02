@@ -129,7 +129,7 @@ pub(crate) fn new_native_fun(
         visibility,
         entry,
         signature,
-        acquires: vec![],
+        access_specifiers: None,
         name,
         inline: false,
         body: sp(loc, FunctionBody_::Native),
@@ -152,7 +152,7 @@ pub(crate) fn new_fun(
         visibility,
         entry,
         signature,
-        acquires: vec![],
+        access_specifiers: None,
         name,
         inline: false,
         body: sp(

@@ -90,7 +90,7 @@ spec aptos_framework::reconfiguration {
         requires exists<stake::ValidatorFees>(@aptos_framework);
 
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
-        include features::spec_collect_and_distribute_gas_fees_enabled() ==> aptos_coin::ExistsAptosCoin;
+        include success ==> aptos_coin::ExistsAptosCoin;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         aborts_if false;
 

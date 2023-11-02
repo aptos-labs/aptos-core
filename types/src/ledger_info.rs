@@ -279,7 +279,7 @@ impl LedgerInfoWithV0 {
     pub fn check_voting_power(
         &self,
         validator: &ValidatorVerifier,
-    ) -> ::std::result::Result<(), VerifyError> {
+    ) -> ::std::result::Result<u128, VerifyError> {
         validator.check_voting_power(
             self.get_voters(&validator.get_ordered_account_addresses_iter().collect_vec())
                 .iter(),

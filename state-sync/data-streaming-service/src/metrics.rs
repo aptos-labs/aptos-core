@@ -171,6 +171,15 @@ pub static RECEIVED_RESPONSE_ERROR: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter that keeps track of the subscription stream lag (versions)
+pub static SUBSCRIPTION_STREAM_LAG: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_data_streaming_service_subscription_stream_lag",
+        "Counters related to the subscription stream lag",
+    )
+    .unwrap()
+});
+
 /// Time it takes to process a data request
 pub static DATA_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
@@ -217,6 +226,11 @@ pub fn set_active_data_streams(value: usize) {
 /// Sets the number of pending data responses
 pub fn set_pending_data_responses(value: usize) {
     PENDING_DATA_RESPONSES.set(value as i64);
+}
+
+/// Sets the subscription stream lag
+pub fn set_subscription_stream_lag(value: u64) {
+    SUBSCRIPTION_STREAM_LAG.set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.

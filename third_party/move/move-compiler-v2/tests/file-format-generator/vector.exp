@@ -35,15 +35,15 @@ fun vector::create(): vector<u64> {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v4294967295
+// Move bytecode v7
 module 42.vector {
 
 
 create(): vector<u64> {
 B0:
-	0: LdConst[0](U64: [1, 0, 0, 0, 0, 0, 0, 0])
-	1: LdConst[1](U64: [2, 0, 0, 0, 0, 0, 0, 0])
-	2: LdConst[2](U64: [3, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
 	3: VecPack(2, 3)
 	4: Ret
 }

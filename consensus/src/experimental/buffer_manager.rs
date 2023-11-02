@@ -234,6 +234,7 @@ impl BufferManager {
 
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: rand_ready_blocks.clone(),
+            lifetime_guard: self.create_new_request(()),
         });
         self.execution_schedule_phase_tx
             .send(request)
@@ -264,7 +265,10 @@ impl BufferManager {
             // properly than complicating it here.
             let ordered_item = self.buffer.get(&self.execution_root);
             let ordered_blocks = ordered_item.get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
+            let request = self.create_new_request(ExecutionRequest {
+                ordered_blocks,
+                lifetime_guard: self.create_new_request(()),
+            });
             let sender = self.execution_schedule_phase_tx.clone();
             Self::spawn_retry_request(sender, request, Duration::from_millis(100));
         }

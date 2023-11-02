@@ -158,7 +158,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
     /// if the corresponding entry does not exist.
-    pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
+    pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert!(

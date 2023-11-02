@@ -554,6 +554,14 @@ module aptos_framework::coin {
         let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
         if (option::is_some(maybe_supply)) {
             let supply = option::borrow_mut(maybe_supply);
+            spec {
+                use aptos_framework::optional_aggregator;
+                use aptos_framework::aggregator;
+                assume optional_aggregator::is_parallelizable(supply) ==> (aggregator::spec_aggregator_get_val(option::borrow(supply.aggregator))
+                    + amount <= aggregator::spec_get_limit(option::borrow(supply.aggregator)));
+                assume !optional_aggregator::is_parallelizable(supply) ==>
+                    (option::borrow(supply.integer).value + amount <= option::borrow(supply.integer).limit);
+            };
             optional_aggregator::add(supply, (amount as u128));
         };
         spec {

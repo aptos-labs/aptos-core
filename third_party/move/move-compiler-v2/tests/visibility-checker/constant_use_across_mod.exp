@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: constant `0xdeadbeef::M::FIVE` cannot be used here because it is private to the module `0xdeadbeef::M`
+   ┌─ tests/visibility-checker/constant_use_across_mod.move:18:9
+   │
+18 │         FIVE
+   │         ^^^^
+
+error: constant `0xdeadbeef::M::FIVE` cannot be used here because it is private to the module `0xdeadbeef::M`
+   ┌─ tests/visibility-checker/constant_use_across_mod.move:13:9
+   │
+13 │         M::FIVE
+   │         ^^^^^^^

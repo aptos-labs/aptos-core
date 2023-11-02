@@ -30,24 +30,24 @@ use aptos_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode};
 use std::sync::{Arc, Weak};
 
 #[derive(Clone, Debug)]
-pub(crate) struct InternalNode<V> {
+pub(crate) struct InternalNode<V: Send + Sync + 'static> {
     pub left: SubTree<V>,
     pub right: SubTree<V>,
 }
 
-impl<V: CryptoHash> InternalNode<V> {
+impl<V: CryptoHash + Send + Sync + 'static> InternalNode<V> {
     pub fn calc_hash(&self) -> HashValue {
         SparseMerkleInternalNode::new(self.left.hash(), self.right.hash()).hash()
     }
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct LeafNode<V> {
+pub(crate) struct LeafNode<V: Send + Sync + 'static> {
     pub key: HashValue,
     pub value: LeafValue<V>,
 }
 
-impl<V> LeafNode<V> {
+impl<V: Send + Sync + 'static> LeafNode<V> {
     pub fn new(key: HashValue, value: LeafValue<V>) -> Self {
         Self { key, value }
     }
@@ -60,13 +60,13 @@ impl<V> LeafNode<V> {
     }
 }
 
-impl<V: CryptoHash> LeafNode<V> {
+impl<V: CryptoHash + Send + Sync + 'static> LeafNode<V> {
     pub fn calc_hash(&self) -> HashValue {
         SparseMerkleLeafNode::new(self.key, self.value.hash).hash()
     }
 }
 
-impl<V> From<&SparseMerkleLeafNode> for LeafNode<V>
+impl<V: Send + Sync + 'static> From<&SparseMerkleLeafNode> for LeafNode<V>
 where
     V: CryptoHash,
 {
@@ -79,18 +79,18 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) enum NodeInner<V> {
+pub(crate) enum NodeInner<V: Send + Sync + 'static> {
     Internal(InternalNode<V>),
     Leaf(LeafNode<V>),
 }
 
 #[derive(Debug)]
-pub(crate) struct Node<V> {
+pub(crate) struct Node<V: Send + Sync + 'static> {
     generation: u64,
     inner: NodeInner<V>,
 }
 
-impl<V: CryptoHash> Node<V> {
+impl<V: CryptoHash + Send + Sync + 'static> Node<V> {
     pub fn calc_hash(&self) -> HashValue {
         match &self.inner {
             NodeInner::Internal(internal_node) => internal_node.calc_hash(),
@@ -99,7 +99,7 @@ impl<V: CryptoHash> Node<V> {
     }
 }
 
-impl<V> Node<V> {
+impl<V: Send + Sync + 'static> Node<V> {
     pub fn new_leaf(key: HashValue, value: LeafValue<V>, generation: u64) -> Self {
         Self {
             generation,
@@ -176,7 +176,7 @@ impl<R> Clone for Ref<R> {
 pub(crate) type NodeHandle<V> = Ref<Node<V>>;
 
 #[derive(Clone, Debug)]
-pub(crate) enum SubTree<V> {
+pub(crate) enum SubTree<V: Send + Sync + 'static> {
     Empty,
     NonEmpty {
         hash: HashValue,
@@ -184,7 +184,7 @@ pub(crate) enum SubTree<V> {
     },
 }
 
-impl<V: CryptoHash> SubTree<V> {
+impl<V: CryptoHash + Send + Sync + 'static> SubTree<V> {
     pub fn new_empty() -> Self {
         Self::Empty
     }
@@ -272,12 +272,12 @@ impl<V: CryptoHash> SubTree<V> {
 }
 
 #[derive(Clone, Debug)]
-pub struct LeafValue<V> {
+pub struct LeafValue<V: Send + Sync + 'static> {
     pub hash: HashValue,
     pub data: Ref<V>,
 }
 
-impl<V> LeafValue<V> {
+impl<V: Send + Sync + 'static> LeafValue<V> {
     pub fn new_with_value(value: V) -> Self
     where
         V: CryptoHash,

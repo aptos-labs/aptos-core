@@ -39,7 +39,10 @@ impl ExecutionPipeline {
         let (prepare_block_tx, prepare_block_rx) = mpsc::unbounded_channel();
         let (execute_block_tx, execute_block_rx) = mpsc::unbounded_channel();
         let (ledger_apply_tx, ledger_apply_rx) = mpsc::unbounded_channel();
-        runtime.spawn(Self::prepare_block(prepare_block_rx, execute_block_tx));
+        runtime.spawn(Self::prepare_block_stage(
+            prepare_block_rx,
+            execute_block_tx,
+        ));
         runtime.spawn(Self::execute_stage(
             execute_block_rx,
             ledger_apply_tx,
@@ -79,7 +82,7 @@ impl ExecutionPipeline {
         })
     }
 
-    async fn prepare_block(
+    async fn prepare_block_stage(
         mut prepare_block_rx: mpsc::UnboundedReceiver<PrepareBlockCommand>,
         execute_block_tx: mpsc::UnboundedSender<ExecuteBlockCommand>,
     ) {

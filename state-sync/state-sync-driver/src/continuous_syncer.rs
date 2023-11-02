@@ -128,7 +128,6 @@ impl<
                         sync_request_target.clone(),
                     )
                     .await?;
-                println!("DKG DEBUG SS highest_synced_version {}, highest_synced_epoch {}, sync_request_target {:?}, responce {:?}", highest_synced_version, highest_synced_epoch, sync_request_target, responce);
                 responce
             },
             ContinuousSyncingMode::ExecuteTransactions => {

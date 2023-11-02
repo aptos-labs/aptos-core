@@ -10,7 +10,7 @@ use crate::sharded_block_executor::{
     messages::CrossShardMsg,
     sharded_aggregator_service,
     sharded_executor_service::ShardedExecutorService,
-    ExecutorShardCommand,
+    ExecutorShardCommand, ShardedBlockExecutor,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
@@ -147,6 +147,16 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
         }
     }
 
+    pub fn create_local_sharded_block_executor(
+        num_shards: usize,
+        num_threads: Option<usize>,
+    ) -> ShardedBlockExecutor<S, LocalExecutorClient<S>> {
+        ShardedBlockExecutor::new(LocalExecutorService::setup_local_executor_shards(
+            num_shards,
+            num_threads,
+        ))
+    }
+
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
         let _timer = WAIT_FOR_SHARDED_OUTPUT_SECONDS.start_timer();
         trace!("LocalExecutorClient Waiting for results");
@@ -207,6 +217,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
 
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
+
+    fn shutdown(&mut self) {}
 }
 
 impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {

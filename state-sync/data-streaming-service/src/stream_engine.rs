@@ -693,8 +693,7 @@ impl ContinuousTransactionStreamEngine {
 
             // Note: if the stream hits the total max subscription stream index,
             // then no new requests should be created. The stream will eventually
-            // be marked for termination once a response is received for
-            // the last subscription request.
+            // be terminated once a response is received for the last request.
             if subscription_stream_index
                 > active_subscription_stream.get_max_subscription_stream_index()
             {

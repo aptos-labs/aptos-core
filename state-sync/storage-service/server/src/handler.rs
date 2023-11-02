@@ -6,8 +6,8 @@ use crate::{
     logging::{LogEntry, LogSchema},
     metrics,
     metrics::{
-        increment_counter, start_timer, LRU_CACHE_HIT, LRU_CACHE_PROBE, OPTIMISTIC_FETCH_ADD,
-        SUBSCRIPTION_ADD, SUBSCRIPTION_FAILURE, SUBSCRIPTION_NEW_STREAM,
+        increment_counter, LRU_CACHE_HIT, LRU_CACHE_PROBE, OPTIMISTIC_FETCH_ADD, SUBSCRIPTION_ADD,
+        SUBSCRIPTION_FAILURE, SUBSCRIPTION_NEW_STREAM,
     },
     moderator::RequestModerator,
     network::ResponseSender,
@@ -16,7 +16,6 @@ use crate::{
     subscription::{SubscriptionRequest, SubscriptionStreamRequests},
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
-use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, sample, sample::SampleRate, trace, warn};
 use aptos_storage_service_types::{
     requests::{
@@ -33,7 +32,7 @@ use aptos_time_service::TimeService;
 use aptos_types::transaction::Version;
 use arc_swap::ArcSwap;
 use dashmap::{mapref::entry::Entry, DashMap};
-use lru::LruCache;
+use mini_moka::sync::Cache;
 use std::{sync::Arc, time::Duration};
 
 /// Storage server constants
@@ -48,7 +47,7 @@ const SUMMARY_LOG_FREQUENCY_SECS: u64 = 5; // The frequency to log the storage s
 pub struct Handler<T> {
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -59,7 +58,7 @@ impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
         optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-        lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+        lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
         request_moderator: Arc<RequestModerator>,
         storage: T,
         subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -121,8 +120,8 @@ impl<T: StorageReaderInterface> Handler<T> {
         request: StorageServiceRequest,
         optimistic_fetch_related: bool,
     ) -> aptos_storage_service_types::Result<StorageServiceResponse> {
-        // Time the request processing (the timer will stop when it's dropped)
-        let _timer = start_timer(
+        // Time the request processing
+        let _timer = metrics::start_timer(
             &metrics::STORAGE_REQUEST_PROCESSING_LATENCY,
             peer_network_id.network_id(),
             request.get_label(),
@@ -363,7 +362,7 @@ impl<T: StorageReaderInterface> Handler<T> {
         );
 
         // Check if the response is already in the cache
-        if let Some(response) = self.lru_response_cache.lock().get(request) {
+        if let Some(response) = self.lru_response_cache.get(request) {
             increment_counter(
                 &metrics::LRU_CACHE_EVENT,
                 peer_network_id.network_id(),
@@ -371,6 +370,13 @@ impl<T: StorageReaderInterface> Handler<T> {
             );
             return Ok(response.clone());
         }
+
+        // Otherwise, we need to fetch the data from storage. Start the timer.
+        let _timer = metrics::start_timer(
+            &metrics::STORAGE_FETCH_PROCESSING_LATENCY,
+            peer_network_id.network_id(),
+            request.get_label(),
+        );
 
         // Fetch the data response from storage
         let data_response = match &request.data_request {
@@ -400,10 +406,8 @@ impl<T: StorageReaderInterface> Handler<T> {
         let storage_response = StorageServiceResponse::new(data_response, request.use_compression)?;
 
         // Cache the response before returning
-        let _ = self
-            .lru_response_cache
-            .lock()
-            .put(request.clone(), storage_response.clone());
+        self.lru_response_cache
+            .insert(request.clone(), storage_response.clone());
 
         Ok(storage_response)
     }

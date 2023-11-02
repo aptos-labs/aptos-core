@@ -25,8 +25,7 @@ COPY --link docker/tools/boto.cfg /etc/boto.cfg
 RUN wget https://storage.googleapis.com/pub/gsutil.tar.gz -O- | tar --gzip --directory /opt --extract && ln -s /opt/gsutil/gsutil /usr/local/bin
 RUN cd /usr/local/bin && wget "https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl" -O kubectl && chmod +x kubectl
 
-COPY --link --from=tools-builder /aptos/dist/aptos-db-bootstrapper /usr/local/bin/aptos-db-bootstrapper
-COPY --link --from=tools-builder /aptos/dist/aptos-db-tool /usr/local/bin/aptos-db-tool
+COPY --link --from=tools-builder /aptos/dist/aptos-debugger /usr/local/bin/aptos-debugger
 COPY --link --from=tools-builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=tools-builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=tools-builder /aptos/dist/aptos-fn-check-client /usr/local/bin/aptos-fn-check-client

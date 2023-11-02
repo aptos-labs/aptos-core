@@ -30,7 +30,7 @@ use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use futures::future::join_all;
-use lru::LruCache;
+use mini_moka::sync::Cache;
 use std::{cmp::min, collections::HashMap, ops::Deref, sync::Arc, time::Instant};
 
 /// An optimistic fetch request from a peer
@@ -179,7 +179,7 @@ pub(crate) async fn handle_active_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -227,7 +227,7 @@ async fn handle_ready_optimistic_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     config: StorageServiceConfig,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -311,7 +311,7 @@ pub(crate) async fn get_peers_with_ready_optimistic_fetches<T: StorageReaderInte
     config: StorageServiceConfig,
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
@@ -368,7 +368,7 @@ async fn identify_expired_invalid_and_ready_fetches<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,
@@ -437,7 +437,7 @@ async fn identify_ready_and_invalid_optimistic_fetches<T: StorageReaderInterface
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
-    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
+    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,

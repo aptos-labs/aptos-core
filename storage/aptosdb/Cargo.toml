@@ -74,8 +74,3 @@ default = []
 fuzzing = ["proptest", "proptest-derive", "aptos-proptest-helpers", "aptos-temppath", "aptos-crypto/fuzzing", "aptos-jellyfish-merkle/fuzzing", "aptos-types/fuzzing", "aptos-executor-types/fuzzing", "aptos-schemadb/fuzzing", "aptos-scratchpad/fuzzing"]
 consensus-only-perf-test = []
 db-debugger = ["aptos-temppath", "clap", "owo-colors"]
-
-[[bin]]
-name = "db-debugger"
-path = "src/db_debugger/main.rs"
-required-features = ["db-debugger"]

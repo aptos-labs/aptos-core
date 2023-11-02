@@ -304,7 +304,6 @@ spec aptos_framework::transaction_validation {
         ensures total_supply_enabled ==> apt_supply_value - amount_to_burn == post_apt_supply_value;
 
         // Check minting.
-        //   (The total supply aggregator is not varified in `coin::mint`, use `coin::supply` variable instead.)
         let amount_to_mint = if (collect_fee_enabled) {
             storage_fee_refunded
         } else {
@@ -317,6 +316,10 @@ spec aptos_framework::transaction_validation {
         aborts_if amount_to_mint > 0 && !exists<AptosCoinMintCapability>(@aptos_framework);
         aborts_if amount_to_mint > 0 && total_supply + amount_to_mint > MAX_U128;
         ensures amount_to_mint > 0 ==> post_total_supply == total_supply + amount_to_mint;
+
+        let aptos_addr = type_info::type_of<AptosCoin>().account_address;
+        aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
+        include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
 
     }
 }

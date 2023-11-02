@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "outDir": "dist",
+        "strict": true,
+        "target": "es2021",
+        "moduleResolution": "node",
+        "declaration": true,
+        "sourceMap": true,
+        "experimentalDecorators": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitAny": false,
+        "noImplicitReturns": true,
+        "allowSyntheticDefaultImports": true,
+        "useDefineForClassFields": true,
+        "esModuleInterop": true,
+        "skipLibCheck": false,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

@@ -15,6 +15,7 @@ use aptos_config::config::{
 };
 use aptos_executor::block_executor::TransactionBlockExecutor;
 use aptos_executor_benchmark::{native_executor::NativeExecutor, pipeline::PipelineConfig};
+use aptos_executor_service::remote_executor_client;
 use aptos_experimental_ptx_executor::PtxBlockExecutor;
 #[cfg(target_os = "linux")]
 use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadManagerBuilder};
@@ -26,6 +27,7 @@ use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
 use std::{
+    net::SocketAddr,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -104,12 +106,41 @@ pub struct PipelineOpt {
     allow_discards: bool,
     #[clap(long)]
     allow_aborts: bool,
-    #[clap(long, default_value = "1")]
+    #[clap(long, default_value = "4")]
+    num_generator_workers: usize,
+    #[clap(flatten)]
+    sharding_opt: ShardingOpt,
+}
+
+impl PipelineOpt {
+    fn pipeline_config(&self) -> PipelineConfig {
+        PipelineConfig {
+            delay_execution_start: self.generate_then_execute,
+            split_stages: self.split_stages,
+            skip_commit: self.skip_commit,
+            allow_discards: self.allow_discards,
+            allow_aborts: self.allow_aborts,
+            num_executor_shards: self.sharding_opt.num_executor_shards,
+            use_global_executor: self.sharding_opt.use_global_executor,
+            num_generator_workers: self.num_generator_workers,
+            partitioner_config: self.sharding_opt.partitioner_config(),
+        }
+    }
+}
+
+#[derive(Debug, Parser)]
+struct ShardingOpt {
+    #[clap(long, default_value = "0")]
     num_executor_shards: usize,
     #[clap(long)]
     use_global_executor: bool,
-    #[clap(long, default_value = "4")]
-    num_generator_workers: usize,
+    /// Gives an option to specify remote shard addresses. If specified, then we expect the number
+    /// of remote addresses to be equal to 'num_executor_shards', and one coordinator address
+    /// Address is specified as <IP>:<PORT>
+    #[clap(long, num_args = 1..)]
+    remote_executor_addresses: Option<Vec<SocketAddr>>,
+    #[clap(long)]
+    coordinator_address: Option<SocketAddr>,
     #[clap(long, default_value = "4")]
     max_partitioning_rounds: usize,
     #[clap(long, default_value = "0.90")]
@@ -126,21 +157,7 @@ pub struct PipelineOpt {
     partitioner_v2_dashmap_num_shards: usize,
 }
 
-impl PipelineOpt {
-    fn pipeline_config(&self) -> PipelineConfig {
-        PipelineConfig {
-            delay_execution_start: self.generate_then_execute,
-            split_stages: self.split_stages,
-            skip_commit: self.skip_commit,
-            allow_discards: self.allow_discards,
-            allow_aborts: self.allow_aborts,
-            num_executor_shards: self.num_executor_shards,
-            use_global_executor: self.use_global_executor,
-            num_generator_workers: self.num_generator_workers,
-            partitioner_config: self.partitioner_config(),
-        }
-    }
-
+impl ShardingOpt {
     fn pre_partitioner_config(&self) -> Box<dyn PrePartitionerConfig> {
         match self.pre_partitioner.as_deref() {
             None => default_pre_partitioner_config(),
@@ -422,14 +439,45 @@ fn main() {
     let _mp = MetricsPusher::start_for_local_run("executor-benchmark");
 
     let execution_threads = opt.execution_threads();
-    let execution_shards = opt.pipeline_opt.num_executor_shards;
-    assert!(
-        execution_threads % execution_shards == 0,
-        "Execution threads ({}) must be divisible by the number of execution shards ({}).",
-        execution_threads,
-        execution_shards
-    );
-    let execution_threads_per_shard = execution_threads / execution_shards;
+    let execution_shards = opt.pipeline_opt.sharding_opt.num_executor_shards;
+    let mut execution_threads_per_shard = execution_threads;
+    if execution_shards > 1 {
+        assert!(
+            execution_threads % execution_shards == 0,
+            "Execution threads ({}) must be divisible by the number of execution shards ({}).",
+            execution_threads,
+            execution_shards
+        );
+        execution_threads_per_shard = execution_threads / execution_shards;
+    }
+
+    if opt
+        .pipeline_opt
+        .sharding_opt
+        .remote_executor_addresses
+        .is_some()
+    {
+        remote_executor_client::set_remote_addresses(
+            opt.pipeline_opt
+                .sharding_opt
+                .remote_executor_addresses
+                .clone()
+                .unwrap(),
+        );
+        assert_eq!(
+            execution_shards,
+            remote_executor_client::get_remote_addresses().len(),
+            "Number of execution shards ({}) must be equal to the number of remote addresses ({}).",
+            execution_shards,
+            remote_executor_client::get_remote_addresses().len()
+        );
+        remote_executor_client::set_coordinator_address(
+            opt.pipeline_opt.sharding_opt.coordinator_address.unwrap(),
+        );
+        // it does not matter because shards are on remote node, but for sake of correctness lets
+        // set it
+        execution_threads_per_shard = execution_threads;
+    }
 
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);

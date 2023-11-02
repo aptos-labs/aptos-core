@@ -2,7 +2,9 @@
 
 use crate::{
     grpc_network_service::GRPCNetworkMessageServiceClientWrapper,
-    network_controller::{inbound_handler::InboundHandler, Message, MessageType},
+    network_controller::{
+        inbound_handler::InboundHandler, metrics::NETWORK_HANDLER_TIMER, Message, MessageType,
+    },
 };
 use aptos_logger::{info, warn};
 use crossbeam_channel::{unbounded, Receiver, Select, Sender};
@@ -111,8 +113,12 @@ impl OutboundHandler {
 
             let index;
             let msg;
+            let _timer;
             {
                 let oper = select.select();
+                _timer = NETWORK_HANDLER_TIMER
+                    .with_label_values(&[&socket_addr.to_string(), "outbound_msgs"])
+                    .start_timer();
                 index = oper.index();
                 match oper.recv(&outbound_handlers[index].0) {
                     Ok(m) => {
