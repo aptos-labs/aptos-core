@@ -40,12 +40,6 @@ spec aptos_std::ed25519 {
     // Native functions
     // ----------------
 
-    spec fun spec_signature_verify_strict_internal(
-        signature: vector<u8>,
-        public_key: vector<u8>,
-        message: vector<u8>
-    ): bool;
-
     spec public_key_validate_internal(bytes: vector<u8>): bool {
         pragma opaque;
         aborts_if false;
@@ -62,10 +56,13 @@ spec aptos_std::ed25519 {
         ensures result == spec_signature_verify_strict_internal(signature, public_key, message);
     }
 
+    /// # Helper functions
 
-    // ----------------
-    // Helper functions
-    // ----------------
+    spec fun spec_signature_verify_strict_internal(
+        signature: vector<u8>,
+        public_key: vector<u8>,
+        message: vector<u8>
+    ): bool;
 
     spec fun spec_public_key_validate_internal(bytes: vector<u8>): bool;
 
