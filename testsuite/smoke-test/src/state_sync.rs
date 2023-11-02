@@ -13,7 +13,7 @@ use aptos_config::config::{
     BootstrappingMode, ContinuousSyncingMode, NodeConfig, OverrideNodeConfig,
 };
 use aptos_db::AptosDB;
-use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
+use aptos_forge::{LocalNode, LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
@@ -226,69 +226,38 @@ async fn test_full_node_continuous_sync_transactions() {
     test_full_node_sync(vfn_peer_id, &mut swarm, false, false).await;
 }
 
-/// Creates a new full node using the given config and swarm
-async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) -> PeerId {
-    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
-    let vfn_peer_id = swarm
-        .add_validator_fullnode(
-            &swarm.versions().max().unwrap(),
-            OverrideNodeConfig::new_with_default_base(full_node_config),
-            validator_peer_id,
-        )
-        .unwrap();
-    for fullnode in swarm.full_nodes_mut() {
-        fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
-            .await
-            .unwrap();
-    }
-    vfn_peer_id
-}
+#[tokio::test]
+#[ignore]
+async fn test_single_validator_failure() {
+    // Create a swarm of 1 validator
+    let mut swarm = new_local_swarm_with_aptos(1).await;
 
-/// A helper method that tests that a full node can sync from a validator after
-/// a failure and continue to stay up-to-date.
-async fn test_full_node_sync(
-    vfn_peer_id: PeerId,
-    swarm: &mut LocalSwarm,
-    epoch_changes: bool,
-    clear_storage: bool,
-) {
-    // Stop the fullnode and potentially clear storage
-    if clear_storage {
-        stop_fullnode_and_delete_storage(swarm, vfn_peer_id).await;
-    } else {
-        swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
-    }
-
-    // Execute a number of transactions on the validator
-    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
-    let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
-    let (mut account_0, mut account_1) = create_test_accounts(swarm).await;
+    // Execute multiple transactions
+    let validator = swarm.validators_mut().next().unwrap();
+    let validator_client = validator.rest_client();
+    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
     execute_transactions(
-        swarm,
+        &mut swarm,
         &validator_client,
         &mut account_0,
         &account_1,
-        epoch_changes,
+        true,
     )
     .await;
 
-    // Restart the fullnode and verify it can sync
-    swarm
-        .fullnode_mut(vfn_peer_id)
-        .unwrap()
-        .restart()
-        .await
-        .unwrap();
-    wait_for_all_nodes(swarm).await;
+    // Restart the validator
+    let validator = swarm.validators_mut().next().unwrap();
+    validator.stop();
+    validator.start().unwrap();
+    swarm.wait_all_alive(Duration::from_secs(20)).await.unwrap();
 
-    // Execute more transactions on the validator and verify the fullnode catches up
-    execute_transactions_and_wait(
-        swarm,
+    // Execute more transactions
+    execute_transactions(
+        &mut swarm,
         &validator_client,
         &mut account_1,
         &account_0,
-        epoch_changes,
+        true,
     )
     .await;
 }
@@ -313,14 +282,14 @@ async fn test_validator_bootstrap_outputs() {
 
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot() {
-    // Test snapshot (fast) syncing in the presence of epoch changes
-    perform_validator_bootstrap_state_snapshot(true).await;
+    // Test snapshot (fast) syncing with epoch changes
+    perform_validator_bootstrap_state_snapshot(4, true).await;
 }
 
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_genesis() {
     // Test snapshot (fast) syncing without epoch changes
-    perform_validator_bootstrap_state_snapshot(false).await;
+    perform_validator_bootstrap_state_snapshot(4, false).await;
 }
 
 #[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
@@ -559,6 +528,67 @@ async fn test_validator_bootstrap_transactions_no_compression() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
+// Ignore this test because it's become increasingly flaky recently
+// and needs to be debugged.
+#[ignore]
+#[tokio::test]
+async fn test_validator_failure_bootstrap_outputs() {
+    // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_all_validator_failures(swarm).await;
+}
+
+// Ignore this test because it's become increasingly flaky recently
+// and needs to be debugged.
+#[ignore]
+#[tokio::test]
+async fn test_validator_failure_bootstrap_execution() {
+    // Create a swarm of 4 validators with state snapshot bootstrapping and transaction syncing
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_all_validator_failures(swarm).await;
+}
+
+/// Creates a new full node using the given config and swarm
+async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) -> PeerId {
+    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
+    let vfn_peer_id = swarm
+        .add_validator_fullnode(
+            &swarm.versions().max().unwrap(),
+            OverrideNodeConfig::new_with_default_base(full_node_config),
+            validator_peer_id,
+        )
+        .unwrap();
+    for fullnode in swarm.full_nodes_mut() {
+        fullnode
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_HEALTHY_WAIT_SECS))
+            .await
+            .unwrap();
+    }
+    vfn_peer_id
+}
+
 /// A test method that verifies that a fullnode can fast sync from
 /// a validator after a data wipe. If `epoch_changes` are enabled
 /// then epoch changes can occur during test execution and fullnode syncing.
@@ -598,31 +628,26 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
 
     // Verify the oldest ledger info and pruning metrics for the fullnode
     if epoch_changes {
-        // Verify the oldest ledger info
+        // Verify the oldest ledger info on the fullnode
         let fullnode = swarm.fullnode_mut(vfn_peer_id).unwrap();
         let vfn_rest_client = fullnode.rest_client();
-        let db_path = fullnode.config().base.data_dir.as_path();
         verify_oldest_version_after_fast_sync(vfn_rest_client.clone(), false).await;
+
         // Verify the fullnode pruning metrics
         let inspection_client = fullnode.inspection_client();
         verify_pruning_metrics_after_fast_sync(inspection_client, false).await;
-        // verify ledger info exists at version 0
-        let mut db_path_buf = db_path.to_path_buf();
-        db_path_buf.push("db");
-        fullnode.stop(); // stop the fullnode to avoid db contention
-        let aptos_db = AptosDB::new_for_test(db_path_buf.as_path());
-        aptos_db
-            .get_epoch_ending_ledger_info(0)
-            .expect("Ledgerinfo should exist at version 0");
+
+        // Verify that the ledger info exists at version 0
+        verify_first_ledger_info(fullnode);
     }
 }
 
 /// A test method that verifies that a validator can fast sync from
 /// other validators after a data wipe. If `epoch_changes` are enabled
 /// then epoch changes can occur during test execution and validator syncing.
-async fn perform_validator_bootstrap_state_snapshot(epoch_changes: bool) {
+async fn perform_validator_bootstrap_state_snapshot(num_validators: usize, epoch_changes: bool) {
     // Create a swarm of 4 validators using snapshot (fast) syncing and a chunk size = 30
-    let mut swarm = SwarmBuilder::new_local(4)
+    let mut swarm = SwarmBuilder::new_local(num_validators)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
@@ -642,14 +667,16 @@ async fn perform_validator_bootstrap_state_snapshot(epoch_changes: bool) {
     // Verify the oldest ledger info and pruning metrics for the validator
     if epoch_changes {
         // Verify the oldest ledger info for the validator
-        let bootstrapped_validator =
-            swarm.validators().collect::<Vec<_>>()[validator_index_to_test];
-        let validator_client = bootstrapped_validator.rest_client();
+        let validator = swarm.validators_mut().nth(validator_index_to_test).unwrap();
+        let validator_client = validator.rest_client();
         verify_oldest_version_after_fast_sync(validator_client, false).await;
 
         // Verify the validator pruning metrics
-        let inspection_client = bootstrapped_validator.inspection_client();
+        let inspection_client = validator.inspection_client();
         verify_pruning_metrics_after_fast_sync(inspection_client, false).await;
+
+        // Get the DB path for the validator
+        verify_first_ledger_info(validator);
     }
 }
 
@@ -677,6 +704,54 @@ async fn perform_validator_bootstrap_state_snapshot_exponential_backoff(epoch_ch
 
     // Test the ability of the validators to sync
     test_validator_sync(&mut swarm, 1, epoch_changes).await;
+}
+
+/// A helper method that tests that a full node can sync from a validator after
+/// a failure and continue to stay up-to-date.
+async fn test_full_node_sync(
+    vfn_peer_id: PeerId,
+    swarm: &mut LocalSwarm,
+    epoch_changes: bool,
+    clear_storage: bool,
+) {
+    // Stop the fullnode and potentially clear storage
+    if clear_storage {
+        stop_fullnode_and_delete_storage(swarm, vfn_peer_id).await;
+    } else {
+        swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
+    }
+
+    // Execute a number of transactions on the validator
+    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
+    let validator_client = swarm.validator(validator_peer_id).unwrap().rest_client();
+    let (mut account_0, mut account_1) = create_test_accounts(swarm).await;
+    execute_transactions(
+        swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        epoch_changes,
+    )
+    .await;
+
+    // Restart the fullnode and verify it can sync
+    swarm
+        .fullnode_mut(vfn_peer_id)
+        .unwrap()
+        .restart()
+        .await
+        .unwrap();
+    wait_for_all_nodes(swarm).await;
+
+    // Execute more transactions on the validator and verify the fullnode catches up
+    execute_transactions_and_wait(
+        swarm,
+        &validator_client,
+        &mut account_1,
+        &account_0,
+        epoch_changes,
+    )
+    .await;
 }
 
 /// A helper method that tests that a validator can sync after a failure and
@@ -720,7 +795,8 @@ async fn test_validator_sync(
     swarm.validator_mut(validator).unwrap().start().unwrap();
     wait_for_all_nodes(swarm).await;
 
-    // Execute multiple transactions and verify the validator can sync
+    // Execute multiple transactions and verify the validator
+    // can sync and that consensus is still running.
     execute_transactions_and_wait(
         swarm,
         &validator_client_0,
@@ -729,48 +805,6 @@ async fn test_validator_sync(
         epoch_changes,
     )
     .await;
-}
-
-// Ignore this test because it's become increasingly flaky recently
-// and needs to be debugged.
-#[ignore]
-#[tokio::test]
-async fn test_validator_failure_bootstrap_outputs() {
-    // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
-    let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
-        .with_init_config(Arc::new(|_, config, _| {
-            config.state_sync.state_sync_driver.bootstrapping_mode =
-                BootstrappingMode::DownloadLatestStates;
-            config.state_sync.state_sync_driver.continuous_syncing_mode =
-                ContinuousSyncingMode::ApplyTransactionOutputs;
-        }))
-        .build()
-        .await;
-
-    // Test the ability of the validators to sync
-    test_all_validator_failures(swarm).await;
-}
-
-// Ignore this test because it's become increasingly flaky recently
-// and needs to be debugged.
-#[ignore]
-#[tokio::test]
-async fn test_validator_failure_bootstrap_execution() {
-    // Create a swarm of 4 validators with state snapshot bootstrapping and transaction syncing
-    let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
-        .with_init_config(Arc::new(|_, config, _| {
-            config.state_sync.state_sync_driver.bootstrapping_mode =
-                BootstrappingMode::DownloadLatestStates;
-            config.state_sync.state_sync_driver.continuous_syncing_mode =
-                ContinuousSyncingMode::ExecuteTransactions;
-        }))
-        .build()
-        .await;
-
-    // Test the ability of the validators to sync
-    test_all_validator_failures(swarm).await;
 }
 
 /// A helper method that tests that all validators can sync after a failure and
@@ -822,42 +856,6 @@ pub async fn test_all_validator_failures(mut swarm: LocalSwarm) {
     execute_transactions_and_wait(
         &mut swarm,
         &validator_client_1,
-        &mut account_1,
-        &account_0,
-        true,
-    )
-    .await;
-}
-
-#[tokio::test]
-#[ignore]
-async fn test_single_validator_failure() {
-    // Create a swarm of 1 validator
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-
-    // Execute multiple transactions
-    let validator = swarm.validators_mut().next().unwrap();
-    let validator_client = validator.rest_client();
-    let (mut account_0, mut account_1) = create_test_accounts(&mut swarm).await;
-    execute_transactions(
-        &mut swarm,
-        &validator_client,
-        &mut account_0,
-        &account_1,
-        true,
-    )
-    .await;
-
-    // Restart the validator
-    let validator = swarm.validators_mut().next().unwrap();
-    validator.stop();
-    validator.start().unwrap();
-    swarm.wait_all_alive(Duration::from_secs(20)).await.unwrap();
-
-    // Execute more transactions
-    execute_transactions(
-        &mut swarm,
-        &validator_client,
         &mut account_1,
         &account_0,
         true,
@@ -948,6 +946,21 @@ async fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: Ac
 
     // The validator is stopped during the clear_storage() call
     validator.clear_storage().await.unwrap();
+}
+
+/// Verifies that the ledger info at version 0 exists in the given node's DB
+fn verify_first_ledger_info(node: &mut LocalNode) {
+    // Get the DB path for the node
+    let db_path = node.config().base.data_dir.as_path();
+    let mut db_path_buf = db_path.to_path_buf();
+    db_path_buf.push("db");
+
+    // Stop the node to prevent any DB contention
+    node.stop();
+
+    // Verfiy that the ledger info exists at version 0
+    let aptos_db = AptosDB::new_for_test(db_path_buf.as_path());
+    aptos_db.get_epoch_ending_ledger_info(0).unwrap();
 }
 
 /// Verifies the oldest ledger version on a node after fast syncing
