@@ -10,7 +10,7 @@ use crate::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_framework::natives::{
-    aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
+    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
     code::{NativeCodeContext, PublishRequest},
     event::NativeEventContext,
 };
@@ -23,32 +23,27 @@ use aptos_types::{
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
-    effects::{AccountChanges, Changes, Op as MoveStorageOp},
+    effects::{AccountChangeSet, ChangeSet as MoveChangeSet, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
-    value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
-    V0(BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>),
+    V0(HashMap<StateKey, MoveStorageOp<Bytes>>),
     // Granular ops to individual resources within a group.
-    V1(BTreeMap<StateKey, BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>>),
+    V1(HashMap<StateKey, HashMap<StructTag, MoveStorageOp<Bytes>>>),
 }
-type AccountChangeSet = AccountChanges<Bytes, BytesWithResourceLayout>;
-type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
-pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 #[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -160,23 +155,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         configs: &ChangeSetConfigs,
     ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
-
-        let resource_converter = |value: Value,
-                                  layout: MoveTypeLayout,
-                                  has_aggregator_lifting: bool|
-         -> PartialVMResult<BytesWithResourceLayout> {
-            value
-                .simple_serialize(&layout)
-                .map(Into::into)
-                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
-                })
-        };
-        let (change_set, mut extensions) = self
-            .inner
-            .finish_with_extensions_with_custom_effects(&resource_converter)?;
+        let (change_set, mut extensions) = self.inner.finish_with_extensions()?;
 
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set, ap_cache)?;
@@ -187,9 +166,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
-        let aggregator_change_set = aggregator_context
-            .into_change_set()
-            .map_err(|e| PartialVMError::from(e).finish(Location::Undefined))?;
+        let aggregator_change_set = aggregator_context.into_change_set();
 
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
@@ -220,10 +197,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     }
 
     fn populate_v0_resource_group_change_set(
-        change_set: &mut BTreeMap<StateKey, MoveStorageOp<BytesWithResourceLayout>>,
+        change_set: &mut HashMap<StateKey, MoveStorageOp<Bytes>>,
         state_key: StateKey,
         mut source_data: BTreeMap<StructTag, Bytes>,
-        resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
+        resources: HashMap<StructTag, MoveStorageOp<Bytes>>,
     ) -> VMResult<()> {
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -238,11 +215,11 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 MoveStorageOp::Delete => {
                     source_data.remove(&struct_tag).ok_or_else(common_error)?;
                 },
-                MoveStorageOp::Modify((new_data, _)) => {
+                MoveStorageOp::Modify(new_data) => {
                     let data = source_data.get_mut(&struct_tag).ok_or_else(common_error)?;
                     *data = new_data;
                 },
-                MoveStorageOp::New((data, _)) => {
+                MoveStorageOp::New(data) => {
                     let data = source_data.insert(struct_tag, data);
                     if data.is_some() {
                         return Err(common_error());
@@ -254,19 +231,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let op = if source_data.is_empty() {
             MoveStorageOp::Delete
         } else if create {
-            MoveStorageOp::New((
+            MoveStorageOp::New(
                 bcs::to_bytes(&source_data)
                     .map_err(|_| common_error())?
                     .into(),
-                None,
-            ))
+            )
         } else {
-            MoveStorageOp::Modify((
+            MoveStorageOp::Modify(
                 bcs::to_bytes(&source_data)
                     .map_err(|_| common_error())?
                     .into(),
-                None,
-            ))
+            )
         };
         change_set.insert(state_key, op);
         Ok(())
@@ -293,13 +268,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into the a single op corresponding to the whole resource group (V0).
-    /// TODO[agg_v2](fix) Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
     fn split_and_merge_resource_groups<C: AccessPathCache>(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
-        change_set: ChangeSet,
+        change_set: MoveChangeSet,
         ap_cache: &mut C,
-    ) -> VMResult<(ChangeSet, ResourceGroupChangeSet)> {
+    ) -> VMResult<(MoveChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
@@ -307,23 +281,17 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .with_message("split_and_merge_resource_groups error".to_string())
                 .finish(Location::Undefined)
         };
-        let mut change_set_filtered = ChangeSet::new();
+        let mut change_set_filtered = MoveChangeSet::new();
 
-        let mut maybe_resource_group_cache = remote.release_resource_group_cache().map(|v| {
-            v.into_iter()
-                .map(|(k, v)| (k, v.into_iter().collect::<BTreeMap<_, _>>()))
-                .collect::<BTreeMap<_, _>>()
-        });
+        let mut maybe_resource_group_cache = remote.release_resource_group_cache();
         let mut resource_group_change_set = if maybe_resource_group_cache.is_some() {
-            ResourceGroupChangeSet::V0(BTreeMap::new())
+            ResourceGroupChangeSet::V0(HashMap::new())
         } else {
-            ResourceGroupChangeSet::V1(BTreeMap::new())
+            ResourceGroupChangeSet::V1(HashMap::new())
         };
         for (addr, account_changeset) in change_set.into_inner() {
-            let mut resource_groups: BTreeMap<
-                StructTag,
-                BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
-            > = BTreeMap::new();
+            let mut resource_groups: BTreeMap<StructTag, HashMap<StructTag, MoveStorageOp<Bytes>>> =
+                BTreeMap::new();
             let mut resources_filtered = BTreeMap::new();
             let (modules, resources) = account_changeset.into_inner();
 
@@ -336,7 +304,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 if let Some(resource_group_tag) = resource_group_tag {
                     if resource_groups
                         .entry(resource_group_tag)
-                        .or_insert_with(BTreeMap::new)
+                        .or_insert_with(HashMap::new)
                         .insert(struct_tag, blob_op)
                         .is_some()
                     {
@@ -396,27 +364,27 @@ impl<'r, 'l> SessionExt<'r, 'l> {
 
     pub(crate) fn convert_change_set<C: AccessPathCache>(
         woc: &WriteOpConverter,
-        change_set: ChangeSet,
+        change_set: MoveChangeSet,
         resource_group_change_set: ResourceGroupChangeSet,
-        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+        events: Vec<ContractEvent>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut resource_write_set = BTreeMap::new();
-        let mut resource_group_write_set = BTreeMap::new();
-        let mut module_write_set = BTreeMap::new();
-        let mut aggregator_v1_write_set = BTreeMap::new();
-        let mut aggregator_v1_delta_set = BTreeMap::new();
+        let mut resource_write_set = HashMap::new();
+        let mut resource_group_write_set = HashMap::new();
+        let mut module_write_set = HashMap::new();
+        let mut aggregator_write_set = HashMap::new();
+        let mut aggregator_delta_set = HashMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
-            for (struct_tag, blob_and_layout_op) in resources {
+            for (struct_tag, blob_op) in resources {
                 let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
                 let op = woc.convert_resource(
                     &state_key,
-                    blob_and_layout_op,
+                    blob_op,
                     configs.legacy_resource_creation_as_modification(),
                 )?;
 
@@ -454,38 +422,30 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (state_key, change) in aggregator_change_set.aggregator_v1_changes {
+        for (id, change) in aggregator_change_set.changes {
+            let state_key = id.into_state_key();
             match change {
-                AggregatorChangeV1::Write(value) => {
+                AggregatorChange::Write(value) => {
                     let write_op = woc.convert_aggregator_modification(&state_key, value)?;
-                    aggregator_v1_write_set.insert(state_key, write_op);
+                    aggregator_write_set.insert(state_key, write_op);
                 },
-                AggregatorChangeV1::Merge(delta_op) => {
-                    aggregator_v1_delta_set.insert(state_key, delta_op);
+                AggregatorChange::Merge(delta_op) => {
+                    aggregator_delta_set.insert(state_key, delta_op);
                 },
-                AggregatorChangeV1::Delete => {
+                AggregatorChange::Delete => {
                     let write_op =
                         woc.convert_aggregator(&state_key, MoveStorageOp::Delete, false)?;
-                    aggregator_v1_write_set.insert(state_key, write_op);
+                    aggregator_write_set.insert(state_key, write_op);
                 },
             }
         }
-
-        // We need to remove values that are already in the writes.
-        let reads_needing_exchange = aggregator_change_set
-            .reads_needing_exchange
-            .into_iter()
-            .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
-            .collect();
 
         VMChangeSet::new(
             resource_write_set,
             resource_group_write_set,
             module_write_set,
-            aggregator_v1_write_set,
-            aggregator_v1_delta_set,
-            aggregator_change_set.delayed_field_changes,
-            reads_needing_exchange,
+            aggregator_write_set,
+            aggregator_delta_set,
             events,
             configs,
         )

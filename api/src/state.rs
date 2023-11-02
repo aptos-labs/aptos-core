@@ -3,7 +3,6 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::api_spawn_blocking,
     failpoint::fail_point_poem,
     response::{
         api_forbidden, build_not_found, module_not_found, resource_not_found, table_item_not_found,
@@ -36,7 +35,6 @@ use poem_openapi::{
 use std::{convert::TryInto, sync::Arc};
 
 /// API for retrieving individual state
-#[derive(Clone)]
 pub struct StateApi {
     pub context: Arc<Context>,
 }
@@ -78,17 +76,12 @@ impl StateApi {
         fail_point_poem("endpoint_get_account_resource")?;
         self.context
             .check_api_output_enabled("Get account resource", &accept_type)?;
-
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.resource(
-                &accept_type,
-                address.0,
-                resource_type.0,
-                ledger_version.0.map(|inner| inner.0),
-            )
-        })
-        .await
+        self.resource(
+            &accept_type,
+            address.0,
+            resource_type.0,
+            ledger_version.0.map(|inner| inner.0),
+        )
     }
 
     /// Get account module
@@ -124,11 +117,7 @@ impl StateApi {
         fail_point_poem("endpoint_get_account_module")?;
         self.context
             .check_api_output_enabled("Get account module", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.module(&accept_type, address.0, module_name.0, ledger_version.0)
-        })
-        .await
+        self.module(&accept_type, address.0, module_name.0, ledger_version.0)
     }
 
     /// Get table item
@@ -171,16 +160,12 @@ impl StateApi {
         fail_point_poem("endpoint_get_table_item")?;
         self.context
             .check_api_output_enabled("Get table item", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.table_item(
-                &accept_type,
-                table_handle.0,
-                table_item_request.0,
-                ledger_version.0,
-            )
-        })
-        .await
+        self.table_item(
+            &accept_type,
+            table_handle.0,
+            table_item_request.0,
+            ledger_version.0,
+        )
     }
 
     /// Get raw table item
@@ -222,16 +207,12 @@ impl StateApi {
         self.context
             .check_api_output_enabled("Get raw table item", &accept_type)?;
 
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.raw_table_item(
-                &accept_type,
-                table_handle.0,
-                table_item_request.0,
-                ledger_version.0,
-            )
-        })
-        .await
+        self.raw_table_item(
+            &accept_type,
+            table_handle.0,
+            table_item_request.0,
+            ledger_version.0,
+        )
     }
 
     /// Get raw state value.
@@ -269,8 +250,7 @@ impl StateApi {
         self.context
             .check_api_output_enabled("Get raw state value", &accept_type)?;
 
-        let api = self.clone();
-        api_spawn_blocking(move || api.raw_value(&accept_type, request.0, ledger_version.0)).await
+        self.raw_value(&accept_type, request.0, ledger_version.0)
     }
 }
 

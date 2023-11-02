@@ -1,16 +1,15 @@
 // Copyright © Aptos Foundation
 
-use super::helpers::TEST_DAG_WINDOW;
 use crate::{
     dag::{
         adapter::OrderedNotifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
-        dag_state_sync::DagStateSynchronizer,
+        dag_state_sync::{DagStateSynchronizer, DAG_WINDOW},
         dag_store::Dag,
         storage::DAGStorage,
         tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
         types::{CertifiedNodeMessage, RemoteFetchRequest},
-        CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
+        CertifiedNode, DAGMessage, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
     test_utils::EmptyStateComputer,
 };
@@ -33,13 +32,13 @@ use std::{sync::Arc, time::Duration};
 struct MockDAGNetworkSender {}
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockDAGNetworkSender {
+impl RBNetworkSender<DAGMessage> for MockDAGNetworkSender {
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGRpcResult> {
+    ) -> anyhow::Result<DAGMessage> {
         unimplemented!()
     }
 }
@@ -51,7 +50,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
         _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGRpcResult> {
+    ) -> anyhow::Result<DAGMessage> {
         unimplemented!()
     }
 
@@ -63,8 +62,6 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
         _message: DAGMessage,
         _retry_interval: Duration,
         _rpc_timeout: Duration,
-        _min_concurrent_responders: u32,
-        _max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         unimplemented!()
     }
@@ -114,13 +111,7 @@ fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagState
     let time_service = TimeService::mock();
     let state_computer = Arc::new(EmptyStateComputer {});
 
-    DagStateSynchronizer::new(
-        epoch_state,
-        time_service,
-        state_computer,
-        storage,
-        TEST_DAG_WINDOW as Round,
-    )
+    DagStateSynchronizer::new(epoch_state, time_service, state_computer, storage)
 }
 
 #[tokio::test]
@@ -202,10 +193,7 @@ async fn test_dag_state_sync() {
         .await;
     let new_dag = sync_result.unwrap().unwrap();
 
-    assert_eq!(
-        new_dag.lowest_round(),
-        (LI_ROUNDS - TEST_DAG_WINDOW) as Round
-    );
-    assert_eq!(new_dag.highest_round(), NUM_ROUNDS as Round);
+    assert_eq!(new_dag.lowest_round(), LI_ROUNDS - DAG_WINDOW);
+    assert_eq!(new_dag.highest_round(), NUM_ROUNDS);
     assert_none!(new_dag.highest_ordered_anchor_round(),);
 }

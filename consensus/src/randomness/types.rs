@@ -1,17 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{network::NetworkSender, network_interface::ConsensusMsg};
 use anyhow::bail;
 pub use aptos_consensus_types::common::Author;
 use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_enum_conversion_derive::EnumConversion;
-use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
+use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
 use aptos_types::{randomness::{RandConfig, RandDecision, Mode, ProofShare, Delta, RandMetadata, WVUF}};
+use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{time::Duration, collections::HashSet};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandShare {
@@ -183,5 +185,23 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
         } else {
             bail!("[RandMessage] Unknown author: {}", peer);
         }
+    }
+}
+
+#[async_trait]
+impl RBNetworkSender<RandMessage> for NetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: RandMessage,
+        timeout_duration: Duration,
+    ) -> anyhow::Result<RandMessage> {
+        let msg = ConsensusMsg::RandMessage(message.into());
+        let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
+            ConsensusMsg::RandMessage(resp) if matches!(*resp, RandMessage::ShareAck(_) | RandMessage::DeltaAck(_)) => *resp,
+            _ => bail!("[RandMessage] Invalid response to request"),
+        };
+
+        Ok(response)
     }
 }

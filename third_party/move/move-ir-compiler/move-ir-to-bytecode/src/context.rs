@@ -666,7 +666,6 @@ impl<'a> Context<'a> {
             parameters: SignatureIndex(params_idx as TableIndex),
             return_: SignatureIndex(return_idx as TableIndex),
             type_parameters,
-            access_specifiers: None,
         };
         // handle duplicate declarations
         // erroring on duplicates needs to be done by the bytecode verifier

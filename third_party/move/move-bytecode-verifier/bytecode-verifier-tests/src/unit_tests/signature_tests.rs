@@ -61,7 +61,6 @@ proptest! {
 fn no_verify_locals_good() {
     let compiled_module_good = CompiledModule {
         version: move_binary_format::file_format_common::VERSION_MAX,
-
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex(0),
@@ -80,7 +79,6 @@ fn no_verify_locals_good() {
                 return_: SignatureIndex(2),
                 parameters: SignatureIndex(0),
                 type_parameters: vec![],
-                access_specifiers: None,
             },
             FunctionHandle {
                 module: ModuleHandleIndex(0),
@@ -88,7 +86,6 @@ fn no_verify_locals_good() {
                 return_: SignatureIndex(2),
                 parameters: SignatureIndex(1),
                 type_parameters: vec![],
-                access_specifiers: None,
             },
         ],
         field_handles: vec![],
@@ -182,7 +179,6 @@ fn big_signature_test() {
             parameters: SignatureIndex(1),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         }],
         field_handles: vec![],
         friend_decls: vec![],

@@ -38,8 +38,8 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{
-        ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig,
-        ProposerAndVoterConfig, ProposerElectionType,
+        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+        ProposerElectionType,
     },
     dkg_state::{DKGSessionState, DKGState},
     execution_config::{

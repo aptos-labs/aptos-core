@@ -325,7 +325,7 @@ module coin_listing {
         let listing_addr = listing::assert_started(&object);
 
         // Retrieve the purchase price if the auction has buy it now or this is a fixed listing.
-        let (price, type) = if (exists<AuctionListing<CoinType>>(listing_addr)) {
+        let price = if (exists<AuctionListing<CoinType>>(listing_addr)) {
             let AuctionListing {
                 starting_bid: _,
                 bid_increment: _,
@@ -345,12 +345,12 @@ module coin_listing {
             } else {
                 option::destroy_none(current_bid);
             };
-            (option::destroy_some(buy_it_now_price), string::utf8(AUCTION_TYPE))
+            option::destroy_some(buy_it_now_price)
         } else if (exists<FixedPriceListing<CoinType>>(listing_addr)) {
             let FixedPriceListing {
                 price,
             } = move_from<FixedPriceListing<CoinType>>(listing_addr);
-            (price, string::utf8(FIXED_PRICE_TYPE))
+            price
         } else {
             // This should just be an abort but the compiler errors.
             abort (error::not_found(ENO_LISTING))
@@ -358,7 +358,7 @@ module coin_listing {
 
         let coins = coin::withdraw<CoinType>(purchaser, price);
 
-        complete_purchase(purchaser, signer::address_of(purchaser), object, coins, type)
+        complete_purchase(purchaser, signer::address_of(purchaser), object, coins, string::utf8(FIXED_PRICE_TYPE))
     }
 
     /// End a fixed price listing early.

@@ -99,7 +99,6 @@ fn script_none_existing_module_dep() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     };
     script.function_handles.push(fun_handle);
 
@@ -178,7 +177,6 @@ fn script_non_existing_function_dep() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     };
     script.function_handles.push(fun_handle);
 
@@ -259,7 +257,6 @@ fn script_bad_sig_function_dep() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     };
     script.function_handles.push(fun_handle);
 
@@ -468,7 +465,6 @@ fn forbid_script_emitting_events() {
         type_parameters: vec![
             AbilitySet::singleton(Ability::Store) | AbilitySet::singleton(Ability::Drop),
         ],
-        access_specifiers: None,
     });
     script.module_handles.push(ModuleHandle {
         address: AddressIdentifierIndex(0),

@@ -1,7 +1,7 @@
-module 0x42::M {
-    struct CupC<phantom T> {}
+module M {
+    struct CupC<T: drop> {}
     struct R {}
-    struct B<phantom T> {}
+    struct B<T> {}
 
     fun foo() acquires B<CupC<R>> {
         abort 0

@@ -37,7 +37,7 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     dkg_events: EventNotificationListener,
-) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
+) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
@@ -71,7 +71,7 @@ pub fn start_consensus(
         consensus_to_mempool_sender,
         state_computer,
         storage.clone(),
-        quorum_store_db.clone(),
+        quorum_store_db,
         reconfig_events,
         dkg_events,
         bounded_executor,
@@ -84,5 +84,5 @@ pub fn start_consensus(
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 
     debug!("Consensus started.");
-    (runtime, storage, quorum_store_db)
+    runtime
 }

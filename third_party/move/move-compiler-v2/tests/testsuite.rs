@@ -7,10 +7,7 @@ use move_binary_format::{binary_views::BinaryIndexedView, file_format as FF};
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    pipeline::{
-        livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
-    },
-    run_file_format_gen, Options,
+    pipeline::livevar_analysis_processor::LiveVarAnalysisProcessor, run_file_format_gen, Options,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
@@ -31,15 +28,13 @@ pub const EXP_EXT: &str = "exp";
 #[derive(Default)]
 struct TestConfig {
     /// Whether only type check should be run.
-    type_check_only: bool,
+    check_only: bool,
     /// Whether we should dump the AST after successful type check.
     dump_ast: bool,
     /// A sequence of bytecode processors to run for this test.
     pipeline: FunctionTargetPipeline,
-    /// Whether we should generate file format from resulting bytecode.
+    /// Whether we should generate file format from resulting bytecode
     generate_file_format: bool,
-    /// Whether we should dump annotated targets for each stage of the pipeline.
-    dump_annotated_targets: bool,
 }
 
 fn path_from_crate_root(path: &str) -> String {
@@ -79,37 +74,25 @@ impl TestConfig {
         let mut pipeline = FunctionTargetPipeline::default();
         if path.contains("/checking/") {
             Self {
-                type_check_only: true,
+                check_only: true,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: false,
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
-                type_check_only: false,
+                check_only: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: true,
             }
         } else if path.contains("/file-format-generator/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             Self {
-                type_check_only: false,
+                check_only: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: true,
-                dump_annotated_targets: true,
-            }
-        } else if path.contains("/visibility-checker/") {
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
-            Self {
-                type_check_only: false,
-                dump_ast: false,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: false,
             }
         } else {
             panic!(
@@ -141,7 +124,7 @@ impl TestConfig {
             out.push_str(&env.dump_env());
             out.push('\n');
         }
-        if ok && !self.type_check_only {
+        if ok && !self.check_only {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
             let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
@@ -151,36 +134,32 @@ impl TestConfig {
                     &env,
                     &mut targets,
                     // Hook which is run before steps in the pipeline. Prints out initial
-                    // bytecode from the generator, if requested.
+                    // bytecode from the generator.
                     |targets_before| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
-                        if self.dump_annotated_targets {
-                            out.push_str(
-                                &move_stackless_bytecode::print_targets_with_annotations_for_test(
-                                    &env,
-                                    "initial bytecode",
-                                    targets_before,
-                                    Self::register_formatters,
-                                ),
-                            );
-                        }
+                        out.push_str(
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                "initial bytecode",
+                                targets_before,
+                                Self::register_formatters,
+                            ),
+                        );
                     },
                     // Hook which is run after every step in the pipeline. Prints out
-                    // bytecode after the processor, if requested.
+                    // bytecode after the processor.
                     |_, processor, targets_after| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
-                        if self.dump_annotated_targets {
-                            out.push_str(
-                                &move_stackless_bytecode::print_targets_with_annotations_for_test(
-                                    &env,
-                                    &format!("after {}:", processor.name()),
-                                    targets_after,
-                                    Self::register_formatters,
-                                ),
-                            );
-                        }
+                        out.push_str(
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                &format!("after {}:", processor.name()),
+                                targets_after,
+                                Self::register_formatters,
+                            ),
+                        );
                     },
                 );
                 let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);

@@ -7,21 +7,19 @@ import json
 import tempfile
 import unittest
 
-from . import asymmetric_crypto, asymmetric_crypto_wrapper, ed25519, secp256k1_ecdsa
+from . import asymmetric_crypto, ed25519
 from .account_address import AccountAddress
-from .authenticator import AccountAuthenticator
 from .bcs import Serializer
-from .transactions import RawTransactionInternal
 
 
 class Account:
     """Represents an account as well as the private, public key-pair for the Aptos blockchain."""
 
     account_address: AccountAddress
-    private_key: asymmetric_crypto.PrivateKey
+    private_key: ed25519.PrivateKey
 
     def __init__(
-        self, account_address: AccountAddress, private_key: asymmetric_crypto.PrivateKey
+        self, account_address: AccountAddress, private_key: ed25519.PrivateKey
     ):
         self.account_address = account_address
         self.private_key = private_key
@@ -38,13 +36,6 @@ class Account:
     def generate() -> Account:
         private_key = ed25519.PrivateKey.random()
         account_address = AccountAddress.from_key(private_key.public_key())
-        return Account(account_address, private_key)
-
-    @staticmethod
-    def generate_secp256k1_ecdsa() -> Account:
-        private_key = secp256k1_ecdsa.PrivateKey.random()
-        public_key = asymmetric_crypto_wrapper.PublicKey(private_key.public_key())
-        account_address = AccountAddress.from_key(public_key)
         return Account(account_address, private_key)
 
     @staticmethod
@@ -79,20 +70,10 @@ class Account:
         """Returns the auth_key for the associated account"""
         return str(AccountAddress.from_key(self.private_key.public_key()))
 
-    def sign(self, data: bytes) -> asymmetric_crypto.Signature:
+    def sign(self, data: bytes) -> ed25519.Signature:
         return self.private_key.sign(data)
 
-    def sign_simulated_transaction(
-        self, transaction: RawTransactionInternal
-    ) -> AccountAuthenticator:
-        return transaction.sign_simulated(self.private_key.public_key())
-
-    def sign_transaction(
-        self, transaction: RawTransactionInternal
-    ) -> AccountAuthenticator:
-        return transaction.sign(self.private_key)
-
-    def public_key(self) -> asymmetric_crypto.PublicKey:
+    def public_key(self) -> ed25519.PublicKey:
         """Returns the public key for the associated account"""
 
         return self.private_key.public_key()

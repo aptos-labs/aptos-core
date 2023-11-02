@@ -15,7 +15,7 @@ pub struct Event<'a> {
 }
 
 impl<'a> Event<'a> {
-    pub(crate) fn new(
+    fn new(
         metadata: &'a Metadata,
         message: Option<fmt::Arguments<'a>>,
         keys_and_values: &'a [&'a dyn Schema],

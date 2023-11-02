@@ -24,7 +24,6 @@ fn test_locals() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
 
     m.function_defs.push(FunctionDefinition {
@@ -58,7 +57,6 @@ fn test_locals() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(2),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(1),
@@ -81,7 +79,6 @@ fn test_locals() {
             parameters: SignatureIndex(0),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i + 1),

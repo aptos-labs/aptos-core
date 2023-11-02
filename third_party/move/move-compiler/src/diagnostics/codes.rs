@@ -114,7 +114,6 @@ codes!(
         SpecContextRestricted:
             { msg: "syntax item restricted to spec contexts", severity: BlockingError },
         InvalidSpecBlockMember: { msg: "invalid spec block member", severity: NonblockingError },
-        InvalidAccessSpecifier: { msg: "invalid access specifier", severity: NonblockingError },
     ],
     // errors for any rules around declaration items
     Declarations: [

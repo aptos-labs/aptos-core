@@ -12,7 +12,6 @@ mod dag_handler;
 mod dag_network;
 mod dag_state_sync;
 mod dag_store;
-mod errors;
 mod observability;
 mod order_rule;
 mod rb_handler;
@@ -27,6 +26,4 @@ pub use bootstrap::DagBootstrapper;
 pub use commit_signer::DagCommitSigner;
 pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
 pub use storage::DAGStorage;
-pub use types::{
-    CertifiedNode, DAGMessage, DAGNetworkMessage, DAGRpcResult, Extensions, Node, NodeId, Vote,
-};
+pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, Extensions, Node, NodeId, Vote};

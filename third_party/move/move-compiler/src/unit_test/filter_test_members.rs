@@ -198,7 +198,7 @@ fn create_test_poison(mloc: Loc) -> P::ModuleMember {
         loc: mloc,
         visibility: P::Visibility::Internal,
         entry: None,
-        access_specifiers: None,
+        acquires: vec![],
         signature,
         inline: false,
         name: P::FunctionName(sp(mloc, "unit_test_poison".into())),

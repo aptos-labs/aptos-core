@@ -126,6 +126,7 @@ impl Checker for TpsChecker {
         let cluster_config = ClusterArgs {
             targets: Some(vec![target_url; self.config.repeat_target_count]),
             targets_file: None,
+            reuse_accounts: false,
             coin_source_args: self.config.coin_source_args.clone(),
             chain_id,
         };
@@ -133,7 +134,7 @@ impl Checker for TpsChecker {
             .await
             .map_err(TpsCheckerError::BuildClusterError)?;
 
-        let stats = emit_transactions_with_cluster(&cluster, &self.config.emit_config)
+        let stats = emit_transactions_with_cluster(&cluster, &self.config.emit_config, false)
             .await
             .map_err(TpsCheckerError::TransactionEmitterError)?;
 

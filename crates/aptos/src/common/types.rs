@@ -23,11 +23,11 @@ use aptos_crypto::{
     encoding_type::{EncodingError, EncodingType},
     x25519, PrivateKey, ValidCryptoMaterialStringExt,
 };
+use aptos_debugger::AptosDebugger;
 use aptos_gas_profiling::FrameName;
 use aptos_global_constants::adjust_gas_headroom;
 use aptos_keygen::KeyGen;
 use aptos_logger::Level;
-use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{
     aptos_api_types::{EntryFunctionId, HashValue, MoveType, ViewRequest},
     error::RestError,
@@ -972,12 +972,6 @@ pub struct RestOptions {
     /// Connection timeout in seconds, used for the REST endpoint of the fullnode
     #[clap(long, default_value_t = DEFAULT_EXPIRATION_SECS, alias = "connection-timeout-s")]
     pub connection_timeout_secs: u64,
-
-    /// Key to use for ratelimiting purposes with the node API. This value will be used
-    /// as `Authorization: Bearer <key>`. You may also set this with the NODE_API_KEY
-    /// environment variable.
-    #[clap(long, env)]
-    pub node_api_key: Option<String>,
 }
 
 impl RestOptions {
@@ -985,7 +979,6 @@ impl RestOptions {
         RestOptions {
             url,
             connection_timeout_secs: connection_timeout_secs.unwrap_or(DEFAULT_EXPIRATION_SECS),
-            node_api_key: None,
         }
     }
 
@@ -1007,13 +1000,10 @@ impl RestOptions {
     }
 
     pub fn client(&self, profile: &ProfileOptions) -> CliTypedResult<Client> {
-        let mut client = Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
+        Ok(Client::builder(AptosBaseUrl::Custom(self.url(profile)?))
             .timeout(Duration::from_secs(self.connection_timeout_secs))
-            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?;
-        if let Some(node_api_key) = &self.node_api_key {
-            client = client.api_key(node_api_key)?;
-        }
-        Ok(client.build())
+            .header(aptos_api_types::X_APTOS_CLIENT, X_APTOS_CLIENT_VALUE)?
+            .build())
     }
 }
 

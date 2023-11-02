@@ -7,7 +7,6 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
-#[derive(Clone)]
 pub struct CommitEvent {
     node_id: NodeId,
     parents: Vec<Author>,
@@ -35,12 +34,12 @@ impl CommitEvent {
         self.node_id.author()
     }
 
-    pub fn parents(&self) -> &[Author] {
-        &self.parents
+    pub fn parents(&self) -> Vec<Author> {
+        self.parents.clone()
     }
 
-    pub fn failed_authors(&self) -> &[Author] {
-        &self.failed_authors
+    pub fn failed_authors(&self) -> Vec<Author> {
+        self.failed_authors.clone()
     }
 }
 

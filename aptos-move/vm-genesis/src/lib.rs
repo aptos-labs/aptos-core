@@ -26,7 +26,6 @@ use aptos_types::{
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
-    write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -37,7 +36,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::{serialize_values, MoveTypeLayout, MoveValue},
+    value::{serialize_values, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -428,7 +427,6 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::EMIT_FEE_STATEMENT,
         FeatureFlag::STORAGE_DELETION_REFUND,
         FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
-        FeatureFlag::AGGREGATOR_V2_API,
         FeatureFlag::SAFER_RESOURCE_GROUPS,
         FeatureFlag::SAFER_METADATA,
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
@@ -645,10 +643,10 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 }
 
 /// Verify the consistency of the genesis `WriteSet`
-fn verify_genesis_write_set(events: &[(ContractEvent, Option<MoveTypeLayout>)]) {
+fn verify_genesis_write_set(events: &[ContractEvent]) {
     let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
-        .filter_map(|(e, _)| {
+        .filter_map(|e| {
             if e.event_key() == Some(&NewEpochEvent::event_key()) {
                 Some(e.v1().unwrap())
             } else {

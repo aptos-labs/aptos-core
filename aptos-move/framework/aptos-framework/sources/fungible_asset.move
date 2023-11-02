@@ -1,11 +1,9 @@
 /// This defines the fungible asset module that can issue fungible asset of any `Metadata` object. The
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
     use aptos_framework::event;
-    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
+    use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef};
     use std::string;
-    use std::features;
 
     use std::error;
     use std::option::{Self, Option};
@@ -54,8 +52,6 @@ module aptos_framework::fungible_asset {
     const ESUPPLY_UNDERFLOW: u64 = 20;
     /// Supply resource is not found for a metadata object.
     const ESUPPLY_NOT_FOUND: u64 = 21;
-    /// Flag for Concurrent Supply not enabled
-    const ECONCURRENT_SUPPLY_NOT_ENABLED: u64 = 22;
 
     //
     // Constants
@@ -74,11 +70,6 @@ module aptos_framework::fungible_asset {
         current: u128,
         // option::none() means unlimited supply.
         maximum: Option<u128>,
-    }
-
-    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    struct ConcurrentSupply has key {
-        current: Aggregator<u128>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -160,8 +151,6 @@ module aptos_framework::fungible_asset {
     /// This returns the capabilities to mint, burn, and transfer.
     /// maximum_supply defines the behavior of maximum supply when monitoring:
     ///   - option::none(): Monitoring unlimited supply
-    ///     (width of the field - MAX_U128 is the implicit maximum supply)
-    ///     if option::some(MAX_U128) is used, it is treated as unlimited supply.
     ///   - option::some(max): Monitoring fixed supply with `max` as the maximum supply.
     public fun add_fungibility(
         constructor_ref: &ConstructorRef,
@@ -188,23 +177,10 @@ module aptos_framework::fungible_asset {
                 project_uri,
             }
         );
-
-        if (features::concurrent_assets_enabled()) {
-            let unlimited = option::is_none(&maximum_supply);
-            move_to(metadata_object_signer, ConcurrentSupply {
-                current: if (unlimited) {
-                    aggregator_v2::create_unbounded_aggregator()
-                } else {
-                    aggregator_v2::create_aggregator(option::extract(&mut maximum_supply))
-                },
-            });
-        } else {
-            move_to(metadata_object_signer, Supply {
-                current: 0,
-                maximum: maximum_supply
-            });
-        };
-
+        move_to(metadata_object_signer, Supply {
+            current: 0,
+            maximum: maximum_supply
+        });
         object::object_from_constructor_ref<Metadata>(constructor_ref)
     }
 
@@ -232,12 +208,9 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the current supply from the `metadata` object.
-    public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+    public fun supply<T: key>(metadata: Object<T>): Option<u128> acquires Supply {
         let metadata_address = object::object_address(&metadata);
-        if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global<ConcurrentSupply>(metadata_address);
-            option::some(aggregator_v2::read(&supply.current))
-        } else if (exists<Supply>(metadata_address)) {
+        if (exists<Supply>(metadata_address)) {
             let supply = borrow_global<Supply>(metadata_address);
             option::some(supply.current)
         } else {
@@ -247,18 +220,9 @@ module aptos_framework::fungible_asset {
 
     #[view]
     /// Get the maximum supply from the `metadata` object.
-    /// If supply is unlimited (or set explicitly to MAX_U128), none is returned
-    public fun maximum<T: key>(metadata: Object<T>): Option<u128> acquires Supply, ConcurrentSupply {
+    public fun maximum<T: key>(metadata: Object<T>): Option<u128> acquires Supply {
         let metadata_address = object::object_address(&metadata);
-        if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global<ConcurrentSupply>(metadata_address);
-            let max_value = aggregator_v2::max_value(&supply.current);
-            if (max_value == MAX_U128) {
-                option::none()
-            } else {
-                option::some(max_value)
-            }
-        } else if (exists<Supply>(metadata_address)) {
+        if (exists<Supply>(metadata_address)) {
             let supply = borrow_global<Supply>(metadata_address);
             supply.maximum
         } else {
@@ -413,7 +377,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Mint the specified `amount` of the fungible asset.
-    public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires Supply, ConcurrentSupply {
+    public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires Supply {
         assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
         increase_supply(&metadata, amount);
@@ -426,7 +390,7 @@ module aptos_framework::fungible_asset {
 
     /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
-    acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
+    acquires FungibleStore, FungibleAssetEvents, Supply {
         deposit(store, mint(ref, amount));
     }
 
@@ -448,7 +412,7 @@ module aptos_framework::fungible_asset {
     }
 
     /// Burns a fungible asset
-    public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
+    public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply {
         let FungibleAsset {
             metadata,
             amount,
@@ -462,7 +426,7 @@ module aptos_framework::fungible_asset {
         ref: &BurnRef,
         store: Object<T>,
         amount: u64
-    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply {
         let metadata = ref.metadata;
         assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
@@ -571,54 +535,32 @@ module aptos_framework::fungible_asset {
     }
 
     /// Increase the supply of a fungible asset by minting.
-    fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply, ConcurrentSupply {
+    fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata_address = object::object_address(metadata);
-
-        if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
+        assert!(exists<Supply>(metadata_address), error::not_found(ESUPPLY_NOT_FOUND));
+        let supply = borrow_global_mut<Supply>(metadata_address);
+        if (option::is_some(&supply.maximum)) {
+            let max = *option::borrow_mut(&mut supply.maximum);
             assert!(
-                aggregator_v2::try_add(&mut supply.current, (amount as u128)),
+                max - supply.current >= (amount as u128),
                 error::out_of_range(EMAX_SUPPLY_EXCEEDED)
-            );
-        } else if (exists<Supply>(metadata_address)) {
-            let supply = borrow_global_mut<Supply>(metadata_address);
-            if (option::is_some(&supply.maximum)) {
-                let max = *option::borrow_mut(&mut supply.maximum);
-                assert!(
-                    max - supply.current >= (amount as u128),
-                    error::out_of_range(EMAX_SUPPLY_EXCEEDED)
-                )
-            };
-            supply.current = supply.current + (amount as u128);
-        } else {
-            assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
-        }
+            )
+        };
+        supply.current = supply.current + (amount as u128);
     }
 
     /// Decrease the supply of a fungible asset by burning.
-    fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply, ConcurrentSupply {
+    fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata_address = object::object_address(metadata);
-
-        if (exists<ConcurrentSupply>(metadata_address)) {
-            let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
-
-            assert!(
-                aggregator_v2::try_sub(&mut supply.current, (amount as u128)),
-                error::out_of_range(ESUPPLY_UNDERFLOW)
-            );
-        } else if (exists<Supply>(metadata_address)) {
-            assert!(exists<Supply>(metadata_address), error::not_found(ESUPPLY_NOT_FOUND));
-            let supply = borrow_global_mut<Supply>(metadata_address);
-            assert!(
-                supply.current >= (amount as u128),
-                error::invalid_state(ESUPPLY_UNDERFLOW)
-            );
-            supply.current = supply.current - (amount as u128);
-        } else {
-            assert!(false, error::not_found(ESUPPLY_NOT_FOUND));
-        }
+        assert!(exists<Supply>(metadata_address), error::not_found(ESUPPLY_NOT_FOUND));
+        let supply = borrow_global_mut<Supply>(metadata_address);
+        assert!(
+            supply.current >= (amount as u128),
+            error::invalid_state(ESUPPLY_UNDERFLOW)
+        );
+        supply.current = supply.current - (amount as u128);
     }
 
     inline fun borrow_fungible_metadata<T: key>(
@@ -637,32 +579,6 @@ module aptos_framework::fungible_asset {
 
     inline fun borrow_store_resource<T: key>(store: &Object<T>): &FungibleStore acquires FungibleStore {
         borrow_global<FungibleStore>(object::object_address(store))
-    }
-
-    public fun upgrade_to_concurrent(
-        ref: &ExtendRef,
-    ) acquires Supply {
-        let metadata_object_address = object::address_from_extend_ref(ref);
-        let metadata_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
-        assert!(exists<Supply>(metadata_object_address), error::not_found(ESUPPLY_NOT_FOUND));
-        let Supply {
-            current,
-            maximum,
-        } = move_from<Supply>(metadata_object_address);
-
-        let unlimited = option::is_none(&maximum);
-        let supply = ConcurrentSupply {
-            current: if (unlimited) {
-                aggregator_v2::create_unbounded_aggregator()
-            }
-            else {
-                aggregator_v2::create_aggregator(option::extract(&mut maximum))
-            },
-        };
-        // update current state:
-        aggregator_v2::add(&mut supply.current, current);
-        move_to(&metadata_object_signer, supply);
     }
 
     #[test_only]
@@ -720,7 +636,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply, ConcurrentSupply {
+    fun test_metadata_basic_flow(creator: &signer) acquires Metadata, Supply {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
         assert!(supply(metadata) == option::some(0), 1);
@@ -737,7 +653,7 @@ module aptos_framework::fungible_asset {
 
     #[test(creator = @0xcafe)]
     #[expected_failure(abort_code = 0x20005, location = Self)]
-    fun test_supply_overflow(creator: &signer) acquires Supply, ConcurrentSupply {
+    fun test_supply_overflow(creator: &signer) acquires Supply {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata(&creator_ref);
         increase_supply(&metadata, 101);
@@ -756,7 +672,7 @@ module aptos_framework::fungible_asset {
     fun test_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply {
         let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -788,7 +704,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x10003, location = Self)]
     fun test_frozen(
         creator: &signer
-    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
@@ -801,7 +717,7 @@ module aptos_framework::fungible_asset {
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, FungibleAssetEvents, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, FungibleAssetEvents, Supply {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -819,7 +735,7 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(creator = @0xcafe)]
-    fun test_merge_and_exact(creator: &signer) acquires Supply, ConcurrentSupply {
+    fun test_merge_and_exact(creator: &signer) acquires Supply {
         let (mint_ref, _transfer_ref, burn_ref, _) = create_fungible_asset(creator);
         let fa = mint(&mint_ref, 100);
         let cash = extract(&mut fa, 80);
@@ -858,31 +774,5 @@ module aptos_framework::fungible_asset {
             metadata: _,
             amount: _
         } = base;
-    }
-
-    #[test(fx = @aptos_framework, creator = @0xcafe)]
-    fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleAssetEvents, FungibleStore {
-        let feature = features::get_concurrent_assets_feature();
-        features::change_feature_flags(fx, vector[], vector[feature]);
-
-        let (creator_ref, token_object) = create_test_token(creator);
-        let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
-        let test_token = object::convert<TestToken, Metadata>(token_object);
-        let creator_store = create_test_store(creator, test_token);
-
-        let fa = mint(&mint_ref, 30);
-        assert!(supply(test_token) == option::some(30), 2);
-
-        deposit_with_ref(&transfer_ref, creator_store, fa);
-
-        features::change_feature_flags(fx, vector[feature], vector[]);
-
-        let extend_ref = object::generate_extend_ref(&creator_ref);
-        upgrade_to_concurrent(&extend_ref);
-
-        let fb = mint(&mint_ref, 20);
-        assert!(supply(test_token) == option::some(50), 3);
-
-        deposit_with_ref(&transfer_ref, creator_store, fb);
     }
 }

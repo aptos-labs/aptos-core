@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    versioned_data::VersionedData, versioned_delayed_fields::VersionedDelayedFields,
-    versioned_group_data::VersionedGroupData, versioned_modules::VersionedModules,
+    versioned_data::VersionedData, versioned_group_data::VersionedGroupData,
+    versioned_modules::VersionedModules,
 };
 use aptos_types::{
     executable::{Executable, ModulePath},
@@ -17,7 +17,6 @@ pub mod types;
 pub mod unsync_map;
 mod utils;
 pub mod versioned_data;
-pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
 pub mod versioned_modules;
 
@@ -33,10 +32,9 @@ mod unit_tests;
 ///
 /// TODO: separate V into different generic types for data and code modules with specialized
 /// traits (currently both WriteOp for executor).
-pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable, I: Clone> {
+pub struct MVHashMap<K, T, V: TransactionWrite, X: Executable> {
     data: VersionedData<K, V>,
     group_data: VersionedGroupData<K, T, V>,
-    delayed_fields: VersionedDelayedFields<I>,
     modules: VersionedModules<K, V, X>,
 }
 
@@ -45,17 +43,15 @@ impl<
         T: Hash + Clone + Eq + Debug + Serialize,
         V: TransactionWrite,
         X: Executable,
-        I: Copy + Clone + Eq + Hash + Debug,
-    > MVHashMap<K, T, V, X, I>
+    > MVHashMap<K, T, V, X>
 {
     // -----------------------------------
     // Functions shared for data and modules.
 
-    pub fn new() -> MVHashMap<K, T, V, X, I> {
+    pub fn new() -> MVHashMap<K, T, V, X> {
         MVHashMap {
             data: VersionedData::new(),
             group_data: VersionedGroupData::new(),
-            delayed_fields: VersionedDelayedFields::new(),
             modules: VersionedModules::new(),
         }
     }
@@ -71,10 +67,6 @@ impl<
         &self.group_data
     }
 
-    pub fn delayed_fields(&self) -> &VersionedDelayedFields<I> {
-        &self.delayed_fields
-    }
-
     pub fn modules(&self) -> &VersionedModules<K, V, X> {
         &self.modules
     }
@@ -85,8 +77,7 @@ impl<
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
         X: Executable,
-        I: Copy + Clone + Eq + Hash + Debug,
-    > Default for MVHashMap<K, T, V, X, I>
+    > Default for MVHashMap<K, T, V, X>
 {
     fn default() -> Self {
         Self::new()

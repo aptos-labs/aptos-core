@@ -5,7 +5,6 @@
 Provides a test harness for treating examples as integration tests.
 """
 
-import asyncio
 import os
 import unittest
 from typing import Optional
@@ -17,20 +16,16 @@ from aptos_sdk.aptos_cli_wrapper import AptosCLIWrapper, AptosInstance
 class Test(unittest.IsolatedAsyncioTestCase):
     _node: Optional[AptosInstance] = None
 
-    @classmethod
-    def setUpClass(self):
+    async def asyncSetUp(self):
         self._node = AptosCLIWrapper.start_node()
-        operational = asyncio.run(self._node.wait_until_operational())
+        print("THERE")
+        operational = await self._node.wait_until_operational()
+        print("HERE")
         if not operational:
             raise Exception("".join(self._node.errors()))
 
         os.environ["APTOS_NODE_URL"] = "http://127.0.0.1:8080/v1"
         os.environ["APTOS_FAUCET_URL"] = "http://127.0.0.1:8081"
-
-    async def test_fee_payer_transfer_coin(self):
-        from . import fee_payer_transfer_coin
-
-        await fee_payer_transfer_coin.main()
 
     async def test_hello_blockchain(self):
         from . import hello_blockchain
@@ -68,11 +63,6 @@ class Test(unittest.IsolatedAsyncioTestCase):
 
         await rotate_key.main()
 
-    async def test_secp256k1_ecdsa_transfer_coin(self):
-        from . import secp256k1_ecdsa_transfer_coin
-
-        await secp256k1_ecdsa_transfer_coin.main()
-
     async def test_simple_nft(self):
         from . import simple_nft
 
@@ -104,8 +94,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
         )
         await your_coin.main(moon_coin_path)
 
-    @classmethod
-    def tearDownClass(self):
+    def tearDown(self):
         self._node.stop()
 
 

@@ -389,10 +389,6 @@ pub struct Flags {
     /// Note that current value of this constant is "Wdeprecation-aptos"
     #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=warn_of_deprecation_use_in_aptos_libs_env_var_str())]
     warn_of_deprecation_use_in_aptos_libs: bool,
-
-    /// Support v2 syntax (up to expansion phase)
-    #[clap(long = cli::V2_FLAG)]
-    v2: bool,
 }
 
 impl Flags {
@@ -408,7 +404,6 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            v2: false,
         }
     }
 
@@ -424,7 +419,6 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            v2: false,
         }
     }
 
@@ -440,7 +434,6 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            v2: false,
         }
     }
 
@@ -456,7 +449,6 @@ impl Flags {
             debug: debug_compiler_env_var(),
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            v2: false,
         }
     }
 
@@ -472,7 +464,6 @@ impl Flags {
             debug: false,
             warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
             warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
-            v2: true,
         }
     }
 
@@ -560,14 +551,6 @@ impl Flags {
 
     pub fn debug(&self) -> bool {
         self.debug
-    }
-
-    pub fn v2(&self) -> bool {
-        self.v2
-    }
-
-    pub fn set_v2(self, v2: bool) -> Self {
-        Self { v2, ..self }
     }
 }
 

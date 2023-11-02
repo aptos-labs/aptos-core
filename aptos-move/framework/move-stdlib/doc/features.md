@@ -72,14 +72,10 @@ return true.
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
 -  [Function `get_aggregator_v2_api_feature`](#0x1_features_get_aggregator_v2_api_feature)
 -  [Function `aggregator_v2_api_enabled`](#0x1_features_aggregator_v2_api_enabled)
--  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
--  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
 -  [Function `get_concurrent_assets_feature`](#0x1_features_get_concurrent_assets_feature)
 -  [Function `concurrent_assets_enabled`](#0x1_features_concurrent_assets_enabled)
--  [Function `get_operator_beneficiary_change_feature`](#0x1_features_get_operator_beneficiary_change_feature)
--  [Function `operator_beneficiary_change_enabled`](#0x1_features_operator_beneficiary_change_enabled)
 -  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
 -  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -344,15 +340,6 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH">LIMIT_MAX_IDENTIFIER_LENGTH</a>: u64 = 38;
-</code></pre>
-
-
-
 <a name="0x1_features_MODULE_EVENT"></a>
 
 Whether emit function in <code>event.<b>move</b></code> are enabled for module events.
@@ -387,17 +374,6 @@ Lifetime: transient
 
 
 
-<a name="0x1_features_OPERATOR_BENEFICIARY_CHANGE"></a>
-
-Whether allow changing beneficiaries for operators.
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>: u64 = 39;
-</code></pre>
-
-
-
 <a name="0x1_features_PARTIAL_GOVERNANCE_VOTING"></a>
 
 Whether enable paritial governance voting on aptos_governance.
@@ -424,7 +400,7 @@ Lifetime: transient
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 42;
+<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 38;
 </code></pre>
 
 
@@ -454,6 +430,15 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SAFER_RESOURCE_GROUPS">SAFER_RESOURCE_GROUPS</a>: u64 = 31;
+</code></pre>
+
+
+
+<a name="0x1_features_SECP256K1_ECDSA_AUTHENTICATOR"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_SECP256K1_ECDSA_AUTHENTICATOR">SECP256K1_ECDSA_AUTHENTICATOR</a>: u64 = 33;
 </code></pre>
 
 
@@ -488,15 +473,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SIGNER_NATIVE_FORMAT_FIX">SIGNER_NATIVE_FORMAT_FIX</a>: u64 = 25;
-</code></pre>
-
-
-
-<a name="0x1_features_SINGLE_SENDER_AUTHENTICATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_SINGLE_SENDER_AUTHENTICATOR">SINGLE_SENDER_AUTHENTICATOR</a>: u64 = 33;
 </code></pre>
 
 
@@ -1493,52 +1469,6 @@ Lifetime: transient
 
 </details>
 
-<a name="0x1_features_get_aggregator_snapshots_feature"></a>
-
-## Function `get_aggregator_snapshots_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a> }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_aggregator_snapshots_enabled"></a>
-
-## Function `aggregator_snapshots_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>)
-}
-</code></pre>
-
-
-
-</details>
-
 <a name="0x1_features_get_sponsored_automatic_account_creation"></a>
 
 ## Function `get_sponsored_automatic_account_creation`
@@ -1624,52 +1554,6 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>)
-}
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_get_operator_beneficiary_change_feature"></a>
-
-## Function `get_operator_beneficiary_change_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operator_beneficiary_change_feature">get_operator_beneficiary_change_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_operator_beneficiary_change_feature">get_operator_beneficiary_change_feature</a>(): u64 { <a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a> }
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_features_operator_beneficiary_change_enabled"></a>
-
-## Function `operator_beneficiary_change_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operator_beneficiary_change_enabled">operator_beneficiary_change_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_operator_beneficiary_change_enabled">operator_beneficiary_change_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OPERATOR_BENEFICIARY_CHANGE">OPERATOR_BENEFICIARY_CHANGE</a>)
 }
 </code></pre>
 

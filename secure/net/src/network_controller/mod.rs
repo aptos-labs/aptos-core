@@ -14,7 +14,6 @@ use tokio::{runtime::Runtime, sync::oneshot};
 
 mod error;
 mod inbound_handler;
-pub(crate) mod metrics;
 mod outbound_handler;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -199,7 +198,7 @@ mod tests {
 
         // wait for the server to be ready to serve
         // TODO: We need to pass this test without this sleep
-        thread::sleep(std::time::Duration::from_millis(100));
+        thread::sleep(std::time::Duration::from_millis(10));
 
         let test1_message = "test1".as_bytes().to_vec();
         test1_sender
@@ -219,6 +218,5 @@ mod tests {
 
         network_controller1.shutdown();
         network_controller2.shutdown();
-        thread::sleep(std::time::Duration::from_millis(100));
     }
 }

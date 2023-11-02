@@ -31,8 +31,7 @@ spec:
             {{- end }}
             imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
             command:
-            - /usr/local/bin/aptos-debugger
-            - aptos-db
+            - /usr/local/bin/aptos-db-tool
             - backup
             - verify
             {{- range $.Values.restore.config.trusted_waypoints }}

@@ -14,7 +14,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         pkg-config \
         libssl-dev \
         libpq-dev \
-        libdw-dev \
         binutils \
         lld \
         libudev-dev

@@ -602,7 +602,6 @@ subtype
 subtyping
 superset
 svg
-symlink
 synchronizer
 terraform
 testnet

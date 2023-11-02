@@ -5,7 +5,6 @@ use crate::move_vm_ext::SessionExt;
 use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
-    deserializer::DeserializerConfig,
     errors::{Location, PartialVMError, VMError, VMResult},
     file_format::{
         Bytecode, CompiledScript,
@@ -122,11 +121,8 @@ pub(crate) fn extract_event_metadata_from_module(
     module_id: &ModuleId,
 ) -> VMResult<HashSet<String>> {
     let metadata = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-        .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
+        CompiledModule::deserialize(&module)
+            .map(|module| aptos_framework::get_metadata_from_compiled_module(&module))
     });
 
     if let Ok(Ok(Some(metadata))) = metadata {
@@ -153,9 +149,12 @@ pub(crate) fn extract_event_metadata(
 
 pub(crate) fn verify_no_event_emission_in_script(
     script_code: &[u8],
-    config: &DeserializerConfig,
+    max_binary_format_version: u32,
 ) -> VMResult<()> {
-    let script = match CompiledScript::deserialize_with_config(script_code, config) {
+    let script = match CompiledScript::deserialize_with_max_version(
+        script_code,
+        max_binary_format_version,
+    ) {
         Ok(script) => script,
         Err(err) => {
             let msg = format!("[VM] deserializer for script returned error: {:?}", err);

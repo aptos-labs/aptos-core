@@ -60,7 +60,7 @@ jobs:
 
       - name: Build CLI binaries in release mode
         shell: bash
-        run: cargo build --release -p aptos-debugger
+        run: cargo build --release -p aptos-db-tool
 
       - name: Run module-verify in parallel
         shell: bash

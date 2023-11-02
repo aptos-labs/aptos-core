@@ -13,7 +13,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::TypeTag,
     u256,
-    value::{LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -167,7 +167,7 @@ fn native_format_impl(
             suffix = "u256";
         },
         MoveTypeLayout::Address => {
-            let addr = val.value_as::<AccountAddress>()?;
+            let addr = val.value_as::<move_core_types::account_address::AccountAddress>()?;
             let str = if context.canonicalize {
                 addr.to_canonical_string()
             } else {
@@ -185,9 +185,9 @@ fn native_format_impl(
                     .unpack()?
                     .next()
                     .unwrap()
-                    .value_as::<AccountAddress>()?
+                    .value_as::<move_core_types::account_address::AccountAddress>()?
             } else {
-                val.value_as::<AccountAddress>()?
+                val.value_as::<move_core_types::account_address::AccountAddress>()?
             };
 
             let str = if context.canonicalize {
@@ -302,12 +302,6 @@ fn native_format_impl(
                 out,
             )?;
             out.push('}');
-        },
-        MoveTypeLayout::Tagged(tag, ty) => match tag {
-            // There is no need to show any lifting information!
-            // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
-            // Can we modify this to print tagging info, or is this something that cannot be changed
-            LayoutTag::IdentifierMapping(_) => native_format_impl(context, ty, val, depth, out)?,
         },
     };
     if context.include_int_type {

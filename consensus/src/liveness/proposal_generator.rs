@@ -339,6 +339,7 @@ impl ProposalGenerator {
                 )
                 .await
                 .context("Fail to retrieve payload")?;
+            println!("DKG debug: node {} generates QS payload {}", self.author, payload.len());
 
             (payload, timestamp.as_micros() as u64)
         };

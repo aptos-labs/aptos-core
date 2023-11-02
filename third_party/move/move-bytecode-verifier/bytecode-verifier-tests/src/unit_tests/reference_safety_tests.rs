@@ -25,7 +25,6 @@ fn test_bicliques() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -52,7 +51,6 @@ fn test_bicliques() {
         parameters: SignatureIndex(1),
         return_: SignatureIndex(1),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(1),
@@ -79,7 +77,6 @@ fn test_bicliques() {
         parameters: SignatureIndex(1),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(2),
@@ -102,7 +99,6 @@ fn test_bicliques() {
             parameters: SignatureIndex(1),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i + 2),
@@ -151,7 +147,6 @@ fn test_merge_state_large_graph() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -177,7 +172,6 @@ fn test_merge_state_large_graph() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(1),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(1),
@@ -198,7 +192,6 @@ fn test_merge_state_large_graph() {
         parameters: SignatureIndex(1),
         return_: SignatureIndex(1),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(2),
@@ -220,7 +213,6 @@ fn test_merge_state_large_graph() {
             parameters: SignatureIndex(1),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i + 3),
@@ -274,7 +266,6 @@ fn test_merge_state() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -306,7 +297,6 @@ fn test_merge_state() {
             parameters: SignatureIndex(1),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i + 1),
@@ -386,7 +376,6 @@ fn test_copyloc_pop() {
             parameters: SignatureIndex(1),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i),

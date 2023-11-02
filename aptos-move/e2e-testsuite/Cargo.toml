@@ -41,8 +41,4 @@ proptest = { workspace = true }
 serde = { workspace = true }
 
 [features]
-default = [
-    "aptos-cached-packages/fuzzing",
-    "move-core-types/fuzzing",
-    "aptos-types/fuzzing",
-]
+default = ["aptos-cached-packages/fuzzing"]

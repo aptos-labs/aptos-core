@@ -8,7 +8,6 @@ use crate::{
     },
     util::mock_time_service::SimulatedTimeService,
 };
-use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
@@ -23,7 +22,6 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use futures::StreamExt;
-use futures_channel::mpsc::unbounded;
 use std::{sync::Arc, time::Duration};
 
 #[test]
@@ -88,15 +86,8 @@ fn make_round_state() -> (RoundState, aptos_channels::Receiver<Round>) {
     let time_interval = Box::new(ExponentialTimeInterval::fixed(Duration::from_millis(2)));
     let simulated_time = SimulatedTimeService::auto_advance_until(Duration::from_millis(4));
     let (timeout_tx, timeout_rx) = aptos_channels::new_test(1_024);
-    let (delayed_qc_tx, _) = unbounded();
     (
-        RoundState::new(
-            time_interval,
-            Arc::new(simulated_time),
-            timeout_tx,
-            delayed_qc_tx,
-            QcAggregatorType::NoDelay,
-        ),
+        RoundState::new(time_interval, Arc::new(simulated_time), timeout_tx),
         timeout_rx,
     )
 }

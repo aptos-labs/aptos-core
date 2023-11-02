@@ -13,22 +13,18 @@
 /// of each transaction of the tested block executor execution.
 use crate::{
     errors::{Error as BlockExecutorError, Result as BlockExecutorResult},
-    proptest_types::types::{
-        MockOutput, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
-    },
+    proptest_types::types::{MockOutput, MockTransaction, STORAGE_AGGREGATOR_VALUE},
 };
 use aptos_aggregator::delta_change_set::serialize;
 use aptos_types::{contract_event::ReadWriteEvent, write_set::TransactionWrite};
-use aptos_vm_types::resource_group_adapter::group_size_as_sum;
-use bytes::Bytes;
-use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
+use claims::{assert_matches, assert_none, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 
 // TODO: extend to derived values, and code.
 #[derive(Clone)]
-enum BaselineValue {
-    GenericWrite(ValueType),
+enum BaselineValue<V> {
+    GenericWrite(V),
     Aggregator(u128),
     Empty,
 }
@@ -40,7 +36,7 @@ enum BaselineValue {
 //    Underflow,
 // }
 
-impl BaselineValue {
+impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> BaselineValue<V> {
     // Compare to the read results during block execution.
     pub(crate) fn assert_read_result(&self, bytes_read: &Option<Vec<u8>>) {
         match (self, bytes_read) {
@@ -82,27 +78,27 @@ enum BaselineStatus {
 ///
 /// For both read_values and resolved_deltas the keys are not included because they are
 /// in the same order as the reads and deltas in the Transaction::Write.
-pub(crate) struct BaselineOutput<K> {
+pub(crate) struct BaselineOutput<K, V> {
     status: BaselineStatus,
-    read_values: Vec<Result<Vec<BaselineValue>, ()>>,
+    read_values: Vec<Result<Vec<BaselineValue<V>>, ()>>,
     resolved_deltas: Vec<Result<HashMap<K, u128>, ()>>,
-    group_reads: Vec<Result<Vec<(K, u32)>, ()>>,
 }
 
-impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
+impl<K: Debug + Hash + Clone + Eq, V: Debug + Clone + PartialEq + Eq + TransactionWrite>
+    BaselineOutput<K, V>
+{
     /// Must be invoked after parallel execution to have incarnation information set and
     /// work with dynamic read/writes.
     pub(crate) fn generate<E: Debug + Clone + ReadWriteEvent>(
-        txns: &[MockTransaction<K, E>],
+        txns: &[MockTransaction<K, V, E>],
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
-        let mut current_world = HashMap::<K, BaselineValue>::new();
+        let mut current_world = HashMap::<K, BaselineValue<V>>::new();
         let mut accumulated_gas = 0;
 
         let mut status = BaselineStatus::Success;
         let mut read_values = vec![];
         let mut resolved_deltas = vec![];
-        let mut group_reads = vec![];
         for txn in txns.iter() {
             match txn {
                 MockTransaction::Abort => {
@@ -184,10 +180,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                                     .insert(k.clone(), BaselineValue::GenericWrite(v.clone()));
                             }
 
-                            group_reads.push(Ok(incarnation_behaviors[last_incarnation]
-                                .group_reads
-                                .clone()));
-
                             // Apply gas.
                             accumulated_gas += incarnation_behaviors[last_incarnation].gas;
                             if let Some(block_gas_limit) = maybe_block_gas_limit {
@@ -201,7 +193,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                             // Transaction does not take effect and we record delta application failure.
                             read_values.push(Err(()));
                             resolved_deltas.push(Err(()));
-                            group_reads.push(Err(()));
                         },
                     }
                 },
@@ -212,7 +203,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
             status,
             read_values,
             resolved_deltas,
-            group_reads,
         }
     }
 
@@ -220,11 +210,8 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Debug>(
         &self,
-        results: &BlockExecutorResult<Vec<MockOutput<K, E>>, usize>,
+        results: &BlockExecutorResult<Vec<MockOutput<K, V, E>>, usize>,
     ) {
-        let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
-        let mut group_world = HashMap::new();
-
         match results {
             Ok(results) => {
                 let committed = self.read_values.len();
@@ -234,94 +221,17 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 izip!(
                     results.iter().take(committed),
                     self.read_values.iter(),
-                    self.resolved_deltas.iter(),
-                    self.group_reads.iter(),
+                    self.resolved_deltas.iter()
                 )
-                .for_each(|(output, reads, resolved_deltas, group_reads)| {
-                    // Compute group read results.
-                    let group_read_results: Vec<Option<Bytes>> = group_reads
+                .for_each(|(output, reads, resolved_deltas)| {
+                    reads
                         .as_ref()
-                        .unwrap()
+                        .expect("Aggregator failures not yet tested")
                         .iter()
-                        .map(|(group_key, resource_tag)| {
-                            let group_map =
-                                group_world.entry(group_key).or_insert(base_map.clone());
-
-                            group_map.get(resource_tag).cloned()
-                        })
-                        .collect();
-                    // Test group read results.
-                    let read_len = reads.as_ref().unwrap().len();
-                    assert_eq!(
-                        group_read_results.len(),
-                        output.read_results.len() - read_len
-                    );
-                    izip!(
-                        output.read_results.iter().skip(read_len),
-                        group_read_results.into_iter()
-                    )
-                    .for_each(|(result_group_read, baseline_group_read)| {
-                        assert!(
-                            result_group_read.clone().map(Into::<Bytes>::into)
-                                == baseline_group_read
-                        );
-                    });
-
-                    for (group_key, size) in output.read_group_sizes.iter() {
-                        let group_map = group_world.entry(group_key).or_insert(base_map.clone());
-
-                        assert_eq!(*size, group_size_as_sum(group_map.iter()).unwrap());
-                    }
-
-                    // Test normal reads.
-                    izip!(
-                        reads
-                            .as_ref()
-                            .expect("Aggregator failures not yet tested")
-                            .iter(),
-                        output.read_results.iter().take(read_len)
-                    )
-                    .for_each(|(baseline_read, result_read)| {
-                        baseline_read.assert_read_result(result_read)
-                    });
-
-                    // Update group world.
-                    for (group_key, _, updates) in output.group_writes.iter() {
-                        for (tag, v) in updates {
-                            let group_map =
-                                group_world.entry(group_key).or_insert(base_map.clone());
-                            if v.is_deletion() {
-                                assert_some!(group_map.remove(tag));
-                            } else {
-                                let existed = group_map
-                                    .insert(*tag, v.extract_raw_bytes().unwrap())
-                                    .is_some();
-                                assert_eq!(existed, v.is_modification());
-                            }
-                        }
-                    }
-
-                    // Test recorded finalized group writes: it should contain the whole group, and
-                    // as such, correspond to the contents of the group_world.
-                    // TODO: figure out what can still be tested here, e.g. RESERVED_TAG
-                    // let groups_tested =
-                    //     (output.group_writes.len() + group_reads.as_ref().unwrap().len()) > 0;
-                    // for (group_key, _, finalized_updates) in output.recorded_groups.get().unwrap() {
-                    //     let baseline_group_map =
-                    //         group_world.entry(group_key).or_insert(base_map.clone());
-                    //     assert_eq!(finalized_updates.len(), baseline_group_map.len());
-                    //     if groups_tested {
-                    //         // RESERVED_TAG should always be contained.
-                    //         assert_ge!(finalized_updates.len(), 1);
-
-                    //         for (tag, v) in finalized_updates.iter() {
-                    //             assert_eq!(
-                    //                 v.bytes().unwrap(),
-                    //                 baseline_group_map.get(tag).unwrap(),
-                    //             );
-                    //         }
-                    //     }
-                    // }
+                        .zip(output.read_results.iter())
+                        .for_each(|(baseline_read, result_read)| {
+                            baseline_read.assert_read_result(result_read)
+                        });
 
                     let baseline_deltas = resolved_deltas
                         .as_ref()
@@ -359,9 +269,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert_eq!(*idx, self.read_values.len());
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
-            Err(BlockExecutorError::FallbackToSequential(e)) => {
-                unimplemented!("not tested here {:?}", e)
-            },
+            Err(BlockExecutorError::ModulePathReadWrite) => unimplemented!("not tested here"),
         }
     }
 }

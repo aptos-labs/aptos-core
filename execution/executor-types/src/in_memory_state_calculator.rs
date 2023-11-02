@@ -69,7 +69,6 @@ impl InMemoryStateCalculator {
             updates_since_base,
         } = base.clone();
 
-        let latest = current.freeze(&frozen_base.base_smt);
         Self {
             _frozen_base: frozen_base,
             proof_reader: ProofReader::new(proofs),
@@ -81,7 +80,7 @@ impl InMemoryStateCalculator {
 
             checkpoint: base,
             checkpoint_version: base_version,
-            latest,
+            latest: current.freeze(),
             updates_between_checkpoint_and_latest: updates_since_base,
         }
     }

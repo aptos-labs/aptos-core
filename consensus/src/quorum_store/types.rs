@@ -54,10 +54,6 @@ impl PersistedValue {
     pub fn batch_info(&self) -> &BatchInfo {
         &self.info
     }
-
-    pub fn payload(&self) -> &Option<Vec<SignedTransaction>> {
-        &self.maybe_payload
-    }
 }
 
 impl Deref for PersistedValue {

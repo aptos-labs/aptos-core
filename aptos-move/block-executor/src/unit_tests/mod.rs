@@ -11,34 +11,30 @@ use crate::{
             MockTransaction, ValueType,
         },
     },
-    scheduler::{
-        DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask, TWaitForDependency,
-    },
+    scheduler::{DependencyResult, ExecutionTaskType, Scheduler, SchedulerTask},
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::{
-    bounded_math::SignedU128,
-    delta_change_set::{delta_add, delta_sub, DeltaOp},
-    delta_math::DeltaHistory,
-};
+use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     contract_event::ReadWriteEvent,
     executable::{ExecutableTestType, ModulePath},
+    write_set::TransactionWrite,
 };
-use claims::assert_matches;
+use claims::{assert_matches, assert_some_eq};
 use rand::{prelude::*, random};
 use std::{
     cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
 };
 
 // TODO: add unit test for block gas limit!
-fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
+fn run_and_assert<K, V, E>(transactions: Vec<MockTransaction<K, V, E>>)
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
+    V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
     E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
 {
-    let data_view = DeltaDataView::<K> {
+    let data_view = DeltaDataView::<K, V> {
         phantom: PhantomData,
     };
 
@@ -50,10 +46,10 @@ where
     );
 
     let output = BlockExecutor::<
-        MockTransaction<K, E>,
-        MockTask<K, E>,
-        DeltaDataView<K>,
-        NoOpTransactionCommitHook<MockOutput<K, E>, usize>,
+        MockTransaction<K, V, E>,
+        MockTask<K, V, E>,
+        DeltaDataView<K, V>,
+        NoOpTransactionCommitHook<MockOutput<K, V, E>, usize>,
         ExecutableTestType,
     >::new(num_cpus::get(), executor_thread_pool, None, None)
     .execute_transactions_parallel((), &transactions, &data_view);
@@ -63,7 +59,7 @@ where
 }
 
 fn random_value(delete_value: bool) -> ValueType {
-    ValueType::from_value(
+    ValueType::new(
         (0..32).map(|_| (random::<u8>())).collect::<Vec<u8>>(),
         !delete_value,
     )
@@ -73,7 +69,7 @@ fn random_value(delete_value: bool) -> ValueType {
 fn empty_block() {
     // This test checks that we do not trigger asserts due to an empty block, e.g. in the
     // scheduler. Instead, parallel execution should gracefully early return empty output.
-    run_and_assert::<KeyType<[u8; 32]>, MockEvent>(vec![]);
+    run_and_assert::<KeyType<[u8; 32]>, ValueType, MockEvent>(vec![]);
 }
 
 #[test]
@@ -81,50 +77,54 @@ fn delta_counters() {
     let key = KeyType(random::<[u8; 32]>(), false);
     let mut transactions = vec![MockTransaction::from_behavior(MockIncarnation::<
         KeyType<[u8; 32]>,
+        ValueType,
         MockEvent,
-    >::new(
-        vec![],
-        vec![(key, random_value(false))], // writes
-        vec![],
-        vec![],
-        1, // gas
-    ))];
+    > {
+        reads: vec![],
+        writes: vec![(key, random_value(false))],
+        events: vec![],
+        deltas: vec![],
+        gas: 1,
+    })];
 
     for _ in 0..50 {
         transactions.push(MockTransaction::from_behavior(MockIncarnation::<
             KeyType<[u8; 32]>,
+            ValueType,
             MockEvent,
-        >::new(
-            vec![key], // reads
-            vec![],
-            vec![(key, delta_add(5, u128::MAX))], // deltas
-            vec![],
-            1, // gas
-        )));
+        > {
+            reads: vec![key],
+            writes: vec![],
+            events: vec![],
+            deltas: vec![(key, delta_add(5, u128::MAX))],
+            gas: 1,
+        }));
     }
 
     transactions.push(MockTransaction::from_behavior(MockIncarnation::<
         KeyType<[u8; 32]>,
+        ValueType,
         MockEvent,
-    >::new(
-        vec![],
-        vec![(key, random_value(false))], // writes
-        vec![],
-        vec![],
-        1, // gas
-    )));
+    > {
+        reads: vec![],
+        writes: vec![(key, random_value(false))],
+        events: vec![],
+        deltas: vec![],
+        gas: 1,
+    }));
 
     for _ in 0..50 {
         transactions.push(MockTransaction::from_behavior(MockIncarnation::<
             KeyType<[u8; 32]>,
+            ValueType,
             MockEvent,
-        >::new(
-            vec![key], // reads
-            vec![],
-            vec![(key, delta_sub(2, u128::MAX))], // deltas
-            vec![],
-            1, // gas
-        )));
+        > {
+            reads: vec![key],
+            writes: vec![],
+            events: vec![],
+            deltas: vec![(key, delta_sub(2, u128::MAX))],
+            gas: 1,
+        }));
     }
 
     run_and_assert(transactions)
@@ -141,32 +141,36 @@ fn delta_chains() {
 
     for i in 0..500 {
         transactions.push(
-            MockTransaction::<KeyType<[u8; 32]>, MockEvent>::from_behavior(MockIncarnation::new(
-                keys.clone(), // reads
-                vec![],
-                keys.iter()
-                    .enumerate()
-                    .filter_map(|(j, k)| match (i + j) % 2 == 0 {
-                        true => Some((
-                            *k,
-                            // Deterministic pattern for adds/subtracts.
-                            DeltaOp::new(
-                                if (i % 2 == 0) == (j < 5) {
-                                    SignedU128::Positive(10)
-                                } else {
-                                    SignedU128::Negative(1)
-                                },
-                                // below params irrelevant for this test.
-                                u128::MAX,
-                                DeltaHistory::new(),
-                            ),
-                        )),
-                        false => None,
-                    })
-                    .collect(), // deltas
-                vec![],
-                1, // gas
-            )),
+            MockTransaction::<KeyType<[u8; 32]>, ValueType, MockEvent>::from_behavior(
+                MockIncarnation {
+                    reads: keys.clone(),
+                    writes: vec![],
+                    events: vec![],
+                    deltas: keys
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(j, k)| match (i + j) % 2 == 0 {
+                            true => Some((
+                                *k,
+                                // Deterministic pattern for adds/subtracts.
+                                DeltaOp::new(
+                                    if (i % 2 == 0) == (j < 5) {
+                                        DeltaUpdate::Plus(10)
+                                    } else {
+                                        DeltaUpdate::Minus(1)
+                                    },
+                                    // below params irrelevant for this test.
+                                    u128::MAX,
+                                    0,
+                                    0,
+                                ),
+                            )),
+                            false => None,
+                        })
+                        .collect(),
+                    gas: 1,
+                },
+            ),
         );
     }
 
@@ -186,14 +190,15 @@ fn cycle_transactions() {
         for _ in 0..WRITES_PER_KEY {
             transactions.push(MockTransaction::from_behavior(MockIncarnation::<
                 KeyType<[u8; 32]>,
+                ValueType,
                 MockEvent,
-            >::new(
-                vec![KeyType(key, false)],                        // reads
-                vec![(KeyType(key, false), random_value(false))], // writes
-                vec![],
-                vec![],
-                1, // gas
-            )));
+            > {
+                reads: vec![KeyType(key, false)],
+                writes: vec![(KeyType(key, false), random_value(false))],
+                events: vec![],
+                deltas: vec![],
+                gas: 1,
+            }));
         }
     }
     run_and_assert(transactions)
@@ -212,26 +217,28 @@ fn one_reads_all_barrier() {
         for key in &keys {
             transactions.push(MockTransaction::from_behavior(MockIncarnation::<
                 KeyType<[u8; 32]>,
+                ValueType,
                 MockEvent,
-            >::new(
-                vec![*key],                        // reads
-                vec![(*key, random_value(false))], // writes
-                vec![],
-                vec![],
-                1, // gas
-            )));
+            > {
+                reads: vec![*key],
+                writes: vec![(*key, random_value(false))],
+                events: vec![],
+                deltas: vec![],
+                gas: 1,
+            }));
         }
         // One transaction reading the write results of every prior transactions in the block.
         transactions.push(MockTransaction::from_behavior(MockIncarnation::<
             KeyType<[u8; 32]>,
+            ValueType,
             MockEvent,
-        >::new(
-            keys.clone(), //reads
-            vec![],
-            vec![],
-            vec![],
-            1, //gas
-        )));
+        > {
+            reads: keys.clone(),
+            writes: vec![],
+            events: vec![],
+            deltas: vec![],
+            gas: 1,
+        }));
     }
     run_and_assert(transactions)
 }
@@ -244,27 +251,29 @@ fn one_writes_all_barrier() {
         .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
-            transactions.push(MockTransaction::from_behavior(MockIncarnation::new(
-                vec![*key],                        //reads
-                vec![(*key, random_value(false))], //writes
-                vec![],
-                vec![],
-                1, //gas
-            )));
+            transactions.push(MockTransaction::from_behavior(MockIncarnation {
+                reads: vec![*key],
+                writes: vec![(*key, random_value(false))],
+                events: vec![],
+                deltas: vec![],
+                gas: 1,
+            }));
         }
         // One transaction writing to the write results of every prior transactions in the block.
         transactions.push(MockTransaction::from_behavior(MockIncarnation::<
             KeyType<[u8; 32]>,
+            ValueType,
             MockEvent,
-        >::new(
-            keys.clone(), // reads
-            keys.iter()
+        > {
+            reads: keys.clone(),
+            writes: keys
+                .iter()
                 .map(|key| (*key, random_value(false)))
-                .collect::<Vec<_>>(), //writes
-            vec![],
-            vec![],
-            1, // gas
-        )));
+                .collect::<Vec<_>>(),
+            events: vec![],
+            deltas: vec![],
+            gas: 1,
+        }));
     }
     run_and_assert(transactions)
 }
@@ -280,14 +289,15 @@ fn early_aborts() {
         for key in &keys {
             transactions.push(MockTransaction::from_behavior(MockIncarnation::<
                 KeyType<[u8; 32]>,
+                ValueType,
                 MockEvent,
-            >::new(
-                vec![*key],                        // reads
-                vec![(*key, random_value(false))], // writes
-                vec![],
-                vec![],
-                1, // gas
-            )));
+            > {
+                reads: vec![*key],
+                writes: vec![(*key, random_value(false))],
+                events: vec![],
+                deltas: vec![],
+                gas: 1,
+            }));
         }
         // One transaction that triggers an abort
         transactions.push(MockTransaction::Abort)
@@ -306,14 +316,15 @@ fn early_skips() {
         for key in &keys {
             transactions.push(MockTransaction::from_behavior(MockIncarnation::<
                 KeyType<[u8; 32]>,
+                ValueType,
                 MockEvent,
-            >::new(
-                vec![*key],                        // reads
-                vec![(*key, random_value(false))], //writes
-                vec![],
-                vec![],
-                1, // gas
-            )));
+            > {
+                reads: vec![*key],
+                writes: vec![(*key, random_value(false))],
+                events: vec![],
+                deltas: vec![],
+                gas: 1,
+            }));
         }
         // One transaction that triggers an abort
         transactions.push(MockTransaction::SkipRest)
@@ -406,7 +417,7 @@ fn scheduler_tasks() {
 
     // Make sure everything can be committed.
     for i in 0..5 {
-        assert_matches!(s.try_commit(), Some((v, _)) if v == i);
+        assert_some_eq!(s.try_commit(), i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -672,7 +683,7 @@ fn scheduler_basic() {
 
     // make sure everything can be committed.
     for i in 0..3 {
-        assert_matches!(s.try_commit(), Some((v, _)) if v == i);
+        assert_some_eq!(s.try_commit(), i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -722,7 +733,7 @@ fn scheduler_drain_idx() {
 
     // make sure everything can be committed.
     for i in 0..3 {
-        assert_matches!(s.try_commit(), Some((v, _)) if v == i);
+        assert_some_eq!(s.try_commit(), i);
     }
 
     assert!(matches!(s.next_task(), SchedulerTask::Done));
@@ -766,7 +777,7 @@ fn rolling_commit_wave() {
     // finish validating txn 0 with proper wave
     s.finish_validation(0, 1);
     // txn 0 can be committed
-    assert_matches!(s.try_commit(), Some((0, _)));
+    assert_some_eq!(s.try_commit(), 0);
     assert_eq!(s.commit_state(), (1, 0));
 
     // This increases the wave, but only sets max_triggered_wave for transaction 2.
@@ -785,7 +796,7 @@ fn rolling_commit_wave() {
     // finish validating txn 1 with proper wave
     s.finish_validation(1, 1);
     // txn 1 can be committed
-    assert_matches!(s.try_commit(), Some((1, _)));
+    assert_some_eq!(s.try_commit(), 1);
     assert_eq!(s.commit_state(), (2, 0));
 
     // No validation task because index is already 2.
@@ -799,7 +810,7 @@ fn rolling_commit_wave() {
     assert_eq!(s.commit_state(), (2, 1));
     // Finish validation with appropriate wave.
     s.finish_validation(2, 1);
-    assert_matches!(s.try_commit(), Some((2, _)));
+    assert_some_eq!(s.try_commit(), 2);
     assert_eq!(s.commit_state(), (3, 1));
 
     // All txns have been committed.
@@ -885,7 +896,7 @@ fn no_conflict_task_count() {
         assert_eq!(num_val_tasks, num_txns);
 
         for i in 0..num_txns {
-            assert_matches!(s.try_commit(), Some((v, _)) if v == i);
+            assert_some_eq!(s.try_commit(), i);
             assert_eq!(s.commit_state(), (i + 1, 0));
         }
         assert!(matches!(s.next_task(), SchedulerTask::Done));

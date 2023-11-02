@@ -57,8 +57,6 @@ pub(crate) struct ModelBuilder<'env> {
     pub move_fun_call_graph: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<QualifiedId<SpecFunId>>>,
     /// A list of intrinsic declarations
     pub intrinsics: Vec<IntrinsicDecl>,
-    /// A module lookup table from names to their ids.
-    pub module_table: BTreeMap<ModuleName, ModuleId>,
 }
 
 /// A declaration of a specification function or operator in the builders state.
@@ -196,8 +194,7 @@ impl<'env> ModelBuilder<'env> {
             fun_table: BTreeMap::new(),
             const_table: BTreeMap::new(),
             move_fun_call_graph: BTreeMap::new(),
-            intrinsics: Vec::new(),
-            module_table: BTreeMap::new(),
+            intrinsics: Default::default(),
         };
         builtins::declare_builtins(&mut translator);
         translator

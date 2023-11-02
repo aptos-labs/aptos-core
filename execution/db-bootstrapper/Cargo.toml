@@ -1,0 +1,26 @@
+[package]
+name = "aptos-db-bootstrapper"
+description = "Aptos DB-Bootstrapper"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-db = { workspace = true }
+aptos-executor = { workspace = true }
+aptos-storage-interface = { workspace = true }
+aptos-temppath = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm = { workspace = true }
+bcs = { workspace = true }
+clap = { workspace = true }

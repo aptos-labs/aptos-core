@@ -151,12 +151,9 @@ pub(crate) fn extract_resource_group_metadata_from_module(
     BTreeMap<String, StructTag>,
     BTreeSet<String>,
 )> {
-    let module = session.load_module(module_id).map(|module| {
-        CompiledModule::deserialize_with_config(
-            &module,
-            &session.get_vm_config().deserializer_config,
-        )
-    });
+    let module = session
+        .load_module(module_id)
+        .map(|module| CompiledModule::deserialize(&module));
     let (metadata, module) = if let Ok(Ok(module)) = module {
         (
             aptos_framework::get_metadata_from_compiled_module(&module),

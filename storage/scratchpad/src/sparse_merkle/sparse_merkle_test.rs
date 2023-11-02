@@ -400,7 +400,6 @@ fn test_update() {
 
     // Now prune smt1.
     drop(smt1);
-    SUBTREE_DROPPER.wait_for_backlog_drop(0);
 
     // Verify oldest ancestor
     assert_eq_pointee(&smt2.get_oldest_ancestor(), &smt2);
@@ -439,7 +438,6 @@ fn update(smt: &SparseMerkleTree) -> SparseMerkleTree {
 }
 
 #[test]
-#[ignore] // gonna remove this functionality
 fn test_get_oldest_ancestor() {
     // smt0 - smt00 - smt000 - smt0000 - smt00000
     //              \

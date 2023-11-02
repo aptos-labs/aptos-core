@@ -2,18 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    experimental::{
-        execution_wait_phase::ExecutionWaitRequest,
-        pipeline_phase::{CountedRequest, StatelessPipeline},
-    },
+    experimental::{execution_wait_phase::ExecutionWaitRequest, pipeline_phase::StatelessPipeline},
     state_replication::StateComputer,
 };
 use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
-use aptos_executor_types::ExecutorError;
 use aptos_logger::debug;
 use async_trait::async_trait;
-use futures::TryFutureExt;
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
@@ -25,9 +20,6 @@ use std::{
 
 pub struct ExecutionRequest {
     pub ordered_blocks: Vec<ExecutedBlock>,
-    // Hold a CountedRequest to guarantee the executor doesn't get reset with pending tasks
-    // stuck in the ExecutinoPipeline.
-    pub lifetime_guard: CountedRequest<()>,
 }
 
 impl Debug for ExecutionRequest {
@@ -60,10 +52,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
     const NAME: &'static str = "execution_schedule";
 
     async fn process(&self, req: ExecutionRequest) -> ExecutionWaitRequest {
-        let ExecutionRequest {
-            ordered_blocks,
-            lifetime_guard,
-        } = req;
+        let ExecutionRequest { ordered_blocks } = req;
 
         if ordered_blocks.is_empty() {
             return ExecutionWaitRequest {
@@ -86,23 +75,15 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         }
 
         // In the future being returned, wait for the compute results in order.
-        // n.b. Must `spawn()` here to make sure lifetime_guard will be released even if
-        //      ExecutionWait phase is never kicked off.
-        let fut = tokio::task::spawn(async move {
+        let fut = Box::pin(async move {
             let mut results = vec![];
             for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
                 results.push(block.replace_result(fut.await?));
             }
-            drop(lifetime_guard);
             Ok(results)
-        })
-        .map_err(ExecutorError::internal_err)
-        .and_then(|res| async { res });
+        });
 
-        ExecutionWaitRequest {
-            block_id,
-            fut: Box::pin(fut),
-        }
+        ExecutionWaitRequest { block_id, fut }
     }
 }

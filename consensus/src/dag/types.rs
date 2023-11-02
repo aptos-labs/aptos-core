@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::errors::DAGRpcError;
 use crate::{
     dag::observability::{
         logging::{LogEvent, LogSchema},
@@ -502,20 +501,6 @@ impl Vote {
     }
 }
 
-impl From<Vote> for DAGRpcResult {
-    fn from(vote: Vote) -> Self {
-        DAGRpcResult(Ok(DAGMessage::VoteMsg(vote)))
-    }
-}
-
-impl TryFrom<DAGRpcResult> for Vote {
-    type Error = anyhow::Error;
-
-    fn try_from(result: DAGRpcResult) -> Result<Self, Self::Error> {
-        result.0?.try_into()
-    }
-}
-
 pub struct SignatureBuilder {
     metadata: NodeMetadata,
     partial_signatures: PartialSignatures,
@@ -532,7 +517,7 @@ impl SignatureBuilder {
     }
 }
 
-impl BroadcastStatus<DAGMessage, DAGRpcResult> for SignatureBuilder {
+impl BroadcastStatus<DAGMessage> for SignatureBuilder {
     type Ack = Vote;
     type Aggregated = NodeCertificate;
     type Message = Node;
@@ -586,21 +571,7 @@ impl CertifiedAck {
     }
 }
 
-impl From<CertifiedAck> for DAGRpcResult {
-    fn from(ack: CertifiedAck) -> Self {
-        DAGRpcResult(Ok(DAGMessage::CertifiedAckMsg(ack)))
-    }
-}
-
-impl TryFrom<DAGRpcResult> for CertifiedAck {
-    type Error = anyhow::Error;
-
-    fn try_from(result: DAGRpcResult) -> Result<Self, Self::Error> {
-        result.0?.try_into()
-    }
-}
-
-impl BroadcastStatus<DAGMessage, DAGRpcResult> for CertificateAckState {
+impl BroadcastStatus<DAGMessage> for CertificateAckState {
     type Ack = CertifiedAck;
     type Aggregated = ();
     type Message = CertifiedNodeMessage;
@@ -844,41 +815,6 @@ impl TryFrom<ConsensusMsg> for DAGMessage {
 
     fn try_from(msg: ConsensusMsg) -> Result<Self, Self::Error> {
         TConsensusMsg::from_network_message(msg)
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct DAGRpcResult(pub Result<DAGMessage, DAGRpcError>);
-
-impl TConsensusMsg for DAGRpcResult {
-    fn epoch(&self) -> u64 {
-        match &self.0 {
-            Ok(dag_message) => dag_message.epoch(),
-            Err(error) => error.epoch(),
-        }
-    }
-
-    fn into_network_message(self) -> ConsensusMsg {
-        ConsensusMsg::DAGMessage(DAGNetworkMessage {
-            epoch: self.epoch(),
-            data: bcs::to_bytes(&self).unwrap(),
-        })
-    }
-}
-
-impl RBMessage for DAGRpcResult {}
-
-impl Deref for DAGRpcResult {
-    type Target = Result<DAGMessage, DAGRpcError>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<Result<DAGMessage, DAGRpcError>> for DAGRpcResult {
-    fn from(result: Result<DAGMessage, DAGRpcError>) -> Self {
-        Self(result)
     }
 }
 

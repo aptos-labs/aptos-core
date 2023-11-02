@@ -47,11 +47,7 @@ impl InboundHandler {
 
         let (server_shutdown_tx, server_shutdown_rx) = oneshot::channel();
         // The server is started in a separate task
-        GRPCNetworkMessageServiceServerWrapper::new(
-            self.inbound_handlers.clone(),
-            self.listen_addr,
-        )
-        .start(
+        GRPCNetworkMessageServiceServerWrapper::new(self.inbound_handlers.clone()).start(
             rt,
             self.service.clone(),
             self.listen_addr,

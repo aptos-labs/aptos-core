@@ -16,7 +16,6 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{btree_map, BTreeMap},
-    fmt::Debug,
     ops::{Deref, DerefMut},
 };
 
@@ -33,13 +32,6 @@ pub static TOTAL_SUPPLY_STATE_KEY: Lazy<StateKey> = Lazy::new(|| {
         ],
     )
 });
-
-#[derive(Eq, Clone, Debug, PartialEq)]
-pub enum WriteOpKind {
-    Creation,
-    Modification,
-    Deletion,
-}
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
@@ -60,6 +52,37 @@ pub enum WriteOp {
 }
 
 impl WriteOp {
+    #[inline]
+    pub fn is_deletion(&self) -> bool {
+        match self {
+            WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => true,
+            WriteOp::Modification(_)
+            | WriteOp::ModificationWithMetadata { .. }
+            | WriteOp::Creation(_)
+            | WriteOp::CreationWithMetadata { .. } => false,
+        }
+    }
+
+    pub fn is_creation(&self) -> bool {
+        match self {
+            WriteOp::Creation(_) | WriteOp::CreationWithMetadata { .. } => true,
+            WriteOp::Modification(_)
+            | WriteOp::ModificationWithMetadata { .. }
+            | WriteOp::Deletion
+            | WriteOp::DeletionWithMetadata { .. } => false,
+        }
+    }
+
+    pub fn is_modification(&self) -> bool {
+        match self {
+            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => true,
+            WriteOp::Creation(_)
+            | WriteOp::CreationWithMetadata { .. }
+            | WriteOp::Deletion
+            | WriteOp::DeletionWithMetadata { .. } => false,
+        }
+    }
+
     /// Merges two write ops on the same state item.
     ///
     /// returns `false` if the result indicates no op has happened -- that's when the first op
@@ -144,7 +167,7 @@ impl WriteOp {
     }
 }
 
-pub trait TransactionWrite: Debug {
+pub trait TransactionWrite {
     fn bytes(&self) -> Option<&Bytes>;
 
     // Returns state value that would be observed by a read following the 'self' write.
@@ -170,6 +193,10 @@ pub trait TransactionWrite: Debug {
         self.bytes().cloned()
     }
 
+    fn bytes_len(&self) -> usize {
+        self.bytes().map(|bytes| bytes.len()).unwrap_or(0)
+    }
+
     fn as_u128(&self) -> anyhow::Result<Option<u128>> {
         match self.bytes() {
             Some(bytes) => Ok(Some(bcs::from_bytes(bytes)?)),
@@ -177,28 +204,11 @@ pub trait TransactionWrite: Debug {
         }
     }
 
-    fn write_op_kind(&self) -> WriteOpKind;
-
     fn is_deletion(&self) -> bool {
-        self.write_op_kind() == WriteOpKind::Deletion
-    }
-
-    fn is_creation(&self) -> bool {
-        self.write_op_kind() == WriteOpKind::Creation
-    }
-
-    fn is_modification(&self) -> bool {
-        self.write_op_kind() == WriteOpKind::Modification
+        self.bytes().is_none()
     }
 
     fn set_bytes(&mut self, bytes: Bytes);
-
-    /// Convert a `self`, which was read (containing DelayedField exchanges) in a current
-    /// transaction, to a modification write, in which we can then exchange DelayedField
-    /// identifiers into their final values, to produce a write operation.
-    fn convert_read_to_modification(&self) -> Option<Self>
-    where
-        Self: Sized;
 }
 
 impl TransactionWrite for WriteOp {
@@ -230,16 +240,6 @@ impl TransactionWrite for WriteOp {
         }
     }
 
-    fn write_op_kind(&self) -> WriteOpKind {
-        match self {
-            WriteOp::Creation(_) | WriteOp::CreationWithMetadata { .. } => WriteOpKind::Creation,
-            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => {
-                WriteOpKind::Modification
-            },
-            WriteOp::Deletion | WriteOp::DeletionWithMetadata { .. } => WriteOpKind::Deletion,
-        }
-    }
-
     fn set_bytes(&mut self, bytes: Bytes) {
         use WriteOp::*;
 
@@ -247,21 +247,6 @@ impl TransactionWrite for WriteOp {
             Creation(data) | CreationWithMetadata { data, .. } => *data = bytes,
             Modification(data) | ModificationWithMetadata { data, .. } => *data = bytes,
             Deletion | DeletionWithMetadata { .. } => (),
-        }
-    }
-
-    fn convert_read_to_modification(&self) -> Option<Self> {
-        use WriteOp::*;
-
-        match self {
-            Creation(data) | Modification(data) => Some(Modification(data.clone())),
-            CreationWithMetadata { data, metadata }
-            | ModificationWithMetadata { data, metadata } => Some(ModificationWithMetadata {
-                data: data.clone(),
-                metadata: metadata.clone(),
-            }),
-            // Deletion don't have data to become modification.
-            Deletion | DeletionWithMetadata { .. } => None,
         }
     }
 }

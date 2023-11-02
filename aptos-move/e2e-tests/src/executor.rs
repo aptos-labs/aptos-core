@@ -96,14 +96,6 @@ const POSTFIX: &str = "_should_error";
 /// Maps block number N to the index of the input and output transactions
 pub type TraceSeqMapping = (usize, Vec<usize>, Vec<usize>);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ExecutorMode {
-    SequentialOnly,
-    ParallelOnly,
-    // Runs sequential, then parallel, and compares outputs.
-    BothComparison,
-}
-
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
@@ -116,10 +108,9 @@ pub struct FakeExecutor {
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
     /// If set, determines whether or not to execute a comparison test with the parallel
-    /// block executor.
-    /// If not set, environment variable E2E_PARALLEL_EXEC must be set
-    /// s.t. the comparison test is executed (BothComparison).
-    executor_mode: Option<ExecutorMode>,
+    /// block executor. If not set, environment variable E2E_PARALLEL_EXEC must be set
+    /// s.t. the comparison test is executed.
+    no_parallel_exec: Option<bool>,
     features: Features,
     chain_id: u8,
 }
@@ -146,7 +137,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
-            executor_mode: None,
+            no_parallel_exec: None,
             features: Features::default(),
             chain_id: chain_id.id(),
         };
@@ -156,21 +147,18 @@ impl FakeExecutor {
         executor
     }
 
-    pub fn set_executor_mode(mut self, mode: ExecutorMode) -> Self {
-        self.executor_mode = Some(mode);
-        self
-    }
-
     /// Configure this executor to not use parallel execution. By default, parallel execution is
     /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
-    pub fn set_not_parallel(self) -> Self {
-        self.set_executor_mode(ExecutorMode::SequentialOnly)
+    pub fn set_not_parallel(mut self) -> Self {
+        self.no_parallel_exec = Some(true);
+        self
     }
 
     /// Configure this executor to use parallel execution. By default, parallel execution is
     /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
-    pub fn set_parallel(self) -> Self {
-        self.set_executor_mode(ExecutorMode::BothComparison)
+    pub fn set_parallel(mut self) -> Self {
+        self.no_parallel_exec = Some(false);
+        self
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
@@ -223,7 +211,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
-            executor_mode: None,
+            no_parallel_exec: None,
             features: Features::default(),
             chain_id: ChainId::test().id(),
         }
@@ -493,54 +481,18 @@ impl FakeExecutor {
 
         let sig_verified_block = into_signature_verified_block(txn_block);
 
-        let mode = self.executor_mode.unwrap_or_else(|| {
-            if env::var(ENV_ENABLE_PARALLEL).is_ok() {
-                ExecutorMode::BothComparison
-            } else {
-                ExecutorMode::SequentialOnly
-            }
-        });
+        let output = AptosVM::execute_block(&sig_verified_block, &self.data_store, None);
 
-        let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(AptosVM::execute_block(
-                &sig_verified_block,
-                &self.data_store,
-                None,
-            ))
+        let no_parallel = if let Some(no_parallel) = self.no_parallel_exec {
+            no_parallel
         } else {
-            None
+            env::var(ENV_ENABLE_PARALLEL).is_err()
         };
 
-        let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block))
-        } else {
-            None
-        };
-
-        if mode == ExecutorMode::BothComparison {
-            let sequential_output = sequential_output.as_ref().unwrap();
-            let parallel_output = parallel_output.as_ref().unwrap();
-
-            // make more granular comparison, to be able to understand test failures better
-            if sequential_output.is_ok() && parallel_output.is_ok() {
-                let seq_txn_output = sequential_output.as_ref().unwrap();
-                let par_txn_output = parallel_output.as_ref().unwrap();
-                assert_eq!(seq_txn_output.len(), par_txn_output.len());
-                for (idx, (seq_output, par_output)) in
-                    seq_txn_output.iter().zip(par_txn_output.iter()).enumerate()
-                {
-                    assert_eq!(
-                        seq_output, par_output,
-                        "first transaction output mismatch at index {}",
-                        idx
-                    );
-                }
-            } else {
-                assert_eq!(sequential_output, parallel_output);
-            }
+        if !no_parallel {
+            let parallel_output = self.execute_transaction_block_parallel(&sig_verified_block);
+            assert_eq!(output, parallel_output);
         }
-
-        let output = sequential_output.or(parallel_output).unwrap();
 
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:#?}\n", output).as_str());
@@ -704,6 +656,8 @@ impl FakeExecutor {
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
+            None,
+            None,
         );
         txn_block.insert(0, Transaction::BlockMetadata(new_block_metadata));
 
@@ -889,6 +843,7 @@ impl FakeExecutor {
                     println!("Should error, but ignoring for now... {}", err);
                 }
             }
+
             let change_set = session
                 .finish(
                     &mut (),

@@ -38,7 +38,6 @@ fn test_large_types() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(0),
@@ -59,7 +58,6 @@ fn test_large_types() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(1),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(1),
@@ -81,7 +79,6 @@ fn test_large_types() {
         parameters: SignatureIndex(1),
         return_: SignatureIndex(1),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(2),
@@ -102,7 +99,6 @@ fn test_large_types() {
         parameters: SignatureIndex(1),
         return_: SignatureIndex(0),
         type_parameters: vec![],
-        access_specifiers: None,
     });
     m.function_defs.push(FunctionDefinition {
         function: FunctionHandleIndex(3),
@@ -125,7 +121,6 @@ fn test_large_types() {
             parameters: SignatureIndex(0),
             return_: SignatureIndex(0),
             type_parameters: vec![],
-            access_specifiers: None,
         });
         m.function_defs.push(FunctionDefinition {
             function: FunctionHandleIndex(i + 4),

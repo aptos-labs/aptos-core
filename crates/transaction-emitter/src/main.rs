@@ -6,9 +6,7 @@ mod diag;
 
 use anyhow::{Context, Result};
 use aptos_logger::{Level, Logger};
-use aptos_transaction_emitter_lib::{
-    create_accounts_command, emit_transactions, Cluster, ClusterArgs, CreateAccountsArgs, EmitArgs,
-};
+use aptos_transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
 use clap::{Parser, Subcommand};
 use diag::diag;
 
@@ -24,9 +22,6 @@ enum TxnEmitterCommand {
     /// we mint many accounts and then hit the target peer(s) with transactions,
     /// recording stats as we go.
     EmitTx(EmitTx),
-
-    /// Create test accounts, for use with EmitTx
-    CreateAccounts(CreateAccounts),
 
     /// This runs the transaction emitter in diag mode, where the focus is on
     /// FullNodes instead of ValidatorNodes. This performs a simple health check.
@@ -44,15 +39,6 @@ struct EmitTx {
 
     #[clap(flatten)]
     emit_args: EmitArgs,
-}
-
-#[derive(Parser, Debug)]
-struct CreateAccounts {
-    #[clap(flatten)]
-    cluster_args: ClusterArgs,
-
-    #[clap(flatten)]
-    create_accounts_args: CreateAccountsArgs,
 }
 
 #[derive(Parser, Debug)]
@@ -82,13 +68,6 @@ pub async fn main() -> Result<()> {
                 .unwrap();
             println!("Total stats: {}", stats);
             println!("Average rate: {}", stats.rate());
-            Ok(())
-        },
-        TxnEmitterCommand::CreateAccounts(args) => {
-            create_accounts_command(&args.cluster_args, &args.create_accounts_args)
-                .await
-                .map_err(|e| panic!("Create accounts failed {:?}", e))
-                .unwrap();
             Ok(())
         },
         TxnEmitterCommand::Diag(args) => {

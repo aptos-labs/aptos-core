@@ -512,7 +512,6 @@ fn function(
         entry,
         signature,
         acquires,
-        access_specifiers: _,
         body,
         specs: _,
     } = ef;

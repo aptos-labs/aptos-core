@@ -23,7 +23,6 @@ proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 
 [build-dependencies]
-anyhow = { workspace = true }
 aptos-framework = { workspace = true }
 
 [features]

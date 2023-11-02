@@ -159,7 +159,6 @@ impl ReplayVerifyCoordinator {
             concurrent_downloads: self.concurrent_downloads,
             replay_concurrency_level: 0, // won't replay, doesn't matter
         };
-
         if !skip_snapshot {
             if let Some(backup) = state_snapshot {
                 StateSnapshotRestoreController::new(
@@ -178,13 +177,11 @@ impl ReplayVerifyCoordinator {
             }
         }
 
+        let txn_manifests = transactions.into_iter().map(|b| b.manifest).collect();
         TransactionRestoreBatchController::new(
             global_opt,
             self.storage,
-            transactions
-                .into_iter()
-                .map(|t| t.manifest)
-                .collect::<Vec<_>>(),
+            txn_manifests,
             None,
             Some((next_txn_version, false)), /* replay_from_version */
             None,                            /* epoch_history */

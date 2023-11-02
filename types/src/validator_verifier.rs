@@ -337,7 +337,7 @@ impl ValidatorVerifier {
         &self,
         authors: impl Iterator<Item = &'a AccountAddress>,
         check_super_majority: bool,
-    ) -> std::result::Result<u128, VerifyError> {
+    ) -> std::result::Result<(), VerifyError> {
         let aggregated_voting_power = self.sum_voting_power(authors)?;
 
         let target = if check_super_majority {
@@ -352,7 +352,7 @@ impl ValidatorVerifier {
                 expected_voting_power: target,
             });
         }
-        Ok(aggregated_voting_power)
+        Ok(())
     }
 
     /// Returns the public key for this address.
@@ -554,7 +554,7 @@ mod tests {
             } else if i < majority {
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
-                    Ok(i as u128),
+                    Ok(()),
                 );
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
@@ -566,11 +566,11 @@ mod tests {
             } else {
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
-                    Ok(i as u128),
+                    Ok(()),
                 );
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
-                    Ok(i as u128),
+                    Ok(()),
                 );
             }
             author_to_signature_map

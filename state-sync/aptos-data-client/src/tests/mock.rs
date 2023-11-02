@@ -23,9 +23,7 @@ use aptos_network::{
     },
     transport::ConnectionMetadata,
 };
-use aptos_peer_monitoring_service_types::{
-    response::NetworkInformationResponse, PeerMonitoringMetadata,
-};
+use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_storage_service_server::network::{NetworkRequest, ResponseSender};
@@ -155,12 +153,8 @@ impl MockNetwork {
             .unwrap();
 
         // Insert peer monitoring metadata for the peer
-        let network_info_response = NetworkInformationResponse {
-            connected_peers: Default::default(),
-            distance_from_validators: OsRng.gen(),
-        };
         let peer_monitoring_metadata =
-            PeerMonitoringMetadata::new(Some(OsRng.gen()), Some(network_info_response), None, None);
+            PeerMonitoringMetadata::new(Some(OsRng.gen()), None, None, None);
         self.peers_and_metadata
             .update_peer_monitoring_metadata(peer_network_id, peer_monitoring_metadata)
             .unwrap();

@@ -5,7 +5,7 @@
 use crate::{
     accept_type::AcceptType,
     accounts::Account,
-    context::{api_spawn_blocking, Context},
+    context::Context,
     failpoint::fail_point_poem,
     page::Page,
     response::{
@@ -27,7 +27,6 @@ use poem_openapi::{
 };
 use std::sync::Arc;
 
-#[derive(Clone)]
 pub struct EventsApi {
     pub context: Arc<Context>,
 }
@@ -76,18 +75,14 @@ impl EventsApi {
         );
 
         // Ensure that account exists
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(api.context.clone(), address.0, None, None, None)?;
-            account.verify_account_or_object_resource()?;
-            api.list(
-                account.latest_ledger_info,
-                accept_type,
-                page,
-                EventKey::new(creation_number.0 .0, address.0.into()),
-            )
-        })
-        .await
+        let account = Account::new(self.context.clone(), address.0, None, None, None)?;
+        account.verify_account_or_object_resource()?;
+        self.list(
+            account.latest_ledger_info,
+            accept_type,
+            page,
+            EventKey::new(creation_number.0 .0, address.0.into()),
+        )
     }
 
     /// Get events by event handle
@@ -142,14 +137,9 @@ impl EventsApi {
             limit.0,
             self.context.max_events_page_size(),
         );
-
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            let account = Account::new(api.context.clone(), address.0, None, None, None)?;
-            let key = account.find_event_key(event_handle.0, field_name.0.into())?;
-            api.list(account.latest_ledger_info, accept_type, page, key)
-        })
-        .await
+        let account = Account::new(self.context.clone(), address.0, None, None, None)?;
+        let key = account.find_event_key(event_handle.0, field_name.0.into())?;
+        self.list(account.latest_ledger_info, accept_type, page, key)
     }
 }
 

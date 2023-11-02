@@ -3,7 +3,7 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::{api_spawn_blocking, Context},
+    context::Context,
     failpoint::fail_point_poem,
     response::{BasicResponse, BasicResponseStatus, BasicResultWith404},
     ApiTags,
@@ -16,7 +16,6 @@ use poem_openapi::{
 use std::sync::Arc;
 
 /// API for block transactions and information
-#[derive(Clone)]
 pub struct BlocksApi {
     pub context: Arc<Context>,
 }
@@ -52,15 +51,11 @@ impl BlocksApi {
         fail_point_poem("endpoint_get_block_by_height")?;
         self.context
             .check_api_output_enabled("Get block by height", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.get_by_height(
-                accept_type,
-                block_height.0,
-                with_transactions.0.unwrap_or_default(),
-            )
-        })
-        .await
+        self.get_by_height(
+            accept_type,
+            block_height.0,
+            with_transactions.0.unwrap_or_default(),
+        )
     }
 
     /// Get blocks by version
@@ -92,15 +87,11 @@ impl BlocksApi {
         fail_point_poem("endpoint_get_block_by_version")?;
         self.context
             .check_api_output_enabled("Get block by version", &accept_type)?;
-        let api = self.clone();
-        api_spawn_blocking(move || {
-            api.get_by_version(
-                accept_type,
-                version.0,
-                with_transactions.0.unwrap_or_default(),
-            )
-        })
-        .await
+        self.get_by_version(
+            accept_type,
+            version.0,
+            with_transactions.0.unwrap_or_default(),
+        )
     }
 }
 

@@ -40,11 +40,12 @@ spec aptos_framework::coin {
     }
 
     spec mint {
+        pragma opaque;
         let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
-        aborts_if (amount != 0) && !exists<CoinInfo<CoinType>>(addr);
+        aborts_if [abstract] false;
+        ensures [abstract] result.value == amount;
         ensures supply<CoinType> == old(supply<CoinType>) + amount;
-        ensures result.value == amount;
     }
 
     /// Get address by reflection.
@@ -91,20 +92,18 @@ spec aptos_framework::coin {
         global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply
     }
 
-    spec schema CoinSubAbortsIf<CoinType> {
+    spec schema AbortsIfAggregator<CoinType> {
         use aptos_framework::optional_aggregator;
-        amount: u64;
+        use aptos_framework::aggregator;
+        coin: Coin<CoinType>;
         let addr =  type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(maybe_supply)) ==> optional_aggregator::SubAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
-    }
-
-    spec schema CoinAddAbortsIf<CoinType> {
-        use aptos_framework::optional_aggregator;
-        amount: u64;
-        let addr =  type_info::type_of<CoinType>().account_address;
-        let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        include (option::is_some(maybe_supply)) ==> optional_aggregator::AddAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        aborts_if option::is_some(maybe_supply) && optional_aggregator::is_parallelizable(option::borrow(maybe_supply))
+            && aggregator::spec_aggregator_get_val(option::borrow(option::borrow(maybe_supply).aggregator)) <
+            coin.value;
+        aborts_if option::is_some(maybe_supply) && !optional_aggregator::is_parallelizable(option::borrow(maybe_supply))
+            && option::borrow(option::borrow(maybe_supply).integer).value <
+            coin.value;
     }
 
     spec schema AbortsIfNotExistCoinInfo<CoinType> {
@@ -143,10 +142,11 @@ spec aptos_framework::coin {
         _cap: &BurnCapability<CoinType>,
     ) {
         let addr =  type_info::type_of<CoinType>().account_address;
+        aborts_if !exists<CoinInfo<CoinType>>(addr);
         modifies global<CoinInfo<CoinType>>(addr);
         include AbortsIfNotExistCoinInfo<CoinType>;
         aborts_if coin.value == 0;
-        include CoinSubAbortsIf<CoinType> { amount: coin.value };
+        include AbortsIfAggregator<CoinType>;
         ensures supply<CoinType> == old(supply<CoinType>) - coin.value;
     }
 

@@ -45,7 +45,7 @@ spec aptos_framework::staking_contract {
 
         ensures result_1 == total_active_stake;
         ensures result_2 == accumulated_rewards;
-        // TODO: This property causes timeout
+        // This property cause timeout
         // ensures result_3 == accumulated_rewards * staking_contract.commission_percentage / 100;
     }
 
@@ -107,12 +107,11 @@ spec aptos_framework::staking_contract {
         let amount = coins.value;
         include CreateStakingContractWithCoinsAbortsIfAndEnsures { amount };
 
-        // TODO: this property causes timeout
-        // let staker_address = signer::address_of(staker);
-        // let seed_0 = bcs::to_bytes(staker_address);
-        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
-        // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
-        // ensures result == resource_addr;
+        let staker_address = signer::address_of(staker);
+        let seed_0 = bcs::to_bytes(staker_address);
+        let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
+        ensures result == resource_addr;
     }
 
     /// Account is not frozen and sufficient to withdraw.
@@ -242,16 +241,6 @@ spec aptos_framework::staking_contract {
         let store = global<Store>(staker_address);
         let staking_contracts = store.staking_contracts;
         aborts_if simple_map::spec_contains_key(staking_contracts, new_operator);
-    }
-
-    spec set_beneficiary_for_operator(operator: &signer, new_beneficiary: address) {
-        // TODO: temporary mockup
-        pragma verify = false;
-    }
-
-    spec beneficiary_for_operator(operator: address): address {
-        // TODO: temporary mockup
-        pragma verify = false;
     }
 
     /// Staking_contract exists the stacker/operator pair.
@@ -472,24 +461,23 @@ spec aptos_framework::staking_contract {
 
         let store = global<Store>(staker_address);
         let staking_contracts = store.staking_contracts;
-        // TODO: this property causes timeout
+        // TODO: this property cause timeout
         // aborts_if simple_map::spec_contains_key(staking_contracts, operator);
 
         // Verify create_stake_pool()
-        // TODO: this property causes timeout
-        // let seed_0 = bcs::to_bytes(staker_address);
-        // let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
-        // let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
-        // include CreateStakePoolAbortsIf {resource_addr};
+        let seed_0 = bcs::to_bytes(staker_address);
+        let seed_1 = concat(concat(concat(seed_0, bcs::to_bytes(operator)), SALT), contract_creation_seed);
+        let resource_addr = account::spec_create_resource_address(staker_address, seed_1);
+        include CreateStakePoolAbortsIf {resource_addr};
 
 
         // Verify stake::add_stake_with_cap()
         let owner_cap = simple_map::spec_get(store.staking_contracts, operator).owner_cap;
-        // TODO: this property causes timeout
+        // TODO: this property cause timeout
         // include stake::AddStakeWithCapAbortsIfAndEnsures{owner_cap: owner_cap};
         let post post_store = global<Store>(staker_address);
         let post post_staking_contracts = post_store.staking_contracts;
-        // TODO: this property causes timeout
+        // TODO: this property cause timeout
         // ensures simple_map::spec_contains_key(post_staking_contracts, operator);
     }
 

@@ -80,10 +80,10 @@ pub async fn write_image_to_gcs(
 ) -> anyhow::Result<String> {
     GCS_UPLOAD_INVOCATION_COUNT.inc();
     let extension = match img_format {
-        ImageFormat::Gif | ImageFormat::Avif | ImageFormat::Png => img_format
+        ImageFormat::Gif | ImageFormat::Avif => img_format
             .extensions_str()
             .last()
-            .expect("ImageFormat should have at least one extension")
+            .unwrap_or(&"gif")
             .to_string(),
         _ => "jpeg".to_string(),
     };

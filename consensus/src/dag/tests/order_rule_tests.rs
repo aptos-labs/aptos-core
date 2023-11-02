@@ -4,12 +4,10 @@
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::RoundRobinAnchorElection,
+    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
     order_rule::OrderRule,
-    tests::{
-        dag_test::MockStorage,
-        helpers::{generate_dag_nodes, TEST_DAG_WINDOW},
-    },
+    tests::{dag_test::MockStorage, helpers::generate_dag_nodes},
     types::NodeMetadata,
     CertifiedNode,
 };
@@ -107,7 +105,6 @@ fn create_order_rule(
             anchor_election,
             Arc::new(TestNotifier { tx }),
             Arc::new(MockStorage::new()),
-            TEST_DAG_WINDOW as Round,
         ),
         rx,
     )
@@ -134,7 +131,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, TEST_DAG_WINDOW);
+        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), 0, DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node(node.clone()).unwrap();
@@ -225,7 +222,7 @@ fn test_order_rule_basic() {
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         0,
-        TEST_DAG_WINDOW,
+        DAG_WINDOW,
     );
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {

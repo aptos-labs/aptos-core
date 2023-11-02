@@ -33,7 +33,7 @@ def local_setup():
             "build",
             "--release",
             "-p",
-            "aptos-debugger",
+            "aptos-db-tool",
         ],
         check=True,
     )
@@ -46,5 +46,5 @@ def local_setup():
 if __name__ == "__main__":
     local_setup()
     replay_verify.main(
-        runner_no=None, runner_cnt=None, start_version=261693085, end_version=267000000
+        runner_no=None, runner_cnt=None, start_version=40000000, end_version=200000000
     )

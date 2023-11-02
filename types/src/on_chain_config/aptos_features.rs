@@ -45,11 +45,7 @@ pub enum FeatureFlag {
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
     CONCURRENT_ASSETS = 37,
-    LIMIT_MAX_IDENTIFIER_LENGTH = 38,
-    OPERATOR_BENEFICIARY_CHANGE = 39,
-    VM_BINARY_FORMAT_V7 = 40,
-    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
-    RECONFIGURE_WITH_DKG = 42,
+    RECONFIGURE_WITH_DKG = 38,
 }
 
 /// Representation of features on chain as a bitset.
@@ -62,8 +58,7 @@ pub struct Features {
 impl Default for Features {
     fn default() -> Self {
         Features {
-            // TODO: for gods sake, make this based on the enum above
-            features: vec![0b00100000, 0b00100000, 0b10001100, 0b01100000, 0b00000000],
+            features: vec![0b00100000, 0b00100000, 0b00001100, 0b00100000],
         }
     }
 }
@@ -114,10 +109,6 @@ impl Features {
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
-    }
-
-    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 }
 

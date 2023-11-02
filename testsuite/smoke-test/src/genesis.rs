@@ -68,8 +68,11 @@ async fn wait_for_node(validator: &mut dyn Validator, expected_to_connect: usize
 /// 3. Test the nodes and clients resume working after updating waypoint
 /// 4. Test a node lagging behind can sync to the waypoint
 async fn test_genesis_transaction_flow() {
-    let aptos_debugger = workspace_builder::get_bin("aptos-debugger");
+    let db_bootstrapper = workspace_builder::get_bin("aptos-db-bootstrapper");
     let aptos_cli = workspace_builder::get_bin("aptos");
+
+    // prebuild tools.
+    workspace_builder::get_bin("aptos-db-tool");
 
     println!("0. pre-building finished.");
 
@@ -179,11 +182,9 @@ async fn test_genesis_transaction_flow() {
     };
 
     println!("6. prepare the waypoint with the transaction");
-    let waypoint_command = Command::new(aptos_debugger.as_path())
+    let waypoint_command = Command::new(db_bootstrapper.as_path())
         .current_dir(workspace_root())
         .args(&vec![
-            "aptos-db",
-            "bootstrap",
             env.validators()
                 .next()
                 .unwrap()

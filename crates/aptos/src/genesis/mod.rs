@@ -294,8 +294,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             voting_power_increase_limit: layout.voting_power_increase_limit,
             employee_vesting_start: layout.employee_vesting_start,
             employee_vesting_period_duration: layout.employee_vesting_period_duration,
-            consensus_config: layout.on_chain_consensus_config,
-            execution_config: layout.on_chain_execution_config,
+            consensus_config: OnChainConsensusConfig::default(),
+            execution_config: OnChainExecutionConfig::default_for_genesis(),
             gas_schedule: default_gas_schedule(),
         },
     )?)

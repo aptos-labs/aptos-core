@@ -7,6 +7,7 @@ use crate::{
     subscription::SubscriptionStreamRequests,
 };
 use aptos_config::network_id::PeerNetworkId;
+use aptos_infallible::Mutex;
 use aptos_storage_service_types::{
     requests::{DataRequest, EpochEndingLedgerInfoRequest, StorageServiceRequest},
     responses::{DataResponse, StorageServerSummary, StorageServiceResponse},
@@ -15,7 +16,7 @@ use aptos_time_service::TimeService;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
-use mini_moka::sync::Cache;
+use lru::LruCache;
 use std::sync::Arc;
 
 /// Gets the epoch ending ledger info at the given epoch
@@ -24,7 +25,7 @@ pub fn get_epoch_ending_ledger_info<T: StorageReaderInterface>(
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
     epoch: u64,
-    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     peer_network_id: &PeerNetworkId,
     storage: T,
@@ -85,7 +86,7 @@ pub fn notify_peer_of_new_data<T: StorageReaderInterface>(
     cached_storage_server_summary: Arc<ArcSwap<StorageServerSummary>>,
     optimistic_fetches: Arc<DashMap<PeerNetworkId, OptimisticFetchRequest>>,
     subscriptions: Arc<DashMap<PeerNetworkId, SubscriptionStreamRequests>>,
-    lru_response_cache: Cache<StorageServiceRequest, StorageServiceResponse>,
+    lru_response_cache: Arc<Mutex<LruCache<StorageServiceRequest, StorageServiceResponse>>>,
     request_moderator: Arc<RequestModerator>,
     storage: T,
     time_service: TimeService,

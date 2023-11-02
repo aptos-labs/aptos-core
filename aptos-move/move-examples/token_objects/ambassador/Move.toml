@@ -2,9 +2,8 @@
 name = 'ambassador'
 version = '1.0.0'
 
-# do not change to "_", concrete address needed for module-publish testing framework
 [addresses]
-ambassador = "0xCAFE"
+ambassador = "_"
 
 [dependencies]
 AptosFramework = { local = "../../../framework/aptos-framework" }

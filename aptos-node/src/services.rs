@@ -2,13 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
-use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
-use aptos_consensus::{
-    network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
-    quorum_store::quorum_store_db::QuorumStoreDB,
-};
+use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener, EventNotificationListener};
@@ -90,9 +86,9 @@ pub fn start_consensus_runtime(
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
-) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
+) -> Runtime {
     let instant = Instant::now();
-    let consensus = aptos_consensus::consensus_provider::start_consensus(
+    let consensus_runtime = aptos_consensus::consensus_provider::start_consensus(
         node_config,
         consensus_network_interfaces.network_client,
         consensus_network_interfaces.network_service_events,
@@ -106,7 +102,7 @@ pub fn start_consensus_runtime(
 
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
-    consensus
+    consensus_runtime
 }
 
 /// Create the mempool runtime and start mempool
@@ -139,11 +135,6 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
     (mempool, consensus_to_mempool_sender)
-}
-
-/// Spawns a new thread for the admin service
-pub fn start_admin_service(node_config: &NodeConfig) -> AdminService {
-    AdminService::new(node_config)
 }
 
 /// Spawns a new thread for the node inspection service

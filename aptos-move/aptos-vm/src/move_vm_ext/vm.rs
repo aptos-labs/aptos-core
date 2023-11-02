@@ -15,12 +15,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
 use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
-use move_binary_format::{
-    deserializer::DeserializerConfig,
-    errors::VMResult,
-    file_format_common,
-    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
-};
+use move_binary_format::errors::VMResult;
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
@@ -34,29 +29,11 @@ pub struct MoveVmExt {
     features: Arc<Features>,
 }
 
-pub fn get_max_binary_format_version(
-    features: &Features,
-    gas_feature_version_opt: Option<u64>,
-) -> u32 {
-    // For historical reasons, we support still < gas version 5, but if a new caller don't specify
-    // the gas version, we default to 5, which was introduced in late '22.
-    let gas_feature_version = gas_feature_version_opt.unwrap_or(5);
-    if gas_feature_version < 5 {
-        file_format_common::VERSION_5
-    } else if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
-        file_format_common::VERSION_7
-    } else if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
-        file_format_common::VERSION_6
+pub fn get_max_binary_format_version(features: &Features, gas_feature_version: u64) -> u32 {
+    if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) && gas_feature_version >= 5 {
+        6
     } else {
-        file_format_common::VERSION_5
-    }
-}
-
-pub fn get_max_identifier_size(features: &Features) -> u64 {
-    if features.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
-        IDENTIFIER_SIZE_MAX
-    } else {
-        LEGACY_IDENTIFIER_SIZE_MAX
+        5
     }
 }
 
@@ -78,9 +55,7 @@ impl MoveVmExt {
         //       Therefore it depends on a new version of the gas schedule and cannot be allowed if
         //       the gas schedule hasn't been updated yet.
         let max_binary_format_version =
-            get_max_binary_format_version(&features, Some(gas_feature_version));
-
-        let max_identifier_size = get_max_identifier_size(&features);
+            get_max_binary_format_version(&features, gas_feature_version);
 
         let enable_invariant_violation_check_in_swap_loc =
             !timed_features.is_enabled(TimedFeatureFlag::DisableInvariantViolationCheckInSwapLoc);
@@ -97,10 +72,6 @@ impl MoveVmExt {
             type_base_cost = 100;
             type_byte_cost = 1;
         }
-
-        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
-        // so they can be exchanged with identifiers during VM execution.
-        let aggregator_v2_type_tagging = features.is_aggregator_v2_delayed_fields_enabled();
 
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
@@ -119,10 +90,7 @@ impl MoveVmExt {
                 builder,
                 VMConfig {
                     verifier: verifier_config,
-                    deserializer_config: DeserializerConfig::new(
-                        max_binary_format_version,
-                        max_identifier_size,
-                    ),
+                    max_binary_format_version,
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,
                     type_size_limit,
@@ -130,7 +98,6 @@ impl MoveVmExt {
                     type_max_cost,
                     type_base_cost,
                     type_byte_cost,
-                    aggregator_v2_type_tagging,
                 },
                 resolver,
             )?,
@@ -200,7 +167,7 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(RandomnessContext::new());
-        extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
+        extensions.add(NativeAggregatorContext::new(txn_hash, resolver));
 
         let script_hash = match session_id {
             SessionId::Txn {

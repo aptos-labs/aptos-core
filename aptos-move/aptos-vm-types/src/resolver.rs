@@ -1,18 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::DelayedFieldID,
-};
+use aptos_aggregator::resolver::TAggregatorView;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
+    aggregator::AggregatorID,
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
-    write_set::WriteOp,
 };
 use bytes::Bytes;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
@@ -65,12 +62,6 @@ pub trait TResourceGroupView {
     type GroupKey;
     type ResourceTag;
     type Layout;
-
-    /// Some resolvers might not be capable of the optimization, and should return false.
-    /// Others might return based on the config or the run paramaters.
-    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
-        false
-    }
 
     /// The size of the resource group, based on the sizes of the latest entries at observed
     /// tags. During parallel execution, this is an estimated value that will get validated,
@@ -194,33 +185,25 @@ pub trait StateStorageView {
 /// TODO: audit and reconsider the default implementation (e.g. should not
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
-pub trait TExecutorView<K, T, L, I, V>:
+pub trait TExecutorView<K, T, L, I>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
-    + TAggregatorV1View<Identifier = K>
-    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
+    + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
     + StateStorageView
 {
 }
 
-impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
+impl<A, K, T, L, I> TExecutorView<K, T, L, I> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
-        + TAggregatorV1View<Identifier = K>
-        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
+        + TAggregatorView<IdentifierV1 = K, IdentifierV2 = I>
         + StateStorageView
 {
 }
 
-pub trait ExecutorView:
-    TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
-{
-}
+pub trait ExecutorView: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
 
-impl<T> ExecutorView for T where
-    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
-{
-}
+impl<T> ExecutorView for T where T: TExecutorView<StateKey, StructTag, MoveTypeLayout, AggregatorID> {}
 
 pub trait ResourceGroupView:
     TResourceGroupView<GroupKey = StateKey, ResourceTag = StructTag, Layout = MoveTypeLayout>
