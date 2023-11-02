@@ -68,6 +68,7 @@ members = [
     "crates/aptos-inspection-service",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
+    "crates/aptos-lint",
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",

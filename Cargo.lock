@@ -2368,6 +2368,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-lint"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.3.21",
+ "codespan-reporting",
+ "move-abigen",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-ir-types",
+ "move-model",
+ "move-package",
+ "move-symbol-pool",
+ "regex",
+ "serde",
+]
+
+[[package]]
 name = "aptos-log-derive"
 version = "0.1.0"
 dependencies = [
