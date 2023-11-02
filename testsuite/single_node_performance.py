@@ -71,6 +71,7 @@ NUM_ACCOUNTS = max(
     ]
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
+PROFILE = os.environ.get("PROFILE")
 
 # numbers are based on the machine spec used by github action
 # Calibrate from https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
@@ -167,6 +168,11 @@ else:
     DB_PRUNER_FLAGS = ""
 
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
+
+if os.environ.get("PROFILE"):
+    PROFILE_FLAGS = "--cpu-profiling"
+else:
+    PROFILE_FLAGS = ""
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
@@ -435,17 +441,22 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         number_of_threads_results = {}
 
         for execution_threads in EXECUTION_ONLY_NUMBER_OF_THREADS:
-            test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}"
+            test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark {PROFILE_FLAGS} --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}``"
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
                 output, execution_only=True
             )
 
-        test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
+        test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark {PROFILE_FLAGS} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
         single_node_result = extract_run_results(output, execution_only=False)
+
+        # Rename profile results
+        if os.environ.get("PROFILE"):
+            os.rename("profiling_results/profile.pb", f"profiling_results/{test.key.transaction_type}.pb")
+            os.rename("profiling_results/cpu_flamegraph.svg", f"profiling_results/{test.key.transaction_type}.svg")
 
         results.append(
             RunGroupInstance(

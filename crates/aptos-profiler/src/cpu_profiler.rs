@@ -6,13 +6,14 @@ use crate::{
     CpuProfilerConfig, Profiler,
 };
 use anyhow::Result;
-use pprof::ProfilerGuard;
+use pprof::{ProfilerGuard, protos::Message};
 use regex::Regex;
-use std::{path::PathBuf, thread, time};
+use std::{io::Write, path::PathBuf, thread, time};
 
 pub struct CpuProfiler<'a> {
     frequency: i32,
     svg_result_path: PathBuf,
+    proto_result_path: PathBuf,
     guard: Option<ProfilerGuard<'a>>,
 }
 
@@ -21,6 +22,7 @@ impl<'a> CpuProfiler<'a> {
         Self {
             frequency: config.frequency,
             svg_result_path: config.svg_result_path.clone(),
+            proto_result_path: config.proto_path.clone(),
             guard: None,
         }
     }
@@ -77,6 +79,11 @@ impl Profiler for CpuProfiler<'_> {
             {
                 let file = create_file_with_parents(self.svg_result_path.as_path())?;
                 let _result = report.flamegraph(file);
+
+                let mut file = create_file_with_parents(self.proto_result_path.as_path())?;
+                let mut content = Vec::new();
+                report.pprof()?.write_to_vec(&mut content)?;
+                file.write_all(&content)?;
             }
             self.destory_guard()?;
         }

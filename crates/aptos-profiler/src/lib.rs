@@ -28,6 +28,7 @@ impl ProfilerConfig {
 struct CpuProfilerConfig {
     frequency: i32,
     svg_result_path: PathBuf,
+    proto_path: PathBuf,
 }
 
 impl CpuProfilerConfig {
@@ -35,6 +36,7 @@ impl CpuProfilerConfig {
         Some(Self {
             frequency: 100,
             svg_result_path: PathBuf::from("./profiling_results/cpu_flamegraph.svg"),
+            proto_path: PathBuf::from("./profiling_results/profile.pb"),
         })
     }
 }
