@@ -12,7 +12,7 @@ use crate::metrics::REMOTE_EXECUTOR_TIMER;
 use aptos_logger::{info, trace};
 use aptos_types::state_store::{StateView, TStateView};
 use itertools::Itertools;
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
@@ -24,6 +24,7 @@ pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
+    recv_condition: Arc<(Mutex<bool>, Condvar)>,
 }
 
 impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
@@ -65,6 +66,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             kv_tx: Arc::new(command_txs),
             thread_pool: Arc::new(thread_pool),
             state_view: Arc::new(RwLock::new(None)),
+            recv_condition: Arc::new((Mutex::new(false), Condvar::new())),
         }
     }
 
@@ -87,10 +89,12 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             let state_view_clone = self.state_view.clone();
             let kv_tx_clone = self.kv_tx.clone();
             let kv_unprocessed_pq_clone = self.kv_unprocessed_pq.clone();
+            let recv_condition_clone = self.recv_condition.clone();
             thread_pool_clone
                 .spawn(move || Self::priority_handler(state_view_clone.clone(),
                                                       kv_tx_clone.clone(),
-                                                      kv_unprocessed_pq_clone.clone()));
+                                                      kv_unprocessed_pq_clone.clone(),
+                                                      recv_condition_clone.clone()));
         }
 
         while let Ok(message) = self.kv_rx.recv() {
@@ -107,7 +111,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 .start_timer();
 
             let priority = message.seq_num.unwrap();
-            self.kv_unprocessed_pq.push(message, priority);
+
+            {
+                let (lock, cvar) = &*self.recv_condition;
+                let _lg = lock.lock().unwrap();
+                self.kv_unprocessed_pq.push(message, priority);
+                self.recv_condition.1.notify_all();
+            }
             REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "kv_req_pq_size"])
                 .observe(self.kv_unprocessed_pq.len() as f64);
@@ -116,9 +126,16 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
                             kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
-                            pq: Arc<ConcurrentPriorityQueue<Message, u64>>) {
+                            pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
+                            recv_condition: Arc<(Mutex<bool>, Condvar)>) {
         loop {
-            while let Some(message) = pq.pop() {
+            let (lock, cvar) = &*recv_condition;
+            let mut lg = lock.lock().unwrap();
+            if pq.is_empty() {
+                lg = cvar.wait(lg).unwrap();
+            }
+            drop(lg);
+            if let Some(message) = pq.pop() {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
