@@ -10,6 +10,7 @@ pub mod account_config;
 pub mod account_state;
 pub mod block_info;
 pub mod block_metadata;
+pub mod block_metadata_ext;
 pub mod chain_id;
 pub mod contract_event;
 pub mod dkg;

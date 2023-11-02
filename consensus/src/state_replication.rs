@@ -99,6 +99,7 @@ pub trait StateComputer: Send + Sync {
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
         transaction_deduper: Arc<dyn TransactionDeduper>,
+        randomness_enabled: bool,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

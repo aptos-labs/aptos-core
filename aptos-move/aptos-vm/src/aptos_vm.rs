@@ -37,7 +37,7 @@ use aptos_types::{
         EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction,
         Transaction::{
-            BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
+            GenesisTransaction, StateCheckpoint,
             UserTransaction,
         },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -82,6 +82,8 @@ use std::{
         Arc,
     },
 };
+use aptos_types::block_metadata_ext::BlockMetadataExt;
+use aptos_types::transaction::Transaction;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1407,41 +1409,87 @@ impl AptosVM {
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self
             .0
-            .new_session(resolver, SessionId::block_meta(&block_metadata));
+            .new_session(resolver, SessionId::block_meta(block_metadata.id()));
 
         let reconfigure_with_dkg_enabled = self
             .0
             .get_features()
             .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
-        if reconfigure_with_dkg_enabled {
-            let args = serialize_values(&block_metadata.get_prologue_v2_move_args(txn_data.sender));
-            session
-                .execute_function_bypass_visibility(
-                    &BLOCK_MODULE,
-                    BLOCK_PROLOGUE_V2,
-                    vec![],
-                    args,
-                    &mut gas_meter,
-                )
-                .map(|_return_vals| ())
-                .or_else(|e| {
-                    expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
-                })?;
-        } else {
-            let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
-            session
-                .execute_function_bypass_visibility(
-                    &BLOCK_MODULE,
-                    BLOCK_PROLOGUE,
-                    vec![],
-                    args,
-                    &mut gas_meter,
-                )
-                .map(|_return_vals| ())
-                .or_else(|e| {
-                    expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
-                })?;
-        }
+
+        assert!(!reconfigure_with_dkg_enabled);
+
+        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
+        session
+            .execute_function_bypass_visibility(
+                &BLOCK_MODULE,
+                BLOCK_PROLOGUE,
+                vec![],
+                args,
+                &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .or_else(|e| {
+                expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
+            })?;
+        SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let output = get_transaction_output(
+            &mut (),
+            session,
+            FeeStatement::zero(),
+            ExecutionStatus::Success,
+            &self
+                .0
+                .get_storage_gas_parameters(log_context)?
+                .change_set_configs,
+        )?;
+        Ok((VMStatus::Executed, output))
+    }
+
+
+    pub(crate) fn process_block_prologue_ext(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        block_metadata_ext: BlockMetadataExt,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        fail_point!("move_adapter::process_block_prologue_ext", |_| {
+            Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
+        let txn_data = TransactionMetadata {
+            sender: account_config::reserved_vm_address(),
+            max_gas_amount: 0.into(),
+            ..Default::default()
+        };
+        let mut gas_meter = UnmeteredGasMeter;
+        let mut session = self
+            .0
+            .new_session(resolver, SessionId::block_meta(block_metadata_ext.id()));
+
+        let reconfigure_with_dkg_enabled = self
+            .0
+            .get_features()
+            .is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
+
+        assert!(reconfigure_with_dkg_enabled);
+
+        let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args(txn_data.sender));
+        session
+            .execute_function_bypass_visibility(
+                &BLOCK_MODULE,
+                BLOCK_PROLOGUE_EXT,
+                vec![],
+                args,
+                &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .or_else(|e| {
+                expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
+            })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = get_transaction_output(
@@ -1790,12 +1838,18 @@ impl VMAdapter for AptosVM {
         }
 
         Ok(match txn.expect_valid() {
-            BlockMetadataTransaction(block_metadata) => {
+            Transaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
                 let (vm_status, output) =
                     self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
                 (vm_status, output, Some("block_prologue".to_string()))
             },
+            Transaction::BlockMetadataExt(block_metadata_ext) => {
+                fail_point!("aptos_vm::execution::block_metadata_ext");
+                let (vm_status, output) =
+                    self.process_block_prologue_ext(resolver, block_metadata_ext.clone(), log_context)?;
+                (vm_status, output, Some("block_prologue".to_string()))
+            }
             GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
                     resolver,

@@ -20,7 +20,7 @@ module aptos_std::randomness {
         block_randomness: vector<u8>,
     }
 
-    /// Invoked in `block_prologue_v2()` to update the block-level seed randomness.
+    /// Invoked in `block_prologue_ext()` to update the block-level seed randomness.
     public(friend) fun on_new_block(vm: &signer, randomness_available: bool, block_randomness: vector<u8>) acquires BlockRandomness {
         system_addresses::assert_vm(vm);
         if (exists<BlockRandomness>(@vm)) {

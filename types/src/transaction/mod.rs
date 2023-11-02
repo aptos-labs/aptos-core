@@ -64,6 +64,7 @@ pub use script::{
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
+use crate::block_metadata_ext::BlockMetadataExt;
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -1800,11 +1801,13 @@ pub enum Transaction {
 
     /// Transaction to update the block metadata resource at the beginning of a block.
     BlockMetadata(BlockMetadata),
-
     /// Transaction to let the executor update the global state tree and record the root hash
     /// in the TransactionInfo
     /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
     StateCheckpoint(HashValue),
+
+    /// `BlockMetadata` but also containing extra information. (E.g., on-chain randomness data).
+    BlockMetadataExt(BlockMetadataExt),
 }
 
 impl Transaction {
@@ -1831,6 +1834,8 @@ impl Transaction {
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
             Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
+            // TODO: display proper information for client
+            Transaction::BlockMetadataExt(_block_metadata_ext) => String::from("block_metadata_ext"),
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
         }

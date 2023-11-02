@@ -151,6 +151,7 @@ impl StateComputer for OrderingStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: Option<u64>,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 
@@ -222,6 +223,7 @@ impl StateComputer for DagStateSyncComputer {
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
         _block_gas_limit: Option<u64>,
         _transaction_deduper: Arc<dyn TransactionDeduper>,
+        _randomness_enabled: bool,
     ) {
         unimplemented!("method not supported");
     }

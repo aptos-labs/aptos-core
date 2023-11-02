@@ -29,7 +29,9 @@ use aptos_types::{
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
 use std::{boxed::Box, sync::Arc};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::Mutex as AsyncMutex;
+use aptos_consensus_types::block::RandomnessData;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<StateComputeResult>>;
 
@@ -66,6 +68,7 @@ pub struct ExecutionProxy {
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
     execution_pipeline: ExecutionPipeline,
+    randomness_enabled: AtomicBool,
 }
 
 impl ExecutionProxy {
@@ -104,6 +107,7 @@ impl ExecutionProxy {
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
             execution_pipeline,
+            randomness_enabled: AtomicBool::new(false),
         }
     }
 }
@@ -135,11 +139,6 @@ impl StateComputer for ExecutionProxy {
             Err(err) => return Box::pin(async move { Err(err) }),
         };
 
-        // already verified by 2/3 stakes during consensus
-        let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
-            Some(dkg_payload.dkg_agg_node().agg_trx().clone())
-        });
-
         let deduped_txns = txn_deduper.dedup(txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
@@ -147,12 +146,25 @@ impl StateComputer for ExecutionProxy {
 
         // TODO: figure out error handling for the prologue txn
         let timestamp = block.timestamp_usecs();
+        let randomness_data = if self.randomness_enabled.load(Ordering::SeqCst) {
+            // already verified by 2/3 stakes during consensus
+            let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
+                Some(dkg_payload.dkg_agg_node().agg_trx().clone())
+            });
+
+            Some(RandomnessData {
+                dkg_transcript,
+                randomness,
+            })
+        } else {
+            None
+        };
+
         let transactions_to_execute = block.transactions_to_execute(
             &self.validators.lock(),
             shuffled_txns.clone(),
             maybe_block_gas_limit,
-            dkg_transcript,
-            randomness,
+            randomness_data,
         );
 
         let fut = self
@@ -226,19 +238,29 @@ impl StateComputer for ExecutionProxy {
             let deduped_txns = txn_deduper.dedup(signed_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
-            // already verified by 2/3 stakes during consensus
-            let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
-                has_dkg_payloads = true;
-                Some(dkg_payload.dkg_agg_node().agg_trx().clone())
-            });
+            let randomness_data= if self.randomness_enabled.load(Ordering::SeqCst) {
+                // already verified by 2/3 stakes during consensus
+                let dkg_transcript = maybe_dkg_payload.map_or_else(|| None, |dkg_payload| {
+                    has_dkg_payloads = true;
+                    Some(dkg_payload.dkg_agg_node().agg_trx().clone())
+                });
 
-            txns.extend(block.transactions_to_commit(
+                Some(RandomnessData {
+                    dkg_transcript,
+                    randomness: block.randomness(),
+                })
+            } else {
+                None
+            };
+
+            let inner_txns = block.transactions_to_commit(
                 &self.validators.lock(),
                 shuffled_txns,
                 block_gas_limit,
-                dkg_transcript,
-                block.randomness.clone(),
-            ));
+                randomness_data,
+            );
+
+            txns.extend(inner_txns);
             reconfig_events.extend(block.reconfig_event());
             dkg_events.extend(block.dkg_event());
         }
@@ -347,6 +369,7 @@ impl StateComputer for ExecutionProxy {
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_gas_limit: Option<u64>,
         transaction_deduper: Arc<dyn TransactionDeduper>,
+        randomness_enabled: bool,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -360,6 +383,7 @@ impl StateComputer for ExecutionProxy {
             .replace(transaction_shuffler);
         *self.maybe_block_gas_limit.lock() = block_gas_limit;
         self.transaction_deduper.lock().replace(transaction_deduper);
+        self.randomness_enabled.store(randomness_enabled, Ordering::SeqCst);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch

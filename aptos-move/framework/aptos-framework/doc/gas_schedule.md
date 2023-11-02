@@ -272,7 +272,7 @@ Unlike <code><a href="gas_schedule.md#0x1_gas_schedule_set_gas_schedule">set_gas
 
 ## Function `on_new_epoch`
 
-Apply the pending gas schedule changes, typically called in <code>block_prologue_v2()</code>.
+Apply the pending gas schedule changes, typically called in <code>block_prologue_ext()</code>.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)

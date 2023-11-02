@@ -81,7 +81,7 @@ module aptos_framework::gas_schedule {
         config_for_next_epoch::upsert(aptos_framework, new_gas_schedule);
     }
 
-    /// Apply the pending gas schedule changes, typically called in `block_prologue_v2()`.
+    /// Apply the pending gas schedule changes, typically called in `block_prologue_ext()`.
     public(friend) fun on_new_epoch(account: &signer) acquires GasScheduleV2 {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         if (config_for_next_epoch::does_exist<GasScheduleV2>()) {

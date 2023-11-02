@@ -111,6 +111,7 @@ use aptos_dkg::{pvss::encryption_dlog::g1::DecryptPrivKey, utils::random::random
 use aptos_dkg::pvss::Player;
 use aptos_dkg::pvss::traits::Transcript;
 use aptos_types::dkg::DKGTranscriptWrapper;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -792,12 +793,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<PayloadManager>,
         onchain_execution_config: &OnChainExecutionConfig,
         network_sender: NetworkSender,
+        features: &Option<Features>,
     ) {
+        let randomness_enabled = features.as_ref().map(|f|f.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)).unwrap_or(false);
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
         let block_gas_limit = onchain_execution_config.block_gas_limit();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
+
 
         // dkg todo: add feature flag to guard changes
         let (dkg_handler_tx, dkg_handler_rx) = aptos_channel::new(
@@ -839,6 +843,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             transaction_shuffler,
             block_gas_limit,
             transaction_deduper,
+            randomness_enabled,
         );
     }
 
@@ -1123,6 +1128,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
+        let features: Option<Features> = payload.get().ok();
+
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
         }
@@ -1137,7 +1144,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
         let (network_sender, payload_client, payload_manager) = self
-            .initialize_shared_component(&epoch_state, &consensus_config, &execution_config)
+            .initialize_shared_component(&epoch_state, &consensus_config, &execution_config, &features)
             .await;
 
         if consensus_config.is_dag_enabled() {
@@ -1168,6 +1175,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         consensus_config: &OnChainConsensusConfig,
         execution_config: &OnChainExecutionConfig,
+        features: &Option<Features>,
     ) -> (NetworkSender, Arc<dyn PayloadClient>, Arc<PayloadManager>) {
         self.set_epoch_start_metrics(epoch_state);
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
@@ -1176,7 +1184,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .init_payload_provider(epoch_state, network_sender.clone())
             .await;
 
-        self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config, network_sender.clone());
+        self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config, network_sender.clone(), features);
         self.start_quorum_store(quorum_store_builder);
         (network_sender, Arc::new(payload_client), payload_manager)
     }

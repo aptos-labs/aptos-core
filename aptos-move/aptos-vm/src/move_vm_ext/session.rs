@@ -16,7 +16,6 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     on_chain_config::Features,
     state_store::state_key::StateKey,
@@ -92,9 +91,9 @@ impl SessionId {
         Self::Genesis { id }
     }
 
-    pub fn block_meta(block_meta: &BlockMetadata) -> Self {
+    pub fn block_meta(block_id: HashValue) -> Self {
         Self::BlockMeta {
-            id: block_meta.id(),
+            id: block_id,
         }
     }
 

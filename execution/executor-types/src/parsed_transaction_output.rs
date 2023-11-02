@@ -138,7 +138,7 @@ impl TransactionsWithParsedOutput {
             return true;
         }
         match txn {
-            Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => false,
+            Transaction::BlockMetadata(_) | Transaction::BlockMetadataExt(_) | Transaction::UserTransaction(_) => false,
             Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => true,
         }
     }

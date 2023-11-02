@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{dkg::DKGTranscriptWrapper, randomness::Randomness};
 use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
@@ -28,8 +27,6 @@ pub struct BlockMetadata {
     previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
-    maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-    randomness: Option<Randomness>,
 }
 
 impl BlockMetadata {
@@ -41,8 +38,6 @@ impl BlockMetadata {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
-        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Option<Randomness>,
     ) -> Self {
         Self {
             id,
@@ -52,8 +47,6 @@ impl BlockMetadata {
             previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
-            maybe_dkg_transcript,
-            randomness,
         }
     }
 
@@ -87,50 +80,6 @@ impl BlockMetadata {
         ret
     }
 
-    pub fn get_prologue_v2_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
-        let mut ret = vec![
-            MoveValue::Signer(signer),
-            MoveValue::Address(AccountAddress::from_bytes(self.id.to_vec()).unwrap()),
-            MoveValue::U64(self.epoch),
-            MoveValue::U64(self.round),
-            MoveValue::Address(self.proposer),
-            MoveValue::Vector(
-                self.failed_proposer_indices
-                    .into_iter()
-                    .map(u64::from)
-                    .map(MoveValue::U64)
-                    .collect(),
-            ),
-            MoveValue::Vector(
-                self.previous_block_votes_bitvec
-                    .into_iter()
-                    .map(MoveValue::U8)
-                    .collect(),
-            ),
-            MoveValue::U64(self.timestamp_usecs),
-        ];
-
-        ret.push(MoveValue::Bool(self.maybe_dkg_transcript.is_some()));
-        ret.push(MoveValue::Vector(
-            self.maybe_dkg_transcript
-                .map_or_else(|| vec![], |trx| bcs::to_bytes(&trx).unwrap())
-                .into_iter()
-                .map(MoveValue::U8)
-                .collect(),
-        ));
-
-        if let Some(r) = &self.randomness {
-            ret.push(MoveValue::Bool(true));
-            ret.push(MoveValue::Vector(
-                r.randomness().to_vec().into_iter().map(MoveValue::U8).collect()
-            ));
-        } else {
-            ret.push(MoveValue::Bool(false));
-            ret.push(MoveValue::Vector(vec![]));
-        }
-        ret
-    }
-
     pub fn timestamp_usecs(&self) -> u64 {
         self.timestamp_usecs
     }
@@ -153,9 +102,5 @@ impl BlockMetadata {
 
     pub fn round(&self) -> u64 {
         self.round
-    }
-
-    pub fn maybe_dkg_transcript(&self) -> &Option<DKGTranscriptWrapper> {
-        &self.maybe_dkg_transcript
     }
 }

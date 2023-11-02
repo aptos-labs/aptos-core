@@ -176,7 +176,7 @@ module aptos_framework::block {
 
     /// Set the metadata for the current block.
     /// The runtime always runs this before executing the transactions in a block.
-    fun block_prologue_v2(
+    fun block_prologue_ext(
         vm: signer,
         hash: address,
         epoch: u64,

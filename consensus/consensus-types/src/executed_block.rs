@@ -14,11 +14,11 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    dkg::DKGTranscriptWrapper,
     randomness::Randomness,
     transaction::{SignedTransaction, Transaction, TransactionStatus},
 };
 use std::fmt::{Debug, Display, Formatter};
+use crate::block::RandomnessData;
 
 /// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
 /// block data, each executed block also has other derived meta data which could be regenerated from
@@ -106,6 +106,10 @@ impl ExecutedBlock {
         &self.state_compute_result
     }
 
+    pub fn randomness(&self) -> Option<Randomness> {
+        self.randomness.clone()
+    }
+
     pub fn has_randomness(&self) -> bool {
         self.randomness.is_some()
     }
@@ -132,8 +136,7 @@ impl ExecutedBlock {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Option<Randomness>,
+        randomness_data: Option<RandomnessData>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
 
@@ -145,8 +148,7 @@ impl ExecutedBlock {
             validators,
             txns,
             block_gas_limit,
-            maybe_dkg_transcript,
-            randomness,
+            randomness_data,
         );
         if block_gas_limit.is_some() && !self.state_compute_result.has_reconfiguration() {
             // After the per-block gas limit change,
@@ -169,11 +171,11 @@ impl ExecutedBlock {
             txns_with_state_checkpoint,
             self.state_compute_result.compute_status(),
         )
-        .filter_map(|(txn, status)| match status {
-            TransactionStatus::Keep(_) => Some(txn),
-            _ => None,
-        })
-        .collect()
+            .filter_map(|(txn, status)| match status {
+                TransactionStatus::Keep(_) => Some(txn),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn reconfig_event(&self) -> Vec<ContractEvent> {

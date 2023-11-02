@@ -28,8 +28,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::{
     convert::TryFrom,
     fmt::{self, Display, Formatter},
-    iter::once,
 };
+use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 #[path = "block_test_utils.rs"]
 #[cfg(any(test, feature = "fuzzing"))]
@@ -38,6 +38,12 @@ pub mod block_test_utils;
 #[cfg(test)]
 #[path = "block_test.rs"]
 pub mod block_test;
+
+/// Some on-chain randomness materials that needs to be in block metadata.
+pub struct RandomnessData {
+    pub dkg_transcript: Option<DKGTranscriptWrapper>,
+    pub randomness: Option<Randomness>,
+}
 
 #[derive(Serialize, Clone, PartialEq, Eq)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
@@ -381,31 +387,32 @@ impl Block {
         validators: &[AccountAddress],
         txns: Vec<SignedTransaction>,
         block_gas_limit: Option<u64>,
-        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Option<Randomness>,
+        randomness_data: Option<RandomnessData>,
     ) -> Vec<Transaction> {
-        if block_gas_limit.is_some() {
-            // After the per-block gas limit change, StateCheckpoint txn
-            // is inserted after block execution
-            once(Transaction::BlockMetadata(self.new_block_metadata(
+        let mut ret = vec![];
+
+        let first_txn = if let Some(data) = randomness_data {
+            let RandomnessData{dkg_transcript, randomness} = data;
+            Transaction::BlockMetadataExt(self.new_block_metadata_ext(
                 validators,
-                maybe_dkg_transcript,
+                dkg_transcript,
                 randomness,
-            )))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .collect()
+            ))
         } else {
-            // Before the per-block gas limit change, StateCheckpoint txn
-            // is inserted here for compatibility.
-            once(Transaction::BlockMetadata(self.new_block_metadata(
+            Transaction::BlockMetadata(self.new_block_metadata(
                 validators,
-                maybe_dkg_transcript,
-                randomness,
-            )))
-            .chain(txns.into_iter().map(Transaction::UserTransaction))
-            .chain(once(Transaction::StateCheckpoint(self.id)))
-            .collect()
+            ))
+        };
+
+        ret.push(first_txn);
+
+        ret.extend(txns.into_iter().map(Transaction::UserTransaction));
+
+        if block_gas_limit.is_none() {
+            ret.push(Transaction::StateCheckpoint(self.id));
         }
+
+        ret
     }
 
     fn previous_bitvec(&self) -> BitVec {
@@ -419,8 +426,6 @@ impl Block {
     fn new_block_metadata(
         &self,
         validators: &[AccountAddress],
-        maybe_dkg_transcript: Option<DKGTranscriptWrapper>,
-        randomness: Option<Randomness>,
     ) -> BlockMetadata {
         BlockMetadata::new(
             self.id(),
@@ -435,7 +440,29 @@ impl Block {
                     Self::failed_authors_to_indices(validators, failed_authors)
                 }),
             self.timestamp_usecs(),
-            maybe_dkg_transcript,
+        )
+    }
+
+    fn new_block_metadata_ext(
+        &self,
+        validators: &[AccountAddress],
+        dkg_transcript: Option<DKGTranscriptWrapper>,
+        randomness: Option<Randomness>,
+    ) -> BlockMetadataExt {
+        BlockMetadataExt::new_v2(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.previous_bitvec().into(),
+            // For nil block, we use 0x0 which is convention for nil address in move.
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
+            self.timestamp_usecs(),
+            dkg_transcript,
             randomness,
         )
     }
