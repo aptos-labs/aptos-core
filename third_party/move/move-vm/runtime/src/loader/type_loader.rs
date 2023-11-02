@@ -4,7 +4,7 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
+use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructIdentifier, Type};
 use std::sync::Arc;
 
 // `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
@@ -40,7 +40,7 @@ pub fn intern_type(
             let struct_handle = module.struct_handle_at(*sh_idx);
             Type::Struct {
                 name: struct_name_table[sh_idx.0 as usize].clone(),
-                ability: struct_handle.abilities,
+                ability: AbilityInfo::struct_(struct_handle.abilities),
             }
         },
         SignatureToken::StructInstantiation(sh_idx, tys) => {
@@ -51,13 +51,15 @@ pub fn intern_type(
             let struct_handle = module.struct_handle_at(*sh_idx);
             Type::StructInstantiation {
                 name: struct_name_table[sh_idx.0 as usize].clone(),
-                base_ability_set: struct_handle.abilities,
                 ty_args: Arc::new(type_args),
-                phantom_ty_args_mask: struct_handle
-                    .type_parameters
-                    .iter()
-                    .map(|ty| ty.is_phantom)
-                    .collect(),
+                ability: AbilityInfo::generic_struct(
+                    struct_handle.abilities,
+                    struct_handle
+                        .type_parameters
+                        .iter()
+                        .map(|ty| ty.is_phantom)
+                        .collect(),
+                ),
             }
         },
     };

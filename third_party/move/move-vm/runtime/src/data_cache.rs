@@ -20,19 +20,19 @@ use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{GlobalValue, Value},
 };
-use std::collections::{btree_map::BTreeMap, hash_map::HashMap};
+use std::collections::btree_map::BTreeMap;
 
 pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
     // an aggregator or snapshot.
-    data_map: HashMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
+    data_map: BTreeMap<Type, (MoveTypeLayout, GlobalValue, bool)>,
     module_map: BTreeMap<Identifier, (Bytes, bool)>,
 }
 
 impl AccountDataCache {
     fn new() -> Self {
         Self {
-            data_map: HashMap::new(),
+            data_map: BTreeMap::new(),
             module_map: BTreeMap::new(),
         }
     }
@@ -201,6 +201,8 @@ impl<'r> TransactionDataCache<'r> {
                 },
             );
 
+            // TODO[agg_v2](fix) We need to propagate errors better, and handle them differently based on:
+            // - DELAYED_FIELDS_CODE_INVARIANT_ERROR, SPECULATIVE_EXECUTION_ABORT_ERROR or other.
             let (data, bytes_loaded) = resolved_result.map_err(|err| {
                 let msg = format!("Unexpected storage error: {:?}", err);
                 PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)

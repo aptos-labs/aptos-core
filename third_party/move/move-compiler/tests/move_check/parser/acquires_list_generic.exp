@@ -1,9 +1,6 @@
-error[E01002]: unexpected token
-  ┌─ tests/move_check/parser/acquires_list_generic.move:6:25
+error[E01012]: invalid access specifier
+  ┌─ tests/move_check/parser/acquires_list_generic.move:6:24
   │
 6 │     fun foo() acquires B<CupC<R>> {
-  │                         ^
-  │                         │
-  │                         Unexpected '<'
-  │                         Expected ','
+  │                        ^^^^^^^^^^^ compiler version 1 only supports simple 'acquires <resource_name>' clauses
 

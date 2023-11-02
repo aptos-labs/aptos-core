@@ -66,6 +66,7 @@ pub trait ExecutorTask: Sync {
             <Self::Txn as Transaction>::Tag,
             MoveTypeLayout,
             <Self::Txn as Transaction>::Identifier,
+            <Self::Txn as Transaction>::Value,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,
@@ -113,15 +114,42 @@ pub trait TransactionOutput: Send + Sync + Debug {
         DelayedChange<<Self::Txn as Transaction>::Identifier>,
     >;
 
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> BTreeMap<
+        <Self::Txn as Transaction>::Key,
+        (<Self::Txn as Transaction>::Value, Arc<MoveTypeLayout>),
+    >;
+
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;
+
+    fn resource_group_write_set(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+        BTreeMap<<Self::Txn as Transaction>::Tag, <Self::Txn as Transaction>::Value>,
+    )>;
+
+    fn resource_group_metadata_ops(
+        &self,
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        <Self::Txn as Transaction>::Value,
+    )> {
+        self.resource_group_write_set()
+            .into_iter()
+            .map(|(key, op, _)| (key, op))
+            .collect()
+    }
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
 
-    /// In parallel execution, will be called once per transaction when the output is
-    /// ready to be committed. In sequential execution, won't be called (deltas are
-    /// materialized and incorporated during execution).
+    /// Will be called once per transaction when the output is ready to be committed.
+    /// Ensures that any writes corresponding to materialized deltas and group updates
+    /// (recorded in output separately) are incorporated into the transaction output.
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
@@ -130,6 +158,10 @@ pub trait TransactionOutput: Send + Sync + Debug {
             <Self::Txn as Transaction>::Value,
         >,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
+        combined_groups: Vec<(
+            <Self::Txn as Transaction>::Key,
+            <Self::Txn as Transaction>::Value,
+        )>,
     );
 
     /// Return the fee statement of the transaction.

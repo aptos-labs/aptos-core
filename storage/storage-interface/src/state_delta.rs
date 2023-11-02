@@ -35,6 +35,7 @@ impl StateDelta {
         current_version: Option<Version>,
         updates_since_base: ShardedStateUpdates,
     ) -> Self {
+        assert!(base.is_family(&current));
         assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
             base,

@@ -172,14 +172,14 @@ https://github.com/aptos-labs/aptos-core/tree/main/storage/backup/backup-cli/src
 
 
 ```bash
-$ cargo run -p aptos-db-tool backup continuously --help
+$ cargo run -p aptos-debugger aptos-db backup continuously --help
     Finished dev [unoptimized + debuginfo] target(s) in 1.06s
-     Running `target/debug/aptos-db-tool backup continuously --help`
+     Running `target/debug/aptos-debugger aptos-db backup continuously --help`
 aptos-db-tool-backup-continuously 0.1.0
 Run the backup coordinator which backs up blockchain data continuously off a Aptos Node.
 
 USAGE:
-    aptos-db-tool backup continuously [OPTIONS] <--local-fs-dir <LOCAL_FS_DIR>|--command-adapter-config <COMMAND_ADAPTER_CONFIG>>
+    aptos-debugger aptos-db backup continuously [OPTIONS] <--local-fs-dir <LOCAL_FS_DIR>|--command-adapter-config <COMMAND_ADAPTER_CONFIG>>
 
 OPTIONS:
         --backup-service-address <ADDRESS>
@@ -237,14 +237,14 @@ OPTIONS:
 
 Example command:
 ```
-$ cargo run -p aptos-db-tool backup continuously \
+$ cargo run -p aptos-debugger aptos-db backup continuously \
     --metadata-cache-dir ./mc \
     --state-snapshot-interval-epochs 1 \
     --concurrent-downloads 4 \
     --command-adapter-config s3.yaml
 ```
 
-There are other subcommands of the aptos-db-tool, all of which are experimental
+There are other subcommands of the aptos-debugger aptos-db, all of which are experimental
 and can mess up with the backup storage, use only at your own risk.
 
 ### Creating an AptosDB with minimal data at the latest epoch ending in a backup
@@ -304,7 +304,7 @@ RUST_LOG=info ./aptos \
 ```
 
 This is basically the same functionality with
-the "auto" mode of `cargo run -p aptos-db-tool restore`, but with more
+the "auto" mode of `cargo run -p aptos-debugger aptos-db restore`, but with more
 limited options. The `restore` tool mentioned has the ability to manually
 hack a local DB and is highly experimental. It's not recommended is be used if
 you are not 100% aware of what you are doing.

@@ -110,6 +110,7 @@ fn make_module() -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
             // fun g_fn<T: key>()
             FunctionHandle {
@@ -118,6 +119,7 @@ fn make_module() -> CompiledModule {
                 parameters: SignatureIndex(0),
                 return_: SignatureIndex(0),
                 type_parameters: vec![AbilitySet::EMPTY | Ability::Key],
+                access_specifiers: None,
             },
             // fun test_fn(Sender)
             FunctionHandle {
@@ -126,6 +128,7 @@ fn make_module() -> CompiledModule {
                 parameters: SignatureIndex(1),
                 return_: SignatureIndex(0),
                 type_parameters: vec![],
+                access_specifiers: None,
             },
         ],
         function_defs: vec![

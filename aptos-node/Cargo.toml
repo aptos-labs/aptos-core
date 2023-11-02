@@ -80,6 +80,9 @@ url = { workspace = true }
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+rstack-self = { workspace = true }
+
 [features]
 assert-private-keys-not-cloneable = ["aptos-crypto/assert-private-keys-not-cloneable"]
 check-vm-features = []
