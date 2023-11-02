@@ -310,7 +310,6 @@ impl BatchGenerator {
             let _timer = counters::BATCH_GENERATOR_MAIN_LOOP.start_timer();
 
             tokio::select! {
-                biased;
                 Some(updated_back_pressure) = back_pressure_rx.recv() => {
                     self.back_pressure = updated_back_pressure;
                 },
