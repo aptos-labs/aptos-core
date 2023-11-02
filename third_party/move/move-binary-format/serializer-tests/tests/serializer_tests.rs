@@ -4,10 +4,12 @@
 
 use move_binary_format::{
     access::ModuleAccess,
+    deserializer::DeserializerConfig,
     file_format::{
         empty_module, AbilitySet, CompiledModule, FunctionHandle, IdentifierIndex, Signature,
         SignatureIndex, SignatureToken,
     },
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
 };
 use move_core_types::identifier::Identifier;
 use proptest::prelude::*;
@@ -16,10 +18,13 @@ proptest! {
     #[test]
     fn serializer_roundtrip(module in CompiledModule::valid_strategy(20)) {
         let mut serialized = Vec::with_capacity(2048);
-        module.serialize(&mut serialized).expect("serialization should work");
+        module.serialize_for_version(Some(VERSION_MAX), &mut serialized).expect("serialization should work");
 
-        let deserialized_module = CompiledModule::deserialize(&serialized)
-            .expect("deserialization should work");
+
+        let deserialized_module = CompiledModule::deserialize_with_config(
+                &serialized,
+                &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+        ).expect("deserialization should work");
 
         prop_assert_eq!(module, deserialized_module);
     }
@@ -34,7 +39,7 @@ proptest! {
     #[test]
     fn garbage_inputs(module in any_with::<CompiledModule>(16)) {
         let mut serialized = Vec::with_capacity(65536);
-        module.serialize(&mut serialized).expect("serialization should work");
+        module.serialize_for_version(Some(VERSION_MAX), &mut serialized).expect("serialization should work");
 
         let deserialized_module = CompiledModule::deserialize_no_check_bounds(&serialized)
             .expect("deserialization should work");
@@ -66,14 +71,18 @@ fn simple_generic_module_round_trip() {
         parameters: sig_t1_idx,
         return_: sig_unit_idx,
         type_parameters: vec![AbilitySet::EMPTY],
+        access_specifiers: None,
     });
 
     let mut serialized = Vec::with_capacity(2048);
-    m.serialize(&mut serialized)
+    m.serialize_for_version(Some(VERSION_MAX), &mut serialized)
         .expect("serialization should work");
 
-    let deserialized_m =
-        CompiledModule::deserialize(&serialized).expect("deserialization should work");
+    let deserialized_m = CompiledModule::deserialize_with_config(
+        &serialized,
+        &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
+    )
+    .expect("deserialization should work");
 
     assert_eq!(m, deserialized_m);
 }

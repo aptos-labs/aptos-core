@@ -299,6 +299,16 @@ impl<'a> BinaryIndexedView<'a> {
         )
     }
 
+    pub fn safe_module_id_for_handle(&self, module_handle: &ModuleHandle) -> Option<ModuleId> {
+        self.address_identifiers()
+            .get(module_handle.address.0 as usize)
+            .and_then(|a| {
+                self.identifiers()
+                    .get(module_handle.name.0 as usize)
+                    .map(|id| ModuleId::new(*a, id.to_owned()))
+            })
+    }
+
     pub fn self_id(&self) -> Option<ModuleId> {
         match self {
             BinaryIndexedView::Module(m) => Some(m.self_id()),

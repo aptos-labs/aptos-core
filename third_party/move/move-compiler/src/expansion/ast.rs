@@ -15,6 +15,7 @@ use crate::{
         *,
     },
 };
+use move_binary_format::file_format;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
 use std::{
@@ -210,9 +211,34 @@ pub struct Function {
     pub entry: Option<Loc>,
     pub signature: FunctionSignature,
     pub acquires: Vec<ModuleAccess>,
+    // Only v2 compiler
+    pub access_specifiers: Option<Vec<AccessSpecifier>>,
     pub body: FunctionBody,
     pub specs: BTreeMap<SpecId, SpecBlock>,
 }
+
+#[derive(PartialEq, Clone, Debug)]
+pub struct AccessSpecifier_ {
+    pub kind: file_format::AccessKind,
+    pub negated: bool,
+    pub module_address: Option<Address>,
+    pub module_name: Option<ModuleName>,
+    pub resource_name: Option<Name>,
+    pub type_args: Option<Vec<Type>>,
+    pub address: AddressSpecifier,
+}
+
+pub type AccessSpecifier = Spanned<AccessSpecifier_>;
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum AddressSpecifier_ {
+    Any,
+    Literal(NumericalAddress),
+    Name(Name),
+    Call(ModuleAccess, Option<Vec<Type>>, Name),
+}
+
+pub type AddressSpecifier = Spanned<AddressSpecifier_>;
 
 //**************************************************************************************************
 // Constants
@@ -1248,6 +1274,7 @@ impl AstDebug for (FunctionName, &Function) {
                 entry,
                 signature,
                 acquires,
+                access_specifiers: _,
                 body,
                 specs: _specs,
             },

@@ -805,7 +805,7 @@ Only called during genesis.
 <b>requires</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>let</b> amount_to_burn = (burn_percentage * <a href="coin.md#0x1_coin_value">coin::value</a>(<a href="coin.md#0x1_coin">coin</a>)) / 100;
-<b>include</b> amount_to_burn &gt; 0 ==&gt; <a href="coin.md#0x1_coin_AbortsIfAggregator">coin::AbortsIfAggregator</a>&lt;AptosCoin&gt;{ <a href="coin.md#0x1_coin">coin</a>: Coin&lt;AptosCoin&gt;{ value: amount_to_burn } };
+<b>include</b> amount_to_burn &gt; 0 ==&gt; <a href="coin.md#0x1_coin_CoinSubAbortsIf">coin::CoinSubAbortsIf</a>&lt;AptosCoin&gt;{ amount: amount_to_burn };
 <b>ensures</b> <a href="coin.md#0x1_coin">coin</a>.value == <b>old</b>(<a href="coin.md#0x1_coin">coin</a>).value - amount_to_burn;
 </code></pre>
 
@@ -942,6 +942,8 @@ Only called during genesis.
 <pre><code><b>pragma</b> opaque;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;AptosCoin&gt;().account_address;
 <b>modifies</b> <b>global</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);
+<b>aborts_if</b> (refund != 0) && !<b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(aptos_addr);
+<b>include</b> <a href="coin.md#0x1_coin_CoinAddAbortsIf">coin::CoinAddAbortsIf</a>&lt;AptosCoin&gt; { amount: refund };
 <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
 <b>modifies</b> <b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(<a href="account.md#0x1_account">account</a>);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinMintCapability">AptosCoinMintCapability</a>&gt;(@aptos_framework);

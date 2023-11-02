@@ -14,7 +14,6 @@ use aptos_config::{
     config::{AptosDataClientConfig, StorageServiceConfig},
     network_id::PeerNetworkId,
 };
-use aptos_infallible::Mutex;
 use aptos_storage_service_types::{
     requests::{
         DataRequest, NewTransactionOutputsWithProofRequest,
@@ -28,7 +27,7 @@ use aptos_types::epoch_change::EpochChangeProof;
 use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use futures::channel::oneshot;
-use lru::LruCache;
+use mini_moka::sync::Cache;
 use rand::{rngs::OsRng, Rng};
 use std::sync::Arc;
 use tokio::runtime::Handle;
@@ -70,7 +69,7 @@ async fn test_peers_with_ready_optimistic_fetches() {
     let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
-    let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
+    let lru_response_cache = Cache::new(0);
     let request_moderator = Arc::new(RequestModerator::new(
         AptosDataClientConfig::default(),
         cached_storage_server_summary.clone(),
@@ -167,7 +166,7 @@ async fn test_remove_expired_optimistic_fetches() {
     let bounded_executor = BoundedExecutor::new(100, Handle::current());
     let cached_storage_server_summary =
         Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
-    let lru_response_cache = Arc::new(Mutex::new(LruCache::new(0)));
+    let lru_response_cache = Cache::new(0);
     let request_moderator = Arc::new(RequestModerator::new(
         AptosDataClientConfig::default(),
         cached_storage_server_summary.clone(),

@@ -157,16 +157,31 @@ impl CachedStateView {
         // n.b. Freeze the state before getting the state snapshot, otherwise it's possible that
         // after we got the snapshot, in-mem trees newer than it gets dropped before being frozen,
         // due to a commit happening from another thread.
-        let speculative_state = speculative_state.freeze();
+        let base_smt = reader.get_buffered_state_base()?;
+        let speculative_state = speculative_state.freeze(&base_smt);
         let snapshot = reader.get_state_snapshot_before(next_version)?;
 
-        Ok(Self {
+        Ok(Self::new_impl(
+            id,
+            snapshot,
+            speculative_state,
+            proof_fetcher,
+        ))
+    }
+
+    pub fn new_impl(
+        id: StateViewId,
+        snapshot: Option<(Version, HashValue)>,
+        speculative_state: FrozenSparseMerkleTree<StateValue>,
+        proof_fetcher: Arc<AsyncProofFetcher>,
+    ) -> Self {
+        Self {
             id,
             snapshot,
             speculative_state,
             sharded_state_cache: ShardedStateCache::default(),
             proof_fetcher,
-        })
+        }
     }
 
     pub fn prime_cache_by_write_set<'a, T: IntoIterator<Item = &'a WriteSet> + Send>(

@@ -85,6 +85,7 @@ mod dbtool_tests {
     use aptos_executor_test_helpers::integration_test_impl::{
         test_execution_with_storage_impl, test_execution_with_storage_impl_inner,
     };
+    use aptos_storage_interface::DbReader;
     use aptos_temppath::TempPath;
     use aptos_types::{
         state_store::{state_key::StateKeyTag::AccessPath, state_key_prefix::StateKeyPrefix},
@@ -288,7 +289,6 @@ mod dbtool_tests {
         force_sharding: bool,
     ) -> (Runtime, String) {
         use aptos_db::utils::iterators::PrefixedStateValueIterator;
-        use aptos_storage_interface::DbReader;
         use itertools::zip_eq;
 
         let db = test_execution_with_storage_impl_inner(force_sharding, old_db_dir.as_path());

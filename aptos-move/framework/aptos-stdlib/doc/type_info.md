@@ -22,6 +22,7 @@
     -  [Function `type_of`](#@Specification_1_type_of)
     -  [Function `type_name`](#@Specification_1_type_name)
     -  [Function `chain_id_internal`](#@Specification_1_chain_id_internal)
+    -  [Function `size_of_val`](#@Specification_1_size_of_val)
     -  [Function `verify_type_of_generic`](#@Specification_1_verify_type_of_generic)
 
 
@@ -424,6 +425,34 @@ analysis of vector size dynamism.
 
 
 <pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
+</code></pre>
+
+
+
+
+<a name="0x1_type_info_spec_size_of_val"></a>
+
+
+<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref: T): u64 {
+   len(std::bcs::serialize(val_ref))
+}
+</code></pre>
+
+
+
+<a name="@Specification_1_size_of_val"></a>
+
+### Function `size_of_val`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="type_info.md#0x1_type_info_size_of_val">size_of_val</a>&lt;T&gt;(val_ref: &T): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref);
 </code></pre>
 
 

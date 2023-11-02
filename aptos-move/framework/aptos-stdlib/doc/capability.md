@@ -108,6 +108,13 @@ is_valid_delegate_for_feature(d);
 -  [Function `remove_element`](#0x1_capability_remove_element)
 -  [Function `add_element`](#0x1_capability_add_element)
 -  [Specification](#@Specification_4)
+    -  [Function `create`](#@Specification_4_create)
+    -  [Function `acquire`](#@Specification_4_acquire)
+    -  [Function `acquire_linear`](#@Specification_4_acquire_linear)
+    -  [Function `delegate`](#@Specification_4_delegate)
+    -  [Function `revoke`](#@Specification_4_revoke)
+    -  [Function `remove_element`](#@Specification_4_remove_element)
+    -  [Function `add_element`](#@Specification_4_add_element)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -575,6 +582,153 @@ Helper specification function to obtain the delegates of a capability.
 <pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(addr: <b>address</b>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
    <b>global</b>&lt;<a href="capability.md#0x1_capability_CapState">CapState</a>&lt;Feature&gt;&gt;(addr).delegates
 }
+</code></pre>
+
+
+Helper specification function to check whether a delegated capability exists at address.
+
+
+<a name="0x1_capability_spec_has_delegate_cap"></a>
+
+
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr: <b>address</b>): bool {
+   <b>exists</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr)
+}
+</code></pre>
+
+
+
+<a name="@Specification_4_create"></a>
+
+### Function `create`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_create">create</a>&lt;Feature&gt;(owner: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<b>aborts_if</b> <a href="capability.md#0x1_capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(addr);
+<b>ensures</b> <a href="capability.md#0x1_capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(addr);
+</code></pre>
+
+
+
+<a name="@Specification_4_acquire"></a>
+
+### Function `acquire`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire">acquire</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(requester);
+<b>let</b> root_addr = <b>global</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root;
+<b>include</b> <a href="capability.md#0x1_capability_AcquireSchema">AcquireSchema</a>&lt;Feature&gt;;
+<b>ensures</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) ==&gt; result.root == root_addr;
+<b>ensures</b> !<a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) ==&gt; result.root == addr;
+</code></pre>
+
+
+
+<a name="@Specification_4_acquire_linear"></a>
+
+### Function `acquire_linear`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_acquire_linear">acquire_linear</a>&lt;Feature&gt;(requester: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _feature_witness: &Feature): <a href="capability.md#0x1_capability_LinearCap">capability::LinearCap</a>&lt;Feature&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(requester);
+<b>let</b> root_addr = <b>global</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root;
+<b>include</b> <a href="capability.md#0x1_capability_AcquireSchema">AcquireSchema</a>&lt;Feature&gt;;
+<b>ensures</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) ==&gt; result.root == root_addr;
+<b>ensures</b> !<a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) ==&gt; result.root == addr;
+</code></pre>
+
+
+
+
+<a name="0x1_capability_AcquireSchema"></a>
+
+
+<pre><code><b>schema</b> <a href="capability.md#0x1_capability_AcquireSchema">AcquireSchema</a>&lt;Feature&gt; {
+    addr: <b>address</b>;
+    root_addr: <b>address</b>;
+    <b>aborts_if</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) && !<a href="capability.md#0x1_capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(root_addr);
+    <b>aborts_if</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) && !<a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<a href="capability.md#0x1_capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(root_addr), addr);
+    <b>aborts_if</b> !<a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr) && !<a href="capability.md#0x1_capability_spec_has_cap">spec_has_cap</a>&lt;Feature&gt;(addr);
+}
+</code></pre>
+
+
+
+<a name="@Specification_4_delegate"></a>
+
+### Function `delegate`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_delegate">delegate</a>&lt;Feature&gt;(cap: <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, <b>to</b>: &<a href="../../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<b>to</b>);
+<b>ensures</b> <a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr);
+<b>ensures</b> !<b>old</b>(<a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr)) ==&gt; <b>global</b>&lt;<a href="capability.md#0x1_capability_CapDelegateState">CapDelegateState</a>&lt;Feature&gt;&gt;(addr).root == cap.root;
+<b>ensures</b> !<b>old</b>(<a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(addr)) ==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<a href="capability.md#0x1_capability_spec_delegates">spec_delegates</a>&lt;Feature&gt;(cap.root), addr);
+</code></pre>
+
+
+
+<a name="@Specification_4_revoke"></a>
+
+### Function `revoke`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="capability.md#0x1_capability_revoke">revoke</a>&lt;Feature&gt;(cap: <a href="capability.md#0x1_capability_Cap">capability::Cap</a>&lt;Feature&gt;, _feature_witness: &Feature, from: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> !<a href="capability.md#0x1_capability_spec_has_delegate_cap">spec_has_delegate_cap</a>&lt;Feature&gt;(from);
+</code></pre>
+
+
+
+<a name="@Specification_4_remove_element"></a>
+
+### Function `remove_element`
+
+
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_remove_element">remove_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: &E)
+</code></pre>
+
+
+
+
+<a name="@Specification_4_add_element"></a>
+
+### Function `add_element`
+
+
+<pre><code><b>fun</b> <a href="capability.md#0x1_capability_add_element">add_element</a>&lt;E: drop&gt;(v: &<b>mut</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;E&gt;, x: E)
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(v, x);
 </code></pre>
 
 

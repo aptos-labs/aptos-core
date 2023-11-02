@@ -52,6 +52,7 @@ fn access_path_panic() {
             parameters: SignatureIndex(0),
             return_: SignatureIndex(0),
             type_parameters: vec![],
+            access_specifiers: None,
         }],
         field_handles: vec![],
         friend_decls: vec![],

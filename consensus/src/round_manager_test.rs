@@ -28,7 +28,7 @@ use crate::{
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::ConsensusConfig,
+    config::{ConsensusConfig, QcAggregatorType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_consensus_types::{
@@ -75,6 +75,7 @@ use futures::{
     stream::select,
     FutureExt, Stream, StreamExt,
 };
+use futures_channel::mpsc::unbounded;
 use maplit::hashmap;
 use std::{
     iter::FromIterator,
@@ -111,7 +112,14 @@ impl NodeSetup {
         let base_timeout = Duration::new(60, 0);
         let time_interval = Box::new(ExponentialTimeInterval::fixed(base_timeout));
         let (round_timeout_sender, _) = aptos_channels::new_test(1_024);
-        RoundState::new(time_interval, time_service, round_timeout_sender)
+        let (delayed_qc_tx, _) = unbounded();
+        RoundState::new(
+            time_interval,
+            time_service,
+            round_timeout_sender,
+            delayed_qc_tx,
+            QcAggregatorType::NoDelay,
+        )
     }
 
     fn create_proposer_election(proposers: Vec<Author>) -> Arc<dyn ProposerElection + Send + Sync> {

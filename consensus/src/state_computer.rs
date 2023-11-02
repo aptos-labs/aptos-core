@@ -12,6 +12,7 @@ use crate::{
     payload_manager::PayloadManager,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
+    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
     txn_notifier::TxnNotifier,
 };
@@ -67,6 +68,7 @@ pub struct ExecutionProxy {
     transaction_shuffler: Mutex<Option<Arc<dyn TransactionShuffler>>>,
     maybe_block_gas_limit: Mutex<Option<u64>>,
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
+    transaction_filter: TransactionFilter,
     execution_pipeline: ExecutionPipeline,
     randomness_enabled: AtomicBool,
 }
@@ -77,6 +79,7 @@ impl ExecutionProxy {
         txn_notifier: Arc<dyn TxnNotifier>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         handle: &tokio::runtime::Handle,
+        txn_filter: TransactionFilter,
     ) -> Self {
         let (tx, mut rx) =
             aptos_channels::new::<NotificationType>(10, &counters::PENDING_STATE_SYNC_NOTIFICATION);
@@ -106,6 +109,7 @@ impl ExecutionProxy {
             transaction_shuffler: Mutex::new(None),
             maybe_block_gas_limit: Mutex::new(None),
             transaction_deduper: Mutex::new(None),
+            transaction_filter: txn_filter,
             execution_pipeline,
             randomness_enabled: AtomicBool::new(false),
         }
@@ -139,7 +143,8 @@ impl StateComputer for ExecutionProxy {
             Err(err) => return Box::pin(async move { Err(err) }),
         };
 
-        let deduped_txns = txn_deduper.dedup(txns);
+        let filtered_txns = self.transaction_filter.filter(block_id, txns);
+        let deduped_txns = txn_deduper.dedup(filtered_txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
         let maybe_block_gas_limit = *self.maybe_block_gas_limit.lock();
@@ -233,9 +238,9 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let (signed_txns, maybe_dkg_payload) =
-                payload_manager.get_transactions(block.block()).await?;
-            let deduped_txns = txn_deduper.dedup(signed_txns);
+            let (signed_txns, maybe_dkg_payload) = payload_manager.get_transactions(block.block()).await?;
+            let filtered_txns = self.transaction_filter.filter(block.id(), signed_txns);
+            let deduped_txns = txn_deduper.dedup(filtered_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
             let randomness_data= if self.randomness_enabled.load(Ordering::SeqCst) {
@@ -401,6 +406,7 @@ async fn test_commit_sync_race() {
         error::MempoolError, transaction_deduper::create_transaction_deduper,
         transaction_shuffler::create_transaction_shuffler,
     };
+    use aptos_config::config::transaction_filter_type::Filter;
     use aptos_consensus_notifications::Error;
     use aptos_executor_types::state_checkpoint_output::StateCheckpointOutput;
     use aptos_types::{
@@ -523,6 +529,7 @@ async fn test_commit_sync_race() {
         recorded_commit.clone(),
         recorded_commit.clone(),
         &tokio::runtime::Handle::current(),
+        TransactionFilter::new(Filter::empty()),
     );
     executor.new_epoch(
         &EpochState::empty(),

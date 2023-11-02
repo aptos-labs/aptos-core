@@ -1,19 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{network::NetworkSender, network_interface::ConsensusMsg};
 use anyhow::bail;
 pub use aptos_consensus_types::common::Author;
 use aptos_consensus_types::common::Round;
 use aptos_crypto::HashValue;
 use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_enum_conversion_derive::EnumConversion;
-use aptos_reliable_broadcast::{BroadcastStatus, RBMessage, RBNetworkSender};
+use aptos_reliable_broadcast::{BroadcastStatus, RBMessage};
 use aptos_types::{randomness::{RandConfig, RandDecision, Mode, ProofShare, Delta, RandMetadata, WVUF}};
-use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use serde::{Deserialize, Serialize};
-use std::{time::Duration, collections::HashSet};
+use std::{collections::HashSet};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RandShare {
@@ -144,7 +142,7 @@ pub struct ShareAckState {
 
 impl ShareAckState {
     pub fn new(validators: impl Iterator<Item = Author>, rand_config: RandConfig, rand_decision_tx: UnboundedSender<RandDecision>, send_delta_request_tx: UnboundedSender<Author>) -> Self {
-        Self { 
+        Self {
             validators: validators.collect(),
             rand_config,
             rand_decision_tx,
@@ -158,7 +156,7 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
     type Aggregated = ();
     type Message = RandShare;
 
-    fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> { 
+    fn add(&mut self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
         if self.validators.remove(&peer) {
             if ack.missing_apk {
                 // send delta to peer if missing
@@ -185,23 +183,5 @@ impl BroadcastStatus<RandMessage> for ShareAckState {
         } else {
             bail!("[RandMessage] Unknown author: {}", peer);
         }
-    }
-}
-
-#[async_trait]
-impl RBNetworkSender<RandMessage> for NetworkSender {
-    async fn send_rb_rpc(
-        &self,
-        receiver: Author,
-        message: RandMessage,
-        timeout_duration: Duration,
-    ) -> anyhow::Result<RandMessage> {
-        let msg = ConsensusMsg::RandMessage(message.into());
-        let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
-            ConsensusMsg::RandMessage(resp) if matches!(*resp, RandMessage::ShareAck(_) | RandMessage::DeltaAck(_)) => *resp,
-            _ => bail!("[RandMessage] Invalid response to request"),
-        };
-
-        Ok(response)
     }
 }

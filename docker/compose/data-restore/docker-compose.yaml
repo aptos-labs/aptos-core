@@ -25,7 +25,7 @@ services:
       - RUST_LOG=debug
     command: >
       sh -c "
-      /usr/local/bin/aptos-db-tool restore bootstrap-db --concurrent-downloads 2 \
+      /usr/local/bin/aptos-debugger aptos-db restore bootstrap-db --concurrent-downloads 2 \
         --target-db-dir /opt/aptos/data/db
         --metadata-cache-dir /tmp/aptos-restore-metadata \
         --command-adapter-config /opt/aptos/etc/restore.yaml

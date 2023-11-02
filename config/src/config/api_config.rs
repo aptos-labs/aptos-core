@@ -137,7 +137,7 @@ impl ConfigSanitizer for ApiConfig {
     fn sanitize(
         node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let api_config = &node_config.api;
@@ -148,11 +148,13 @@ impl ConfigSanitizer for ApiConfig {
         }
 
         // Verify that failpoints are not enabled in mainnet
-        if chain_id.is_mainnet() && api_config.failpoints_enabled {
-            return Err(Error::ConfigSanitizerFailed(
-                sanitizer_name,
-                "Failpoints are not supported on mainnet nodes!".into(),
-            ));
+        if let Some(chain_id) = chain_id {
+            if chain_id.is_mainnet() && api_config.failpoints_enabled {
+                return Err(Error::ConfigSanitizerFailed(
+                    sanitizer_name,
+                    "Failpoints are not supported on mainnet nodes!".into(),
+                ));
+            }
         }
 
         // Validate basic runtime properties
@@ -163,6 +165,7 @@ impl ConfigSanitizer for ApiConfig {
             ));
         }
 
+        // Sanitize the gas estimation config
         GasEstimationConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
@@ -186,7 +189,7 @@ mod tests {
         };
 
         // Sanitize the config and verify that it succeeds
-        ApiConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap();
+        ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet())).unwrap();
     }
 
     #[test]
@@ -204,8 +207,15 @@ mod tests {
         // Sanitize the config and verify that it fails because
         // failpoints are not supported on mainnet.
         let error =
-            ApiConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap_err();
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+
+        // Sanitize the config for a different network and verify that it succeeds
+        ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::testnet())).unwrap();
+
+        // Sanitize the config for an unknown network and verify that it succeeds
+        ApiConfig::sanitize(&node_config, NodeType::Validator, None).unwrap();
     }
 
     #[test]
@@ -224,7 +234,8 @@ mod tests {
         // Sanitize the config and verify that it fails because
         // the runtime worker multiplier is invalid.
         let error =
-            ApiConfig::sanitize(&node_config, NodeType::Validator, ChainId::mainnet()).unwrap_err();
+            ApiConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
+                .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

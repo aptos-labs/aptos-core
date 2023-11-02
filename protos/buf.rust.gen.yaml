@@ -1,0 +1,20 @@
+version: v1
+managed:
+  enabled: true
+plugins:
+  - name: prost
+    out: rust/src/pb/
+    opt:
+      - file_descriptor_set
+
+  - name: prost-serde
+    out: rust/src/pb/
+
+  - name: prost-crate
+    out: rust/src/pb/
+    strategy: all
+    opt:
+      - no_features
+
+  - name: tonic
+    out: rust/src/pb/

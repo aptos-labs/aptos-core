@@ -864,7 +864,8 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(result) == 1;
+<pre><code><b>aborts_if</b> bucket_size == 0;
+<b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(result) == 1;
 <b>ensures</b> result.bucket_size == bucket_size;
 </code></pre>
 
@@ -948,12 +949,26 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 <pre><code><b>let</b> num_buckets = <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(v.buckets);
-<b>aborts_if</b> num_buckets * v.bucket_size &gt; MAX_U64;
-<b>aborts_if</b> v.end_index + 1 &gt; MAX_U64;
+<b>include</b> <a href="big_vector.md#0x1_big_vector_PushbackAbortsIf">PushbackAbortsIf</a>&lt;T&gt;;
 <b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(v) == <a href="big_vector.md#0x1_big_vector_length">length</a>(<b>old</b>(v)) + 1;
 <b>ensures</b> v.end_index == <b>old</b>(v.end_index) + 1;
 <b>ensures</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, v.end_index-1) == val;
 <b>ensures</b> <b>forall</b> i in 0..v.end_index-1: <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), i);
+<b>ensures</b> v.bucket_size == <b>old</b>(v).bucket_size;
+</code></pre>
+
+
+
+
+<a name="0x1_big_vector_PushbackAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="big_vector.md#0x1_big_vector_PushbackAbortsIf">PushbackAbortsIf</a>&lt;T&gt; {
+    v: <a href="big_vector.md#0x1_big_vector_BigVector">BigVector</a>&lt;T&gt;;
+    <b>let</b> num_buckets = <a href="big_vector.md#0x1_big_vector_spec_table_len">spec_table_len</a>(v.buckets);
+    <b>aborts_if</b> num_buckets * v.bucket_size &gt; MAX_U64;
+    <b>aborts_if</b> v.end_index + 1 &gt; MAX_U64;
+}
 </code></pre>
 
 
@@ -1023,7 +1038,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify_duration_estimate = 1000;
 <b>aborts_if</b> i &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v) || j &gt;= <a href="big_vector.md#0x1_big_vector_length">length</a>(v);
 <b>ensures</b> <a href="big_vector.md#0x1_big_vector_length">length</a>(v) == <a href="big_vector.md#0x1_big_vector_length">length</a>(<b>old</b>(v));
 <b>ensures</b> <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(v, i) == <a href="big_vector.md#0x1_big_vector_spec_at">spec_at</a>(<b>old</b>(v), j);

@@ -39,7 +39,8 @@ def main():
     os.mkdir("local")
     subprocess.run(
         [
-            "target/release/aptos-db-tool",
+            "target/release/aptos-debugger",
+            "aptos-db",
             "backup",
             "verify",
             "--validate-modules",

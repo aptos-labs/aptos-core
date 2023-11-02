@@ -25,3 +25,13 @@ impl TimerHelper for HistogramVec {
         self.with_label_values(vals).start_timer()
     }
 }
+
+pub trait IntGaugeHelper {
+    fn set_with(&self, labels: &[&str], val: i64);
+}
+
+impl IntGaugeHelper for IntGaugeVec {
+    fn set_with(&self, labels: &[&str], val: i64) {
+        self.with_label_values(labels).set(val)
+    }
+}

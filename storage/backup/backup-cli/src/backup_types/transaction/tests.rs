@@ -115,7 +115,6 @@ fn end_to_end() {
         .run(),
     )
     .unwrap();
-
     // We don't write down any ledger infos when recovering transactions. State-sync needs to take
     // care of it before running consensus. The latest transactions are deemed "synced" instead of
     // "committed" most likely.

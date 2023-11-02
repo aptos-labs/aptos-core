@@ -73,6 +73,29 @@ impl DataClientRequest {
             },
         }
     }
+
+    /// Returns true iff the request is an optimistic fetch request
+    pub fn is_optimistic_fetch_request(&self) -> bool {
+        matches!(self, DataClientRequest::NewTransactionsWithProof(_))
+            || matches!(self, DataClientRequest::NewTransactionOutputsWithProof(_))
+            || matches!(
+                self,
+                DataClientRequest::NewTransactionsOrOutputsWithProof(_)
+            )
+    }
+
+    /// Returns true iff the request is a subscription request
+    pub fn is_subscription_request(&self) -> bool {
+        matches!(self, DataClientRequest::SubscribeTransactionsWithProof(_))
+            || matches!(
+                self,
+                DataClientRequest::SubscribeTransactionOutputsWithProof(_)
+            )
+            || matches!(
+                self,
+                DataClientRequest::SubscribeTransactionsOrOutputsWithProof(_)
+            )
+    }
 }
 
 /// A request for fetching states values.

@@ -8,21 +8,25 @@ use aptos_db::{fast_sync_storage_wrapper::FastSyncStorageWrapper, AptosDB};
 use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::{DbReader, DbReaderWriter};
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use either::Either;
 use std::{fs, path::Path, sync::Arc, time::Instant};
 use tokio::runtime::Runtime;
 
-pub(crate) fn maybe_apply_genesis(db_rw: &DbReaderWriter, node_config: &NodeConfig) -> Result<()> {
+pub(crate) fn maybe_apply_genesis(
+    db_rw: &DbReaderWriter,
+    node_config: &NodeConfig,
+) -> Result<Option<LedgerInfoWithSignatures>> {
     let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {
-        maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
+        let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
             .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
+        Ok(ledger_info_opt)
     } else {
         info ! ("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
+        Ok(None)
     }
-    Ok(())
 }
 
 #[cfg(not(feature = "consensus-only-perf-test"))]
@@ -43,9 +47,24 @@ pub(crate) fn bootstrap_db(
             Either::Right(fast_sync_db_wrapper) => {
                 let temp_db = fast_sync_db_wrapper.get_temporary_db_with_genesis();
                 maybe_apply_genesis(&DbReaderWriter::from_arc(temp_db), node_config)?;
-
                 let (db_arc, db_rw) = DbReaderWriter::wrap(fast_sync_db_wrapper);
                 let fast_sync_db = db_arc.get_fast_sync_db();
+                // FastSyncDB requires ledger info at epoch 0 to establish provenance to genesis
+                let ledger_info = db_arc
+                    .get_temporary_db_with_genesis()
+                    .get_epoch_ending_ledger_info(0)
+                    .expect("Genesis ledger info must exist");
+
+                if fast_sync_db
+                    .get_latest_ledger_info_option()
+                    .expect("should returns Ok results")
+                    .is_none()
+                {
+                    // it means the DB is empty and we need to
+                    // commit the genesis ledger info to the DB.
+                    fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
+                }
+
                 let db_backup_service =
                     start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
 

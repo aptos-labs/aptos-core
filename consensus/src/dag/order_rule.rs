@@ -4,13 +4,12 @@
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::AnchorElection,
-    dag_state_sync::DAG_WINDOW,
     dag_store::{Dag, NodeStatus},
     observability::{
         logging::{LogEvent, LogSchema},
         tracing::{observe_node, NodeStage},
     },
-    storage::DAGStorage,
+    storage::{CommitEvent, DAGStorage},
     types::NodeMetadata,
     CertifiedNode,
 };
@@ -27,6 +26,7 @@ pub struct OrderRule {
     anchor_election: Box<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
     storage: Arc<dyn DAGStorage>,
+    dag_window_size_config: Round,
 }
 
 impl OrderRule {
@@ -37,9 +37,10 @@ impl OrderRule {
         mut anchor_election: Box<dyn AnchorElection>,
         notifier: Arc<dyn OrderedNotifier>,
         storage: Arc<dyn DAGStorage>,
+        dag_window_size_config: Round,
     ) -> Self {
         let commit_events = storage
-            .get_latest_k_committed_events(DAG_WINDOW)
+            .get_latest_k_committed_events(dag_window_size_config)
             .expect("Failed to read commit events from storage");
         // make sure it's sorted
         assert!(commit_events
@@ -57,12 +58,7 @@ impl OrderRule {
                         .for_each(|node_status| node_status.mark_as_ordered());
                 }
             }
-            anchor_election.update_reputation(
-                event.round(),
-                event.author(),
-                event.parents(),
-                event.failed_authors(),
-            );
+            anchor_election.update_reputation(event);
         }
         let mut order_rule = Self {
             epoch_state,
@@ -71,6 +67,7 @@ impl OrderRule {
             anchor_election,
             notifier,
             storage,
+            dag_window_size_config,
         };
         // re-check if anything can be ordered to recover pending anchors
         order_rule.process_all();
@@ -158,7 +155,7 @@ impl OrderRule {
             self.lowest_unordered_anchor_round,
             anchor.round(),
         ));
-        let lowest_round_to_reach = anchor.round().saturating_sub(DAG_WINDOW);
+        let lowest_round_to_reach = anchor.round().saturating_sub(self.dag_window_size_config);
 
         // Ceil it to the closest unordered anchor round
         let lowest_anchor_round = std::cmp::max(
@@ -168,7 +165,7 @@ impl OrderRule {
         );
         assert!(Self::check_parity(lowest_anchor_round, anchor.round()));
 
-        let failed_authors: Vec<_> = (lowest_anchor_round..anchor.round())
+        let failed_authors_and_rounds: Vec<_> = (lowest_anchor_round..anchor.round())
             .step_by(2)
             .map(|failed_round| (failed_round, self.anchor_election.get_anchor(failed_round)))
             .collect();
@@ -177,12 +174,15 @@ impl OrderRule {
             .iter()
             .map(|cert| *cert.metadata().author())
             .collect();
-        self.anchor_election.update_reputation(
-            anchor.round(),
-            anchor.author(),
+        let event = CommitEvent::new(
+            anchor.id(),
             parents,
-            failed_authors.iter().map(|(_, author)| *author).collect(),
+            failed_authors_and_rounds
+                .iter()
+                .map(|(_, author)| *author)
+                .collect(),
         );
+        self.anchor_election.update_reputation(event);
 
         let mut dag_writer = self.dag.write();
         let mut ordered_nodes: Vec<_> = dag_writer
@@ -209,7 +209,7 @@ impl OrderRule {
 
         self.lowest_unordered_anchor_round = anchor.round() + 1;
         self.notifier
-            .send_ordered_nodes(ordered_nodes, failed_authors);
+            .send_ordered_nodes(ordered_nodes, failed_authors_and_rounds);
     }
 
     /// Check if this node can trigger anchors to be ordered

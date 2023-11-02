@@ -128,13 +128,13 @@ trait AssertNoExternalStrongRef {
     fn assert_no_external_strong_ref(&self);
 }
 
-impl<V> AssertNoExternalStrongRef for SparseMerkleTree<V> {
+impl<V: Send + Sync + 'static> AssertNoExternalStrongRef for SparseMerkleTree<V> {
     fn assert_no_external_strong_ref(&self) {
-        assert_subtree_sole_strong_ref(&self.inner.root);
+        assert_subtree_sole_strong_ref(self.inner.root());
     }
 }
 
-fn assert_subtree_sole_strong_ref<V>(subtree: &SubTree<V>) {
+fn assert_subtree_sole_strong_ref<V: Send + Sync + 'static>(subtree: &SubTree<V>) {
     if let SubTree::NonEmpty {
         root: NodeHandle::Shared(arc),
         ..

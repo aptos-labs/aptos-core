@@ -9,10 +9,12 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 
 mod error;
+pub mod local_executor_helper;
+mod metrics;
 pub mod process_executor_service;
 mod remote_cordinator_client;
 mod remote_cross_shard_client;
-mod remote_executor_client;
+pub mod remote_executor_client;
 pub mod remote_executor_service;
 mod remote_state_view;
 mod remote_state_view_service;

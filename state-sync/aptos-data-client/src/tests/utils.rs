@@ -7,6 +7,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::HashValue;
+use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_storage_service_server::network::NetworkRequest;
 use aptos_storage_service_types::{
     requests::DataRequest,
@@ -104,15 +105,35 @@ pub async fn get_network_request(
     mock_network.next_request(network_id).await.unwrap()
 }
 
+/// Returns the peer distance from validators for the given peer
+pub fn get_peer_distance_from_validators(
+    mock_network: &mut MockNetwork,
+    peer: PeerNetworkId,
+) -> u64 {
+    let peer_monitoring_metadata = get_peer_monitoring_metadata(mock_network, peer);
+    peer_monitoring_metadata
+        .latest_network_info_response
+        .unwrap()
+        .distance_from_validators
+}
+
 /// Returns the ping latency for the given peer
 pub fn get_peer_ping_latency(mock_network: &mut MockNetwork, peer: PeerNetworkId) -> f64 {
-    // Get the peer monitoring metadata
+    let peer_monitoring_metadata = get_peer_monitoring_metadata(mock_network, peer);
+    peer_monitoring_metadata.average_ping_latency_secs.unwrap()
+}
+
+/// Returns the peer monitoring metadata for the given peer
+fn get_peer_monitoring_metadata(
+    mock_network: &mut MockNetwork,
+    peer: PeerNetworkId,
+) -> PeerMonitoringMetadata {
+    // Get the peer metadata
     let peers_and_metadata = mock_network.get_peers_and_metadata();
     let peer_metadata = peers_and_metadata.get_metadata_for_peer(peer).unwrap();
-    let peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata();
 
-    // Return the ping latency
-    peer_monitoring_metadata.average_ping_latency_secs.unwrap()
+    // Return the peer monitoring metadata
+    peer_metadata.get_peer_monitoring_metadata()
 }
 
 /// Handles a storage server summary request by sending the specified storage summary
@@ -150,6 +171,22 @@ pub fn handle_transactions_request(network_request: NetworkRequest, use_compress
             use_compression,
         )
         .unwrap()));
+}
+
+/// Removes the distance metadata for the specified peer
+pub fn remove_distance_metadata(client: &AptosDataClient, peer: PeerNetworkId) {
+    // Get the peer monitoring metadata
+    let peers_and_metadata = client.get_peers_and_metadata();
+    let peer_metadata = peers_and_metadata.get_metadata_for_peer(peer).unwrap();
+    let mut peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata().clone();
+
+    // Remove the network info response (containing the distance metadata)
+    peer_monitoring_metadata.latest_network_info_response = None;
+
+    // Update the peer monitoring metadata
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer, peer_monitoring_metadata)
+        .unwrap();
 }
 
 /// Removes the latency metadata for the specified peer

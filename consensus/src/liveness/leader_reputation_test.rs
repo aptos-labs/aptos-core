@@ -322,7 +322,7 @@ fn test_api(use_root_hash: bool) {
             (epoch, 2),
             aptos_db.add_event_with_data(proposers[0], vec![3], vec![])
         );
-        let backend = Box::new(AptosDBBackend::new(1, 4, aptos_db.clone()));
+        let backend = Arc::new(AptosDBBackend::new(1, 4, aptos_db.clone()));
         let leader_reputation = LeaderReputation::new(
             epoch,
             HashMap::from([(epoch, proposers.clone())]),

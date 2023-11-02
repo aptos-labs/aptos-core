@@ -8,18 +8,79 @@ This translates Aptos transactions to and from BCS for signing and submitting to
 from __future__ import annotations
 
 import hashlib
-import typing
 import unittest
-from typing import List
+from typing import Any, Callable, List, Optional, Union, cast
 
-from . import ed25519
+from typing_extensions import Protocol
+
+from . import asymmetric_crypto, ed25519, secp256k1_ecdsa
 from .account_address import AccountAddress
-from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
+from .authenticator import (
+    AccountAuthenticator,
+    Authenticator,
+    Ed25519Authenticator,
+    FeePayerAuthenticator,
+    MultiAgentAuthenticator,
+    SingleKeyAuthenticator,
+    SingleSenderAuthenticator,
+)
 from .bcs import Deserializer, Serializer
 from .type_tag import StructTag, TypeTag
 
 
-class RawTransaction:
+class RawTransactionInternal(Protocol):
+    def keyed(self) -> bytes:
+        ser = Serializer()
+        self.serialize(ser)
+        prehash = bytearray(self.prehash())
+        prehash.extend(ser.output())
+        return bytes(prehash)
+
+    def prehash(self) -> bytes:
+        ...
+
+    def serialize(self, ser: Serializer):
+        ...
+
+    def sign(self, key: asymmetric_crypto.PrivateKey) -> AccountAuthenticator:
+        signature = key.sign(self.keyed())
+        if isinstance(signature, ed25519.Signature):
+            return AccountAuthenticator(
+                Ed25519Authenticator(
+                    cast(ed25519.PublicKey, key.public_key()), signature
+                )
+            )
+        return AccountAuthenticator(SingleKeyAuthenticator(key.public_key(), signature))
+
+    def sign_simulated(self, key: asymmetric_crypto.PublicKey) -> AccountAuthenticator:
+        if isinstance(key, ed25519.PublicKey):
+            return AccountAuthenticator(
+                Ed25519Authenticator(key, ed25519.Signature(b"\x00" * 64))
+            )
+        elif isinstance(key, secp256k1_ecdsa.PublicKey):
+            return AccountAuthenticator(
+                SingleKeyAuthenticator(key, secp256k1_ecdsa.Signature(b"\x00" * 64))
+            )
+        else:
+            raise NotImplementedError()
+
+    def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
+        return key.verify(self.keyed(), signature)
+
+
+class RawTransactionWithData(RawTransactionInternal, Protocol):
+    raw_transaction: RawTransaction
+
+    def inner(self) -> RawTransaction:
+        return self.raw_transaction
+
+    def prehash(self) -> bytes:
+        hasher = hashlib.sha3_256()
+        hasher.update(b"APTOS::RawTransactionWithData")
+        return hasher.digest()
+
+
+class RawTransaction(RawTransactionInternal):
     # Sender's address
     sender: AccountAddress
     # Sequence number of this transaction. This must match the sequence number in the sender's
@@ -83,19 +144,6 @@ class RawTransaction:
         hasher.update(b"APTOS::RawTransaction")
         return hasher.digest()
 
-    def keyed(self) -> bytes:
-        ser = Serializer()
-        self.serialize(ser)
-        prehash = bytearray(self.prehash())
-        prehash.extend(ser.output())
-        return bytes(prehash)
-
-    def sign(self, key: ed25519.PrivateKey) -> ed25519.Signature:
-        return key.sign(self.keyed())
-
-    def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
-        return key.verify(self.keyed(), signature)
-
     @staticmethod
     def deserialize(deserializer: Deserializer) -> RawTransaction:
         return RawTransaction(
@@ -118,8 +166,7 @@ class RawTransaction:
         serializer.u8(self.chain_id)
 
 
-class MultiAgentRawTransaction:
-    raw_transaction: RawTransaction
+class MultiAgentRawTransaction(RawTransactionWithData):
     secondary_signers: List[AccountAddress]
 
     def __init__(
@@ -128,30 +175,35 @@ class MultiAgentRawTransaction:
         self.raw_transaction = raw_transaction
         self.secondary_signers = secondary_signers
 
-    def inner(self) -> RawTransaction:
-        return self.raw_transaction
-
-    def prehash(self) -> bytes:
-        hasher = hashlib.sha3_256()
-        hasher.update(b"APTOS::RawTransactionWithData")
-        return hasher.digest()
-
-    def keyed(self) -> bytes:
-        serializer = Serializer()
+    def serialize(self, serializer: Serializer):
         # This is a type indicator for an enum
         serializer.u8(0)
         serializer.struct(self.raw_transaction)
         serializer.sequence(self.secondary_signers, Serializer.struct)
 
-        prehash = bytearray(self.prehash())
-        prehash.extend(serializer.output())
-        return bytes(prehash)
 
-    def sign(self, key: ed25519.PrivateKey) -> ed25519.Signature:
-        return key.sign(self.keyed())
+class FeePayerRawTransaction(RawTransactionWithData):
+    secondary_signers: List[AccountAddress]
+    fee_payer: Optional[AccountAddress]
 
-    def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
-        return key.verify(self.keyed(), signature)
+    def __init__(
+        self,
+        raw_transaction: RawTransaction,
+        secondary_signers: List[AccountAddress],
+        fee_payer: Optional[AccountAddress],
+    ):
+        self.raw_transaction = raw_transaction
+        self.secondary_signers = secondary_signers
+        self.fee_payer = fee_payer
+
+    def serialize(self, serializer: Serializer):
+        serializer.u8(1)
+        serializer.struct(self.raw_transaction)
+        serializer.sequence(self.secondary_signers, Serializer.struct)
+        fee_payer = (
+            AccountAddress.from_str("0x0") if self.fee_payer is None else self.fee_payer
+        )
+        serializer.struct(fee_payer)
 
 
 class TransactionPayload:
@@ -160,9 +212,9 @@ class TransactionPayload:
     SCRIPT_FUNCTION: int = 2
 
     variant: int
-    value: typing.Any
+    value: Any
 
-    def __init__(self, payload: typing.Any):
+    def __init__(self, payload: Any):
         if isinstance(payload, Script):
             self.variant = TransactionPayload.SCRIPT
         elif isinstance(payload, ModuleBundle):
@@ -186,7 +238,7 @@ class TransactionPayload:
         variant = deserializer.uleb128()
 
         if variant == TransactionPayload.SCRIPT:
-            payload: typing.Any = Script.deserialize(deserializer)
+            payload: Any = Script.deserialize(deserializer)
         elif variant == TransactionPayload.MODULE_BUNDLE:
             payload = ModuleBundle.deserialize(deserializer)
         elif variant == TransactionPayload.SCRIPT_FUNCTION:
@@ -260,9 +312,9 @@ class ScriptArgument:
     U256: int = 8
 
     variant: int
-    value: typing.Any
+    value: Any
 
-    def __init__(self, variant: int, value: typing.Any):
+    def __init__(self, variant: int, value: Any):
         if variant < 0 or variant > 5:
             raise Exception("Invalid variant")
 
@@ -273,7 +325,7 @@ class ScriptArgument:
     def deserialize(deserializer: Deserializer) -> ScriptArgument:
         variant = deserializer.u8()
         if variant == ScriptArgument.U8:
-            value: typing.Any = deserializer.u8()
+            value: Any = deserializer.u8()
         elif variant == ScriptArgument.U16:
             value = deserializer.u16()
         elif variant == ScriptArgument.U32:
@@ -416,13 +468,13 @@ class ModuleId:
 
 
 class TransactionArgument:
-    value: typing.Any
-    encoder: typing.Callable[[Serializer, typing.Any], bytes]
+    value: Any
+    encoder: Callable[[Serializer, Any], bytes]
 
     def __init__(
         self,
-        value: typing.Any,
-        encoder: typing.Callable[[Serializer, typing.Any], bytes],
+        value: Any,
+        encoder: Callable[[Serializer, Any], bytes],
     ):
         self.value = value
         self.encoder = encoder
@@ -437,8 +489,21 @@ class SignedTransaction:
     transaction: RawTransaction
     authenticator: Authenticator
 
-    def __init__(self, transaction: RawTransaction, authenticator: Authenticator):
+    def __init__(
+        self,
+        transaction: RawTransaction,
+        authenticator: Union[AccountAuthenticator, Authenticator],
+    ):
         self.transaction = transaction
+        if isinstance(authenticator, AccountAuthenticator):
+            if (
+                authenticator.variant == AccountAuthenticator.ED25519
+                or authenticator == AccountAuthenticator.MULTI_ED25519
+            ):
+                authenticator = Authenticator(authenticator.authenticator)
+            else:
+                authenticator = Authenticator(SingleSenderAuthenticator(authenticator))
+
         self.authenticator = authenticator
 
     def __eq__(self, other: object) -> bool:
@@ -458,14 +523,23 @@ class SignedTransaction:
         return ser.output()
 
     def verify(self) -> bool:
-        if isinstance(self.authenticator.authenticator, MultiAgentAuthenticator):
-            transaction = MultiAgentRawTransaction(
-                self.transaction, self.authenticator.authenticator.secondary_addresses()
+        auth = self.authenticator.authenticator
+        if isinstance(auth, MultiAgentAuthenticator):
+            transaction: RawTransactionInternal = MultiAgentRawTransaction(
+                self.transaction, auth.secondary_addresses()
             )
-            keyed = transaction.keyed()
+        elif isinstance(auth, FeePayerAuthenticator):
+            transaction = cast(
+                RawTransactionInternal,
+                FeePayerRawTransaction(
+                    self.transaction,
+                    auth.secondary_addresses(),
+                    auth.fee_payer_address(),
+                ),
+            )
         else:
-            keyed = self.transaction.keyed()
-        return self.authenticator.verify(keyed)
+            transaction = self.transaction
+        return self.authenticator.verify(transaction.keyed())
 
     @staticmethod
     def deserialize(deserializer: Deserializer) -> SignedTransaction:
@@ -510,10 +584,7 @@ class Test(unittest.TestCase):
             4,
         )
 
-        signature = raw_transaction.sign(private_key)
-        self.assertTrue(raw_transaction.verify(public_key, signature))
-
-        authenticator = Authenticator(Ed25519Authenticator(public_key, signature))
+        authenticator = raw_transaction.sign(private_key)
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
@@ -565,12 +636,7 @@ class Test(unittest.TestCase):
             chain_id_input,
         )
 
-        signature = raw_transaction_generated.sign(sender_private_key)
-        self.assertTrue(raw_transaction_generated.verify(sender_public_key, signature))
-
-        authenticator = Authenticator(
-            Ed25519Authenticator(sender_public_key, signature)
-        )
+        authenticator = raw_transaction_generated.sign(sender_private_key)
         signed_transaction_generated = SignedTransaction(
             raw_transaction_generated, authenticator
         )
@@ -640,30 +706,13 @@ class Test(unittest.TestCase):
             [receiver_account_address],
         )
 
-        sender_signature = raw_transaction_generated.sign(sender_private_key)
-        receiver_signature = raw_transaction_generated.sign(receiver_private_key)
-        self.assertTrue(
-            raw_transaction_generated.verify(sender_public_key, sender_signature)
-        )
-        self.assertTrue(
-            raw_transaction_generated.verify(receiver_public_key, receiver_signature)
-        )
+        sender_authenticator = raw_transaction_generated.sign(sender_private_key)
+        receiver_authenticator = raw_transaction_generated.sign(receiver_private_key)
 
         authenticator = Authenticator(
             MultiAgentAuthenticator(
-                Authenticator(
-                    Ed25519Authenticator(sender_public_key, sender_signature)
-                ),
-                [
-                    (
-                        receiver_account_address,
-                        Authenticator(
-                            Ed25519Authenticator(
-                                receiver_public_key, receiver_signature
-                            )
-                        ),
-                    )
-                ],
+                sender_authenticator,
+                [(receiver_account_address, receiver_authenticator)],
             )
         )
 
@@ -714,5 +763,18 @@ class Test(unittest.TestCase):
         )
 
         self.assertEqual(signed_transaction.transaction, raw_transaction)
-        self.assertEqual(signed_transaction, signed_transaction_generated)
         self.assertTrue(signed_transaction.verify())
+
+    def verify_fee_payer(self):
+        signed_transaction_input = "4629fa78b6a7810c6c3a45565707896944c4936a5583f9d3981c0692beb9e3fe010000000000000002915efe6647e0440f927d46e39bcb5eb040a7e567e1756e002073bc6e26f2cd230c63616e7661735f746f6b656e04647261770004205d45bb2a6f391440ba10444c7734559bd5ef9053930e3ef53d05be332518522bc90164850086008700880089008a008b008c008d008e008f0090009100920093009400950096009700980099009a009b009c009d009e009f00a000a100a200a300a400a500a600a700a800a900aa00ab00ac00ad00ae00af00b000b100b200b300b400b500b600b700b800b900ba00bb00bc00bd00be00bf00c000c100c200c300c4009f00a000a100a200a300a400a500a600a700a800a900aa00ab00ac00ad00ae00af00b000b100b200b300b400b500b600b700b800b900ba00bb00bc00bd00be00bf00c000c100c200c90164b701b701b701b701b701b701b701b701b701b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601b601130213021302130213021302130213021302130213021302130213021302130213021302130213021302130213021302130213021302130213021302130213021302130213021302656400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400d030000000000640000000000000043663065000000000103002076585d13da61c3d65f786b082e75ef790be66639fa066e0fc3b6f427d6ceb89340e137736ee1a0b60e8bdac8d0c75f29f1e6c6e7378689928125ea7a13164f96244d98ed3584df98643f5db00624f0271931498ff19492558737fbd4dcd0e99c040000af621023eaa26d6f1139da3e146a43aa4757fd77552f73ceba34b00295c340ce0020c245d6e4f0ce0867b80f9b901c00be5d790ed73272f4e5126ce02a5a7d55a15c4002fbb70e7d79b536d692953e4bdc3f762b5a288839ab974f03c8597ebb1c51d1d7e0920991bd79ca8c0acd02a7fb7c38b9c1f4d7e53f19f88b130555b20ef60d"
+        der = Deserializer()
+        signed_txn = der.struct(SignedTransaction)
+
+        ser = Serializer()
+        ser.seriaize(signed_txn)
+        self.assertEqual(ser.output().hex(), signed_transaction_input)
+
+        self.assertTrue(
+            isinstance(signed_txn.authenticator.authenticator, FeePayerAuthenticator)
+        )
+        self.assertTrue(signed_txn.verify())

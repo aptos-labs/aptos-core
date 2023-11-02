@@ -31,7 +31,7 @@ pub(crate) struct BlockPreparationStage {
 
 impl BlockPreparationStage {
     pub fn new(num_shards: usize, partitioner_config: &dyn PartitionerConfig) -> Self {
-        let maybe_partitioner = if num_shards <= 1 {
+        let maybe_partitioner = if num_shards == 0 {
             None
         } else {
             let partitioner = partitioner_config.build();

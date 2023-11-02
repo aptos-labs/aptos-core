@@ -234,6 +234,7 @@ impl BufferManager {
 
         let request = self.create_new_request(ExecutionRequest {
             ordered_blocks: rand_ready_blocks.clone(),
+            lifetime_guard: self.create_new_request(()),
         });
         self.execution_schedule_phase_tx
             .send(request)
@@ -262,9 +263,11 @@ impl BufferManager {
             // NOTE: probably should schedule retry for all ordered blocks, but since execution error
             // is not expected nor retryable in reality, I'd rather remove retrying or do it more
             // properly than complicating it here.
-            let ordered_item = self.buffer.get(&self.execution_root);
-            let ordered_blocks = ordered_item.get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
+            let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
+            let request = self.create_new_request(ExecutionRequest {
+                ordered_blocks,
+                lifetime_guard: self.create_new_request(()),
+            });
             let sender = self.execution_schedule_phase_tx.clone();
             Self::spawn_retry_request(sender, request, Duration::from_millis(100));
         }

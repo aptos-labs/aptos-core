@@ -19,6 +19,12 @@ A module for generating globally unique identifiers
 -  [Function `eq_id`](#0x1_guid_eq_id)
 -  [Specification](#@Specification_1)
     -  [Function `create`](#@Specification_1_create)
+    -  [Function `id`](#@Specification_1_id)
+    -  [Function `creator_address`](#@Specification_1_creator_address)
+    -  [Function `id_creator_address`](#@Specification_1_id_creator_address)
+    -  [Function `creation_num`](#@Specification_1_creation_num)
+    -  [Function `id_creation_num`](#@Specification_1_id_creation_num)
+    -  [Function `eq_id`](#@Specification_1_eq_id)
 
 
 <pre><code></code></pre>
@@ -335,6 +341,102 @@ Return true if the GUID's ID is <code>id</code>
 <pre><code><b>aborts_if</b> creation_num_ref + 1 &gt; MAX_U64;
 <b>ensures</b> result.id.creation_num == <b>old</b>(creation_num_ref);
 <b>ensures</b> creation_num_ref == <b>old</b>(creation_num_ref) + 1;
+</code></pre>
+
+
+
+<a name="@Specification_1_id"></a>
+
+### Function `id`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id">id</a>(<a href="guid.md#0x1_guid">guid</a>: &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <a href="guid.md#0x1_guid_ID">guid::ID</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_creator_address"></a>
+
+### Function `creator_address`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creator_address">creator_address</a>(<a href="guid.md#0x1_guid">guid</a>: &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_id_creator_address"></a>
+
+### Function `id_creator_address`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creator_address">id_creator_address</a>(id: &<a href="guid.md#0x1_guid_ID">guid::ID</a>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_creation_num"></a>
+
+### Function `creation_num`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_creation_num">creation_num</a>(<a href="guid.md#0x1_guid">guid</a>: &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_id_creation_num"></a>
+
+### Function `id_creation_num`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_id_creation_num">id_creation_num</a>(id: &<a href="guid.md#0x1_guid_ID">guid::ID</a>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a name="@Specification_1_eq_id"></a>
+
+### Function `eq_id`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="guid.md#0x1_guid_eq_id">eq_id</a>(<a href="guid.md#0x1_guid">guid</a>: &<a href="guid.md#0x1_guid_GUID">guid::GUID</a>, id: &<a href="guid.md#0x1_guid_ID">guid::ID</a>): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

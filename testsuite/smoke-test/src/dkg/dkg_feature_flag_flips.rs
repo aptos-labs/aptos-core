@@ -53,7 +53,7 @@ script {{
     use aptos_framework::aptos_governance;
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = 38; // supposed to be `std::features::get_reconfigure_with_dkg_feature()` but not sure if it will work.
+        let dkg_feature_id: u64 = 42; // supposed to be `std::features::get_reconfigure_with_dkg_feature()` but not sure if it will work.
         aptos_governance::toggle_features(&framework_signer, vector[], vector[dkg_feature_id]);
     }}
 }}
@@ -74,7 +74,7 @@ script {{
     use aptos_framework::aptos_governance;
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = 38; // supposed to be `std::features::get_reconfigure_with_dkg_feature()` but not sure if it will work.
+        let dkg_feature_id: u64 = 42; // supposed to be `std::features::get_reconfigure_with_dkg_feature()` but not sure if it will work.
         aptos_governance::toggle_features(&framework_signer, vector[dkg_feature_id], vector[]);
     }}
 }}

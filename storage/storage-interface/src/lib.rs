@@ -49,6 +49,7 @@ pub mod state_delta;
 pub mod state_view;
 
 use crate::state_delta::StateDelta;
+use aptos_scratchpad::SparseMerkleTree;
 pub use executed_trees::ExecutedTrees;
 
 // This is last line of defense against large queries slipping through external facing interfaces,
@@ -370,6 +371,9 @@ pub trait DbReader: Send + Sync {
         /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
         fn get_latest_executed_trees(&self) -> Result<ExecutedTrees>;
+
+        /// Get the oldest in memory state tree.
+        fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>>;
 
         /// Get the ledger info of the epoch that `known_version` belongs to.
         fn get_epoch_ending_ledger_info(

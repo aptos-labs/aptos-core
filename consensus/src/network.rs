@@ -5,7 +5,10 @@
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     counters,
-    dag::{DAGMessage, DAGNetworkMessage, ProofNotifier, RpcWithFallback, TDAGNetworkSender},
+    dag::{
+        DAGMessage, DAGNetworkMessage, DAGRpcResult, ProofNotifier, RpcWithFallback,
+        TDAGNetworkSender,
+    },
     experimental::commit_reliable_broadcast::CommitMessage,
     dkg::DKGNetworkMessage,
     logging::{LogEvent, LogSchema},
@@ -31,7 +34,7 @@ use aptos_network::{
     protocols::{network::Event, rpc::error::RpcError},
     ProtocolId,
 };
-use aptos_reliable_broadcast::{RBNetworkSender, RBMessage};
+use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures, validator_verifier::ValidatorVerifier,
@@ -51,8 +54,9 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
+use crate::dkg::DKGMessage;
 
-pub trait TConsensusMsg: Sized + Clone + Serialize + DeserializeOwned {
+pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
 
     fn from_network_message(msg: ConsensusMsg) -> anyhow::Result<Self> {
@@ -469,7 +473,7 @@ impl TDAGNetworkSender for NetworkSender {
         receiver: Author,
         message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
@@ -484,6 +488,8 @@ impl TDAGNetworkSender for NetworkSender {
         message: DAGMessage,
         retry_interval: Duration,
         rpc_timeout: Duration,
+        min_concurrent_responders: u32,
+        max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         RpcWithFallback::new(
             responders,
@@ -492,26 +498,57 @@ impl TDAGNetworkSender for NetworkSender {
             rpc_timeout,
             self.clone(),
             self.time_service.clone(),
+            min_concurrent_responders,
+            max_concurrent_responders,
         )
     }
 }
 
-#[async_trait::async_trait]
-impl<M> RBNetworkSender<M> for NetworkSender
-where
-    M: RBMessage + TConsensusMsg + 'static,
-{
+#[async_trait]
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for NetworkSender {
     async fn send_rb_rpc(
         &self,
         receiver: Author,
-        message: M,
+        message: DAGMessage,
         timeout: Duration,
-    ) -> anyhow::Result<M> {
-        self.consensus_network_client
-            .send_rpc(receiver, message.into_network_message(), timeout)
+    ) -> anyhow::Result<DAGRpcResult> {
+        self.send_rpc(receiver, message.into_network_message(), timeout)
             .await
             .map_err(|e| anyhow!("invalid rpc response: {}", e))
             .and_then(TConsensusMsg::from_network_message)
+    }
+}
+
+#[async_trait]
+impl RBNetworkSender<DKGMessage, DKGMessage> for NetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: DKGMessage,
+        timeout: Duration,
+    ) -> anyhow::Result<DKGMessage> {
+        self.send_rpc(receiver, message.into_network_message(), timeout)
+            .await
+            .map_err(|e| anyhow!("invalid rpc response: {}", e))
+            .and_then(TConsensusMsg::from_network_message)
+    }
+}
+
+#[async_trait]
+impl RBNetworkSender<RandMessage, RandMessage> for NetworkSender {
+    async fn send_rb_rpc(
+        &self,
+        receiver: Author,
+        message: RandMessage,
+        timeout_duration: Duration,
+    ) -> anyhow::Result<RandMessage> {
+        let msg = ConsensusMsg::RandMessage(message.into());
+        let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
+            ConsensusMsg::RandMessage(resp) if matches!(*resp, RandMessage::ShareAck(_) | RandMessage::DeltaAck(_)) => *resp,
+            _ => bail!("[RandMessage] Invalid response to request"),
+        };
+
+        Ok(response)
     }
 }
 

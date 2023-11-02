@@ -5,7 +5,7 @@ extern crate core;
 
 mod backup;
 mod backup_maintenance;
-mod debugger;
+mod bootstrap;
 mod replay_verify;
 pub mod restore;
 #[cfg(test)]
@@ -13,6 +13,7 @@ mod tests;
 mod utils;
 
 use anyhow::Result;
+use aptos_db::db_debugger;
 use clap::Parser;
 
 #[derive(Parser)]
@@ -20,23 +21,30 @@ use clap::Parser;
 pub enum DBTool {
     #[clap(subcommand)]
     Backup(backup::Command),
-    #[clap(subcommand)]
-    Restore(restore::Command),
-    ReplayVerify(replay_verify::Opt),
-    #[clap(subcommand)]
-    Debug(debugger::Command),
+
     #[clap(subcommand)]
     BackupMaintenance(backup_maintenance::Command),
+
+    Bootstrap(bootstrap::Command),
+
+    #[clap(subcommand)]
+    Debug(db_debugger::Cmd),
+
+    ReplayVerify(replay_verify::Opt),
+
+    #[clap(subcommand)]
+    Restore(restore::Command),
 }
 
 impl DBTool {
     pub async fn run(self) -> Result<()> {
         match self {
             DBTool::Backup(cmd) => cmd.run().await,
-            DBTool::Restore(cmd) => cmd.run().await,
-            DBTool::ReplayVerify(cmd) => cmd.run().await,
             DBTool::BackupMaintenance(cmd) => cmd.run().await,
+            DBTool::Bootstrap(cmd) => cmd.run(),
             DBTool::Debug(cmd) => cmd.run(),
+            DBTool::ReplayVerify(cmd) => cmd.run().await,
+            DBTool::Restore(cmd) => cmd.run().await,
         }
     }
 }

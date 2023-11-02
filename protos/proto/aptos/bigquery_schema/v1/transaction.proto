@@ -1,0 +1,33 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Proto2 is required.
+// Current BigQuery runs over proto2, thus optional(nullable)
+// field with default value will be ignored. For example,
+// `int64 value = null` will be translated to 0 under column `value`.
+// To avoid any analytics hassle, proto2 is required here.
+syntax = "proto2";
+
+package aptos.bigquery_schema.transaction.v1;
+
+// Transaction is a simplified representation for the transaction
+// happened on the chain. Mainly built for streaming into BigQuery.
+// It matches with the structure defined for the transaction in Indexer.
+message Transaction {
+    required int64 version = 1;
+    required int64 block_height = 2;
+    required string hash = 3;
+    required string type = 4;
+    optional string payload = 5;
+    required string state_change_hash = 6;
+    required string event_root_hash = 7;
+    optional string state_checkpoint_hash = 8;
+    required uint64 gas_used = 9;
+    required bool success = 10;
+    required string vm_status = 11;
+    required string accumulator_root_hash = 12;
+    required int64 num_events = 13;
+    required int64 num_write_set_changes = 14;
+    required int64 epoch = 15;
+    required int64 inserted_at = 16;
+}

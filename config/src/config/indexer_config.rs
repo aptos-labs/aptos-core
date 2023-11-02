@@ -121,7 +121,7 @@ impl ConfigOptimizer for IndexerConfig {
         node_config: &mut NodeConfig,
         _local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         // If the indexer is not enabled, there's nothing to do
         let indexer_config = &mut node_config.indexer;

@@ -105,10 +105,20 @@ fn get_local_config_yaml<P: AsRef<Path>>(node_config_path: P) -> Result<Value, E
 }
 
 /// Extracts the node type and chain ID from the given node config
-fn extract_node_type_and_chain_id(node_config: &NodeConfig) -> Result<(NodeType, ChainId), Error> {
+/// and genesis transaction. If the chain ID cannot be extracted,
+/// None is returned.
+fn extract_node_type_and_chain_id(node_config: &NodeConfig) -> (NodeType, Option<ChainId>) {
+    // Get the node type from the node config
     let node_type = NodeType::extract_from_config(node_config);
-    let chain_id = get_chain_id(node_config)?;
-    Ok((node_type, chain_id))
+
+    // Get the chain ID from the genesis transaction
+    match get_chain_id(node_config) {
+        Ok(chain_id) => (node_type, Some(chain_id)),
+        Err(error) => {
+            println!("Failed to extract the chain ID from the genesis transaction: {:?}! Continuing with None.", error);
+            (node_type, None)
+        },
+    }
 }
 
 /// Optimize and sanitize the node config for the current environment
@@ -117,13 +127,7 @@ fn optimize_and_sanitize_node_config(
     local_config_yaml: Value,
 ) -> Result<(), Error> {
     // Extract the node type and chain ID from the node config
-    let (node_type, chain_id) = match extract_node_type_and_chain_id(node_config) {
-        Ok((node_type, chain_id)) => (node_type, chain_id),
-        Err(error) => {
-            println!("Failed to extract node type and chain ID from node config: {:?}. Skipping config optimization and sanitization!", error);
-            return Ok(());
-        },
-    };
+    let (node_type, chain_id) = extract_node_type_and_chain_id(node_config);
 
     // Print the extracted node type and chain ID
     println!(
@@ -141,19 +145,14 @@ fn optimize_and_sanitize_node_config(
 /// Sanitize the node config for the current environment
 pub fn sanitize_node_config(node_config: &mut NodeConfig) -> Result<(), Error> {
     // Extract the node type and chain ID from the node config
-    let (node_type, chain_id) = match extract_node_type_and_chain_id(node_config) {
-        Ok((node_type, chain_id)) => (node_type, chain_id),
-        Err(error) => {
-            println!("Failed to extract node type and chain ID from node config: {:?}. Skipping config sanitization!", error);
-            return Ok(());
-        },
-    };
+    let (node_type, chain_id) = extract_node_type_and_chain_id(node_config);
 
     // Sanitize the node config
     NodeConfig::sanitize(node_config, node_type, chain_id)
 }
 
-/// Get the chain ID for the node
+/// Get the chain ID for the node from the genesis transaction.
+/// If the chain ID cannot be extracted, an error is returned.
 fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
     // TODO: can we make this less hacky?
 

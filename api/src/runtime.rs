@@ -16,9 +16,11 @@ use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use poem::{
+    handler,
     http::{header, Method},
     listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
     middleware::Cors,
+    web::Html,
     EndpointExt, Route, Server,
 };
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
@@ -178,6 +180,7 @@ pub fn attach_poem_to_runtime(
 
         // Build routes for the API
         let route = Route::new()
+            .at("/", root_handler)
             .nest(
                 "/v1",
                 Route::new()
@@ -205,6 +208,24 @@ pub fn attach_poem_to_runtime(
     info!("API server is running at {}", actual_address);
 
     Ok(actual_address)
+}
+
+#[handler]
+async fn root_handler() -> Html<&'static str> {
+    let response = "<html>
+<head>
+    <title>Aptos Node API</title>
+</head>
+<body>
+    <p>
+        Welcome! The latest node API can be found at <a href=\"/v1\">/v1<a/>.
+    </p>
+    <p>
+        Learn more about the v1 node API here: <a href=\"/v1/spec\">/v1/spec<a/>.
+    </p>
+</body>
+</html>";
+    Html(response)
 }
 
 /// Returns the maximum number of runtime workers to be given to the

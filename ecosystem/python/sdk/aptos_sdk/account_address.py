@@ -7,13 +7,15 @@ import hashlib
 import unittest
 from dataclasses import dataclass
 
-from . import asymmetric_crypto, ed25519
+from . import asymmetric_crypto, asymmetric_crypto_wrapper, ed25519
 from .bcs import Deserializer, Serializer
 
 
 class AuthKeyScheme:
     Ed25519: bytes = b"\x00"
     MultiEd25519: bytes = b"\x01"
+    SingleKey: bytes = b"\x02"
+    MultiKey: bytes = b"\x03"
     DeriveObjectAddressFromGuid: bytes = b"\xFD"
     DeriveObjectAddressFromSeed: bytes = b"\xFE"
     DeriveResourceAccountAddress: bytes = b"\xFF"
@@ -204,6 +206,8 @@ class AccountAddress:
             hasher.update(AuthKeyScheme.Ed25519)
         elif isinstance(key, ed25519.MultiPublicKey):
             hasher.update(AuthKeyScheme.MultiEd25519)
+        elif isinstance(key, asymmetric_crypto_wrapper.PublicKey):
+            hasher.update(AuthKeyScheme.SingleKey)
         else:
             raise Exception("Unsupported asymmetric_crypto.PublicKey key type.")
 

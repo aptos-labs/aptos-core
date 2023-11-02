@@ -9,6 +9,7 @@ spec aptos_framework::chain_id {
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if exists<ChainId>(@aptos_framework);
+        ensures exists<ChainId>(addr);
     }
 
     spec get {

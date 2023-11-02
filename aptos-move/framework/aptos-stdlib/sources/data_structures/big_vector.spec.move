@@ -47,6 +47,7 @@ spec aptos_std::big_vector {
     }
 
     spec singleton<T: store>(element: T, bucket_size: u64): BigVector<T> {
+        aborts_if bucket_size == 0;
         ensures length(result) == 1;
         ensures result.bucket_size == bucket_size;
     }
@@ -67,12 +68,19 @@ spec aptos_std::big_vector {
 
     spec push_back<T: store>(v: &mut BigVector<T>, val: T) {
         let num_buckets = spec_table_len(v.buckets);
-        aborts_if num_buckets * v.bucket_size > MAX_U64;
-        aborts_if v.end_index + 1 > MAX_U64;
+        include PushbackAbortsIf<T>;
         ensures length(v) == length(old(v)) + 1;
         ensures v.end_index == old(v.end_index) + 1;
         ensures spec_at(v, v.end_index-1) == val;
         ensures forall i in 0..v.end_index-1: spec_at(v, i) == spec_at(old(v), i);
+        ensures v.bucket_size == old(v).bucket_size;
+    }
+
+    spec schema PushbackAbortsIf<T> {
+        v: BigVector<T>;
+        let num_buckets = spec_table_len(v.buckets);
+        aborts_if num_buckets * v.bucket_size > MAX_U64;
+        aborts_if v.end_index + 1 > MAX_U64;
     }
 
     spec pop_back<T>(v: &mut BigVector<T>): T {
@@ -90,7 +98,7 @@ spec aptos_std::big_vector {
     }
 
     spec swap<T>(v: &mut BigVector<T>, i: u64, j: u64) {
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 1000;
         aborts_if i >= length(v) || j >= length(v);
         ensures length(v) == length(old(v));
         ensures spec_at(v, i) == spec_at(old(v), j);

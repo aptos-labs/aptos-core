@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    docker::{
+        delete_container, get_docker, pull_docker_image, setup_docker_logging,
+        StopContainerShutdownStep,
+    },
     health_checker::HealthChecker,
     traits::{PostHealthyStep, ServiceManager, ShutdownStep},
-    utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
-};
-use crate::node::local_testnet::utils::{
-    get_docker, setup_docker_logging, StopContainerShutdownStep,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -89,7 +89,7 @@ impl ServiceManager for IndexerApiManager {
 
     async fn pre_run(&self) -> Result<()> {
         // Confirm Docker is available.
-        confirm_docker_available().await?;
+        get_docker().await?;
 
         // Delete any existing indexer API container we find.
         delete_container(INDEXER_API_CONTAINER_NAME).await?;
@@ -139,7 +139,7 @@ impl ServiceManager for IndexerApiManager {
             ..Default::default()
         };
 
-        let docker = get_docker()?;
+        let docker = get_docker().await?;
 
         // When using Docker Desktop you can and indeed must use the magic hostname
         // host.docker.internal in order to access localhost on the host system from

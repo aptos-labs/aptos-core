@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: function `0x2::X::foo` cannot be called from a script, because it is not public
+   ┌─ tests/visibility-checker/main_call_visibility_friend.move:13:5
+   │
+13 │     0x2::X::foo();
+   │     ^^^^^^^^^^^^^
+
+error: function `0x2::X::foo` cannot be called from a script, because it is not public
+   ┌─ tests/visibility-checker/main_call_visibility_friend.move:15:5
+   │
+15 │     0x2::X::foo();
+   │     ^^^^^^^^^^^^^
+
+error: function `0x2::X::baz` cannot be called from a script, because it is not public
+   ┌─ tests/visibility-checker/main_call_visibility_friend.move:16:5
+   │
+16 │     0x2::X::baz();
+   │     ^^^^^^^^^^^^^

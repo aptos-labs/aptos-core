@@ -1,31 +1,31 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    adapter::TLedgerInfoProvider,
-    dag_fetcher::FetchRequester,
-    order_rule::OrderRule,
-    storage::DAGStorage,
-    types::{CertifiedAck, CertifiedNodeMessage, DAGMessage, Extensions},
-    RpcHandler,
-};
 use crate::{
     dag::{
-        dag_fetcher::TFetchRequester,
-        dag_state_sync::DAG_WINDOW,
+        adapter::TLedgerInfoProvider,
+        dag_fetcher::{FetchRequester, TFetchRequester},
         dag_store::Dag,
+        errors::DagDriverError,
         observability::{
             counters,
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
+        order_rule::OrderRule,
         round_state::RoundState,
-        types::{CertificateAckState, CertifiedNode, Node, SignatureBuilder},
+        storage::DAGStorage,
+        types::{
+            CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
+            Extensions, Node, SignatureBuilder,
+        },
+        DAGRpcResult, RpcHandler,
     },
     payload_manager::PayloadManager,
     state_replication::PayloadClient,
 };
 use anyhow::bail;
+use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, PayloadFilter};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
@@ -39,14 +39,7 @@ use futures::{
     FutureExt,
 };
 use std::{sync::Arc, time::Duration};
-use thiserror::Error as ThisError;
 use tokio_retry::strategy::ExponentialBackoff;
-
-#[derive(Debug, ThisError)]
-pub enum DagDriverError {
-    #[error("missing parents")]
-    MissingParents,
-}
 
 pub(crate) struct DagDriver {
     author: Author,
@@ -54,7 +47,7 @@ pub(crate) struct DagDriver {
     dag: Arc<RwLock<Dag>>,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
+    reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
     rb_abort_handle: Option<(AbortHandle, u64)>,
     storage: Arc<dyn DAGStorage>,
@@ -62,6 +55,8 @@ pub(crate) struct DagDriver {
     fetch_requester: Arc<FetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
+    window_size_config: Round,
+    payload_config: DagPayloadConfig,
 }
 
 impl DagDriver {
@@ -71,13 +66,15 @@ impl DagDriver {
         dag: Arc<RwLock<Dag>>,
         payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
-        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff>>,
+        reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
         order_rule: OrderRule,
         fetch_requester: Arc<FetchRequester>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         round_state: RoundState,
+        window_size_config: Round,
+        payload_config: DagPayloadConfig,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -99,6 +96,8 @@ impl DagDriver {
             fetch_requester,
             ledger_info_provider,
             round_state,
+            window_size_config,
+            payload_config,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -181,7 +180,7 @@ impl DagDriver {
                     &dag_reader
                         .reachable(
                             strong_links.iter().map(|node| node.metadata()),
-                            Some(highest_commit_round.saturating_sub(DAG_WINDOW)),
+                            Some(highest_commit_round.saturating_sub(self.window_size_config)),
                             |_| true,
                         )
                         .map(|node_status| node_status.as_node().payload())
@@ -189,12 +188,23 @@ impl DagDriver {
                 )
             }
         };
+        // TODO: warn/panic if division yields 0 txns
+        let max_txns = self
+            .payload_config
+            .max_sending_txns_per_round
+            .saturating_div(self.epoch_state.verifier.len() as u64)
+            .max(1);
+        let max_txn_size_bytes = self
+            .payload_config
+            .max_sending_size_per_round_bytes
+            .saturating_div(self.epoch_state.verifier.len() as u64)
+            .max(1024);
         let payload = match self
             .payload_client
             .pull_payload(
-                Duration::from_secs(1),
-                1000,
-                10 * 1024 * 1024,
+                Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
+                max_txns,
+                max_txn_size_bytes,
                 payload_filter,
                 Box::pin(async {}),
                 false,

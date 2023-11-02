@@ -8,10 +8,9 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from . import ed25519
 from .account import Account
 from .account_address import AccountAddress
-from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
+from .authenticator import Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
 from .metadata import Metadata
 from .transactions import (
@@ -228,6 +227,30 @@ class RestClient:
     # Transactions
     #
 
+    async def simulate_bcs_transaction(
+        self,
+        signed_transaction: SignedTransaction,
+        estimate_gas_usage: bool = False,
+    ) -> Dict[str, Any]:
+        headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
+        params = {}
+        if estimate_gas_usage:
+            params = {
+                "estimate_gas_unit_price": "true",
+                "estimate_max_gas_amount": "true",
+            }
+
+        response = await self.client.post(
+            f"{self.base_url}/transactions/simulate",
+            params=params,
+            headers=headers,
+            content=signed_transaction.bytes(),
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+
+        return response.json()
+
     async def simulate_transaction(
         self,
         transaction: RawTransaction,
@@ -235,12 +258,7 @@ class RestClient:
         estimate_gas_usage: bool = False,
     ) -> Dict[str, Any]:
         # Note that simulated transactions are not signed and have all 0 signatures!
-        authenticator = Authenticator(
-            Ed25519Authenticator(
-                sender.public_key(),
-                ed25519.Signature(b"\x00" * 64),
-            )
-        )
+        authenticator = sender.sign_simulated_transaction(transaction)
         signed_transaction = SignedTransaction(transaction, authenticator)
 
         headers = {"Content-Type": "application/x.aptos.signed_transaction+bcs"}
@@ -394,19 +412,13 @@ class RestClient:
             [x.address() for x in secondary_accounts],
         )
 
-        keyed_txn = raw_transaction.keyed()
-
         authenticator = Authenticator(
             MultiAgentAuthenticator(
-                Authenticator(
-                    Ed25519Authenticator(sender.public_key(), sender.sign(keyed_txn))
-                ),
+                sender.sign_transaction(raw_transaction),
                 [
                     (
                         x.address(),
-                        Authenticator(
-                            Ed25519Authenticator(x.public_key(), x.sign(keyed_txn))
-                        ),
+                        x.sign_transaction(raw_transaction),
                     )
                     for x in secondary_accounts
                 ],
@@ -445,10 +457,7 @@ class RestClient:
         raw_transaction = await self.create_bcs_transaction(
             sender, payload, sequence_number
         )
-        signature = sender.sign(raw_transaction.keyed())
-        authenticator = Authenticator(
-            Ed25519Authenticator(sender.public_key(), signature)
-        )
+        authenticator = sender.sign_transaction(raw_transaction)
         return SignedTransaction(raw_transaction, authenticator)
 
     #
@@ -496,261 +505,6 @@ class RestClient:
             sender, TransactionPayload(payload), sequence_number=sequence_number
         )
         return await self.submit_bcs_transaction(signed_transaction)  # <:!:bcs_transfer
-
-    #
-    # Token transaction wrappers
-    #
-
-    # :!:>create_collection
-    async def create_collection(
-        self, account: Account, name: str, description: str, uri: str
-    ) -> str:  # <:!:create_collection
-        """Creates a new collection within the specified account"""
-
-        transaction_arguments = [
-            TransactionArgument(name, Serializer.str),
-            TransactionArgument(description, Serializer.str),
-            TransactionArgument(uri, Serializer.str),
-            TransactionArgument(U64_MAX, Serializer.u64),
-            TransactionArgument(
-                [False, False, False], Serializer.sequence_serializer(Serializer.bool)
-            ),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x3::token",
-            "create_collection_script",
-            [],
-            transaction_arguments,
-        )
-
-        signed_transaction = await self.create_bcs_signed_transaction(
-            account, TransactionPayload(payload)
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    # :!:>create_token
-    async def create_token(
-        self,
-        account: Account,
-        collection_name: str,
-        name: str,
-        description: str,
-        supply: int,
-        uri: str,
-        royalty_points_per_million: int,
-    ) -> str:  # <:!:create_token
-        transaction_arguments = [
-            TransactionArgument(collection_name, Serializer.str),
-            TransactionArgument(name, Serializer.str),
-            TransactionArgument(description, Serializer.str),
-            TransactionArgument(supply, Serializer.u64),
-            TransactionArgument(supply, Serializer.u64),
-            TransactionArgument(uri, Serializer.str),
-            TransactionArgument(account.address(), Serializer.struct),
-            # SDK assumes per million
-            TransactionArgument(1000000, Serializer.u64),
-            TransactionArgument(royalty_points_per_million, Serializer.u64),
-            TransactionArgument(
-                [False, False, False, False, False],
-                Serializer.sequence_serializer(Serializer.bool),
-            ),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
-            TransactionArgument(
-                [], Serializer.sequence_serializer(Serializer.to_bytes)
-            ),
-            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x3::token",
-            "create_token_script",
-            [],
-            transaction_arguments,
-        )
-        signed_transaction = await self.create_bcs_signed_transaction(
-            account, TransactionPayload(payload)
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    async def offer_token(
-        self,
-        account: Account,
-        receiver: AccountAddress,
-        creator: AccountAddress,
-        collection_name: str,
-        token_name: str,
-        property_version: int,
-        amount: int,
-    ) -> str:
-        transaction_arguments = [
-            TransactionArgument(receiver, Serializer.struct),
-            TransactionArgument(creator, Serializer.struct),
-            TransactionArgument(collection_name, Serializer.str),
-            TransactionArgument(token_name, Serializer.str),
-            TransactionArgument(property_version, Serializer.u64),
-            TransactionArgument(amount, Serializer.u64),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x3::token_transfers",
-            "offer_script",
-            [],
-            transaction_arguments,
-        )
-        signed_transaction = await self.create_bcs_signed_transaction(
-            account, TransactionPayload(payload)
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    async def claim_token(
-        self,
-        account: Account,
-        sender: AccountAddress,
-        creator: AccountAddress,
-        collection_name: str,
-        token_name: str,
-        property_version: int,
-    ) -> str:
-        transaction_arguments = [
-            TransactionArgument(sender, Serializer.struct),
-            TransactionArgument(creator, Serializer.struct),
-            TransactionArgument(collection_name, Serializer.str),
-            TransactionArgument(token_name, Serializer.str),
-            TransactionArgument(property_version, Serializer.u64),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x3::token_transfers",
-            "claim_script",
-            [],
-            transaction_arguments,
-        )
-        signed_transaction = await self.create_bcs_signed_transaction(
-            account, TransactionPayload(payload)
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    async def direct_transfer_token(
-        self,
-        sender: Account,
-        receiver: Account,
-        creators_address: AccountAddress,
-        collection_name: str,
-        token_name: str,
-        property_version: int,
-        amount: int,
-    ) -> str:
-        transaction_arguments = [
-            TransactionArgument(creators_address, Serializer.struct),
-            TransactionArgument(collection_name, Serializer.str),
-            TransactionArgument(token_name, Serializer.str),
-            TransactionArgument(property_version, Serializer.u64),
-            TransactionArgument(amount, Serializer.u64),
-        ]
-
-        payload = EntryFunction.natural(
-            "0x3::token",
-            "direct_transfer_script",
-            [],
-            transaction_arguments,
-        )
-
-        signed_transaction = await self.create_multi_agent_bcs_transaction(
-            sender,
-            [receiver],
-            TransactionPayload(payload),
-        )
-        return await self.submit_bcs_transaction(signed_transaction)
-
-    #
-    # Token accessors
-    #
-
-    async def get_token(
-        self,
-        owner: AccountAddress,
-        creator: AccountAddress,
-        collection_name: str,
-        token_name: str,
-        property_version: int,
-    ) -> Any:
-        resource = await self.account_resource(owner, "0x3::token::TokenStore")
-        token_store_handle = resource["data"]["tokens"]["handle"]
-
-        token_id = {
-            "token_data_id": {
-                "creator": str(creator),
-                "collection": collection_name,
-                "name": token_name,
-            },
-            "property_version": str(property_version),
-        }
-
-        try:
-            return await self.get_table_item(
-                token_store_handle,
-                "0x3::token::TokenId",
-                "0x3::token::Token",
-                token_id,
-            )
-        except ApiError as e:
-            if e.status_code == 404:
-                return {
-                    "id": token_id,
-                    "amount": "0",
-                }
-            raise
-
-    async def get_token_balance(
-        self,
-        owner: AccountAddress,
-        creator: AccountAddress,
-        collection_name: str,
-        token_name: str,
-        property_version: int,
-    ) -> str:
-        info = await self.get_token(
-            owner, creator, collection_name, token_name, property_version
-        )
-        return info["amount"]
-
-    # :!:>read_token_data_table
-    async def get_token_data(
-        self,
-        creator: AccountAddress,
-        collection_name: str,
-        token_name: str,
-        property_version: int,
-    ) -> Any:
-        resource = await self.account_resource(creator, "0x3::token::Collections")
-        token_data_handle = resource["data"]["token_data"]["handle"]
-
-        token_data_id = {
-            "creator": str(creator),
-            "collection": collection_name,
-            "name": token_name,
-        }
-
-        return await self.get_table_item(
-            token_data_handle,
-            "0x3::token::TokenDataId",
-            "0x3::token::TokenData",
-            token_data_id,
-        )  # <:!:read_token_data_table
-
-    async def get_collection(
-        self, creator: AccountAddress, collection_name: str
-    ) -> Any:
-        resource = await self.account_resource(creator, "0x3::token::Collections")
-        token_data = resource["data"]["collection_data"]["handle"]
-
-        return await self.get_table_item(
-            token_data,
-            "0x1::string::String",
-            "0x3::token::CollectionData",
-            collection_name,
-        )
 
     async def transfer_object(
         self, owner: Account, object: AccountAddress, to: AccountAddress

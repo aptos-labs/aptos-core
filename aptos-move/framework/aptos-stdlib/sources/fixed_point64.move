@@ -141,7 +141,7 @@ module aptos_std::fixed_point64 {
     }
     spec create_from_rational {
         pragma opaque;
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved).
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved).
         include CreateFromRationalAbortsIf;
         ensures result == spec_create_from_rational(numerator, denominator);
     }
@@ -356,8 +356,8 @@ module aptos_std::fixed_point64 {
         (val >> 64 as u128)
     }
     spec ceil {
-        /// TODO: worked in the past but started to time out since last z3 update
-        pragma verify = false;
+        // TODO: set because of timeout (property proved).
+        pragma verify_duration_estimate = 1000;
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(num);

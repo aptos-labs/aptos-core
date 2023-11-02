@@ -12,6 +12,7 @@ use std::{
 };
 
 extern crate itertools;
+use crate::metrics::{REMOTE_EXECUTOR_REMOTE_KV_COUNT, REMOTE_EXECUTOR_TIMER};
 use anyhow::Result;
 use aptos_logger::trace;
 use aptos_state_view::TStateView;
@@ -20,8 +21,9 @@ use aptos_types::{
     state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
 };
 use dashmap::DashMap;
+use rayon::ThreadPool;
 
-pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 50000;
+pub static REMOTE_STATE_KEY_BATCH_SIZE: usize = 200;
 
 pub struct RemoteStateView {
     state_values: DashMap<StateKey, RemoteStateValue>,
@@ -114,23 +116,56 @@ impl RemoteStateViewClient {
 
     pub fn init_for_block(&self, state_keys: Vec<StateKey>) {
         *self.state_view.write().unwrap() = RemoteStateView::new();
-        self.pre_fetch_state_values(state_keys);
+        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+            .with_label_values(&[&self.shard_id.to_string(), "prefetch_kv"])
+            .inc_by(state_keys.len() as u64);
+        self.pre_fetch_state_values(state_keys, false);
     }
 
-    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>) {
+    fn insert_keys_and_fetch_values(
+        state_view_clone: Arc<RwLock<RemoteStateView>>,
+        thread_pool: Arc<ThreadPool>,
+        kv_tx: Arc<Sender<Message>>,
+        shard_id: ShardId,
+        state_keys: Vec<StateKey>,
+    ) {
         state_keys.clone().into_iter().for_each(|state_key| {
-            self.state_view.read().unwrap().insert_state_key(state_key);
+            state_view_clone.read().unwrap().insert_state_key(state_key);
         });
         state_keys
             .chunks(REMOTE_STATE_KEY_BATCH_SIZE)
             .map(|state_keys_chunk| state_keys_chunk.to_vec())
             .for_each(|state_keys| {
-                let sender = self.kv_tx.clone();
-                let shard_id = self.shard_id;
-                self.thread_pool.spawn(move || {
+                let sender = kv_tx.clone();
+                thread_pool.spawn(move || {
                     Self::send_state_value_request(shard_id, sender, state_keys);
                 });
             });
+    }
+
+    fn pre_fetch_state_values(&self, state_keys: Vec<StateKey>, sync_insert_keys: bool) {
+        let state_view_clone = self.state_view.clone();
+        let thread_pool_clone = self.thread_pool.clone();
+        let kv_tx_clone = self.kv_tx.clone();
+        let shard_id = self.shard_id;
+
+        let insert_and_fetch = move || {
+            Self::insert_keys_and_fetch_values(
+                state_view_clone,
+                thread_pool_clone,
+                kv_tx_clone,
+                shard_id,
+                state_keys,
+            );
+        };
+        if sync_insert_keys {
+            // we want to insert keys synchronously here because when called from get_state_value()
+            // it expects the key to be in the table while waiting for the value to be fetched from
+            // remote state view.
+            insert_and_fetch();
+        } else {
+            self.thread_pool.spawn(insert_and_fetch);
+        }
     }
 
     fn send_state_value_request(
@@ -151,10 +186,19 @@ impl TStateView for RemoteStateViewClient {
         let state_view_reader = self.state_view.read().unwrap();
         if state_view_reader.has_state_key(state_key) {
             // If the key is already in the cache then we return it.
+            let _timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&[&self.shard_id.to_string(), "prefetch_wait"])
+                .start_timer();
             return state_view_reader.get_state_value(state_key);
         }
         // If the value is not already in the cache then we pre-fetch it and wait for it to arrive.
-        self.pre_fetch_state_values(vec![state_key.clone()]);
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_wait"])
+            .start_timer();
+        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+            .with_label_values(&[&self.shard_id.to_string(), "non_prefetch_kv"])
+            .inc();
+        self.pre_fetch_state_values(vec![state_key.clone()], true);
         state_view_reader.get_state_value(state_key)
     }
 
@@ -200,7 +244,18 @@ impl RemoteStateValueReceiver {
         message: Message,
         state_view: Arc<RwLock<RemoteStateView>>,
     ) {
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&shard_id.to_string(), "kv_responses"])
+            .start_timer();
+        let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&shard_id.to_string(), "kv_resp_deser"])
+            .start_timer();
         let response: RemoteKVResponse = bcs::from_bytes(&message.data).unwrap();
+        drop(bcs_deser_timer);
+
+        REMOTE_EXECUTOR_REMOTE_KV_COUNT
+            .with_label_values(&[&shard_id.to_string(), "kv_responses"])
+            .inc();
         let state_view_lock = state_view.read().unwrap();
         trace!(
             "Received state values for shard {} with size {}",

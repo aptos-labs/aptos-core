@@ -1,0 +1,129 @@
+// ---- Model Dump
+module 0x42::m {
+    struct T {
+        dummy_field: bool,
+    }
+    struct G {
+        dummy_field: bool,
+    }
+    struct R {
+        dummy_field: bool,
+    }
+    struct S {
+        dummy_field: bool,
+    }
+    private fun f1()
+        acquires m::S(*)
+     {
+        Tuple()
+    }
+    private fun f10(x: u64)
+        acquires *(m::make_up_address(x))
+     {
+        Tuple()
+    }
+    private fun f11()
+        !reads *(0x42)
+        !reads *(0x43)
+     {
+        Tuple()
+    }
+    private fun f12()
+     {
+        Tuple()
+    }
+    private fun f2()
+        reads m::S(*)
+     {
+        Tuple()
+    }
+    private fun f3()
+        writes m::S(*)
+     {
+        Tuple()
+    }
+    private fun f4()
+        acquires m::S(*)
+     {
+        Tuple()
+    }
+    private fun f5()
+        acquires 0x42::*(*)
+     {
+        Tuple()
+    }
+    private fun f6()
+        acquires 0x42::m::*(*)
+     {
+        Tuple()
+    }
+    private fun f7()
+        acquires *(*)
+     {
+        Tuple()
+    }
+    private fun f8()
+        acquires *(0x42)
+     {
+        Tuple()
+    }
+    private fun f9(a: address)
+        acquires *(a)
+     {
+        Tuple()
+    }
+    private fun f_multiple()
+        acquires m::R(*)
+        reads m::R(*)
+        writes m::T(*)
+        writes m::S(*)
+        reads m::G<u64>(*)
+     {
+        Tuple()
+    }
+    private fun make_up_address(x: u64): address {
+        0x42
+    }
+    spec fun $f1() {
+        Tuple()
+    }
+    spec fun $f10(x: u64) {
+        Tuple()
+    }
+    spec fun $f11() {
+        Tuple()
+    }
+    spec fun $f12() {
+        Tuple()
+    }
+    spec fun $f2() {
+        Tuple()
+    }
+    spec fun $f3() {
+        Tuple()
+    }
+    spec fun $f4() {
+        Tuple()
+    }
+    spec fun $f5() {
+        Tuple()
+    }
+    spec fun $f6() {
+        Tuple()
+    }
+    spec fun $f7() {
+        Tuple()
+    }
+    spec fun $f8() {
+        Tuple()
+    }
+    spec fun $f9(a: address) {
+        Tuple()
+    }
+    spec fun $f_multiple() {
+        Tuple()
+    }
+    spec fun $make_up_address(x: u64): address {
+        0x42
+    }
+} // end 0x42::m

@@ -23,7 +23,13 @@ To initialize a delegation pool, follow the instructions in [delegation pool ope
 
 ## Bootstrapping validator node
 
-After initializing the stake pool, make sure the validator node is bootstrapped with the correct [genesis blob and waypoint](../../node-files-all-networks/node-files.md) for the corresponding network. To bootstrap your node, first you need to know the pool address to use:
+After initializing the stake pool, make sure the validator node is bootstrapped with the correct [genesis blob and waypoint](../../node-files-all-networks/node-files.md) for the corresponding network. 
+
+1. Follow the steps for [joining the validator set.](../../../nodes/validator-node/operator/connect-to-aptos-network/#joining-validator-set)
+2. Bring up the validator fullnode (VFN) only. It will connect to other nodes and fast sync.
+3. Once the VFN is synced, bring up the validator. It will sync from the VFN and then connect to other validators and start participating in consensus.
+
+To bootstrap your node, first you need to know the pool address to use:
 
 
 ```bash

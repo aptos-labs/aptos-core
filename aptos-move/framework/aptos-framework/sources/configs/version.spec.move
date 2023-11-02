@@ -27,6 +27,8 @@ spec aptos_framework::version {
 
         let old_major = global<Version>(@aptos_framework).major;
         aborts_if !(old_major < major);
+
+        ensures global<Version>(@aptos_framework).major == major;
     }
 
     /// Abort if resource already exists in `@aptos_framwork` when initializing.
@@ -36,6 +38,8 @@ spec aptos_framework::version {
         aborts_if signer::address_of(aptos_framework) != @aptos_framework;
         aborts_if exists<Version>(@aptos_framework);
         aborts_if exists<SetVersionCapability>(@aptos_framework);
+        ensures exists<Version>(@aptos_framework);
+        ensures exists<SetVersionCapability>(@aptos_framework);
     }
 
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.

@@ -3,7 +3,7 @@
 
 use crate::{
     accept_type::AcceptType,
-    context::Context,
+    context::{api_spawn_blocking, Context},
     generate_error_response, generate_success_response,
     response::{InternalError, ServiceUnavailableError},
     ApiTags,
@@ -83,7 +83,8 @@ impl BasicApi {
         /// If not provided, the healthcheck will always succeed
         duration_secs: Query<Option<u32>>,
     ) -> HealthCheckResult<HealthCheckSuccess> {
-        let ledger_info = self.context.get_latest_ledger_info()?;
+        let context = self.context.clone();
+        let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
 
         // If we have a duration, check that it's close to the current time, otherwise it's ok
         if let Some(duration) = duration_secs.0 {

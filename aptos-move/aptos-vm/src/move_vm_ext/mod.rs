@@ -14,5 +14,5 @@ pub use crate::move_vm_ext::{
     resolver::{AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver},
     respawned_session::RespawnedSession,
     session::{SessionExt, SessionId},
-    vm::{get_max_binary_format_version, verifier_config, MoveVmExt},
+    vm::{get_max_binary_format_version, get_max_identifier_size, verifier_config, MoveVmExt},
 };
