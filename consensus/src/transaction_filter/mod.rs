@@ -17,7 +17,7 @@ impl TransactionFilter {
 
     pub fn filter(
         &self,
-        _block_id: HashValue,
+        block_id: HashValue,
         txns: Vec<SignedTransaction>,
     ) -> Vec<SignedTransaction> {
         // Special case for no filter to avoid unnecessary iteration through all transactions in the default case
@@ -25,7 +25,7 @@ impl TransactionFilter {
             return txns;
         }
         txns.into_iter()
-            .filter(|txn| self.filter.matches(_block_id, txn))
+            .filter(|txn| self.filter.allows(block_id, txn))
             .collect()
     }
 }

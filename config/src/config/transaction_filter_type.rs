@@ -50,27 +50,27 @@ enum Rule {
     Deny(Matcher),
 }
 
-enum MatchResult {
+enum EvalResult {
     Allow,
     Deny,
     NoMatch,
 }
 
 impl Rule {
-    fn matches(&self, block_id: HashValue, txn: &SignedTransaction) -> MatchResult {
+    fn eval(&self, block_id: HashValue, txn: &SignedTransaction) -> EvalResult {
         match self {
             Rule::Allow(matcher) => {
                 if matcher.matches(block_id, txn) {
-                    MatchResult::Allow
+                    EvalResult::Allow
                 } else {
-                    MatchResult::NoMatch
+                    EvalResult::NoMatch
                 }
             },
             Rule::Deny(matcher) => {
                 if matcher.matches(block_id, txn) {
-                    MatchResult::Deny
+                    EvalResult::Deny
                 } else {
-                    MatchResult::NoMatch
+                    EvalResult::NoMatch
                 }
             },
         }
@@ -179,12 +179,12 @@ impl Filter {
         self
     }
 
-    pub fn matches(&self, block_id: HashValue, txn: &SignedTransaction) -> bool {
+    pub fn allows(&self, block_id: HashValue, txn: &SignedTransaction) -> bool {
         for rule in &self.rules {
-            match rule.matches(block_id, txn) {
-                MatchResult::Allow => return true,
-                MatchResult::Deny => return false,
-                MatchResult::NoMatch => continue,
+            match rule.eval(block_id, txn) {
+                EvalResult::Allow => return true,
+                EvalResult::Deny => return false,
+                EvalResult::NoMatch => continue,
             }
         }
         true
