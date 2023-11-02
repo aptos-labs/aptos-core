@@ -193,7 +193,7 @@ impl DagDriver {
             }
         };
 
-        let (max_txns, max_size_bytes) = self.calculate_payload_dimensions(new_round);
+        let (max_txns, max_size_bytes) = self.calculate_payload_limits(new_round);
 
         let payload = match self
             .payload_client
@@ -287,11 +287,11 @@ impl DagDriver {
         }
     }
 
-    fn calculate_payload_dimensions(&self, round: Round) -> (u64, u64) {
-        let (max_txns_per_round, max_size_per_round_bytes) =
-            if let Some((backoff_max_txns, backoff_max_size_bytes)) =
-                self.chain_backoff.get_round_payload_limits(round)
-            {
+    fn calculate_payload_limits(&self, round: Round) -> (u64, u64) {
+        let (voting_power_ratio, maybe_backoff_limits) =
+            self.chain_backoff.get_round_payload_limits(round);
+        let (max_txns_per_round, max_size_per_round_bytes) = {
+            if let Some((backoff_max_txns, backoff_max_size_bytes)) = maybe_backoff_limits {
                 (
                     self.payload_config
                         .max_sending_txns_per_round
@@ -305,13 +305,18 @@ impl DagDriver {
                     self.payload_config.max_sending_txns_per_round,
                     self.payload_config.max_sending_size_per_round_bytes,
                 )
-            };
+            }
+        };
         // TODO: warn/panic if division yields 0 txns
         let max_txns = max_txns_per_round
-            .saturating_div(self.epoch_state.verifier.len() as u64)
+            .saturating_div(
+                (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
+            )
             .max(1);
         let max_txn_size_bytes = max_size_per_round_bytes
-            .saturating_div(self.epoch_state.verifier.len() as u64)
+            .saturating_div(
+                (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
+            )
             .max(1024);
 
         (max_txns, max_txn_size_bytes)

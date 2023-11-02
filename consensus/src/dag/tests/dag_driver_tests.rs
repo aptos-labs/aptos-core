@@ -95,12 +95,12 @@ impl TLedgerInfoProvider for MockLedgerInfoProvider {
 struct MockChainHealthBackoff {}
 
 impl TChainHealthBackoff for MockChainHealthBackoff {
-    fn get_round_backoff(&self, _round: Round) -> Option<Duration> {
-        None
+    fn get_round_backoff(&self, _round: Round) -> (f64, Option<Duration>) {
+        (1.0, None)
     }
 
-    fn get_round_payload_limits(&self, _round: Round) -> Option<(u64, u64)> {
-        None
+    fn get_round_payload_limits(&self, _round: Round) -> (f64, Option<(u64, u64)>) {
+        (1.0, None)
     }
 }
 

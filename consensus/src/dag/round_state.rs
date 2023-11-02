@@ -156,7 +156,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
             .sum_voting_power(strong_links.iter().map(|cert| cert.metadata().author()))
             .expect("Unable to sum voting power from strong links");
 
-        let backoff_duration = self.chain_backoff.get_round_backoff(new_round);
+        let (_, backoff_duration) = self.chain_backoff.get_round_backoff(new_round);
         let wait_time = if let Some(duration) = backoff_duration {
             duration.max(self.minimal_wait_time)
         } else {

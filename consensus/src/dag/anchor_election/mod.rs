@@ -12,9 +12,9 @@ pub trait AnchorElection: Send + Sync {
 }
 
 pub trait TChainHealthBackoff: Send + Sync {
-    fn get_round_backoff(&self, round: Round) -> Option<Duration>;
+    fn get_round_backoff(&self, round: Round) -> (f64, Option<Duration>);
 
-    fn get_round_payload_limits(&self, round: Round) -> Option<(u64, u64)>;
+    fn get_round_payload_limits(&self, round: Round) -> (f64, Option<(u64, u64)>);
 }
 
 mod leader_reputation_adapter;

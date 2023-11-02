@@ -19,7 +19,8 @@ use aptos_types::account_config::NewBlockEvent;
 use move_core_types::account_address::AccountAddress;
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc, time::Duration,
+    sync::Arc,
+    time::Duration,
 };
 
 pub struct MetadataBackendAdapter {
@@ -127,6 +128,15 @@ impl LeaderReputationAdapter {
             chain_health_backoff_config,
         }
     }
+
+    fn get_chain_health_backoff(&self, round: u64) -> (f64, Option<&aptos_config::config::ChainHealthBackoffValues>) {
+        let voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
+
+        let chain_health_backoff = self
+            .chain_health_backoff_config
+            .get_backoff(voting_power_ratio);
+        (voting_power_ratio, chain_health_backoff)
+    }
 }
 
 impl AnchorElection for LeaderReputationAdapter {
@@ -140,33 +150,28 @@ impl AnchorElection for LeaderReputationAdapter {
 }
 
 impl TChainHealthBackoff for LeaderReputationAdapter {
-    fn get_round_backoff(&self, round: Round) -> Option<Duration> {
-        let voting_power_ratio =
-            self.reputation.get_voting_power_participation_ratio(round);
-
-        let chain_health_backoff = self
-            .chain_health_backoff_config
-            .get_backoff(voting_power_ratio);
-        if let Some(value) = chain_health_backoff {
+    fn get_round_backoff(&self, round: Round) -> (f64, Option<Duration>) {
+        let (voting_power_ratio, chain_health_backoff) = self.get_chain_health_backoff(round);
+        let backoff_duration = if let Some(value) = chain_health_backoff {
             CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
             Some(Duration::from_millis(value.backoff_proposal_delay_ms))
         } else {
             CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(0.0);
             None
-        }
+        };
+        (voting_power_ratio, backoff_duration)
     }
 
-    fn get_round_payload_limits(&self, round: Round) -> Option<(u64, u64)> {
-        let voting_power_ratio =
-            self.reputation.get_voting_power_participation_ratio(round);
-
-        let chain_health_backoff = self
-            .chain_health_backoff_config
-            .get_backoff(voting_power_ratio);
-        if let Some(value) = chain_health_backoff {
-            Some((value.max_sending_block_txns_override, value.max_sending_block_bytes_override))
+    fn get_round_payload_limits(&self, round: Round) -> (f64, Option<(u64, u64)>) {
+        let (voting_power_ratio, chain_health_backoff) = self.get_chain_health_backoff(round);
+        let backoff_limits = if let Some(value) = chain_health_backoff {
+            Some((
+                value.max_sending_block_txns_override,
+                value.max_sending_block_bytes_override,
+            ))
         } else {
             None
-        }
+        };
+        (voting_power_ratio, backoff_limits)
     }
 }
