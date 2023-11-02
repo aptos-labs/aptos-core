@@ -11,6 +11,7 @@ use crate::dag::{
     RpcHandler,
 };
 use anyhow::{anyhow, ensure};
+use aptos_bitvec::BitVec;
 use aptos_config::config::DagFetcherConfig;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
@@ -307,12 +308,15 @@ impl TDagFetcher for DagFetcher {
                     };
                 },
                 Ok(DAGRpcResult(Err(dag_rpc_error))) => {
-                    info!(error = ?dag_rpc_error, "responder returned error");
+                    info!("unable to fetch nodes from target: {}", dag_rpc_error);
                     if let DAGError::FetchRequestHandleError(err) = dag_rpc_error.deref() {
                         match err {
-                            FetchRequestHandleError::TargetsMissing => {
+                            FetchRequestHandleError::TargetsMissing(missing_bitvec) => {
                                 // TODO: add who the responder is
-                                info!("responder is missing target nodes to serve")
+                                info!(
+                                    "responder is missing target nodes to serve. missing {}",
+                                    missing_bitvec.count_ones()
+                                );
                             },
                             FetchRequestHandleError::GarbageCollected(
                                 requested_round,
@@ -321,7 +325,7 @@ impl TDagFetcher for DagFetcher {
                                 info!(
                                     "fetch error. requested: {}, lowest_round: {}",
                                     requested_round, lowest_round
-                                )
+                                );
                             },
                         }
                     }
@@ -369,15 +373,20 @@ impl RpcHandler for FetchRequestHandler {
             target_round = message.target_round(),
         );
         ensure!(
-            dag_reader.all_exists(message.targets()),
-            FetchRequestHandleError::TargetsMissing
-        );
-        ensure!(
             dag_reader.lowest_round() <= message.start_round(),
             FetchRequestHandleError::GarbageCollected(
                 message.start_round(),
                 dag_reader.lowest_round()
             ),
+        );
+
+        let missing_targets: BitVec = message
+            .targets()
+            .map(|node| !dag_reader.exists(node))
+            .collect();
+        ensure!(
+            missing_targets.all_zeros(),
+            FetchRequestHandleError::TargetsMissing(missing_targets)
         );
 
         let certified_nodes: Vec<_> = dag_reader
