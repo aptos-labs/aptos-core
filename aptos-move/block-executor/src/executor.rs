@@ -522,11 +522,7 @@ where
                 }
             }
 
-            let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
-            let mut finalized_group_writes = Vec::with_capacity(group_metadata_ops.len());
-            let mut maybe_err = None;
-            for (group_key, metadata_op) in group_metadata_ops.into_iter() {
-                // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
+            let finalize_group = |group_key: T::Key, metadata_op: T::Value| -> Result<_, _> {
                 match versioned_cache
                     .group_data()
                     .finalize_group(&group_key, txn_idx)
@@ -539,24 +535,67 @@ where
                                 finalized_group.is_empty(),
                                 metadata_op.is_deletion()
                             );
-                            maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
+                            return Err(Error::FallbackToSequential(PanicOr::Or(
                                 IntentionalFallbackToSequential::ResourceGroupError,
                             )));
                         }
-                        finalized_group_writes.push((group_key, metadata_op, finalized_group));
+                        Ok((group_key, metadata_op, finalized_group))
                     },
                     Err(e) => {
                         error!("Error committing resource group {:?}", e);
-                        maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
+                        Err(Error::FallbackToSequential(PanicOr::Or(
                             IntentionalFallbackToSequential::ResourceGroupError,
-                        )));
+                        )))
                     },
-                };
+                }
+            };
 
+            let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
+            let mut finalized_group_writes = Vec::with_capacity(group_metadata_ops.len());
+            let mut maybe_err = None;
+            for (group_key, metadata_op) in group_metadata_ops.into_iter() {
+                // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
+                match finalize_group(group_key, metadata_op) {
+                    Ok((group_key, metadata_op, finalized_group)) => {
+                        finalized_group_writes.push((group_key, metadata_op, finalized_group));
+                    },
+                    Err(err) => {
+                        maybe_err = Some(err);
+                        break;
+                    },
+                }
                 if maybe_err.is_some() {
                     break;
                 }
             }
+
+            if maybe_err.is_none() {
+                if let Some(group_reads_needing_delayed_field_exchange) =
+                    last_input_output.group_reads_needing_delayed_field_exchange(txn_idx)
+                {
+                    for (group_key, (metadata_op, _)) in
+                        group_reads_needing_delayed_field_exchange.into_iter()
+                    {
+                        match finalize_group(group_key, metadata_op) {
+                            Ok((group_key, metadata_op, finalized_group)) => {
+                                finalized_group_writes.push((
+                                    group_key,
+                                    metadata_op,
+                                    finalized_group,
+                                ));
+                            },
+                            Err(err) => {
+                                maybe_err = Some(err);
+                                break;
+                            },
+                        }
+                        if maybe_err.is_some() {
+                            break;
+                        }
+                    }
+                }
+            }
+
             last_input_output.record_finalized_group(txn_idx, finalized_group_writes);
 
             maybe_err = maybe_err.or_else(|| last_input_output.maybe_execution_error(txn_idx));
@@ -827,38 +866,8 @@ where
             }
         }
 
-        let mut patched_finalized_group_writes =
+        let patched_finalized_group_writes =
             Self::map_id_to_values_in_group_writes(finalized_group_writes, &latest_view);
-
-        if let Some(group_reads_needing_delayed_field_exchange) =
-            last_input_output.group_reads_needing_delayed_field_exchange(txn_idx)
-        {
-            for (key, (metadata, resource_map)) in
-                group_reads_needing_delayed_field_exchange.into_iter()
-            {
-                patched_finalized_group_writes.push((
-                    key,
-                    metadata,
-                    resource_map
-                        .into_iter()
-                        .map(|(tag, (value, maybe_layout))| {
-                            (
-                                tag,
-                                if let Some(layout) = maybe_layout {
-                                    Arc::new(Self::replace_ids_with_values(
-                                        &value,
-                                        layout.as_ref(),
-                                        &latest_view,
-                                    ))
-                                } else {
-                                    Arc::new(value)
-                                },
-                            )
-                        })
-                        .collect(),
-                ));
-            }
-        }
 
         let events = last_input_output.events(txn_idx);
         let patched_events = Self::map_id_to_values_events(events, &latest_view);
@@ -1265,6 +1274,27 @@ where
                     }
 
                     if dynamic_change_set_optimizations_enabled {
+                        for (group_key, (group_metadata_op, _)) in
+                            output.group_reads_needing_delayed_field_exchange()
+                        {
+                            let finalized_group = unsync_map.finalize_group(&group_key);
+                            if finalized_group.is_empty() != group_metadata_op.is_deletion() {
+                                error!(
+                                    "Group is empty = {} but op is deletion = {} in sequential execution",
+                                    finalized_group.is_empty(),
+                                    group_metadata_op.is_deletion()
+                                );
+                                return Err(Error::FallbackToSequential(PanicOr::Or(
+                                    IntentionalFallbackToSequential::ResourceGroupError,
+                                )));
+                            }
+                            finalized_group_writes.push((
+                                group_key,
+                                group_metadata_op,
+                                finalized_group,
+                            ));
+                        }
+
                         // Replace delayed field id with values in resource write set and read set.
                         let resource_change_set = Some(output.resource_write_set());
                         let mut patched_resource_write_set =
@@ -1290,36 +1320,10 @@ where
                             }
                         }
 
-                        let mut patched_finalized_group_writes =
-                            Self::map_id_to_values_in_group_writes(
-                                finalized_group_writes,
-                                &latest_view,
-                            );
-                        for (key, (metadata, resource_map)) in
-                            output.group_reads_needing_delayed_field_exchange()
-                        {
-                            patched_finalized_group_writes.push((
-                                key,
-                                metadata,
-                                resource_map
-                                    .into_iter()
-                                    .map(|(tag, (value, maybe_layout))| {
-                                        (
-                                            tag,
-                                            if let Some(layout) = maybe_layout {
-                                                Arc::new(Self::replace_ids_with_values(
-                                                    &value,
-                                                    layout.as_ref(),
-                                                    &latest_view,
-                                                ))
-                                            } else {
-                                                Arc::new(value)
-                                            },
-                                        )
-                                    })
-                                    .collect(),
-                            ));
-                        }
+                        let patched_finalized_group_writes = Self::map_id_to_values_in_group_writes(
+                            finalized_group_writes,
+                            &latest_view,
+                        );
 
                         // Replace delayed field id with values in events
                         let patched_events = Self::map_id_to_values_events(
