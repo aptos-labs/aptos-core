@@ -40,7 +40,7 @@ impl BatchReader for MockBatchReader {
 async fn test_proof_coordinator_basic() {
     aptos_logger::Logger::init_for_testing();
     let (signers, verifier) = random_validator_verifier(4, None, true);
-    let (tx, _rx) = channel(100);
+    let (tx, _rx) = aptos_channels::tokio_channel::new_test(100);
     let proof_coordinator = ProofCoordinator::new(
         100,
         signers[0].author(),

@@ -23,7 +23,7 @@ pub enum CoordinatorCommand {
 
 pub struct QuorumStoreCoordinator {
     my_peer_id: PeerId,
-    batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
+    batch_generator_cmd_tx: aptos_channels::tokio_channel::Sender<BatchGeneratorCommand>,
     remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
     proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
     proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,
@@ -33,7 +33,7 @@ pub struct QuorumStoreCoordinator {
 impl QuorumStoreCoordinator {
     pub(crate) fn new(
         my_peer_id: PeerId,
-        batch_generator_cmd_tx: mpsc::Sender<BatchGeneratorCommand>,
+        batch_generator_cmd_tx: aptos_channels::tokio_channel::Sender<BatchGeneratorCommand>,
         remote_batch_coordinator_cmd_tx: Vec<mpsc::Sender<BatchCoordinatorCommand>>,
         proof_coordinator_cmd_tx: mpsc::Sender<ProofCoordinatorCommand>,
         proof_manager_cmd_tx: mpsc::Sender<ProofManagerCommand>,

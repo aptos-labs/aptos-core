@@ -134,7 +134,7 @@ pub(crate) struct ProofCoordinator {
     // to record the batch creation time
     timeouts: Timeouts<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
-    batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+    batch_generator_cmd_tx: aptos_channels::tokio_channel::Sender<BatchGeneratorCommand>,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -143,7 +143,7 @@ impl ProofCoordinator {
         proof_timeout_ms: usize,
         peer_id: PeerId,
         batch_reader: Arc<dyn BatchReader>,
-        batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+        batch_generator_cmd_tx: aptos_channels::tokio_channel::Sender<BatchGeneratorCommand>,
     ) -> Self {
         Self {
             peer_id,

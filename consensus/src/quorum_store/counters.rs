@@ -3,8 +3,8 @@
 
 use aptos_metrics_core::{
     exponential_buckets, op_counters::DurationHistogram, register_avg_counter, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, Histogram,
-    HistogramVec, IntCounter, IntCounterVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 use std::time::Duration;
@@ -593,6 +593,24 @@ pub static BATCH_RECEIVED_REPLIES_VOTING_POWER: Lazy<Histogram> = Lazy::new(|| {
         "quorum_store_batch_received_replies_voting_power",
         "Voting power of validators for which we received signed replies.",
         TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+/// Count of pending events in quorum store back pressure channel
+pub static PENDING_BACK_PRESSURE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_pending_back_pressure",
+        "Count of pending events in quorum store back pressure channel"
+    )
+    .unwrap()
+});
+
+/// Count of pending events in batch generator cmd channel
+pub static PENDING_BATCH_GENERATOR_CMD: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "quorum_store_pending_batch_generator_cmd",
+        "Count of pending events in batch generator cmd channel"
     )
     .unwrap()
 });

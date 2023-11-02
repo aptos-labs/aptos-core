@@ -289,8 +289,8 @@ impl BatchGenerator {
     pub async fn start(
         mut self,
         mut network_sender: NetworkSender,
-        mut cmd_rx: tokio::sync::mpsc::Receiver<BatchGeneratorCommand>,
-        mut back_pressure_rx: tokio::sync::mpsc::Receiver<BackPressure>,
+        mut cmd_rx: aptos_channels::tokio_channel::Receiver<BatchGeneratorCommand>,
+        mut back_pressure_rx: aptos_channels::tokio_channel::Receiver<BackPressure>,
         mut interval: Interval,
     ) {
         let start = Instant::now();

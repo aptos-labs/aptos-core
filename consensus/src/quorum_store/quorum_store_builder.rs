@@ -124,14 +124,14 @@ pub struct InnerBuilder {
     backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
-    batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
-    batch_generator_cmd_rx: Option<tokio::sync::mpsc::Receiver<BatchGeneratorCommand>>,
+    batch_generator_cmd_tx: aptos_channels::tokio_channel::Sender<BatchGeneratorCommand>,
+    batch_generator_cmd_rx: Option<aptos_channels::tokio_channel::Receiver<BatchGeneratorCommand>>,
     proof_coordinator_cmd_tx: tokio::sync::mpsc::Sender<ProofCoordinatorCommand>,
     proof_coordinator_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofCoordinatorCommand>>,
     proof_manager_cmd_tx: tokio::sync::mpsc::Sender<ProofManagerCommand>,
     proof_manager_cmd_rx: Option<tokio::sync::mpsc::Receiver<ProofManagerCommand>>,
-    back_pressure_tx: tokio::sync::mpsc::Sender<BackPressure>,
-    back_pressure_rx: Option<tokio::sync::mpsc::Receiver<BackPressure>>,
+    back_pressure_tx: aptos_channels::tokio_channel::Sender<BackPressure>,
+    back_pressure_rx: Option<aptos_channels::tokio_channel::Receiver<BackPressure>>,
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, VerifiedEvent>,
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
@@ -156,13 +156,18 @@ impl InnerBuilder {
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
-        let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
-            tokio::sync::mpsc::channel(config.channel_size);
+        let (batch_generator_cmd_tx, batch_generator_cmd_rx) = aptos_channels::tokio_channel::new(
+            config.channel_size,
+            &counters::PENDING_BATCH_GENERATOR_CMD,
+        );
         let (proof_coordinator_cmd_tx, proof_coordinator_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
         let (proof_manager_cmd_tx, proof_manager_cmd_rx) =
             tokio::sync::mpsc::channel(config.channel_size);
-        let (back_pressure_tx, back_pressure_rx) = tokio::sync::mpsc::channel(config.channel_size);
+        let (back_pressure_tx, back_pressure_rx) = aptos_channels::tokio_channel::new(
+            config.channel_size,
+            &counters::PENDING_BACK_PRESSURE,
+        );
         let (quorum_store_msg_tx, quorum_store_msg_rx) =
             aptos_channel::new::<AccountAddress, VerifiedEvent>(
                 QueueStyle::FIFO,

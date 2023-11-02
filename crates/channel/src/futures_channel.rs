@@ -22,21 +22,6 @@ use futures::{
     task::{Context, Poll},
 };
 use std::pin::Pin;
-
-#[cfg(test)]
-mod test;
-
-pub mod aptos_channel;
-#[cfg(test)]
-mod aptos_channel_test;
-
-pub mod message_queues;
-#[cfg(test)]
-mod message_queues_test;
-
-pub mod futures_channel;
-pub mod tokio_channel;
-
 /// An [`mpsc::Sender`](futures::channel::mpsc::Sender) with an [`IntGauge`]
 /// counting the number of currently queued items.
 pub struct Sender<T> {
