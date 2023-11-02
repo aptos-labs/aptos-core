@@ -2863,7 +2863,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Some(entry) = self.parent.parent.struct_table.get(struct_name) {
             Some(entry.clone())
         } else {
-            self.error(&struct_name_loc, msg);
+            self.error(struct_name_loc, msg);
             None
         }
     }
@@ -2893,7 +2893,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             Some(field_decls)
         } else {
             self.error(
-                &struct_name_loc,
+                struct_name_loc,
                 &format!(
                     "native struct `{}` cannot be packed or unpacked",
                     struct_name.display(self.parent.parent.env)
