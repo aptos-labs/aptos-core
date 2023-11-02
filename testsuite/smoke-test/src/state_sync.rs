@@ -18,7 +18,14 @@ use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::DbReader;
-use aptos_types::{account_address::AccountAddress, PeerId};
+use aptos_types::{
+    account_address::AccountAddress,
+    on_chain_config::{
+        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
+        ProposerElectionType,
+    },
+    PeerId,
+};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
@@ -227,7 +234,6 @@ async fn test_full_node_continuous_sync_transactions() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -249,7 +255,10 @@ async fn test_single_validator_failure() {
     let validator = swarm.validators_mut().next().unwrap();
     validator.stop();
     validator.start().unwrap();
-    swarm.wait_all_alive(Duration::from_secs(20)).await.unwrap();
+    swarm
+        .wait_all_alive(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
+        .await
+        .unwrap();
 
     // Execute more transactions
     execute_transactions(
@@ -281,18 +290,30 @@ async fn test_validator_bootstrap_outputs() {
 }
 
 #[tokio::test]
+async fn test_validator_bootstrap_default() {
+    // Test the default syncing method with epoch changes
+    test_validator_sync_and_participate(false, true).await;
+}
+
+#[tokio::test]
+async fn test_validator_bootstrap_default_no_epoch_changes() {
+    // Test the default syncing method without epoch changes
+    test_validator_sync_and_participate(false, false).await;
+}
+
+#[tokio::test]
 async fn test_validator_bootstrap_state_snapshot() {
     // Test snapshot (fast) syncing with epoch changes
-    perform_validator_bootstrap_state_snapshot(4, true).await;
+    test_validator_sync_and_participate(true, true).await;
 }
 
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_genesis() {
     // Test snapshot (fast) syncing without epoch changes
-    perform_validator_bootstrap_state_snapshot(4, false).await;
+    test_validator_sync_and_participate(true, false).await;
 }
 
-#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_outputs_network_limit() {
     // Create a swarm of 4 validators using output syncing and an aggressive network limit
@@ -312,7 +333,7 @@ async fn test_validator_bootstrap_outputs_network_limit() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
-#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_outputs_network_limit_tiny() {
     // Create a swarm of 4 validators using output syncing and an unrealistic network limit.
@@ -352,7 +373,7 @@ async fn test_validator_bootstrap_state_snapshot_no_compression() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
-#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_network_limit() {
     // Create a swarm of 4 validators using state snapshot syncing and an aggressive network limit
@@ -372,7 +393,7 @@ async fn test_validator_bootstrap_state_snapshot_network_limit() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
-#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_network_limit_tiny() {
     // Create a swarm of 4 validators using state snapshot syncing and an unrealistic network limit.
@@ -395,15 +416,13 @@ async fn test_validator_bootstrap_state_snapshot_network_limit_tiny() {
 
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_exponential_backoff() {
-    // Test snapshot (fast) syncing in the presence of
-    // exponential backoff and epoch changes.
+    // Test snapshot (fast) syncing with exponential backoff and epoch changes
     perform_validator_bootstrap_state_snapshot_exponential_backoff(true).await;
 }
 
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot_exponential_backoff_genesis() {
-    // Test snapshot (fast) syncing in the presence of
-    // exponential backoff without epoch changes.
+    // Test snapshot (fast) syncing without exponential backoff and epoch changes
     perform_validator_bootstrap_state_snapshot_exponential_backoff(false).await;
 }
 
@@ -449,7 +468,7 @@ async fn test_validator_bootstrap_transactions_or_outputs() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
-#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_transactions_network_limit() {
     // Create a swarm of 4 validators using transaction syncing and an aggressive network limit
@@ -469,7 +488,7 @@ async fn test_validator_bootstrap_transactions_network_limit() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
-#[ignore] // We ignore this test because it takes a long time. But, it works, so it shouldn't be removed.
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_bootstrap_transactions_network_limit_tiny() {
     // Create a swarm of 4 validators using transaction syncing and an unrealistic network limit.
@@ -528,9 +547,7 @@ async fn test_validator_bootstrap_transactions_no_compression() {
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
-// Ignore this test because it's become increasingly flaky recently
-// and needs to be debugged.
-#[ignore]
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_failure_bootstrap_outputs() {
     // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
@@ -549,9 +566,7 @@ async fn test_validator_failure_bootstrap_outputs() {
     test_all_validator_failures(swarm).await;
 }
 
-// Ignore this test because it's become increasingly flaky recently
-// and needs to be debugged.
-#[ignore]
+#[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
 async fn test_validator_failure_bootstrap_execution() {
     // Create a swarm of 4 validators with state snapshot bootstrapping and transaction syncing
@@ -607,14 +622,8 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
         .await;
 
     // Verify the oldest ledger info and pruning metrics for the validators
-    for validator in swarm.validators() {
-        // Verify the oldest ledger info
-        let validator_rest_client = validator.rest_client();
-        verify_oldest_version_after_fast_sync(validator_rest_client.clone(), true).await;
-
-        // Verify the pruning metrics
-        let inspection_client = validator.inspection_client();
-        verify_pruning_metrics_after_fast_sync(inspection_client, true).await;
+    for validator in swarm.validators_mut() {
+        verify_fast_sync_version_and_metrics(validator, true).await;
     }
 
     // Create a fullnode config that uses snapshot syncing
@@ -628,55 +637,8 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
 
     // Verify the oldest ledger info and pruning metrics for the fullnode
     if epoch_changes {
-        // Verify the oldest ledger info on the fullnode
         let fullnode = swarm.fullnode_mut(vfn_peer_id).unwrap();
-        let vfn_rest_client = fullnode.rest_client();
-        verify_oldest_version_after_fast_sync(vfn_rest_client.clone(), false).await;
-
-        // Verify the fullnode pruning metrics
-        let inspection_client = fullnode.inspection_client();
-        verify_pruning_metrics_after_fast_sync(inspection_client, false).await;
-
-        // Verify that the ledger info exists at version 0
-        verify_first_ledger_info(fullnode);
-    }
-}
-
-/// A test method that verifies that a validator can fast sync from
-/// other validators after a data wipe. If `epoch_changes` are enabled
-/// then epoch changes can occur during test execution and validator syncing.
-async fn perform_validator_bootstrap_state_snapshot(num_validators: usize, epoch_changes: bool) {
-    // Create a swarm of 4 validators using snapshot (fast) syncing and a chunk size = 30
-    let mut swarm = SwarmBuilder::new_local(num_validators)
-        .with_aptos()
-        .with_init_config(Arc::new(|_, config, _| {
-            config.state_sync.state_sync_driver.bootstrapping_mode =
-                BootstrappingMode::DownloadLatestStates;
-            config.state_sync.storage_service.max_state_chunk_size = 30;
-        }))
-        .with_init_genesis_config(Arc::new(|genesis_config| {
-            genesis_config.epoch_duration_secs = 10_000; // Prevent epoch changes from occurring unnecessarily
-        }))
-        .build()
-        .await;
-
-    // Test the ability of the validators to sync
-    let validator_index_to_test = 1;
-    test_validator_sync(&mut swarm, validator_index_to_test, epoch_changes).await;
-
-    // Verify the oldest ledger info and pruning metrics for the validator
-    if epoch_changes {
-        // Verify the oldest ledger info for the validator
-        let validator = swarm.validators_mut().nth(validator_index_to_test).unwrap();
-        let validator_client = validator.rest_client();
-        verify_oldest_version_after_fast_sync(validator_client, false).await;
-
-        // Verify the validator pruning metrics
-        let inspection_client = validator.inspection_client();
-        verify_pruning_metrics_after_fast_sync(inspection_client, false).await;
-
-        // Get the DB path for the validator
-        verify_first_ledger_info(validator);
+        verify_fast_sync_version_and_metrics(fullnode, false).await;
     }
 }
 
@@ -777,7 +739,7 @@ async fn test_validator_sync(
     )
     .await;
 
-    // Stop the validator and delete the storage
+    // Stop the specified validator and delete the storage
     let validator = validator_peer_ids[validator_index_to_test];
     stop_validator_and_delete_storage(swarm, validator).await;
 
@@ -803,6 +765,113 @@ async fn test_validator_sync(
         &mut account_0,
         &account_1,
         epoch_changes,
+    )
+    .await;
+}
+
+/// A test method that verifies that a validator can sync after a data wipe
+/// and begin to participate in consensus. If `epoch_changes` are enabled
+/// then epoch changes can occur during test execution and validator syncing.
+/// If `fast_sync` is true, then the validator will use snapshot (fast)
+/// syncing. Otherwise, it will use the default syncing method.
+async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: bool) {
+    // Create a swarm of 4 validators
+    let num_validators = 4;
+    let mut swarm = SwarmBuilder::new_local(num_validators)
+        .with_aptos()
+        .with_init_config(Arc::new(move |_, config, _| {
+            if fast_sync {
+                // Set the bootstrapping mode to fast syncing
+                config.state_sync.state_sync_driver.bootstrapping_mode =
+                    BootstrappingMode::DownloadLatestStates;
+                config.state_sync.storage_service.max_state_chunk_size = 30;
+            }
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            // Shorten the required proposer history to speed up the test
+            let consensus_config = match genesis_config.consensus_config.clone() {
+                OnChainConsensusConfig::V1(consensus_config) => consensus_config,
+                OnChainConsensusConfig::V2(consensus_config) => consensus_config,
+                config => unimplemented!(
+                    "This test requires a V1 or V2 consensus config, but got: {:?}",
+                    config
+                ),
+            };
+            let leader_reputation_type = match &consensus_config.proposer_election_type {
+                ProposerElectionType::LeaderReputation(leader_reputation_type) => {
+                    leader_reputation_type
+                },
+                proposer_election_type => panic!(
+                    "This test requires a leader reputation proposer election, but got: {:?}",
+                    proposer_election_type
+                ),
+            };
+            let proposer_and_voter_config = match &leader_reputation_type {
+                LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
+                    proposer_and_voter_config
+                },
+                leader_reputation_type => panic!(
+                    "This test requires a proposer and voter V2 leader reputation, but got: {:?}",
+                    leader_reputation_type
+                ),
+            };
+            genesis_config.consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
+                proposer_election_type: ProposerElectionType::LeaderReputation(
+                    LeaderReputationType::ProposerAndVoter(ProposerAndVoterConfig {
+                        proposer_window_num_validators_multiplier: 1,
+                        voter_window_num_validators_multiplier: 1,
+                        use_history_from_previous_epoch_max_count: 1,
+                        ..*proposer_and_voter_config
+                    }),
+                ),
+                ..Default::default()
+            });
+
+            // Prevent epoch changes from occurring unnecessarily
+            genesis_config.epoch_duration_secs = 10_000;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the second validator to sync
+    let validator_index_to_test = 1;
+    test_validator_sync(&mut swarm, validator_index_to_test, epoch_changes).await;
+
+    // Verify the oldest ledger info and pruning metrics for the second validator
+    if fast_sync && epoch_changes {
+        let validator = swarm.validators_mut().nth(validator_index_to_test).unwrap();
+        verify_fast_sync_version_and_metrics(validator, false).await;
+    }
+
+    // Execute multiple transactions through the first validator
+    let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+    let validator_client = swarm
+        .validator(*validator_peer_ids.first().unwrap())
+        .unwrap()
+        .rest_client();
+    let (mut account_0, account_1) = create_test_accounts(&mut swarm).await;
+    execute_transactions_and_wait(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        false,
+    )
+    .await;
+
+    // Stop the last validator (to prevent it from participating in consensus)
+    let last_validator = swarm
+        .validator_mut(*validator_peer_ids.last().unwrap())
+        .unwrap();
+    last_validator.stop();
+
+    // Verify that consensus is progressing (the second validator should participate after syncing)
+    execute_transactions(
+        &mut swarm,
+        &validator_client,
+        &mut account_0,
+        &account_1,
+        false,
     )
     .await;
 }
@@ -948,6 +1017,20 @@ async fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: Ac
     validator.clear_storage().await.unwrap();
 }
 
+/// Verifies that the oldest ledger info, pruning metrics and first
+/// ledger info are all correctly aligned after a fast sync.
+async fn verify_fast_sync_version_and_metrics(node: &mut LocalNode, sync_to_genesis: bool) {
+    // Verify the oldest ledger info for the node
+    verify_oldest_version_after_fast_sync(node.rest_client(), sync_to_genesis).await;
+
+    // Verify the node's pruning metrics
+    let inspection_client = node.inspection_client();
+    verify_pruning_metrics_after_fast_sync(inspection_client, sync_to_genesis).await;
+
+    // Verify that the ledger info exists at version 0
+    verify_first_ledger_info(node);
+}
+
 /// Verifies that the ledger info at version 0 exists in the given node's DB
 fn verify_first_ledger_info(node: &mut LocalNode) {
     // Get the DB path for the node
@@ -958,9 +1041,12 @@ fn verify_first_ledger_info(node: &mut LocalNode) {
     // Stop the node to prevent any DB contention
     node.stop();
 
-    // Verfiy that the ledger info exists at version 0
+    // Verify that the ledger info exists at version 0
     let aptos_db = AptosDB::new_for_test(db_path_buf.as_path());
     aptos_db.get_epoch_ending_ledger_info(0).unwrap();
+
+    // Restart the node
+    node.start().unwrap();
 }
 
 /// Verifies the oldest ledger version on a node after fast syncing
