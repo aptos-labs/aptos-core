@@ -2513,14 +2513,15 @@ mod test {
         let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         data.insert(KeyType::<u32>(4, false), state_value_4);
         let base_view = MockStateView::new(data);
-        let sequential_state: SequentialState<'_, TestTransactionType, MockExecutable> = SequentialState {
-            unsync_map: &unsync_map,
-            counter: &counter,
-            resource_read_set: RefCell::new(HashSet::new()),
-            group_read_set: RefCell::new(HashSet::new()),
-            dynamic_change_set_optimizations_enabled: true,
-        };
-        
+        let sequential_state: SequentialState<'_, TestTransactionType, MockExecutable> =
+            SequentialState {
+                unsync_map: &unsync_map,
+                counter: &counter,
+                resource_read_set: RefCell::new(HashSet::new()),
+                group_read_set: RefCell::new(HashSet::new()),
+                dynamic_change_set_optimizations_enabled: true,
+            };
+
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
             ViewState::Unsync(sequential_state),
@@ -2572,7 +2573,9 @@ mod test {
                 .unwrap(),
             Some(state_value_4.clone())
         );
-        assert!(latest_view.get_resource_read_set_sequential().contains(&KeyType(4, false)));
+        assert!(latest_view
+            .get_resource_read_set_sequential()
+            .contains(&KeyType(4, false)));
         // TODO [agg_v2](test) Gives an error that == check can't be done on ValueType as
         // it doesn't satisfy PartialEq, Eq traits
         // assert_eq!(

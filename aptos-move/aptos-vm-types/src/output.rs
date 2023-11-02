@@ -173,6 +173,8 @@ impl VMOutput {
         let _ = self
             .change_set
             .drain_group_reads_needing_delayed_field_exchange();
+        // TODO[agg_v2](question) Is this correct to drain resource group write set here?
+        let _ = self.change_set.drain_resource_group_write_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set
