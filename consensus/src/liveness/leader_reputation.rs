@@ -19,11 +19,9 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
-use aptos_storage_interface::{DbReader, Order};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
-    account_config::{new_block_event_key, NewBlockEvent},
-    epoch_change::EpochChangeProof,
-    epoch_state::EpochState,
+    account_config::NewBlockEvent, epoch_change::EpochChangeProof, epoch_state::EpochState,
 };
 use std::{
     cmp::max,
@@ -76,21 +74,7 @@ impl AptosDBBackend {
         // assumes target round is not too far from latest commit
         let limit = self.window_size + self.seek_len;
 
-        // there is a race condition between the next two lines, and new events being added.
-        // I.e. when latest_db_version is fetched, and get_events are called.
-        // if in between a new entry gets added max_returned_version will be larger than
-        // latest_db_version, and so we should take the max of the two.
-
-        // we cannot reorder those two functions, as if get_events is first,
-        // and then new entry gets added before get_latest_version is called,
-        // we would incorrectly think that we have a newer version.
-        let events = self.aptos_db.get_events(
-            &new_block_event_key(),
-            u64::max_value(),
-            Order::Descending,
-            limit as u64,
-            latest_db_version,
-        )?;
+        let events = self.aptos_db.get_latest_block_events(limit)?;
 
         let max_returned_version = events.first().map_or(0, |first| first.transaction_version);
 
