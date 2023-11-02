@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::HashValue;
@@ -181,6 +180,8 @@ impl Filter {
 
     pub fn allows(&self, block_id: HashValue, txn: &SignedTransaction) -> bool {
         for rule in &self.rules {
+            // Rules are evaluated in the order and the first rule that matches is used. If no rule
+            // matches, the transaction is allowed.
             match rule.eval(block_id, txn) {
                 EvalResult::Allow => return true,
                 EvalResult::Deny => return false,
