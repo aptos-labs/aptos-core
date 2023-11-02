@@ -10,6 +10,7 @@ use crate::{
     persistent_liveness_storage::StorageWriteProxy,
     quorum_store::quorum_store_db::QuorumStoreDB,
     state_computer::ExecutionProxy,
+    transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
@@ -51,6 +52,7 @@ pub fn start_consensus(
         txn_notifier,
         state_sync_notifier,
         runtime.handle(),
+        TransactionFilter::new(node_config.execution.transaction_filter.clone()),
     ));
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));

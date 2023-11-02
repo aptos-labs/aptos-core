@@ -718,6 +718,7 @@ name = "aptos-consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos",
  "aptos-bitvec",
  "aptos-bounded-executor",
  "aptos-cached-packages",
@@ -777,6 +778,7 @@ dependencies = [
  "serde 1.0.149",
  "serde_bytes",
  "serde_json",
+ "serde_yaml 0.8.26",
  "tempfile",
  "thiserror",
  "tokio",

@@ -68,12 +68,14 @@ rayon = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
 tokio-retry = { workspace = true }
 
 [dev-dependencies]
+aptos = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true, features = ["fuzzing"] }
 aptos-consensus-types = { workspace = true, features = ["fuzzing"] }
