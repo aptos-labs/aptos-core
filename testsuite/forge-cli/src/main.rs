@@ -2017,13 +2017,7 @@ fn pfn_performance(
     add_network_emulation: bool,
 ) -> ForgeConfig {
     // Determine the minimum expected TPS
-    let min_expected_tps = if add_cpu_chaos {
-        3000
-    } else if add_network_emulation {
-        4000
-    } else {
-        4500
-    };
+    let min_expected_tps = 4500;
 
     // Create the forge config
     ForgeConfig::default()
