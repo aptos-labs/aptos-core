@@ -56,6 +56,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub mempool: MempoolConfig,
     #[serde(default)]
+    pub netbench: Option<NetbenchConfig>,
+    #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
@@ -63,8 +65,6 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
-    #[serde(default)]
-    pub netbench: Option<NetbenchConfig>,
 }
 
 impl NodeConfig {

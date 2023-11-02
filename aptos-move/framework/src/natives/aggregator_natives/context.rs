@@ -10,9 +10,14 @@ use aptos_aggregator::{
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
     types::DelayedFieldID,
 };
-use aptos_types::state_store::state_key::StateKey;
+use aptos_types::{aggregator::PanicError, state_store::state_key::StateKey, write_set::WriteOp};
 use better_any::{Tid, TidAble};
-use std::{cell::RefCell, collections::HashMap};
+use move_core_types::value::MoveTypeLayout;
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 /// Represents a single aggregator change.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -29,8 +34,9 @@ pub enum AggregatorChangeV1 {
 /// set can be converted into appropriate `WriteSet` and `DeltaChangeSet` by the
 /// user, e.g. VM session.
 pub struct AggregatorChangeSet {
-    pub aggregator_v1_changes: HashMap<StateKey, AggregatorChangeV1>,
-    pub delayed_field_changes: HashMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
+    pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+    pub reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -69,7 +75,7 @@ impl<'a> NativeAggregatorContext<'a> {
 
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
-    pub fn into_change_set(self) -> AggregatorChangeSet {
+    pub fn into_change_set(self) -> Result<AggregatorChangeSet, PanicError> {
         let NativeAggregatorContext {
             aggregator_v1_data,
             delayed_field_data,
@@ -77,7 +83,7 @@ impl<'a> NativeAggregatorContext<'a> {
         } = self;
         let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
 
-        let mut aggregator_v1_changes = HashMap::new();
+        let mut aggregator_v1_changes = BTreeMap::new();
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
@@ -107,11 +113,31 @@ impl<'a> NativeAggregatorContext<'a> {
         }
 
         let delayed_field_changes = delayed_field_data.into_inner().into();
-
-        AggregatorChangeSet {
+        let delayed_write_set_keys = delayed_field_changes
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>();
+        Ok(AggregatorChangeSet {
             aggregator_v1_changes,
-            delayed_field_changes: HashMap::from_iter(delayed_field_changes),
-        }
+            delayed_field_changes,
+            // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
+            // are any changes that would require computing reads needing exchange.
+            // TODO[agg_v2](optimize) we only later compute the the write set, so cannot pass the correct skip values here.
+            reads_needing_exchange: if delayed_write_set_keys.is_empty() {
+                BTreeMap::new()
+            } else {
+                self.delayed_field_resolver
+                    .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
+            },
+        })
+    }
+
+    #[cfg(test)]
+    fn into_delayed_fields(self) -> BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>> {
+        let NativeAggregatorContext {
+            delayed_field_data, ..
+        } = self;
+        delayed_field_data.into_inner().into()
     }
 }
 
@@ -193,7 +219,7 @@ mod test {
         let AggregatorChangeSet {
             aggregator_v1_changes,
             ..
-        } = context.into_change_set();
+        } = context.into_change_set().unwrap();
 
         assert!(!aggregator_v1_changes.contains_key(&aggregator_v1_state_key_for_test(100)));
         assert_matches!(
@@ -418,10 +444,7 @@ mod test {
         let resolver = get_test_resolver_v2();
         let context = NativeAggregatorContext::new([0; 32], &resolver, &resolver);
         test_set_up_v2(&context);
-        let AggregatorChangeSet {
-            delayed_field_changes,
-            ..
-        } = context.into_change_set();
+        let delayed_field_changes = context.into_delayed_fields();
         assert!(!delayed_field_changes.contains_key(&DelayedFieldID::new(1000)));
         assert_some_eq!(
             delayed_field_changes.get(&DelayedFieldID::new(900)),

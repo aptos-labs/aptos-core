@@ -6,10 +6,7 @@ on:
   schedule:
     - cron: "0 0 * * *"
   pull_request:
-    types: [labeled, opened, synchronize, reopened]
-  push:
-    branches:
-      - main
+    types: [labeled]
   workflow_dispatch:
   workflow_call:
 
@@ -25,7 +22,9 @@ concurrency:
 
 jobs:
   rust-unit-coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule'
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
+      ${{ github.event_name == 'schedule' && github.ref_name == 'main' }}
     # Note the tests run slowly due to instrutmentation. It takes CI ~8 hrs
     timeout-minutes: 600
     runs-on: high-perf-docker
@@ -48,7 +47,9 @@ jobs:
           path: lcov_unit.info
 
   rust-smoke-coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule'
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
+      ${{ github.event_name == 'schedule' && github.ref_name == 'main' }}
     timeout-minutes: 240
     runs-on: high-perf-docker
     steps:

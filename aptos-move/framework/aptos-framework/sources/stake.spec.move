@@ -190,12 +190,13 @@ spec aptos_framework::stake {
     }
 
     spec on_new_epoch {
-        pragma verify = false;
+        pragma verify_duration_estimate = 120;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
+        include aptos_framework::aptos_coin::ExistsAptosCoin;
         // This function should never abort.
         aborts_if false;
     }
@@ -216,7 +217,7 @@ spec aptos_framework::stake {
 
     spec update_stake_pool {
         // TODO: set because of timeout in CI. The property is proved (inconsistency check also passes)
-        pragma verify = false;
+        pragma verify = true;
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
 

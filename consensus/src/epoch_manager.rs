@@ -56,9 +56,13 @@ use crate::{
 use anyhow::{bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{ConsensusConfig, DagConsensusConfig, NodeConfig, SecureBackend};
+use aptos_config::config::{
+    ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig, QcAggregatorType,
+    SecureBackend,
+};
 use aptos_consensus_types::{
     common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
@@ -117,6 +121,7 @@ pub enum LivenessStorageData {
 pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
+    execution_config: ExecutionConfig,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
@@ -171,12 +176,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
+        let execution_config = node_config.execution.clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
         Self {
             author,
             config,
+            execution_config,
             time_service,
             self_sender,
             network_sender,
@@ -222,13 +229,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &self,
         time_service: Arc<dyn TimeService>,
         timeout_sender: aptos_channels::Sender<Round>,
+        delayed_qc_tx: UnboundedSender<DelayedQcMsg>,
+        qc_aggregator_type: QcAggregatorType,
     ) -> RoundState {
         let time_interval = Box::new(ExponentialTimeInterval::new(
             Duration::from_millis(self.config.round_initial_timeout_ms),
             self.config.round_timeout_backoff_exponent_base,
             self.config.round_timeout_backoff_max_exponent,
         ));
-        RoundState::new(time_interval, time_service, timeout_sender)
+        RoundState::new(
+            time_interval,
+            time_service,
+            timeout_sender,
+            delayed_qc_tx,
+            qc_aggregator_type,
+        )
     }
 
     /// Create a proposer election handler based on proposers
@@ -791,10 +806,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 "Unable to initialize safety rules.",
             );
         }
+        let (delayed_qc_tx, delayed_qc_rx) = unbounded();
 
         info!(epoch = epoch, "Create RoundState");
-        let round_state =
-            self.create_round_state(self.time_service.clone(), self.timeout_sender.clone());
+        let round_state = self.create_round_state(
+            self.time_service.clone(),
+            self.timeout_sender.clone(),
+            delayed_qc_tx,
+            self.config.qc_aggregator_type.clone(),
+        );
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election =
@@ -843,7 +863,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
         );
-
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
             1,
@@ -876,7 +895,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_manager_close_tx = Some(close_tx);
-        tokio::spawn(round_manager.start(round_manager_rx, buffered_proposal_rx, close_rx));
+        tokio::spawn(round_manager.start(
+            round_manager_rx,
+            buffered_proposal_rx,
+            delayed_qc_rx,
+            close_rx,
+        ));
 
         self.spawn_block_retrieval_task(epoch, block_store);
     }

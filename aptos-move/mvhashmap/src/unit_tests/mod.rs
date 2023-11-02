@@ -32,7 +32,8 @@ fn match_unresolved(
 
 #[test]
 fn unsync_map_data_basic() {
-    let map: UnsyncMap<KeyType<Vec<u8>>, TestValue, ExecutableTestType, ()> = UnsyncMap::new();
+    let map: UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()> =
+        UnsyncMap::new();
 
     let ap = KeyType(b"/foo/b".to_vec());
 
@@ -223,10 +224,10 @@ fn aggregator_base_mismatch() {
     let vd: VersionedData<KeyType<Vec<u8>>, TestValue> = VersionedData::new();
     let ap = KeyType(b"/foo/b".to_vec());
 
-    vd.set_base_value(ap.clone(), TestValue::with_len(1), None);
+    vd.set_base_value(ap.clone(), TestValue::creation_with_len(1), None);
     // This call must panic, because it provides a mismatching base value:
     // However, only base value length is compared in assert.
-    vd.set_base_value(ap, TestValue::with_len(2), None);
+    vd.set_base_value(ap, TestValue::creation_with_len(2), None);
 }
 
 #[test]

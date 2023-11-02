@@ -262,7 +262,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
 
     pub fn set_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {
         let mut v = self.values.entry(key).or_default();
-        let bytes_len = data.bytes_len();
+        let bytes_len = data.bytes().map(|b| b.len());
         // For base value, incarnation is irrelevant, and is always set to 0.
 
         use btree_map::Entry::*;
@@ -287,22 +287,13 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                         // Assert the length of bytes for efficiency (instead of full equality)
                         layout.is_some() == maybe_layout.is_some()
                             && *i == 0
-                            && (layout.is_some() || v.bytes_len() == bytes_len)
+                            && (layout.is_some() || v.bytes().map(|b| b.len()) == bytes_len)
                     } else {
                         true
                     }
                 );
             },
         };
-
-        // let prev_entry = v.versioned_map.insert(
-        //     ShiftedTxnIndex::zero(),
-        //     CachePadded::new(Entry::new_write_from(0, data, maybe_layout)),
-        // );
-
-        // assert!(prev_entry.map_or(true, |entry| -> bool {
-
-        // }));
     }
 
     /// Versioned write of data at a given key (and version).

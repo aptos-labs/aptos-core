@@ -770,14 +770,6 @@ impl SignedTransaction {
         Ok(SignatureCheckedTransaction(self))
     }
 
-    /// Special check for fee payer transaction having optional fee payer address in the
-    /// transaction. This will be removed after 1.8 has been fully released.
-    pub fn check_fee_payer_signature(self) -> Result<SignatureCheckedTransaction> {
-        self.authenticator
-            .verify_with_optional_fee_payer(&self.raw_txn)?;
-        Ok(SignatureCheckedTransaction(self))
-    }
-
     pub fn verify_signature(&self) -> Result<()> {
         self.authenticator.verify(&self.raw_txn)?;
         Ok(())
@@ -1880,6 +1872,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + From<u64>
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
-    type Value: Send + Sync + Clone + TransactionWrite;
+    type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
 }

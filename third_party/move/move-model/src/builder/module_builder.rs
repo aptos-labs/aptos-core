@@ -5,7 +5,7 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, GlobalInvariant, ModuleName, Operation, PropertyBag, PropertyValue,
+        ExpData, FriendDecl, GlobalInvariant, ModuleName, Operation, PropertyBag, PropertyValue,
         QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl,
         Value,
     },
@@ -65,6 +65,8 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub module_name: ModuleName,
     /// Translated use declarations.
     pub use_decls: Vec<UseDecl>,
+    /// Translated friend declarations.
+    pub friend_decls: Vec<FriendDecl>,
     /// Translated specification functions.
     pub spec_funs: Vec<SpecFunDecl>,
     /// During the definition analysis, the index into `spec_funs` we are currently
@@ -89,7 +91,7 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Let bindings for the current spec block, characterized by a boolean indicating whether
     /// post state is active and the node id of the original expression of the let.
     pub spec_block_lets: BTreeMap<Symbol, (bool, NodeId)>,
-    /// Whether during model building, we actuallly compile the full Move source. If this is not
+    /// Whether during model building, we actually compile the full Move source. If this is not
     /// set, we assume a compiled bytecode module as input. We still need the AST of the spec
     /// language part.
     pub compile_move: bool,
@@ -148,6 +150,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_id,
             module_name,
             use_decls: vec![],
+            friend_decls: vec![],
             spec_funs: vec![],
             inline_spec_builder: Spec::default(),
             spec_fun_index: 0,
@@ -249,7 +252,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
     /// Creates a SpecBlockContext from the given SpecBlockTarget. The context is used during
     /// definition analysis when visiting a schema block member (condition, invariant, etc.).
-    /// This returns None if the SpecBlockTarget cannnot be resolved; error reporting happens
+    /// This returns None if the SpecBlockTarget cannot be resolved; error reporting happens
     /// at caller side.
     fn get_spec_block_context<'pa>(
         &self,
@@ -280,7 +283,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
-/// # Abilitity Analysis
+/// # Ability Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     pub(crate) fn translate_abilities(&self, set: &EA::AbilitySet) -> AbilitySet {
@@ -411,6 +414,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
         for use_decl in &module_def.use_decls {
             self.decl_ana_use_decl(use_decl)
+        }
+        for (friend_mod_id, friend) in module_def.friends.key_cloned_iter() {
+            self.decl_ana_friend_decl(&friend_mod_id, friend);
         }
     }
 
@@ -591,9 +597,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let module_name = ModuleName::new(given_addr, module_sym);
         let module_id = self
             .parent
-            .env
-            .find_module(&ModuleName::new(resolved_addr, module_sym))
-            .map(|e| e.get_id());
+            .module_table
+            .get(&ModuleName::new(resolved_addr, module_sym))
+            .copied();
         self.use_decls.push(UseDecl {
             loc,
             module_name,
@@ -609,6 +615,25 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     )
                 })
                 .collect(),
+        });
+    }
+
+    fn decl_ana_friend_decl(&mut self, friend_mod_id: &EA::ModuleIdent, friend: &EA::Friend) {
+        // Get various information about the declared friend module.
+        let addr = self.parent.resolve_address(
+            &self.parent.to_loc(&friend_mod_id.loc),
+            &friend_mod_id.value.address,
+        );
+        let name = self
+            .symbol_pool()
+            .make(friend_mod_id.value.module.0.value.as_str());
+        let module_name = ModuleName::from_address_bytes_and_name(addr, name);
+        let loc = self.parent.to_loc(&friend.loc);
+        // Add a corresponding friend declaration.
+        self.friend_decls.push(FriendDecl {
+            loc,
+            module_name,
+            module_id: None, // will be filled in later after all modules have an id.
         });
     }
 
@@ -3649,6 +3674,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.module_name.clone(),
             attributes,
             std::mem::take(&mut self.use_decls),
+            std::mem::take(&mut self.friend_decls),
             named_constants,
             struct_data,
             function_data,

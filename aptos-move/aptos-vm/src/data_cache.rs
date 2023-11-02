@@ -21,12 +21,14 @@ use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
+    aggregator::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadataKind},
     },
+    write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
@@ -48,6 +50,7 @@ use move_core_types::{
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
 };
 
 pub(crate) fn get_resource_group_from_metadata(
@@ -97,6 +100,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             maybe_resource_group_view,
             executor_view,
             gas_feature_version,
+            features.is_resource_group_charge_as_size_sum_enabled(),
         );
 
         Self::new(
@@ -286,6 +290,9 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
 
 impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
+    type ResourceGroupTag = StructTag;
+    type ResourceKey = StateKey;
+    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -312,6 +319,16 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         self.executor_view.generate_delayed_field_id()
     }
+
+    fn get_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
+    {
+        self.executor_view
+            .get_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
 }
 
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
@@ -334,7 +351,12 @@ impl<S: StateView> AsMoveResolver<S> for S {
         let features = Features::fetch_config(&config_view).unwrap_or_default();
         let max_binary_version =
             get_max_binary_format_version(&features, Some(gas_feature_version));
-        let resource_group_adapter = ResourceGroupAdapter::new(None, self, gas_feature_version);
+        let resource_group_adapter = ResourceGroupAdapter::new(
+            None,
+            self,
+            gas_feature_version,
+            features.is_resource_group_charge_as_size_sum_enabled(),
+        );
         let max_identifier_size = get_max_identifier_size(&features);
         StorageAdapter::new(
             self,
@@ -405,12 +427,19 @@ pub(crate) mod tests {
         state_view: &S,
         group_size_kind: GroupSizeKind,
     ) -> StorageAdapter<S> {
-        let gas_feature_version = match group_size_kind {
-            GroupSizeKind::AsSum => 12,
-            GroupSizeKind::AsBlob => 10,
-            GroupSizeKind::None => 1,
+        let (gas_feature_version, resource_group_charge_as_size_sum_enabled) = match group_size_kind
+        {
+            GroupSizeKind::AsSum => (12, true),
+            GroupSizeKind::AsBlob => (10, false),
+            GroupSizeKind::None => (1, false),
         };
-        let group_adapter = ResourceGroupAdapter::new(None, state_view, gas_feature_version);
+
+        let group_adapter = ResourceGroupAdapter::new(
+            None,
+            state_view,
+            gas_feature_version,
+            resource_group_charge_as_size_sum_enabled,
+        );
         StorageAdapter::new(state_view, 0, 0, group_adapter)
     }
 }
