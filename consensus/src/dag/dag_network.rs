@@ -82,7 +82,11 @@ pub struct RpcWithFallback {
 
     terminated: bool,
     futures: Pin<
-        Box<FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<DAGRpcResult>> + Send>>>>,
+        Box<
+            FuturesUnordered<
+                Pin<Box<dyn Future<Output = (Author, anyhow::Result<DAGRpcResult>)> + Send>>,
+            >,
+        >,
     >,
     sender: Arc<dyn TDAGNetworkSender>,
     interval: Pin<Box<Interval>>,
@@ -121,12 +125,12 @@ async fn send_rpc(
     peer: Author,
     message: DAGMessage,
     timeout: Duration,
-) -> anyhow::Result<DAGRpcResult> {
-    sender.send_rpc(peer, message, timeout).await
+) -> (Author, anyhow::Result<DAGRpcResult>) {
+    (peer, sender.send_rpc(peer, message, timeout).await)
 }
 
 impl Stream for RpcWithFallback {
-    type Item = anyhow::Result<DAGRpcResult>;
+    type Item = (Author, anyhow::Result<DAGRpcResult>);
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if !self.futures.is_empty() {

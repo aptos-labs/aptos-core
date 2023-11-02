@@ -138,7 +138,7 @@ impl StateSyncTrigger {
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round()
-                + self.dag_window_size_config
+                + 2*self.dag_window_size_config
                 < li.commit_info().round()
     }
 }
@@ -224,7 +224,7 @@ impl DagStateSynchronizer {
             Ok(_) => {},
             Err(err) => {
                 error!("error fetching nodes {}", err);
-                return Err(err);
+                Err(err)?;
             },
         }
 

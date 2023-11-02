@@ -59,6 +59,8 @@ impl Dag {
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
         let mut dag = Self::new_empty(epoch_state, storage.clone(), start_round, window_size);
+
+        debug!("Populating the DAG with {} nodes from storage.", all_nodes.len());
         for (digest, certified_node) in all_nodes {
             // TODO: save the storage call in this case
             if let Err(e) = dag.add_node(certified_node) {

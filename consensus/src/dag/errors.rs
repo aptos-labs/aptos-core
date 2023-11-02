@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::Round;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
@@ -24,7 +25,7 @@ pub enum DagDriverError {
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]
 pub enum FetchRequestHandleError {
     #[error("target nodes are missing")]
-    TargetsMissing,
+    TargetsMissing(BitVec),
     #[error("garbage collected, request round {0}, lowest round {1}")]
     GarbageCollected(Round, Round),
 }

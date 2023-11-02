@@ -4,7 +4,7 @@ use super::helpers::TEST_DAG_WINDOW;
 use crate::{
     dag::{
         adapter::OrderedNotifier,
-        dag_fetcher::{FetchRequestHandler, TDagFetcher},
+        dag_fetcher::{FetchRequestHandler, TDagFetcher, DagFetcherError},
         dag_state_sync::DagStateSynchronizer,
         dag_store::Dag,
         storage::DAGStorage,
@@ -82,7 +82,7 @@ impl TDagFetcher for MockDagFetcher {
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
         new_dag: Arc<RwLock<Dag>>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), DagFetcherError> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
             .await

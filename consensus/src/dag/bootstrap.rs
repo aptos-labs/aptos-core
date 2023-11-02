@@ -292,7 +292,7 @@ impl DagBootstrapper {
             self.onchain_config.dag_ordering_causal_history_window as Round,
         );
 
-        loop {
+        'outer: loop {
             let ledger_info_from_storage = self
                 .storage
                 .get_latest_ledger_info()
@@ -313,82 +313,94 @@ impl DagBootstrapper {
                 self.onchain_config.dag_ordering_causal_history_window as u64,
             );
 
-            let state_sync_trigger = StateSyncTrigger::new(
-                self.epoch_state.clone(),
-                ledger_info_provider.clone(),
-                dag_store.clone(),
-                self.proof_notifier.clone(),
-                self.onchain_config.dag_ordering_causal_history_window as Round,
-            );
+            'inner: loop {
+                let state_sync_trigger = StateSyncTrigger::new(
+                    self.epoch_state.clone(),
+                    ledger_info_provider.clone(),
+                    dag_store.clone(),
+                    self.proof_notifier.clone(),
+                    self.onchain_config.dag_ordering_causal_history_window as Round,
+                );
 
-            let (handler, fetch_service) = self.bootstrap_components(
-                dag_store.clone(),
-                order_rule,
-                state_sync_trigger,
-                ledger_info_provider.clone(),
-                chain_health_backoff,
-                self.config.rb_config.clone(),
-                self.config.round_state_config.clone(),
-            );
+                let (handler, fetch_service) = self.bootstrap_components(
+                    dag_store.clone(),
+                    order_rule.clone(),
+                    state_sync_trigger,
+                    ledger_info_provider.clone(),
+                    chain_health_backoff.clone(),
+                    self.config.rb_config.clone(),
+                    self.config.round_state_config.clone(),
+                );
+    
+                let df_handle: JoinHandle<()> = tokio::spawn(fetch_service.start());
 
-            let df_handle = tokio::spawn(fetch_service.start());
+                // poll the network handler while waiting for rebootstrap notification or shutdown notification
+                select! {
+                    biased;
+                    Ok(ack_tx) = &mut shutdown_rx => {
+                        df_handle.abort();
+                        let _ = df_handle.await;
+                        if let Err(e) = ack_tx.send(()) {
+                            error!(error = ?e, "unable to ack to shutdown signal");
+                        }
+                        return;
+                    },
+                    sync_status = handler.run(&mut dag_rpc_rx) => {
+                        df_handle.abort();
+                        let _ = df_handle.await;
 
-            // poll the network handler while waiting for rebootstrap notification or shutdown notification
-            select! {
-                biased;
-                Ok(ack_tx) = &mut shutdown_rx => {
-                    df_handle.abort();
-                    let _ = df_handle.await;
-                    if let Err(e) = ack_tx.send(()) {
-                        error!(error = ?e, "unable to ack to shutdown signal");
-                    }
-                    return;
-                },
-                sync_status = handler.run(&mut dag_rpc_rx) => {
-                    df_handle.abort();
-                    let _ = df_handle.await;
+                        match sync_status {
+                            StateSyncStatus::NeedsSync(certified_node_msg) => {
+                                let highest_committed_anchor_round = ledger_info_provider.get_highest_committed_anchor_round();
+                                debug!(LogSchema::new(LogEvent::StateSync).round(dag_store.read().highest_round()),
+                                    target_round = certified_node_msg.round(),
+                                    local_ordered_round = dag_store.read().highest_ordered_anchor_round(),
+                                    local_committed_round = highest_committed_anchor_round
+                                );
+                                let dag_fetcher = DagFetcher::new(
+                                    self.epoch_state.clone(),
+                                    self.dag_network_sender.clone(),
+                                    self.time_service.clone(),
+                                    self.config.fetcher_config.clone()
+                                );
 
-                    match sync_status {
-                        StateSyncStatus::NeedsSync(certified_node_msg) => {
-                            let highest_committed_anchor_round = ledger_info_provider.get_highest_committed_anchor_round();
-                            debug!(LogSchema::new(LogEvent::StateSync).round(dag_store.read().highest_round()),
-                                target_round = certified_node_msg.round(),
-                                local_ordered_round = dag_store.read().highest_ordered_anchor_round(),
-                                local_committed_round = highest_committed_anchor_round
-                            );
-                            let dag_fetcher = DagFetcher::new(
-                                self.epoch_state.clone(),
-                                self.dag_network_sender.clone(),
-                                self.time_service.clone(),
-                                self.config.fetcher_config.clone()
-                            );
+                                let sync_future = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone(), highest_committed_anchor_round);
 
-                            let sync_future = sync_manager.sync_dag_to(&certified_node_msg, dag_fetcher, dag_store.clone(), highest_committed_anchor_round);
-
-                            let result = sync_future.await;
-                            match result {
-                                Ok(_) => debug!("Sync finishes"),
-                                Err(e) => error!(error = ?e, "unable to sync"),
-                            }
-
-                            if let Ok(Some(ack_tx)) = (&mut shutdown_rx).try_recv() {
-                                debug!("aborting rebootstrap. shutting down bootstrapper");
-                                let _ = ack_tx.send(());
+                                // Keep dequeing dag_rx msgs and queue them
+                                // return failure for fetch messages
+                                // queue Node message post sync window
+                                // queue CertNode message post sync window. abort sync if new cert node post 2xsync_window received and resync.
+                                select! {
+                                    result = sync_future => {
+                                        match result {
+                                            Ok(_) => {
+                                                debug!("Sync finished. going to rebootstrap.");
+                                                break 'outer;
+                                            },
+                                            Err(e) => {
+                                                error!(error = ?e, "unable to state sync");
+                                                break 'inner;
+                                            },
+                                        }
+                                    },
+                                    Ok(ack_tx) = &mut shutdown_rx => {
+                                        debug!("aborting rebootstrap. shutting down bootstrapper");
+                                        let _ = ack_tx.send(());
+                                        return;
+                                    }
+                                }
+                            },
+                            StateSyncStatus::EpochEnds => {
+                                // Wait for epoch manager to signal shutdown
+                                if let Ok(ack_tx) = shutdown_rx.await {
+                                    let _ = ack_tx.send(());
+                                } else {
+                                    panic!("did not receive shutdown signal");
+                                }
                                 return;
-                            }
-
-                            debug!("going to rebootstrap.");
-                        },
-                        StateSyncStatus::EpochEnds => {
-                            // Wait for epoch manager to signal shutdown
-                            if let Ok(ack_tx) = shutdown_rx.await {
-                                let _ = ack_tx.send(());
-                            } else {
-                                panic!("did not receive shutdown signal");
-                            }
-                            return;
-                        },
-                        _ => unreachable!()
+                            },
+                            _ => unreachable!()
+                        }
                     }
                 }
             }

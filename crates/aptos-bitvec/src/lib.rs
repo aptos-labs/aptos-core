@@ -189,6 +189,18 @@ impl FromIterator<u8> for BitVec {
     }
 }
 
+impl FromIterator<bool> for BitVec {
+    fn from_iter<T: IntoIterator<Item = bool>>(iter: T) -> Self {
+        let mut bitvec = Self::default();
+        for (index, bit) in iter.into_iter().enumerate() {
+            if bit {
+                bitvec.set(index as u16);
+            }
+        }
+        bitvec
+    }
+}
+
 impl From<Vec<u8>> for BitVec {
     fn from(raw_bytes: Vec<u8>) -> Self {
         assert!(raw_bytes.len() <= MAX_BUCKETS);
