@@ -2974,7 +2974,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
         let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
-        let instantiation = self.make_instantiation_or_report(loc, struct_entry.type_params.len(), generics)?;
+        let instantiation =
+            self.make_instantiation_or_report(loc, struct_entry.type_params.len(), generics)?;
         let field_decls = self
             .get_field_decls_for_pack_unpack(&struct_entry, &struct_name, &struct_name_loc)?
             .clone();
@@ -3033,7 +3034,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let struct_name_loc = self.to_loc(&maccess.loc);
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
         let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
-        let instantiation = self.make_instantiation_or_report(loc, struct_entry.type_params.len(), generics)?;
+        let instantiation =
+            self.make_instantiation_or_report(loc, struct_entry.type_params.len(), generics)?;
         let field_decls = self
             .get_field_decls_for_pack_unpack(&struct_entry, &struct_name, &struct_name_loc)?
             .clone();
