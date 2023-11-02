@@ -1309,6 +1309,7 @@ dependencies = [
  "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
+ "aptos-drop-helper",
  "aptos-executor-types",
  "aptos-infallible",
  "aptos-language-e2e-tests",

@@ -441,15 +441,6 @@ fn main() {
     let execution_threads = opt.execution_threads();
     let execution_shards = opt.pipeline_opt.sharding_opt.num_executor_shards;
     let mut execution_threads_per_shard = execution_threads;
-    if execution_shards > 1 {
-        assert!(
-            execution_threads % execution_shards == 0,
-            "Execution threads ({}) must be divisible by the number of execution shards ({}).",
-            execution_threads,
-            execution_shards
-        );
-        execution_threads_per_shard = execution_threads / execution_shards;
-    }
 
     if opt
         .pipeline_opt
@@ -477,6 +468,14 @@ fn main() {
         // it does not matter because shards are on remote node, but for sake of correctness lets
         // set it
         execution_threads_per_shard = execution_threads;
+    } else if execution_shards > 1 {
+        assert!(
+            execution_threads % execution_shards == 0,
+            "Execution threads ({}) must be divisible by the number of execution shards ({}).",
+            execution_threads,
+            execution_shards
+        );
+        execution_threads_per_shard = execution_threads / execution_shards;
     }
 
     AptosVM::set_num_shards_once(execution_shards);
