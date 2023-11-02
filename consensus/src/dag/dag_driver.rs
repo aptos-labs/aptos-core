@@ -62,6 +62,7 @@ pub(crate) struct DagDriver {
 }
 
 impl DagDriver {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,

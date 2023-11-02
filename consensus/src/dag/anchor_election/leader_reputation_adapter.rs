@@ -129,7 +129,10 @@ impl LeaderReputationAdapter {
         }
     }
 
-    fn get_chain_health_backoff(&self, round: u64) -> (f64, Option<&aptos_config::config::ChainHealthBackoffValues>) {
+    fn get_chain_health_backoff(
+        &self,
+        round: u64,
+    ) -> (f64, Option<&aptos_config::config::ChainHealthBackoffValues>) {
         let voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
 
         let chain_health_backoff = self
@@ -164,14 +167,12 @@ impl TChainHealthBackoff for LeaderReputationAdapter {
 
     fn get_round_payload_limits(&self, round: Round) -> (f64, Option<(u64, u64)>) {
         let (voting_power_ratio, chain_health_backoff) = self.get_chain_health_backoff(round);
-        let backoff_limits = if let Some(value) = chain_health_backoff {
-            Some((
+        let backoff_limits = chain_health_backoff.map(|value| {
+            (
                 value.max_sending_block_txns_override,
                 value.max_sending_block_bytes_override,
-            ))
-        } else {
-            None
-        };
+            )
+        });
         (voting_power_ratio, backoff_limits)
     }
 }

@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::time::Duration;
 use crate::dag::storage::CommitEvent;
 use aptos_consensus_types::common::{Author, Round};
+use std::time::Duration;
 
 pub trait AnchorElection: Send + Sync {
     fn get_anchor(&self, round: Round) -> Author;
