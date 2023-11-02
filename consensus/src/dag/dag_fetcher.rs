@@ -280,7 +280,7 @@ impl TDagFetcher for DagFetcher {
             self.config.max_concurrent_responders,
         );
 
-        while let Some(response) = rpc.next().await {
+        while let Some((responder, response)) = rpc.next().await {
             match response {
                 Ok(DAGRpcResult(Ok(response))) => {
                     match FetchResponse::try_from(response).and_then(|response| {
@@ -293,7 +293,7 @@ impl TDagFetcher for DagFetcher {
                                 let mut dag_writer = dag.write();
                                 for node in certified_nodes.into_iter().rev() {
                                     if let Err(e) = dag_writer.add_node(node) {
-                                        error!("Failed to add node {}", e);
+                                        error!(error = ?e, "failed to add node");
                                     }
                                 }
                             }
@@ -303,36 +303,15 @@ impl TDagFetcher for DagFetcher {
                             }
                         },
                         Err(err) => {
-                            info!(error = ?err, "unable to parse fetch response");
+                            info!(error = ?err, "failure parsing/verifying fetch response from {}", responder);
                         },
                     };
                 },
                 Ok(DAGRpcResult(Err(dag_rpc_error))) => {
-                    info!("unable to fetch nodes from target: {}", dag_rpc_error);
-                    if let DAGError::FetchRequestHandleError(err) = dag_rpc_error.deref() {
-                        match err {
-                            FetchRequestHandleError::TargetsMissing(missing_bitvec) => {
-                                // TODO: add who the responder is
-                                info!(
-                                    "responder is missing target nodes to serve. missing {}",
-                                    missing_bitvec.count_ones()
-                                );
-                            },
-                            FetchRequestHandleError::GarbageCollected(
-                                requested_round,
-                                lowest_round,
-                            ) => {
-                                info!(
-                                    "fetch error. requested: {}, lowest_round: {}",
-                                    requested_round, lowest_round
-                                );
-                            },
-                        }
-                    }
+                    info!(error = ?dag_rpc_error, responder, "fetch failure: target {} returned error", responder);
                 },
                 Err(err) => {
-                    // TODO: add who responder is
-                    info!(error = ?err, "error issuing RPC");
+                    info!(error = ?err, responder, "rpc failed to {}", responder);
                 },
             }
         }
