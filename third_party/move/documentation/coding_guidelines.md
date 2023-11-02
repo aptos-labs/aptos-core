@@ -23,6 +23,29 @@ $ cargo xclippy --all-targets
 
 In general, we follow the recommendations from [rust-lang-nursery](https://rust-lang.github.io/api-guidelines/) and [The Rust Programming Language](https://doc.rust-lang.org/book/).  The remainder of this guide provides detailed guidelines on specific topics in order to achieve uniformity of the codebase.
 
+## Code review
+
+We require every PR to have approval by at least two reviewers. This is enforced by the CI presubmit.
+
+### Guidelines for Authors of PRs
+
+- Have a meaningful description of the PR
+    - the purpose of a PR
+    - major design decisions
+    - testing strategy
+    - any additional, non-primary changes related to the PR. It is OK to do minor refactorings of the code as you visit it.
+- Respond to each comment of the reviewers. If you think you resolved a request for a change, just use 'done' as a response. If you diasgree with the reviewer, explain why
+- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTLA' ('please take a look again') as an acronym for this purpose.
+- If possible, avoid force push so the reviewer can see how you changed code in comparison. There are exceptions to this, for example if you need to rebase
+
+### Guidelines for Reviewers of PRs
+
+- Review timely. If you are too busy to perform the review, indicate this and possibly suggest a different reviewer.
+- Change requests should try to avoid minor coding style issues. It's a final balancing about what minor or major code style issues are.
+- When you review, consider the context of the code. You can use an IDE like VS Code or CLion to conduct reviews in the IDE which allows navigating the code.
+- Be cordial in the way how to formulate your comments. "Can you please explain what this does?" goes a long way compared to "This looks strange to me".
+
+
 ## Code documentation
 
 Any public fields, functions, and methods should be documented with [Rustdoc](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#making-useful-documentation-comments).
@@ -107,6 +130,7 @@ assumptions will be added in the future.
 * Describe how the component is modeled. For example, why is the
   code organized the way it is?
 * Other relevant implementation details.
+```
 
 ## Binary, Argument, and Crate Naming
 
