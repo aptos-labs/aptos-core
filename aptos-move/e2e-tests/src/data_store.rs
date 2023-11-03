@@ -106,7 +106,7 @@ impl FakeDataStore {
     /// Adds CoinInfo to this data store.
     pub fn add_coin_info(&mut self) {
         let coin_info = CoinInfoResource::random(u128::MAX);
-        let write_set = coin_info.to_writeset().expect("access path in test");
+        let write_set = coin_info.to_writeset(0).expect("access path in test");
         self.add_write_set(&write_set)
     }
 

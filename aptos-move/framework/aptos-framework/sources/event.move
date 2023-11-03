@@ -38,6 +38,13 @@ module aptos_framework::event {
         guid: GUID,
     }
 
+    public fun destory_handle<T: drop + store>(event_handle: EventHandle<T>) {
+        let EventHandle<T> {
+            counter: _,
+            guid: _,
+        } = event_handle;
+    }
+
     #[deprecated]
     /// Use EventHandleGenerator to generate a unique event handle for `sig`
     public(friend) fun new_event_handle<T: drop + store>(guid: GUID): EventHandle<T> {

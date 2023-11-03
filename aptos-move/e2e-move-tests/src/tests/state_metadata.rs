@@ -3,10 +3,12 @@
 
 use crate::MoveHarness;
 use aptos_types::{
+    account_config::{fungible_store::primary_store, ObjectGroupResource},
     on_chain_config::{CurrentTimeMicroseconds, FeatureFlag},
     state_store::state_value::StateValueMetadata,
 };
-use move_core_types::{account_address::AccountAddress, parser::parse_struct_tag};
+use move_core_types::parser::parse_struct_tag;
+use move_core_types::{account_address::AccountAddress, move_resource::MoveStructType};
 
 #[test]
 fn test_metadata_tracking() {
@@ -26,10 +28,13 @@ fn test_metadata_tracking() {
     let account1 = harness.new_account_at(address1);
 
     // Disable storage slot metadata tracking
-    harness.enable_features(vec![], vec![
-        FeatureFlag::STORAGE_SLOT_METADATA,
-        FeatureFlag::REFUNDABLE_BYTES,
-    ]);
+    harness.enable_features(
+        vec![],
+        vec![
+            FeatureFlag::STORAGE_SLOT_METADATA,
+            FeatureFlag::REFUNDABLE_BYTES,
+        ],
+    );
     // Create and fund account2
     harness.run_transaction_payload(
         &account1,
