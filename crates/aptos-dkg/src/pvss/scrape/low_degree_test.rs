@@ -17,7 +17,6 @@ use std::ops::Mul;
 ///
 /// When `includes_zero` is true, there are `n - 1` (instead of `n`) roots of unity evaluations and
 /// an extra evaluation at zero.
-/// TODO: use a reference with a liftime to batch_dom?
 pub struct LowDegreeTest<'a> {
     /// Consider a degree-$(t-1)$ polynomial $p(X)$. Its "dual" polynomial $f(X)$ will be of degree
     /// $n - t - 1$, and will have $n - t$ coefficients.
