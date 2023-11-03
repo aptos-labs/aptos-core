@@ -43,6 +43,8 @@ impl GcsClient {
     }
 }
 
+// TODO: fix the broken client is copied to new connection.
+
 #[derive(Clone)]
 pub struct GcsInternalClient<T: GcsClientTrait> {
     // Bucket name.
