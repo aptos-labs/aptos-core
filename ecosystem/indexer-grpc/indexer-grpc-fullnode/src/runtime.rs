@@ -22,6 +22,11 @@ use aptos_types::chain_id::ChainId;
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
 use tonic::{codec::CompressionEncoding, transport::Server};
+use std::thread;
+use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager, r2d2};
+use openssl::ssl::{SslConnector, SslMethod};
+use postgres_openssl::MakeTlsConnector;
+use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime as dpRunTime};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -49,6 +54,19 @@ pub fn bootstrap(
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
 
+    let connector =
+        MakeTlsConnector::new(SslConnector::builder(SslMethod::tls()).unwrap().build());
+    let mut cfg = Config::new();
+    cfg.dbname = Some("defaultdb".to_string());
+    cfg.host = Some("ash-ape-3749.g95.cockroachlabs.cloud".to_string());
+    cfg.port = Some(26257);
+    cfg.options = Some("sslmode=require".to_string());
+    cfg.user = Some("jill".to_string());
+    cfg.password = Some("RC6qo8u4r147JPPouphsbw".to_string());
+
+    cfg.manager = Some(ManagerConfig { recycling_method: RecyclingMethod::Fast });
+    let pool = cfg.create_pool(Some(dpRunTime::Tokio1), connector).unwrap();
+    let pool = pool.clone();
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
         let service_context = ServiceContext {
@@ -60,6 +78,7 @@ pub fn bootstrap(
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
             service_context: service_context.clone(),
+            pool: Arc::new(pool),
         };
         let localnet_data_server = LocalnetDataService { service_context };
 

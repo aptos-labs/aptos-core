@@ -62,15 +62,16 @@ impl RawData for LocalnetDataService {
             );
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch().await;
-                let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
-                    Ok(max_version) => max_version,
-                    Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
-                        break;
-                    },
-                };
-                coordinator.current_version = max_version + 1;
+                // let results = coordinator.process_next_batch(None).await;
+                // let results = coordinator.process_next_batch().await;
+                // let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
+                //     Ok(max_version) => max_version,
+                //     Err(e) => {
+                //         error!("[indexer-grpc] Error sending to stream: {}", e);
+                //         break;
+                //     },
+                // };
+                // coordinator.current_version = max_version + 1;
             }
         });
         tokio::spawn(async move {

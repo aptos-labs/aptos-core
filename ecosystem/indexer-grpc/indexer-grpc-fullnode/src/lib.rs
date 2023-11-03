@@ -9,7 +9,10 @@ pub mod counters;
 pub mod fullnode_data_service;
 pub mod localnet_data_service;
 pub mod runtime;
+// pub mod runtime_for_table_info;
 pub mod stream_coordinator;
+pub mod table_info_parser;
+// pub mod table_info_parser_multithread;
 
 #[derive(Clone, Debug)]
 pub struct ServiceContext {

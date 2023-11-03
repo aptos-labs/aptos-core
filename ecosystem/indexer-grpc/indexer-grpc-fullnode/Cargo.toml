@@ -28,6 +28,7 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tonic-reflection = { workspace = true }
+move-resource-viewer = { workspace = true }
 
 aptos-api = { workspace = true }
 aptos-api-types = { workspace = true }
@@ -47,6 +48,11 @@ aptos-vm = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-package = { workspace = true }
+aptos-sdk = { workspace = true }
+postgres-openssl = "0.5.0"
+openssl = "0.10.58"
+tokio-postgres = "0.7.10"
+deadpool-postgres = "0.11.0"
 
 [dev-dependencies]
 goldenfile = { workspace = true }
@@ -64,7 +70,6 @@ aptos-global-constants = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
-aptos-sdk = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-vm = { workspace = true }
