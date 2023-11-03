@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-
-use aptos_protos::{
-    indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
-};
 use crate::grpc_response_stream::GrpcResponseStream;
 use aptos_indexer_grpc_data_access::StorageClient;
+use aptos_protos::indexer::v1::{
+    raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse,
+};
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::{pin::Pin, time::Duration};

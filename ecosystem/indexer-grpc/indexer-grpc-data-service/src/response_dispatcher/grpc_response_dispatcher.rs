@@ -413,15 +413,10 @@ mod tests {
             let first_storage_transactions = create_transactions(200, 200);
             let second_storage_transactions = create_transactions(0, 200);
             let storages = vec![
-                StorageClient::MockClient(MockStorageClient::new(
-                1,
-                first_storage_transactions)),
-                StorageClient::MockClient(MockStorageClient::new(
-                    1,
-                second_storage_transactions)),
+                StorageClient::MockClient(MockStorageClient::new(1, first_storage_transactions)),
+                StorageClient::MockClient(MockStorageClient::new(1, second_storage_transactions)),
             ];
-            let mut dispatcher =
-                GrpcResponseDispatcher::new(0, None, sender, storages.as_slice());
+            let mut dispatcher = GrpcResponseDispatcher::new(0, None, sender, storages.as_slice());
             let run_result = dispatcher.run().await;
             assert!(run_result.is_err());
         });
