@@ -298,6 +298,11 @@ spec aptos_framework::object {
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
 
+    spec create_object_at_address(owner_address: address, object_address: address, can_delete: bool): ConstructorRef {
+        // TODO(fa_migration)
+        pragma verify = false;
+    }
+
     spec create_object_internal(
     creator_address: address,
     object: address,

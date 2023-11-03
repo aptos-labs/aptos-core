@@ -26,8 +26,8 @@ use aptos_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
+        account_config::aptos_test_root_address, get_apt_primary_store_address,
+        transaction::SignedTransaction, AccountKey, LocalAccount,
     },
 };
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
@@ -657,19 +657,41 @@ impl TestContext {
     }
 
     pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {
-        let coin_balance = self
-            .api_get_account_resource(
+        let coin_balance_option = self
+            .api_get_account_resource_option(
                 account,
                 "0x1",
                 "coin",
                 "CoinStore<0x1::aptos_coin::AptosCoin>",
             )
             .await;
-        coin_balance["data"]["coin"]["value"]
-            .as_str()
-            .unwrap()
-            .parse::<u64>()
-            .unwrap()
+        let coin = coin_balance_option
+            .map(|x| {
+                x["data"]["coin"]["value"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap()
+            })
+            .unwrap_or(0);
+        let fungible_store_option = self
+            .api_get_account_resource_option(
+                get_apt_primary_store_address(account),
+                "0x1",
+                "fungible_asset",
+                "FungibleStore",
+            )
+            .await;
+        let fa = fungible_store_option
+            .map(|x| {
+                x["data"]["balance"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap()
+            })
+            .unwrap_or(0);
+        coin + fa
     }
 
     pub async fn gen_events_by_handle(
@@ -717,15 +739,27 @@ impl TestContext {
     }
 
     // TODO: Add support for generic_type_params if necessary.
+    pub async fn api_get_account_resource_option(
+        &self,
+        account: AccountAddress,
+        resource_account_address: &str,
+        module: &str,
+        name: &str,
+    ) -> Option<Value> {
+        let resource = format!("{}::{}::{}", resource_account_address, module, name);
+        self.gen_resource(&account, &resource).await
+    }
+
     pub async fn api_get_account_resource(
         &self,
         account: AccountAddress,
         resource_account_address: &str,
         module: &str,
         name: &str,
-    ) -> serde_json::Value {
-        let resource = format!("{}::{}::{}", resource_account_address, module, name);
-        self.gen_resource(&account, &resource).await.unwrap()
+    ) -> Value {
+        self.api_get_account_resource_option(account, resource_account_address, module, name)
+            .await
+            .unwrap()
     }
 
     // TODO: remove the helper function since we don't publish module directly anymore

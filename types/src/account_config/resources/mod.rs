@@ -7,6 +7,7 @@ pub mod challenge;
 pub mod coin_info;
 pub mod coin_store;
 pub mod core_account;
+pub mod fungible_store;
 pub mod object;
 
 pub use chain_id::*;
