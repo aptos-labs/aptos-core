@@ -1112,6 +1112,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
+
+    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+        match &self.latest_view {
+            ViewState::Sync(_) => true,
+            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+        }
+    }
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView

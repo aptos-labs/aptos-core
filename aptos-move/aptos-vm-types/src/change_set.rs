@@ -336,6 +336,10 @@ impl VMChangeSet {
         &self.resource_group_write_set
     }
 
+    pub(crate) fn drain_resource_group_write_set(&mut self) -> BTreeMap<StateKey, GroupWrite> {
+        std::mem::take(&mut self.resource_group_write_set)
+    }
+
     pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.module_write_set
     }

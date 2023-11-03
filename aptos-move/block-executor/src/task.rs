@@ -76,6 +76,8 @@ pub trait ExecutorTask: Sync {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<Self::Output, Self::Error>;
+
+    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool;
 }
 
 /// Trait for execution result of a single transaction.
@@ -163,6 +165,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
             <Self::Txn as Transaction>::Value,
         )>,
     );
+
+    fn set_txn_output_for_non_dynamic_change_set(&self);
 
     /// Return the fee statement of the transaction.
     fn fee_statement(&self) -> FeeStatement;

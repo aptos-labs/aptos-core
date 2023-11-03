@@ -242,6 +242,22 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         );
     }
 
+    fn set_txn_output_for_non_dynamic_change_set(&self) {
+        assert!(
+            self.committed_output
+                .set(
+                    self.vm_output
+                        .lock()
+                        .take()
+                        .expect("Output must be set to incorporate materialized data")
+                        .into_transaction_output()
+                        .expect("We should be able to always convert to transaction output"),
+                )
+                .is_ok(),
+            "Could not combine VMOutput with the patched resource and event data"
+        );
+    }
+
     /// Return the fee statement of the transaction.
     /// Should never be called after vm_output is consumed.
     fn fee_statement(&self) -> FeeStatement {
