@@ -20,12 +20,19 @@
 /// storing addresses of other modules in the same package or system addresses such as the NFT collection.
 module package::package_manager {
     use aptos_framework::account::{Self, SignerCapability};
+    use aptos_framework::code;
     use aptos_framework::resource_account;
     use aptos_std::smart_table::{Self, SmartTable};
     use std::string::String;
+    use std::signer;
+
+    /// Account is not the admin.
+    const ENOT_ADMIN: u64 = 1;
 
     /// Stores permission config such as SignerCapability for controlling the resource account.
     struct PermissionConfig has key {
+        /// The account that can perform upgrades.
+        admin: address,
         /// Required to obtain the resource account signer.
         signer_cap: SignerCapability,
         /// Track the addresses created by the modules in this package.
@@ -37,9 +44,20 @@ module package::package_manager {
     fun init_module(package_signer: &signer) {
         let signer_cap = resource_account::retrieve_resource_account_cap(package_signer, @deployer);
         move_to(package_signer, PermissionConfig {
+            admin: @deployer,
             addresses: smart_table::new<String, address>(),
             signer_cap,
         });
+    }
+
+    public entry fun upgrade(
+        admin: &signer,
+        metadata_serialized: vector<u8>,
+        code: vector<vector<u8>>,
+    ) acquires PermissionConfig {
+        let config = borrow_global<PermissionConfig>(@bridge);
+        assert!(config.admin == signer::address_of(admin), ENOT_ADMIN);
+        code::publish_package_txn(&get_signer(), metadata_serialized, code);
     }
 
     /// Can be called by friended modules to obtain the resource account signer.
@@ -75,6 +93,7 @@ module package::package_manager {
 
             account::create_account_for_test(deployer_addr);
             move_to(deployer, PermissionConfig {
+                admin: signer::address_of(deployer),
                 addresses: smart_table::new<String, address>(),
                 signer_cap: account::create_test_signer_cap(deployer_addr),
             });
