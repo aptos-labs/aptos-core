@@ -40,8 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8 # pin@v3
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/check-aptos-core
         with:
           cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
@@ -51,7 +51,7 @@ jobs:
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all')
     needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
+    uses: ./.github/workflows/workflow-run-replay-verify.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -71,7 +71,7 @@ jobs:
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' && (inputs.CHAIN_NAME == 'testnet' || inputs.CHAIN_NAME == 'all' )
     needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
+    uses: ./.github/workflows/workflow-run-replay-verify.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ inputs.GIT_SHA }}
@@ -88,7 +88,7 @@ jobs:
   test-replay:
     if: ${{ github.event_name == 'pull_request' }}
     needs: determine-test-metadata
-    uses: aptos-labs/aptos-core/.github/workflows/workflow-run-replay-verify.yaml@main
+    uses: ./.github/workflows/workflow-run-replay-verify.yaml
     secrets: inherit
     with:
       GIT_SHA: ${{ github.event.pull_request.head.sha }}
