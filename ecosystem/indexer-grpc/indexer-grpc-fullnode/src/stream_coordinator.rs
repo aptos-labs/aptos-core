@@ -5,6 +5,8 @@ use crate::{
     convert::convert_transaction,
     counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
+    // table_info_parser_multithread::IndexerLookupDB,
+    table_info_parser::IndexerLookupDB,
 };
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
@@ -20,10 +22,13 @@ use aptos_protos::{
     },
     transaction::v1::Transaction as TransactionPB,
 };
+use aptos_types::write_set::WriteSet;
 use aptos_vm::data_cache::AsMoveResolver;
+use deadpool_postgres::Pool;
+use move_resource_viewer::MoveValueAnnotator;
 use std::{
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    sync::{Arc, RwLock},
+    time::{Duration, SystemTime, UNIX_EPOCH}, borrow::Borrow,
 };
 use tokio::sync::mpsc;
 use tonic::Status;
@@ -88,11 +93,12 @@ impl IndexerStreamCoordinator {
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
 
+        let pool = pool.clone();
         for batch in batches {
             let context = self.context.clone();
+            let pool = pool.clone();
             let ledger_version = self.highest_known_version;
             let transaction_sender = self.transactions_sender.clone();
-
             let task = tokio::spawn(async move {
                 let batch_start_time = std::time::Instant::now();
                 // Fetch and convert transactions from API
@@ -274,6 +280,7 @@ impl IndexerStreamCoordinator {
     async fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
+        pool: Arc<Pool>,
     ) -> Vec<APITransaction> {
         if raw_txns.is_empty() {
             return vec![];
@@ -284,7 +291,15 @@ impl IndexerStreamCoordinator {
         let state_view = context.latest_state_view().unwrap();
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(context.db.clone());
-
+        let annotator = MoveValueAnnotator::new(&resolver);
+        let indexer = IndexerLookupDB { pool };
+        let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
+        let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+        async move {
+            indexer
+                .index_with_annotator(&annotator, first_version, &write_sets_slice).await;
+        };
+        
         // Enrich data with block metadata
         let (_, _, block_event) = context
             .db

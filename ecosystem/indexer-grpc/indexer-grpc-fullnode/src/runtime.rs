@@ -22,6 +22,11 @@ use aptos_types::chain_id::ChainId;
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
 use tonic::{codec::CompressionEncoding, transport::Server};
+use std::thread;
+use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager, r2d2};
+use openssl::ssl::{SslConnector, SslMethod};
+use postgres_openssl::MakeTlsConnector;
+use deadpool_postgres::{Config, Manager, ManagerConfig, Pool, RecyclingMethod, Runtime as dpRunTime};
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;

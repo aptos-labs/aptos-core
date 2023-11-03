@@ -8,8 +8,9 @@ use aptos_protos::internal::fullnode::v1::{
     fullnode_data_server::FullnodeData, stream_status::StatusType, transactions_from_node_response,
     GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
 };
+use deadpool_postgres::Pool;
 use futures::Stream;
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -61,7 +62,7 @@ impl FullnodeData for FullnodeDataService {
 
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
-
+        let pool = self.pool.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
