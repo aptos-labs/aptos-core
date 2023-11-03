@@ -59,8 +59,8 @@ impl TestUniverse {
         let executor = FakeExecutor::from_head_genesis().set_parallel();
         let mut harness = MoveHarness::new_with_executor(executor);
         harness.set_default_gas_unit_price(1);
-        let core_resources =
-            harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
+        let core_resources = harness
+            .new_account_with_balance_at(AccountAddress::from_hex_literal("0xA550C18").unwrap(), 0);
         let validators: Vec<Account> = (0..num_validators)
             .map(|idx| {
                 harness.new_account_at(
@@ -99,12 +99,11 @@ impl TestUniverse {
             .map(|_| {
                 // Select random users.
                 let src_account = &self.users[rng.sample(Uniform::new(0, num_users))];
-                let dst_account = &self.users[rng.sample(Uniform::new(0, num_users))];
 
-                // Create a new p2p transaction.
+                // Create a noop transaction that does not trigger any refund.
                 self.harness.create_transaction_payload(
                     src_account,
-                    aptos_stdlib::aptos_coin_transfer(*dst_account.address(), 1),
+                    aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true),
                 )
             })
             .collect()
@@ -131,7 +130,7 @@ impl TestUniverse {
     }
 
     /// Returns the total supply of AptosCoin in the universe.
-    pub fn read_total_supply(&self) -> u128 {
+    pub fn read_total_supply(&mut self) -> u128 {
         self.harness.executor.read_coin_supply().unwrap()
     }
 }
@@ -186,12 +185,13 @@ fn test_fee_collection_and_distribution_flow(burn_percentage: u8) {
     // Run a single block and record how much gas it costs. Since fee collection
     // is enabled, this amount is stored in aggregatable coin.
     let validator_addr = *universe.validators[0].address();
-    let txns = universe.create_block(1000);
+    let txns = universe.create_block(100);
 
     let mut total_supply = universe.read_total_supply();
     let outputs = universe
         .harness
         .run_block_with_metadata(validator_addr, vec![], txns);
+    println!("###### {:?}", outputs);
     let (p2p_gas, proposal_gas) = calculate_gas_used(outputs);
     assert_eq!(proposal_gas, 0);
 

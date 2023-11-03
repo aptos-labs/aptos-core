@@ -48,6 +48,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object`](#0x1_object_create_object)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
+-  [Function `create_object_at_address`](#0x1_object_create_object_at_address)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
@@ -97,6 +98,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `create_user_derived_object`](#@Specification_1_create_user_derived_object)
     -  [Function `create_object`](#@Specification_1_create_object)
     -  [Function `create_sticky_object`](#@Specification_1_create_sticky_object)
+    -  [Function `create_object_at_address`](#@Specification_1_create_object_at_address)
     -  [Function `create_object_from_account`](#@Specification_1_create_object_from_account)
     -  [Function `create_object_from_object`](#@Specification_1_create_object_from_object)
     -  [Function `create_object_from_guid`](#@Specification_1_create_object_from_guid)
@@ -1075,6 +1077,35 @@ Same as <code>create_object</code> except the object to be created will be undel
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_sticky_object">create_sticky_object</a>(owner_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> unique_address = <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>();
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, unique_address, <b>false</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_object_at_address"></a>
+
+## Function `create_object_at_address`
+
+Create an object at a specific address. Used by framework.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>, can_delete: bool): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(
+    owner_address: <b>address</b>,
+    object_address: <b>address</b>,
+    can_delete: bool
+): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
+    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, object_address, can_delete)
 }
 </code></pre>
 
@@ -2499,6 +2530,22 @@ Return true if the provided address has indirect or direct ownership of the prov
     }
 };
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: unique_address, can_delete: <b>false</b> };
+</code></pre>
+
+
+
+<a id="@Specification_1_create_object_at_address"></a>
+
+### Function `create_object_at_address`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>, can_delete: bool): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 

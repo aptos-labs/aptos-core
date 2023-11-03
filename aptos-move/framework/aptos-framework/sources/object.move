@@ -29,6 +29,7 @@ module aptos_framework::object {
     use aptos_framework::event;
     use aptos_framework::guid;
 
+    friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
 
     /// An object already exists at this address
@@ -257,6 +258,15 @@ module aptos_framework::object {
     public fun create_sticky_object(owner_address: address): ConstructorRef {
         let unique_address = transaction_context::generate_auid_address();
         create_object_internal(owner_address, unique_address, false)
+    }
+
+    /// Create an object at a specific address. Used by framework.
+    public(friend) fun create_object_at_address(
+        owner_address: address,
+        object_address: address,
+        can_delete: bool
+    ): ConstructorRef {
+        create_object_internal(owner_address, object_address, can_delete)
     }
 
     #[deprecated]

@@ -367,13 +367,9 @@ async fn test_multisig_transaction_simulation() {
     let withdraw_event = &simulation_resp["events"].as_array().unwrap()[0];
     assert_eq!(
         withdraw_event["type"].as_str().unwrap(),
-        "0x1::coin::Withdraw<0x1::aptos_coin::AptosCoin>"
+        "0x1::fungible_asset::WithdrawEvent"
     );
-    let withdraw_from_account =
-        AccountAddress::from_hex_literal(withdraw_event["data"]["account"].as_str().unwrap())
-            .unwrap();
     let withdrawn_amount = withdraw_event["data"]["amount"].as_str().unwrap();
-    assert_eq!(withdraw_from_account, multisig_account);
     assert_eq!(withdrawn_amount, "1000");
 
     // Simulating transferring more than what the multisig account has should fail.
@@ -512,7 +508,7 @@ async fn assert_multisig_tx_execution_failed(
         transaction_execution_failed_events.as_array().unwrap();
     assert_eq!(1, transaction_execution_failed_events.len());
     let event_data = &transaction_execution_failed_events[sequence_number - 1]["data"];
-    assert_eq!("65542", event_data["execution_error"]["error_code"]);
+    assert_eq!("65540", event_data["execution_error"]["error_code"]);
     let expected_payload = format!("0x{}", hex::encode(payload));
     assert_eq!(expected_payload, event_data["transaction_payload"],);
 }

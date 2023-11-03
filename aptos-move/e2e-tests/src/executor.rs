@@ -38,6 +38,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    move_utils::MemberId,
     on_chain_config::{
         AptosVersion, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
         TimedFeaturesBuilder, ValidatorSet,
@@ -79,6 +80,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
+    str::FromStr,
     sync::{Arc, Mutex},
     time::Instant,
 };
@@ -369,7 +371,19 @@ impl FakeExecutor {
 
     /// Adds an account to this executor's data store.
     pub fn add_account_data(&mut self, account_data: &AccountData) {
-        self.data_store.add_account_data(account_data)
+        self.data_store.add_account_data(account_data);
+        let new_supply = account_data.balance();
+        if new_supply != 0 {
+            let coin_info_resource = self
+                .read_coin_info_resource()
+                .expect("coin info must exist in data store");
+            let old_supply = self.read_coin_supply().unwrap();
+            self.data_store.add_write_set(
+                &coin_info_resource
+                    .to_writeset(old_supply + (new_supply as u128))
+                    .unwrap(),
+            )
+        }
     }
 
     /// Adds coin info to this executor's data store.
@@ -414,21 +428,20 @@ impl FakeExecutor {
     }
 
     /// Reads supply from CoinInfo resource value from this executor's data store.
-    pub fn read_coin_supply(&self) -> Option<u128> {
-        self.read_coin_info_resource()
-            .expect("coin info must exist in data store")
-            .supply()
-            .as_ref()
-            .map(|o| match o.aggregator.as_ref() {
-                Some(aggregator) => {
-                    let state_key = aggregator.state_key();
-                    let value_bytes = self
-                        .read_state_value_bytes(&state_key)
-                        .expect("aggregator value must exist in data store");
-                    bcs::from_bytes(&value_bytes).unwrap()
-                },
-                None => o.integer.as_ref().unwrap().value,
-            })
+    pub fn read_coin_supply(&mut self) -> Option<u128> {
+        let bytes = self
+            .execute_view_function(
+                str::parse("0x1::coin::supply").unwrap(),
+                vec![move_core_types::language_storage::TypeTag::from_str(
+                    "0x1::aptos_coin::AptosCoin",
+                )
+                .unwrap()],
+                vec![],
+            )
+            .unwrap()
+            .pop()
+            .unwrap();
+        bcs::from_bytes::<Option<u128>>(bytes.as_slice()).unwrap()
     }
 
     /// Reads the CoinInfo resource value from this executor's data store.
@@ -1214,16 +1227,15 @@ impl FakeExecutor {
 
     pub fn execute_view_function(
         &mut self,
-        module_id: ModuleId,
-        func_name: Identifier,
+        fun: MemberId,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
     ) -> ViewFunctionOutput {
         // No gas limit
         AptosVM::execute_view_function(
             self.get_state_view(),
-            module_id,
-            func_name,
+            fun.module_id,
+            fun.member_id,
             type_args,
             arguments,
             u64::MAX,
