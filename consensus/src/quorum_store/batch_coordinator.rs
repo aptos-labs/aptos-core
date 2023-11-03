@@ -24,7 +24,7 @@ pub enum BatchCoordinatorCommand {
 pub struct BatchCoordinator {
     my_peer_id: PeerId,
     network_sender: NetworkSender,
-    batch_store: Arc<BatchStore<NetworkSender>>,
+    batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
     max_total_txns: u64,
@@ -35,7 +35,7 @@ impl BatchCoordinator {
     pub(crate) fn new(
         my_peer_id: PeerId,
         network_sender: NetworkSender,
-        batch_store: Arc<BatchStore<NetworkSender>>,
+        batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
         max_batch_bytes: u64,
         max_total_txns: u64,
