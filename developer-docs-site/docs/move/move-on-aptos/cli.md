@@ -566,6 +566,8 @@ aptos move run \
         0x1::chain_id::ChainId \
     --args \
         u8:123 \
+        "hex:0x1234" \
+        "string:hello, world\! ♥" \
         "bool:[false, true, false, false]" \
         'address:[["0xace", "0xbee"], ["0xcad"], []]' \
     --private-key-file ace.key \
@@ -682,9 +684,11 @@ import view_json_file from '!!raw-loader!../../../../aptos-move/move-examples/cl
         false,
         false
       ],
+      "bytes": "0x1234",
       "type_info_1_match": true,
       "type_info_2_match": false,
-      "u8_solo": 123
+      "u8_solo": 123,
+      "utf8_string": "hello, world! ♥"
     }
   ]
 }
@@ -726,6 +730,8 @@ aptos move run-script \
         0x1::chain_id::ChainId \
     --args \
         u8:123 \
+        "hex:0x1234" \
+        "string:hello, world\! ♥" \
         "u8:[122, 123, 124, 125]" \
         address:"0xace" \
     --private-key-file ace.key \
@@ -810,9 +816,11 @@ aptos move view \
         true,
         true
       ],
+      "bytes": "0x1234",
       "type_info_1_match": true,
       "type_info_2_match": true,
-      "u8_solo": 123
+      "u8_solo": 123,
+      "utf8_string": "hello, world! ♥"
     }
   ]
 }
