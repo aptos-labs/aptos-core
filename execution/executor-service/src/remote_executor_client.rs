@@ -6,7 +6,7 @@ use crate::{
     RemoteExecutionResult,
 };
 use aptos_logger::{info, trace};
-use aptos_secure_net::network_controller::{Message, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
@@ -27,6 +27,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 
 pub static COORDINATOR_PORT: u16 = 52200;
 
@@ -80,7 +81,7 @@ pub struct RemoteExecutorClient<S: StateView + Sync + Send + 'static> {
     network_controller: NetworkController,
     state_view_service: Arc<RemoteStateViewService<S>>,
     // Channels to send execute block commands to the executor shards.
-    command_txs: Arc<Vec<Mutex<Sender<Message>>>>,
+    command_txs: Arc<Vec<Mutex<OutboundRpcHelper>>>,
     // Channels to receive execution results from the executor shards.
     result_rxs: Vec<Receiver<Message>>,
     // Thread pool used to pre-fetch the state values for the block in parallel and create an in-memory state view.
@@ -104,6 +105,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 .build()
                 .unwrap(),
         );
+        let self_addr = controller.get_self_addr();
         let controller_mut_ref = &mut controller;
         let (command_txs, result_rxs) = remote_shard_addresses
             .iter()
@@ -112,7 +114,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
                 let execute_command_type = format!("execute_command_{}", shard_id);
                 let execute_result_type = format!("execute_result_{}", shard_id);
                 let command_tx = Mutex::new(
-                    controller_mut_ref.create_outbound_channel(*address, execute_command_type),
+                    //controller_mut_ref.create_outbound_channel(*address, execute_command_type),
+                    OutboundRpcHelper::new(self_addr, *address),
                 );
                 let result_rx = controller_mut_ref.create_inbound_channel(execute_result_type);
                 (command_tx, result_rx)
@@ -191,19 +194,31 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         if !global_txns.is_empty() {
             panic!("Global transactions are not supported yet");
         }
+
+        let thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(self.num_shards())
+                .build()
+                .unwrap(),
+        );
+
         for (shard_id, sub_blocks) in sub_blocks.into_iter().enumerate() {
             let senders = self.command_txs.clone();
-            let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
-                sub_blocks,
-                concurrency_level: concurrency_level_per_shard,
-                onchain_config: onchain_config.clone(),
-            });
+            let onchain_config_clone = onchain_config.clone();
+            thread_pool.spawn(move || {
+                let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
+                    sub_blocks,
+                    concurrency_level: concurrency_level_per_shard,
+                    onchain_config: onchain_config_clone,
+                    //maybe_block_gas_limit,
+                });
 
-            senders[shard_id]
-                .lock()
-                .unwrap()
-                .send(Message::new(bcs::to_bytes(&execution_request).unwrap()))
-                .unwrap();
+                let execute_command_type = format!("execute_command_{}", shard_id);
+                senders[shard_id]
+                    .lock()
+                    .unwrap()
+                    .send(Message::new(bcs::to_bytes(&execution_request).unwrap()), &MessageType::new(execute_command_type));
+            });
         }
 
         let execution_results = self.get_output_from_shards()?;
