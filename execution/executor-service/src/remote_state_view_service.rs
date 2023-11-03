@@ -14,6 +14,8 @@ use aptos_types::state_store::{StateView, TStateView};
 use itertools::Itertools;
 use std::sync::{Condvar, Mutex};
 use cpq::ConcurrentPriorityQueue;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
@@ -21,7 +23,7 @@ use aptos_secure_net::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_
 pub struct RemoteStateViewService<S: StateView + Sync + Send + 'static> {
     kv_rx: Receiver<Message>,
     kv_unprocessed_pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
-    kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+    kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
     //thread_pool: Arc<Vec<rayon::ThreadPool>>,
     thread_pool: Arc<rayon::ThreadPool>,
     state_view: Arc<RwLock<Option<Arc<S>>>>,
@@ -35,6 +37,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         num_threads: Option<usize>,
     ) -> Self {
         let num_threads = num_threads.unwrap_or_else(num_cpus::get);
+        let num_kv_req_threads = num_cpus::get() / 2;
         info!("num threads for remote state view service: {}", num_threads);
         /*let mut thread_pool = vec![];
         for _ in 0..remote_shard_addresses.len() {
@@ -58,7 +61,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .iter()
             .map(|address| {
                 //controller.create_outbound_channel(*address, kv_response_type.to_string())
-                Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address))
+                let mut command_tx = vec![];
+                for _ in 0..num_kv_req_threads {
+                    command_tx.push(Mutex::new(OutboundRpcHelper::new(controller.get_self_addr(), *address)));
+                }
+                command_tx
             })
             .collect_vec();
         Self {
@@ -126,9 +133,10 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     }
 
     pub fn priority_handler(state_view: Arc<RwLock<Option<Arc<S>>>>,
-                            kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+                            kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
                             pq: Arc<ConcurrentPriorityQueue<Message, u64>>,
                             recv_condition: Arc<(Mutex<bool>, Condvar)>) {
+        let mut rng = StdRng::from_entropy();
         loop {
             let (lock, cvar) = &*recv_condition;
             let mut lg = lock.lock().unwrap();
@@ -140,7 +148,7 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 let state_view = state_view.clone();
                 let kv_txs = kv_tx.clone();
 
-                Self::handle_message(message, state_view, kv_txs);
+                Self::handle_message(message, state_view, kv_txs, &mut rng);
             }
         }
     }
@@ -148,7 +156,8 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
     pub fn handle_message(
         message: Message,
         state_view: Arc<RwLock<Option<Arc<S>>>>,
-        kv_tx: Arc<Vec<Mutex<OutboundRpcHelper>>>,
+        kv_tx: Arc<Vec<Vec<Mutex<OutboundRpcHelper>>>>,
+        rng: &mut StdRng,
     ) {
         let start_ms_since_epoch = message.start_ms_since_epoch.unwrap();
         {
@@ -175,6 +184,9 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         let req: RemoteKVRequest = bcs::from_bytes(&message.data).unwrap();
         drop(bcs_deser_timer);
 
+        let timer_2 = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_requests_2"])
+            .start_timer();
         let (shard_id, state_keys) = req.into();
         trace!(
             "remote state view service - received request for shard {} with {} keys",
@@ -194,6 +206,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
                 (state_key, state_value)
             })
             .collect_vec();
+        drop(timer_2);
+
+        let timer_3 = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_requests_3"])
+            .start_timer();
         let len = resp.len();
         let resp = RemoteKVResponse::new(resp);
         let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
@@ -212,7 +229,14 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         DEFAULT_DROPPER.schedule_drop(message);
        // info!("Processing message with seq_num: {}", seq_num);
         let resp_message = Message::create_with_metadata(resp_serialized, start_ms_since_epoch, seq_num, shard_id as u64);
-        kv_tx[shard_id].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
+        drop(timer_3);
+
+        let _timer_4 = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_requests_4"])
+            .start_timer();
+
+        let rand_send_thread_idx = rng.gen_range(0, kv_tx[shard_id].len());
+        kv_tx[shard_id][rand_send_thread_idx].lock().unwrap().send(resp_message, &MessageType::new("remote_kv_response".to_string()));
         {
             let curr_time = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
