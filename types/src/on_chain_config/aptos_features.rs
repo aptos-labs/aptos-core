@@ -112,7 +112,11 @@ impl Features {
     /// Whether the Aggregator V2 delayed fields feature is enabled.
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
+        // This feature depends on resource groups being split inside VMChange set,
+        // which is gated by RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM feature, so
+        // require that feature to be enabled as well.
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
+            && self.is_resource_group_charge_as_size_sum_enabled()
     }
 
     pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {

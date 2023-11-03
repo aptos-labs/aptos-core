@@ -360,7 +360,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
             Err(BlockExecutorError::FallbackToSequential(e)) => {
-                unimplemented!("not tested here {:?}", e)
+                unimplemented!("not tested here FallbackToSequential({:?})", e)
             },
         }
     }
