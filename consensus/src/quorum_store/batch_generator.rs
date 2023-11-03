@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionSummary},
+    common::{TransactionInProgress, TransactionInfo, TransactionSummary},
     proof_of_store::BatchId,
 };
 use aptos_logger::prelude::*;
@@ -21,7 +21,7 @@ use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use itertools::Itertools;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -48,7 +48,7 @@ pub struct BatchGenerator {
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
-    txns_in_progress_sorted: Vec<TransactionInProgress>,
+    txns_in_progress_sorted: BTreeMap<TransactionSummary, TransactionInfo>,
     batch_expirations: TimeExpirations<BatchId>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
@@ -89,7 +89,7 @@ impl BatchGenerator {
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
-            txns_in_progress_sorted: vec![],
+            txns_in_progress_sorted: BTreeMap::new(),
             batch_expirations: TimeExpirations::new(),
             latest_block_timestamp: 0,
             last_end_batch_time: Instant::now(),
@@ -123,7 +123,7 @@ impl BatchGenerator {
             })
             .sorted()
             .collect();
-        self.batches_in_progress.insert(batch_id, txns_in_progress);
+        self.insert_batch_in_progress(batch_id, txns_in_progress);
         self.batch_expirations.add_item(batch_id, expiry_time);
 
         counters::CREATED_BATCHES_COUNT.inc();
@@ -221,19 +221,41 @@ impl BatchGenerator {
         batches
     }
 
-    async fn update_txns_in_progress_sorted(&mut self) {
-        let mut transactions: Vec<_> = self
-            .batches_in_progress
-            .values()
-            .flatten()
-            .cloned()
-            .collect();
-        self.txns_in_progress_sorted = tokio::task::spawn_blocking(move || {
-            transactions.sort();
-            transactions
-        })
-        .await
-        .unwrap();
+    fn insert_batch_in_progress(
+        &mut self,
+        batch_id: BatchId,
+        txns_in_progress: Vec<TransactionInProgress>,
+    ) {
+        for txn_in_progress in &txns_in_progress {
+            let txn_info = self
+                .txns_in_progress_sorted
+                .entry(txn_in_progress.summary)
+                .or_insert_with(|| TransactionInfo::new(txn_in_progress.gas_unit_price));
+            txn_info.increment();
+            txn_info.gas_unit_price = txn_in_progress.gas_unit_price.max(txn_info.gas_unit_price);
+        }
+        self.batches_in_progress.insert(batch_id, txns_in_progress);
+    }
+
+    fn remove_batch_in_progress(&mut self, batch_id: &BatchId) -> bool {
+        let removed = self.batches_in_progress.remove(batch_id);
+        match removed {
+            Some(txns_in_progress) => {
+                for txn_in_progress in txns_in_progress {
+                    if let Some(mut txn_info) = self
+                        .txns_in_progress_sorted
+                        .remove(&txn_in_progress.summary)
+                    {
+                        if txn_info.decrement() > 0 {
+                            self.txns_in_progress_sorted
+                                .insert(txn_in_progress.summary, txn_info);
+                        }
+                    }
+                }
+                true
+            },
+            None => false,
+        }
     }
 
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
@@ -248,7 +270,14 @@ impl BatchGenerator {
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
-                self.txns_in_progress_sorted.clone(),
+                // TODO: pass the actual BTreeMap
+                self.txns_in_progress_sorted
+                    .iter()
+                    .map(|(summary, info)| TransactionInProgress {
+                        summary: *summary,
+                        gas_unit_price: info.gas_unit_price(),
+                    })
+                    .collect(),
             )
             .await
             .unwrap_or_default();
@@ -277,9 +306,6 @@ impl BatchGenerator {
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
-        if !batches.is_empty() {
-            self.update_txns_in_progress_sorted().await;
-        }
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 
@@ -387,12 +413,10 @@ impl BatchGenerator {
                             );
                             self.latest_block_timestamp = block_timestamp;
 
-                            let mut batches_committed: u64 = 0;
                             // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
                             for batch_id in self.batch_expirations.expire(block_timestamp) {
-                                if self.batches_in_progress.remove(&batch_id).is_some() {
-                                    batches_committed += 1;
+                                if self.remove_batch_in_progress(&batch_id) {
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
                                         batch_id,
@@ -400,24 +424,15 @@ impl BatchGenerator {
                                     );
                                 }
                             }
-                            if batches_committed > 0 {
-                                self.update_txns_in_progress_sorted().await;
-                            }
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
-                            let mut batches_expired: u64 = 0;
                             for batch_id in batch_ids {
                                 debug!(
                                     "QS: received timeout for proof of store, batch id = {}",
                                     batch_id
                                 );
                                 // Not able to gather the proof, allow transactions to be polled again.
-                                if self.batches_in_progress.remove(&batch_id).is_some() {
-                                    batches_expired += 1;
-                                }
-                            }
-                            if batches_expired > 0 {
-                                self.update_txns_in_progress_sorted().await;
+                                self.remove_batch_in_progress(&batch_id);
                             }
                         }
                         BatchGeneratorCommand::Shutdown(ack_tx) => {

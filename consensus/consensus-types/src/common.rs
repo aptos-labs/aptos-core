@@ -50,6 +50,37 @@ pub struct TransactionInProgress {
 }
 
 #[derive(Clone)]
+pub struct TransactionInfo {
+    // TODO: scope?
+    pub gas_unit_price: u64,
+    pub count: u64,
+}
+
+impl TransactionInfo {
+    pub fn new(gas_unit_price: u64) -> Self {
+        Self {
+            gas_unit_price,
+            count: 0,
+        }
+    }
+
+    pub fn gas_unit_price(&self) -> u64 {
+        self.gas_unit_price
+    }
+
+    // TODO: scope?
+    pub fn decrement(&mut self) -> u64 {
+        self.count -= 1;
+        self.count
+    }
+
+    pub fn increment(&mut self) -> u64 {
+        self.count += 1;
+        self.count
+    }
+}
+
+#[derive(Clone)]
 pub struct RejectedTransactionSummary {
     pub sender: AccountAddress,
     pub sequence_number: u64,
