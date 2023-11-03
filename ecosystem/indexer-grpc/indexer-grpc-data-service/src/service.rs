@@ -122,6 +122,7 @@ impl RawData for RawDataServerWrapper {
         };
         CONNECTION_COUNT.inc();
         let request = req.into_inner();
+        // Log request received
 
         let transactions_count = request.transactions_count;
 
@@ -151,6 +152,7 @@ impl RawData for RawDataServerWrapper {
         // Adds tracing context for the request.
         let serving_span = tracing::span!(
             tracing::Level::INFO,
+            // Add id for tracing
             "Data Serving",
             request_name = request_metadata.processor_name.as_str(),
             request_email = request_metadata.request_email.as_str(),
@@ -164,6 +166,8 @@ impl RawData for RawDataServerWrapper {
             async move {
                 let mut connection_start_time = Some(std::time::Instant::now());
                 let mut transactions_count = transactions_count;
+
+                // Log starting redis client
                 let conn = match redis_client.get_tokio_connection_manager().await {
                     Ok(conn) => conn,
                     Err(e) => {
@@ -193,8 +197,11 @@ impl RawData for RawDataServerWrapper {
                         return;
                     },
                 };
+
+                // Log starting redis cache
                 let mut cache_operator = CacheOperator::new(conn);
                 file_store_operator.verify_storage_bucket_existence().await;
+                // Log file store verified
 
                 let chain_id = match cache_operator.get_chain_id().await {
                     Ok(chain_id) => chain_id,
@@ -236,6 +243,7 @@ impl RawData for RawDataServerWrapper {
 
                 loop {
                     // 1. Fetch data from cache and file store.
+                    // Log fetching data from cache and file store
                     let mut transaction_data = match data_fetch(
                         current_version,
                         &mut cache_operator,
@@ -261,6 +269,11 @@ impl RawData for RawDataServerWrapper {
                             continue;
                         },
                     };
+
+                    // Log successfully fetched data from cache and file store
+
+                    // If the client requests a finite stream of transactions, we trim the data to the requested start and end version.
+                    // Can clean this up to truncate with indices. Common interface for truncating.
                     if let Some(count) = transactions_count {
                         if count == 0 {
                             // End the data stream.
@@ -304,6 +317,7 @@ impl RawData for RawDataServerWrapper {
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
 
+                    // Log sending txns to channel
                     match channel_send_multiple_with_timeout(resp_items, tx.clone()).await {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
@@ -355,6 +369,8 @@ impl RawData for RawDataServerWrapper {
                             break;
                         },
                     }
+
+                    // Log successfully sent txns to channel
                     // 3. Update the current version and record current tps.
                     tps_calculator.tick_now(current_batch_size as u64);
                     current_version = end_of_batch_version + 1;
@@ -369,8 +385,10 @@ impl RawData for RawDataServerWrapper {
                         );
                     )
                 }
+                // Log more fields
                 info!("[Indexer Data] Client disconnected.");
                 if let Some(start_time) = connection_start_time {
+                    // Log short connection
                     if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
                         SHORT_CONNECTION_COUNT
                             .with_label_values(&[
@@ -455,6 +473,8 @@ async fn data_fetch(
 
 /// Handles the case when the data is not ready in the cache, i.e., beyond the current head.
 async fn ahead_of_cache_data_handling() {
+    // Log ahead of cache
+
     // TODO: add exponential backoff.
     tokio::time::sleep(Duration::from_millis(
         AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,

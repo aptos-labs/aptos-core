@@ -146,11 +146,14 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?;
 
         // Add authentication interceptor.
+        // Log starting RawDataServerWrapper
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
         )?;
+        // Log success
+
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
@@ -175,6 +178,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                     .serve(listen_address)
                     .await
                     .map_err(|e| anyhow::anyhow!(e))
+                // Log success
             }));
         }
         if let Some(config) = &self.data_service_grpc_tls_config {
@@ -196,6 +200,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                     .serve(listen_address)
                     .await
                     .map_err(|e| anyhow::anyhow!(e))
+                // Log success
             }));
         }
 

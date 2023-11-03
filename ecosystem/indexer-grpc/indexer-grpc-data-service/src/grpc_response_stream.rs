@@ -15,6 +15,7 @@ pub struct GrpcResponseStream {
     inner: tokio_stream::wrappers::ReceiverStream<Result<TransactionsResponse, Status>>,
 }
 
+// Why do we need this?
 impl GrpcResponseStream {
     #[allow(dead_code)]
     pub fn new(
