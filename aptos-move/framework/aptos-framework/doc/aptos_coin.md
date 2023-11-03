@@ -14,6 +14,7 @@ modified from https://github.com/move-language/move/tree/main/language/documenta
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_aptos_coin_initialize)
 -  [Function `has_mint_capability`](#0x1_aptos_coin_has_mint_capability)
+-  [Function `initialize_aptos_fungible_asset`](#0x1_aptos_coin_initialize_aptos_fungible_asset)
 -  [Function `destroy_mint_cap`](#0x1_aptos_coin_destroy_mint_cap)
 -  [Function `configure_accounts_for_test`](#0x1_aptos_coin_configure_accounts_for_test)
 -  [Function `mint`](#0x1_aptos_coin_mint)
@@ -32,7 +33,10 @@ modified from https://github.com/move-language/move/tree/main/language/documenta
 
 <pre><code><b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -243,6 +247,44 @@ Can only called during genesis to initialize the Aptos coin.
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_has_mint_capability">has_mint_capability</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): bool {
     <b>exists</b>&lt;<a href="aptos_coin.md#0x1_aptos_coin_MintCapStore">MintCapStore</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_coin_initialize_aptos_fungible_asset"></a>
+
+## Function `initialize_aptos_fungible_asset`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_initialize_aptos_fungible_asset">initialize_aptos_fungible_asset</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_coin.md#0x1_aptos_coin_initialize_aptos_fungible_asset">initialize_aptos_fungible_asset</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): ConstructorRef {
+    assert_aptos_framework(aptos_framework);
+    <b>let</b> cref = <a href="object.md#0x1_object_create_object_at_address">object::create_object_at_address</a>(@aptos_framework, <b>false</b>);
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_create_primary_store_enabled_fungible_asset">primary_fungible_store::create_primary_store_enabled_fungible_asset</a>(&cref,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"Aptos Coin"),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"APT"),
+        8,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"https://aptosfoundation.org/brandbook/logomark/PNG/Aptos_mark_WHT.png"),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"https://aptosfoundation.org/"),
+    );
+    <a href="coin.md#0x1_coin_add_to_coin_conversion_map">coin::add_to_coin_conversion_map</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">AptosCoin</a>&gt;(
+        aptos_framework,
+        <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;Metadata&gt;(&cref)
+    );
+    cref
 }
 </code></pre>
 

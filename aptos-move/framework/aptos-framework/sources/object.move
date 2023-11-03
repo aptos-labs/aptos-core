@@ -30,6 +30,7 @@ module aptos_framework::object {
     use aptos_framework::guid;
 
     friend aptos_framework::primary_fungible_store;
+    friend aptos_framework::aptos_coin;
 
     /// An object already exists at this address
     const EOBJECT_EXISTS: u64 = 1;
@@ -234,6 +235,10 @@ module aptos_framework::object {
     public(friend) fun create_user_derived_object(creator_address: address, derive_ref: &DeriveRef): ConstructorRef {
         let obj_addr = create_user_derived_object_address(creator_address, derive_ref.self);
         create_object_internal(creator_address, obj_addr, false)
+    }
+
+    public(friend) fun create_object_at_address(address: address, can_delete: bool): ConstructorRef {
+        create_object_internal(address, address, can_delete)
     }
 
     /// Create a new object by generating a random unique address based on transaction hash.

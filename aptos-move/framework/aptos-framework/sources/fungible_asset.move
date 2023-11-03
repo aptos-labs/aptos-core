@@ -12,8 +12,9 @@ module aptos_framework::fungible_asset {
     use std::signer;
     use std::string::String;
 
-    /// Amount cannot be zero.
-    const EAMOUNT_CANNOT_BE_ZERO: u64 = 1;
+    friend aptos_framework::coin;
+    friend aptos_framework::primary_fungible_store;
+
     /// The transfer ref and the fungible asset do not match.
     const ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 2;
     /// Store is disabled from sending and receiving this fungible asset.
@@ -414,10 +415,16 @@ module aptos_framework::fungible_asset {
 
     /// Mint the specified `amount` of the fungible asset.
     public fun mint(ref: &MintRef, amount: u64): FungibleAsset acquires Supply, ConcurrentSupply {
-        assert!(amount > 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let metadata = ref.metadata;
-        increase_supply(&metadata, amount);
+        mint_internal(metadata, amount)
+    }
 
+    /// CAN ONLY BE CALLED BY coin.move for migration.
+    public(friend) fun mint_internal(
+        metadata: Object<Metadata>,
+        amount: u64
+    ): FungibleAsset acquires Supply, ConcurrentSupply {
+        increase_supply(&metadata, amount);
         FungibleAsset {
             metadata,
             amount
@@ -449,12 +456,23 @@ module aptos_framework::fungible_asset {
 
     /// Burns a fungible asset
     public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
+        assert!(
+            ref.metadata == metadata_from_asset(&fa),
+            error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH)
+        );
+        burn_internal(fa);
+    }
+
+    /// CAN ONLY BE CALLED BY coin.move for migration.
+    public(friend) fun burn_internal(
+        fa: FungibleAsset
+    ): u64 acquires Supply, ConcurrentSupply {
         let FungibleAsset {
             metadata,
-            amount,
+            amount
         } = fa;
-        assert!(ref.metadata == metadata, error::invalid_argument(EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH));
         decrease_supply(&metadata, amount);
+        amount
     }
 
     /// Burn the `amount` of the fungible asset from the given store.
@@ -539,7 +557,10 @@ module aptos_framework::fungible_asset {
         assert!(amount == 0, error::invalid_argument(EAMOUNT_IS_NOT_ZERO));
     }
 
-    fun deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, FungibleAssetEvents {
+    public(friend) fun deposit_internal<T: key>(
+        store: Object<T>,
+        fa: FungibleAsset
+    ) acquires FungibleStore, FungibleAssetEvents {
         let FungibleAsset { metadata, amount } = fa;
         if (amount == 0) return;
 
@@ -554,11 +575,10 @@ module aptos_framework::fungible_asset {
     }
 
     /// Extract `amount` of the fungible asset from `store`.
-    fun withdraw_internal(
+    public(friend) fun withdraw_internal(
         store_addr: address,
         amount: u64,
     ): FungibleAsset acquires FungibleStore, FungibleAssetEvents {
-        assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
         let store = borrow_global_mut<FungibleStore>(store_addr);
         assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         store.balance = store.balance - amount;
@@ -572,7 +592,9 @@ module aptos_framework::fungible_asset {
 
     /// Increase the supply of a fungible asset by minting.
     fun increase_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply, ConcurrentSupply {
-        assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
+        if (amount == 0) {
+            return
+        };
         let metadata_address = object::object_address(metadata);
 
         if (exists<ConcurrentSupply>(metadata_address)) {
@@ -598,7 +620,9 @@ module aptos_framework::fungible_asset {
 
     /// Decrease the supply of a fungible asset by burning.
     fun decrease_supply<T: key>(metadata: &Object<T>, amount: u64) acquires Supply, ConcurrentSupply {
-        assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
+        if (amount == 0) {
+            return
+        };
         let metadata_address = object::object_address(metadata);
 
         if (exists<ConcurrentSupply>(metadata_address)) {
@@ -861,7 +885,10 @@ module aptos_framework::fungible_asset {
     }
 
     #[test(fx = @aptos_framework, creator = @0xcafe)]
-    fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleAssetEvents, FungibleStore {
+    fun test_fungible_asset_upgrade(
+        fx: &signer,
+        creator: &signer
+    ) acquires Supply, ConcurrentSupply, FungibleAssetEvents, FungibleStore {
         let feature = features::get_concurrent_assets_feature();
         features::change_feature_flags(fx, vector[], vector[feature]);
 

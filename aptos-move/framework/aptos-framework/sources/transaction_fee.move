@@ -7,6 +7,9 @@ module aptos_framework::transaction_fee {
     use std::error;
     use std::option::{Self, Option};
     use aptos_framework::event;
+    use aptos_framework::fungible_asset;
+    use aptos_framework::fungible_asset::{MintRef, TransferRef, BurnRef};
+    use aptos_framework::object::ConstructorRef;
 
     friend aptos_framework::block;
     friend aptos_framework::genesis;
@@ -16,6 +19,9 @@ module aptos_framework::transaction_fee {
     /// Gas fees are already being collected and the struct holding
     /// information about collected amounts is already published.
     const EALREADY_COLLECTING_FEES: u64 = 1;
+
+    /// The existence of aptos fungible asset refs.
+    const EAPTOS_FUNGIBLE_ASSET_REFS: u64 = 2;
 
     /// The burn percentage is out of range [0, 100].
     const EINVALID_BURN_PERCENTAGE: u64 = 3;
@@ -69,6 +75,30 @@ module aptos_framework::transaction_fee {
         storage_fee_octas: u64,
         /// Storage fee refund.
         storage_fee_refund_octas: u64,
+    }
+
+    struct AptosFungibleAssetRefs has key {
+        mint_ref: MintRef,
+        transfer_ref: TransferRef,
+        burn_ref: BurnRef,
+    }
+
+    public(friend) fun initialize_aptos_fungible_asset_refs(
+        aptos_framework: &signer,
+        cref: &ConstructorRef,
+    ) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(!exists<AptosFungibleAssetRefs>(@aptos_framework), error::already_exists(EAPTOS_FUNGIBLE_ASSET_REFS));
+        move_to(aptos_framework, AptosFungibleAssetRefs {
+            mint_ref: fungible_asset::generate_mint_ref(cref),
+            transfer_ref: fungible_asset::generate_transfer_ref(cref),
+            burn_ref: fungible_asset::generate_burn_ref(cref),
+        })
+    }
+
+    inline fun borrow_aptos_fungible_asset_refs(): &AptosFungibleAssetRefs {
+        assert!(exists<AptosFungibleAssetRefs>(@aptos_framework), error::not_found(EAPTOS_FUNGIBLE_ASSET_REFS));
+        borrow_global<AptosFungibleAssetRefs>(@aptos_framework)
     }
 
     /// Initializes the resource storing information about gas fees collection and

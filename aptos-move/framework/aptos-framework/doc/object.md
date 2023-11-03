@@ -46,6 +46,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `convert`](#0x1_object_convert)
 -  [Function `create_named_object`](#0x1_object_create_named_object)
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
+-  [Function `create_object_at_address`](#0x1_object_create_object_at_address)
 -  [Function `create_object`](#0x1_object_create_object)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
@@ -1003,6 +1004,30 @@ Derivde objects, similar to named objects, cannot be deleted.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator_address: <b>address</b>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> obj_addr = <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(creator_address, derive_ref.self);
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(creator_address, obj_addr, <b>false</b>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_object_at_address"></a>
+
+## Function `create_object_at_address`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(<b>address</b>: <b>address</b>, can_delete: bool): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(<b>address</b>: <b>address</b>, can_delete: bool): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
+    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(<b>address</b>, <b>address</b>, can_delete)
 }
 </code></pre>
 

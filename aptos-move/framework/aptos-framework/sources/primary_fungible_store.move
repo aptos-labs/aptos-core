@@ -19,6 +19,8 @@ module aptos_framework::primary_fungible_store {
     use std::signer;
     use std::string::String;
 
+    friend aptos_framework::coin;
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
     /// stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
@@ -131,11 +133,24 @@ module aptos_framework::primary_fungible_store {
         fungible_asset::withdraw(owner, store, amount)
     }
 
+    /// Withdraw `amount` of fungible asset from the given account's primary store, used internally.
+    public(friend) fun withdraw_internal<T: key>(owner: address, metadata: Object<T>, amount: u64): FungibleAsset {
+        let store = primary_store(owner, metadata);
+        fungible_asset::withdraw_internal(object::object_address(&store), amount)
+    }
+
     /// Deposit fungible asset `fa` to the given account's primary store.
     public fun deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
         fungible_asset::deposit(store, fa);
+    }
+
+    /// Deposit fungible asset `fa` to the given account's primary store.
+    public(friend) fun force_deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
+        let metadata = fungible_asset::asset_metadata(&fa);
+        let store = ensure_primary_store_exists(owner, metadata);
+        fungible_asset::deposit_internal(store, fa);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
@@ -204,7 +219,12 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[test_only]
-    use aptos_framework::fungible_asset::{create_test_token, generate_mint_ref, generate_burn_ref, generate_transfer_ref};
+    use aptos_framework::fungible_asset::{
+        create_test_token,
+        generate_mint_ref,
+        generate_burn_ref,
+        generate_transfer_ref
+    };
     #[test_only]
     use std::string;
     #[test_only]
@@ -216,10 +236,10 @@ module aptos_framework::primary_fungible_store {
     ): (MintRef, TransferRef, BurnRef) {
         create_primary_store_enabled_fungible_asset(
             constructor_ref,
-            option::some(100), // max supply
-            string::utf8(b"TEST COIN"),
-            string::utf8(b"@T"),
-            0,
+            option::none(),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
+            1,
             string::utf8(b"http://example.com/icon"),
             string::utf8(b"http://example.com"),
         );

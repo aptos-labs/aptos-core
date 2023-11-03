@@ -10,7 +10,10 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Resource `AptosCoinMintCapability`](#0x1_transaction_fee_AptosCoinMintCapability)
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
+-  [Resource `AptosFungibleAssetRefs`](#0x1_transaction_fee_AptosFungibleAssetRefs)
 -  [Constants](#@Constants_0)
+-  [Function `initialize_aptos_fungible_asset_refs`](#0x1_transaction_fee_initialize_aptos_fungible_asset_refs)
+-  [Function `borrow_aptos_fungible_asset_refs`](#0x1_transaction_fee_borrow_aptos_fungible_asset_refs)
 -  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
 -  [Function `is_fees_collection_enabled`](#0x1_transaction_fee_is_fees_collection_enabled)
 -  [Function `upgrade_burn_percentage`](#0x1_transaction_fee_upgrade_burn_percentage)
@@ -44,6 +47,8 @@ This module provides an interface to burn or collect and redistribute transactio
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -219,6 +224,45 @@ This is meant to emitted as a module event.
 
 </details>
 
+<a id="0x1_transaction_fee_AptosFungibleAssetRefs"></a>
+
+## Resource `AptosFungibleAssetRefs`
+
+
+
+<pre><code><b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">AptosFungibleAssetRefs</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>mint_ref: <a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>transfer_ref: <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>burn_ref: <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a></code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -235,6 +279,16 @@ information about collected amounts is already published.
 
 
 
+<a id="0x1_transaction_fee_EAPTOS_FUNGIBLE_ASSET_REFS"></a>
+
+The existence of aptos fungible asset refs.
+
+
+<pre><code><b>const</b> <a href="transaction_fee.md#0x1_transaction_fee_EAPTOS_FUNGIBLE_ASSET_REFS">EAPTOS_FUNGIBLE_ASSET_REFS</a>: u64 = 2;
+</code></pre>
+
+
+
 <a id="0x1_transaction_fee_EINVALID_BURN_PERCENTAGE"></a>
 
 The burn percentage is out of range [0, 100].
@@ -244,6 +298,64 @@ The burn percentage is out of range [0, 100].
 </code></pre>
 
 
+
+<a id="0x1_transaction_fee_initialize_aptos_fungible_asset_refs"></a>
+
+## Function `initialize_aptos_fungible_asset_refs`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_aptos_fungible_asset_refs">initialize_aptos_fungible_asset_refs</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, cref: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_aptos_fungible_asset_refs">initialize_aptos_fungible_asset_refs</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    cref: &ConstructorRef,
+) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>assert</b>!(!<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">AptosFungibleAssetRefs</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="transaction_fee.md#0x1_transaction_fee_EAPTOS_FUNGIBLE_ASSET_REFS">EAPTOS_FUNGIBLE_ASSET_REFS</a>));
+    <b>move_to</b>(aptos_framework, <a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">AptosFungibleAssetRefs</a> {
+        mint_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">fungible_asset::generate_mint_ref</a>(cref),
+        transfer_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_transfer_ref">fungible_asset::generate_transfer_ref</a>(cref),
+        burn_ref: <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_ref">fungible_asset::generate_burn_ref</a>(cref),
+    })
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_borrow_aptos_fungible_asset_refs"></a>
+
+## Function `borrow_aptos_fungible_asset_refs`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_borrow_aptos_fungible_asset_refs">borrow_aptos_fungible_asset_refs</a>(): &<a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">transaction_fee::AptosFungibleAssetRefs</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_borrow_aptos_fungible_asset_refs">borrow_aptos_fungible_asset_refs</a>(): &<a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">AptosFungibleAssetRefs</a> {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">AptosFungibleAssetRefs</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="transaction_fee.md#0x1_transaction_fee_EAPTOS_FUNGIBLE_ASSET_REFS">EAPTOS_FUNGIBLE_ASSET_REFS</a>));
+    <b>borrow_global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosFungibleAssetRefs">AptosFungibleAssetRefs</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_transaction_fee_initialize_fee_collection_and_distribution"></a>
 

@@ -16,6 +16,7 @@ module aptos_framework::genesis {
     use aptos_framework::consensus_config;
     use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
+    use aptos_framework::fungible_asset;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -81,7 +82,9 @@ module aptos_framework::genesis {
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
-        let (aptos_framework_account, aptos_framework_signer_cap) = account::create_framework_reserved_account(@aptos_framework);
+        let (aptos_framework_account, aptos_framework_signer_cap) = account::create_framework_reserved_account(
+            @aptos_framework
+        );
         // Initialize account configs on aptos framework account.
         account::initialize(&aptos_framework_account);
 
@@ -228,7 +231,10 @@ module aptos_framework::genesis {
 
             while (j < num_vesting_events) {
                 let numerator = vector::borrow(&employee_group.vesting_schedule_numerator, j);
-                let event = fixed_point32::create_from_rational(*numerator, employee_group.vesting_schedule_denominator);
+                let event = fixed_point32::create_from_rational(
+                    *numerator,
+                    employee_group.vesting_schedule_denominator
+                );
                 vector::push_back(&mut schedule, event);
 
                 j = j + 1;
@@ -434,6 +440,15 @@ module aptos_framework::genesis {
         create_employee_validators(employee_vesting_start, employee_vesting_period_duration, employees);
         create_initialize_validators_with_commission(aptos_framework, true, validators);
         set_genesis_end(aptos_framework);
+    }
+
+    public fun initialize_aptos_fungible_asset(aptos_framework: &signer) {
+        let cref = &aptos_coin::initialize_aptos_fungible_asset(aptos_framework);
+        stake::store_aptos_fungible_asset_mint_ref(aptos_framework, fungible_asset::generate_mint_ref(cref));
+        transaction_fee::initialize_aptos_fungible_asset_refs(
+            aptos_framework,
+            cref
+        );
     }
 
     #[test_only]

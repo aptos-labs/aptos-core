@@ -172,7 +172,10 @@ module aptos_framework::resource_account {
         let resource_addr = signer::address_of(resource);
         let (resource_signer_cap, empty_container) = {
             let container = borrow_global_mut<Container>(source_addr);
-            assert!(simple_map::contains_key(&container.store, &resource_addr), error::invalid_argument(EUNAUTHORIZED_NOT_OWNER));
+            assert!(
+                simple_map::contains_key(&container.store, &resource_addr),
+                error::invalid_argument(EUNAUTHORIZED_NOT_OWNER)
+            );
             let (_resource_addr, signer_cap) = simple_map::remove(&mut container.store, &resource_addr);
             (signer_cap, simple_map::length(&container.store) == 0)
         };
@@ -206,7 +209,9 @@ module aptos_framework::resource_account {
 
     #[test(user = @0x1111)]
     #[expected_failure(abort_code = 0x10002, location = aptos_std::simple_map)]
-    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(user: signer) acquires Container {
+    public entry fun test_create_account_and_retrieve_cap_resource_address_does_not_exist(
+        user: signer
+    ) acquires Container {
         let user_addr = signer::address_of(&user);
         account::create_account(user_addr);
 

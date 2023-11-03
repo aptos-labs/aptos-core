@@ -8,7 +8,11 @@ module aptos_framework::aptos_coin {
     use std::option::{Self, Option};
 
     use aptos_framework::coin::{Self, BurnCapability, MintCapability};
-    use aptos_framework::system_addresses;
+    use aptos_framework::fungible_asset::Metadata;
+    use aptos_framework::object;
+    use aptos_framework::object::ConstructorRef;
+    use aptos_framework::primary_fungible_store;
+    use aptos_framework::system_addresses::{Self, assert_aptos_framework};
 
     friend aptos_framework::genesis;
 
@@ -57,6 +61,25 @@ module aptos_framework::aptos_coin {
 
     public fun has_mint_capability(account: &signer): bool {
         exists<MintCapStore>(signer::address_of(account))
+    }
+
+    // Initialize the APT fungible asset once via governance proposal.
+    public(friend) fun initialize_aptos_fungible_asset(aptos_framework: &signer): ConstructorRef {
+        assert_aptos_framework(aptos_framework);
+        let cref = object::create_object_at_address(@aptos_framework, false);
+        primary_fungible_store::create_primary_store_enabled_fungible_asset(&cref,
+            option::none(),
+            string::utf8(b"Aptos Coin"),
+            string::utf8(b"APT"),
+            8,
+            string::utf8(b"https://aptosfoundation.org/brandbook/logomark/PNG/Aptos_mark_WHT.png"),
+            string::utf8(b"https://aptosfoundation.org/"),
+        );
+        coin::add_to_coin_conversion_map<AptosCoin>(
+            aptos_framework,
+            object::object_from_constructor_ref<Metadata>(&cref)
+        );
+        cref
     }
 
     /// Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
@@ -158,9 +181,16 @@ module aptos_framework::aptos_coin {
         initialize(aptos_framework)
     }
 
+    #[test_only]
+    public fun initialize_aptos_fungible_asset_for_test(aptos_framework: &signer): ConstructorRef {
+        initialize_aptos_fungible_asset(aptos_framework)
+    }
+
     // This is particularly useful if the aggregator_factory is already initialized via another call path.
     #[test_only]
-    public fun initialize_for_test_without_aggregator_factory(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+    public fun initialize_for_test_without_aggregator_factory(
+        aptos_framework: &signer
+    ): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         initialize(aptos_framework)
     }
 }
