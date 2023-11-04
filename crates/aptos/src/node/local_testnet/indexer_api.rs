@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    docker::{
+        delete_container, get_docker, pull_docker_image, setup_docker_logging,
+        StopContainerShutdownStep,
+    },
     health_checker::HealthChecker,
     traits::{PostHealthyStep, ServiceManager, ShutdownStep},
-    utils::{confirm_docker_available, delete_container, pull_docker_image},
     RunLocalTestnet,
-};
-use crate::node::local_testnet::utils::{
-    get_docker, setup_docker_logging, StopContainerShutdownStep,
 };
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -24,7 +24,7 @@ use std::{collections::HashSet, path::PathBuf};
 use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "indexer-api";
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.33.0";
+const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.35.0";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///
@@ -89,7 +89,7 @@ impl ServiceManager for IndexerApiManager {
 
     async fn pre_run(&self) -> Result<()> {
         // Confirm Docker is available.
-        confirm_docker_available().await?;
+        get_docker().await?;
 
         // Delete any existing indexer API container we find.
         delete_container(INDEXER_API_CONTAINER_NAME).await?;
@@ -139,7 +139,7 @@ impl ServiceManager for IndexerApiManager {
             ..Default::default()
         };
 
-        let docker = get_docker()?;
+        let docker = get_docker().await?;
 
         // When using Docker Desktop you can and indeed must use the magic hostname
         // host.docker.internal in order to access localhost on the host system from
@@ -156,11 +156,14 @@ impl ServiceManager for IndexerApiManager {
         // daemon but not when running in WSL configured to use Docker from within the
         // WSL environment. So instead of checking for OS we check the name of the
         // Docker daemon.
+        //
+        // This is the best method I could figure out for determining the Docker env,
+        // see more here: https://stackoverflow.com/q/77243960/3846032.
         let info = docker
             .info()
             .await
             .context("Failed to get info about Docker daemon")?;
-        let is_docker_desktop = info.name == Some("docker-desktop".to_string());
+        let is_docker_desktop = info.operating_system == Some("Docker Desktop".to_string());
         let postgres_connection_string = if is_docker_desktop {
             info!("Running with Docker Desktop, using host.docker.internal");
             self.postgres_connection_string

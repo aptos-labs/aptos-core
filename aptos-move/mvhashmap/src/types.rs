@@ -1,11 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{
+    delta_change_set::DeltaOp,
+    types::{DelayedFieldsSpeculativeError, PanicOr},
+};
 use aptos_crypto::hash::HashValue;
 use aptos_types::executable::ExecutableDescriptor;
-use std::sync::Arc;
+use bytes::Bytes;
+use move_core_types::value::MoveTypeLayout;
+use std::sync::{atomic::AtomicU32, Arc};
 
+pub type AtomicTxnIndex = AtomicU32;
 pub type TxnIndex = u32;
 pub type Incarnation = u32;
 
@@ -57,6 +63,29 @@ pub enum MVModulesError {
     Dependency(TxnIndex),
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum GroupReadResult {
+    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
+    Size(u64),
+    Uninitialized,
+}
+
+impl GroupReadResult {
+    pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
+        match self {
+            GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
+            _ => unreachable!("Expected a value"),
+        }
+    }
+
+    pub fn into_size(self) -> u64 {
+        match self {
+            GroupReadResult::Size(size) => size,
+            _ => unreachable!("Expected size"),
+        }
+    }
+}
+
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MVDataOutput<V> {
@@ -66,7 +95,7 @@ pub enum MVDataOutput<V> {
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
-    Versioned(Version, Arc<V>),
+    Versioned(Version, Arc<V>, Option<Arc<MoveTypeLayout>>),
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
@@ -80,6 +109,38 @@ pub enum MVModulesOutput<M, X> {
     /// The Option can be None if HashValue can't be computed, currently may happen
     /// if the latest entry corresponded to the module deletion.
     Module((Arc<M>, HashValue)),
+}
+
+// TODO[agg_v2](cleanup): once VersionedAggregators is separated from the MVHashMap,
+// seems that MVDataError and MVModulesError can be unified and simplified.
+#[derive(Debug, PartialEq, Eq)]
+pub enum MVDelayedFieldsError {
+    /// No prior entry is found. This can happen if the aggregator was created
+    /// by an earlier transaction which aborted, re-executed, and did not re-create
+    /// the aggregator (o.w. the ID of the aggregator provided to the reading API
+    /// could not have been obtained). NOTE: We could record & return some additional
+    /// information and save validations in the caller.
+    NotFound,
+    /// A dependency on another transaction (index returned) was found during the read.
+    Dependency(TxnIndex),
+    /// While reading, delta application failed at the returned transaction index
+    /// (either it violated the limits when not supposed to, or vice versa).
+    /// Note: we can return affected indices to optimize invalidations by the caller.
+    DeltaApplicationFailure,
+}
+
+impl MVDelayedFieldsError {
+    pub fn from_panic_or(
+        err: PanicOr<DelayedFieldsSpeculativeError>,
+    ) -> PanicOr<MVDelayedFieldsError> {
+        match err {
+            PanicOr::CodeInvariantError(e) => PanicOr::CodeInvariantError(e),
+            PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(_)) => {
+                PanicOr::Or(MVDelayedFieldsError::NotFound)
+            },
+            PanicOr::Or(_) => PanicOr::Or(MVDelayedFieldsError::DeltaApplicationFailure),
+        }
+    }
 }
 
 // In order to store base vales at the lowest index, i.e. at index 0, without conflicting
@@ -113,8 +174,10 @@ pub(crate) mod test {
     use super::*;
     use aptos_aggregator::delta_change_set::serialize;
     use aptos_types::{
-        access_path::AccessPath, executable::ModulePath, state_store::state_value::StateValue,
-        write_set::TransactionWrite,
+        access_path::AccessPath,
+        executable::ModulePath,
+        state_store::state_value::StateValue,
+        write_set::{TransactionWrite, WriteOpKind},
     };
     use bytes::Bytes;
     use claims::{assert_err, assert_ok_eq};
@@ -151,35 +214,60 @@ pub(crate) mod test {
         }
     }
 
-    #[derive(Debug, PartialEq, Eq)]
+    // Kind is set to Creation by default as that makes sense for providing
+    // group base values (used in some tests), and most tests do not care about
+    // the kind. Otherwise, there are specific constructors that initialize kind
+    // for the tests that care (testing group commit logic in parallel).
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub(crate) struct TestValue {
         bytes: Bytes,
+        kind: WriteOpKind,
     }
 
     impl TestValue {
         pub(crate) fn deletion() -> Self {
             Self {
-                bytes: vec![].into(),
+                bytes: Bytes::new(),
+                kind: WriteOpKind::Deletion,
             }
         }
 
-        pub fn new(mut seed: Vec<u32>) -> Self {
+        pub(crate) fn with_kind(value: usize, is_creation: bool) -> Self {
+            let mut s = Self::from_u128(value as u128);
+            s.kind = if is_creation {
+                WriteOpKind::Creation
+            } else {
+                WriteOpKind::Modification
+            };
+            s
+        }
+
+        pub(crate) fn new(mut seed: Vec<u32>) -> Self {
             seed.resize(4, 0);
             Self {
                 bytes: seed.into_iter().flat_map(|v| v.to_be_bytes()).collect(),
+                kind: WriteOpKind::Creation,
             }
         }
 
         pub(crate) fn from_u128(value: u128) -> Self {
             Self {
                 bytes: serialize(&value).into(),
+                kind: WriteOpKind::Creation,
             }
         }
 
-        pub(crate) fn with_len(len: usize) -> Self {
-            assert!(len > 0, "0 is deletion");
+        pub(crate) fn creation_with_len(len: usize) -> Self {
             Self {
                 bytes: vec![100_u8; len].into(),
+                kind: WriteOpKind::Creation,
+            }
+        }
+
+        pub(crate) fn modification_with_len(len: usize) -> Self {
+            Self {
+                bytes: vec![100_u8; len].into(),
+                kind: WriteOpKind::Modification,
             }
         }
     }
@@ -187,6 +275,10 @@ pub(crate) mod test {
     impl TransactionWrite for TestValue {
         fn bytes(&self) -> Option<&Bytes> {
             (!self.bytes.is_empty()).then_some(&self.bytes)
+        }
+
+        fn write_op_kind(&self) -> WriteOpKind {
+            self.kind.clone()
         }
 
         fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
@@ -197,8 +289,15 @@ pub(crate) mod test {
             unimplemented!("Irrelevant for the test")
         }
 
-        fn set_bytes(&mut self, _bytes: Bytes) {
-            unimplemented!("Irrelevant for the test")
+        fn set_bytes(&mut self, bytes: Bytes) {
+            self.bytes = bytes;
+        }
+
+        fn convert_read_to_modification(&self) -> Option<Self>
+        where
+            Self: Sized,
+        {
+            Some(self.clone())
         }
     }
 

@@ -270,7 +270,7 @@ mod tests {
             .unwrap();
         // Wait for the fetch task to finish.
         tokio::time::sleep(std::time::Duration::from_millis(
-            REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 2,
+            REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 10,
         ))
         .await;
         {
@@ -321,7 +321,7 @@ mod tests {
                 .unwrap();
         // Wait for the fetch task to finish.
         tokio::time::sleep(std::time::Duration::from_millis(
-            REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 3,
+            REDIS_FETCH_TASK_INTERVAL_IN_MILLIS * 10,
         ))
         .await;
         {

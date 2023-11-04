@@ -85,7 +85,7 @@ impl ConfigSanitizer for MempoolConfig {
     fn sanitize(
         _node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         Ok(()) // TODO: add reasonable verifications
     }
@@ -96,7 +96,7 @@ impl ConfigOptimizer for MempoolConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let mempool_config = &mut node_config.mempool;
         let local_mempool_config_yaml = &local_config_yaml["mempool"];
@@ -153,7 +153,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::ValidatorFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -180,7 +180,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::Validator,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -232,7 +232,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::ValidatorFullnode,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap();
         assert!(modified_config);

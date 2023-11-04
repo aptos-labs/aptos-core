@@ -414,7 +414,7 @@ impl CheckChangeSet for ChangeSetConfigs {
         }
 
         let mut total_event_size = 0;
-        for event in change_set.events() {
+        for (event, _) in change_set.events() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
                 return Err(VMStatus::error(ERR, None));

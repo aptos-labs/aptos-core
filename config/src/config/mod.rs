@@ -9,6 +9,7 @@ mod base_config;
 mod config_optimizer;
 mod config_sanitizer;
 mod consensus_config;
+mod dag_consensus_config;
 mod error;
 mod execution_config;
 mod gas_estimation_config;
@@ -30,6 +31,7 @@ mod safety_rules_config;
 mod secure_backend_config;
 mod state_sync_config;
 mod storage_config;
+pub mod transaction_filter_type;
 mod utils;
 
 // All public usage statements should be declared below
@@ -37,6 +39,7 @@ pub use admin_service_config::*;
 pub use api_config::*;
 pub use base_config::*;
 pub use consensus_config::*;
+pub use dag_consensus_config::*;
 pub use error::*;
 pub use execution_config::*;
 pub use gas_estimation_config::*;

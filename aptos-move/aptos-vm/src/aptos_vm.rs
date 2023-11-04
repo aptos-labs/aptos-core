@@ -9,7 +9,9 @@ use crate::{
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
-    move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
+    move_vm_ext::{
+        get_max_binary_format_version, AptosMoveResolver, RespawnedSession, SessionExt, SessionId,
+    },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -537,6 +539,12 @@ impl AptosVM {
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
+        // TODO[agg_v2](fix): Charge SnapshotDerived (string concat) based on lenght,
+        // as charge below charges based on non-exchanged writes (i.e. identifier being in the read_op)
+        // Do we want to charge delayed field changes also?
+        for (key, (read_op, _)) in change_set.reads_needing_delayed_field_exchange().iter() {
+            gas_meter.charge_io_gas_for_write(key, read_op)?;
+        }
         for (key, group_write) in change_set.resource_group_write_set().iter() {
             gas_meter.charge_io_gas_for_group_write(key, group_write)?;
         }
@@ -550,7 +558,7 @@ impl AptosVM {
             storage_refund = 0.into();
         }
 
-        // TODO(Gas): Charge for aggregator writes
+        // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
     }
@@ -855,15 +863,7 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = if self
-            .0
-            .get_features()
-            .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6)
-        {
-            6
-        } else {
-            5
-        };
+        let max_version = get_max_binary_format_version(self.0.get_features(), None);
         let max_identifier_size = if self
             .0
             .get_features()
@@ -1282,9 +1282,11 @@ impl AptosVM {
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.0.get_gas_feature_version());
 
         match write_set_payload {
-            WriteSetPayload::Direct(change_set) => {
-                VMChangeSet::try_from_storage_change_set(change_set.clone(), &change_set_configs)
-            },
+            WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
+                change_set.clone(),
+                &change_set_configs,
+                resolver.is_delayed_field_optimization_capable(),
+            ),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -1341,6 +1343,7 @@ impl AptosVM {
         }
         for (state_key, group_write) in change_set.resource_group_write_set().iter() {
             for tag in group_write.inner_ops().keys() {
+                // TODO: Typelayout is set to None. Is this correct?
                 resource_group_view
                     .get_resource_from_group(state_key, tag, None)
                     .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
@@ -1357,11 +1360,11 @@ impl AptosVM {
         let has_new_block_event = change_set
             .events()
             .iter()
-            .any(|e| e.event_key() == Some(&new_block_event_key()));
+            .any(|(e, _)| e.event_key() == Some(&new_block_event_key()));
         let has_new_epoch_event = change_set
             .events()
             .iter()
-            .any(|e| e.event_key() == Some(&new_epoch_event_key()));
+            .any(|(e, _)| e.event_key() == Some(&new_epoch_event_key()));
         if has_new_block_event && has_new_epoch_event {
             Ok(())
         } else {
@@ -1719,18 +1722,6 @@ impl VMAdapter for AptosVM {
     }
 
     fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
-        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
-            ..
-        } = &txn.authenticator_ref()
-        {
-            if self
-                .0
-                .get_features()
-                .is_enabled(FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL)
-            {
-                return txn.check_fee_payer_signature();
-            }
-        }
         txn.check_signature()
     }
 
@@ -1769,7 +1760,7 @@ impl VMAdapter for AptosVM {
             .change_set()
             .events()
             .iter()
-            .any(|event| event.event_key() == Some(&new_epoch_event_key))
+            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
     }
 
     fn execute_single_transaction(
@@ -1846,8 +1837,11 @@ impl VMAdapter for AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );
-                            },
-                        // Ignore Storage Error as it can be intentionally triggered by parallel execution.
+                        },
+                        // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
+                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
+                        // Ignore Storage Error as currently it sometimes wraps speculative errors
+                        // TODO[agg_v2](fix) propagate SPECULATIVE_EXECUTION_ABORT_ERROR correctly, and remove storage from valid errors here.
                         StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //

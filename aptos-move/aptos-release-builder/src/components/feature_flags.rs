@@ -89,6 +89,9 @@ pub enum FeatureFlag {
     AggregatorV2DelayedFields,
     ConcurrentAssets,
     LimitMaxIdentifierLength,
+    OperatorBeneficiaryChange,
+    VMBinaryFormatV7,
+    ResourceGroupsChargeAsSizeSum,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -184,6 +187,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::AptosStdChainIdNatives => AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
             FeatureFlag::VMBinaryFormatV6 => AptosFeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::VMBinaryFormatV7 => AptosFeatureFlag::VM_BINARY_FORMAT_V7,
             FeatureFlag::MultiEd25519PkValidateV2Natives => {
                 AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES
             },
@@ -232,6 +236,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+            FeatureFlag::ResourceGroupsChargeAsSizeSum => {
+                AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
+            },
         }
     }
 }
@@ -250,6 +258,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::APTOS_STD_CHAIN_ID_NATIVES => FeatureFlag::AptosStdChainIdNatives,
             AptosFeatureFlag::VM_BINARY_FORMAT_V6 => FeatureFlag::VMBinaryFormatV6,
+            AptosFeatureFlag::VM_BINARY_FORMAT_V7 => FeatureFlag::VMBinaryFormatV7,
             AptosFeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES => {
                 FeatureFlag::MultiEd25519PkValidateV2Natives
             },
@@ -298,6 +307,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
+            AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
+            AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
+                FeatureFlag::ResourceGroupsChargeAsSizeSum
+            },
         }
     }
 }

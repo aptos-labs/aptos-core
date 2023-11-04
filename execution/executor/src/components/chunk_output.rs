@@ -7,8 +7,11 @@
 use crate::{components::apply_chunk_output::ApplyChunkOutput, metrics};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_executor_service::{
+    local_executor_helper::SHARDED_BLOCK_EXECUTOR,
+    remote_executor_client::{get_remote_addresses, REMOTE_SHARDED_BLOCK_EXECUTOR},
+};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, ExecutedChunk};
-use aptos_infallible::Mutex;
 use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
@@ -26,24 +29,10 @@ use aptos_types::{
         TransactionStatus,
     },
 };
-use aptos_vm::{
-    sharded_block_executor::{
-        local_executor_shard::{LocalExecutorClient, LocalExecutorService},
-        ShardedBlockExecutor,
-    },
-    AptosVM, VMExecutor,
-};
+use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
-use once_cell::sync::Lazy;
 use std::{ops::Deref, sync::Arc, time::Duration};
-
-pub static SHARDED_BLOCK_EXECUTOR: Lazy<
-    Arc<Mutex<ShardedBlockExecutor<CachedStateView, LocalExecutorClient<CachedStateView>>>>,
-> = Lazy::new(|| {
-    let client = LocalExecutorService::setup_local_executor_shards(AptosVM::get_num_shards(), None);
-    Arc::new(Mutex::new(ShardedBlockExecutor::new(client)))
-});
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -108,7 +97,6 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
-
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()
@@ -188,12 +176,21 @@ impl ChunkOutput {
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
-        Ok(V::execute_block_sharded(
-            SHARDED_BLOCK_EXECUTOR.lock().deref(),
-            partitioned_txns,
-            state_view,
-            maybe_block_gas_limit,
-        )?)
+        if !get_remote_addresses().is_empty() {
+            Ok(V::execute_block_sharded(
+                REMOTE_SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                maybe_block_gas_limit,
+            )?)
+        } else {
+            Ok(V::execute_block_sharded(
+                SHARDED_BLOCK_EXECUTOR.lock().deref(),
+                partitioned_txns,
+                state_view,
+                maybe_block_gas_limit,
+            )?)
+        }
     }
 
     /// Executes the block of [Transaction]s using the [VMExecutor] and returns

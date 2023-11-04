@@ -31,7 +31,6 @@ operation that also reduced parallelism, and should be avoided as much as possib
 -  [Function `copy_snapshot`](#0x1_aggregator_v2_copy_snapshot)
 -  [Function `read_snapshot`](#0x1_aggregator_v2_read_snapshot)
 -  [Function `string_concat`](#0x1_aggregator_v2_string_concat)
--  [Function `test_aggregator_valid_type`](#0x1_aggregator_v2_test_aggregator_valid_type)
 -  [Specification](#@Specification_1)
     -  [Function `create_aggregator`](#@Specification_1_create_aggregator)
     -  [Function `create_unbounded_aggregator`](#@Specification_1_create_unbounded_aggregator)
@@ -510,33 +509,6 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 
 
 <pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_string_concat">string_concat</a>&lt;IntElement&gt;(before: String, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;, after: String): <a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;String&gt;;
-</code></pre>
-
-
-
-</details>
-
-<a name="0x1_aggregator_v2_test_aggregator_valid_type"></a>
-
-## Function `test_aggregator_valid_type`
-
-
-
-<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_test_aggregator_valid_type">test_aggregator_valid_type</a>() {
-    <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u64&gt;();
-    <a href="aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">create_unbounded_aggregator</a>&lt;u128&gt;();
-    <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u64&gt;(5);
-    <a href="aggregator_v2.md#0x1_aggregator_v2_create_aggregator">create_aggregator</a>&lt;u128&gt;(5);
-}
 </code></pre>
 
 

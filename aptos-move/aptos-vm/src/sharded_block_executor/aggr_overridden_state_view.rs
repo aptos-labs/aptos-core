@@ -39,6 +39,10 @@ impl<'a, S: StateView + Sync + Send> TStateView for AggregatorOverriddenStateVie
 
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
         if *state_key == *TOTAL_SUPPLY_STATE_KEY {
+            // TODO: Remove this when we have aggregated total supply implementation for remote
+            //       sharding. For now we need this because after all the txns are executed, the
+            //       proof checker expects the total_supply to read/written to the tree.
+            self.base_view.get_state_value(state_key)?;
             return self.total_supply_base_view_override();
         }
         self.base_view.get_state_value(state_key)

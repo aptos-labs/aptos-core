@@ -3,12 +3,23 @@
 
 #![allow(unused)]
 
+use anyhow::{Error, Result};
 use aptos_logger::debug;
 use http::header::{HeaderName, HeaderValue};
 use hyper::{Body, Response, StatusCode};
 use std::{convert::Into, iter::IntoIterator};
 
 pub const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
+
+pub(crate) async fn spawn_blocking<F, T>(func: F) -> Result<T>
+where
+    F: FnOnce() -> Result<T> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(func)
+        .await
+        .map_err(Error::msg)?
+}
 
 pub(crate) fn reply_with_status<T>(status_code: StatusCode, message: T) -> Response<Body>
 where

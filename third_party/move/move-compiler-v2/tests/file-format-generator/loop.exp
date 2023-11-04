@@ -318,7 +318,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v4294967295
+// Move bytecode v7
 module 42.loops {
 
 
@@ -328,21 +328,21 @@ L1:	loc2: u64
 L2:	loc3: u64
 L3:	loc4: u64
 B0:
-	0: LdConst[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
 	2: CopyLoc[0](Arg0: u64)
 	3: MoveLoc[1](loc0: u64)
 	4: Gt
 	5: BrFalse(30)
 B1:
-	6: LdConst[1](U64: [10, 0, 0, 0, 0, 0, 0, 0])
+	6: LdU64(10)
 	7: StLoc[2](loc1: u64)
 	8: CopyLoc[0](Arg0: u64)
 	9: MoveLoc[2](loc1: u64)
 	10: Gt
 	11: BrFalse(20)
 B2:
-	12: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	12: LdU64(1)
 	13: StLoc[3](loc2: u64)
 	14: MoveLoc[0](Arg0: u64)
 	15: MoveLoc[3](loc2: u64)
@@ -356,7 +356,7 @@ B4:
 B5:
 	21: Branch(6)
 B6:
-	22: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	22: LdU64(1)
 	23: StLoc[4](loc3: u64)
 	24: MoveLoc[0](Arg0: u64)
 	25: MoveLoc[4](loc3: u64)
@@ -379,14 +379,14 @@ while_loop(Arg0: u64): u64 {
 L0:	loc1: u64
 L1:	loc2: u64
 B0:
-	0: LdConst[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
 	2: CopyLoc[0](Arg0: u64)
 	3: MoveLoc[1](loc0: u64)
 	4: Gt
 	5: BrFalse(13)
 B1:
-	6: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	6: LdU64(1)
 	7: StLoc[2](loc1: u64)
 	8: MoveLoc[0](Arg0: u64)
 	9: MoveLoc[2](loc1: u64)
@@ -409,14 +409,14 @@ L1:	loc2: u64
 L2:	loc3: u64
 L3:	loc4: u64
 B0:
-	0: LdConst[0](U64: [0, 0, 0, 0, 0, 0, 0, 0])
+	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
 	2: CopyLoc[0](Arg0: u64)
 	3: MoveLoc[1](loc0: u64)
 	4: Gt
 	5: BrFalse(29)
 B1:
-	6: LdConst[3](U64: [42, 0, 0, 0, 0, 0, 0, 0])
+	6: LdU64(42)
 	7: StLoc[2](loc1: u64)
 	8: CopyLoc[0](Arg0: u64)
 	9: MoveLoc[2](loc1: u64)
@@ -427,7 +427,7 @@ B2:
 B3:
 	13: Branch(14)
 B4:
-	14: LdConst[4](U64: [21, 0, 0, 0, 0, 0, 0, 0])
+	14: LdU64(21)
 	15: StLoc[3](loc2: u64)
 	16: CopyLoc[0](Arg0: u64)
 	17: MoveLoc[3](loc2: u64)
@@ -438,7 +438,7 @@ B5:
 B6:
 	21: Branch(22)
 B7:
-	22: LdConst[2](U64: [1, 0, 0, 0, 0, 0, 0, 0])
+	22: LdU64(1)
 	23: StLoc[4](loc3: u64)
 	24: MoveLoc[0](Arg0: u64)
 	25: MoveLoc[4](loc3: u64)

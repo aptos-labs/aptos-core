@@ -26,6 +26,7 @@ use aptos_types::{
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
+    write_set::TransactionWrite,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -36,7 +37,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
-    value::{serialize_values, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
@@ -643,10 +644,10 @@ fn emit_new_block_and_epoch_event(session: &mut SessionExt) {
 }
 
 /// Verify the consistency of the genesis `WriteSet`
-fn verify_genesis_write_set(events: &[ContractEvent]) {
+fn verify_genesis_write_set(events: &[(ContractEvent, Option<MoveTypeLayout>)]) {
     let new_epoch_events: Vec<&ContractEventV1> = events
         .iter()
-        .filter_map(|e| {
+        .filter_map(|(e, _)| {
             if e.event_key() == Some(&NewEpochEvent::event_key()) {
                 Some(e.v1().unwrap())
             } else {

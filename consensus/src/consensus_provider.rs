@@ -10,6 +10,7 @@ use crate::{
     persistent_liveness_storage::StorageWriteProxy,
     quorum_store::quorum_store_db::QuorumStoreDB,
     state_computer::ExecutionProxy,
+    transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
     util::time_service::ClockTimeService,
 };
@@ -36,7 +37,7 @@ pub fn start_consensus(
     consensus_to_mempool_sender: mpsc::Sender<QuorumStoreRequest>,
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
-) -> Runtime {
+) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
@@ -51,6 +52,7 @@ pub fn start_consensus(
         txn_notifier,
         state_sync_notifier,
         runtime.handle(),
+        TransactionFilter::new(node_config.execution.transaction_filter.clone()),
     ));
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
@@ -70,7 +72,7 @@ pub fn start_consensus(
         consensus_to_mempool_sender,
         state_computer,
         storage.clone(),
-        quorum_store_db,
+        quorum_store_db.clone(),
         reconfig_events,
         bounded_executor,
         aptos_time_service::TimeService::real(),
@@ -82,5 +84,5 @@ pub fn start_consensus(
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 
     debug!("Consensus started.");
-    runtime
+    (runtime, storage, quorum_store_db)
 }

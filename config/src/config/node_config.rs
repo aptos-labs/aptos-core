@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::DagConsensusConfig;
 use crate::{
     config::{
         netbench::NetbenchConfig, node_config_loader::NodeConfigLoader,
@@ -37,6 +38,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub consensus: ConsensusConfig,
     #[serde(default)]
+    pub dag_consensus: DagConsensusConfig,
+    #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]
     pub failpoints: Option<HashMap<String, String>>,
@@ -53,6 +56,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub mempool: MempoolConfig,
     #[serde(default)]
+    pub netbench: Option<NetbenchConfig>,
+    #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
@@ -60,8 +65,6 @@ pub struct NodeConfig {
     pub storage: StorageConfig,
     #[serde(default)]
     pub validator_network: Option<NetworkConfig>,
-    #[serde(default)]
-    pub netbench: Option<NetbenchConfig>,
 }
 
 impl NodeConfig {

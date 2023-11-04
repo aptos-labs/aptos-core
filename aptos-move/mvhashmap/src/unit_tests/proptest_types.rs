@@ -8,8 +8,9 @@ use super::{
 };
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
-    executable::ExecutableTestType, state_store::state_value::StateValue,
-    write_set::TransactionWrite,
+    executable::ExecutableTestType,
+    state_store::state_value::StateValue,
+    write_set::{TransactionWrite, WriteOpKind},
 };
 use bytes::Bytes;
 use claims::assert_none;
@@ -44,6 +45,7 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Failure,
 }
 
+#[derive(Debug, Clone)]
 struct Value<V> {
     maybe_value: Option<V>,
     maybe_bytes: Option<Bytes>,
@@ -63,9 +65,13 @@ impl<V: Into<Vec<u8>> + Clone> Value<V> {
     }
 }
 
-impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
+impl<V: Into<Vec<u8>> + Clone + Debug> TransactionWrite for Value<V> {
     fn bytes(&self) -> Option<&Bytes> {
         self.maybe_bytes.as_ref()
+    }
+
+    fn write_op_kind(&self) -> WriteOpKind {
+        unimplemented!("Irrelevant for the test")
     }
 
     fn from_state_value(_maybe_state_value: Option<StateValue>) -> Self {
@@ -76,8 +82,16 @@ impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
         unimplemented!("Irrelevant for the test")
     }
 
-    fn set_bytes(&mut self, _bytes: Bytes) {
-        unimplemented!("Irrelevant for the test")
+    fn set_bytes(&mut self, bytes: Bytes) {
+        self.maybe_bytes = Some(bytes);
+    }
+
+    fn convert_read_to_modification(&self) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        // If we have no bytes, no modification can be created.
+        self.maybe_bytes.as_ref().map(|_| self.clone())
     }
 }
 
@@ -215,7 +229,7 @@ where
 
     let baseline = Baseline::new(transactions.as_slice(), test_group);
     // Only testing data, provide executable type ().
-    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType>::new();
+    let map = MVHashMap::<KeyType<K>, usize, Value<V>, ExecutableTestType, ()>::new();
 
     // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -237,7 +251,7 @@ where
                 .write(key.clone(), idx, 0, vec![(5, value)]);
             map.group_data().mark_estimate(&key, idx);
         } else {
-            map.data().write(key.clone(), idx, 0, value);
+            map.data().write(key.clone(), idx, 0, (value, None));
             map.data().mark_estimate(&key, idx);
         }
     }
@@ -278,7 +292,7 @@ where
                                     &5,
                                     idx as TxnIndex,
                                 ) {
-                                    Ok((_, v)) => {
+                                    Ok((_, v, _)) => {
                                         assert_value(v);
                                         break;
                                     },
@@ -294,7 +308,7 @@ where
                                     .data()
                                     .fetch_data(&KeyType(key.clone()), idx as TxnIndex)
                                 {
-                                    Ok(Versioned(_, v)) => {
+                                    Ok(Versioned(_, v, _)) => {
                                         assert_value(v);
                                         break;
                                     },
@@ -341,7 +355,7 @@ where
                             map.group_data()
                                 .write(key, idx as TxnIndex, 1, vec![(5, value)]);
                         } else {
-                            map.data().write(key, idx as TxnIndex, 1, value);
+                            map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
                     },
                     Operator::Insert(v) => {
@@ -351,7 +365,7 @@ where
                             map.group_data()
                                 .write(key, idx as TxnIndex, 1, vec![(5, value)]);
                         } else {
-                            map.data().write(key, idx as TxnIndex, 1, value);
+                            map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
                     },
                     Operator::Update(delta) => {

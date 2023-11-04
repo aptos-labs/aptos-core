@@ -22,7 +22,7 @@ An entity may call `create_account` in an attempt to claim an account ahead of t
 
 The easiest way to set up a resource account is by:
 
-1. Using Aptos CLI: `aptos account create-resource-account` creates a resource account, and `aptos move create-resource-account-and-publish-package` creates a resource account and publishes the specified package under the resource account's adddress.
+1. Using Aptos CLI: `aptos account create-resource-account` creates a resource account, and `aptos move create-resource-account-and-publish-package` creates a resource account and publishes the specified package under the resource account's address.
 1. Writing custom smart contracts code: in the `resource_account.move` module, developers can find the resource account creation functions `create_resource_account`, `create_resource_account_and_fund`, and `create_resource_account_and_publish_package`. Developers can then call those functions to create resource accounts in their smart contracts.
 
 Each of those options offers slightly different functionality:
@@ -36,7 +36,7 @@ In this example, you will [initialize](https://github.com/aptos-labs/aptos-core/
 1. Call `create_resource_account_and_publish_package` to publish the module under the resource account's address, such as in the [`mint_nft.rs`](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/e2e-move-tests/src/tests/mint_nft.rs#L62) end-to-end example.
 1. Retrieve the signer cap from the resource account + module account as shown in the [`minting.move`](https://github.com/aptos-labs/aptos-core/blob/2e9d8ee759fcd3f6e831034f05c1656b1c48efc4/aptos-move/move-examples/mint_nft/sources/minting.move#L83) example.
 
-Note, if the above `resource_account` signer is **not** already set up as a resource account, retrieving the signer cap will fail. The `source_addr` field in the `retrieve_resource_account_cap` function refers to the the address of the source account, or the account that creates the resource account.
+Note, if the above `resource_account` signer is **not** already set up as a resource account, retrieving the signer cap will fail. The `source_addr` field in the `retrieve_resource_account_cap` function refers to the address of the source account, or the account that creates the resource account.
 
 For an example, see the `SignerCapability` employed by the `mint_nft` function in [`minting.move`](https://github.com/aptos-labs/aptos-core/blob/2e9d8ee759fcd3f6e831034f05c1656b1c48efc4/aptos-move/move-examples/mint_nft/sources/minting.move#L143-L181).
 

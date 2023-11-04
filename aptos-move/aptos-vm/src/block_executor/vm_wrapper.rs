@@ -7,10 +7,12 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_state_view::StateView;
-use aptos_types::transaction::signature_verified_transaction::SignatureVerifiedTransaction;
+use aptos_types::transaction::{
+    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
-use move_core_types::vm_status::VMStatus;
+use move_core_types::vm_status::{StatusCode, VMStatus};
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
@@ -43,6 +45,13 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn_idx: TxnIndex,
         materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+        if (executor_with_group_view.is_delayed_field_optimization_capable()
+            || executor_with_group_view.is_resource_group_split_in_change_set_capable())
+            && !Self::is_transaction_dynamic_change_set_capable(txn)
+        {
+            return ExecutionStatus::DirectWriteSetTransactionNotCapableError;
+        }
+
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self
             .vm
@@ -52,8 +61,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .execute_single_transaction(txn, &resolver, &log_context)
         {
             Ok((vm_status, mut vm_output, sender)) => {
+                // TODO[agg_v2](cleanup): move materialize deltas outside, into sequential execution.
                 if materialize_deltas {
-                    // TODO: Integrate aggregator v2.
                     vm_output = vm_output
                         .try_materialize(&resolver)
                         .expect("Delta materialization failed");
@@ -76,7 +85,16 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                         },
                     };
                 }
-                if AptosVM::should_restart_execution(&vm_output) {
+                if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
+                    ExecutionStatus::SpeculativeExecutionAbortError(
+                        vm_status.message().cloned().unwrap_or_default(),
+                    )
+                } else if vm_status.status_code() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
+                {
+                    ExecutionStatus::DelayedFieldsCodeInvariantError(
+                        vm_status.message().cloned().unwrap_or_default(),
+                    )
+                } else if AptosVM::should_restart_execution(&vm_output) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
@@ -86,7 +104,33 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },
-            Err(err) => ExecutionStatus::Abort(err),
+            // execute_single_transaction only returns an error when transactions that should never fail
+            // (BlockMetadataTransaction and GenesisTransaction) return an error themselves.
+            Err(err) => {
+                if err.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
+                    ExecutionStatus::SpeculativeExecutionAbortError(
+                        err.message().cloned().unwrap_or_default(),
+                    )
+                } else if err.status_code() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR {
+                    ExecutionStatus::DelayedFieldsCodeInvariantError(
+                        err.message().cloned().unwrap_or_default(),
+                    )
+                } else {
+                    ExecutionStatus::Abort(err)
+                }
+            },
         }
+    }
+
+    fn is_transaction_dynamic_change_set_capable(txn: &Self::Txn) -> bool {
+        if txn.is_valid() {
+            if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
+            {
+                // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
+                // resource_group_split_in_write_set is enabled.
+                return false;
+            }
+        }
+        true
     }
 }

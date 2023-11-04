@@ -14,9 +14,11 @@ use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace};
+use aptos_metrics_core::TimerHelper;
 use aptos_schemadb::SchemaBatch;
+use aptos_scratchpad::SmtAncestors;
 use aptos_storage_interface::state_delta::StateDelta;
-use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
 use std::sync::{mpsc::Receiver, Arc};
 
 pub struct StateMerkleBatch {
@@ -29,21 +31,25 @@ pub struct StateMerkleBatch {
 pub(crate) struct StateMerkleBatchCommitter {
     state_db: Arc<StateDb>,
     state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+    smt_ancestors: SmtAncestors<StateValue>,
 }
 
 impl StateMerkleBatchCommitter {
     pub fn new(
         state_db: Arc<StateDb>,
         state_merkle_batch_receiver: Receiver<CommitMessage<StateMerkleBatch>>,
+        smt_ancestors: SmtAncestors<StateValue>,
     ) -> Self {
         Self {
             state_db,
             state_merkle_batch_receiver,
+            smt_ancestors,
         }
     }
 
     pub fn run(self) {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
+            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["batch_committer_work"]);
             match msg {
                 CommitMessage::Data(state_merkle_batch) => {
                     let StateMerkleBatch {
@@ -91,6 +97,12 @@ impl StateMerkleBatchCommitter {
                     if !self.state_db.skip_usage {
                         self.check_usage_consistency(&state_delta).unwrap();
                     }
+                    state_delta.base.log_generation("buffered_state_commit");
+                    state_delta
+                        .current
+                        .log_generation("buffered_state_in_mem_base");
+
+                    self.smt_ancestors.add(state_delta.current.clone());
                 },
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
