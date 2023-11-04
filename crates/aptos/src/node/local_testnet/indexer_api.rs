@@ -24,7 +24,7 @@ use std::{collections::HashSet, path::PathBuf};
 use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "indexer-api";
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.33.0";
+const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.35.0";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///
@@ -156,11 +156,14 @@ impl ServiceManager for IndexerApiManager {
         // daemon but not when running in WSL configured to use Docker from within the
         // WSL environment. So instead of checking for OS we check the name of the
         // Docker daemon.
+        //
+        // This is the best method I could figure out for determining the Docker env,
+        // see more here: https://stackoverflow.com/q/77243960/3846032.
         let info = docker
             .info()
             .await
             .context("Failed to get info about Docker daemon")?;
-        let is_docker_desktop = info.name == Some("docker-desktop".to_string());
+        let is_docker_desktop = info.operating_system == Some("Docker Desktop".to_string());
         let postgres_connection_string = if is_docker_desktop {
             info!("Running with Docker Desktop, using host.docker.internal");
             self.postgres_connection_string

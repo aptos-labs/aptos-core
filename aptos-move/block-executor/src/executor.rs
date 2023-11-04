@@ -40,6 +40,7 @@ use aptos_types::{
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
 use bytes::Bytes;
 use claims::assert_none;
+use core::panic;
 use move_core_types::value::MoveTypeLayout;
 use num_cpus;
 use rand::{thread_rng, Rng};
@@ -240,9 +241,8 @@ where
                 ExecutionStatus::Abort(Error::UserError(err))
             },
             ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
-                return Err(PanicOr::Or(
-                    IntentionalFallbackToSequential::DirectWriteSetTransaction,
-                ));
+                // TODO[agg_v2](fix) decide how to handle/propagate.
+                panic!("PayloadWriteSet::Direct transaction not alone in a block");
             },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
@@ -534,21 +534,18 @@ where
                     Ok(finalized_group) => {
                         // finalize_group already applies the deletions.
                         if finalized_group.is_empty() != metadata_op.is_deletion() {
-                            error!(
+                            maybe_err =
+                                Some(Error::FallbackToSequential(resource_group_error(format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
                                 finalized_group.is_empty(),
                                 metadata_op.is_deletion()
-                            );
-                            maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
-                                IntentionalFallbackToSequential::ResourceGroupError,
-                            )));
+                            ))));
                         }
                         finalized_groups.push((group_key, metadata_op, finalized_group));
                     },
                     Err(e) => {
-                        error!("Error committing resource group {:?}", e);
-                        maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
-                            IntentionalFallbackToSequential::ResourceGroupError,
+                        maybe_err = Some(Error::FallbackToSequential(resource_group_error(
+                            format!("Error committing resource group {:?}", e),
                         )));
                     },
                 };
@@ -753,7 +750,9 @@ where
                     .collect();
 
                 bcs::to_bytes(&btree)
-                    .map_err(|_| PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError))
+                    .map_err(|e| {
+                        resource_group_error(format!("Unexpected resource group error {:?}", e))
+                    })
                     .map(|group_bytes| {
                         metadata_op.set_bytes(group_bytes.into());
                         (group_key, metadata_op)
@@ -1057,8 +1056,8 @@ where
             for (value_tag, group_op) in group_ops.into_iter() {
                 unsync_map
                     .insert_group_op(&group_key, value_tag, group_op)
-                    .map_err(|_| {
-                        PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError)
+                    .map_err(|e| {
+                        resource_group_error(format!("Unexpected resource group error {:?}", e))
                     })?;
             }
         }
@@ -1167,29 +1166,26 @@ where
                     counters::update_sequential_txn_gas_counters(&fee_statement);
 
                     // Apply the writes.
-                    // TODO: return code invariant error if dynamic change set optimizations disabled.
-                    Self::apply_output_sequential(&unsync_map, &output)
-                        .map_err(Error::FallbackToSequential)?;
-
-                    let group_metadata_ops = output.resource_group_metadata_ops();
-                    let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
-                    for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
-                        let finalized_group = unsync_map.finalize_group(&group_key);
-                        if finalized_group.is_empty() != group_metadata_op.is_deletion() {
-                            error!(
-                                "Group is empty = {} but op is deletion = {} in sequential execution",
-                                finalized_group.is_empty(),
-                                group_metadata_op.is_deletion()
-                            );
-                            // TODO: code invariant error if dynamic change set optimizations disabled.
-                            return Err(Error::FallbackToSequential(PanicOr::Or(
-                                IntentionalFallbackToSequential::ResourceGroupError,
-                            )));
-                        }
-                        finalized_groups.push((group_key, group_metadata_op, finalized_group));
-                    }
+                    // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
+                    Self::apply_output_sequential(&unsync_map, &output)?;
 
                     if dynamic_change_set_optimizations_enabled {
+                        let group_metadata_ops = output.resource_group_metadata_ops();
+                        let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
+                        for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
+                            let finalized_group = unsync_map.finalize_group(&group_key);
+                            if finalized_group.is_empty() != group_metadata_op.is_deletion() {
+                                // TODO[agg_v2](fix): code invariant error if dynamic change set optimizations disabled.
+                                // TODO[agg_v2](fix): make sure this cannot be triggered by an user transaction
+                                return Err(resource_group_error(format!(
+                                    "Group is empty = {} but op is deletion = {} in sequential execution",
+                                    finalized_group.is_empty(),
+                                    group_metadata_op.is_deletion()
+                                )).into());
+                            }
+                            finalized_groups.push((group_key, group_metadata_op, finalized_group));
+                        }
+
                         // Replace delayed field id with values in resource write set and read set.
                         let resource_change_set = Some(output.resource_write_set());
                         let mut patched_resource_write_set =
@@ -1228,24 +1224,15 @@ where
                         // TODO[agg_v2] patch resources in groups and provide explicitly
                         output.incorporate_materialized_txn_output(
                             // No aggregator v1 delta writes are needed for sequential execution.
+                            // They are already handled because we passed materialize_deltas=true
+                            // to execute_transaction.
                             vec![],
                             patched_resource_write_set,
                             patched_events,
                             serialized_groups,
                         );
                     } else {
-                        assert!(output.delayed_field_change_set().is_empty());
-
-                        // TODO[agg_v2]: fallback to no resource group capability instead of unwrap.
-                        let serialized_groups = Self::serialize_groups(finalized_groups)
-                            .map_err(Error::FallbackToSequential)?;
-
-                        output.incorporate_materialized_txn_output(
-                            vec![],
-                            BTreeMap::new(),
-                            output.get_events().into_iter().map(|(e, _)| e).collect(),
-                            serialized_groups,
-                        );
+                        output.set_txn_output_for_non_dynamic_change_set();
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
@@ -1261,9 +1248,7 @@ where
                     return Err(Error::UserError(err));
                 },
                 ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
-                    return Err(Error::FallbackToSequential(PanicOr::Or(
-                        IntentionalFallbackToSequential::DirectWriteSetTransaction,
-                    )));
+                    panic!("PayloadWriteSet::Direct transaction not alone in a block, in sequential execution")
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                     panic!(
@@ -1331,7 +1316,10 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> Result<Vec<E::Output>, E::Error> {
-        let mut ret = if self.concurrency_level > 1 {
+        let dynamic_change_set_optimizations_enabled = signature_verified_block.len() != 1
+            || E::is_transaction_dynamic_change_set_capable(&signature_verified_block[0]);
+
+        let mut ret = if self.concurrency_level > 1 && dynamic_change_set_optimizations_enabled {
             self.execute_transactions_parallel(
                 executor_arguments,
                 signature_verified_block,
@@ -1342,74 +1330,43 @@ where
                 executor_arguments,
                 signature_verified_block,
                 base_view,
-                true,
+                dynamic_change_set_optimizations_enabled,
             )
         };
 
-        // Regular sequential execution fallback with dynamic_change_set_optimizations_enabled == true
+        // Sequential execution fallback
         // Only worth doing if we did parallel before, i.e. if we did a different pass.
         if self.concurrency_level > 1 {
             if let Err(Error::FallbackToSequential(e)) = &ret {
-                let can_use_dynamic_change_set_optimizations = match e {
+                match e {
                     PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
                         debug!("[Execution]: Module read & written, sequential fallback");
-                        true
                     },
-                    PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction)
-                    | PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError) => false,
+                    PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError(msg)) => {
+                        error!(
+                            "[Execution]: ResourceGroupError({:?}), sequential fallback",
+                            msg
+                        );
+                    },
                     PanicOr::CodeInvariantError(msg) => {
                         error!(
                             "[Execution]: CodeInvariantError({:?}), sequential fallback",
                             msg
                         );
-                        true
                     },
                 };
 
-                if can_use_dynamic_change_set_optimizations {
-                    // All logs from the parallel execution should be cleared and not reported.
-                    // Clear by re-initializing the speculative logs.
-                    init_speculative_logs(signature_verified_block.len());
+                // All logs from the parallel execution should be cleared and not reported.
+                // Clear by re-initializing the speculative logs.
+                init_speculative_logs(signature_verified_block.len());
 
-                    ret = self.execute_transactions_sequential(
-                        executor_arguments,
-                        signature_verified_block,
-                        base_view,
-                        true,
-                    );
-                }
+                ret = self.execute_transactions_sequential(
+                    executor_arguments,
+                    signature_verified_block,
+                    base_view,
+                    dynamic_change_set_optimizations_enabled,
+                );
             }
-        }
-
-        // Sequential execution fallback with dynamic_change_set_optimizations_enabled == false
-        if let Err(Error::FallbackToSequential(e)) = &ret {
-            match e {
-                PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
-                    unreachable!("ModulePathReadWrite shouldn't happen in sequential execution")
-                },
-                PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError) => {
-                    error!("[Execution]: Sequential fallback due to ResourceGroupError");
-                },
-                PanicOr::Or(IntentionalFallbackToSequential::DirectWriteSetTransaction) => {
-                    info!(
-                        "[Execution]: DirectWriteSetTransaction found, during sequential fallback"
-                    );
-                },
-                PanicOr::CodeInvariantError(msg) => {
-                    error!("[Execution]: CodeInvariantError({:?}) in sequential with dynamic_change_set_optimizations_enabled, sequential fallback", msg);
-                },
-            };
-
-            // All logs from the parallel execution should be cleared and not reported.
-            // Clear by re-initializing the speculative logs.
-            init_speculative_logs(signature_verified_block.len());
-
-            ret = self.execute_transactions_sequential(
-                executor_arguments,
-                signature_verified_block,
-                base_view,
-                false,
-            );
         }
 
         // If after trying available fallbacks, we still are askign to do a fallback,
@@ -1422,6 +1379,11 @@ where
 
         ret
     }
+}
+
+fn resource_group_error(err_msg: String) -> PanicOr<IntentionalFallbackToSequential> {
+    error!("resource_group_error: {:?}", err_msg);
+    PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError(err_msg))
 }
 
 fn gen_id_start_value(sequential: bool) -> u32 {

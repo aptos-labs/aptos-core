@@ -32,11 +32,12 @@ impl ConfigSanitizer for DagPayloadConfig {
     fn sanitize(
         node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let dag_node_payload_config = &node_config.dag_consensus.node_payload_config;
 
+        // Sanitize the payload size limits
         Self::sanitize_payload_size_limits(&sanitizer_name, dag_node_payload_config)?;
 
         Ok(())
@@ -144,10 +145,57 @@ impl ConfigSanitizer for DagConsensusConfig {
     fn sanitize(
         node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         DagPayloadConfig::sanitize(node_config, node_type, chain_id)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_txn_limits() {
+        // Create a node config with invalid txn limits
+        let node_config = NodeConfig {
+            dag_consensus: DagConsensusConfig {
+                node_payload_config: DagPayloadConfig {
+                    max_sending_txns_per_round: 100,
+                    max_receiving_txns_per_round: 99,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            DagPayloadConfig::sanitize(&node_config, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_sanitize_size_limits() {
+        // Create a node config with invalid size limits
+        let node_config = NodeConfig {
+            dag_consensus: DagConsensusConfig {
+                node_payload_config: DagPayloadConfig {
+                    max_sending_size_per_round_bytes: 100,
+                    max_receiving_size_per_round_bytes: 99,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error =
+            DagPayloadConfig::sanitize(&node_config, NodeType::Validator, None).unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }
 }

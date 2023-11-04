@@ -30,12 +30,14 @@ pub fn initialize(
             vec![
                 FeatureFlag::AGGREGATOR_V2_API,
                 FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+                FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
             ],
             vec![],
         );
     } else {
         harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);

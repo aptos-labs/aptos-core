@@ -418,6 +418,8 @@ pub(crate) mod tests {
         state_view: &S,
         group_size_kind: GroupSizeKind,
     ) -> StorageAdapter<S> {
+        assert!(group_size_kind != GroupSizeKind::AsSum, "not yet supported");
+
         let (gas_feature_version, resource_group_charge_as_size_sum_enabled) = match group_size_kind
         {
             GroupSizeKind::AsSum => (12, true),
@@ -426,6 +428,7 @@ pub(crate) mod tests {
         };
 
         let group_adapter = ResourceGroupAdapter::new(
+            // TODO[agg_v2](fix) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,
