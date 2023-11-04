@@ -47,7 +47,6 @@ mod module;
 mod multisig;
 mod script;
 pub mod signature_verified_transaction;
-mod transaction_argument;
 
 use crate::{
     contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
@@ -55,6 +54,7 @@ use crate::{
 };
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
+pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
@@ -64,7 +64,6 @@ pub use script::{
 };
 use serde::de::DeserializeOwned;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
