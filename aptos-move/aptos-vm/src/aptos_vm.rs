@@ -1143,7 +1143,7 @@ impl AptosVM {
         } = &txn.authenticator_ref()
         {
             if self
-                .0
+                .vm_impl
                 .get_features()
                 .is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
             {
