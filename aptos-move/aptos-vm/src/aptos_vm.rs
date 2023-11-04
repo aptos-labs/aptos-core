@@ -1490,17 +1490,14 @@ impl AptosVM {
             ))
         });
 
-        let txn_data = TransactionMetadata {
-            sender: account_config::reserved_vm_address(),
-            max_gas_amount: 0.into(),
-            ..Default::default()
-        };
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self
             .vm_impl
             .new_session(resolver, SessionId::block_meta(&block_metadata));
 
-        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
+        let args = serialize_values(
+            &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
+        );
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
