@@ -40,6 +40,7 @@ pub struct IndexerStreamCoordinator {
 // Single batch of transactions to fetch, convert, and stream
 pub struct TransactionBatchInfo {
     pub start_version: u64,
+    pub head_version: u64,
     pub num_transactions_to_fetch: u16,
 }
 
@@ -165,6 +166,7 @@ impl IndexerStreamCoordinator {
             batches.push(TransactionBatchInfo {
                 start_version: starting_version,
                 num_transactions_to_fetch,
+                head_version: self.highest_known_version,
             });
             starting_version += num_transactions_to_fetch as u64;
             num_fetches += 1;

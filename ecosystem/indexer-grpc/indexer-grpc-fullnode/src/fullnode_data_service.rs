@@ -91,6 +91,7 @@ impl FullnodeData for FullnodeDataService {
                         break;
                     },
                 };
+                let head_version = coordinator.highest_known_version;
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
@@ -112,6 +113,7 @@ impl FullnodeData for FullnodeDataService {
                                 batch_start_version = coordinator.current_version,
                                 batch_end_version = max_version,
                                 versions_processed = ma.sum(),
+                                head_version = head_version,
                                 tps = (ma.avg() * 1000.0) as u64,
                                 "[indexer-grpc] Sent batch successfully"
                             );

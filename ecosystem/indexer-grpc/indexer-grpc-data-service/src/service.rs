@@ -29,11 +29,18 @@ use aptos_protos::{
 use futures::Stream;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::mpsc::{channel, error::SendTimeoutError};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn, Instrument};
+use uuid::Uuid;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -42,6 +49,7 @@ struct RequestMetadata {
     pub request_email: String,
     pub request_user_classification: String,
     pub request_api_key_name: String,
+    pub request_connection_id: String,
     // Token is no longer needed behind api gateway.
     #[deprecated]
     pub request_token: String,
@@ -63,6 +71,8 @@ const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
 const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
 const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
+const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
+const SERVICE_TYPE: &str = "data_service";
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
@@ -156,7 +166,9 @@ impl RawData for RawDataServerWrapper {
             request_email = request_metadata.request_email.as_str(),
             request_api_key_name = request_metadata.request_api_key_name.as_str(),
             processor_name = request_metadata.processor_name.as_str(),
+            request_connection_id = request_metadata.request_connection_id.as_str(),
             request_user_classification = request_metadata.request_user_classification.as_str(),
+            service_type = SERVICE_TYPE,
         );
 
         let redis_client = self.redis_client.clone();
@@ -164,6 +176,12 @@ impl RawData for RawDataServerWrapper {
             async move {
                 let mut connection_start_time = Some(std::time::Instant::now());
                 let mut transactions_count = transactions_count;
+                info!(
+                    start_version = current_version,
+                    transactions_count =  ?transactions_count,
+                    service_type = SERVICE_TYPE,
+                    "[Data Service] New request received."
+                );
                 let conn = match redis_client.get_tokio_connection_manager().await {
                     Ok(conn) => conn,
                     Err(e) => {
@@ -229,13 +247,17 @@ impl RawData for RawDataServerWrapper {
                 let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
 
                 info!(
+                    start_version = current_version,
                     chain_id = chain_id,
-                    current_version = current_version,
-                    "[Indexer Data] New request received."
+                    num_of_transactions = ?transactions_count,
+                    service_type = SERVICE_TYPE,
+                    "[Data Service] Request is validated."
                 );
-
                 loop {
                     // 1. Fetch data from cache and file store.
+                    // TODO: start preparing the response.
+                    // info!(start_time = time, "Start fetching data.")
+                    let current_batch_start_time = std::time::Instant::now();
                     let mut transaction_data = match data_fetch(
                         current_version,
                         &mut cache_operator,
@@ -261,6 +283,25 @@ impl RawData for RawDataServerWrapper {
                             continue;
                         },
                     };
+                    let size_in_bytes = transaction_data
+                        .iter()
+                        .map(|(encoded, _)| encoded.len())
+                        .sum::<usize>();
+                    info!(
+                        start_version = transaction_data.first().unwrap().1,
+                        end_version = transaction_data.last().unwrap().1,
+                        num_of_transactions = transaction_data.len(),
+                        size_in_bytes = size_in_bytes,
+                        duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
+                        tps = transaction_data.len() as f64
+                            / current_batch_start_time.elapsed().as_secs_f64(),
+                        bytes_per_sec =
+                            size_in_bytes as f64 / current_batch_start_time.elapsed().as_secs_f64(),
+                        "[Indexer Data] Data fetched."
+                    );
+
+                    // TODO: unify the truncation logic for start and end.
+                    //  Abstract into a function.
                     if let Some(count) = transactions_count {
                         if count == 0 {
                             // End the data stream.
@@ -268,7 +309,7 @@ impl RawData for RawDataServerWrapper {
                             connection_start_time = None;
                             break;
                         } else if (count as usize) < transaction_data.len() {
-                            // Trim the data to the requested size.
+                            // Trim the data to the requested end version.
                             transaction_data.truncate(count as usize);
                             transactions_count = Some(0);
                         } else {
@@ -303,8 +344,13 @@ impl RawData for RawDataServerWrapper {
                         .timestamp
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
-
-                    match channel_send_multiple_with_timeout(resp_items, tx.clone()).await {
+                    match channel_send_multiple_with_timeout(
+                        resp_items,
+                        tx.clone(),
+                        current_batch_start_time,
+                    )
+                    .await
+                    {
                         Ok(_) => {
                             PROCESSED_BATCH_SIZE
                                 .with_label_values(&[
@@ -361,11 +407,11 @@ impl RawData for RawDataServerWrapper {
                     sample!(
                         SampleRate::Duration(Duration::from_secs(15)),
                         info!(
-                            current_version = current_version,
+                            start_version = current_version - current_batch_size as u64,
                             end_version = end_of_batch_version,
                             batch_size = current_batch_size,
                             tps = (tps_calculator.avg() * 1000.0) as u64,
-                            "[Indexer Data] Sending batch."
+                            "Batch stats."
                         );
                     )
                 }
@@ -386,9 +432,13 @@ impl RawData for RawDataServerWrapper {
         );
 
         let output_stream = ReceiverStream::new(rx);
-        Ok(Response::new(
-            Box::pin(output_stream) as Self::GetTransactionsStream
-        ))
+        let mut response = Response::new(Box::pin(output_stream) as Self::GetTransactionsStream);
+
+        response.metadata_mut().insert(
+            RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER,
+            tonic::metadata::MetadataValue::from_str(request_metadata.request_connection_id.as_str()).unwrap(),
+        );
+        Ok(response)
     }
 }
 
@@ -422,6 +472,7 @@ async fn data_fetch(
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: &dyn FileStoreOperator,
 ) -> anyhow::Result<TransactionsDataStatus> {
+    let start_time = std::time::Instant::now();
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
         .await;
@@ -429,17 +480,53 @@ async fn data_fetch(
     match batch_get_result {
         // Data is not ready yet in the cache.
         Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
-        Ok(CacheBatchGetStatus::Ok(transactions)) => Ok(TransactionsDataStatus::Success(
-            build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-        )),
+        Ok(CacheBatchGetStatus::Ok(transactions)) => {
+            let size_in_bytes = transactions
+                .iter()
+                .map(|transaction| transaction.len())
+                .sum::<usize>();
+            let num_of_transactions = transactions.len();
+            let duration_in_secs = start_time.elapsed().as_secs_f64();
+            info!(
+                start_version = starting_version,
+                end_version = starting_version + num_of_transactions as u64 - 1,
+                num_of_transactions = transactions.len(),
+                size_in_bytes = size_in_bytes,
+                duration_in_secs = duration_in_secs,
+                tps = num_of_transactions as f64 / duration_in_secs,
+                bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
+                "[Indexer Data] Data fetched from cache."
+            );
+            Ok(TransactionsDataStatus::Success(
+                build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
+            ))
+        },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
             // Data is evicted from the cache. Fetch from file store.
             let file_store_batch_get_result =
                 file_store_operator.get_transactions(starting_version).await;
             match file_store_batch_get_result {
-                Ok(transactions) => Ok(TransactionsDataStatus::Success(
-                    build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
-                )),
+                Ok(transactions) => {
+                    let size_in_bytes = transactions
+                        .iter()
+                        .map(|transaction| transaction.len())
+                        .sum::<usize>();
+                    let num_of_transactions = transactions.len();
+                    let duration_in_secs = start_time.elapsed().as_secs_f64();
+                    info!(
+                        start_version = starting_version,
+                        end_version = starting_version + num_of_transactions as u64 - 1,
+                        num_of_transactions = transactions.len(),
+                        size_in_bytes = size_in_bytes,
+                        duration_in_secs = duration_in_secs,
+                        tps = num_of_transactions as f64 / duration_in_secs,
+                        bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
+                        "[Indexer Data] Data fetched from cache."
+                    );
+                    Ok(TransactionsDataStatus::Success(
+                        build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
+                    ))
+                },
                 Err(e) => {
                     if e.to_string().contains("Transactions file not found") {
                         Ok(TransactionsDataStatus::DataGap)
@@ -498,7 +585,7 @@ fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
     ];
-    let request_metadata_map: HashMap<String, String> = request_metadata_pairs
+    let mut request_metadata_map: HashMap<String, String> = request_metadata_pairs
         .into_iter()
         .map(|(key, value)| {
             (
@@ -510,30 +597,123 @@ fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> tonic::Result<
             )
         })
         .collect();
+    request_metadata_map.insert(
+        "request_connection_id".to_string(),
+        Uuid::new_v4().to_string(),
+    );
     let request_metadata: RequestMetadata =
         serde_json::from_str(&serde_json::to_string(&request_metadata_map).unwrap()).unwrap();
-    // TODO: update the request name if these are internal requests.
     Ok(request_metadata)
 }
 
 async fn channel_send_multiple_with_timeout(
     resp_items: Vec<TransactionsResponse>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+    current_batch_start_time: Instant,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
+    info!(
+        start_version = resp_items
+            .first()
+            .unwrap()
+            .transactions
+            .first()
+            .unwrap()
+            .version,
+        end_version = resp_items
+            .last()
+            .unwrap()
+            .transactions
+            .last()
+            .unwrap()
+            .version,
+        num_of_chunks = resp_items.len(),
+        num_of_transactions = resp_items
+            .iter()
+            .map(|resp_item| resp_item.transactions.len())
+            .sum::<usize>(),
+        size_in_bytes = resp_items
+            .iter()
+            .map(|resp_item| resp_item.encoded_len())
+            .sum::<usize>(),
+        "[Indexer Data] Finish chunking; sending."
+    );
+    let overall_size = resp_items
+        .iter()
+        .map(|resp_item| resp_item.encoded_len())
+        .sum::<usize>();
+    let start_version = resp_items
+        .first()
+        .unwrap()
+        .transactions
+        .first()
+        .unwrap()
+        .version;
+    let end_version = resp_items
+        .last()
+        .unwrap()
+        .transactions
+        .last()
+        .unwrap()
+        .version;
     for resp_item in resp_items {
-        let current_instant = std::time::Instant::now();
+        let response_size = resp_item.encoded_len();
+        let num_of_transactions = resp_item.transactions.len();
+        let start_version = resp_item.transactions.first().unwrap().version;
+        let end_version = resp_item.transactions.last().unwrap().version;
+        let start_version_txn_timestamp_in_sec = {
+            let timestamp = resp_item
+                .transactions
+                .first()
+                .unwrap()
+                .timestamp
+                .as_ref()
+                .unwrap();
+            timestamp.seconds as f64 + timestamp.nanos as f64 / 1_000_000_000.0
+        };
+        let end_version_txn_timestamp_in_sec = {
+            let timestamp = resp_item
+                .transactions
+                .last()
+                .unwrap()
+                .timestamp
+                .as_ref()
+                .unwrap();
+            timestamp.seconds as f64 + timestamp.nanos as f64 / 1_000_000_000.0
+        };
         tx.send_timeout(
             Result::<TransactionsResponse, Status>::Ok(resp_item),
             RESPONSE_CHANNEL_SEND_TIMEOUT,
         )
         .await?;
-        sample!(
-            SampleRate::Duration(Duration::from_secs(60)),
-            info!(
-                "[data service] response waiting time in seconds: {}",
-                current_instant.elapsed().as_secs_f64()
-            );
+        info!(
+            start_version = start_version,
+            end_version = end_version,
+            start_version_txn_timestamp = start_version_txn_timestamp_in_sec,
+            end_version_txn_timestamp = end_version_txn_timestamp_in_sec,
+            duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
+            size_in_bytes = response_size,
+            num_of_transactions = num_of_transactions,
+            bytes_per_sec =
+                (response_size as f64) / current_batch_start_time.elapsed().as_secs_f64(),
+            tps = num_of_transactions as f64 / current_batch_start_time.elapsed().as_secs_f64(),
+            txn_tps = num_of_transactions as f64
+                / (end_version_txn_timestamp_in_sec - start_version_txn_timestamp_in_sec),
+            service_type = SERVICE_TYPE,
+            "Chunk of transactions sent to GRPC response channel.",
         );
     }
+    info!(
+        start_version = start_version,
+        end_version = end_version,
+        num_of_transactions = end_version - start_version + 1,
+        duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
+        size_in_bytes = overall_size,
+        bytes_per_sec = (overall_size as f64) / current_batch_start_time.elapsed().as_secs_f64(),
+        service_type = SERVICE_TYPE,
+        tps = (end_version - start_version + 1) as f64
+            / current_batch_start_time.elapsed().as_secs_f64(),
+        "All chunks of transactions sent to GRPC response channel. Current batch finished.",
+    );
+
     Ok(())
 }

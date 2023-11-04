@@ -13,7 +13,7 @@ use aptos_indexer_grpc_utils::{
     file_store_operator::{
         FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
     },
-    time_diff_since_pb_timestamp_in_secs,
+    proto_timestamp_to_timestamp, time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
@@ -47,6 +47,8 @@ pub(crate) enum GrpcDataStatus {
     ChunkDataOk {
         start_version: u64,
         num_of_transactions: u64,
+        start_version_txn_timestamp_in_secs: f64,
+        end_version_txn_timestamp_in_secs: f64,
     },
     /// Init signal received with start version of current stream.
     /// No two `Init` signals will be sent in the same stream.
@@ -175,6 +177,16 @@ async fn process_transactions_from_node_response(
                 .context("There were unexpectedly no transactions in the response")?;
             let start_version = first_transaction.version;
             let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
+            let first_version_txn_timestamp =
+                proto_timestamp_to_timestamp(first_transaction_pb_timestamp.as_ref().unwrap());
+            let last_transaction_pb_timestamp = data
+                .transactions
+                .last()
+                .context("There were unexpectedly no transactions in the response")?
+                .timestamp
+                .clone();
+            let last_version_txn_timestamp =
+                proto_timestamp_to_timestamp(last_transaction_pb_timestamp.as_ref().unwrap());
             let transactions = data
                 .transactions
                 .into_iter()
@@ -207,6 +219,14 @@ async fn process_transactions_from_node_response(
             Ok(GrpcDataStatus::ChunkDataOk {
                 start_version,
                 num_of_transactions: transaction_len as u64,
+                start_version_txn_timestamp_in_secs: first_version_txn_timestamp
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("SystemTime before UNIX EPOCH!")
+                    .as_secs_f64(),
+                end_version_txn_timestamp_in_secs: last_version_txn_timestamp
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .expect("SystemTime before UNIX EPOCH!")
+                    .as_secs_f64(),
             })
         },
     }
@@ -276,7 +296,7 @@ async fn process_streaming_response(
         }
     }
     let mut current_version = starting_version;
-
+    let mut starting_time = std::time::Instant::now();
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
         let received: TransactionsFromNodeResponse = match received {
@@ -291,12 +311,14 @@ async fn process_streaming_response(
         if received.chain_id as u64 != fullnode_chain_id as u64 {
             panic!("[Indexer Cache] Chain id mismatch happens during data streaming.");
         }
-
+        let size_in_bytes = received.encoded_len();
         match process_transactions_from_node_response(received, &mut cache_operator).await {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
                     start_version,
                     num_of_transactions,
+                    start_version_txn_timestamp_in_secs,
+                    end_version_txn_timestamp_in_secs,
                 } => {
                     current_version += num_of_transactions;
                     transaction_count += num_of_transactions;
@@ -307,7 +329,13 @@ async fn process_streaming_response(
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
                     info!(
                         start_version = start_version,
+                        end_version = start_version + num_of_transactions - 1,
+                        size_in_bytes = size_in_bytes,
+                        duration_in_secs = starting_time.elapsed().as_secs_f64(),
+                        start_version_txn_timestamp_in_secs = start_version_txn_timestamp_in_secs,
+                        end_version_txn_timestamp_in_secs = end_version_txn_timestamp_in_secs,
                         num_of_transactions = num_of_transactions,
+                        service_type = "cache_worker",
                         "[Indexer Cache] Data chunk received.",
                     );
                 },
@@ -323,6 +351,7 @@ async fn process_streaming_response(
                     start_version,
                     num_of_transactions,
                 } => {
+                    starting_time = std::time::Instant::now();
                     info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,

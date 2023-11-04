@@ -106,6 +106,11 @@ pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
     current_timestamp - transaction_time
 }
 
+pub fn proto_timestamp_to_timestamp(timestamp: &Timestamp) -> std::time::SystemTime {
+    let transaction_time = timestamp.seconds as u64 * 1_000_000_000 + timestamp.nanos as u64;
+    std::time::UNIX_EPOCH + std::time::Duration::from_nanos(transaction_time)
+}
+
 /// Chunk transactions into chunks with chunk size less than or equal to chunk_size.
 /// If a single transaction is larger than chunk_size, it will be put into a chunk by itself.
 pub fn chunk_transactions(
