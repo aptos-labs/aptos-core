@@ -8,6 +8,7 @@ use std::{
 };
 
 use aptos_language_e2e_tests::{data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor};
+use aptos_vm::AptosVM;
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
 use libfuzzer_sys::Corpus;
@@ -18,7 +19,10 @@ use move_binary_format::{
 
 use aptos_types::{
     chain_id::ChainId,
-    transaction::{EntryFunction, ModuleBundle, Script, TransactionArgument, TransactionPayload, TransactionStatus, ExecutionStatus},
+    transaction::{
+        EntryFunction, ExecutionStatus, ModuleBundle, Script, TransactionArgument,
+        TransactionPayload, TransactionStatus,
+    },
     write_set::WriteSet,
 };
 
@@ -30,7 +34,7 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 
-#[derive(Debug, Arbitrary, Eq, PartialEq)]
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
 pub enum ExecVariant {
     Script {
         script: CompiledScript,
@@ -45,7 +49,7 @@ pub enum ExecVariant {
     },
 }
 
-#[derive(Debug, Arbitrary, Eq, PartialEq)]
+#[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
 pub struct RunnableState {
     pub dep_modules: Vec<CompiledModule>,
     pub exec_variant: ExecVariant,
@@ -71,7 +75,7 @@ macro_rules! tdbg {
         if DEBUG {
             dbg!($(($val)),+,)
         } else {
-            dbg!($(($val)),+,)
+            ($(($val)),+,)
         }
     };
 }
@@ -115,6 +119,7 @@ fn check_for_invariant_violation(e: VMStatus) {
 
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     tdbg!(&input);
+    AptosVM::set_concurrency_level_once(2);
     let mut vm = FakeExecutor::from_genesis(&VM, ChainId::mainnet()).set_not_parallel();
 
     for m in input.dep_modules.iter_mut() {
@@ -133,7 +138,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     }
 
     // topologically order modules {
-    let all_modules = std::mem::take(&mut input.dep_modules);
+    let all_modules = input.dep_modules.clone();
     let mut map = all_modules
         .into_iter()
         .map(|m| (m.self_id(), m))
@@ -194,13 +199,23 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             })?
             .pop()
             .expect("expected 1 output");
+        tdbg!(&res);
         // if error exit gracefully
         let status = match tdbg!(res.status()) {
             TransactionStatus::Keep(status) => status,
             _ => return Err(Corpus::Keep),
         };
+        vm.apply_write_set(res.write_set());
         match tdbg!(status) {
             ExecutionStatus::Success => (),
+            ExecutionStatus::MiscellaneousError(e) => {
+                if let Some(e) = e {
+                    if e.status_type() == StatusType::InvariantViolation {
+                        panic!("invariant violation {:?}", e);
+                    }
+                }
+                return Err(Corpus::Keep);
+            },
             _ => return Err(Corpus::Keep),
         };
         tdbg!("published");
@@ -208,7 +223,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     let acc = vm.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     // build tx
-    let tx = match input.exec_variant {
+    let tx = match input.exec_variant.clone() {
         ExecVariant::Script {
             script,
             type_args,
@@ -279,8 +294,21 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     // exec tx
     tdbg!("exec start");
-    let res = vm
-        .execute_block(vec![tx])
+    let mut old_res = None;
+    const N_EXTRA_RERUNS: usize = 3;
+    for _ in 0..N_EXTRA_RERUNS {
+        let res = vm.execute_block(vec![tx.clone()]);
+        if let Some(old_res) = old_res {
+            assert!(old_res == res);
+        }
+        old_res = Some(res);
+    }
+    let res = vm.execute_block(vec![tx]);
+    // check main execution as well
+    if let Some(old_res) = old_res {
+        assert!(old_res == res);
+    }
+    let res = res
         .map_err(|e| {
             check_for_invariant_violation(e);
             Corpus::Keep
@@ -296,6 +324,14 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     };
     match tdbg!(status) {
         ExecutionStatus::Success => (),
+        ExecutionStatus::MiscellaneousError(e) => {
+            if let Some(e) = e {
+                if e.status_type() == StatusType::InvariantViolation {
+                    panic!("invariant violation {:?}", e);
+                }
+            }
+            return Err(Corpus::Keep);
+        },
         _ => return Err(Corpus::Keep),
     };
 
