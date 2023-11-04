@@ -184,11 +184,11 @@ Also learn how to run a public fullnode on a local network and connect to either
         <div class="card-body">
         </div>
         <div class="list-group list-group-flush">
-          <a href="./deployments" class="list-group-item">
+          <a href="./networks" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">
-              <h4 class="mb-1">Aptos blockchain deployments</h4>
+              <h4 class="mb-1">Aptos blockchain networks</h4>
             </div>
-            <small>See a snapshot of all Aptos deployments.</small>
+            <small>See a snapshot of all Aptos networks.</small>
           </a>
           <a href="./identity-and-configuration" class="list-group-item">
             <div class="d-flex w-100 justify-content-between">

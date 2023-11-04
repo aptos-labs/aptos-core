@@ -118,8 +118,8 @@ const config = {
               to: "releases/aptos-releases",
             },
             {
-              label: "Deployments",
-              to: "nodes/deployments",
+              label: "Networks",
+              to: "nodes/networks",
             },
             {
               label: "Integrate with Aptos",
@@ -134,7 +134,7 @@ const config = {
           position: "left",
           items: [
             {
-              label: "Start with Onboarding Tutorials",
+              label: "Tutorials",
               to: "tutorials",
               activeBaseRegex: "^/tutorials$|^/tutorials$",
             },
@@ -143,8 +143,12 @@ const config = {
               to: "move/move-on-aptos",
             },
             {
-              label: "Embrace the Aptos Standards",
+              label: "Aptos Standards",
               to: "standards",
+            },
+            {
+              label: "Aptos APIs",
+              to: "apis",
             },
             {
               label: "Integrate with Aptos",
@@ -155,12 +159,8 @@ const config = {
               to: "/category/environment",
             },
             {
-              label: "Create NFTs on Aptos",
+              label: "Create NFTs",
               to: "/category/nft",
-            },
-            {
-              label: "Examples",
-              to: "/category/examples",
             },
             {
               label: "Build E2E Dapp on Aptos",
@@ -210,6 +210,10 @@ const config = {
             {
               label: "Aptos REST API Spec",
               to: "nodes/aptos-api-spec",
+            },
+            {
+              label: "Aptos Errors Codes",
+              to: "reference/error-codes",
             },
             {
               label: "Aptos Move Framework",
