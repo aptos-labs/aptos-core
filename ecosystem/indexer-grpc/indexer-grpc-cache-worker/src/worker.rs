@@ -297,6 +297,7 @@ async fn process_streaming_response(
     }
     let mut current_version = starting_version;
     let mut starting_time = std::time::Instant::now();
+    let mut size_in_bytes = 0;
     // 4. Process the streaming response.
     while let Some(received) = resp_stream.next().await {
         let received: TransactionsFromNodeResponse = match received {
@@ -311,7 +312,8 @@ async fn process_streaming_response(
         if received.chain_id as u64 != fullnode_chain_id as u64 {
             panic!("[Indexer Cache] Chain id mismatch happens during data streaming.");
         }
-        let size_in_bytes = received.encoded_len();
+        let current_size_in_bytes = received.encoded_len();
+        size_in_bytes += current_size_in_bytes;
         match process_transactions_from_node_response(received, &mut cache_operator).await {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
@@ -330,7 +332,7 @@ async fn process_streaming_response(
                     info!(
                         start_version = start_version,
                         end_version = start_version + num_of_transactions - 1,
-                        size_in_bytes = size_in_bytes,
+                        size_in_bytes = current_size_in_bytes,
                         duration_in_secs = starting_time.elapsed().as_secs_f64(),
                         start_version_txn_timestamp_in_secs = start_version_txn_timestamp_in_secs,
                         end_version_txn_timestamp_in_secs = end_version_txn_timestamp_in_secs,
@@ -374,11 +376,16 @@ async fn process_streaming_response(
                         .context("Failed to update the latest version in the cache")?;
                     transaction_count = 0;
                     info!(
-                        current_version = current_version,
+                        start_version = start_version,
+                        end_version = start_version + num_of_transactions - 1,
+                        num_of_transactions = num_of_transactions,
+                        size_in_bytes = size_in_bytes,
+                        service_type = "cache_worker",
                         chain_id = fullnode_chain_id,
                         tps = (tps_calculator.avg() * 1000.0) as u64,
                         "[Indexer Cache] Successfully process current batch."
                     );
+                    size_in_bytes = 0;
                 },
             },
             Err(e) => {

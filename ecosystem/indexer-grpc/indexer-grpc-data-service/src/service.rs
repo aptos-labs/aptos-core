@@ -436,7 +436,10 @@ impl RawData for RawDataServerWrapper {
 
         response.metadata_mut().insert(
             RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER,
-            tonic::metadata::MetadataValue::from_str(request_metadata.request_connection_id.as_str()).unwrap(),
+            tonic::metadata::MetadataValue::from_str(
+                request_metadata.request_connection_id.as_str(),
+            )
+            .unwrap(),
         );
         Ok(response)
     }
