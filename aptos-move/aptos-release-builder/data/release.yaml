@@ -2,7 +2,7 @@
 remote_endpoint: ~
 name: "v1.8"
 proposals:
-  - name: upgrade_framework
+  - name: step_1_upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.8"
       description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.8"
@@ -12,7 +12,7 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: add_secp256k1_support_and_introduce_single_sender_authenticator
+  - name: step_2_add_secp256k1_support_and_introduce_single_sender_authenticator
     metadata:
       title: "AIP-49: secp256k1 ECDSA for Transaction Authentication, and AIP-55: Generalize Transaction Authentication and Support Arbitrary K-of-N MultiKey Accounts"
       description: "AIP-49: secp256k1 ECDSA for Transaction Authentication (Discussion URL: https://github.com/aptos-foundation/AIPs/issues/247), and AIP-55: Generalize Transaction Authentication and Support Arbitrary K-of-N MultiKey Accounts (Discussion URL: https://github.com/aptos-foundation/AIPs/issues/267)."
@@ -22,7 +22,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - single_sender_authenticator
-  - name: enable_automatic_sponsored_account_creation
+  - name: step_3_enable_automatic_sponsored_account_creation
     metadata:
       title: "AIP-52: Automated Account Creation for Sponsored Transactions"
       description: "AIP-52: Automated Account Creation for Sponsored Transactions."
@@ -32,7 +32,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - sponsored_automatic_account_creation
-  - name: allow_optional_fee_payer
+  - name: step_4_allow_optional_fee_payer
     metadata:
       title: "AIP-53: Make Fee Payer Address Optional in Transactions Authenticator"
       description: "AIP-53: Make Fee Payer Address Optional in Transactions Authenticator."
@@ -42,7 +42,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - fee_payer_account_optional
-  - name: reduce_ident_size_max
+  - name: step_5_reduce_ident_size_max
     metadata:
       title: "Reduce the maximum identifier size"
       description: "This reduces the maximum identifier size for (de)serializer of Move binary format"
