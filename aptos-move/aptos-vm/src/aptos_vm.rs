@@ -1326,15 +1326,13 @@ impl AptosVM {
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
-        // TODO(Gas): avoid creating txn metadata twice.
-        let balance = TransactionMetadata::new(txn).max_gas_amount();
         let mut gas_meter = make_gas_meter(
             self.vm_impl.get_gas_feature_version(),
             self.vm_impl.get_gas_parameters(log_context)?.vm.clone(),
             self.vm_impl
                 .get_storage_gas_parameters(log_context)?
                 .clone(),
-            balance,
+            txn.max_gas_amount().into(),
         )?;
         let (status, output) =
             self.execute_user_transaction_impl(resolver, txn, log_context, &mut gas_meter);
