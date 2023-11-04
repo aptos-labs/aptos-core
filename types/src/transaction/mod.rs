@@ -49,7 +49,7 @@ mod script;
 pub mod signature_verified_transaction;
 
 use crate::{
-    contract_event::ReadWriteEvent, executable::ModulePath, fee_statement::FeeStatement,
+    contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
     proof::accumulator::InMemoryEventAccumulator, write_set::TransactionWrite,
 };
 pub use change_set::ChangeSet;
@@ -1872,5 +1872,5 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
-    type Event: Send + Sync + Debug + Clone + ReadWriteEvent;
+    type Event: Send + Sync + Debug + Clone + TransactionEvent;
 }

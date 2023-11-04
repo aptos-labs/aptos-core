@@ -31,7 +31,7 @@ use aptos_mvhashmap::{
 use aptos_state_view::TStateView;
 use aptos_types::{
     aggregator::PanicError,
-    contract_event::ReadWriteEvent,
+    contract_event::TransactionEvent,
     executable::Executable,
     fee_statement::FeeStatement,
     transaction::BlockExecutableTransaction as Transaction,
@@ -666,13 +666,13 @@ where
         let mut patched_events = vec![];
         for (event, layout) in events {
             if let Some(layout) = layout {
-                let (_, _, _, event_data) = event.get_event_data();
+                let event_data = event.get_event_data();
                 match latest_view
                     .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
                 {
                     Ok((bytes, _)) => {
                         let mut patched_event = event;
-                        patched_event.update_event_data(bytes.to_vec());
+                        patched_event.set_event_data(bytes.to_vec());
                         patched_events.push(patched_event);
                     },
                     Err(_) => unreachable!("Failed to replace identifiers with values in event"),

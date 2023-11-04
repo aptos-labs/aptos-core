@@ -16,7 +16,7 @@ use crate::{
     txn_commit_hook::NoOpTransactionCommitHook,
 };
 use aptos_aggregator::types::PanicOr;
-use aptos_types::{contract_event::ReadWriteEvent, executable::ExecutableTestType};
+use aptos_types::{contract_event::TransactionEvent, executable::ExecutableTestType};
 use claims::assert_ok;
 use num_cpus;
 use proptest::{
@@ -41,7 +41,7 @@ fn run_transactions<K, V, E>(
 ) where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
-    E: Send + Sync + Debug + Clone + ReadWriteEvent + 'static,
+    E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
     Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
