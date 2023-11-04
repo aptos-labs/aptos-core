@@ -258,6 +258,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "async-graphql-reverse",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -726,7 +727,7 @@ dependencies = [
  "clap 4.4.12",
  "clap-verbosity-flag",
  "determinator",
- "env_logger",
+ "env_logger 0.10.1",
  "guppy",
  "log",
  "reqwest",
@@ -1641,7 +1642,7 @@ dependencies = [
  "aptos-node-checker",
  "aptos-sdk",
  "clap 4.4.12",
- "env_logger",
+ "env_logger 0.10.1",
  "futures",
  "gcp-bigquery-client",
  "reqwest",
@@ -3108,7 +3109,7 @@ dependencies = [
  "async-trait",
  "clap 4.4.12",
  "const_format",
- "env_logger",
+ "env_logger 0.10.1",
  "futures",
  "once_cell",
  "poem",
@@ -4817,6 +4818,30 @@ dependencies = [
  "pest",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "async-graphql-reverse"
+version = "0.6.0"
+source = "git+https://github.com/tacogips/async-graphql-reverse.git?rev=2e5e7758051f7ba57da3940e5bc75a4e80badf4c#2e5e7758051f7ba57da3940e5bc75a4e80badf4c"
+dependencies = [
+ "anyhow",
+ "async-graphql",
+ "async-graphql-parser",
+ "clap 3.2.25",
+ "derive_macro_tool",
+ "env_logger 0.8.4",
+ "heck 0.3.3",
+ "lazy_static",
+ "log",
+ "paste",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "serde",
+ "structopt",
+ "strum 0.21.0",
+ "syn 1.0.109",
+ "toml 0.5.11",
 ]
 
 [[package]]
@@ -6836,6 +6861,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_macro_tool"
+version = "0.1.0"
+source = "git+https://github.com/tacogips/async-graphql-reverse.git?rev=2e5e7758051f7ba57da3940e5bc75a4e80badf4c#2e5e7758051f7ba57da3940e5bc75a4e80badf4c"
+dependencies = [
+ "chrono",
+ "quote 1.0.35",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7255,6 +7290,19 @@ dependencies = [
  "proc-macro2 1.0.75",
  "quote 1.0.35",
  "syn 2.0.47",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a19187fea3ac7e84da7dacf48de0c45d63c6a76f9490dae389aead16c243fce3"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -9213,7 +9261,7 @@ dependencies = [
  "crossbeam-channel",
  "crossbeam-utils",
  "dashmap",
- "env_logger",
+ "env_logger 0.10.1",
  "indexmap 2.1.0",
  "is-terminal",
  "itoa",
@@ -14919,6 +14967,15 @@ dependencies = [
 
 [[package]]
 name = "strum"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+dependencies = [
+ "strum_macros 0.21.1",
+]
+
+[[package]]
+name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
@@ -14933,6 +14990,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
 dependencies = [
  "strum_macros 0.25.3",
+]
+
+[[package]]
+name = "strum_macros"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
+dependencies = [
+ "heck 0.3.3",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "syn 1.0.109",
 ]
 
 [[package]]

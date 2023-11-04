@@ -459,6 +459,7 @@ aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-proc
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
+async-graphql-reverse = { git = "https://github.com/tacogips/async-graphql-reverse.git", rev = "2e5e7758051f7ba57da3940e5bc75a4e80badf4c" }
 async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-stream = "0.3"

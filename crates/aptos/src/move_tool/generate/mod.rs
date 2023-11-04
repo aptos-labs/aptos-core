@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod rust;
 mod schema;
 
 use crate::{
@@ -19,12 +20,14 @@ use clap::Subcommand;
 /// Generates schemas / code based on a Move module
 #[derive(Subcommand)]
 pub enum GenerateTool {
+    Rust(rust::GenerateRust),
     Schema(schema::GenerateSchema),
 }
 
 impl GenerateTool {
     pub async fn execute(self) -> CliResult {
         match self {
+            Self::Rust(tool) => tool.execute_serialized().await,
             Self::Schema(tool) => tool.execute_serialized().await,
         }
     }
@@ -47,6 +50,7 @@ pub fn build_schema_str(
             move_options.named_addresses(),
             move_options.bytecode_version,
             None,
+            false,
             false,
         )
     };
