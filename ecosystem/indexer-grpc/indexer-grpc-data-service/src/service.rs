@@ -178,16 +178,17 @@ impl RawData for RawDataServerWrapper {
                 let mut transactions_count = transactions_count;
                 info!(
                     start_version = current_version,
-                    transactions_count =  ?transactions_count,
-                    service_type = SERVICE_TYPE,
+                    num_of_transactions =  ?transactions_count,
                     "[Data Service] New request received."
                 );
+                // Establish redis connection
                 let conn = match redis_client.get_tokio_connection_manager().await {
                     Ok(conn) => conn,
                     Err(e) => {
                         ERROR_COUNT
                             .with_label_values(&["redis_connection_failed"])
                             .inc();
+                        // TODO: Error should be counted as a failed connection, not a short connection, so probably don't count it here.
                         SHORT_CONNECTION_COUNT
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
@@ -214,12 +215,14 @@ impl RawData for RawDataServerWrapper {
                 let mut cache_operator = CacheOperator::new(conn);
                 file_store_operator.verify_storage_bucket_existence().await;
 
+                // Validate redis chain id
                 let chain_id = match cache_operator.get_chain_id().await {
                     Ok(chain_id) => chain_id,
                     Err(e) => {
                         ERROR_COUNT
                             .with_label_values(&["redis_get_chain_id_failed"])
                             .inc();
+                        // TODO: Error should be counted as a failed connection, not a short connection, so probably don't count it here.
                         SHORT_CONNECTION_COUNT
                             .with_label_values(&[
                                 request_metadata.request_api_key_name.as_str(),
@@ -231,14 +234,14 @@ impl RawData for RawDataServerWrapper {
                         let _result = tx
                             .send_timeout(
                                 Err(Status::unavailable(
-                                    "[Indexer Data] Cannot get the chain id; please retry.",
+                                    "[Data Service] Cannot get the chain id from redis; please retry.",
                                 )),
                                 RESPONSE_CHANNEL_SEND_TIMEOUT,
                             )
                             .await;
                         error!(
                             error = e.to_string(),
-                            "[Indexer Data] Failed to get chain id."
+                            "[Data Service] Failed to get chain id from redis."
                         );
                         return;
                     },
@@ -250,13 +253,10 @@ impl RawData for RawDataServerWrapper {
                     start_version = current_version,
                     chain_id = chain_id,
                     num_of_transactions = ?transactions_count,
-                    service_type = SERVICE_TYPE,
                     "[Data Service] Request is validated."
                 );
                 loop {
                     // 1. Fetch data from cache and file store.
-                    // TODO: start preparing the response.
-                    // info!(start_time = time, "Start fetching data.")
                     let current_batch_start_time = std::time::Instant::now();
                     let mut transaction_data = match data_fetch(
                         current_version,
@@ -272,7 +272,7 @@ impl RawData for RawDataServerWrapper {
                             continue;
                         },
                         Ok(TransactionsDataStatus::DataGap) => {
-                            data_gap_handling(current_version);
+                            data_gap_handling(current_version, chain_id);
                             // End the data stream.
                             break;
                         },
@@ -287,18 +287,6 @@ impl RawData for RawDataServerWrapper {
                         .iter()
                         .map(|(encoded, _)| encoded.len())
                         .sum::<usize>();
-                    info!(
-                        start_version = transaction_data.first().unwrap().1,
-                        end_version = transaction_data.last().unwrap().1,
-                        num_of_transactions = transaction_data.len(),
-                        size_in_bytes = size_in_bytes,
-                        duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-                        tps = transaction_data.len() as f64
-                            / current_batch_start_time.elapsed().as_secs_f64(),
-                        bytes_per_sec =
-                            size_in_bytes as f64 / current_batch_start_time.elapsed().as_secs_f64(),
-                        "[Indexer Data] Data fetched."
-                    );
 
                     // TODO: unify the truncation logic for start and end.
                     //  Abstract into a function.
@@ -393,11 +381,11 @@ impl RawData for RawDataServerWrapper {
                             }
                         },
                         Err(SendTimeoutError::Timeout(_)) => {
-                            warn!("[Indexer Data] Receiver is full; exiting.");
+                            warn!("[Data Service] GRPC response channel receiver is full; exiting.");
                             break;
                         },
                         Err(SendTimeoutError::Closed(_)) => {
-                            warn!("[Indexer Data] Receiver is closed; exiting.");
+                            warn!("[Data Service] GRPC response channel receiver is closed; exiting.");
                             break;
                         },
                     }
@@ -411,11 +399,11 @@ impl RawData for RawDataServerWrapper {
                             end_version = end_of_batch_version,
                             batch_size = current_batch_size,
                             tps = (tps_calculator.avg() * 1000.0) as u64,
-                            "Batch stats."
+                            "[Data Service] Batch stats."
                         );
                     )
                 }
-                info!("[Indexer Data] Client disconnected.");
+                info!("[Data Service] Client disconnected.");
                 if let Some(start_time) = connection_start_time {
                     if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
                         SHORT_CONNECTION_COUNT
@@ -498,7 +486,7 @@ async fn data_fetch(
                 duration_in_secs = duration_in_secs,
                 tps = num_of_transactions as f64 / duration_in_secs,
                 bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
-                "[Indexer Data] Data fetched from cache."
+                "[Data Service] Data fetched from redis cache."
             );
             Ok(TransactionsDataStatus::Success(
                 build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
@@ -524,7 +512,7 @@ async fn data_fetch(
                         duration_in_secs = duration_in_secs,
                         tps = num_of_transactions as f64 / duration_in_secs,
                         bytes_per_sec = size_in_bytes as f64 / duration_in_secs,
-                        "[Indexer Data] Data fetched from cache."
+                        "[Data Service] Data fetched from file store."
                     );
                     Ok(TransactionsDataStatus::Success(
                         build_protobuf_encoded_transaction_wrappers(transactions, starting_version),
@@ -553,12 +541,12 @@ async fn ahead_of_cache_data_handling() {
 }
 
 /// Handles data gap errors, i.e., the data is not present in the cache or file store.
-fn data_gap_handling(version: u64) {
+fn data_gap_handling(version: u64, chain_id: u64) {
     // TODO(larry): add metrics/alerts to track the gap.
     // Do not crash the server when gap detected since other clients may still be able to get data.
     error!(
         current_version = version,
-        "[Indexer Data] Data gap detected. Please check the logs for more details."
+        chain_id, "[Data Service] Data gap detected. Please check the logs for more details."
     );
 }
 
@@ -567,7 +555,7 @@ async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, cha
     error!(
         chain_id = chain_id,
         current_version = current_version,
-        "[Indexer Data] Failed to fetch data from cache and file store. {:?}",
+        "[Data Service] Failed to fetch data from cache and file store. {:?}",
         err
     );
     tokio::time::sleep(Duration::from_millis(
@@ -614,50 +602,36 @@ async fn channel_send_multiple_with_timeout(
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     current_batch_start_time: Instant,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
+    let overall_size_in_bytes = resp_items
+        .iter()
+        .map(|resp_item| resp_item.encoded_len())
+        .sum::<usize>();
+    let overall_start_version = resp_items
+        .first()
+        .unwrap()
+        .transactions
+        .first()
+        .unwrap()
+        .version;
+    let overall_end_version = resp_items
+        .last()
+        .unwrap()
+        .transactions
+        .last()
+        .unwrap()
+        .version;
     info!(
-        start_version = resp_items
-            .first()
-            .unwrap()
-            .transactions
-            .first()
-            .unwrap()
-            .version,
-        end_version = resp_items
-            .last()
-            .unwrap()
-            .transactions
-            .last()
-            .unwrap()
-            .version,
+        start_version = overall_start_version,
+        end_version = overall_end_version,
         num_of_chunks = resp_items.len(),
         num_of_transactions = resp_items
             .iter()
             .map(|resp_item| resp_item.transactions.len())
             .sum::<usize>(),
-        size_in_bytes = resp_items
-            .iter()
-            .map(|resp_item| resp_item.encoded_len())
-            .sum::<usize>(),
-        "[Indexer Data] Finish chunking; sending."
+        size_in_bytes = overall_size_in_bytes,
+        "[Data Service] Finished chunking; sending transactions chunks to GRPC response channel."
     );
-    let overall_size = resp_items
-        .iter()
-        .map(|resp_item| resp_item.encoded_len())
-        .sum::<usize>();
-    let start_version = resp_items
-        .first()
-        .unwrap()
-        .transactions
-        .first()
-        .unwrap()
-        .version;
-    let end_version = resp_items
-        .last()
-        .unwrap()
-        .transactions
-        .last()
-        .unwrap()
-        .version;
+
     for resp_item in resp_items {
         let response_size = resp_item.encoded_len();
         let num_of_transactions = resp_item.transactions.len();
@@ -701,21 +675,20 @@ async fn channel_send_multiple_with_timeout(
             tps = num_of_transactions as f64 / current_batch_start_time.elapsed().as_secs_f64(),
             txn_tps = num_of_transactions as f64
                 / (end_version_txn_timestamp_in_sec - start_version_txn_timestamp_in_sec),
-            service_type = SERVICE_TYPE,
-            "Chunk of transactions sent to GRPC response channel.",
+            "[Data Service] One chunk of transactions sent to GRPC response channel.",
         );
     }
     info!(
-        start_version = start_version,
-        end_version = end_version,
-        num_of_transactions = end_version - start_version + 1,
+        start_version = overall_start_version,
+        end_version = overall_end_version,
+        num_of_transactions = overall_end_version - overall_start_version + 1,
         duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-        size_in_bytes = overall_size,
-        bytes_per_sec = (overall_size as f64) / current_batch_start_time.elapsed().as_secs_f64(),
-        service_type = SERVICE_TYPE,
-        tps = (end_version - start_version + 1) as f64
+        size_in_bytes = overall_size_in_bytes,
+        bytes_per_sec =
+            (overall_size_in_bytes as f64) / current_batch_start_time.elapsed().as_secs_f64(),
+        tps = (overall_end_version - overall_start_version + 1) as f64
             / current_batch_start_time.elapsed().as_secs_f64(),
-        "All chunks of transactions sent to GRPC response channel. Current batch finished.",
+        "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
     );
 
     Ok(())

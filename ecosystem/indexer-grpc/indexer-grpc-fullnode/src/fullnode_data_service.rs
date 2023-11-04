@@ -25,6 +25,7 @@ pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
+const SERVICE_TYPE: &str = "indexer_fullnode";
 
 #[tonic::async_trait]
 impl FullnodeData for FullnodeDataService {
@@ -74,10 +75,20 @@ impl FullnodeData for FullnodeDataService {
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
                 Ok(_) => {
                     // TODO: Add request details later
-                    info!("[indexer-grpc] Init connection");
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        service_type = SERVICE_TYPE,
+                        "[Indexer Fullnode] Init connection"
+                    );
                 },
                 Err(_) => {
-                    panic!("[indexer-grpc] Unable to initialize stream");
+                    panic!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        service_type = SERVICE_TYPE,
+                        "[Indexer Fullnode] Unable to initialize stream"
+                    );
                 },
             }
             let mut base: u64 = 0;
@@ -87,11 +98,14 @@ impl FullnodeData for FullnodeDataService {
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
-                        error!("[indexer-grpc] Error sending to stream: {}", e);
+                        error!(
+                            service_type = SERVICE_TYPE,
+                            "[Indexer Fullnode] Error sending to stream: {}", e
+                        );
                         break;
                     },
                 };
-                let head_version = coordinator.highest_known_version;
+                let highest_known_version = coordinator.highest_known_version;
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
@@ -110,17 +124,22 @@ impl FullnodeData for FullnodeDataService {
                             base = new_base;
 
                             info!(
-                                batch_start_version = coordinator.current_version,
-                                batch_end_version = max_version,
-                                versions_processed = ma.sum(),
-                                head_version = head_version,
+                                start_version = coordinator.current_version,
+                                end_version = max_version,
+                                num_of_transactions = ma.sum(),
+                                // TODO: Move latest version into a metric
+                                highest_known_version,
                                 tps = (ma.avg() * 1000.0) as u64,
-                                "[indexer-grpc] Sent batch successfully"
+                                service_type = SERVICE_TYPE,
+                                "[Indexer Fullnode] Sent batch successfully"
                             );
                         }
                     },
                     Err(_) => {
-                        aptos_logger::warn!("[indexer-grpc] Unable to send end batch status");
+                        aptos_logger::warn!(
+                            service_type = SERVICE_TYPE,
+                            "[Indexer Fullnode] Unable to send end batch status"
+                        );
                         break;
                     },
                 }
