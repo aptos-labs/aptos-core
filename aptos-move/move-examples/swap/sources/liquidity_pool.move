@@ -666,8 +666,9 @@ module swap::liquidity_pool {
     }
 
     inline fun get_pool_seeds(token_1: Object<Metadata>, token_2: Object<Metadata>, is_stable: bool): vector<u8> {
-        let token_symbol = lp_token_name(token_1, token_2);
-        let seeds = *string::bytes(&token_symbol);
+        let seeds = vector[];
+        vector::append(&mut seeds, bcs::to_bytes(&object::object_address(&token_1)));
+        vector::append(&mut seeds, bcs::to_bytes(&object::object_address(&token_2)));
         vector::append(&mut seeds, bcs::to_bytes(&is_stable));
         seeds
     }
