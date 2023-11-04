@@ -1387,19 +1387,12 @@ fn resource_group_error(err_msg: String) -> PanicOr<IntentionalFallbackToSequent
 }
 
 fn gen_id_start_value(sequential: bool) -> u32 {
-    // All identifiers are ephemeral. We pick a fixed large value to start with
-    // so that it is easier to catch cases when the exchange is not performed.
-    // The value HAS TO BE FIXED to ensure deterministic behavior across
-    // validators (in test mode, we allow randomness though).
-    // We also take a different range for parallel execution, to even more easily
-    // differentiate.
-    let offset = if sequential { 0 } else { 1000 };
+    // IDs are ephemeral. Pick a random prefix, and different each time,
+    // in case exchange is mistakenly not performed - to more easily catch it.
+    // And in a bad case where it happens in prod, to and make sure incorrect
+    // block doesn't get committed, but chain halts.
+    // (take a different range from parallel execution, to even more easily differentiate)
 
-    const AGGREGATOR_DEBUG_VAR: &str = "AGGREGATOR_DEBUG";
-    if std::env::var(AGGREGATOR_DEBUG_VAR).is_ok() {
-        // A fixed magic value.
-        7 * offset * 1_000_000
-    } else {
-        thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
-    }
+    let offset = if sequential { 0 } else { 1000 };
+    thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
 }
