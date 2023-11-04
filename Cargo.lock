@@ -7402,9 +7402,11 @@ version = "0.1.0"
 name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
- "aptos-consensus",
- "aptos-consensus-types",
+ "aptos-framework",
+ "aptos-language-e2e-tests",
  "aptos-types",
+ "aptos-vm",
+ "aptos-vm-genesis",
  "arbitrary",
  "bcs 0.1.4",
  "libfuzzer-sys",
@@ -7414,6 +7416,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "once_cell",
 ]
 
 [[package]]
