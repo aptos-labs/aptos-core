@@ -63,7 +63,9 @@ impl NetworkHandler {
     pub async fn run(
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
+        _buffer: Vec<DAGMessage>,
     ) -> StateSyncStatus {
+        // TODO: process buffer
         loop {
             select! {
                 msg = dag_rpc_rx.select_next_some() => {

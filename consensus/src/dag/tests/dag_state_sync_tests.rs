@@ -197,8 +197,17 @@ async fn test_dag_state_sync() {
         epoch_state: epoch_state.clone(),
     };
 
+    let (request, responders, sync_dag_store) =
+        state_sync.build_sync_to_request(&sync_node_li, slow_dag.clone(), 0);
+
     let sync_result = state_sync
-        .sync_dag_to(&sync_node_li, dag_fetcher, slow_dag.clone(), 0)
+        .sync_dag_to(
+            dag_fetcher,
+            request,
+            responders,
+            sync_dag_store,
+            sync_node_li.ledger_info().clone(),
+        )
         .await;
     let new_dag = sync_result.unwrap().unwrap();
 

@@ -8,15 +8,17 @@ use super::{
     types::{CertifiedNodeMessage, RemoteFetchRequest},
     ProofNotifier,
 };
-use crate::state_replication::StateComputer;
+use crate::{dag::DAGMessage, network::IncomingDAGRequest, state_replication::StateComputer};
 use anyhow::ensure;
-use aptos_consensus_types::common::Round;
+use aptos_channels::aptos_channel;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
+use futures::StreamExt;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -168,14 +170,12 @@ impl DagStateSynchronizer {
         }
     }
 
-    /// Note: Assumes that the sync checks have been done
-    pub async fn sync_dag_to(
+    pub(crate) fn build_sync_to_request(
         &self,
         node: &CertifiedNodeMessage,
-        dag_fetcher: impl TDagFetcher,
         current_dag_store: Arc<RwLock<Dag>>,
         highest_committed_anchor_round: Round,
-    ) -> anyhow::Result<Option<Dag>> {
+    ) -> (RemoteFetchRequest, Vec<Author>, Arc<RwLock<Dag>>) {
         let commit_li = node.ledger_info();
 
         {
@@ -217,6 +217,18 @@ impl DagStateSynchronizer {
             .signatures()
             .get_signers_addresses(&self.epoch_state.verifier.get_ordered_account_addresses());
 
+        (request, responders, sync_dag_store)
+    }
+
+    /// Note: Assumes that the sync checks have been done
+    pub async fn sync_dag_to(
+        &self,
+        dag_fetcher: impl TDagFetcher,
+        request: RemoteFetchRequest,
+        responders: Vec<Author>,
+        sync_dag_store: Arc<RwLock<Dag>>,
+        commit_li: LedgerInfoWithSignatures,
+    ) -> anyhow::Result<Option<Dag>> {
         match dag_fetcher
             .fetch(request, responders, sync_dag_store.clone())
             .await
@@ -228,8 +240,89 @@ impl DagStateSynchronizer {
             },
         }
 
-        self.state_computer.sync_to(commit_li.clone()).await?;
+        self.state_computer.sync_to(commit_li).await?;
 
         Ok(Arc::into_inner(sync_dag_store).map(|r| r.into_inner()))
+    }
+}
+
+pub(crate) struct SyncModeMessageHandler {
+    epoch_state: Arc<EpochState>,
+    start_round: Round,
+    target_round: Round,
+}
+
+impl SyncModeMessageHandler {
+    pub(crate) fn new(
+        epoch_state: Arc<EpochState>,
+        start_round: Round,
+        target_round: Round,
+    ) -> Self {
+        Self {
+            epoch_state,
+            start_round,
+            target_round,
+        }
+    }
+
+    pub(crate) async fn run(
+        mut self,
+        dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
+        buffer: &mut Vec<DAGMessage>,
+    ) -> Option<CertifiedNodeMessage> {
+        while let Some(msg) = dag_rpc_rx.next().await {
+            match self.process_rpc(msg, buffer) {
+                Ok(may_be_cert_node) => {
+                    if let Some(next_sync_msg) = may_be_cert_node {
+                        return Some(next_sync_msg);
+                    }
+                },
+                Err(err) => {
+                    error!("error processing {}", err);
+                },
+            }
+        }
+        return None;
+    }
+
+    fn process_rpc(
+        &mut self,
+        rpc_request: IncomingDAGRequest,
+        buffer: &mut Vec<DAGMessage>,
+    ) -> anyhow::Result<Option<CertifiedNodeMessage>> {
+        let dag_message: DAGMessage = rpc_request.req.try_into()?;
+
+        debug!(
+            "processing rpc message {} from {}",
+            dag_message.name(),
+            rpc_request.sender
+        );
+
+        match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
+            Ok(_) => match dag_message {
+                DAGMessage::NodeMsg(_) => {
+                    debug!("ignoring node msg");
+                },
+                DAGMessage::CertifiedNodeMsg(ref cert_node_msg) => {
+                    if cert_node_msg.round() < self.start_round {
+                        debug!("ignoring stale certified node msg");
+                    } else if cert_node_msg.round() > self.target_round * 2 {
+                        debug!("cancelling current sync");
+                        return Ok(Some(cert_node_msg.clone()));
+                    } else {
+                        buffer.push(dag_message);
+                    }
+                },
+                DAGMessage::FetchRequest(_) => {
+                    debug!("ignoring fetch msg");
+                },
+                _ => unreachable!("verification must catch this error"),
+            },
+            Err(err) => {
+                error!(error = ?err, "error verifying message");
+                return Err(err);
+            },
+        };
+        return Ok(None);
     }
 }

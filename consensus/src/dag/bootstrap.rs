@@ -19,7 +19,7 @@ use crate::{
     dag::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
-        dag_state_sync::StateSyncStatus,
+        dag_state_sync::{StateSyncStatus, SyncModeMessageHandler},
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
     },
@@ -84,6 +84,7 @@ struct ActiveMode {
     handler: NetworkHandler,
     fetch_service: DagFetcherService,
     base_state: BootstrapBaseState,
+    buffer: Vec<DAGMessage>,
 }
 
 #[async_trait]
@@ -102,7 +103,7 @@ impl TDagMode for ActiveMode {
         });
 
         // Run the network handler until it returns with state sync status.
-        let sync_status = self.handler.run(dag_rpc_rx).await;
+        let sync_status = self.handler.run(dag_rpc_rx, self.buffer).await;
 
         match sync_status {
             StateSyncStatus::NeedsSync(certified_node_msg) => Some(Mode::Sync(SyncMode {
@@ -124,7 +125,7 @@ struct SyncMode {
 impl TDagMode for SyncMode {
     async fn run(
         self,
-        _dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
@@ -159,42 +160,82 @@ impl TDagMode for SyncMode {
             bootstrapper.config.fetcher_config.clone(),
         );
 
-        let success = match sync_manager
-            .sync_dag_to(
-                &self.certified_node_msg,
-                dag_fetcher,
-                self.base_state.dag_store.clone(),
-                highest_committed_anchor_round,
-            )
-            .await
-        {
-            Ok(_) => {
-                info!("sync success. going to rebootstrap.");
-                true
-            },
-            Err(_) => {
-                info!("sync failed. continuing without advancing.");
-                false
-            },
-        };
+        let (request, responders, sync_dag_store) = sync_manager.build_sync_to_request(
+            &self.certified_node_msg,
+            self.base_state.dag_store.clone(),
+            highest_committed_anchor_round,
+        );
 
-        let next_mode = if success {
-            let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
-            Mode::Active(ActiveMode {
-                handler: new_handler,
-                fetch_service: new_fetch_service,
-                base_state: new_state,
-            })
-        } else {
-            let (new_handler, new_fetch_service) =
-                bootstrapper.bootstrap_components(&self.base_state);
-            Mode::Active(ActiveMode {
-                handler: new_handler,
-                fetch_service: new_fetch_service,
-                base_state: self.base_state,
-            })
-        };
-        Some(next_mode)
+        let commit_li = self.certified_node_msg.ledger_info().clone();
+
+        let network_handle = SyncModeMessageHandler::new(
+            bootstrapper.epoch_state.clone(),
+            request.start_round(),
+            request.target_round(),
+        );
+
+        let (res_tx, res_rx) = oneshot::channel();
+        let handle = tokio::spawn(async move {
+            let success = match sync_manager
+                .sync_dag_to(dag_fetcher, request, responders, sync_dag_store, commit_li)
+                .await
+            {
+                Ok(_) => {
+                    info!("sync success. going to rebootstrap.");
+                    true
+                },
+                Err(_) => {
+                    info!("sync failed. continuing without advancing.");
+                    false
+                },
+            };
+            let _ = res_tx.send(success);
+        });
+        defer!({
+            handle.abort();
+            let _ = block_on(handle);
+        });
+
+        let mut buffer = Vec::new();
+
+        select! {
+            res = network_handle.run(dag_rpc_rx, &mut buffer) => {
+                // The network handle returns if the sender side of dag_rpc_rx closes,
+                // or network handle found a future CertifiedNodeMessage to cancel the
+                // current sync.
+                if let Some(msg) = res {
+                    return Some(Mode::Sync(SyncMode {
+                        certified_node_msg: msg,
+                        base_state: self.base_state,
+                    }));
+                } else {
+                    unreachable!("remote mustn't drop the network message sender until bootstrapper returns");
+                }
+            },
+            res = res_rx => {
+                if let Ok(true) = res {
+                    // If the sync task finishes successfully, we can transition to Active mode by
+                    // rebootstrapping all components starting from the DAG store.
+                    let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
+                    return Some(Mode::Active(ActiveMode {
+                        handler: new_handler,
+                        fetch_service: new_fetch_service,
+                        base_state: new_state,
+                        buffer,
+                    }))
+                } else {
+                    // If the sync task fails, then continue the DAG in Active Mode with existing state.
+                    let (new_handler, new_fetch_service) =
+                        bootstrapper.bootstrap_components(&self.base_state);
+                    return Some(Mode::Active(ActiveMode {
+                        handler: new_handler,
+                        fetch_service: new_fetch_service,
+                        base_state: self.base_state,
+                        buffer,
+                    }))
+                }
+            }
+        }
     }
 }
 
@@ -476,6 +517,7 @@ impl DagBootstrapper {
             handler,
             fetch_service,
             base_state,
+            buffer: Vec::new(),
         });
         loop {
             select! {
@@ -534,7 +576,7 @@ pub(super) fn bootstrap_dag_for_test(
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;
-        handler.run(&mut dag_rpc_rx).await
+        handler.run(&mut dag_rpc_rx, Vec::new()).await
     });
     let df_handle = tokio::spawn(fetch_service.start());
 
