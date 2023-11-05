@@ -819,6 +819,7 @@ dependencies = [
  "chrono",
  "claims",
  "dashmap",
+ "enum_dispatch",
  "fail 0.5.0",
  "futures",
  "futures-channel",

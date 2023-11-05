@@ -218,7 +218,7 @@ impl DagStateSynchronizer {
             .get_signers_addresses(&self.epoch_state.verifier.get_ordered_account_addresses());
 
         match dag_fetcher
-            .fetch(request, responders, sync_dag_store.clone())
+            .fetch(request, responders, sync_dag_store.clone(), Box::pin(async {}))
             .await
         {
             Ok(_) => {},

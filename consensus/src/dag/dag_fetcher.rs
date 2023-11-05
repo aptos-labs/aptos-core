@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::DAGRpcResult;
+use super::{shutdown::Shutdown, DAGRpcResult};
 use crate::dag::{
     dag_network::{RpcResultWithResponder, TDAGNetworkSender},
     dag_store::Dag,
@@ -19,7 +19,7 @@ use aptos_logger::{debug, error, info};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
-use futures::{stream::FuturesUnordered, Stream, StreamExt};
+use futures::{stream::FuturesUnordered, Future, Stream, StreamExt};
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -170,17 +170,25 @@ impl DagFetcherService {
         )
     }
 
-    pub async fn start(mut self) {
-        while let Some(local_request) = self.request_rx.recv().await {
-            match self
-                .fetch(
-                    local_request.node(),
-                    local_request.responders(&self.ordered_authors),
-                )
-                .await
-            {
-                Ok(_) => local_request.notify(),
-                Err(err) => error!("unable to complete fetch successfully: {}", err),
+    pub(crate) async fn start(mut self, mut shutdown: Shutdown) {
+        while !shutdown.is_shutdown() {
+            tokio::select! {
+                Some(local_request) = self.request_rx.recv() => {
+                    match self
+                        .fetch(
+                            local_request.node(),
+                            local_request.responders(&self.ordered_authors),
+                            &mut shutdown,
+                        )
+                        .await
+                    {
+                        Ok(_) => local_request.notify(),
+                        Err(err) => error!("unable to complete fetch successfully: {}", err),
+                    }
+                },
+                _ = shutdown.recv() => {
+                    return;
+                }
             }
         }
     }
@@ -189,6 +197,7 @@ impl DagFetcherService {
         &mut self,
         node: &Node,
         responders: Vec<Author>,
+        shutdown: impl Future + Send + Unpin,
     ) -> anyhow::Result<()> {
         let remote_request = {
             let dag_reader = self.dag.read();
@@ -215,7 +224,7 @@ impl DagFetcherService {
             )
         };
         self.inner
-            .fetch(remote_request, responders, self.dag.clone())
+            .fetch(remote_request, responders, self.dag.clone(), shutdown)
             .await
     }
 }
@@ -227,6 +236,7 @@ pub trait TDagFetcher: Send {
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
         dag: Arc<RwLock<Dag>>,
+        mut shutdown: impl Future + Send + Unpin,
     ) -> anyhow::Result<()>;
 }
 
@@ -260,6 +270,7 @@ impl TDagFetcher for DagFetcher {
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
         dag: Arc<RwLock<Dag>>,
+        mut shutdown: impl Future + Send + Unpin,
     ) -> anyhow::Result<()> {
         debug!(
             LogSchema::new(LogEvent::FetchNodes),
@@ -279,42 +290,53 @@ impl TDagFetcher for DagFetcher {
             self.config.max_concurrent_responders,
         );
 
-        while let Some(RpcResultWithResponder { responder, result }) = rpc.next().await {
-            match result {
-                Ok(DAGRpcResult(Ok(response))) => {
-                    match FetchResponse::try_from(response).and_then(|response| {
-                        response.verify(&remote_request, &self.epoch_state.verifier)
-                    }) {
-                        Ok(fetch_response) => {
-                            let certified_nodes = fetch_response.certified_nodes();
-                            // TODO: support chunk response or fallback to state sync
-                            {
-                                let mut dag_writer = dag.write();
-                                for node in certified_nodes.into_iter().rev() {
-                                    if let Err(e) = dag_writer.add_node(node) {
-                                        error!(error = ?e, "failed to add node");
-                                    }
-                                }
-                            }
+        loop {
+            tokio::select! {
+                res = rpc.next() => {
+                    if let Some(RpcResultWithResponder { responder, result }) = res {
+                        match result {
+                            Ok(DAGRpcResult(Ok(response))) => {
+                                match FetchResponse::try_from(response).and_then(|response| {
+                                    response.verify(&remote_request, &self.epoch_state.verifier)
+                                }) {
+                                    Ok(fetch_response) => {
+                                        let certified_nodes = fetch_response.certified_nodes();
+                                        // TODO: support chunk response or fallback to state sync
+                                        {
+                                            let mut dag_writer = dag.write();
+                                            for node in certified_nodes.into_iter().rev() {
+                                                if let Err(e) = dag_writer.add_node(node) {
+                                                    error!("Failed to add node {}", e);
+                                                }
+                                            }
+                                        }
 
-                            if dag.read().all_exists(remote_request.targets()) {
-                                return Ok(());
-                            }
-                        },
-                        Err(err) => {
-                            info!(error = ?err, "failure parsing/verifying fetch response from {}", responder);
-                        },
-                    };
+                                        if dag.read().all_exists(remote_request.targets()) {
+                                            return Ok(());
+                                        }
+                                    },
+                                    Err(err) => {
+                                        info!(error = ?err, "failure parsing/verifying fetch response from {}", responder);
+                                    },
+                                };
+                            },
+                            Ok(DAGRpcResult(Err(dag_rpc_error))) => {
+                                info!(error = ?dag_rpc_error, responder = responder, "fetch failure: target {} returned error", responder);
+                            },
+                            Err(err) => {
+                                info!(error = ?err, responder = responder, "rpc failed to {}", responder);
+                            },
+                        }
+                    } else {
+                        break;
+                    }
                 },
-                Ok(DAGRpcResult(Err(dag_rpc_error))) => {
-                    info!(error = ?dag_rpc_error, responder = responder, "fetch failure: target {} returned error", responder);
-                },
-                Err(err) => {
-                    info!(error = ?err, responder = responder, "rpc failed to {}", responder);
+                _ = &mut shutdown => {
+                    return Err(anyhow!("cancelled"));
                 },
             }
         }
-        Err(anyhow!("Fetch with fallback failed"))
+        Err(anyhow!("fetch failed"))
     }
 }
 

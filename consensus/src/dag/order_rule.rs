@@ -19,6 +19,7 @@ use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct OrderRule {
     epoch_state: Arc<EpochState>,
     lowest_unordered_anchor_round: Round,

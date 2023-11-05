@@ -28,6 +28,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use claims::assert_none;
+use futures::Future;
 use std::{sync::Arc, time::Duration};
 
 struct MockDAGNetworkSender {}
@@ -82,6 +83,7 @@ impl TDagFetcher for MockDagFetcher {
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
         new_dag: Arc<RwLock<Dag>>,
+        _shutdown: impl Future + Send + Unpin,
     ) -> anyhow::Result<()> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
