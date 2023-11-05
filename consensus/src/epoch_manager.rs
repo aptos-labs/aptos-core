@@ -615,12 +615,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop DAG bootstrapper");
+            debug!("[EpochManager] DAG bootstrapper has shutdown");
         }
         self.dag_shutdown_tx = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.buffer_manager_msg_tx = None;
         if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
+            debug!("[EpochManager] Shutting down Buffer manager");
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
@@ -631,6 +633,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ack_rx
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
+            debug!("[EpochManager] Buffer manager has shutdown");
         }
 
         // Shutdown the block retrieval task by dropping the sender
@@ -638,15 +641,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.batch_retrieval_tx = None;
 
         if let Some(mut quorum_store_coordinator_tx) = self.quorum_store_coordinator_tx.take() {
+            debug!("[EpochManager] Shutting down Quorum Store");
             let (ack_tx, ack_rx) = oneshot::channel();
             quorum_store_coordinator_tx
                 .send(CoordinatorCommand::Shutdown(ack_tx))
                 .await
                 .expect("Could not send shutdown indicator to QuorumStore");
             ack_rx.await.expect("Failed to stop QuorumStore");
+            debug!("[EpochManager] Quorum Store has shut down");
         }
 
         self.commit_state_computer.end_epoch();
+        debug!("[EpochManager] shutdown current processor complete");
     }
 
     async fn start_recovery_manager(
