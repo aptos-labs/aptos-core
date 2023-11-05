@@ -601,6 +601,7 @@ impl DagBootstrapper {
             select! {
                 biased;
                 Ok(ack_tx) = &mut shutdown_rx => {
+                    debug!("shutdown signal received");
                     let _ = ack_tx.send(());
                     info!(LogSchema::new(LogEvent::Shutdown), epoch = self.epoch_state.epoch);
                     return;

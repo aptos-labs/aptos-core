@@ -607,6 +607,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.round_manager_tx = None;
 
         if let Some(close_tx) = self.dag_shutdown_tx.take() {
+            debug!("[EpochManager] Shutting down DAG");
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
             close_tx
