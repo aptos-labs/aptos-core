@@ -174,7 +174,7 @@ async fn handle_root(
     let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
 
     // Use spawn_blocking to run the function on a separate thread.
-    let result = tokio::spawn(spawn_parser(
+    let _ = tokio::spawn(spawn_parser(
         context.parser_config.clone(),
         msg,
         context.pool.clone(),
@@ -182,7 +182,7 @@ async fn handle_root(
     ))
     .await;
 
-    if !to_ack || result.is_err() {
+    if !to_ack {
         return Ok(warp::reply::with_status(
             warp::reply(),
             warp::http::StatusCode::BAD_REQUEST,
