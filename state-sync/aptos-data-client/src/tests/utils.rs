@@ -205,6 +205,30 @@ pub fn remove_latency_metadata(client: &AptosDataClient, peer: PeerNetworkId) {
         .unwrap();
 }
 
+/// Updates the distance metadata for the specified peer
+pub fn update_distance_metadata(
+    client: &AptosDataClient,
+    peer: PeerNetworkId,
+    distance_from_validators: u64,
+) {
+    // Get the peer monitoring metadata
+    let peers_and_metadata = client.get_peers_and_metadata();
+    let peer_metadata = peers_and_metadata.get_metadata_for_peer(peer).unwrap();
+    let mut peer_monitoring_metadata = peer_metadata.get_peer_monitoring_metadata().clone();
+
+    // Update the distance metadata
+    let mut latest_network_info_response = peer_monitoring_metadata
+        .latest_network_info_response
+        .unwrap();
+    latest_network_info_response.distance_from_validators = distance_from_validators;
+    peer_monitoring_metadata.latest_network_info_response = Some(latest_network_info_response);
+
+    // Update the peer monitoring metadata
+    peers_and_metadata
+        .update_peer_monitoring_metadata(peer, peer_monitoring_metadata)
+        .unwrap();
+}
+
 /// Verifies the top 10% of selected peers are the lowest latency peers
 pub fn verify_highest_peer_selection_latencies(
     mock_network: &mut MockNetwork,
