@@ -127,9 +127,9 @@ async fn test_send_rpc_with_fallback() {
         )
         .await;
 
-    assert_ok!(rpc.next().await.unwrap().1.unwrap().0);
-    assert_err!(rpc.next().await.unwrap().1);
-    assert_ok!(rpc.next().await.unwrap().1.unwrap().0);
-    assert_err!(rpc.next().await.unwrap().1);
-    assert_ok!(rpc.next().await.unwrap().1.unwrap().0);
+    assert_ok!(rpc.next().await.unwrap().result.unwrap().0);
+    assert_err!(rpc.next().await.unwrap().result);
+    assert_ok!(rpc.next().await.unwrap().result.unwrap().0);
+    assert_err!(rpc.next().await.unwrap().result);
+    assert_ok!(rpc.next().await.unwrap().result.unwrap().0);
 }

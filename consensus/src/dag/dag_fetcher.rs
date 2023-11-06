@@ -3,12 +3,12 @@
 
 use super::DAGRpcResult;
 use crate::dag::{
-    dag_network::{RpcWithFallback, TDAGNetworkSender},
+    dag_network::{RpcResultWithResponder, TDAGNetworkSender},
     dag_store::Dag,
-    errors::{DAGError, FetchRequestHandleError},
+    errors::FetchRequestHandleError,
     observability::logging::{LogEvent, LogSchema},
     types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
-    RpcHandler,
+    RpcHandler, RpcWithFallback,
 };
 use anyhow::{anyhow, ensure};
 use aptos_bitvec::BitVec;
@@ -22,7 +22,6 @@ use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, Stream, StreamExt};
 use std::{
     collections::HashMap,
-    ops::Deref,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -280,8 +279,8 @@ impl TDagFetcher for DagFetcher {
             self.config.max_concurrent_responders,
         );
 
-        while let Some((responder, response)) = rpc.next().await {
-            match response {
+        while let Some(RpcResultWithResponder { responder, result }) = rpc.next().await {
+            match result {
                 Ok(DAGRpcResult(Ok(response))) => {
                     match FetchResponse::try_from(response).and_then(|response| {
                         response.verify(&remote_request, &self.epoch_state.verifier)
@@ -308,10 +307,10 @@ impl TDagFetcher for DagFetcher {
                     };
                 },
                 Ok(DAGRpcResult(Err(dag_rpc_error))) => {
-                    info!(error = ?dag_rpc_error, responder, "fetch failure: target {} returned error", responder);
+                    info!(error = ?dag_rpc_error, responder = responder, "fetch failure: target {} returned error", responder);
                 },
                 Err(err) => {
-                    info!(error = ?err, responder, "rpc failed to {}", responder);
+                    info!(error = ?err, responder = responder, "rpc failed to {}", responder);
                 },
             }
         }

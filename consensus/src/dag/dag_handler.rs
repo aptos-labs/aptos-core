@@ -6,7 +6,10 @@ use crate::{
         dag_fetcher::{FetchRequestHandler, FetchWaiter},
         dag_network::RpcHandler,
         dag_state_sync::{StateSyncStatus, StateSyncTrigger},
-        errors::{DAGError, DAGRpcError, DagDriverError, NodeBroadcastHandleError, FetchRequestHandleError},
+        errors::{
+            DAGError, DAGRpcError, DagDriverError, FetchRequestHandleError,
+            NodeBroadcastHandleError,
+        },
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
         CertifiedNode, Node,
