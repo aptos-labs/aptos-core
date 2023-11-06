@@ -130,7 +130,9 @@ impl StateComputer for ExecutionProxy {
         let txn_shuffler = self.transaction_shuffler.lock().as_ref().unwrap().clone();
         let txns = payload_manager.get_transactions(block).await?;
 
-        let filtered_txns = self.transaction_filter.filter(block_id, txns);
+        let filtered_txns = self
+            .transaction_filter
+            .filter(block_id, block.timestamp_usecs(), txns);
         let deduped_txns = txn_deduper.dedup(filtered_txns);
         let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
@@ -206,7 +208,9 @@ impl StateComputer for ExecutionProxy {
             }
 
             let signed_txns = payload_manager.get_transactions(block.block()).await?;
-            let filtered_txns = self.transaction_filter.filter(block.id(), signed_txns);
+            let filtered_txns =
+                self.transaction_filter
+                    .filter(block.id(), block.timestamp_usecs(), signed_txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let shuffled_txns = txn_shuffler.shuffle(deduped_txns);
 
