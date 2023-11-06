@@ -2,21 +2,7 @@
 
 // Copyright © Aptos Foundation
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    convert::TryInto,
-};
-
 use aptos_language_e2e_tests::{data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor};
-use aptos_vm::AptosVM;
-use arbitrary::Arbitrary;
-use libfuzzer_sys::fuzz_target;
-use libfuzzer_sys::Corpus;
-use move_binary_format::{
-    access::ModuleAccess,
-    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
-};
-
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
@@ -25,7 +11,13 @@ use aptos_types::{
     },
     write_set::WriteSet,
 };
-
+use aptos_vm::AptosVM;
+use arbitrary::Arbitrary;
+use libfuzzer_sys::{fuzz_target, Corpus};
+use move_binary_format::{
+    access::ModuleAccess,
+    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
+};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, TypeTag},
@@ -33,6 +25,10 @@ use move_core_types::{
     vm_status::{StatusType, VMStatus},
 };
 use once_cell::sync::Lazy;
+use std::{
+    collections::{BTreeMap, HashSet},
+    convert::TryInto,
+};
 
 #[derive(Debug, Arbitrary, Eq, PartialEq, Clone)]
 pub enum ExecVariant {
@@ -104,7 +100,7 @@ fn sort_by_deps(
         }
     }
     order.push(id);
-    return Ok(());
+    Ok(())
 }
 
 // panic to catch invariant violations
@@ -128,7 +124,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     }
     for module in input.dep_modules.iter() {
         // reject bad modules fast
-        move_bytecode_verifier::verify_module(&module).map_err(|_| Corpus::Keep)?;
+        move_bytecode_verifier::verify_module(module).map_err(|_| Corpus::Keep)?;
     }
 
     // check no duplicates
@@ -161,7 +157,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         for id in order.iter() {
             // check if part of current package
             if id.address() == cur_package_id.address() {
-                if let Some(module) = map.remove(&cur_package_id) {
+                if let Some(module) = map.remove(cur_package_id) {
                     cur.push(module);
                 }
             }
