@@ -31,20 +31,22 @@ use std::{
     time::{Duration, Instant},
 };
 
+// TODO: Go through the existing tests, identify any gaps, and clean up the rest.
+
 #[tokio::test]
-async fn test_full_node_bootstrap_state_snapshot() {
-    // Test snapshot (fast) syncing in the presence of epoch changes
-    perform_full_node_bootstrap_state_snapshot(true).await;
+async fn test_fullnode_fast_sync_epoch_changes() {
+    // Test fast syncing in the presence of epoch changes
+    test_fullnode_fast_sync(true).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_state_snapshot_genesis() {
-    // Test snapshot (fast) syncing without epoch changes
-    perform_full_node_bootstrap_state_snapshot(false).await;
+async fn test_fullnode_fast_sync_no_epoch_changes() {
+    // Test fast syncing without epoch changes
+    test_fullnode_fast_sync(false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_outputs() {
+async fn test_fullnode_output_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -58,15 +60,13 @@ async fn test_full_node_bootstrap_outputs() {
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
     vfn_config.state_sync.aptos_data_client.use_compression = true;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, true, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_outputs_no_compression() {
+async fn test_fullnode_output_sync_no_compression() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -80,15 +80,13 @@ async fn test_full_node_bootstrap_outputs_no_compression() {
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
     vfn_config.state_sync.aptos_data_client.use_compression = false;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, true, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_outputs_exponential_backoff() {
+async fn test_fullnode_output_sync_exponential_backoff() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -102,15 +100,13 @@ async fn test_full_node_bootstrap_outputs_exponential_backoff() {
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, true, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_transactions_or_outputs() {
+async fn test_fullnode_intelligent_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node with a small network limit
     let mut swarm = SwarmBuilder::new_local(1)
         .with_aptos()
@@ -134,15 +130,13 @@ async fn test_full_node_bootstrap_transactions_or_outputs() {
         .max_num_output_reductions = 1;
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, true, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_snapshot_transactions_or_outputs() {
+async fn test_fullnode_fast_and_intelligent_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node with a small network limit
     let mut swarm = SwarmBuilder::new_local(1)
         .with_aptos()
@@ -152,7 +146,7 @@ async fn test_full_node_bootstrap_snapshot_transactions_or_outputs() {
         .build()
         .await;
 
-    // Create a fullnode config that uses snapshot syncing and transactions or outputs
+    // Create a fullnode config that uses fast and intelligent syncing
     let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
@@ -166,15 +160,13 @@ async fn test_full_node_bootstrap_snapshot_transactions_or_outputs() {
         .max_num_output_reductions = 2;
     vfn_config.state_sync.aptos_data_client.response_timeout_ms = 1;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, true, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_bootstrap_transactions() {
+async fn test_fullnode_execution_sync_epoch_changes() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -188,15 +180,13 @@ async fn test_full_node_bootstrap_transactions() {
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
     vfn_config.state_sync.aptos_data_client.use_compression = true;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, true, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, true, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_continuous_sync_outputs() {
+async fn test_fullnode_output_sync_no_epoch_changes() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -207,15 +197,13 @@ async fn test_full_node_continuous_sync_outputs() {
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, false, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
 }
 
 #[tokio::test]
-async fn test_full_node_continuous_sync_transactions() {
+async fn test_fullnode_execution_sync_no_epoch_changes() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -226,15 +214,13 @@ async fn test_full_node_continuous_sync_transactions() {
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
 
-    // Create the fullnode
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-
-    // Test the ability of the fullnode to sync
-    test_full_node_sync(vfn_peer_id, &mut swarm, false, false).await;
+    // Create the fullnode and test its ability to sync
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, false, false).await;
 }
 
 #[tokio::test]
-async fn test_single_validator_failure() {
+async fn test_single_validator_reboot() {
     // Create a swarm of 1 validator
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -261,7 +247,7 @@ async fn test_single_validator_failure() {
         .unwrap();
 
     // Execute more transactions
-    execute_transactions(
+    execute_transactions_and_wait(
         &mut swarm,
         &validator_client,
         &mut account_1,
@@ -272,7 +258,7 @@ async fn test_single_validator_failure() {
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_outputs() {
+async fn test_validator_output_sync_epoch_changes() {
     // Create a swarm of 4 validators using output syncing
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -285,37 +271,37 @@ async fn test_validator_bootstrap_outputs() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_default() {
+async fn test_validator_sync_and_participate_epoch_changes() {
     // Test the default syncing method with epoch changes
     test_validator_sync_and_participate(false, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_default_no_epoch_changes() {
+async fn test_validator_sync_and_participate_no_epoch_changes() {
     // Test the default syncing method without epoch changes
     test_validator_sync_and_participate(false, false).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot() {
-    // Test snapshot (fast) syncing with epoch changes
+async fn test_validator_fast_sync_and_participate_epoch_changes() {
+    // Test fast syncing with epoch changes
     test_validator_sync_and_participate(true, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot_genesis() {
-    // Test snapshot (fast) syncing without epoch changes
+async fn test_validator_fast_sync_and_participate_no_epoch_changes() {
+    // Test fast syncing without epoch changes
     test_validator_sync_and_participate(true, false).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_bootstrap_outputs_network_limit() {
+async fn test_validator_output_sync_small_network_limit() {
     // Create a swarm of 4 validators using output syncing and an aggressive network limit
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -329,13 +315,13 @@ async fn test_validator_bootstrap_outputs_network_limit() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_bootstrap_outputs_network_limit_tiny() {
+async fn test_validator_output_sync_unrealistic_network_limit() {
     // Create a swarm of 4 validators using output syncing and an unrealistic network limit.
     // This forces all chunks to be of size 1.
     let mut swarm = SwarmBuilder::new_local(4)
@@ -350,13 +336,13 @@ async fn test_validator_bootstrap_outputs_network_limit_tiny() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot_no_compression() {
-    // Create a swarm of 4 validators using state snapshot syncing
+async fn test_validator_fast_sync_no_compression() {
+    // Create a swarm of 4 validators using fast syncing and no compression
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -369,14 +355,14 @@ async fn test_validator_bootstrap_state_snapshot_no_compression() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot_network_limit() {
-    // Create a swarm of 4 validators using state snapshot syncing and an aggressive network limit
+async fn test_validator_fast_sync_small_network_limit() {
+    // Create a swarm of 4 validators using fast sync and an aggressive network limit
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -389,14 +375,14 @@ async fn test_validator_bootstrap_state_snapshot_network_limit() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot_network_limit_tiny() {
-    // Create a swarm of 4 validators using state snapshot syncing and an unrealistic network limit.
+async fn test_validator_fast_sync_unrealistic_network_limit() {
+    // Create a swarm of 4 validators using fast sync and an unrealistic network limit.
     // This forces all chunks to be of size 1.
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -410,24 +396,24 @@ async fn test_validator_bootstrap_state_snapshot_network_limit_tiny() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot_exponential_backoff() {
-    // Test snapshot (fast) syncing with exponential backoff and epoch changes
-    perform_validator_bootstrap_state_snapshot_exponential_backoff(true).await;
+async fn test_validator_fast_sync_exponential_backoff_epoch_changes() {
+    // Test fast syncing with exponential backoff and epoch changes
+    test_validator_sync_exponential_backoff(true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_state_snapshot_exponential_backoff_genesis() {
-    // Test snapshot (fast) syncing without exponential backoff and epoch changes
-    perform_validator_bootstrap_state_snapshot_exponential_backoff(false).await;
+async fn test_validator_fast_sync_exponential_backoff_no_epoch_changes() {
+    // Test fast syncing without exponential backoff and no epoch changes
+    test_validator_sync_exponential_backoff(false).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_transactions() {
+async fn test_validator_execution_sync_epoch_changes() {
     // Create a swarm of 4 validators using transaction syncing
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -440,12 +426,12 @@ async fn test_validator_bootstrap_transactions() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_transactions_or_outputs() {
+async fn test_validator_intelligent_sync_epoch_changes() {
     // Create a swarm of 4 validators using transaction or output syncing
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -464,13 +450,13 @@ async fn test_validator_bootstrap_transactions_or_outputs() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_bootstrap_transactions_network_limit() {
+async fn test_validator_execution_sync_small_network_limits() {
     // Create a swarm of 4 validators using transaction syncing and an aggressive network limit
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -484,13 +470,13 @@ async fn test_validator_bootstrap_transactions_network_limit() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_bootstrap_transactions_network_limit_tiny() {
+async fn test_validator_execution_sync_unrealistic_network_limits() {
     // Create a swarm of 4 validators using transaction syncing and an unrealistic network limit.
     // This forces all chunks to be of size 1.
     let mut swarm = SwarmBuilder::new_local(4)
@@ -505,12 +491,12 @@ async fn test_validator_bootstrap_transactions_network_limit_tiny() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_outputs_network_exponential_backoff() {
+async fn test_validator_output_sync_exponential_backoff() {
     // Create a swarm of 4 validators using output syncing and a small response timeout
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -524,12 +510,12 @@ async fn test_validator_bootstrap_outputs_network_exponential_backoff() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[tokio::test]
-async fn test_validator_bootstrap_transactions_no_compression() {
+async fn test_validator_execution_sync_no_compression() {
     // Create a swarm of 4 validators using transaction syncing and no compression
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -543,14 +529,14 @@ async fn test_validator_bootstrap_transactions_no_compression() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, true).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_failure_bootstrap_outputs() {
-    // Create a swarm of 4 validators with state snapshot bootstrapping and output syncing
+async fn test_all_validators_fast_and_output_sync() {
+    // Create a swarm of 4 validators with fast and output syncing
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -562,14 +548,14 @@ async fn test_validator_failure_bootstrap_outputs() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of all validators to sync
     test_all_validator_failures(swarm).await;
 }
 
 #[ignore] // Ignore this test because it takes a long time. But, it works so it shouldn't be removed.
 #[tokio::test]
-async fn test_validator_failure_bootstrap_execution() {
-    // Create a swarm of 4 validators with state snapshot bootstrapping and transaction syncing
+async fn test_all_validators_fast_and_execution_sync() {
+    // Create a swarm of 4 validators with fast and execution syncing
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -581,12 +567,12 @@ async fn test_validator_failure_bootstrap_execution() {
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of all validators to sync
     test_all_validator_failures(swarm).await;
 }
 
 /// Creates a new full node using the given config and swarm
-async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) -> PeerId {
+async fn create_fullnode(full_node_config: NodeConfig, swarm: &mut LocalSwarm) -> PeerId {
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm
         .add_validator_fullnode(
@@ -607,7 +593,7 @@ async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) 
 /// A test method that verifies that a fullnode can fast sync from
 /// a validator after a data wipe. If `epoch_changes` are enabled
 /// then epoch changes can occur during test execution and fullnode syncing.
-async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
+async fn test_fullnode_fast_sync(epoch_changes: bool) {
     // Create a swarm with 2 validators
     let mut swarm = SwarmBuilder::new_local(2)
         .with_aptos()
@@ -626,14 +612,14 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
         verify_fast_sync_version_and_metrics(validator, true).await;
     }
 
-    // Create a fullnode config that uses snapshot syncing
+    // Create a fullnode config that uses fast syncing
     let mut vfn_config = NodeConfig::get_default_vfn_config();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
 
     // Test the ability of a fullnode to sync
-    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
-    test_full_node_sync(vfn_peer_id, &mut swarm, epoch_changes, true).await;
+    let vfn_peer_id = create_fullnode(vfn_config, &mut swarm).await;
+    test_fullnode_sync(vfn_peer_id, &mut swarm, epoch_changes, true).await;
 
     // Verify the oldest ledger info and pruning metrics for the fullnode
     if epoch_changes {
@@ -646,8 +632,8 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
 /// validators after a data wipe and while requiring exponential backoff.
 /// If `epoch_changes` are enabled then epoch changes can occur during
 /// test execution and validator syncing.
-async fn perform_validator_bootstrap_state_snapshot_exponential_backoff(epoch_changes: bool) {
-    // Create a swarm of 4 validators using state snapshot syncing and a small response timeout
+async fn test_validator_sync_exponential_backoff(epoch_changes: bool) {
+    // Create a swarm of 4 validators using fast sync and a small response timeout
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()
         .with_init_config(Arc::new(|_, config, _| {
@@ -664,13 +650,13 @@ async fn perform_validator_bootstrap_state_snapshot_exponential_backoff(epoch_ch
         .build()
         .await;
 
-    // Test the ability of the validators to sync
+    // Test the ability of the validator to sync
     test_validator_sync(&mut swarm, 1, epoch_changes).await;
 }
 
 /// A helper method that tests that a full node can sync from a validator after
 /// a failure and continue to stay up-to-date.
-async fn test_full_node_sync(
+async fn test_fullnode_sync(
     vfn_peer_id: PeerId,
     swarm: &mut LocalSwarm,
     epoch_changes: bool,
@@ -772,7 +758,7 @@ async fn test_validator_sync(
 /// A test method that verifies that a validator can sync after a data wipe
 /// and begin to participate in consensus. If `epoch_changes` are enabled
 /// then epoch changes can occur during test execution and validator syncing.
-/// If `fast_sync` is true, then the validator will use snapshot (fast)
+/// If `fast_sync` is true, then the validator will use fast (snapshot)
 /// syncing. Otherwise, it will use the default syncing method.
 async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: bool) {
     // Create a swarm of 4 validators
