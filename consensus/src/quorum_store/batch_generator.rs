@@ -271,13 +271,7 @@ impl BatchGenerator {
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
                 // TODO: pass the actual BTreeMap
-                self.txns_in_progress_sorted
-                    .iter()
-                    .map(|(summary, info)| TransactionInProgress {
-                        summary: *summary,
-                        gas_unit_price: info.gas_unit_price(),
-                    })
-                    .collect(),
+                self.txns_in_progress_sorted.clone(),
             )
             .await
             .unwrap_or_default();

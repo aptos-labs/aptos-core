@@ -4,7 +4,7 @@
 use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, TransactionInProgress, TransactionSummary},
+    common::{Payload, PayloadFilter, TransactionInfo, TransactionSummary},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
@@ -17,7 +17,10 @@ use futures::{
     },
     StreamExt,
 };
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeMap,
+    time::{Duration, Instant},
+};
 use tokio::time::timeout;
 
 pub struct DirectMempoolQuorumStore {
@@ -47,12 +50,9 @@ impl DirectMempoolQuorumStore {
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let exclude_txns: Vec<_> = exclude_txns
-            .iter()
-            .map(|txn| TransactionInProgress {
-                summary: *txn,
-                gas_unit_price: 0,
-            })
+        let exclude_txns: BTreeMap<_, _> = exclude_txns
+            .into_iter()
+            .map(|txn| (txn, TransactionInfo::new(0)))
             .collect();
         let msg = QuorumStoreRequest::GetBatchRequest(
             max_items,

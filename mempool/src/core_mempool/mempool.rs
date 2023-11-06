@@ -15,7 +15,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
-use aptos_consensus_types::common::TransactionInProgress;
+use aptos_consensus_types::common::{TransactionInfo, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -25,7 +25,7 @@ use aptos_types::{
     vm_status::DiscardedVMStatus,
 };
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -234,19 +234,17 @@ impl Mempool {
         max_bytes: u64,
         return_non_full: bool,
         include_gas_upgraded: bool,
-        exclude_transactions_sorted: Vec<TransactionInProgress>,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInfo>,
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
-        let exclude_size = exclude_transactions_sorted.len();
+        let exclude_size = exclude_transactions.len();
         let mut seen = HashMap::new();
         let mut upgraded = HashSet::new();
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
             for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns() {
-                if let Ok(index) = exclude_transactions_sorted
-                    .binary_search_by_key(txn_pointer, |txn_in_progress| txn_in_progress.summary)
-                {
-                    if *new_gas > exclude_transactions_sorted[index].gas_unit_price {
+                if let Some(txn_info) = exclude_transactions.get(txn_pointer) {
+                    if *new_gas > txn_info.gas_unit_price() {
                         upgraded.insert(txn_pointer);
                     }
                 }
@@ -271,11 +269,7 @@ impl Mempool {
             let txn_pointer = TxnPointer::from(txn);
             if seen.contains_key(&txn_pointer)
                 || (!upgraded.contains(&txn_pointer)
-                    && exclude_transactions_sorted
-                        .binary_search_by_key(&txn_pointer, |txn_in_progress| {
-                            txn_in_progress.summary
-                        })
-                        .is_ok())
+                    && exclude_transactions.get(&txn_pointer).is_some())
             {
                 continue;
             }
@@ -288,11 +282,7 @@ impl Mempool {
                     let prev_pointer = TxnPointer::new(txn.address, tx_seq - 1);
                     seen.contains_key(&prev_pointer)
                         || (!upgraded.contains(&prev_pointer)
-                            && exclude_transactions_sorted
-                                .binary_search_by_key(&prev_pointer, |txn_in_progress| {
-                                    txn_in_progress.summary
-                                })
-                                .is_ok())
+                            && exclude_transactions.get(&prev_pointer).is_some())
                 }
             };
             // include transaction if it's "next" for given account or

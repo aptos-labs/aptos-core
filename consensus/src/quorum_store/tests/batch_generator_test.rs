@@ -11,7 +11,10 @@ use crate::quorum_store::{
     },
 };
 use aptos_config::config::QuorumStoreConfig;
-use aptos_consensus_types::{common::TransactionInProgress, proof_of_store::BatchId};
+use aptos_consensus_types::{
+    common::{TransactionInfo, TransactionSummary},
+    proof_of_store::BatchId,
+};
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
 use futures::{
@@ -19,7 +22,7 @@ use futures::{
     StreamExt,
 };
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
 #[allow(clippy::needless_collect)]
@@ -27,7 +30,7 @@ async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
     max_size: usize,
     quorum_store_to_mempool_receiver: &mut Receiver<QuorumStoreRequest>,
-) -> Vec<TransactionInProgress> {
+) -> BTreeMap<TransactionSummary, TransactionInfo> {
     if let QuorumStoreRequest::GetBatchRequest(
         _max_batch_size,
         _max_bytes,
