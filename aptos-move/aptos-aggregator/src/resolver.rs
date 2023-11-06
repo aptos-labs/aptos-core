@@ -196,6 +196,12 @@ pub trait TDelayedFieldView {
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>;
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError>;
 }
 
 pub trait DelayedFieldResolver:
@@ -269,5 +275,13 @@ where
     ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
     {
         unimplemented!("get_reads_needing_exchange not implemented")
+    }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        unimplemented!("get_group_reads_needing_exchange not implemented")
     }
 }

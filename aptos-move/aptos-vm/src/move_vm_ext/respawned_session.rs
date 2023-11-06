@@ -40,7 +40,7 @@ use move_core_types::{
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
@@ -261,6 +261,15 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         self.base_executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        self.base_executor_view
+            .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
 }
 
 impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
@@ -297,7 +306,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        // TODO: resource_group_write_set also contains a layout. What to do with it?
+        // TODO[agg_v2](test): resource_group_write_set also contains a layout. What to do with it?
         if let Some((write_op, _layout)) = self
             .change_set
             .resource_group_write_set()
@@ -312,6 +321,12 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 maybe_layout,
             )
         }
+    }
+
+    fn release_group_cache(
+        &self,
+    ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
+        unreachable!("Must not be called by RespawnedSession finish");
     }
 }
 
@@ -467,8 +482,7 @@ mod test {
                 key("resource_group_both"),
                 GroupWrite::new(
                     WriteOp::Deletion,
-                    0,
-                    BTreeMap::from([
+                    vec![
                         (
                             mock_tag_0(),
                             (WriteOp::Modification(serialize(&1000).into()), None),
@@ -477,18 +491,19 @@ mod test {
                             mock_tag_2(),
                             (WriteOp::Modification(serialize(&300).into()), None),
                         ),
-                    ]),
+                    ],
+                    0,
                 ),
             ),
             (
                 key("resource_group_write_set"),
                 GroupWrite::new(
                     WriteOp::Deletion,
-                    0,
-                    BTreeMap::from([(
+                    vec![(
                         mock_tag_1(),
                         (WriteOp::Modification(serialize(&5000).into()), None),
-                    )]),
+                    )],
+                    0,
                 ),
             ),
         ]);
@@ -499,6 +514,7 @@ mod test {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
+            BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
             vec![],

@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, MVModulesOutput},
+    types::{GroupReadResult, MVModulesOutput, UnsetOrLayout},
     utils::module_hash,
 };
-use anyhow::bail;
 use aptos_aggregator::types::DelayedFieldValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
-    write_set::{TransactionWrite, WriteOpKind},
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_core_types::value::MoveTypeLayout;
@@ -32,7 +31,7 @@ pub struct UnsyncMap<
     // simplifies the trait-based integration for executable caching. TODO: better representation.
     // Optional hash can store the hash of the module to avoid re-computations.
     map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>, Option<Arc<MoveTypeLayout>>)>>,
-    group_cache: RefCell<HashMap<K, HashMap<T, Arc<V>>>>,
+    group_cache: RefCell<HashMap<K, RefCell<HashMap<T, (Arc<V>, UnsetOrLayout)>>>>,
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
@@ -72,17 +71,19 @@ impl<
     pub fn set_group_base_values(
         &self,
         group_key: K,
-        base_values: impl IntoIterator<Item = (T, V)>,
+        base_values: impl IntoIterator<Item = (T, (V, UnsetOrLayout))>,
     ) {
         assert!(
             self.group_cache
                 .borrow_mut()
                 .insert(
                     group_key,
-                    base_values
-                        .into_iter()
-                        .map(|(t, v)| (t, Arc::new(v)))
-                        .collect()
+                    RefCell::new(
+                        base_values
+                            .into_iter()
+                            .map(|(t, (v, maybe_layout))| (t, (Arc::new(v), maybe_layout)))
+                            .collect()
+                    )
                 )
                 .is_none(),
             "UnsyncMap group cache must be empty to provide base values"
@@ -93,46 +94,69 @@ impl<
         Ok(match self.group_cache.borrow().get(group_key) {
             Some(group_map) => GroupReadResult::Size(group_size_as_sum(
                 group_map
+                    .borrow()
                     .iter()
-                    .flat_map(|(t, v)| v.bytes().map(|bytes| (t, bytes))),
+                    .flat_map(|(t, (v, _))| v.bytes().map(|bytes| (t, bytes))),
             )?),
             None => GroupReadResult::Uninitialized,
         })
     }
 
-    pub fn get_value_from_group(&self, group_key: &K, value_tag: &T) -> GroupReadResult {
-        self.group_cache.borrow().get(group_key).map_or(
+    pub fn read_from_group(
+        &self,
+        group_key: &K,
+        value_tag: &T,
+        maybe_layout_input: Option<Arc<MoveTypeLayout>>,
+    ) -> GroupReadResult {
+        self.group_cache.borrow_mut().get(group_key).map_or(
             GroupReadResult::Uninitialized,
             |group_map| {
-                GroupReadResult::Value(
-                    group_map.get(value_tag).and_then(|v| v.extract_raw_bytes()),
-                    // TODO[agg_v2]: support layouts.
-                    None,
-                )
+                group_map
+                    .borrow_mut()
+                    .get_mut(value_tag)
+                    .map(|(v, maybe_layout)| {
+                        if let UnsetOrLayout::Set(maybe_layout) = maybe_layout {
+                            GroupReadResult::Value(v.extract_raw_bytes(), maybe_layout.clone())
+                        } else {
+                            *maybe_layout = UnsetOrLayout::Set(maybe_layout_input.clone());
+                            GroupReadResult::Value(v.extract_raw_bytes(), maybe_layout_input)
+                        }
+                    })
+                    .unwrap_or(GroupReadResult::Value(None, None))
             },
         )
     }
 
     /// Contains the latest group ops for the given group key.
-    pub fn finalize_group(&self, group_key: &K) -> Vec<(T, Arc<V>)> {
+    pub fn finalize_group(&self, group_key: &K) -> Vec<(T, (Arc<V>, Option<Arc<MoveTypeLayout>>))> {
         self.group_cache
             .borrow()
             .get(group_key)
             .expect("Resource group must be cached")
+            .borrow()
             .clone()
             .into_iter()
+            .map(|(tag, (v, maybe_layout))| (tag, (v, maybe_layout.convert_unset_to_none())))
             .collect()
     }
 
-    pub fn insert_group_op(&self, group_key: &K, value_tag: T, v: V) -> anyhow::Result<()> {
+    pub fn insert_group_op(
+        &self,
+        group_key: &K,
+        value_tag: T,
+        v: V,
+        maybe_layout: Option<Arc<MoveTypeLayout>>,
+    ) -> anyhow::Result<()> {
+        use anyhow::bail;
+        use aptos_types::write_set::WriteOpKind::*;
         use std::collections::hash_map::Entry::*;
-        use WriteOpKind::*;
 
         match (
             self.group_cache
                 .borrow_mut()
                 .get_mut(group_key)
                 .expect("Resource group must be cached")
+                .borrow_mut()
                 .entry(value_tag.clone()),
             v.write_op_kind(),
         ) {
@@ -140,10 +164,10 @@ impl<
                 entry.remove();
             },
             (Occupied(mut entry), Modification) => {
-                entry.insert(Arc::new(v));
+                entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
             },
             (Vacant(entry), Creation) => {
-                entry.insert(Arc::new(v));
+                entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
             },
             (_, _) => {
                 bail!(
@@ -162,6 +186,24 @@ impl<
             .borrow()
             .get(key)
             .map(|entry| (entry.0.clone(), entry.2.clone()))
+    }
+
+    pub fn fetch_group_data(
+        &self,
+        key: &K,
+    ) -> Option<Vec<(Arc<T>, (Arc<V>, Option<Arc<MoveTypeLayout>>))>> {
+        self.group_cache.borrow().get(key).map(|group_map| {
+            group_map
+                .borrow()
+                .iter()
+                .map(|(tag, value)| {
+                    (
+                        Arc::new(tag.clone()),
+                        (value.0.clone(), value.1.clone().convert_unset_to_none()),
+                    )
+                })
+                .collect()
+        })
     }
 
     pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<V, X>> {
@@ -226,10 +268,11 @@ mod test {
     fn finalize_group_as_hashmap(
         map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
         key: &KeyType<Vec<u8>>,
-    ) -> HashMap<usize, Arc<TestValue>> {
+    ) -> HashMap<usize, (Arc<TestValue>, Option<Arc<MoveTypeLayout>>)> {
         map.finalize_group(key).into_iter().collect()
     }
 
+    // TODO[agg_v2](test) Add tests with non trivial layout
     #[test]
     fn group_commit_idx() {
         let ap = KeyType(b"/foo/f".to_vec());
@@ -238,76 +281,82 @@ mod test {
         map.set_group_base_values(
             ap.clone(),
             // base tag 1, 2, 3
-            (1..4).map(|i| (i, TestValue::with_kind(i, true))),
+            (1..4).map(|i| (i, (TestValue::with_kind(i, true), UnsetOrLayout::Set(None)))),
         );
-        assert_ok!(map.insert_group_op(&ap, 2, TestValue::with_kind(202, false)));
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(203, false)));
+        assert_ok!(map.insert_group_op(&ap, 2, TestValue::with_kind(202, false), None));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(203, false), None));
         let committed = finalize_group_as_hashmap(&map, &ap);
 
         // // The value at tag 1 is from base, while 2 and 3 are from txn 3.
         // // (Arc compares with value equality)
         assert_eq!(committed.len(), 3);
-        assert_some_eq!(committed.get(&1), &Arc::new(TestValue::with_kind(1, true)));
+        assert_some_eq!(
+            committed.get(&1),
+            &(Arc::new(TestValue::with_kind(1, true)), None)
+        );
         assert_some_eq!(
             committed.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed.get(&3),
-            &Arc::new(TestValue::with_kind(203, false))
+            &(Arc::new(TestValue::with_kind(203, false)), None)
         );
 
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(303, false)));
-        assert_ok!(map.insert_group_op(&ap, 4, TestValue::with_kind(304, true)));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(303, false), None));
+        assert_ok!(map.insert_group_op(&ap, 4, TestValue::with_kind(304, true), None));
         let committed = finalize_group_as_hashmap(&map, &ap);
         assert_eq!(committed.len(), 4);
-        assert_some_eq!(committed.get(&1), &Arc::new(TestValue::with_kind(1, true)));
+        assert_some_eq!(
+            committed.get(&1),
+            &(Arc::new(TestValue::with_kind(1, true)), None)
+        );
         assert_some_eq!(
             committed.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed.get(&3),
-            &Arc::new(TestValue::with_kind(303, false))
+            &(Arc::new(TestValue::with_kind(303, false)), None)
         );
         assert_some_eq!(
             committed.get(&4),
-            &Arc::new(TestValue::with_kind(304, true))
+            &(Arc::new(TestValue::with_kind(304, true)), None)
         );
 
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::with_kind(100, true)));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion()));
-        assert_err!(map.insert_group_op(&ap, 1, TestValue::deletion()));
+        assert_ok!(map.insert_group_op(&ap, 0, TestValue::with_kind(100, true), None));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
+        assert_err!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
         let committed = finalize_group_as_hashmap(&map, &ap);
         assert_eq!(committed.len(), 4);
         assert_some_eq!(
             committed.get(&0),
-            &Arc::new(TestValue::with_kind(100, true))
+            &(Arc::new(TestValue::with_kind(100, true)), None)
         );
         assert_none!(committed.get(&1));
         assert_some_eq!(
             committed.get(&2),
-            &Arc::new(TestValue::with_kind(202, false))
+            &(Arc::new(TestValue::with_kind(202, false)), None)
         );
         assert_some_eq!(
             committed.get(&3),
-            &Arc::new(TestValue::with_kind(303, false))
+            &(Arc::new(TestValue::with_kind(303, false)), None)
         );
         assert_some_eq!(
             committed.get(&4),
-            &Arc::new(TestValue::with_kind(304, true))
+            &(Arc::new(TestValue::with_kind(304, true)), None)
         );
 
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::deletion()));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::with_kind(400, true)));
-        assert_ok!(map.insert_group_op(&ap, 2, TestValue::deletion()));
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::deletion()));
-        assert_ok!(map.insert_group_op(&ap, 4, TestValue::deletion()));
+        assert_ok!(map.insert_group_op(&ap, 0, TestValue::deletion(), None));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::with_kind(400, true), None));
+        assert_ok!(map.insert_group_op(&ap, 2, TestValue::deletion(), None));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::deletion(), None));
+        assert_ok!(map.insert_group_op(&ap, 4, TestValue::deletion(), None));
         let committed = finalize_group_as_hashmap(&map, &ap);
         assert_eq!(committed.len(), 1);
         assert_some_eq!(
             committed.get(&1),
-            &Arc::new(TestValue::with_kind(400, true))
+            &(Arc::new(TestValue::with_kind(400, true)), None)
         );
     }
 
@@ -319,11 +368,11 @@ mod test {
 
         map.set_group_base_values(
             ap.clone(),
-            (1..4).map(|i| (i, TestValue::with_kind(i, true))),
+            (1..4).map(|i| (i, (TestValue::with_kind(i, true), UnsetOrLayout::Set(None)))),
         );
         map.set_group_base_values(
             ap.clone(),
-            (1..4).map(|i| (i, TestValue::with_kind(i, true))),
+            (1..4).map(|i| (i, (TestValue::with_kind(i, true), UnsetOrLayout::Set(None)))),
         );
     }
 
@@ -333,7 +382,7 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true)));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::with_kind(10, true), None));
     }
 
     #[should_panic]
@@ -355,7 +404,12 @@ mod test {
         map.set_group_base_values(
             ap.clone(),
             // base tag 1, 2, 3, 4
-            (1..5).map(|i| (i, TestValue::creation_with_len(1))),
+            (1..5).map(|i| {
+                (
+                    i,
+                    (TestValue::creation_with_len(1), UnsetOrLayout::Set(None)),
+                )
+            }),
         );
 
         let tag: usize = 5;
@@ -371,26 +425,26 @@ mod test {
             GroupReadResult::Size(exp_size as u64)
         );
 
-        assert_err!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(2)));
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::creation_with_len(2)));
-        assert_err!(map.insert_group_op(&ap, 1, TestValue::creation_with_len(2)));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(2)));
+        assert_err!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(2), None));
+        assert_ok!(map.insert_group_op(&ap, 0, TestValue::creation_with_len(2), None));
+        assert_err!(map.insert_group_op(&ap, 1, TestValue::creation_with_len(2), None));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(2), None));
         let exp_size = 2 * two_entry_len + 3 * one_entry_len + 5 * tag_len;
         assert_ok_eq!(
             map.get_group_size(&ap),
             GroupReadResult::Size(exp_size as u64)
         );
 
-        assert_ok!(map.insert_group_op(&ap, 4, TestValue::modification_with_len(3)));
-        assert_ok!(map.insert_group_op(&ap, 5, TestValue::creation_with_len(3)));
+        assert_ok!(map.insert_group_op(&ap, 4, TestValue::modification_with_len(3), None));
+        assert_ok!(map.insert_group_op(&ap, 5, TestValue::creation_with_len(3), None));
         let exp_size = exp_size + 2 * three_entry_len + tag_len - one_entry_len;
         assert_ok_eq!(
             map.get_group_size(&ap),
             GroupReadResult::Size(exp_size as u64)
         );
 
-        assert_ok!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(4)));
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(4)));
+        assert_ok!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(4), None));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(4), None));
         let exp_size = 2 * four_entry_len + 2 * three_entry_len + 2 * one_entry_len + 6 * tag_len;
         assert_ok_eq!(
             map.get_group_size(&ap),
@@ -404,59 +458,64 @@ mod test {
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
         assert_eq!(
-            map.get_value_from_group(&ap, &1),
+            map.read_from_group(&ap, &1, None),
             GroupReadResult::Uninitialized
         );
 
         map.set_group_base_values(
             ap.clone(),
             // base tag 1, 2, 3, 4
-            (1..5).map(|i| (i, TestValue::creation_with_len(i))),
+            (1..5).map(|i| {
+                (
+                    i,
+                    (TestValue::creation_with_len(i), UnsetOrLayout::Set(None)),
+                )
+            }),
         );
 
         for i in 1..5 {
             assert_eq!(
-                map.get_value_from_group(&ap, &i),
+                map.read_from_group(&ap, &i, None),
                 GroupReadResult::Value(TestValue::creation_with_len(i).bytes().cloned(), None)
             )
         }
         assert_eq!(
-            map.get_value_from_group(&ap, &0),
+            map.read_from_group(&ap, &0, None),
             GroupReadResult::Value(None, None)
         );
         assert_eq!(
-            map.get_value_from_group(&ap, &6),
+            map.read_from_group(&ap, &6, None),
             GroupReadResult::Value(None, None)
         );
 
-        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion()));
-        assert_ok!(map.insert_group_op(&ap, 3, TestValue::modification_with_len(8)));
-        assert_ok!(map.insert_group_op(&ap, 6, TestValue::creation_with_len(9)));
+        assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
+        assert_ok!(map.insert_group_op(&ap, 3, TestValue::modification_with_len(8), None));
+        assert_ok!(map.insert_group_op(&ap, 6, TestValue::creation_with_len(9), None));
 
         assert_eq!(
-            map.get_value_from_group(&ap, &1),
+            map.read_from_group(&ap, &1, None),
             GroupReadResult::Value(None, None)
         );
         assert_eq!(
-            map.get_value_from_group(&ap, &3),
+            map.read_from_group(&ap, &3, None),
             GroupReadResult::Value(TestValue::creation_with_len(8).bytes().cloned(), None)
         );
         assert_eq!(
-            map.get_value_from_group(&ap, &6),
+            map.read_from_group(&ap, &6, None),
             GroupReadResult::Value(TestValue::creation_with_len(9).bytes().cloned(), None)
         );
 
         // others unaffected.
         assert_eq!(
-            map.get_value_from_group(&ap, &0),
+            map.read_from_group(&ap, &0, None),
             GroupReadResult::Value(None, None)
         );
         assert_eq!(
-            map.get_value_from_group(&ap, &2),
+            map.read_from_group(&ap, &2, None),
             GroupReadResult::Value(TestValue::creation_with_len(2).bytes().cloned(), None)
         );
         assert_eq!(
-            map.get_value_from_group(&ap, &4),
+            map.read_from_group(&ap, &4, None),
             GroupReadResult::Value(TestValue::creation_with_len(4).bytes().cloned(), None)
         );
     }

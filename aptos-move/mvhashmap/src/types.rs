@@ -169,6 +169,26 @@ impl ShiftedTxnIndex {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum UnsetOrLayout {
+    // When the group is initialized, but the resource in the group is not read,
+    // the resource's type layout is unset
+    Unset,
+    // When the resource in the group is read and the tyep layout for the resource is set.
+    // The type layout is Some if there is a delayed field in the resource.
+    // The type layout is None if there is no delayed field in the resource.
+    Set(Option<Arc<MoveTypeLayout>>),
+}
+
+impl UnsetOrLayout {
+    pub fn convert_unset_to_none(&self) -> Option<Arc<MoveTypeLayout>> {
+        match self {
+            UnsetOrLayout::Unset => None,
+            UnsetOrLayout::Set(layout) => layout.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test {
     use super::*;

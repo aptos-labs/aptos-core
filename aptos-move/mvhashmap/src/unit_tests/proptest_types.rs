@@ -6,6 +6,7 @@ use super::{
     types::{test::KeyType, MVDataError, MVDataOutput, MVGroupError, TxnIndex},
     MVHashMap,
 };
+use crate::types::UnsetOrLayout;
 use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp};
 use aptos_types::{
     executable::ExecutableTestType,
@@ -247,8 +248,10 @@ where
         let value = Value::new(None);
         let idx = idx as TxnIndex;
         if test_group {
-            map.group_data()
-                .write(key.clone(), idx, 0, vec![(5, value)]);
+            map.group_data().write(key.clone(), idx, 0, vec![(
+                5,
+                (value, UnsetOrLayout::Set(None)),
+            )]);
             map.group_data().mark_estimate(&key, idx);
         } else {
             map.data().write(key.clone(), idx, 0, (value, None));
@@ -287,10 +290,11 @@ where
                         let mut retry_attempts = 0;
                         loop {
                             if test_group {
-                                match map.group_data().read_from_group(
+                                match map.group_data.read_from_group(
                                     &KeyType(key.clone()),
                                     &5,
                                     idx as TxnIndex,
+                                    UnsetOrLayout::Set(None),
                                 ) {
                                     Ok((_, v, _)) => {
                                         assert_value(v);
@@ -352,8 +356,10 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(None);
                         if test_group {
-                            map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                            map.group_data().write(key, idx as TxnIndex, 1, vec![(
+                                5,
+                                (value, UnsetOrLayout::Set(None)),
+                            )]);
                         } else {
                             map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
@@ -362,8 +368,10 @@ where
                         let key = KeyType(key.clone());
                         let value = Value::new(Some(v.clone()));
                         if test_group {
-                            map.group_data()
-                                .write(key, idx as TxnIndex, 1, vec![(5, value)]);
+                            map.group_data().write(key, idx as TxnIndex, 1, vec![(
+                                5,
+                                (value, UnsetOrLayout::Set(None)),
+                            )]);
                         } else {
                             map.data().write(key, idx as TxnIndex, 1, (value, None));
                         }
@@ -378,6 +386,7 @@ where
             })
         }
     });
+
     Ok(())
 }
 

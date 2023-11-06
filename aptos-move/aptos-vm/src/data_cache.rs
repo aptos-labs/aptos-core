@@ -336,6 +336,15 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         self.executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
+
+    fn get_group_reads_needing_exchange(
+        &self,
+        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        skip: &HashSet<Self::ResourceKey>,
+    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        self.executor_view
+            .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
+    }
 }
 
 impl<'e, E: ExecutorView> ConfigStorage for StorageAdapter<'e, E> {
@@ -399,14 +408,6 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     ) -> anyhow::Result<Option<StateValueMetadataKind>> {
         self.executor_view
             .get_resource_state_value_metadata(state_key)
-    }
-
-    fn get_resource_group_state_value_metadata(
-        &self,
-        _state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
-        // TODO[agg_v2](fix): forward to self.executor_view.
-        unimplemented!("Resource group metadata handling not yet implemented");
     }
 }
 

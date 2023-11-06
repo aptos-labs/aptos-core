@@ -12,7 +12,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        Version,
+        UnsetOrLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -154,11 +154,11 @@ impl<V: TransactionWrite> DataRead<V> {
 /// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-struct GroupRead<T: Transaction> {
+pub(crate) struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
-    collected_size: Option<u64>,
+    pub(crate) collected_size: Option<u64>,
     /// Reads to individual resources in the group, keyed by a tag.
-    inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
+    pub(crate) inner_reads: HashMap<T::Tag, DataRead<T::Value>>,
 }
 
 /// Defines different ways `DelayedFieldResolver` can be used to read its values
@@ -317,6 +317,21 @@ impl<T: Transaction> CapturedReads<T> {
         self.data_reads
             .iter()
             .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
+    }
+
+    // Return an iterator over the captured group reads
+    // that contain a delayed field
+    pub(crate) fn get_group_read_values_with_delayed_fields(
+        &self,
+    ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {
+        // TODO[agg_v2](optimize) - We could potentially filter out inner_reads
+        // to only contain those that have Some(layout)
+        self.group_reads.iter().filter(|(_, group_read)| {
+            group_read
+                .inner_reads
+                .iter()
+                .any(|(_, data_read)| matches!(data_read, DataRead::Versioned(_, _, Some(_))))
+        })
     }
 
     // Given a hashmap entry for a key, incorporate a new DataRead. This checks
@@ -564,7 +579,7 @@ impl<T: Transaction> CapturedReads<T> {
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                match group_map.read_from_group(key, tag, idx_to_validate) {
+                match group_map.read_from_group(key, tag, idx_to_validate, UnsetOrLayout::Unset) {
                     Ok((version, v, layout)) => {
                         matches!(
                             DataRead::Versioned(version, v, layout).contains(r),

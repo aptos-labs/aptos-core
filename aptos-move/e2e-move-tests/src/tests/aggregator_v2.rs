@@ -295,8 +295,7 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         Just(UseType::UseTableType),
-        // TODO[agg_v2](fix) add back once ResourceGroups are supported
-        // Just(UseType::UseResourceGroupType),
+        Just(UseType::UseResourceGroupType),
     ]
     .boxed()
 }
