@@ -37,6 +37,7 @@ use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::{ops::Deref, sync::Arc, time::Duration};
+use aptos_vm::counters::TIMER;
 
 pub struct ChunkOutput {
     /// Input transactions.
@@ -87,8 +88,13 @@ impl ChunkOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Self> {
         let state_view_arc = Arc::new(state_view);
+        let timer = TIMER
+            .with_label_values(&["partitioned_txns_clone"])
+            .start_timer();
+        let partitioned_txns_clone = transactions.clone();
+        drop(timer);
         let transaction_outputs = Self::execute_block_sharded::<V>(
-            transactions.clone(),
+            partitioned_txns_clone,
             state_view_arc.clone(),
             onchain_config,
         )?;
@@ -98,6 +104,9 @@ impl ChunkOutput {
         // Unwrapping here is safe because the execution has finished and it is guaranteed that
         // the state view is not used anymore.
         let state_view = Arc::try_unwrap(state_view_arc).unwrap();
+        let _timer = TIMER
+            .with_label_values(&["flatten_results"])
+            .start_timer();
         Ok(Self {
             transactions: PartitionedTransactions::flatten(transactions)
                 .into_iter()

@@ -30,6 +30,7 @@ use std::{
 use std::thread::JoinHandle;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
+use crate::metrics::REMOTE_EXECUTOR_TIMER;
 
 pub static COORDINATOR_PORT: u16 = 52200;
 
@@ -184,10 +185,17 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
 
         let results: Vec<(usize, Vec<Vec<TransactionOutput>>)> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
             let received_bytes = self.result_rxs[shard_id].recv().unwrap().to_bytes();
+            let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+                .with_label_values(&["0", "result_rx_bcs_deser"])
+                .start_timer();
             let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
+            drop(bcs_deser_timer);
             (shard_id, result.inner.unwrap())
         }).collect();
 
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "result_rx_gather"])
+            .start_timer();
         let mut res: Vec<Vec<Vec<TransactionOutput>>> = vec![vec![]; self.num_shards()];
         for (shard_id, result) in results.into_iter() {
             res[shard_id] = result;
@@ -222,6 +230,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 .unwrap(),
         );
 
+        let cmd_tx_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "cmd_tx_async"])
+            .start_timer();
         for (shard_id, sub_blocks) in sub_blocks.into_iter().enumerate() {
             let senders = self.command_txs.clone();
             let onchain_config_clone = onchain_config.clone();
@@ -234,16 +245,26 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 });
 
                 let execute_command_type = format!("execute_command_{}", shard_id);
+                let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+                    .with_label_values(&["0", "cmd_tx_bcs_ser"])
+                    .start_timer();
+                let msg = Message::new(bcs::to_bytes(&execution_request).unwrap());
+                drop(bcs_ser_timer);
                 senders[shard_id]
                     .lock()
                     .unwrap()
-                    .send(Message::new(bcs::to_bytes(&execution_request).unwrap()), &MessageType::new(execute_command_type));
+                    .send(msg, &MessageType::new(execute_command_type));
             });
         }
+        drop(cmd_tx_timer);
 
         let execution_results = self.get_output_from_shards()?;
 
+        let timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "drop_state_view_finally"])
+            .start_timer();
         self.state_view_service.drop_state_view();
+        drop(timer);
         Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
 

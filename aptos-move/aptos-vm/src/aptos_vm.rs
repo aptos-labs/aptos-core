@@ -2596,6 +2596,9 @@ impl VMExecutor for AptosVM {
         );
 
         let count = transactions.num_txns();
+        let _timer = TIMER
+            .with_label_values(&["sharded_block_executor_coordinator_wrapper"])
+            .start_timer();
         let ret = sharded_block_executor.execute_block(
             state_view,
             transactions,
