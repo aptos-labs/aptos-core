@@ -13,7 +13,7 @@ VM Benchmark allows an arbitrary amount of packages to be benchmarked.
 
 Move packages should be placed under the `/samples` directory. In order to benchmark
 a transaction, the function must be marked with `entry` and have a prefix of `benchmark`.
-For example, the following funcitons would work:
+For example, the following functions would work:
 
 ```Move
 
