@@ -28,10 +28,17 @@ const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.35.0";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///
-/// This metadata is from revision: 1b8e14d9669258f797403e2b38da9ea5aea29e35.
+/// This metadata is from revision: 2d5cb211a89a8705674e9e1e741c841dd899c558.
 ///
 /// The metadata file is not taken verbatim, it is currently edited by hand to remove
 /// any references to tables that aren't created by the Rust processor migrations.
+///
+/// To arrive at the final edited file I normally start with the new metadata file,
+/// try to start the local testnet, and check .aptos/testnet/main/tracing.log to
+/// see what error Hasura returned. Remove the culprit from the metadata, which is
+/// generally a few tables and relations to those tables, and try again. Repeat until
+/// it accepts the metadata.
+///
 /// This works fine today since all the key processors you'd need in a local testnet
 /// are in the set of processors written in Rust. If this changes, we can explore
 /// alternatives, e.g. running processors in other languages using containers.
@@ -279,8 +286,13 @@ async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
     let metadata_json: serde_json::Value = serde_json::from_str(metadata_content)?;
 
     // Make the request.
+    info!("Submitting request to apply Hasura metadata");
     let response =
         make_hasura_metadata_request(url, "replace_metadata", Some(metadata_json)).await?;
+    info!(
+        "Received response for applying Hasura metadata: {:?}",
+        response
+    );
 
     // Confirm that the metadata was applied successfully and there is no inconsistency
     // between the schema and the underlying DB schema.
@@ -302,7 +314,12 @@ async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
 /// checker.
 pub async fn confirm_metadata_applied(url: Url) -> Result<()> {
     // Make the request.
+    info!("Confirming Hasura metadata applied...");
     let response = make_hasura_metadata_request(url, "export_metadata", None).await?;
+    info!(
+        "Received response for confirming Hasura metadata applied: {:?}",
+        response
+    );
 
     // If the sources field is set it means the metadata was applied successfully.
     if let Some(obj) = response.as_object() {
