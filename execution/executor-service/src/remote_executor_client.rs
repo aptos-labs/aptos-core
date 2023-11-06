@@ -27,6 +27,8 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use std::thread::JoinHandle;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 
 pub static COORDINATOR_PORT: u16 = 52200;
@@ -166,13 +168,31 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
         trace!("RemoteExecutorClient Waiting for results");
-        let mut results = vec![];
+        let thread_pool = Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(self.num_shards())
+                .build()
+                .unwrap(),
+        );
+
+        /*let mut results = vec![];
         for rx in self.result_rxs.iter() {
             let received_bytes = rx.recv().unwrap().to_bytes();
             let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
             results.push(result.inner?);
+        }*/
+
+        let results: Vec<(usize, Vec<Vec<TransactionOutput>>)> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
+            let received_bytes = self.result_rxs[shard_id].recv().unwrap().to_bytes();
+            let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
+            (shard_id, result.inner.unwrap())
+        }).collect();
+
+        let mut res: Vec<Vec<Vec<TransactionOutput>>> = vec![vec![]; self.num_shards()];
+        for (shard_id, result) in results.into_iter() {
+            res[shard_id] = result;
         }
-        Ok(results)
+        Ok(res)
     }
 }
 
