@@ -1,6 +1,6 @@
 [package]
-name = "aptos-indexer-grpc-fullnode"
-description = "Aptos Indexer GRPC runtime on fullnode."
+name = "aptos-indexer-grpc-fullnode-table-info"
+description = "Aptos Indexer GRPC runtime on fullnode for table info parsing."
 version = "1.0.0"
 
 # Workspace inherited keys
@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aptos-rocksdb-options = { workspace = true }
 anyhow = { workspace = true }
 base64 = { workspace = true }
 bytes = { workspace = true }
@@ -28,6 +29,7 @@ tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true }
 tonic-reflection = { workspace = true }
+move-resource-viewer = { workspace = true }
 
 aptos-api = { workspace = true }
 aptos-api-types = { workspace = true }
@@ -47,6 +49,9 @@ aptos-vm = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-package = { workspace = true }
+aptos-sdk = { workspace = true }
+aptos-db-indexer.workspace = true
+aptos-schemadb.workspace = true
 
 [dev-dependencies]
 goldenfile = { workspace = true }
@@ -64,7 +69,6 @@ aptos-global-constants = { workspace = true }
 aptos-mempool = { workspace = true }
 aptos-mempool-notifications = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
-aptos-sdk = { workspace = true }
 aptos-secure-storage = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-vm = { workspace = true }

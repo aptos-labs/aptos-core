@@ -12,7 +12,8 @@ use aptos_consensus::{
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
+// use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
+use aptos_indexer_grpc_fullnode_table_info::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;

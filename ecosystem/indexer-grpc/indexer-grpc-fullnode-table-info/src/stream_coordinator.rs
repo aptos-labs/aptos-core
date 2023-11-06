@@ -5,9 +5,10 @@ use crate::{
     convert::convert_transaction,
     counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
+    table_info_parser::IndexerLookupDB,
 };
 use aptos_api::context::Context;
-use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
+use aptos_api_types::{Transaction as APITransaction, TransactionOnChainData, AsConverter};
 use aptos_indexer_grpc_utils::{chunk_transactions, constants::MESSAGE_SIZE_LIMIT};
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
@@ -16,7 +17,9 @@ use aptos_protos::{
     },
     transaction::v1::Transaction as TransactionPB,
 };
+use aptos_types::write_set::WriteSet;
 use aptos_vm::data_cache::AsMoveResolver;
+use move_resource_viewer::MoveValueAnnotator;
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -61,6 +64,7 @@ impl IndexerStreamCoordinator {
             highest_known_version: 0,
             context,
             transactions_sender,
+            // indexer
         }
     }
 
@@ -72,22 +76,26 @@ impl IndexerStreamCoordinator {
     /// 2. Convert transactions to rust objects (for example stringifying move structs into json)
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
-    pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+    pub async fn process_next_batch(
+        &mut self,
+        indexer: Arc<IndexerLookupDB>,
+    ) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
-
+        let indexer = indexer.clone();
         for batch in batches {
+            let indexer = indexer.clone();
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
             let transaction_sender = self.transactions_sender.clone();
-
             let task = tokio::spawn(async move {
+                let indexer = indexer.clone();
                 // Fetch and convert transactions from API
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
-                let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
+                let api_txns = Self::convert_to_api_txns(indexer.clone(), context, raw_txns).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 // Wrap in stream response object and send to channel
@@ -215,6 +223,7 @@ impl IndexerStreamCoordinator {
     }
 
     async fn convert_to_api_txns(
+        indexer: Arc<IndexerLookupDB>,
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
     ) -> Vec<APITransaction> {
@@ -226,7 +235,14 @@ impl IndexerStreamCoordinator {
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(context.db.clone());
+        let converter = resolver.as_converter(indexer.clone());
+        let annotator = MoveValueAnnotator::new(&resolver);
+        let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
+        let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+        indexer
+            .clone()
+            .index_with_annotator(&annotator, first_version, &write_sets_slice)
+            .expect("");
 
         // Enrich data with block metadata
         let (_, _, block_event) = context

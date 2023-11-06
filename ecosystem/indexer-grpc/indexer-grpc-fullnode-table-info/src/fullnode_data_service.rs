@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use crate::{
+    stream_coordinator::IndexerStreamCoordinator, table_info_parser::IndexerLookupDB,
+    ServiceContext,
+};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::internal::fullnode::v1::{
@@ -8,13 +11,14 @@ use aptos_protos::internal::fullnode::v1::{
     GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
 };
 use futures::Stream;
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
+    pub indexer: Arc<IndexerLookupDB>,
 }
 
 type FullnodeResponseStream =
@@ -57,7 +61,7 @@ impl FullnodeData for FullnodeDataService {
 
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
-
+        let indexer = self.indexer.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -69,6 +73,7 @@ impl FullnodeData for FullnodeDataService {
                 output_batch_size,
                 tx.clone(),
             );
+            let indexer = indexer.clone();
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -83,7 +88,8 @@ impl FullnodeData for FullnodeDataService {
             let mut base: u64 = 0;
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch().await;
+                let indexer = indexer.clone();
+                let results = coordinator.process_next_batch(indexer.clone()).await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {

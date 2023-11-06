@@ -2117,7 +2117,64 @@ dependencies = [
  "base64 0.13.0",
  "bytes",
  "chrono",
- "deadpool-postgres",
+ "fail 0.5.0",
+ "futures",
+ "goldenfile",
+ "hex",
+ "hyper",
+ "move-binary-format",
+ "move-core-types",
+ "move-package",
+ "once_cell",
+ "rand 0.7.3",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.10.2",
+ "tonic-reflection",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-fullnode-table-info"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-db",
+ "aptos-db-indexer",
+ "aptos-executor",
+ "aptos-executor-types",
+ "aptos-framework",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-indexer-grpc-utils",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-mempool-notifications",
+ "aptos-metrics-core",
+ "aptos-moving-average 0.1.0",
+ "aptos-proptest-helpers",
+ "aptos-protos 1.1.2",
+ "aptos-rocksdb-options",
+ "aptos-runtimes",
+ "aptos-schemadb",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-validator",
+ "base64 0.13.0",
+ "bytes",
+ "chrono",
  "fail 0.5.0",
  "futures",
  "goldenfile",
@@ -2128,14 +2185,11 @@ dependencies = [
  "move-package",
  "move-resource-viewer",
  "once_cell",
- "openssl",
- "postgres-openssl",
  "rand 0.7.3",
  "regex",
  "serde",
  "serde_json",
  "tokio",
- "tokio-postgres",
  "tokio-stream",
  "tonic 0.10.2",
  "tonic-reflection",
@@ -2871,6 +2925,7 @@ dependencies = [
  "aptos-genesis",
  "aptos-indexer",
  "aptos-indexer-grpc-fullnode",
+ "aptos-indexer-grpc-fullnode-table-info",
  "aptos-infallible",
  "aptos-inspection-service",
  "aptos-logger",
@@ -6253,36 +6308,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "deadpool"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb84100978c1c7b37f09ed3ce3e5f843af02c2a2c431bae5b19230dad2c1b490"
-dependencies = [
- "async-trait",
- "deadpool-runtime",
- "num_cpus",
- "tokio",
-]
-
-[[package]]
-name = "deadpool-postgres"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b75ba49590d27f677d3bebaf76cd15889ca8b308bc7ba99bfa25f1d7269c13"
-dependencies = [
- "deadpool 0.10.0",
- "tokio",
- "tokio-postgres",
- "tracing",
-]
-
-[[package]]
 name = "deadpool-redis"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b8bde44cbfdf17ae5baa45c9f43073b320f1a19955389315629304a23909ad2"
 dependencies = [
- "deadpool 0.9.5",
+ "deadpool",
  "redis",
 ]
 
@@ -11748,19 +11779,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26f6a7b87c2e435a3241addceeeff740ff8b7e76b74c13bf9acb17fa454ea00b"
 
 [[package]]
-name = "postgres-openssl"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1de0ea6504e07ca78355a6fb88ad0f36cafe9e696cbc6717f16a207f3a60be72"
-dependencies = [
- "futures",
- "openssl",
- "tokio",
- "tokio-openssl",
- "tokio-postgres",
-]
-
-[[package]]
 name = "postgres-protocol"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14633,18 +14651,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7d995660bd2b7f8c1568414c1126076c13fbb725c40112dc0120b78eb9b717b"
 dependencies = [
  "native-tls",
- "tokio",
-]
-
-[[package]]
-name = "tokio-openssl"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c08f9ffb7809f1b20c1b398d92acf4cc719874b3b2b2d9ea2f09b4a80350878a"
-dependencies = [
- "futures-util",
- "openssl",
- "openssl-sys",
  "tokio",
 ]
 
