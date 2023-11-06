@@ -2533,6 +2533,7 @@ mod test {
             SequentialState {
                 unsync_map: &unsync_map,
                 counter: &counter,
+                start_counter: 5,
                 resource_read_set: RefCell::new(HashSet::new()),
                 group_read_set: RefCell::new(HashSet::new()),
                 dynamic_change_set_optimizations_enabled: true,
@@ -2633,7 +2634,7 @@ mod test {
         let scheduler = Scheduler::new(10);
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            ViewState::Sync(ParallelState::new(&versioned_map, &scheduler, &counter)),
+            ViewState::Sync(ParallelState::new(&versioned_map, &scheduler, 5, &counter)),
             1,
         );
 

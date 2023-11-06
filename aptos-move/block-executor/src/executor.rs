@@ -540,19 +540,20 @@ where
                     Ok(finalized_group) => {
                         // finalize_group already applies the deletions.
                         if finalized_group.is_empty() != metadata_op.is_deletion() {
-                            return Err(Error::FallbackToSequential(resource_group_error(format!(
+                            return Err(Error::FallbackToSequential(resource_group_error(
+                                format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
                                 finalized_group.is_empty(),
                                 metadata_op.is_deletion()
-                            ))));
+                            ),
+                            )));
                         }
                         Ok((group_key, metadata_op, finalized_group))
                     },
-                    Err(e) => {
-                        return Err(Error::FallbackToSequential(resource_group_error(
-                            format!("Error committing resource group {:?}", e),
-                        )));
-                    },
+                    Err(e) => Err(Error::FallbackToSequential(resource_group_error(format!(
+                        "Error committing resource group {:?}",
+                        e
+                    )))),
                 }
             };
 
@@ -595,9 +596,11 @@ where
                                 } else {
                                     // TODO[agg_v2](question). Is this a code invariante error?
                                     error!("Writing to a resource group that is already deleted");
-                                    maybe_err = Some(Error::FallbackToSequential(PanicOr::Or(
-                                        IntentionalFallbackToSequential::ResourceGroupError,
-                                    )));
+                                    maybe_err =
+                                        Some(Error::FallbackToSequential(resource_group_error(
+                                            "Writing to a resource group that is already deleted"
+                                                .to_string(),
+                                        )));
                                     break;
                                 }
                             },
@@ -1169,10 +1172,9 @@ where
         }
 
         for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
-            for (value_tag, group_op) in group_ops.into_iter() {
-                // TODO[agg_v2](fix): provide layouts
+            for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
                 unsync_map
-                    .insert_group_op(&group_key, value_tag, group_op)
+                    .insert_group_op(&group_key, value_tag, group_op, maybe_layout)
                     .map_err(|e| {
                         resource_group_error(format!("Unexpected resource group error {:?}", e))
                     })?;
@@ -1296,7 +1298,8 @@ where
 
                     if dynamic_change_set_optimizations_enabled {
                         let group_metadata_ops = output.resource_group_metadata_ops();
-                        let mut finalized_group_writes = Vec::with_capacity(group_metadata_ops.len());
+                        let mut finalized_group_writes =
+                            Vec::with_capacity(group_metadata_ops.len());
                         for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
                             let finalized_group = unsync_map.finalize_group(&group_key);
                             if finalized_group.is_empty() != group_metadata_op.is_deletion() {
@@ -1308,23 +1311,23 @@ where
                                     group_metadata_op.is_deletion()
                                 )).into());
                             }
-                            finalized_group_writes.push((group_key, group_metadata_op, finalized_group));
+                            finalized_group_writes.push((
+                                group_key,
+                                group_metadata_op,
+                                finalized_group,
+                            ));
                         }
 
-                    if dynamic_change_set_optimizations_enabled {
                         for (group_key, group_metadata_op) in
                             output.group_reads_needing_delayed_field_exchange()
                         {
                             let finalized_group = unsync_map.finalize_group(&group_key);
                             if finalized_group.is_empty() != group_metadata_op.is_deletion() {
-                                error!(
+                                return Err(resource_group_error(format!(
                                     "Group is empty = {} but op is deletion = {} in sequential execution",
                                     finalized_group.is_empty(),
                                     group_metadata_op.is_deletion()
-                                );
-                                return Err(Error::FallbackToSequential(PanicOr::Or(
-                                    IntentionalFallbackToSequential::ResourceGroupError,
-                                )));
+                                )).into());
                             }
                             finalized_group_writes.push((
                                 group_key,

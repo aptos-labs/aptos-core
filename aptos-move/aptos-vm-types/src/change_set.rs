@@ -387,10 +387,6 @@ impl VMChangeSet {
         std::mem::take(&mut self.delayed_field_change_set)
     }
 
-    pub(crate) fn drain_resource_group_write_set(&mut self) -> BTreeMap<StateKey, GroupWrite> {
-        std::mem::take(&mut self.resource_group_write_set)
-    }
-
     pub fn aggregator_v1_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
         &self.aggregator_v1_write_set
     }
