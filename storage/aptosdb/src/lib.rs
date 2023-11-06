@@ -99,6 +99,7 @@ use aptos_types::{
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
         TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
@@ -1874,8 +1875,24 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
             ensure!(version <= self.get_latest_version()?);
 
-            let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
-            Ok(new_block_event.proposed_time())
+            match self.event_store.get_block_metadata(version) {
+                Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
+                Err(err) => {
+                    // when event index is disabled, we won't be able to search the NewBlock event stream.
+                    // TODO(grao): evaluate adding dedicated block_height_by_version index
+                    warn!(
+                        error = ?err,
+                        "Failed to fetch block timestamp, falling back to on-chain config.",
+                    );
+                    let ts = self
+                        .get_state_value_by_version(
+                            &StateKey::access_path(CurrentTimeMicroseconds::access_path()?),
+                            version,
+                        )?
+                        .ok_or_else(|| anyhow!("Timestamp not found at version {}", version))?;
+                    Ok(bcs::from_bytes::<CurrentTimeMicroseconds>(ts.bytes())?.microseconds)
+                },
+            }
         })
     }
 
