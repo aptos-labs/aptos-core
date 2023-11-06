@@ -3,7 +3,7 @@
 
 use crate::{
     fullnode_data_service::FullnodeDataService, localnet_data_service::LocalnetDataService,
-    ServiceContext,
+    table_info_parser::IndexerLookupDB, ServiceContext,
 };
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
@@ -38,8 +38,8 @@ pub fn bootstrap(
     if !config.indexer_grpc.enabled {
         return None;
     }
-
-    let runtime = aptos_runtimes::spawn_named_runtime("indexer-grpc".to_string(), None);
+    info!("bootstrapping igrpc-ti thread");
+    let runtime = aptos_runtimes::spawn_named_runtime("igrpc-ti".to_string(), None);
 
     let node_config = config.clone();
 
@@ -48,10 +48,22 @@ pub fn bootstrap(
     let processor_task_count = node_config.indexer_grpc.processor_task_count;
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
-    let enable_expensive_logging = node_config.indexer_grpc.enable_expensive_logging;
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
+        let indexer = Arc::new(
+            IndexerLookupDB::open(
+                context.clone().node_config.storage.dir(),
+                context
+                    .clone()
+                    .node_config
+                    .storage
+                    .rocksdb_configs
+                    .index_db_config,
+            )
+            .expect(""),
+        );
+
         let service_context = ServiceContext {
             context: context.clone(),
             processor_task_count,
@@ -61,11 +73,11 @@ pub fn bootstrap(
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
             service_context: service_context.clone(),
-            enable_expensive_logging,
+            indexer: indexer.clone(),
         };
         let localnet_data_server = LocalnetDataService {
             service_context,
-            enable_expensive_logging,
+            indexer: indexer.clone(),
         };
 
         let reflection_service = tonic_reflection::server::Builder::configure()
@@ -101,7 +113,10 @@ pub fn bootstrap(
             .serve(address.to_socket_addrs().unwrap().next().unwrap())
             .await
             .unwrap();
-        info!(address = address, "[indexer-grpc] Started GRPC server");
+        info!(
+            address = address,
+            "[indexer-grpc] Started GRPC server for table info parsing"
+        );
     });
     Some(runtime)
 }

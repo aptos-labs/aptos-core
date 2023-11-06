@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
-use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};
+use crate::{
+    stream_coordinator::IndexerStreamCoordinator, table_info_parser::IndexerLookupDB,
+    ServiceContext,
+};
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
 use aptos_protos::internal::fullnode::v1::{
@@ -9,14 +11,14 @@ use aptos_protos::internal::fullnode::v1::{
     GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
 };
 use futures::Stream;
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
-    pub enable_expensive_logging: bool,
+    pub indexer: Arc<IndexerLookupDB>,
 }
 
 type FullnodeResponseStream =
@@ -27,7 +29,6 @@ pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
-const SERVICE_TYPE: &str = "indexer_fullnode";
 
 #[tonic::async_trait]
 impl FullnodeData for FullnodeDataService {
@@ -50,7 +51,6 @@ impl FullnodeData for FullnodeDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
-        let enable_expensive_logging = self.enable_expensive_logging;
 
         // Some node metadata
         let context = self.service_context.context.clone();
@@ -61,7 +61,7 @@ impl FullnodeData for FullnodeDataService {
 
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
-
+        let indexer = self.indexer.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -73,38 +73,30 @@ impl FullnodeData for FullnodeDataService {
                 output_batch_size,
                 tx.clone(),
             );
+            let indexer = indexer.clone();
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
                 Ok(_) => {
                     // TODO: Add request details later
-                    info!(
-                        start_version = starting_version,
-                        chain_id = ledger_chain_id,
-                        service_type = SERVICE_TYPE,
-                        "[Indexer Fullnode] Init connection"
-                    );
+                    info!("[indexer-grpc] Init connection");
                 },
                 Err(_) => {
-                    panic!("[Indexer Fullnode] Unable to initialize stream");
+                    panic!("[indexer-grpc] Unable to initialize stream");
                 },
             }
             let mut base: u64 = 0;
             loop {
-                let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
-                let results = coordinator
-                    .process_next_batch(enable_expensive_logging)
-                    .await;
+                let indexer = indexer.clone();
+                let results = coordinator.process_next_batch(indexer.clone()).await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
-                        error!("[Indexer Fullnode] Error sending to stream: {}", e);
+                        error!("[indexer-grpc] Error sending to stream: {}", e);
                         break;
                     },
                 };
-                let highest_known_version = coordinator.highest_known_version;
-
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
@@ -122,20 +114,17 @@ impl FullnodeData for FullnodeDataService {
                         if base != new_base {
                             base = new_base;
 
-                            log_grpc_step_fullnode(
-                                IndexerGrpcStep::FullnodeProcessedBatch,
-                                Some(coordinator.current_version as i64),
-                                Some(max_version as i64),
-                                None,
-                                Some(highest_known_version as i64),
-                                Some(ma.avg() * 1000.0),
-                                Some(start_time.elapsed().as_secs_f64()),
-                                Some(ma.sum() as i64),
+                            info!(
+                                batch_start_version = coordinator.current_version,
+                                batch_end_version = max_version,
+                                versions_processed = ma.sum(),
+                                tps = (ma.avg() * 1000.0) as u64,
+                                "[indexer-grpc] Sent batch successfully"
                             );
                         }
                     },
                     Err(_) => {
-                        aptos_logger::warn!("[Indexer Fullnode] Unable to send end batch status");
+                        aptos_logger::warn!("[indexer-grpc] Unable to send end batch status");
                         break;
                     },
                 }
