@@ -350,3 +350,11 @@ impl RpcHandler for DagDriver {
         Ok(CertifiedAck::new(epoch))
     }
 }
+
+impl Drop for DagDriver {
+    fn drop(&mut self) {
+        if let Some((handle, _)) = self.rb_abort_handle {
+            handle.abort()
+        }
+    }
+}
