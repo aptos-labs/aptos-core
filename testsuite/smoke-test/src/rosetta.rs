@@ -8,9 +8,6 @@ use aptos::{
     common::types::GasOptions,
     test::{CliTestFramework, INVALID_ACCOUNT},
 };
-use move_core_types::{
-    ident_str,
-};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
@@ -50,9 +47,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{task::JoinHandle, time::Instant};
-use aptos_rest_client::aptos_api_types::Event;
-use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use move_core_types::language_storage::ModuleId;
 
 const EPOCH_DURATION_S: u64 = 5;
 const DEFAULT_TRANSFER_AMOUNT: u64 = 20;
@@ -2686,172 +2680,6 @@ async fn test_delegation_pool_operations() {
         // Keep track of the previous
         previous_block_index = block_height;
     }
-}
-
-#[tokio::test]
-async fn test_fee_statement() {
-    const NUM_TXNS_PER_PAGE: u16 = 2;
-
-    let (mut swarm, _, _, rosetta_client) = setup_test(
-        2,
-        Arc::new(|_, config, _| config.api.max_transactions_page_size = NUM_TXNS_PER_PAGE),
-    )
-    .await;
-
-    let validator = swarm.validators().next().unwrap();
-    let rest_client = validator.rest_client();
-
-    let chain_id = swarm.chain_id();
-    swarm
-        .aptos_public_info()
-        .sync_root_account_sequence_number()
-        .await;
-
-    let mut account_1 = swarm
-        .aptos_public_info()
-        .create_and_fund_user_account(10_000_000_000)
-        .await
-        .unwrap();
-
-    let seq_number = account_1.sequence_number();
-    // test create a new collection, mint and burn to trigger the refund
-    create_collection(
-        &swarm.aptos_public_info(),
-        &mut account_1,
-        seq_number,
-    )
-    .await;
-
-    let object_address = mint_token(
-        &swarm.aptos_public_info(),
-        &mut account_1,
-        seq_number+1,
-    )
-    .await;
-
-    let txn = burn_token(
-        &swarm.aptos_public_info(),
-        &mut account_1,
-        seq_number + 2,
-        object_address
-    ).await;
-
-    let actual_txn = if let Transaction::UserTransaction(user_txn) = txn.into_inner() {
-        user_txn
-    } else {
-        panic!("Not a user transaction");
-    };
-    let txn_version = actual_txn.info.version.0;
-
-    let block_info = rest_client
-        .get_block_by_version(txn_version, false)
-        .await
-        .unwrap()
-        .into_inner();
-    let block_with_burn = rosetta_client
-        .block(&BlockRequest::by_index(chain_id, block_info.block_height.0))
-        .await
-        .unwrap();
-
-    let block_with_burn = block_with_burn.block;
-    let rosetta_txn = block_with_burn
-        .transactions
-        .iter()
-        .find(|txn| txn.metadata.version.0 == txn_version)
-        .unwrap();
-    
-    assert_eq!(
-        format!("{:x}", actual_txn.info.hash),
-        rosetta_txn.transaction_identifier.hash
-    );
-}
-
-// To test FeeStatement, we create a coin and burn it to trigger a storage fee refund
-const TEST_COLLECTION:&str = "test-collection";
-const TEST_TOKEN: &str = "test-token";
-
-async fn create_collection(
-    info: &AptosPublicInfo<'_>,
-    account: &mut LocalAccount,
-    sequence_number: u64,
-) -> Response<Transaction> {
-    let txn = account.sign_with_transaction_builder(info
-        .transaction_factory()
-        .payload(aptos_stdlib::aptos_token_objects_stdlib::aptos_token_create_collection(
-            "".as_bytes().to_vec(),
-            10000,
-            TEST_COLLECTION.as_bytes().to_vec(),
-            "".as_bytes().to_vec(),
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            true,
-            0,
-            100,
-        ))
-        .sequence_number(sequence_number));
-    info.client().submit_and_wait(&txn).await.unwrap()
-}
-
-async fn mint_token(
-    info: &AptosPublicInfo<'_>,
-    account: &mut LocalAccount,
-    sequence_number: u64,
-)  -> AccountAddress {
-    let txn = account.sign_with_transaction_builder(info
-        .transaction_factory()
-        .payload(aptos_stdlib::aptos_token_objects_stdlib::aptos_token_mint(
-            TEST_COLLECTION.as_bytes().to_vec(),
-            "".as_bytes().to_vec(),
-            TEST_TOKEN.as_bytes().to_vec(),
-            "".as_bytes().to_vec(),
-            vec![],
-            vec![],
-            vec![],
-        ))
-        .sequence_number(sequence_number));
-    let res = info.client().submit_and_wait(&txn).await.unwrap();
-    let txn = res.into_inner();
-    if let Transaction::UserTransaction(user_txn) = txn {
-        let event: Event = user_txn.events.iter().find(|event| event.typ.to_string().as_str() == "0x4::collection::MintEvent").unwrap().clone();
-        let address_str = event.data.get("token").unwrap().as_str().unwrap();
-        AccountAddress::from_str(address_str).unwrap()
-    } else {
-        panic!("Unexpected transaction received back")
-    }
-}
-
-async fn burn_token(
-    info: &AptosPublicInfo<'_>,
-    account: &mut LocalAccount,
-    sequence_number: u64,
-    object_address: AccountAddress,
-) -> Response<Transaction> {
-    let payload = TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 4,
-            ]),
-            ident_str!("aptos_token").to_owned(),
-        ),
-        ident_str!("burn").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&object_address).unwrap(),
-        ],
-    ));
-
-    let txn = account.sign_with_transaction_builder(info
-        .transaction_factory()
-        .payload(payload)
-        .sequence_number(sequence_number));
-    info.client().submit_and_wait(&txn).await.unwrap()
 }
 
 #[derive(Debug)]

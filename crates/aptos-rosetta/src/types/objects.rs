@@ -31,11 +31,11 @@ use aptos_types::{
     account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
     contract_event::ContractEvent,
     event::EventKey,
+    fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
     state_store::state_key::{StateKey, StateKeyInner},
     transaction::{EntryFunction, TransactionPayload},
     write_set::{WriteOp, WriteSet},
-    fee_statement::FeeStatement,
 };
 use itertools::Itertools;
 use move_core_types::language_storage::TypeTag;
@@ -1835,7 +1835,7 @@ fn get_fee_statement_from_event(events: &[ContractEvent]) -> Vec<FeeStatement> {
         .filter_map(|event| {
             if let Ok(fee_statement_event) = bcs::from_bytes::<FeeStatement>(event.event_data()) {
                 if fee_statement_event.storage_fee_refund() != 0 {
-                    Some(fee_statement_event.clone()) // Collect only if storage_fee_refund_octas is non-zero
+                    Some(fee_statement_event) // Collect only if storage_fee_refund_octas is non-zero
                 } else {
                     None
                 }
