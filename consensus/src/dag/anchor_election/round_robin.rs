@@ -19,5 +19,5 @@ impl AnchorElection for RoundRobinAnchorElection {
         self.validators[(round / 2) as usize % self.validators.len()]
     }
 
-    fn update_reputation(&mut self, _event: CommitEvent) {}
+    fn update_reputation(&self, _event: CommitEvent) {}
 }

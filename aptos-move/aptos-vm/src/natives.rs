@@ -24,10 +24,10 @@ use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    aggregator::PanicError,
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
-    write_set::WriteOp,
 };
+#[cfg(feature = "testing")]
+use aptos_types::{aggregator::PanicError, write_set::WriteOp};
 #[cfg(feature = "testing")]
 use aptos_types::{
     chain_id::ChainId,
@@ -40,6 +40,7 @@ use move_core_types::language_storage::StructTag;
 #[cfg(feature = "testing")]
 use move_core_types::value::MoveTypeLayout;
 use move_vm_runtime::native_functions::NativeFunctionTable;
+#[cfg(feature = "testing")]
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,

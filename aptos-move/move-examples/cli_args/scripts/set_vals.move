@@ -2,6 +2,7 @@
 script {
     use test_account::cli_args;
     use std::vector;
+    use std::string::String;
 
     /// Get a `bool` vector where each element indicates `true` if the
     /// corresponding element in `u8_vec` is greater than `u8_solo`.
@@ -10,11 +11,13 @@ script {
     fun set_vals<T1, T2>(
         account: signer,
         u8_solo: u8,
+        bytes: vector<u8>,
+        utf8_string: String,
         u8_vec: vector<u8>,
         address_solo: address,
     ) {
         let bool_vec = vector::map_ref(&u8_vec, |e_ref| *e_ref > u8_solo);
         let addr_vec_vec = vector[vector[address_solo]];
-        cli_args::set_vals<T1, T2>(account, u8_solo, bool_vec, addr_vec_vec);
+        cli_args::set_vals<T1, T2>(account, u8_solo, bytes, utf8_string, bool_vec, addr_vec_vec);
     }
 } // <:!:script
