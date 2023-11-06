@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
-use aptos_indexer_grpc_utils::counters::{
-    IndexerGrpcStep, DURATION_IN_SECS, LATEST_PROCESSED_VERSION, NUM_TRANSACTIONS_COUNT,
+use crate::{
+    stream_coordinator::IndexerStreamCoordinator, table_info_parser::IndexerLookupDB,
+    ServiceContext,
 };
 use aptos_logger::{error, info};
 use aptos_moving_average::MovingAverage;
@@ -11,13 +11,14 @@ use aptos_protos::internal::fullnode::v1::{
     GetTransactionsFromNodeRequest, StreamStatus, TransactionsFromNodeResponse,
 };
 use futures::Stream;
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
+    pub indexer: Arc<IndexerLookupDB>,
 }
 
 type FullnodeResponseStream =
@@ -28,7 +29,6 @@ pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
 const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
-const SERVICE_TYPE: &str = "indexer_fullnode";
 
 #[tonic::async_trait]
 impl FullnodeData for FullnodeDataService {
@@ -61,7 +61,7 @@ impl FullnodeData for FullnodeDataService {
 
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
-
+        let indexer = self.indexer.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -73,6 +73,7 @@ impl FullnodeData for FullnodeDataService {
                 output_batch_size,
                 tx.clone(),
             );
+            let indexer = indexer.clone();
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
             match tx.send(Result::<_, Status>::Ok(init_status)).await {
@@ -86,9 +87,9 @@ impl FullnodeData for FullnodeDataService {
             }
             let mut base: u64 = 0;
             loop {
-                let mut start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch().await;
+                let indexer = indexer.clone();
+                let results = coordinator.process_next_batch(indexer.clone()).await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
@@ -96,31 +97,6 @@ impl FullnodeData for FullnodeDataService {
                         break;
                     },
                 };
-
-                LATEST_PROCESSED_VERSION
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
-                    ])
-                    .set(max_version as i64);
-                NUM_TRANSACTIONS_COUNT
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
-                    ])
-                    .set(ma.sum() as i64);
-                DURATION_IN_SECS
-                    .with_label_values(&[
-                        SERVICE_TYPE,
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_step(),
-                        IndexerGrpcStep::FullnodeProcessedBatch.get_label(),
-                    ])
-                    .set(start_time.elapsed().as_secs_f64());
-
-                start_time = std::time::Instant::now();
-
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
@@ -145,28 +121,6 @@ impl FullnodeData for FullnodeDataService {
                                 tps = (ma.avg() * 1000.0) as u64,
                                 "[indexer-grpc] Sent batch successfully"
                             );
-
-                            LATEST_PROCESSED_VERSION
-                                .with_label_values(&[
-                                    SERVICE_TYPE,
-                                    IndexerGrpcStep::FullnodeSentBatch.get_step(),
-                                    IndexerGrpcStep::FullnodeSentBatch.get_label(),
-                                ])
-                                .set(max_version as i64);
-                            NUM_TRANSACTIONS_COUNT
-                                .with_label_values(&[
-                                    SERVICE_TYPE,
-                                    IndexerGrpcStep::FullnodeSentBatch.get_step(),
-                                    IndexerGrpcStep::FullnodeSentBatch.get_label(),
-                                ])
-                                .set(ma.sum() as i64);
-                            DURATION_IN_SECS
-                                .with_label_values(&[
-                                    SERVICE_TYPE,
-                                    IndexerGrpcStep::FullnodeSentBatch.get_step(),
-                                    IndexerGrpcStep::FullnodeSentBatch.get_label(),
-                                ])
-                                .set(start_time.elapsed().as_secs_f64());
                         }
                     },
                     Err(_) => {
