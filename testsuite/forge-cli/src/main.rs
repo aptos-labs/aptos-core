@@ -1852,39 +1852,39 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 500_000,
         }))
-        // .with_validator_override_node_config_fn(Arc::new(|config, _| {
-        //     // consensus and quorum store configs copied from the consensus-only suite
-        //     optimize_for_maximum_throughput(config);
-        //
-        //     // Other consensus / Quroum store configs
-        //     config
-        //         .consensus
-        //         .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
-        //     config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
-        //     config.consensus.quorum_store_pull_timeout_ms = 200;
-        //
-        //     // Experimental storage optimizations
-        //     config.storage.rocksdb_configs.enable_storage_sharding = true;
-        //
-        //     // Experimental delayed QC aggregation
-        //     config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
-        //
-        //     if USE_CRAZY_MACHINES {
-        //         config.execution.concurrency_level = 48;
-        //     }
-        // }))
-        // .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-        //     // Mempool config optimizations
-        //     mempool_config_practically_non_expiring(&mut config.mempool);
-        //
-        //     // Higher concurrency level
-        //     if USE_CRAZY_MACHINES {
-        //         config.execution.concurrency_level = 48;
-        //     }
-        //
-        //     // Experimental storage optimizations
-        //     config.storage.rocksdb_configs.enable_storage_sharding = true;
-        // }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // // consensus and quorum store configs copied from the consensus-only suite
+            // optimize_for_maximum_throughput(config);
+            //
+            // // Other consensus / Quroum store configs
+            // config
+            //     .consensus
+            //     .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
+            // config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+            // config.consensus.quorum_store_pull_timeout_ms = 200;
+            //
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
+
+            // // Experimental delayed QC aggregation
+            // config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
+            //
+            // if USE_CRAZY_MACHINES {
+            //     config.execution.concurrency_level = 48;
+            // }
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // // Mempool config optimizations
+            // mempool_config_practically_non_expiring(&mut config.mempool);
+            //
+            // // Higher concurrency level
+            // if USE_CRAZY_MACHINES {
+            //     config.execution.concurrency_level = 48;
+            // }
+
+            // Experimental storage optimizations
+            config.storage.rocksdb_configs.enable_storage_sharding = true;
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
