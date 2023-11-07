@@ -300,7 +300,7 @@ fn native_try_add(
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let id = aggregator_value_field_as_id(agg_value)?;
+        let id = aggregator_value_field_as_id(agg_value, resolver)?;
         delayed_field_data.try_add_delta(
             id,
             agg_max_value,
@@ -340,7 +340,7 @@ fn native_try_sub(
     let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let id = aggregator_value_field_as_id(agg_value)?;
+        let id = aggregator_value_field_as_id(agg_value, resolver)?;
         delayed_field_data.try_add_delta(
             id,
             agg_max_value,
@@ -379,7 +379,7 @@ fn native_read(
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
     let result_value = if let Some((resolver, delayed_field_data)) = get_context_data(context) {
-        let id = aggregator_value_field_as_id(agg_value)?;
+        let id = aggregator_value_field_as_id(agg_value, resolver)?;
         delayed_field_data.read_aggregator(id, resolver)?
     } else {
         agg_value
@@ -412,7 +412,7 @@ fn native_snapshot(
         get_aggregator_fields_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let aggregator_id = aggregator_value_field_as_id(agg_value)?;
+        let aggregator_id = aggregator_value_field_as_id(agg_value, resolver)?;
         delayed_field_data
             .snapshot(aggregator_id, agg_max_value, resolver)?
             .as_u64() as u128
@@ -478,7 +478,7 @@ fn native_copy_snapshot(
     // let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
     // let result_value = if context.aggregator_execution_enabled() {
-    //     let id = aggregator_snapshot_value_field_as_id(snapshot_value)?;
+    //     let id = aggregator_snapshot_value_field_as_id(snapshot_value, resolver)?;
 
     //     // snapshots are immutable so we can just return the id
     //     SnapshotValue::Integer(id.id() as u128)
@@ -510,7 +510,7 @@ fn native_read_snapshot(
     let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let aggregator_id = aggregator_snapshot_value_field_as_id(snapshot_value)?;
+        let aggregator_id = aggregator_snapshot_value_field_as_id(snapshot_value, resolver)?;
         delayed_field_data.read_snapshot(aggregator_id, resolver)?
     } else {
         snapshot_value
@@ -572,7 +572,7 @@ fn native_string_concat(
     context.charge(STRING_UTILS_PER_BYTE * NumBytes::new((prefix.len() + suffix.len()) as u64))?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let base_id = aggregator_value_field_as_id(snapshot_value)?;
+        let base_id = aggregator_value_field_as_id(snapshot_value, resolver)?;
         SnapshotValue::Integer(
             delayed_field_data
                 .string_concat(base_id, prefix, suffix, resolver)?

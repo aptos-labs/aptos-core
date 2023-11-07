@@ -538,6 +538,13 @@ mod test {
             unimplemented!("Irrelevant for the test")
         }
 
+        fn validate_and_convert_delayed_field_id(
+            &self,
+            _id: u64,
+        ) -> Result<Self::Identifier, PanicError> {
+            unimplemented!("Irrelevant for the test")
+        }
+
         fn get_reads_needing_exchange(
             &self,
             _delayed_write_set_keys: &HashSet<Self::Identifier>,

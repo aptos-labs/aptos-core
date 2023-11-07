@@ -6,7 +6,10 @@ use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_change_set::serialize,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{expect_ok, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{
+        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
+        DelayedFieldsSpeculativeError, PanicOr,
+    },
 };
 use aptos_types::{
     aggregator::PanicError,
@@ -36,6 +39,7 @@ pub struct FakeAggregatorView {
     // delayed_field_try_add_delta_outcome operate on different state
     v1_store: HashMap<StateKey, StateValue>,
     v2_store: HashMap<DelayedFieldID, DelayedFieldValue>,
+    start_counter: u32,
     counter: RefCell<u32>,
 }
 
@@ -45,6 +49,7 @@ impl Default for FakeAggregatorView {
             v1_store: HashMap::new(),
             v2_store: HashMap::new(),
             // Put some recognizable number, to easily spot missed exchanges
+            start_counter: FAKE_AGGREGATOR_VIEW_GEN_ID_START,
             counter: RefCell::new(FAKE_AGGREGATOR_VIEW_GEN_ID_START),
         }
     }
@@ -111,6 +116,28 @@ impl TDelayedFieldView for FakeAggregatorView {
         let id = Self::Identifier::new(*counter as u64);
         *counter += 1;
         id
+    }
+
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        if id < self.start_counter as u64 {
+            return Err(code_invariant_error(format!(
+                "Invalid delayed field id: {}, we've started from {}",
+                id, self.start_counter
+            )));
+        }
+
+        let current = *self.counter.borrow();
+        if id > current as u64 {
+            return Err(code_invariant_error(format!(
+                "Invalid delayed field id: {}, we've only reached to {}",
+                id, current
+            )));
+        }
+
+        Ok(Self::Identifier::new(id))
     }
 
     fn get_reads_needing_exchange(

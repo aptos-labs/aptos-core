@@ -4,7 +4,7 @@
 use super::{
     docker::{
         delete_container, get_docker, pull_docker_image, setup_docker_logging,
-        StopContainerShutdownStep,
+        StopContainerShutdownStep, CONTAINER_NETWORK_NAME,
     },
     health_checker::HealthChecker,
     traits::{PostHealthyStep, ServiceManager, ShutdownStep},
@@ -23,15 +23,22 @@ use reqwest::Url;
 use std::{collections::HashSet, path::PathBuf};
 use tracing::{info, warn};
 
-const INDEXER_API_CONTAINER_NAME: &str = "indexer-api";
+const INDEXER_API_CONTAINER_NAME: &str = "local-testnet-indexer-api";
 const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.35.0";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///
-/// This metadata is from revision: 1b8e14d9669258f797403e2b38da9ea5aea29e35.
+/// This metadata is from revision: 2d5cb211a89a8705674e9e1e741c841dd899c558.
 ///
 /// The metadata file is not taken verbatim, it is currently edited by hand to remove
 /// any references to tables that aren't created by the Rust processor migrations.
+///
+/// To arrive at the final edited file I normally start with the new metadata file,
+/// try to start the local testnet, and check .aptos/testnet/main/tracing.log to
+/// see what error Hasura returned. Remove the culprit from the metadata, which is
+/// generally a few tables and relations to those tables, and try again. Repeat until
+/// it accepts the metadata.
+///
 /// This works fine today since all the key processors you'd need in a local testnet
 /// are in the set of processors written in Rust. If this changes, we can explore
 /// alternatives, e.g. running processors in other languages using containers.
@@ -128,8 +135,36 @@ impl ServiceManager for IndexerApiManager {
     async fn run_service(self: Box<Self>) -> Result<()> {
         setup_docker_logging(&self.test_dir, "indexer-api", INDEXER_API_CONTAINER_NAME)?;
 
+        // This is somewhat hard to maintain. If it requires any further maintenance we
+        // should just delete support for using Postgres on the host system.
+        let (postgres_connection_string, network_mode) =
+            // When connecting to postgres on the host via an IP from inside a
+            // container, we need to instead connect to host.docker.internal.
+            // There is no need to bind to a Docker network in this case.
+            if self.postgres_connection_string.contains("127.0.0.1") {
+                (
+                    self.postgres_connection_string
+                        .replace("127.0.0.1", "host.docker.internal"),
+                    None,
+                )
+            } else {
+                // Otherwise we use the standard connection string (containing the name
+                // of the container) and bind to the Docker network we created earlier
+                // in the Postgres pre_run steps.
+                (
+                    self.postgres_connection_string,
+                    Some(CONTAINER_NETWORK_NAME.to_string()),
+                )
+            };
+
         let exposed_ports = Some(hashmap! {self.indexer_api_port.to_string() => hashmap!{}});
-        let mut host_config = HostConfig {
+        let host_config = HostConfig {
+            // Connect the container to the network we made in the postgres pre_run.
+            // This allows the indexer API to access the postgres container without
+            // routing through the host network.
+            network_mode,
+            // This is necessary so connecting to the host postgres works on Linux.
+            extra_hosts: Some(vec!["host.docker.internal:host-gateway".to_string()]),
             port_bindings: Some(hashmap! {
                 self.indexer_api_port.to_string() => Some(vec![PortBinding {
                     host_ip: Some("127.0.0.1".to_string()),
@@ -140,39 +175,6 @@ impl ServiceManager for IndexerApiManager {
         };
 
         let docker = get_docker().await?;
-
-        // When using Docker Desktop you can and indeed must use the magic hostname
-        // host.docker.internal in order to access localhost on the host system from
-        // within the container. This also theoretically works without Docker Desktop,
-        // but you have to manually add the name to /etc/hosts in the container, and in
-        // my experience even that doesn't work sometimes. So when in a Docker Desktop
-        // environment we replace 127.0.0.1 with host.docker.internal, whereas in other
-        // environments we still use 127.0.0.1 and use host networking mode.
-        //
-        // In practice, this means we do the replacement when on MacOS or Windows, both
-        // standard (NT) and WSL and we don't do it on Linux / when running from within
-        // a container. But checking for OS is not accurate, since for example we must
-        // do the replacement when running in WSL configured to use the host Docker
-        // daemon but not when running in WSL configured to use Docker from within the
-        // WSL environment. So instead of checking for OS we check the name of the
-        // Docker daemon.
-        //
-        // This is the best method I could figure out for determining the Docker env,
-        // see more here: https://stackoverflow.com/q/77243960/3846032.
-        let info = docker
-            .info()
-            .await
-            .context("Failed to get info about Docker daemon")?;
-        let is_docker_desktop = info.operating_system == Some("Docker Desktop".to_string());
-        let postgres_connection_string = if is_docker_desktop {
-            info!("Running with Docker Desktop, using host.docker.internal");
-            self.postgres_connection_string
-                .replace("127.0.0.1", "host.docker.internal")
-        } else {
-            info!("Not running with Docker Desktop, using host networking mode");
-            host_config.network_mode = Some("host".to_string());
-            self.postgres_connection_string
-        };
 
         info!(
             "Using postgres connection string: {}",
@@ -193,6 +195,8 @@ impl ServiceManager for IndexerApiManager {
                 format!("INDEXER_V2_POSTGRES_URL={}", postgres_connection_string),
                 "HASURA_GRAPHQL_DEV_MODE=true".to_string(),
                 "HASURA_GRAPHQL_ENABLE_CONSOLE=true".to_string(),
+                // See the docs for the image, this is a magic path inside the
+                // container where they have already bundled in the UI assets.
                 "HASURA_GRAPHQL_CONSOLE_ASSETS_DIR=/srv/console-assets".to_string(),
                 format!("HASURA_GRAPHQL_SERVER_PORT={}", self.indexer_api_port),
             ]),
@@ -279,8 +283,13 @@ async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
     let metadata_json: serde_json::Value = serde_json::from_str(metadata_content)?;
 
     // Make the request.
+    info!("Submitting request to apply Hasura metadata");
     let response =
         make_hasura_metadata_request(url, "replace_metadata", Some(metadata_json)).await?;
+    info!(
+        "Received response for applying Hasura metadata: {:?}",
+        response
+    );
 
     // Confirm that the metadata was applied successfully and there is no inconsistency
     // between the schema and the underlying DB schema.
@@ -302,7 +311,12 @@ async fn post_metadata(url: Url, metadata_content: &str) -> Result<()> {
 /// checker.
 pub async fn confirm_metadata_applied(url: Url) -> Result<()> {
     // Make the request.
+    info!("Confirming Hasura metadata applied...");
     let response = make_hasura_metadata_request(url, "export_metadata", None).await?;
+    info!(
+        "Received response for confirming Hasura metadata applied: {:?}",
+        response
+    );
 
     // If the sources field is set it means the metadata was applied successfully.
     if let Some(obj) = response.as_object() {

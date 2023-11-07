@@ -27,6 +27,8 @@ use aptos_types::{
     on_chain_config::{Features, TimedFeatures, TimedFeaturesBuilder},
 };
 #[cfg(feature = "testing")]
+use aptos_types::{aggregator::PanicError, write_set::WriteOp};
+#[cfg(feature = "testing")]
 use aptos_types::{
     aggregator::PanicError,
     chain_id::ChainId,
@@ -54,21 +56,15 @@ use {
     },
     move_vm_runtime::native_extensions::NativeContextExtensions,
     once_cell::sync::Lazy,
-    std::sync::atomic::{AtomicU32, Ordering},
 };
 
 #[cfg(feature = "testing")]
-struct AptosBlankStorage {
-    counter: AtomicU32,
-}
+struct AptosBlankStorage;
 
 #[cfg(feature = "testing")]
 impl AptosBlankStorage {
     pub fn new() -> Self {
-        Self {
-            // Put some recognizable number, to easily spot missed exchanges
-            counter: AtomicU32::new(55551111),
-        }
+        Self {}
     }
 }
 
@@ -99,7 +95,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _id: &Self::Identifier,
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
-        unimplemented!()
+        unreachable!()
     }
 
     fn delayed_field_try_add_delta_outcome(
@@ -109,11 +105,18 @@ impl TDelayedFieldView for AptosBlankStorage {
         _delta: &SignedU128,
         _max_value: u128,
     ) -> Result<bool, PanicOr<DelayedFieldsSpeculativeError>> {
-        unimplemented!()
+        unreachable!()
     }
 
     fn generate_delayed_field_id(&self) -> Self::Identifier {
-        (self.counter.fetch_add(1, Ordering::SeqCst) as u64).into()
+        unreachable!()
+    }
+
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        _id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        unreachable!()
     }
 
     fn get_reads_needing_exchange(
@@ -122,7 +125,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         _skip: &HashSet<Self::ResourceKey>,
     ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
     {
-        unimplemented!()
+        unreachable!()
     }
 }
 

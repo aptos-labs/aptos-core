@@ -2,6 +2,7 @@
 
 use super::{
     adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
+    anchor_election::TChainHealthBackoff,
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
@@ -23,7 +24,10 @@ use crate::{
         round_state::{AdaptiveResponsive, RoundState},
     },
     experimental::buffer_manager::OrderedBlocks,
-    liveness::leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
+    liveness::{
+        leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
+        proposal_generator::ChainHealthBackoffConfig,
+    },
     network::IncomingDAGRequest,
     payload_manager::PayloadManager,
     state_replication::{PayloadClient, StateComputer},
@@ -104,7 +108,7 @@ impl DagBootstrapper {
         parent_block_info: BlockInfo,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
         dag_window_size_config: u64,
-    ) -> (Arc<RwLock<Dag>>, OrderRule) {
+    ) -> (Arc<RwLock<Dag>>, OrderRule, Arc<dyn TChainHealthBackoff>) {
         let initial_ledger_info = ledger_info_provider
             .get_latest_ledger_info()
             .ledger_info()
@@ -162,7 +166,7 @@ impl DagBootstrapper {
             .get_ordered_account_addresses_iter()
             .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
             .collect();
-        let anchor_election = Box::new(LeaderReputationAdapter::new(
+        let anchor_election = Arc::new(LeaderReputationAdapter::new(
             self.epoch_state.epoch,
             HashMap::from([(
                 self.epoch_state.epoch,
@@ -172,19 +176,20 @@ impl DagBootstrapper {
             metadata_adapter,
             heuristic,
             100,
+            ChainHealthBackoffConfig::new(self.config.chain_backoff_config.clone()),
         ));
 
         let order_rule = OrderRule::new(
             self.epoch_state.clone(),
             commit_round + 1,
             dag.clone(),
-            anchor_election,
+            anchor_election.clone(),
             notifier,
             self.storage.clone(),
             self.onchain_config.dag_ordering_causal_history_window as Round,
         );
 
-        (dag, order_rule)
+        (dag, order_rule, anchor_election)
     }
 
     fn bootstrap_components(
@@ -193,6 +198,7 @@ impl DagBootstrapper {
         order_rule: OrderRule,
         state_sync_trigger: StateSyncTrigger,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+        chain_health_backoff: Arc<dyn TChainHealthBackoff>,
         rb_config: ReliableBroadcastConfig,
         round_state_config: DagRoundStateConfig,
     ) -> (NetworkHandler, DagFetcherService) {
@@ -227,6 +233,7 @@ impl DagBootstrapper {
                 new_round_tx,
                 self.epoch_state.clone(),
                 Duration::from_millis(round_state_config.adaptive_responsive_minimum_wait_time_ms),
+                chain_health_backoff.clone(),
             )),
         );
 
@@ -245,6 +252,7 @@ impl DagBootstrapper {
             round_state,
             self.onchain_config.dag_ordering_causal_history_window as Round,
             self.config.node_payload_config.clone(),
+            chain_health_backoff,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag.clone(),
@@ -298,7 +306,7 @@ impl DagBootstrapper {
 
             let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
 
-            let (dag_store, order_rule) = self.bootstrap_dag_store(
+            let (dag_store, order_rule, chain_health_backoff) = self.bootstrap_dag_store(
                 ledger_info_provider.clone(),
                 parent_block_info,
                 ordered_nodes_tx.clone(),
@@ -318,6 +326,7 @@ impl DagBootstrapper {
                 order_rule,
                 state_sync_trigger,
                 ledger_info_provider.clone(),
+                chain_health_backoff,
                 self.config.rb_config.clone(),
                 self.config.round_state_config.clone(),
             );
@@ -430,7 +439,7 @@ pub(super) fn bootstrap_dag_for_test(
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
-    let (dag_store, order_rule) = bootstraper.bootstrap_dag_store(
+    let (dag_store, order_rule, chain_health_backoff) = bootstraper.bootstrap_dag_store(
         ledger_info_provider.clone(),
         parent_block_info,
         ordered_nodes_tx,
@@ -454,6 +463,7 @@ pub(super) fn bootstrap_dag_for_test(
         order_rule,
         state_sync_trigger,
         ledger_info_provider,
+        chain_health_backoff,
         bootstraper.config.rb_config.clone(),
         bootstraper.config.round_state_config.clone(),
     );

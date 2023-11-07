@@ -184,6 +184,13 @@ pub trait TDelayedFieldView {
     /// new aggregator V2.
     fn generate_delayed_field_id(&self) -> Self::Identifier;
 
+    /// Validate that given value (from aggregator structure) is a valid delayed field identifier,
+    /// and convert it to Self::Identifier if so.
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        id: u64,
+    ) -> Result<Self::Identifier, PanicError>;
+
     fn get_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
@@ -246,6 +253,13 @@ where
     /// new aggregator V2.
     fn generate_delayed_field_id(&self) -> Self::Identifier {
         unimplemented!("generate_delayed_field_id not implemented")
+    }
+
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        _id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        unimplemented!("get_and_validate_delayed_field_id not implemented")
     }
 
     fn get_reads_needing_exchange(
