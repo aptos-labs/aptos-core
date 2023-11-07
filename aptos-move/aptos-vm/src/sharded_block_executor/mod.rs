@@ -116,6 +116,55 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         Ok(aggregated_results)
     }
 
+    pub fn execute_block_remote(
+        &self,
+        state_view: Arc<S>,
+        transactions: Arc<PartitionedTransactions>,
+        concurrency_level_per_shard: usize,
+        onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let _timer = SHARDED_BLOCK_EXECUTION_SECONDS.start_timer();
+        let num_executor_shards = self.executor_client.num_shards();
+        NUM_EXECUTOR_SHARDS.set(num_executor_shards as i64);
+        assert_eq!(
+            num_executor_shards,
+            transactions.num_shards(),
+            "Block must be partitioned into {} sub-blocks",
+            num_executor_shards
+        );
+        let (sharded_output, global_output) = self
+            .executor_client
+            .execute_block_remote(
+                state_view,
+                transactions,
+                concurrency_level_per_shard,
+                onchain_config,
+            )?
+            .into_inner();
+        // wait for all remote executors to send the result back and append them in order by shard id
+        info!("ShardedBlockExecutor Received all results");
+        let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();
+        let num_rounds = sharded_output[0].len();
+        let mut aggregated_results = vec![];
+        let mut ordered_results = vec![vec![]; num_executor_shards * num_rounds];
+        // Append the output from individual shards in the round order
+        for (shard_id, results_from_shard) in sharded_output.into_iter().enumerate() {
+            for (round, result) in results_from_shard.into_iter().enumerate() {
+                ordered_results[round * num_executor_shards + shard_id] = result;
+            }
+        }
+
+        for result in ordered_results.into_iter() {
+            aggregated_results.extend(result);
+        }
+
+        // Lastly append the global output
+        aggregated_results.extend(global_output);
+
+        Ok(aggregated_results)
+    }
+
+
     pub fn shutdown(&mut self) {
         self.executor_client.shutdown();
     }

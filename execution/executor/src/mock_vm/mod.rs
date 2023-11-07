@@ -191,7 +191,7 @@ impl VMExecutor for MockVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        _transactions: PartitionedTransactions,
+        _transactions: Arc<PartitionedTransactions>,
         _state_view: Arc<S>,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> std::result::Result<Vec<TransactionOutput>, VMStatus> {

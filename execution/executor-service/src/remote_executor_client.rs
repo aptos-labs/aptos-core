@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{
-    remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest,
-    RemoteExecutionResult,
-};
+use crate::{remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest, RemoteExecutionResult, RemoteExecutionRequestRef, ExecuteBlockCommandRef};
 use aptos_logger::{info, trace};
 use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use aptos_storage_interface::cached_state_view::CachedStateView;
@@ -28,7 +25,7 @@ use std::{
     thread,
 };
 use std::thread::JoinHandle;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 
@@ -209,16 +206,20 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         self.command_txs.len()
     }
 
-    fn execute_block(
+    fn execute_block(&self, state_view: Arc<S>, transactions: PartitionedTransactions, concurrency_level_per_shard: usize, onchain_config: BlockExecutorConfigFromOnchain) -> Result<ShardedExecutionOutput, VMStatus> {
+        panic!("Not implemented for RemoteExecutorClient");
+    }
+
+    fn execute_block_remote(
         &self,
         state_view: Arc<S>,
-        transactions: PartitionedTransactions,
+        transactions: Arc<PartitionedTransactions>,
         concurrency_level_per_shard: usize,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ShardedExecutionOutput, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
         self.state_view_service.set_state_view(state_view);
-        let (sub_blocks, global_txns) = transactions.into();
+        let (sub_blocks, global_txns) = transactions.get_ref();
         if !global_txns.is_empty() {
             panic!("Global transactions are not supported yet");
         }
@@ -229,19 +230,21 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 .build()
                 .unwrap(),
         );
-
+        
         let cmd_tx_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "cmd_tx_async"])
             .start_timer();
-        for (shard_id, sub_blocks) in sub_blocks.into_iter().enumerate() {
+
+        for (shard_id, _) in sub_blocks.into_iter().enumerate() {
             let senders = self.command_txs.clone();
+            // TODO: Check if the function can get Arc<BlockExecutorConfigFromOnchain> instead.
             let onchain_config_clone = onchain_config.clone();
+            let transactions_clone = transactions.clone();
             thread_pool.spawn(move || {
-                let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
-                    sub_blocks,
+                let execution_request = RemoteExecutionRequestRef::ExecuteBlock(ExecuteBlockCommandRef {
+                    sub_blocks: &transactions_clone.get_ref().0[shard_id],
                     concurrency_level: concurrency_level_per_shard,
-                    onchain_config: onchain_config_clone,
-                    //maybe_block_gas_limit,
+                    onchain_config: &onchain_config_clone,
                 });
 
                 let execute_command_type = format!("execute_command_{}", shard_id);
@@ -256,6 +259,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                     .send(msg, &MessageType::new(execute_command_type));
             });
         }
+
         drop(cmd_tx_timer);
 
         let execution_results = self.get_output_from_shards()?;

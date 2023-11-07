@@ -1,3 +1,4 @@
+use std::sync::Arc;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::{
@@ -61,6 +62,19 @@ impl ExecuteBlockCommand {
     ) {
         (self.sub_blocks, self.concurrency_level, self.onchain_config)
     }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub enum RemoteExecutionRequestRef<'a> {
+    ExecuteBlock(ExecuteBlockCommandRef<'a>),
+}
+
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ExecuteBlockCommandRef<'a> {
+    pub(crate) sub_blocks: &'a SubBlocksForShard<AnalyzedTransaction>,
+    pub(crate) concurrency_level: usize,
+    pub(crate) onchain_config: &'a BlockExecutorConfigFromOnchain,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -222,6 +222,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
 
+    fn execute_block_remote(&self, state_view: Arc<S>, transactions: Arc<PartitionedTransactions>, concurrency_level_per_shard: usize, onchain_config: BlockExecutorConfigFromOnchain) -> Result<ShardedExecutionOutput, VMStatus> {
+        panic!("Not implemented for LocalExecutorClient");
+    }
+
     fn shutdown(&mut self) {}
 }
 

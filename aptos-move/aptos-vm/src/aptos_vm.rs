@@ -2584,7 +2584,7 @@ impl VMExecutor for AptosVM {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>>(
         sharded_block_executor: &ShardedBlockExecutor<S, C>,
-        transactions: PartitionedTransactions,
+        transactions: Arc<PartitionedTransactions>,
         state_view: Arc<S>,
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
@@ -2599,7 +2599,7 @@ impl VMExecutor for AptosVM {
         let _timer = TIMER
             .with_label_values(&["sharded_block_executor_coordinator_wrapper"])
             .start_timer();
-        let ret = sharded_block_executor.execute_block(
+        let ret = sharded_block_executor.execute_block_remote(
             state_view,
             transactions,
             AptosVM::get_concurrency_level(),

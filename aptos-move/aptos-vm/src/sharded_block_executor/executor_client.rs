@@ -46,5 +46,13 @@ pub trait ExecutorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
         onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<ShardedExecutionOutput, VMStatus>;
 
+    fn execute_block_remote(
+        &self,
+        state_view: Arc<S>,
+        transactions: Arc<PartitionedTransactions>,
+        concurrency_level_per_shard: usize,
+        onchain_config: BlockExecutorConfigFromOnchain,
+    ) -> Result<ShardedExecutionOutput, VMStatus>;
+
     fn shutdown(&mut self);
 }

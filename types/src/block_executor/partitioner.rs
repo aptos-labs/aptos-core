@@ -492,6 +492,10 @@ impl PartitionedTransactions {
         (self.sharded_txns, self.global_txns)
     }
 
+    pub fn get_ref(&self) -> (&Vec<SubBlocksForShard<AnalyzedTransaction>>, &Vec<TransactionWithDependencies<AnalyzedTransaction>>) {
+        (&self.sharded_txns, &self.global_txns)
+    }
+
     pub fn num_shards(&self) -> usize {
         self.sharded_txns.len()
     }
