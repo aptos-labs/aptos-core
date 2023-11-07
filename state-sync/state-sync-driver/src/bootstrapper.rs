@@ -33,8 +33,9 @@ use aptos_types::{
 use futures::channel::oneshot;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-/// The expected version of the genesis transaction
-pub const GENESIS_TRANSACTION_VERSION: u64 = 0;
+// Useful bootstrapper constants
+const BOOTSTRAPPER_LOG_INTERVAL_SECS: u64 = 3;
+pub const GENESIS_TRANSACTION_VERSION: u64 = 0; // The expected version of the genesis transaction
 
 /// A simple container for verified epoch states and epoch ending ledger infos
 /// that have been fetched from the network.
@@ -487,9 +488,13 @@ impl<
             return self.bootstrapping_complete().await;
         }
 
-        info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
-            "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
-            highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode())));
+        sample!(
+            SampleRate::Duration(Duration::from_secs(BOOTSTRAPPER_LOG_INTERVAL_SECS)),
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Highest synced version is {}, highest_known_ledger_info is {:?}, bootstrapping_mode is {:?}.",
+                highest_synced_version, highest_known_ledger_info, self.get_bootstrapping_mode()))
+            );
+        );
 
         // Bootstrap according to the mode
         if self.get_bootstrapping_mode().is_fast_sync() {
