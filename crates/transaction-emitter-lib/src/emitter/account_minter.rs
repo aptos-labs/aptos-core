@@ -124,12 +124,28 @@ impl<'t> AccountMinter<'t> {
                 )
             });
 
+        let balance = txn_executor
+            .get_account_balance(self.source_account.address())
+            .await?;
         if req.mint_to_root {
-            self.mint_to_root(txn_executor, coins_for_source).await?;
+            if balance.checked_add(coins_for_source).is_some() {
+                info!(
+                    "Mint account {} current balance is {}, minting additional {} coins",
+                    self.source_account.address(),
+                    balance,
+                    coins_for_source,
+                );
+                self.mint_to_root(txn_executor, coins_for_source).await?;
+            } else {
+                info!(
+                    "Mint account {} current balance is {}, needing {}. Proceeding without minting, as balance would overflow otherwise",
+                    self.source_account.address(),
+                    balance,
+                    coins_for_source,
+                );
+                assert!(balance > coins_for_source);
+            }
         } else {
-            let balance = txn_executor
-                .get_account_balance(self.source_account.address())
-                .await?;
             info!(
                 "Source account {} current balance is {}, needed {} coins, or {:.3}% of its balance",
                 self.source_account.address(),
