@@ -102,7 +102,7 @@ impl VMExecutor for PtxBlockExecutor {
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
         _sharded_block_executor: &ShardedBlockExecutor<S, E>,
-        _transactions: PartitionedTransactions,
+        _transactions: Arc<PartitionedTransactions>,
         _state_view: Arc<S>,
         _maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {

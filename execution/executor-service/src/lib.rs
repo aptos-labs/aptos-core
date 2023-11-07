@@ -1,3 +1,4 @@
+use std::sync::Arc;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_types::{
@@ -56,6 +57,19 @@ impl ExecuteBlockCommand {
             self.maybe_block_gas_limit,
         )
     }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub enum RemoteExecutionRequestRef<'a> {
+    ExecuteBlock(ExecuteBlockCommandRef<'a>),
+}
+
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ExecuteBlockCommandRef<'a> {
+    pub(crate) sub_blocks: &'a SubBlocksForShard<AnalyzedTransaction>,
+    pub(crate) concurrency_level: usize,
+    pub(crate) maybe_block_gas_limit: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -91,12 +91,14 @@ impl ChunkOutput {
         let timer = TIMER
             .with_label_values(&["partitioned_txns_clone"])
             .start_timer();
-        let partitioned_txns_clone = transactions.clone();
+        let transactions_arc = Arc::new(transactions);
+        let transactions_arc_clone = transactions_arc.clone();
         drop(timer);
 
         let (sender, receiver) = mpsc::channel();
         rayon::spawn(move || {
-            let flattened_txns = PartitionedTransactions::flatten(transactions)
+            let transactions_clone = (*transactions_arc_clone).clone();
+            let flattened_txns = PartitionedTransactions::flatten(transactions_clone)
                 .into_iter()
                 .map(|t| t.into_txn().into_inner())
                 .collect();
@@ -104,7 +106,7 @@ impl ChunkOutput {
         });
 
         let transaction_outputs = Self::execute_block_sharded::<V>(
-            partitioned_txns_clone,
+            transactions_arc,
             state_view_arc.clone(),
             maybe_block_gas_limit,
         )?;
@@ -189,7 +191,7 @@ impl ChunkOutput {
     }
 
     fn execute_block_sharded<V: VMExecutor>(
-        partitioned_txns: PartitionedTransactions,
+        partitioned_txns: Arc<PartitionedTransactions>,
         state_view: Arc<CachedStateView>,
         maybe_block_gas_limit: Option<u64>,
     ) -> Result<Vec<TransactionOutput>> {
@@ -201,12 +203,13 @@ impl ChunkOutput {
                 maybe_block_gas_limit,
             )?)
         } else {
-            Ok(V::execute_block_sharded(
+            panic!("Temporarily local sharded execution is not supported");
+            /*Ok(V::execute_block_sharded(
                 SHARDED_BLOCK_EXECUTOR.lock().deref(),
                 partitioned_txns,
                 state_view,
                 maybe_block_gas_limit,
-            )?)
+            )?)*/
         }
     }
 
