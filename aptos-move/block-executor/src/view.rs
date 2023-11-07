@@ -776,10 +776,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         delayed_write_set_keys: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
     ) -> Result<BTreeMap<T::Key, (T::Value, u64)>, PanicError> {
-        parallel_state
+        let group_read_values_with_delayed_fields = parallel_state
             .captured_reads
             .borrow()
             .get_group_read_values_with_delayed_fields()
+            .map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>();
+        group_read_values_with_delayed_fields.into_iter()
             .filter(|(key, _)| !skip.contains(key))
             .flat_map(|(key, group_read)| {
                 let GroupRead { inner_reads, .. } = group_read;
@@ -803,14 +805,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 }
 
                 // TODO[agg_v2](fix): Is it guaranteed that metadata is not None?
-                if let Ok(Some(maybe_metadata)) = self.get_resource_state_value_metadata(key) {
+                if let Ok(Some(maybe_metadata)) = self.get_resource_state_value_metadata(&key) {
                     let maybe_metadata = maybe_metadata.map(
                         |metadata: aptos_types::state_store::state_value::StateValueMetadata| {
                             StateValue::new_with_metadata(Bytes::new(), metadata)
                         },
                     );
                     if let Ok(GroupReadResult::Size(group_size)) =
-                        parallel_state.read_group_size(key, self.txn_idx)
+                        parallel_state.read_group_size(&key, self.txn_idx)
                     {
                         return Some(Ok((
                             key.clone(),
@@ -1146,10 +1148,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        println!(
-            "get_resource_from_group {:?} {:?} {:?}",
-            group_key, resource_tag, maybe_layout
-        );
+        // println!(
+        //     "get_resource_from_group {:?} {:?} {:?}",
+        //     group_key, resource_tag, maybe_layout
+        // );
         let maybe_layout = maybe_layout.map(|layout| Arc::new(layout.clone()));
 
         let read_from_group_parallel =
@@ -1161,7 +1163,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                     .borrow()
                     .get_by_kind(group_key, Some(resource_tag), ReadKind::Value)
                 {
-                    println!("answered_from_captured_reads");
+                    // println!("answered_from_captured_reads");
                     return Ok(GroupReadResult::Value(
                         v.extract_raw_bytes(),
                         UnsetOrLayout::Set(layout),
@@ -1169,7 +1171,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 }
 
                 loop {
-                    println!("answered_from_versioned_map");
+                    // println!("answered_from_versioned_map");
                     match parallel_state.versioned_map.group_data().read_from_group(
                         group_key,
                         resource_tag,
@@ -1177,14 +1179,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                         UnsetOrLayout::Set(maybe_layout.clone()),
                     ) {
                         Ok((version, v, maybe_layout)) => {
-                            println!("obtained_data_from_versioned_map");
+                            // println!("obtained_data_from_versioned_map");
                             let patched_v = match (v.as_state_value(), maybe_layout.clone()) {
                                 (Some(state_value), Some(layout)) => {
                                     let res = self.replace_values_with_identifiers(
                                         state_value,
                                         layout.as_ref(),
                                     );
-                                    println!("replace_values_with_identifiers {:?}", res);
+                                    // println!("replace_values_with_identifiers {:?}", res);
                                     match res {
                                         Ok((patched_value, _)) => Some(Arc::new(
                                             T::Value::from_state_value(Some(patched_value)),
@@ -1233,11 +1235,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                             return Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset));
                         },
                         Err(Uninitialized) => {
-                            println!("unitialized_in_versioned_map");
+                            // println!("unitialized_in_versioned_map");
                             return Ok(GroupReadResult::Uninitialized);
                         },
                         Err(TagNotFound) => {
-                            println!("tag_not_found_in_versioned_map");
+                            // println!("tag_not_found_in_versioned_map");
                             let data_read = DataRead::Versioned(
                                 Err(StorageVersion),
                                 Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
@@ -1277,11 +1279,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
 
                 match group_read {
                     GroupReadResult::Value(value, UnsetOrLayout::Unset) => {
-                        if let Some(layout) = maybe_layout.clone() {
-                            if let Some(bytes) = value {
+                        match (&value, &maybe_layout) {
+                            (Some(bytes), Some(layout)) => {
                                 let res = self.replace_values_with_identifiers(
                                     //TODO[agg_v2](fix) Is this correct way to get the state value in this context?
-                                    StateValue::new_legacy(bytes),
+                                    StateValue::new_legacy(bytes.clone()),
                                     layout.as_ref(),
                                 );
                                 println!("replace_values_with_identifiers_seq {:?}", res);
@@ -1293,11 +1295,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                                             TransactionWrite::from_state_value(Some(
                                                 patched_state_value.clone(),
                                             )),
-                                            maybe_layout.clone(),
+                                            Some(layout.clone()),
                                         );
                                         Ok(GroupReadResult::Value(
                                             Some(patched_state_value.bytes().clone()),
-                                            UnsetOrLayout::Set(maybe_layout.clone()),
+                                            UnsetOrLayout::Set(Some(layout.clone())),
                                         ))
                                     },
                                     Err(err) => {
@@ -1318,19 +1320,21 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                                         Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset))
                                     },
                                 }
-                            } else {
+                            },
+                            (Some(bytes), None) => {
+                                sequential_state.unsync_map.write_group_data(
+                                    group_key.clone(),
+                                    resource_tag.clone(),
+                                    TransactionWrite::from_state_value(
+                                        Some(StateValue::new_legacy(bytes.clone())),
+                                    ),
+                                    None,
+                                );
+                                Ok(GroupReadResult::Value(value, UnsetOrLayout::Set(None)))
+                            },
+                            (None, _) => {
                                 Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset))
                             }
-                        } else {
-                            sequential_state.unsync_map.write_group_data(
-                                group_key.clone(),
-                                resource_tag.clone(),
-                                TransactionWrite::from_state_value(
-                                    value.clone().map(StateValue::new_legacy),
-                                ),
-                                None,
-                            );
-                            Ok(GroupReadResult::Value(value, UnsetOrLayout::Set(None)))
                         }
                     },
                     GroupReadResult::Value(value, UnsetOrLayout::Set(maybe_layout)) => Ok(

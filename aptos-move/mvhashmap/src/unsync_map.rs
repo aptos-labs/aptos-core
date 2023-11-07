@@ -9,7 +9,7 @@ use aptos_aggregator::types::DelayedFieldValue;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     executable::{Executable, ExecutableDescriptor, ModulePath},
-    write_set::TransactionWrite,
+    write_set::{TransactionWrite, WriteOpKind},
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_core_types::value::MoveTypeLayout;
@@ -57,7 +57,7 @@ impl<
 }
 
 impl<
-        K: ModulePath + Hash + Clone + Eq,
+        K: ModulePath + Hash + Clone + Eq + Debug,
         T: Hash + Clone + Debug + Eq + Serialize,
         V: TransactionWrite,
         X: Executable,
@@ -73,17 +73,17 @@ impl<
         group_key: K,
         base_values: impl IntoIterator<Item = (T, (V, UnsetOrLayout))>,
     ) {
+        let base_map = base_values
+            .into_iter()
+            .map(|(t, (v, maybe_layout))| (t, (Arc::new(v), maybe_layout)))
+            .collect();
+        println!("set_group_base_values: {:?} => {:?}", group_key, base_map);
         assert!(
             self.group_cache
                 .borrow_mut()
                 .insert(
                     group_key,
-                    RefCell::new(
-                        base_values
-                            .into_iter()
-                            .map(|(t, (v, maybe_layout))| (t, (Arc::new(v), maybe_layout)))
-                            .collect()
-                    )
+                    RefCell::new(base_map)
                 )
                 .is_none(),
             "UnsyncMap group cache must be empty to provide base values"
@@ -155,10 +155,23 @@ impl<
             (Occupied(mut entry), Modification) => {
                 entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
             },
+            // (Occupied(mut entry), Creation) => {
+            //     if entry.get().0.write_op_kind() == Deletion {
+            //         entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
+            //     } else {
+            //         println!("WriteOp kind {:?} not consistent with previous value at tag {:?}. l: {:?}, r: {:?}", v.write_op_kind(), value_tag, l, r);
+            //         bail!(
+            //             "WriteOp kind {:?} not consistent with previous value at tag {:?}",
+            //             v.write_op_kind(),
+            //             value_tag
+            //         );
+            //     }
+            // },
             (Vacant(entry), Creation) => {
                 entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
             },
-            (_, _) => {
+            (l, r) => {
+                println!("WriteOp kind {:?} not consistent with previous value at tag {:?}. l: {:?}, r: {:?}", v.write_op_kind(), value_tag, l, r);
                 bail!(
                     "WriteOp kind {:?} not consistent with previous value at tag {:?}",
                     v.write_op_kind(),
@@ -226,6 +239,10 @@ impl<
         value: V,
         layout: Option<Arc<MoveTypeLayout>>,
     ) {
+        println!("write_group_data: {:?} => {:?} => {:?}", group_key, value_tag, value);
+        if value.write_op_kind() == WriteOpKind::Deletion {
+            panic!();
+        }
         self.group_cache
             .borrow_mut()
             .get_mut(&group_key)

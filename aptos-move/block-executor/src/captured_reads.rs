@@ -152,7 +152,7 @@ impl<V: TransactionWrite> DataRead<V> {
 /// over the latest contents present in the group, i.e. the respective tags and values (in
 /// this sense, group size is even more speculative than other captured information, as it
 /// does not depend on a single "latest" entry, but collected sizes of many "latest" entries).
-#[derive(Derivative)]
+#[derive(Derivative, Clone)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct GroupRead<T: Transaction> {
     /// The size of the resource group can be read (used for gas charging).
