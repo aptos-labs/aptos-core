@@ -3,7 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
-- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558.
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558. 
+- Improved reliability of inter-container networking with local testnet.
 
 ## [2.3.0] - 2023/10/25
 ### Added
