@@ -77,7 +77,6 @@ impl<
             .into_iter()
             .map(|(t, (v, maybe_layout))| (t, (Arc::new(v), maybe_layout)))
             .collect();
-        println!("set_group_base_values: {:?} => {:?}", group_key, base_map);
         assert!(
             self.group_cache
                 .borrow_mut()
