@@ -349,6 +349,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-mutex",
+ "bcs 0.1.4",
  "futures",
  "http",
  "hyper",
@@ -2527,6 +2528,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "regex",
+ "reqwest",
  "tokio",
  "url",
 ]
