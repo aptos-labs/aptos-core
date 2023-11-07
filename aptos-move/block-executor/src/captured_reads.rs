@@ -12,7 +12,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        UnsetOrLayout, Version,
+        UnsetOrLayout, Version, ValueWithLayout,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -143,6 +143,14 @@ impl<V: TransactionWrite> DataRead<V> {
             },
             (_, _) => unreachable!("{:?}, {:?} must be covered", self_kind, kind),
         })
+    }
+
+    pub(crate) fn from_value_with_layout(version: Version, value: ValueWithLayout<V>) -> Self {
+        match value {
+            // If value was never exchanged, then it can be the highest one without full value.
+            ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
+            ValueWithLayout::Exchanged(v, layout) => DataRead::Versioned(version, v.clone(), layout),
+        }
     }
 }
 
@@ -540,9 +548,9 @@ impl<T: Transaction> CapturedReads<T> {
         use MVDataOutput::*;
         self.data_reads.iter().all(|(k, r)| {
             match data_map.fetch_data(k, idx_to_validate) {
-                Ok(Versioned(version, v, layout)) => {
+                Ok(Versioned(version, v)) => {
                     matches!(
-                        DataRead::Versioned(version, v, layout).contains(r),
+                        DataRead::from_value_with_layout(version, v).contains(r),
                         DataReadComparison::Contains
                     )
                 },
@@ -656,6 +664,10 @@ impl<T: Transaction> CapturedReads<T> {
 
     pub(crate) fn mark_failure(&mut self) {
         self.speculative_failure = true;
+    }
+
+    pub(crate) fn mark_incorrect_use(&mut self) {
+        self.incorrect_use = true;
     }
 }
 

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex};
+use crate::types::{Flag, Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout};
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::write_set::TransactionWrite;
@@ -33,7 +33,7 @@ enum EntryCell<V> {
     /// has: 1) Incarnation number of the transaction that wrote the entry (note
     /// that TxnIndex is part of the key and not recorded here), 2) actual data
     /// stored in a shared pointer (to ensure ownership and avoid clones).
-    Write(Incarnation, Arc<V>, Option<Arc<MoveTypeLayout>>),
+    Write(Incarnation, ValueWithLayout<V>),
 
     /// Recorded in the shared multi-version data-structure for each delta.
     /// Option<u128> is a shortcut to aggregated value (to avoid traversing down
@@ -55,11 +55,10 @@ pub struct VersionedData<K, V> {
 impl<V> Entry<V> {
     fn new_write_from(
         incarnation: Incarnation,
-        data: V,
-        layout: Option<Arc<MoveTypeLayout>>,
+        value: ValueWithLayout<V>,
     ) -> Entry<V> {
         Entry {
-            cell: EntryCell::Write(incarnation, Arc::new(data), layout),
+            cell: EntryCell::Write(incarnation, value),
             flag: Flag::Done,
         }
     }
@@ -127,18 +126,17 @@ impl<V: TransactionWrite> VersionedValue<V> {
             }
 
             match (&entry.cell, accumulator.as_mut()) {
-                (EntryCell::Write(incarnation, data, layout), None) => {
+                (EntryCell::Write(incarnation, data), None) => {
                     // Resolve to the write if no deltas were applied in between.
                     return Ok(Versioned(
                         idx.idx().map(|idx| (idx, *incarnation)),
                         data.clone(),
-                        layout.clone(),
                     ));
                 },
-                (EntryCell::Write(incarnation, data, layout), Some(accumulator)) => {
+                (EntryCell::Write(incarnation, data), Some(accumulator)) => {
                     // Deltas were applied. We must deserialize the value
                     // of the write and apply the aggregated delta accumulator.
-                    let value = data.as_ref();
+                    let value = data.extract_value_no_layout().as_ref();
                     return match value
                         .as_u128()
                         .expect("Aggregator value must deserialize to u128")
@@ -150,7 +148,6 @@ impl<V: TransactionWrite> VersionedValue<V> {
                             Ok(Versioned(
                                 idx.idx().map(|idx| (idx, *incarnation)),
                                 data.clone(),
-                                layout.clone(),
                             ))
                         },
                         Some(value) => {
@@ -260,38 +257,54 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
-    pub fn set_base_value(&self, key: K, data: V, maybe_layout: Option<Arc<MoveTypeLayout>>) {
+    pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
         let mut v = self.values.entry(key).or_default();
-        let bytes_len = data.bytes().map(|b| b.len());
         // For base value, incarnation is irrelevant, and is always set to 0.
 
         use btree_map::Entry::*;
+        use ValueWithLayout::*;
         match v.versioned_map.entry(ShiftedTxnIndex::zero()) {
             Vacant(v) => {
-                v.insert(CachePadded::new(Entry::new_write_from(
-                    0,
-                    data,
-                    maybe_layout,
-                )));
+                v.insert(CachePadded::new(Entry::new_write_from(0, value)));
             },
-            Occupied(o) => {
-                assert!(
-                    if let EntryCell::Write(i, v, layout) = &o.get().cell {
-                        // base value may have already been provided by another transaction
-                        // executed simultaneously and asking for the same resource.
-                        // Value from storage must be identical, but then delayed field
-                        // identifier exchange could've modiefied it.
-                        //
-                        // If maybe_layout is None, they are required to be identical
-                        // If maybe_layout is Some, there might have been an exchange
-                        // Assert the length of bytes for efficiency (instead of full equality)
-                        layout.is_some() == maybe_layout.is_some()
-                            && *i == 0
-                            && (layout.is_some() || v.bytes().map(|b| b.len()) == bytes_len)
-                    } else {
-                        true
+            Occupied(mut o) => {
+                if let EntryCell::Write(i, existing_value) = &o.get().cell {
+                    assert!(*i == 0);
+                    match (existing_value, &value) {
+                        (RawFromStorage(ev), RawFromStorage(v)) => {
+                            // Base value from storage needs to be identical
+                            // Assert the length of bytes for efficiency (instead of full equality)
+                            assert!(
+                                *i == 0
+                                && v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len())
+                            )
+                        },
+                        (Exchanged(_, _), RawFromStorage(_)) => {
+                            // Stored value contains more info, nothing to do.
+                        },
+                        (RawFromStorage(_), Exchanged(_, _)) => {
+                            // Received more info, update
+                            o.insert(CachePadded::new(Entry::new_write_from(0, value)));
+                        },
+                        (Exchanged(ev, e_layout), Exchanged(v, layout)) => {
+                            // base value may have already been provided by another transaction
+                            // executed simultaneously and asking for the same resource.
+                            // Value from storage must be identical, but then delayed field
+                            // identifier exchange could've modiefied it.
+                            //
+                            // If maybe_layout is None, they are required to be identical
+                            // If maybe_layout is Some, there might have been an exchange
+                            // Assert the length of bytes for efficiency (instead of full equality)
+                            assert!(e_layout.is_some() == layout.is_some()
+                                && (layout.is_some() || v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len())));
+                        },
+                        // (DoesntExist, DoesntExist) => {
+                        // },
+                        // (DoesntExist, _) | (_, DoesntExist) => {
+                        //     panic!("We cannot have a base value sometimes exist, and sometimes doesn't");
+                        // }
                     }
-                );
+                }
             },
         };
     }
@@ -307,12 +320,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(Entry::new_write_from(incarnation, data.0, data.1)),
+            CachePadded::new(Entry::new_write_from(incarnation, ValueWithLayout::Exchanged(Arc::new(data.0), data.1))),
         );
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
         assert!(prev_entry.map_or(true, |entry| -> bool {
-            if let EntryCell::Write(i, _, _) = entry.cell {
+            if let EntryCell::Write(i, _) = entry.cell {
                 i < incarnation
             } else {
                 true

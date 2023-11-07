@@ -95,7 +95,7 @@ pub enum MVDataOutput<V> {
     Resolved(u128),
     /// Information from the last versioned-write. Note that the version is returned
     /// and not the data to avoid copying big values around.
-    Versioned(Version, Arc<V>, Option<Arc<MoveTypeLayout>>),
+    Versioned(Version, ValueWithLayout<V>),
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
@@ -167,6 +167,44 @@ impl ShiftedTxnIndex {
     pub(crate) fn zero() -> Self {
         Self { idx: 0 }
     }
+}
+
+// TODO[agg_v2](cleanup): consider adding `DoesntExist` variant.
+// Currently, "not existing value" is represented as Deletion.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ValueWithLayout<V> {
+    // When we read from storage, but don't have access to layout, we can only store the raw value.
+    // This should never be returned to the user, before exchange is performed.
+    RawFromStorage(Arc<V>),
+    // We've used the optional layout, and applied exchange to the storage value.
+    // The type layout is Some if there is a delayed field in the resource.
+    // The type layout is None if there is no delayed field in the resource.
+    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>)
+}
+
+impl<T> Clone for ValueWithLayout<T> {
+    fn clone(&self) -> Self {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => ValueWithLayout::RawFromStorage(value.clone()),
+            ValueWithLayout::Exchanged(value, layout) => ValueWithLayout::Exchanged(value.clone(), layout.clone()),
+        }
+    }
+}
+
+impl<V> ValueWithLayout<V> {
+    pub fn extract_value_no_layout(&self) -> &Arc<V> {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => value,
+            ValueWithLayout::Exchanged(value, None) => value,
+            ValueWithLayout::Exchanged(_, Some(_)) => panic!("Unexpected layout"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum UnknownOrLayout<'a> {
+    Unknown,
+    Known(Option<&'a MoveTypeLayout>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

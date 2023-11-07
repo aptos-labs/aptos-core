@@ -23,7 +23,7 @@ use aptos_aggregator::{
 };
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDelayedFieldsError, TxnIndex, UnsetOrLayout},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex, UnsetOrLayout, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
@@ -803,7 +803,7 @@ where
                         .expect("Aggregator base value deserialization error")
                         .expect("Aggregator base value must exist");
 
-                    versioned_cache.data().set_base_value(k.clone(), w, None);
+                    versioned_cache.data().set_base_value(k.clone(), ValueWithLayout::RawFromStorage(Arc::new(w)));
                     op.apply_to(value_u128)
                         .expect("Materializing delta w. base value set must succeed")
                 });
@@ -1165,10 +1165,15 @@ where
         for (key, write_op) in output
             .aggregator_v1_write_set()
             .into_iter()
-            .chain(output.module_write_set().into_iter())
         {
             unsync_map.write(key, write_op, None);
         }
+
+        for (key, write_op) in output.module_write_set().into_iter()
+        {
+            unsync_map.write_module(key, write_op);
+        }
+
 
         let mut second_phase = Vec::new();
         let mut updates = HashMap::new();
@@ -1242,14 +1247,12 @@ where
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
-                ViewState::Unsync(SequentialState {
-                    unsync_map: &unsync_map,
+                ViewState::Unsync(SequentialState::new(
+                    &unsync_map,
                     start_counter,
-                    counter: &counter,
-                    resource_read_set: RefCell::new(HashSet::new()),
-                    group_read_set: RefCell::new(HashSet::new()),
+                    &counter,
                     dynamic_change_set_optimizations_enabled,
-                }),
+                )),
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex, true);

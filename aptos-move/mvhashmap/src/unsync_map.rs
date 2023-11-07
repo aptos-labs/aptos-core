@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    types::{GroupReadResult, MVModulesOutput, UnsetOrLayout},
+    types::{GroupReadResult, MVModulesOutput, UnsetOrLayout, ValueWithLayout},
     utils::module_hash,
 };
 use aptos_aggregator::types::DelayedFieldValue;
@@ -29,8 +29,9 @@ pub struct UnsyncMap<
 > {
     // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
     // simplifies the trait-based integration for executable caching. TODO: better representation.
+    map: RefCell<HashMap<K, ValueWithLayout<V>>>,
     // Optional hash can store the hash of the module to avoid re-computations.
-    map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>, Option<Arc<MoveTypeLayout>>)>>,
+    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, (Arc<V>, UnsetOrLayout)>>>>,
     executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
     executable_bytes: RefCell<usize>,
@@ -48,6 +49,7 @@ impl<
     fn default() -> Self {
         Self {
             map: RefCell::new(HashMap::new()),
+            module_map: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
             executable_cache: RefCell::new(HashMap::new()),
             executable_bytes: RefCell::new(0),
@@ -167,11 +169,11 @@ impl<
         Ok(())
     }
 
-    pub fn fetch_data(&self, key: &K) -> Option<(Arc<V>, Option<Arc<MoveTypeLayout>>)> {
+    pub fn fetch_data(&self, key: &K) -> Option<ValueWithLayout<V>> {
         self.map
             .borrow()
             .get(key)
-            .map(|entry| (entry.0.clone(), entry.2.clone()))
+            .map(|entry| entry.clone())
     }
 
     pub fn fetch_group_data(
@@ -192,11 +194,18 @@ impl<
         })
     }
 
+    pub fn fetch_module_data(&self, key: &K) -> Option<Arc<V>> {
+        self.module_map
+            .borrow()
+            .get(key)
+            .map(|entry| entry.0.clone())
+    }
+
     pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<V, X>> {
         use MVModulesOutput::*;
         debug_assert!(key.module_path().is_some());
 
-        self.map.borrow_mut().get_mut(key).map(|entry| {
+        self.module_map.borrow_mut().get_mut(key).map(|entry| {
             let hash = entry.1.get_or_insert(module_hash(entry.0.as_ref()));
 
             self.executable_cache.borrow().get(hash).map_or_else(
@@ -213,7 +222,17 @@ impl<
     pub fn write(&self, key: K, value: V, layout: Option<Arc<MoveTypeLayout>>) {
         self.map
             .borrow_mut()
-            .insert(key, (Arc::new(value), None, layout));
+            .insert(key, ValueWithLayout::Exchanged(Arc::new(value), layout));
+    }
+
+    pub fn write_module(&self, key: K, value: V) {
+        self.module_map
+            .borrow_mut()
+            .insert(key, (Arc::new(value), None));
+    }
+
+    pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
+        self.map.borrow_mut().insert(key, value);
     }
 
     pub fn write_group_data(
