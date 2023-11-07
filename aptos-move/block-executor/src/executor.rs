@@ -532,23 +532,20 @@ where
                 }
             }
 
-            let finalize_group = |group_key: T::Key, metadata_op: T::Value| -> Result<_, _> {
-                match versioned_cache
-                    .group_data()
-                    .finalize_group(&group_key, txn_idx)
-                {
+            let process_finalized_group = |finalized_group: anyhow::Result<Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>>, metadata_is_deletion: bool| -> Result<_, _> {
+                match finalized_group {
                     Ok(finalized_group) => {
                         // finalize_group already applies the deletions.
-                        if finalized_group.is_empty() != metadata_op.is_deletion() {
+                        if finalized_group.is_empty() != metadata_is_deletion {
                             return Err(Error::FallbackToSequential(resource_group_error(
                                 format!(
                                 "Group is empty = {} but op is deletion = {} in parallel execution",
                                 finalized_group.is_empty(),
-                                metadata_op.is_deletion()
+                                metadata_is_deletion
                             ),
                             )));
                         }
-                        Ok((group_key, metadata_op, finalized_group))
+                        Ok(finalized_group)
                     },
                     Err(e) => Err(Error::FallbackToSequential(resource_group_error(format!(
                         "Error committing resource group {:?}",
@@ -562,8 +559,11 @@ where
             let mut maybe_err = None;
             for (group_key, metadata_op) in group_metadata_ops.into_iter() {
                 // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
-                match finalize_group(group_key, metadata_op) {
-                    Ok((group_key, metadata_op, finalized_group)) => {
+                let finalized_result = versioned_cache
+                    .group_data()
+                    .finalize_group(&group_key, txn_idx);
+                match process_finalized_group(finalized_result, metadata_op.is_deletion()) {
+                    Ok(finalized_group) => {
                         finalized_group_writes.push((group_key, metadata_op, finalized_group));
                     },
                     Err(err) => {
@@ -583,8 +583,11 @@ where
                     for (group_key, metadata_op) in
                         group_reads_needing_delayed_field_exchange.into_iter()
                     {
-                        match finalize_group(group_key, metadata_op) {
-                            Ok((group_key, metadata_op, finalized_group)) => {
+                        let finalized_result = versioned_cache
+                            .group_data()
+                            .get_last_committed_group(&group_key);
+                        match process_finalized_group(finalized_result, metadata_op.is_deletion()) {
+                            Ok(finalized_group) => {
                                 if let Some(metadata_op) =
                                     metadata_op.convert_read_to_modification()
                                 {

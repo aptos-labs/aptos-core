@@ -442,6 +442,14 @@ impl<
         v.commit_idx(ShiftedTxnIndex::new(txn_idx))?;
         Ok(v.get_committed_group())
     }
+
+    pub fn get_last_committed_group(
+        &self,
+        key: &K,
+    ) -> anyhow::Result<Vec<(T, (Arc<V>, Option<Arc<MoveTypeLayout>>))>> {
+        let v = self.group_values.get_mut(key).expect("Path must exist");
+        Ok(v.get_committed_group())
+    }
 }
 
 #[cfg(test)]

@@ -624,6 +624,7 @@ mod tests {
 
     #[test]
     fn test_benchmark_transaction() {
+        AptosVM::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::TokenV2AmbassadorMint), true);
     }
 
