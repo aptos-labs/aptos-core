@@ -1,32 +1,33 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This file implements traits for ECDSA signatures over NIST-P256.
+//! This file implements traits for ECDSA signatures over Secp256r1.
 
-use super::P256_SIGNATURE_LENGTH;
+use super::SIGNATURE_LENGTH;
 use crate::{
     hash::CryptoHash,
-    p256_ecdsa::{P256PrivateKey, P256PublicKey, ORDER_HALF},
-    traits::*,
+    secp256r1_ecdsa::{PrivateKey, PublicKey, ORDER_HALF},
+    traits::{Signature as SignatureTrait, *},
 };
 use anyhow::{anyhow, Result};
-use aptos_crypto_derive::{DeserializeKey, SerializeKey};
+use aptos_crypto_derive::{key_name, DeserializeKey, SerializeKey};
 use core::convert::TryFrom;
 use p256::NonZeroScalar;
 use serde::Serialize;
 use signature::Verifier;
 use std::{cmp::Ordering, fmt};
 
-/// A P256 signature
+/// A Secp256r1 ECDSA signature
 #[derive(DeserializeKey, Clone, SerializeKey)]
-pub struct P256Signature(pub(crate) p256::ecdsa::Signature);
+#[key_name("Secp256r1EcdsaSignature")]
+pub struct Signature(pub(crate) p256::ecdsa::Signature);
 
-impl P256Signature {
-    /// The length of the P256Signature
-    pub const LENGTH: usize = P256_SIGNATURE_LENGTH;
+impl Signature {
+    /// The length of the Signature
+    pub const LENGTH: usize = SIGNATURE_LENGTH;
 
-    /// Serialize an P256Signature. Uses the SEC1 serialization format.
-    pub fn to_bytes(&self) -> [u8; P256_SIGNATURE_LENGTH] {
+    /// Serialize an Signature. Uses the SEC1 serialization format.
+    pub fn to_bytes(&self) -> [u8; SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
         self.0.to_bytes().try_into().unwrap()
     }
@@ -35,9 +36,9 @@ impl P256Signature {
     /// Uses the SEC1 serialization format.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
-    ) -> std::result::Result<P256Signature, CryptoMaterialError> {
+    ) -> std::result::Result<Signature, CryptoMaterialError> {
         match p256::ecdsa::Signature::try_from(bytes) {
-            Ok(p256_signature) => Ok(P256Signature(p256_signature)),
+            Ok(p256_signature) => Ok(Signature(p256_signature)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
     }
@@ -55,15 +56,15 @@ impl P256Signature {
     /// We use the technique described in
     /// [BIP146](https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki) to prevent
     /// malleability of ECDSA signatures. Signatures comprise elements {R, S}, and S can be
-    /// enforced to be of canonical form by ensuring it is less than the order of the P256 curve
+    /// enforced to be of canonical form by ensuring it is less than the order of the Secp256r1 curve
     /// divided by 2. If this is not done, a value S > n/2 can be replaced by S' = n - S to form another distinct valid
     /// signature, where n is the curve order. This check is not performed by the RustCrypto P256 library
     /// we use
     pub fn check_s_malleability(bytes: &[u8]) -> std::result::Result<(), CryptoMaterialError> {
-        if bytes.len() != P256_SIGNATURE_LENGTH {
+        if bytes.len() != SIGNATURE_LENGTH {
             return Err(CryptoMaterialError::WrongLengthError);
         }
-        if !P256Signature::check_s_lt_order_half(&bytes[32..]) {
+        if !Signature::check_s_lt_order_half(&bytes[32..]) {
             return Err(CryptoMaterialError::CanonicalRepresentationError);
         }
         Ok(())
@@ -85,8 +86,8 @@ impl P256Signature {
     /// If the signature {R,S} does not have S < n/2 where n is the Ristretto255 order, return
     /// {R,n-S} as the canonical encoding of this signature to prevent malleability attacks. See
     /// `check_s_malleability` for more detail
-    pub fn make_canonical(&self) -> P256Signature {
-        if P256Signature::check_s_malleability(&self.to_bytes()[..]).is_ok() {
+    pub fn make_canonical(&self) -> Signature {
+        if Signature::check_s_malleability(&self.to_bytes()[..]).is_ok() {
             return self.clone();
         };
         let s = self.0.s();
@@ -94,7 +95,17 @@ impl P256Signature {
         let new_s = -*s;
         let new_s_nonzero = NonZeroScalar::new(new_s).unwrap();
         let new_sig = p256::ecdsa::Signature::from_scalars(r, new_s_nonzero).unwrap();
-        P256Signature(new_sig)
+        Signature(new_sig)
+    }
+
+    /// If signature bytes are serialized correctly, this function will return a canonical signature
+    /// that passes malleability checks.
+    #[cfg(feature = "testing")]
+    pub fn make_canonical_from_bytes_unchecked(
+        bytes: &[u8],
+    ) -> Result<Signature, CryptoMaterialError> {
+        let signature = Signature::from_bytes_unchecked(bytes)?;
+        Ok(Signature::make_canonical(&signature))
     }
 }
 
@@ -102,17 +113,13 @@ impl P256Signature {
 // Signature Traits //
 //////////////////////
 
-impl Signature for P256Signature {
-    type SigningKeyMaterial = P256PrivateKey;
-    type VerifyingKeyMaterial = P256PublicKey;
+impl SignatureTrait for Signature {
+    type SigningKeyMaterial = PrivateKey;
+    type VerifyingKeyMaterial = PublicKey;
 
     /// Verifies that the provided signature is valid for the provided message, going beyond the
     /// [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final) specification, to prevent scalar malleability as done in [BIP146](https://github.com/bitcoin/bips/blob/master/bip-0146.mediawiki).
-    fn verify<T: CryptoHash + Serialize>(
-        &self,
-        message: &T,
-        public_key: &P256PublicKey,
-    ) -> Result<()> {
+    fn verify<T: CryptoHash + Serialize>(&self, message: &T, public_key: &PublicKey) -> Result<()> {
         Self::verify_arbitrary_msg(self, &signing_message(message)?, public_key)
     }
 
@@ -122,8 +129,8 @@ impl Signature for P256Signature {
     ///
     /// Checks for and rejects non-canonical signatures (r,s) where s > (n/2), where n is the group
     /// order
-    fn verify_arbitrary_msg(&self, message: &[u8], public_key: &P256PublicKey) -> Result<()> {
-        P256Signature::check_s_malleability(&self.to_bytes())?;
+    fn verify_arbitrary_msg(&self, message: &[u8], public_key: &PublicKey) -> Result<()> {
+        Signature::check_s_malleability(&self.to_bytes())?;
 
         public_key
             .0
@@ -137,51 +144,51 @@ impl Signature for P256Signature {
     }
 }
 
-impl Length for P256Signature {
+impl Length for Signature {
     fn length(&self) -> usize {
-        P256_SIGNATURE_LENGTH
+        SIGNATURE_LENGTH
     }
 }
 
-impl ValidCryptoMaterial for P256Signature {
+impl ValidCryptoMaterial for Signature {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
 }
 
-impl std::hash::Hash for P256Signature {
+impl std::hash::Hash for Signature {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         let encoded_signature = self.to_bytes();
         state.write(&encoded_signature);
     }
 }
 
-impl TryFrom<&[u8]> for P256Signature {
+impl TryFrom<&[u8]> for Signature {
     type Error = CryptoMaterialError;
 
-    fn try_from(bytes: &[u8]) -> std::result::Result<P256Signature, CryptoMaterialError> {
-        P256Signature::check_s_malleability(bytes)?;
-        P256Signature::from_bytes_unchecked(bytes)
+    fn try_from(bytes: &[u8]) -> std::result::Result<Signature, CryptoMaterialError> {
+        Signature::check_s_malleability(bytes)?;
+        Signature::from_bytes_unchecked(bytes)
     }
 }
 
 // Those are required by the implementation of hash above
-impl PartialEq for P256Signature {
-    fn eq(&self, other: &P256Signature) -> bool {
+impl PartialEq for Signature {
+    fn eq(&self, other: &Signature) -> bool {
         self.to_bytes()[..] == other.to_bytes()[..]
     }
 }
 
-impl Eq for P256Signature {}
+impl Eq for Signature {}
 
-impl fmt::Display for P256Signature {
+impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(&self.0.to_bytes()[..]))
     }
 }
 
-impl fmt::Debug for P256Signature {
+impl fmt::Debug for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "P256Signature({})", self)
+        write!(f, "secp256r1_ecdsa::Signature({})", self)
     }
 }

@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This file implements traits for P256 private keys and public keys.
+//! This file implements traits for Secp256r1 ECDSA private keys and public keys.
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
 use crate::{
     hash::CryptoHash,
-    p256_ecdsa::{P256Signature, ORDER, P256_PRIVATE_KEY_LENGTH, P256_PUBLIC_KEY_LENGTH},
-    traits::*,
+    secp256r1_ecdsa::{Signature, ORDER, PRIVATE_KEY_LENGTH, PUBLIC_KEY_LENGTH},
+    traits::{PrivateKey as PrivateKeyTrait, PublicKey as PublicKeyTrait, *},
 };
-use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
+use aptos_crypto_derive::{key_name, DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
 use num_bigint::BigUint;
 use num_integer::Integer;
@@ -20,59 +20,61 @@ use proptest::prelude::*;
 use serde::Serialize;
 use std::fmt;
 
-/// A P256 private key
+/// A secp256r1_ecdsa private key
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
-pub struct P256PrivateKey(pub(crate) p256::ecdsa::SigningKey);
+#[key_name("Secp256r1EcdsaPrivateKey")]
+pub struct PrivateKey(pub(crate) p256::ecdsa::SigningKey);
 
 #[cfg(feature = "assert-private-keys-not-cloneable")]
-static_assertions::assert_not_impl_any!(P256PrivateKey: Clone);
+static_assertions::assert_not_impl_any!(PrivateKey: Clone);
 
 #[cfg(any(test, feature = "cloneable-private-keys"))]
-impl Clone for P256PrivateKey {
+impl Clone for PrivateKey {
     fn clone(&self) -> Self {
         let serialized: &[u8] = &(self.to_bytes());
-        P256PrivateKey::try_from(serialized).unwrap()
+        PrivateKey::try_from(serialized).unwrap()
     }
 }
 
-/// A P256 public key
+/// A secp256r1_ecdsa public key
 #[derive(DeserializeKey, Clone, SerializeKey)]
-pub struct P256PublicKey(pub(crate) p256::ecdsa::VerifyingKey);
+#[key_name("Secp256r1EcdsaPublicKey")]
+pub struct PublicKey(pub(crate) p256::ecdsa::VerifyingKey);
 
-impl P256PrivateKey {
-    /// The length of the P256PrivateKey
-    pub const LENGTH: usize = P256_PRIVATE_KEY_LENGTH;
+impl PrivateKey {
+    /// The length of the PrivateKey
+    pub const LENGTH: usize = PRIVATE_KEY_LENGTH;
 
-    /// Serialize a P256PrivateKey. Uses the SEC1 serialization format.
-    pub fn to_bytes(&self) -> [u8; P256_PRIVATE_KEY_LENGTH] {
+    /// Serialize a PrivateKey. Uses the SEC1 serialization format.
+    pub fn to_bytes(&self) -> [u8; PRIVATE_KEY_LENGTH] {
         self.0.to_bytes().into()
     }
 
-    /// Deserialize an P256PrivateKey without any validation checks apart from expected key size.
+    /// Deserialize a PrivateKey without any validation checks apart from expected key size.
     /// Uses the SEC1 serialization format. Bytes are expected to be in big-endian form.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
-    ) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
+    ) -> std::result::Result<PrivateKey, CryptoMaterialError> {
         match p256::ecdsa::SigningKey::from_slice(bytes) {
-            Ok(p256_secret_key) => Ok(P256PrivateKey(p256_secret_key)),
+            Ok(p256_secret_key) => Ok(PrivateKey(p256_secret_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
     }
 
     /// Private function aimed at minimizing code duplication between sign
     /// methods of the SigningKey implementation. This should remain private.
-    /// This function uses the `RustCrypto` P256 signing library, which uses,
+    /// This function uses the `RustCrypto` secp256r1_ecdsa signing library, which uses,
     /// as of version 0.13.2, SHA2-256 as its hashing algorithm
-    fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
+    fn sign_arbitrary_message(&self, message: &[u8]) -> Signature {
         let secret_key = &self.0;
-        let sig = P256Signature(secret_key.sign(message.as_ref()));
-        P256Signature::make_canonical(&sig)
+        let sig = Signature(secret_key.sign(message.as_ref()));
+        Signature::make_canonical(&sig)
     }
 }
 
-impl P256PublicKey {
-    /// Serialize a P256PublicKey. Uses the SEC1 serialization format.
-    pub fn to_bytes(&self) -> [u8; P256_PUBLIC_KEY_LENGTH] {
+impl PublicKey {
+    /// Serialize a PublicKey. Uses the SEC1 serialization format.
+    pub fn to_bytes(&self) -> [u8; PUBLIC_KEY_LENGTH] {
         // The RustCrypto P256 `to_sec1_bytes` call here should never return an array of the wrong length and cause a panic
         (*self.0.to_sec1_bytes()).try_into().unwrap()
     }
@@ -82,9 +84,9 @@ impl P256PublicKey {
     /// Uses the SEC1 serialization format.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
-    ) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
+    ) -> std::result::Result<PublicKey, CryptoMaterialError> {
         match p256::ecdsa::VerifyingKey::from_sec1_bytes(bytes) {
-            Ok(p256_public_key) => Ok(P256PublicKey(p256_public_key)),
+            Ok(p256_public_key) => Ok(PublicKey(p256_public_key)),
             Err(_) => Err(CryptoMaterialError::DeserializationError),
         }
     }
@@ -94,31 +96,31 @@ impl P256PublicKey {
 // PrivateKey Traits //
 ///////////////////////
 
-impl PrivateKey for P256PrivateKey {
-    type PublicKeyMaterial = P256PublicKey;
+impl PrivateKeyTrait for PrivateKey {
+    type PublicKeyMaterial = PublicKey;
 }
 
-impl SigningKey for P256PrivateKey {
-    type SignatureMaterial = P256Signature;
-    type VerifyingKeyMaterial = P256PublicKey;
+impl SigningKey for PrivateKey {
+    type SignatureMaterial = Signature;
+    type VerifyingKeyMaterial = PublicKey;
 
     fn sign<T: CryptoHash + Serialize>(
         &self,
         message: &T,
-    ) -> Result<P256Signature, CryptoMaterialError> {
-        Ok(P256PrivateKey::sign_arbitrary_message(
+    ) -> Result<Signature, CryptoMaterialError> {
+        Ok(PrivateKey::sign_arbitrary_message(
             self,
             signing_message(message)?.as_ref(),
         ))
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    fn sign_arbitrary_message(&self, message: &[u8]) -> P256Signature {
-        P256PrivateKey::sign_arbitrary_message(self, message)
+    fn sign_arbitrary_message(&self, message: &[u8]) -> Signature {
+        PrivateKey::sign_arbitrary_message(self, message)
     }
 }
 
-impl Uniform for P256PrivateKey {
+impl Uniform for PrivateKey {
     // Returns a random field element as a private key indistinguishable from uniformly random.
     // Uses a hack to get around the incompatability of the `aptos-crypto` RngCore trait and the
     // `RustCrypto` RngCore trait
@@ -126,51 +128,51 @@ impl Uniform for P256PrivateKey {
     where
         R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
     {
-        let mut bytes = [0u8; P256_PRIVATE_KEY_LENGTH * 2];
+        let mut bytes = [0u8; PRIVATE_KEY_LENGTH * 2];
         rng.fill_bytes(&mut bytes);
         let bignum = BigUint::from_bytes_be(&bytes[..]);
         let order = BigUint::from_bytes_be(&ORDER);
         let remainder = bignum.mod_floor(&order);
-        P256PrivateKey::from_bytes_unchecked(&remainder.to_bytes_be()).unwrap()
+        PrivateKey::from_bytes_unchecked(&remainder.to_bytes_be()).unwrap()
     }
 }
 
-impl PartialEq<Self> for P256PrivateKey {
+impl PartialEq<Self> for PrivateKey {
     fn eq(&self, other: &Self) -> bool {
         self.to_bytes() == other.to_bytes()
     }
 }
 
-impl Eq for P256PrivateKey {}
+impl Eq for PrivateKey {}
 
-impl TryFrom<&[u8]> for P256PrivateKey {
+impl TryFrom<&[u8]> for PrivateKey {
     type Error = CryptoMaterialError;
 
-    /// Deserialize a P256PrivateKey. This method will check for private key validity: i.e.,
+    /// Deserialize a PrivateKey. This method will check for private key validity: i.e.,
     /// correct key length.
-    fn try_from(bytes: &[u8]) -> std::result::Result<P256PrivateKey, CryptoMaterialError> {
+    fn try_from(bytes: &[u8]) -> std::result::Result<PrivateKey, CryptoMaterialError> {
         // Note that the only requirement is that the size of the key is 32 bytes, something that
         // is already checked during deserialization of p256::ecdsa::SigningKey
-        P256PrivateKey::from_bytes_unchecked(bytes)
+        PrivateKey::from_bytes_unchecked(bytes)
     }
 }
 
-impl Length for P256PrivateKey {
+impl Length for PrivateKey {
     fn length(&self) -> usize {
         Self::LENGTH
     }
 }
 
-impl ValidCryptoMaterial for P256PrivateKey {
+impl ValidCryptoMaterial for PrivateKey {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
 }
 
-impl Genesis for P256PrivateKey {
+impl Genesis for PrivateKey {
     fn genesis() -> Self {
-        let mut buf = [0u8; P256_PRIVATE_KEY_LENGTH];
-        buf[P256_PRIVATE_KEY_LENGTH - 1] = 1;
+        let mut buf = [0u8; PRIVATE_KEY_LENGTH];
+        buf[PRIVATE_KEY_LENGTH - 1] = 1;
         Self::try_from(buf.as_ref()).unwrap()
     }
 }
@@ -180,20 +182,20 @@ impl Genesis for P256PrivateKey {
 //////////////////////
 
 // Implementing From<&PrivateKey<...>> allows to derive a public key in a more elegant fashion
-impl From<&P256PrivateKey> for P256PublicKey {
-    fn from(private_key: &P256PrivateKey) -> Self {
+impl From<&PrivateKey> for PublicKey {
+    fn from(private_key: &PrivateKey) -> Self {
         let secret = &private_key.0;
         let public: p256::ecdsa::VerifyingKey = secret.into();
-        P256PublicKey(public)
+        PublicKey(public)
     }
 }
 
 // We deduce PublicKey from this
-impl PublicKey for P256PublicKey {
-    type PrivateKeyMaterial = P256PrivateKey;
+impl PublicKeyTrait for PublicKey {
+    type PrivateKeyMaterial = PrivateKey;
 }
 
-impl std::hash::Hash for P256PublicKey {
+impl std::hash::Hash for PublicKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         let encoded_pubkey = self.to_bytes();
         state.write(&encoded_pubkey);
@@ -201,49 +203,49 @@ impl std::hash::Hash for P256PublicKey {
 }
 
 // Those are required by the implementation of hash above
-impl PartialEq for P256PublicKey {
-    fn eq(&self, other: &P256PublicKey) -> bool {
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &PublicKey) -> bool {
         self.to_bytes() == other.to_bytes()
     }
 }
 
-impl Eq for P256PublicKey {}
+impl Eq for PublicKey {}
 
 // We deduce VerifyingKey from pointing to the signature material
 // we get the ability to do `pubkey.validate(msg, signature)`
-impl VerifyingKey for P256PublicKey {
-    type SignatureMaterial = P256Signature;
-    type SigningKeyMaterial = P256PrivateKey;
+impl VerifyingKey for PublicKey {
+    type SignatureMaterial = Signature;
+    type SigningKeyMaterial = PrivateKey;
 }
 
-impl fmt::Display for P256PublicKey {
+impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0.to_sec1_bytes()))
     }
 }
 
-impl fmt::Debug for P256PublicKey {
+impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "P256PublicKey({})", self)
+        write!(f, "secp256r1_ecdsa::PublicKey({})", self)
     }
 }
 
-impl TryFrom<&[u8]> for P256PublicKey {
+impl TryFrom<&[u8]> for PublicKey {
     type Error = CryptoMaterialError;
 
-    /// Deserialize a P256PublicKey.
-    fn try_from(bytes: &[u8]) -> std::result::Result<P256PublicKey, CryptoMaterialError> {
-        P256PublicKey::from_bytes_unchecked(bytes)
+    /// Deserialize a PublicKey.
+    fn try_from(bytes: &[u8]) -> std::result::Result<PublicKey, CryptoMaterialError> {
+        PublicKey::from_bytes_unchecked(bytes)
     }
 }
 
-impl Length for P256PublicKey {
+impl Length for PublicKey {
     fn length(&self) -> usize {
-        P256_PUBLIC_KEY_LENGTH
+        PUBLIC_KEY_LENGTH
     }
 }
 
-impl ValidCryptoMaterial for P256PublicKey {
+impl ValidCryptoMaterial for PublicKey {
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes().to_vec()
     }
@@ -253,20 +255,20 @@ impl ValidCryptoMaterial for P256PublicKey {
 // Fuzzing //
 /////////////
 
-/// Produces a uniformly random P256 keypair from a seed
+/// Produces a uniformly random secp256r1_ecdsa keypair from a seed
 #[cfg(any(test, feature = "fuzzing"))]
-pub fn keypair_strategy() -> impl Strategy<Value = KeyPair<P256PrivateKey, P256PublicKey>> {
-    test_utils::uniform_keypair_strategy::<P256PrivateKey, P256PublicKey>()
+pub fn keypair_strategy() -> impl Strategy<Value = KeyPair<PrivateKey, PublicKey>> {
+    test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
 }
 
-/// Produces a uniformly random P256 public key
+/// Produces a uniformly random secp256r1_ecdsa public key
 #[cfg(any(test, feature = "fuzzing"))]
-impl proptest::arbitrary::Arbitrary for P256PublicKey {
+impl proptest::arbitrary::Arbitrary for PublicKey {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        crate::test_utils::uniform_keypair_strategy::<P256PrivateKey, P256PublicKey>()
+        crate::test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
             .prop_map(|v| v.public_key)
             .boxed()
     }
