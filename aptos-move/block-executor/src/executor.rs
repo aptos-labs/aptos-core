@@ -1175,7 +1175,7 @@ where
         }
 
         for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
-            println!("Applying group write set in executor.rs {:?}, {:?} {:?}", group_key, metadata_op, group_ops);
+            // println!("Applying group write set in executor.rs {:?}, {:?} {:?}", group_key, metadata_op, group_ops);
             for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
                 unsync_map
                     .insert_group_op(&group_key, value_tag, group_op, maybe_layout)

@@ -1348,7 +1348,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => read_from_group_parallel(state)?,
             ViewState::Unsync(state) => {
-                println!("read_from_group_sequntial");
+                // println!("read_from_group_sequntial");
                 // TODO[agg_v2](fix): Should we push the group key into read set
                 // irresepctive of whether the read operation succeeds?
                 state.group_read_set.borrow_mut().insert(group_key.clone());
@@ -1366,7 +1366,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 ViewState::Sync(state) => read_from_group_parallel(state)?,
                 ViewState::Unsync(state) => {
                     // TODO[agg_v2](optimize): Cloning layout here to convert &layout to Arc<layout>
-                    println!("read_from_group_sequntial");
+                    // println!("read_from_group_sequntial");
                     read_from_group_sequential(state)?
                     // state
                     //     .unsync_map
