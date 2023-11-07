@@ -818,6 +818,7 @@ dependencies = [
  "bytes",
  "chrono",
  "claims",
+ "clap 4.3.21",
  "dashmap",
  "fail 0.5.0",
  "futures",
@@ -1141,6 +1142,7 @@ name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-consensus",
  "aptos-db-tool",
  "aptos-logger",
  "aptos-move-debugger",
@@ -2499,6 +2501,7 @@ name = "aptos-move-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-meter",
  "aptos-gas-profiling",

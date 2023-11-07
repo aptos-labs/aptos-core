@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::server::utils::{reply_with, reply_with_status, spawn_blocking};
-use anyhow::{bail, Error};
+use anyhow::Error;
 use aptos_consensus::{
     persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::{quorum_store_db::QuorumStoreStorage, types::PersistedValue},
+    quorum_store::quorum_store_db::QuorumStoreStorage, util::db_tool::extract_txns_from_block,
 };
-use aptos_consensus_types::{block::Block, common::Payload};
 use aptos_crypto::HashValue;
 use aptos_logger::info;
-use aptos_types::transaction::SignedTransaction;
 use http::header::{HeaderValue, CONTENT_LENGTH};
 use hyper::{Body, Request, Response, StatusCode};
 use std::{collections::HashMap, sync::Arc};
@@ -202,38 +200,4 @@ fn dump_blocks(
     }
 
     Ok(body)
-}
-
-fn extract_txns_from_block<'a>(
-    block: &'a Block,
-    all_batches: &'a HashMap<HashValue, PersistedValue>,
-) -> anyhow::Result<Vec<&'a SignedTransaction>> {
-    match block.payload().as_ref() {
-        Some(payload) => {
-            let mut block_txns = Vec::new();
-            match payload {
-                Payload::DirectMempool(_) => {
-                    bail!("DirectMempool is not supported.");
-                },
-                Payload::InQuorumStore(proof_with_data) => {
-                    for proof in &proof_with_data.proofs {
-                        let digest = proof.digest();
-                        if let Some(batch) = all_batches.get(digest) {
-                            if let Some(txns) = batch.payload() {
-                                block_txns.extend(txns);
-                            } else {
-                                bail!("Payload is not found for batch ({digest}).");
-                            }
-                        } else {
-                            bail!("Batch ({digest}) is not found.");
-                        }
-                    }
-                },
-            }
-            Ok(block_txns)
-        },
-        None => {
-            bail!("No payload in the block.")
-        },
-    }
 }
