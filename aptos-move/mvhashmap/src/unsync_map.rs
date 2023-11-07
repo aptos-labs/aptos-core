@@ -102,27 +102,17 @@ impl<
         })
     }
 
-    pub fn read_from_group(
-        &self,
-        group_key: &K,
-        value_tag: &T,
-        maybe_layout_input: Option<Arc<MoveTypeLayout>>,
-    ) -> GroupReadResult {
-        self.group_cache.borrow_mut().get(group_key).map_or(
+    pub fn read_from_group(&self, group_key: &K, value_tag: &T) -> GroupReadResult {
+        self.group_cache.borrow().get(group_key).map_or(
             GroupReadResult::Uninitialized,
             |group_map| {
                 group_map
-                    .borrow_mut()
-                    .get_mut(value_tag)
+                    .borrow()
+                    .get(value_tag)
                     .map(|(v, maybe_layout)| {
-                        if let UnsetOrLayout::Set(maybe_layout) = maybe_layout {
-                            GroupReadResult::Value(v.extract_raw_bytes(), maybe_layout.clone())
-                        } else {
-                            *maybe_layout = UnsetOrLayout::Set(maybe_layout_input.clone());
-                            GroupReadResult::Value(v.extract_raw_bytes(), maybe_layout_input)
-                        }
+                        GroupReadResult::Value(v.extract_raw_bytes(), maybe_layout.clone())
                     })
-                    .unwrap_or(GroupReadResult::Value(None, None))
+                    .unwrap_or(GroupReadResult::Value(None, UnsetOrLayout::Unset))
             },
         )
     }
@@ -150,7 +140,6 @@ impl<
         use anyhow::bail;
         use aptos_types::write_set::WriteOpKind::*;
         use std::collections::hash_map::Entry::*;
-
         match (
             self.group_cache
                 .borrow_mut()
@@ -228,6 +217,21 @@ impl<
         self.map
             .borrow_mut()
             .insert(key, (Arc::new(value), None, layout));
+    }
+
+    pub fn write_group_data(
+        &self,
+        group_key: K,
+        value_tag: T,
+        value: V,
+        layout: Option<Arc<MoveTypeLayout>>,
+    ) {
+        self.group_cache
+            .borrow_mut()
+            .get_mut(&group_key)
+            .expect("Resource group must be cached")
+            .borrow_mut()
+            .insert(value_tag, (Arc::new(value), UnsetOrLayout::Set(layout)));
     }
 
     /// We return false if the executable was already stored, as this isn't supposed to happen
@@ -457,10 +461,7 @@ mod test {
         let ap = KeyType(b"/foo/f".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        assert_eq!(
-            map.read_from_group(&ap, &1, None),
-            GroupReadResult::Uninitialized
-        );
+        assert_eq!(map.read_from_group(&ap, &1), GroupReadResult::Uninitialized);
 
         map.set_group_base_values(
             ap.clone(),
@@ -475,17 +476,20 @@ mod test {
 
         for i in 1..5 {
             assert_eq!(
-                map.read_from_group(&ap, &i, None),
-                GroupReadResult::Value(TestValue::creation_with_len(i).bytes().cloned(), None)
+                map.read_from_group(&ap, &i),
+                GroupReadResult::Value(
+                    TestValue::creation_with_len(i).bytes().cloned(),
+                    UnsetOrLayout::Set(None)
+                )
             )
         }
         assert_eq!(
-            map.read_from_group(&ap, &0, None),
-            GroupReadResult::Value(None, None)
+            map.read_from_group(&ap, &0),
+            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
         );
         assert_eq!(
-            map.read_from_group(&ap, &6, None),
-            GroupReadResult::Value(None, None)
+            map.read_from_group(&ap, &6),
+            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
         );
 
         assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
@@ -493,30 +497,42 @@ mod test {
         assert_ok!(map.insert_group_op(&ap, 6, TestValue::creation_with_len(9), None));
 
         assert_eq!(
-            map.read_from_group(&ap, &1, None),
-            GroupReadResult::Value(None, None)
+            map.read_from_group(&ap, &1),
+            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
         );
         assert_eq!(
-            map.read_from_group(&ap, &3, None),
-            GroupReadResult::Value(TestValue::creation_with_len(8).bytes().cloned(), None)
+            map.read_from_group(&ap, &3),
+            GroupReadResult::Value(
+                TestValue::creation_with_len(8).bytes().cloned(),
+                UnsetOrLayout::Set(None)
+            )
         );
         assert_eq!(
-            map.read_from_group(&ap, &6, None),
-            GroupReadResult::Value(TestValue::creation_with_len(9).bytes().cloned(), None)
+            map.read_from_group(&ap, &6),
+            GroupReadResult::Value(
+                TestValue::creation_with_len(9).bytes().cloned(),
+                UnsetOrLayout::Set(None)
+            )
         );
 
         // others unaffected.
         assert_eq!(
-            map.read_from_group(&ap, &0, None),
-            GroupReadResult::Value(None, None)
+            map.read_from_group(&ap, &0),
+            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
         );
         assert_eq!(
-            map.read_from_group(&ap, &2, None),
-            GroupReadResult::Value(TestValue::creation_with_len(2).bytes().cloned(), None)
+            map.read_from_group(&ap, &2),
+            GroupReadResult::Value(
+                TestValue::creation_with_len(2).bytes().cloned(),
+                UnsetOrLayout::Set(None)
+            )
         );
         assert_eq!(
-            map.read_from_group(&ap, &4, None),
-            GroupReadResult::Value(TestValue::creation_with_len(4).bytes().cloned(), None)
+            map.read_from_group(&ap, &4),
+            GroupReadResult::Value(
+                TestValue::creation_with_len(4).bytes().cloned(),
+                UnsetOrLayout::Set(None)
+            )
         );
     }
 }

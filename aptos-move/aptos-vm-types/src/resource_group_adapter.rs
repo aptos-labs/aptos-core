@@ -173,15 +173,11 @@ impl TResourceGroupView for ResourceGroupAdapter<'_> {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-        _maybe_layout: Option<&MoveTypeLayout>,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        /*
-        TODO[agg_v2] fix the error here before committing.
-        if let Some(group_view) = &mut self.maybe_resource_group_view {
+        if let Some(group_view) = &self.maybe_resource_group_view {
             return group_view.get_resource_from_group(group_key, resource_tag, maybe_layout);
         }
-        */
-
         self.load_to_cache(group_key)?;
         Ok(self
             .group_cache

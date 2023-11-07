@@ -38,7 +38,7 @@ pub enum MVGroupError {
     TagNotFound,
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
-    /// Tag serialization is needed for group size computation
+    /// Tag serialization is needed for group size computation.
     TagSerializationError,
 }
 
@@ -65,13 +65,13 @@ pub enum MVModulesError {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum GroupReadResult {
-    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
+    Value(Option<Bytes>, UnsetOrLayout),
     Size(u64),
     Uninitialized,
 }
 
 impl GroupReadResult {
-    pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
+    pub fn into_value(self) -> (Option<Bytes>, UnsetOrLayout) {
         match self {
             GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
             _ => unreachable!("Expected a value"),
@@ -169,7 +169,7 @@ impl ShiftedTxnIndex {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum UnsetOrLayout {
     // When the group is initialized, but the resource in the group is not read,
     // the resource's type layout is unset

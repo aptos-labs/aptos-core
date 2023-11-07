@@ -95,7 +95,6 @@ impl ReadResult {
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    //TODO[agg_v2](fix): Had to use mut here to fix an error in the `read_from_group` function.
     versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     scheduler: &'a Scheduler,
     start_counter: u32,
@@ -412,76 +411,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
             .push(key.clone());
 
         self.versioned_map.modules().fetch_module(key, txn_idx)
-    }
-
-    fn read_from_group(
-        &self,
-        group_key: &T::Key,
-        resource_tag: &T::Tag,
-        txn_idx: TxnIndex,
-        maybe_layout: Option<Arc<MoveTypeLayout>>,
-    ) -> anyhow::Result<GroupReadResult> {
-        use MVGroupError::*;
-
-        if let Some(DataRead::Versioned(_, v, layout)) =
-            self.captured_reads
-                .borrow()
-                .get_by_kind(group_key, Some(resource_tag), ReadKind::Value)
-        {
-            return Ok(GroupReadResult::Value(v.extract_raw_bytes(), layout));
-        }
-
-        loop {
-            match self.versioned_map.group_data().read_from_group(
-                group_key,
-                resource_tag,
-                txn_idx,
-                UnsetOrLayout::Set(maybe_layout.clone()),
-            ) {
-                Ok((version, v, layout)) => {
-                    let data_read = DataRead::Versioned(version, v.clone(), layout.clone());
-
-                    assert_ok!(
-                        self.captured_reads.borrow_mut().capture_read(
-                            group_key.clone(),
-                            Some(resource_tag.clone()),
-                            data_read
-                        ),
-                        "Resource read in group recorded once: may not be inconsistent"
-                    );
-
-                    return Ok(GroupReadResult::Value(v.extract_raw_bytes(), layout));
-                },
-                Err(Uninitialized) => {
-                    return Ok(GroupReadResult::Uninitialized);
-                },
-                Err(TagNotFound) => {
-                    let data_read = DataRead::Versioned(
-                        Err(StorageVersion),
-                        Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
-                        None,
-                    );
-                    assert_ok!(
-                        self.captured_reads.borrow_mut().capture_read(
-                            group_key.clone(),
-                            Some(resource_tag.clone()),
-                            data_read
-                        ),
-                        "Resource read in group recorded once: may not be inconsistent"
-                    );
-
-                    return Ok(GroupReadResult::Value(None, None));
-                },
-                Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
-                    }
-                },
-                Err(TagSerializationError) => {
-                    unreachable!("Reading a resource does not require tag serialization");
-                },
-            }
-        }
     }
 
     fn read_group_size(
@@ -1217,23 +1146,212 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
+        println!(
+            "get_resource_from_group {:?} {:?} {:?}",
+            group_key, resource_tag, maybe_layout
+        );
         let maybe_layout = maybe_layout.map(|layout| Arc::new(layout.clone()));
 
+        let read_from_group_parallel =
+            |parallel_state: &ParallelState<'_, T, X>| -> anyhow::Result<GroupReadResult> {
+                use MVGroupError::*;
+
+                if let Some(DataRead::Versioned(_, v, layout)) = parallel_state
+                    .captured_reads
+                    .borrow()
+                    .get_by_kind(group_key, Some(resource_tag), ReadKind::Value)
+                {
+                    println!("answered_from_captured_reads");
+                    return Ok(GroupReadResult::Value(
+                        v.extract_raw_bytes(),
+                        UnsetOrLayout::Set(layout),
+                    ));
+                }
+
+                loop {
+                    println!("answered_from_versioned_map");
+                    match parallel_state.versioned_map.group_data().read_from_group(
+                        group_key,
+                        resource_tag,
+                        self.txn_idx,
+                        UnsetOrLayout::Set(maybe_layout.clone()),
+                    ) {
+                        Ok((version, v, maybe_layout)) => {
+                            println!("obtained_data_from_versioned_map");
+                            let patched_v = match (v.as_state_value(), maybe_layout.clone()) {
+                                (Some(state_value), Some(layout)) => {
+                                    let res = self.replace_values_with_identifiers(
+                                        state_value,
+                                        layout.as_ref(),
+                                    );
+                                    println!("replace_values_with_identifiers {:?}", res);
+                                    match res {
+                                        Ok((patched_value, _)) => Some(Arc::new(
+                                            T::Value::from_state_value(Some(patched_value)),
+                                        )),
+                                        Err(err) => {
+                                            // TODO[agg_v2](fix): This means replacement failed
+                                            //       and most likely there is a bug. Log the error
+                                            //       for now, and add recovery mechanism later.
+                                            let log_context = AdapterLogSchema::new(
+                                                self.base_view.id(),
+                                                self.txn_idx as usize,
+                                            );
+                                            alert!(
+                                            log_context,
+                                            "[VM, ResourceGroups] Error during value to id replacement for {:?}: {}",
+                                            group_key,
+                                            err
+                                        );
+                                            None
+                                        },
+                                    }
+                                },
+                                (_, _) => Some(v),
+                            };
+
+                            if let Some(patched_v) = patched_v {
+                                let data_read = DataRead::Versioned(
+                                    version,
+                                    patched_v.clone(),
+                                    maybe_layout.clone(),
+                                );
+                                assert_ok!(
+                                    parallel_state.captured_reads.borrow_mut().capture_read(
+                                        group_key.clone(),
+                                        Some(resource_tag.clone()),
+                                        data_read
+                                    ),
+                                    "Resource read in group recorded once: may not be inconsistent"
+                                );
+                                return Ok(GroupReadResult::Value(
+                                    patched_v.extract_raw_bytes(),
+                                    UnsetOrLayout::Set(maybe_layout),
+                                ));
+                            }
+                            // TODO[agg_v2](fix): Is this a correct response for the case when the id - value replacement fails?
+                            return Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset));
+                        },
+                        Err(Uninitialized) => {
+                            println!("unitialized_in_versioned_map");
+                            return Ok(GroupReadResult::Uninitialized);
+                        },
+                        Err(TagNotFound) => {
+                            println!("tag_not_found_in_versioned_map");
+                            let data_read = DataRead::Versioned(
+                                Err(StorageVersion),
+                                Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
+                                None,
+                            );
+                            assert_ok!(
+                                parallel_state.captured_reads.borrow_mut().capture_read(
+                                    group_key.clone(),
+                                    Some(resource_tag.clone()),
+                                    data_read
+                                ),
+                                "Resource read in group recorded once: may not be inconsistent"
+                            );
+
+                            return Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset));
+                        },
+                        Err(Dependency(dep_idx)) => {
+                            println!("dependency_versioned_map");
+                            if !wait_for_dependency(parallel_state.scheduler, self.txn_idx, dep_idx)
+                            {
+                                bail!("Interrupted as block execution was halted");
+                            }
+                        },
+                        Err(TagSerializationError) => {
+                            unreachable!("Reading a resource does not require tag serialization");
+                        },
+                    }
+                }
+            };
+
+        // Call this function
+        let read_from_group_sequential =
+            |sequential_state: &SequentialState<'_, T, X>| -> anyhow::Result<GroupReadResult> {
+                let group_read = sequential_state
+                    .unsync_map
+                    .read_from_group(group_key, resource_tag);
+
+                match group_read {
+                    GroupReadResult::Value(value, UnsetOrLayout::Unset) => {
+                        if let Some(layout) = maybe_layout.clone() {
+                            if let Some(bytes) = value {
+                                let res = self.replace_values_with_identifiers(
+                                    //TODO[agg_v2](fix) Is this correct way to get the state value in this context?
+                                    StateValue::new_legacy(bytes),
+                                    layout.as_ref(),
+                                );
+                                println!("replace_values_with_identifiers_seq {:?}", res);
+                                match res {
+                                    Ok((patched_state_value, _)) => {
+                                        sequential_state.unsync_map.write_group_data(
+                                            group_key.clone(),
+                                            resource_tag.clone(),
+                                            TransactionWrite::from_state_value(Some(
+                                                patched_state_value.clone(),
+                                            )),
+                                            maybe_layout.clone(),
+                                        );
+                                        Ok(GroupReadResult::Value(
+                                            Some(patched_state_value.bytes().clone()),
+                                            UnsetOrLayout::Set(maybe_layout.clone()),
+                                        ))
+                                    },
+                                    Err(err) => {
+                                        // TODO[agg_v2](fix): This means replacement failed
+                                        //       and most likely there is a bug. Log the error
+                                        //       for now, and add recovery mechanism later.
+                                        let log_context = AdapterLogSchema::new(
+                                            self.base_view.id(),
+                                            self.txn_idx as usize,
+                                        );
+                                        alert!(
+                                            log_context,
+                                            "[VM, ResourceGroups] Error during value to id replacement for {:?}: {}",
+                                            group_key,
+                                            err
+                                        );
+                                        // TODO[agg_v2](fix): Is this the correct return value in this context?
+                                        Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset))
+                                    },
+                                }
+                            } else {
+                                Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset))
+                            }
+                        } else {
+                            sequential_state.unsync_map.write_group_data(
+                                group_key.clone(),
+                                resource_tag.clone(),
+                                TransactionWrite::from_state_value(
+                                    value.clone().map(StateValue::new_legacy),
+                                ),
+                                None,
+                            );
+                            Ok(GroupReadResult::Value(value, UnsetOrLayout::Set(None)))
+                        }
+                    },
+                    GroupReadResult::Value(value, UnsetOrLayout::Set(maybe_layout)) => Ok(
+                        GroupReadResult::Value(value, UnsetOrLayout::Set(maybe_layout)),
+                    ),
+                    GroupReadResult::Size(size) => Ok(GroupReadResult::Size(size)),
+                    GroupReadResult::Uninitialized => Ok(GroupReadResult::Uninitialized),
+                }
+            };
+
         let mut group_read = match &self.latest_view {
-            ViewState::Sync(state) => state.read_from_group(
-                group_key,
-                resource_tag,
-                self.txn_idx,
-                maybe_layout.clone(),
-            )?,
+            ViewState::Sync(state) => read_from_group_parallel(state)?,
             ViewState::Unsync(state) => {
+                println!("read_from_group_sequntial");
                 // TODO[agg_v2](fix): Should we push the group key into read set
                 // irresepctive of whether the read operation succeeds?
                 state.group_read_set.borrow_mut().insert(group_key.clone());
-                // TODO[agg_v2](optimize): Cloning layout here to convert &layout to Arc<layout>
-                state
-                    .unsync_map
-                    .read_from_group(group_key, resource_tag, maybe_layout.clone())
+                read_from_group_sequential(state)?
+                // state
+                //     .unsync_map
+                //     .read_from_group(group_key, resource_tag, maybe_layout.clone())
             },
         };
 
@@ -1241,14 +1359,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
             self.initialize_mvhashmap_base_group_contents(group_key)?;
 
             group_read = match &self.latest_view {
-                ViewState::Sync(state) => {
-                    state.read_from_group(group_key, resource_tag, self.txn_idx, maybe_layout)?
-                },
+                ViewState::Sync(state) => read_from_group_parallel(state)?,
                 ViewState::Unsync(state) => {
                     // TODO[agg_v2](optimize): Cloning layout here to convert &layout to Arc<layout>
-                    state
-                        .unsync_map
-                        .read_from_group(group_key, resource_tag, maybe_layout)
+                    println!("read_from_group_sequntial");
+                    read_from_group_sequential(state)?
+                    // state
+                    //     .unsync_map
+                    //     .read_from_group(group_key, resource_tag, maybe_layout)
                 },
             };
         };
