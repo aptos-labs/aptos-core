@@ -19,7 +19,7 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
@@ -551,8 +551,37 @@ pub fn setup_environment_and_start_node(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
+    // Override the state sync node configurations (fast sync and execution)
+    node_config.state_sync.state_sync_driver.bootstrapping_mode = BootstrappingMode::DownloadLatestStates;
+    node_config.state_sync.state_sync_driver.continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
+
+    // If the node isn't using storage sharding, panic!
+    if !node_config.storage.rocksdb_configs.enable_storage_sharding {
+        panic!("Storage sharding must be enabled! Please enable it in your config and re-sync your node!");
+    }
+
     // Log the node config at node startup
     info!("Using node config {:?}", &node_config);
+
+    // Log different parts of the node config (to avoid truncation)
+    info!("Using admin service config: {:?}", &node_config.admin_service);
+    info!("Using API config: {:?}", &node_config.api);
+    info!("Using base config: {:?}", &node_config.base);
+    info!("Using consensus config: {:?}", &node_config.consensus);
+    info!("Using dag consensus config: {:?}", &node_config.dag_consensus);
+    info!("Using execution config: {:?}", &node_config.execution);
+    info!("Using failpoints config: {:?}", &node_config.failpoints);
+    info!("Using full node networks config: {:?}", &node_config.full_node_networks);
+    info!("Using indexer config: {:?}", &node_config.indexer);
+    info!("Using indexer gRPC config: {:?}", &node_config.indexer_grpc);
+    info!("Using inspection service config: {:?}", &node_config.inspection_service);
+    info!("Using logger config: {:?}", &node_config.logger);
+    info!("Using mempool config: {:?}", &node_config.mempool);
+    info!("Using netbench config: {:?}", &node_config.netbench);
+    info!("Using peer monitoring service config: {:?}", &node_config.peer_monitoring_service);
+    info!("Using state sync config: {:?}", &node_config.state_sync);
+    info!("Using storage config: {:?}", &node_config.storage);
+    info!("Using validator network config: {:?}", &node_config.validator_network);
 
     // Starts the admin service
     let admin_service = services::start_admin_service(&node_config);
