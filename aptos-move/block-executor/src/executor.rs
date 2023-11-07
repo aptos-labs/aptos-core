@@ -594,7 +594,7 @@ where
                                         finalized_group,
                                     ));
                                 } else {
-                                    // TODO[agg_v2](question). Is this a code invariante error?
+                                    // TODO[agg_v2](question). Is this a code invariant error?
                                     error!("Writing to a resource group that is already deleted");
                                     maybe_err =
                                         Some(Error::FallbackToSequential(resource_group_error(

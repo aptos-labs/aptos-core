@@ -1053,13 +1053,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                             .resource_read_set
                                             .borrow_mut()
                                             .insert(state_key.clone());
-                                        state.unsync_map.write(
-                                            state_key.clone(),
-                                            TransactionWrite::from_state_value(Some(
-                                                patched_state_value.clone(),
-                                            )),
-                                            maybe_layout.map(|layout| Arc::new(layout.clone())),
-                                        );
                                         Some(patched_state_value)
                                     },
                                     Err(err) => {

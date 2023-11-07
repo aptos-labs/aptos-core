@@ -48,7 +48,7 @@ pub struct GroupWrite {
     /// exist in the group. Note: During parallel block execution, due to speculative
     /// reads, this invariant may be violated (and lead to speculation error if observed)
     /// but guaranteed to fail validation and lead to correct re-execution in that case.
-    pub inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    inner_ops: BTreeMap<StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
     /// Group size as used for gas charging, None if (metadata_)op is Deletion.
     maybe_group_op_size: Option<u64>,
 }
@@ -62,6 +62,10 @@ impl GroupWrite {
         inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
         group_size: u64,
     ) -> Self {
+        assert!(
+            metadata_op.bytes().is_none() || metadata_op.bytes().unwrap().is_empty(),
+            "Metadata op should have empty bytes"
+        );
         for (_tag, (v, _layout)) in &inner_ops {
             assert_none!(v.metadata(), "Group inner ops must have no metadata");
         }
@@ -657,10 +661,8 @@ impl VMChangeSet {
                             additional_inner_ops,
                         )?;
 
-                        let maybe_op_size = group_entry
-                            .get_mut()
-                            .maybe_group_op_size
-                            .or(additional_maybe_group_op_size);
+                        let maybe_op_size = additional_maybe_group_op_size
+                            .or(group_entry.get_mut().maybe_group_op_size);
                         group_entry.get_mut().maybe_group_op_size = maybe_op_size;
                     }
                 },
@@ -805,11 +807,13 @@ impl VMChangeSet {
             &mut self.delayed_field_change_set,
             additional_delayed_field_change_set,
         )?;
+        // This must be called after resource_write_set is squashed
         Self::squash_additional_reads_needing_exchange(
             &mut self.reads_needing_delayed_field_exchange,
             additional_reads_needing_delayed_field_exchange,
             &self.resource_write_set,
         )?;
+        // This must be called after resource_group_write_set is squashed
         Self::squash_additional_group_reads_needing_exchange(
             &mut self.group_reads_needing_delayed_field_exchange,
             additional_group_reads_needing_delayed_field_exchange,
