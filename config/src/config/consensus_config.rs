@@ -172,7 +172,7 @@ impl Default for ConsensusConfig {
             // We never go above 20-30 pending blocks, so this disables it
             wait_for_full_blocks_above_pending_blocks: 8,
             // Max is 1, so 1.1 disables it.
-            wait_for_full_blocks_above_recent_fill_threshold: 1.1,
+            wait_for_full_blocks_above_recent_fill_threshold: 0.2,
             intra_consensus_channel_buffer_size: 10,
             quorum_store: QuorumStoreConfig::default(),
 
