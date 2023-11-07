@@ -84,6 +84,9 @@ impl TryIntoMoveValue for DelayedFieldID {
             MoveTypeLayout::U64 => Value::u64(self.as_u64()),
             MoveTypeLayout::U128 => Value::u128(self.as_u64() as u128),
             layout if is_string_layout(layout) => {
+                // Here, we make sure we convert identifiers to fixed-size Move
+                // values. This is needed because we charge gas based on the resource
+                // size with identifiers inside, and so it has to be deterministic.
                 bytes_to_string(u64_to_fixed_size_utf8_bytes(self.as_u64()))
             },
             _ => {
@@ -167,7 +170,9 @@ fn string_to_bytes(value: Struct) -> Result<Vec<u8>, PanicError> {
 }
 
 fn u64_to_fixed_size_utf8_bytes(value: u64) -> Vec<u8> {
-    // Maximum u64 identifier size is 20 characters.
+    // Maximum u64 identifier size is 20 characters. We need a fixed size to
+    // ensure identifiers have the same size all the time for all validators,
+    // to ensure consistent and deterministic gas charging.
     format!("{:0>20}", value).to_string().into_bytes()
 }
 
