@@ -139,7 +139,7 @@ impl LoadDestination {
 
 pub trait NetworkLoadTest: Test {
     fn setup(&self, _ctx: &mut NetworkContext) -> Result<LoadDestination> {
-        Ok(LoadDestination::FullnodesOtherwiseValidators)
+        Ok(LoadDestination::AllValidators)
     }
 
     // Load is started before this function is called, and stops after this function returns.
