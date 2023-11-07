@@ -10,7 +10,7 @@ on:
       - main
 
 jobs:
-  windows-build:
+  windows-cli-build:
     runs-on: windows-latest-8-core
     defaults:
       run:

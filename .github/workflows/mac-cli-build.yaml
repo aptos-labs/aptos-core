@@ -1,0 +1,30 @@
+# This workflow tests that the Aptos CLI can be compiled and run on MacOS
+name: "MacOS CLI Build"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+  push:
+    branches:
+      - main
+
+jobs:
+  macos-cli-build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v3
+
+      # This action will cache ~/.cargo and ./target. See more here:
+      # https://github.com/Swatinem/rust-cache#cache-details
+      - name: Run cargo cache
+        uses: Swatinem/rust-cache@359a70e43a0bb8a13953b04a90f76428b4959bb6 # pin@v2.2.0
+
+      - name: Build the Aptos CLI
+        run: cargo build -p aptos
+
+      - name: Run the Aptos CLI help command
+        run: cargo run -p aptos -- --help
