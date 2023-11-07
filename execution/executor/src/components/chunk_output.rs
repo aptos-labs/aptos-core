@@ -33,6 +33,7 @@ use aptos_vm::{AptosVM, VMExecutor};
 use fail::fail_point;
 use move_core_types::vm_status::StatusCode;
 use std::{ops::Deref, sync::Arc, time::Duration};
+use std::sync::mpsc;
 use aptos_vm::counters::TIMER;
 
 pub struct ChunkOutput {
@@ -92,6 +93,16 @@ impl ChunkOutput {
             .start_timer();
         let partitioned_txns_clone = transactions.clone();
         drop(timer);
+
+        let (sender, receiver) = mpsc::channel();
+        rayon::spawn(move || {
+            let flattened_txns = PartitionedTransactions::flatten(transactions)
+                .into_iter()
+                .map(|t| t.into_txn().into_inner())
+                .collect();
+            sender.send(flattened_txns).unwrap();
+        });
+
         let transaction_outputs = Self::execute_block_sharded::<V>(
             partitioned_txns_clone,
             state_view_arc.clone(),
@@ -107,10 +118,7 @@ impl ChunkOutput {
             .with_label_values(&["flatten_results"])
             .start_timer();
         Ok(Self {
-            transactions: PartitionedTransactions::flatten(transactions)
-                .into_iter()
-                .map(|t| t.into_txn().into_inner())
-                .collect(),
+            transactions: receiver.recv().unwrap(),
             transaction_outputs,
             state_cache: state_view.into_state_cache(),
         })
