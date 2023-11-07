@@ -43,6 +43,8 @@ where
         })
         .on_thread_start(on_thread_start)
         .disable_lifo_slot()
+        // limit concurrent blocking tasks from spawn_blocking()
+        .max_blocking_threads(64)
         .enable_all();
     if let Some(num_worker_threads) = num_worker_threads {
         builder.worker_threads(num_worker_threads);
