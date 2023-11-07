@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_consensus_types::common::Author;
+use aptos_logger::info;
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use futures::{stream::FuturesUnordered, Future, StreamExt};
@@ -61,7 +62,10 @@ where
         &self,
         message: S::Message,
         mut aggregating: S,
-    ) -> impl Future<Output = S::Aggregated>  where <<S as BroadcastStatus<Req, Res>>::Ack as TryFrom<Res>>::Error: Debug {
+    ) -> impl Future<Output = S::Aggregated>
+    where
+        <<S as BroadcastStatus<Req, Res>>::Ack as TryFrom<Res>>::Error: Debug,
+    {
         let receivers: Vec<_> = self.validators.clone();
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
@@ -101,7 +105,9 @@ where
                             return aggregated;
                         }
                     },
-                    Err(_) => {
+                    Err(e) => {
+                        info!(error = ?e, "rpc to {} failed", receiver);
+
                         let backoff_strategy = backoff_policies
                             .get_mut(&receiver)
                             .expect("should be present");
