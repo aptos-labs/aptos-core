@@ -68,7 +68,7 @@ impl Default for MempoolConfig {
             max_network_channel_size: 1024,
             mempool_snapshot_interval_secs: 180,
             capacity: 3_000_000,
-            capacity_bytes:(3_u64 * 1024 * 1024 * 1024) as usize,
+            capacity_bytes: (3_u64 * 1024 * 1024 * 1024) as usize,
             capacity_per_user: 100_000,
             default_failovers: 1,
             shared_mempool_peer_update_interval_ms: 1_000,
