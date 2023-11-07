@@ -18,14 +18,25 @@ use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_change::EpochChangeProof, epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
 };
+use core::fmt;
 use futures::StreamExt;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub enum StateSyncStatus {
+pub enum SyncOutcome {
     NeedsSync(CertifiedNodeMessage),
     Synced(Option<CertifiedNodeMessage>),
     EpochEnds,
+}
+
+impl fmt::Display for SyncOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SyncOutcome::NeedsSync(_) => write!(f, "NeedsSync"),
+            SyncOutcome::Synced(_) => write!(f, "Synced"),
+            SyncOutcome::EpochEnds => write!(f, "EpochEnds"),
+        }
+    }
 }
 
 pub(super) struct StateSyncTrigger {
@@ -67,14 +78,11 @@ impl StateSyncTrigger {
 
     /// This method checks if a state sync is required, and if so,
     /// notifies the bootstraper, to let the bootstraper can abort this task.
-    pub(super) async fn check(
-        &self,
-        node: CertifiedNodeMessage,
-    ) -> anyhow::Result<StateSyncStatus> {
+    pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<SyncOutcome> {
         let ledger_info_with_sigs = node.ledger_info();
 
         if !self.need_sync_for_ledger_info(ledger_info_with_sigs) {
-            return Ok(StateSyncStatus::Synced(Some(node)));
+            return Ok(SyncOutcome::Synced(Some(node)));
         }
 
         // Only verify the certificate if we need to sync
@@ -89,10 +97,10 @@ impl StateSyncTrigger {
                     /* more = */ false,
                 ))
                 .await;
-            return Ok(StateSyncStatus::EpochEnds);
+            return Ok(SyncOutcome::EpochEnds);
         }
 
-        Ok(StateSyncStatus::NeedsSync(node))
+        Ok(SyncOutcome::NeedsSync(node))
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
@@ -170,7 +178,7 @@ impl DagStateSynchronizer {
         }
     }
 
-    pub(crate) fn build_sync_to_request(
+    pub(crate) fn build_request(
         &self,
         node: &CertifiedNodeMessage,
         current_dag_store: Arc<RwLock<Dag>>,

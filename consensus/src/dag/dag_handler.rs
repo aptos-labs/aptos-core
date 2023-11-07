@@ -5,7 +5,7 @@ use crate::{
         dag_driver::DagDriver,
         dag_fetcher::{FetchRequestHandler, FetchWaiter},
         dag_network::RpcHandler,
-        dag_state_sync::{StateSyncStatus, StateSyncTrigger},
+        dag_state_sync::{SyncOutcome, StateSyncTrigger},
         errors::{
             DAGError, DAGRpcError, DagDriverError, FetchRequestHandleError,
             NodeBroadcastHandleError,
@@ -64,14 +64,14 @@ impl NetworkHandler {
         mut self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
         _buffer: Vec<DAGMessage>,
-    ) -> StateSyncStatus {
+    ) -> SyncOutcome {
         // TODO: process buffer
         loop {
             select! {
                 msg = dag_rpc_rx.select_next_some() => {
                     match self.process_rpc(msg).await {
                         Ok(sync_status) => {
-                            if matches!(sync_status, StateSyncStatus::NeedsSync(_) | StateSyncStatus::EpochEnds) {
+                            if matches!(sync_status, SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) {
                                 return sync_status;
                             }
                         },
@@ -110,7 +110,7 @@ impl NetworkHandler {
     async fn process_rpc(
         &mut self,
         rpc_request: IncomingDAGRequest,
-    ) -> anyhow::Result<StateSyncStatus> {
+    ) -> anyhow::Result<SyncOutcome> {
         let dag_message: DAGMessage = rpc_request.req.try_into()?;
         let epoch = dag_message.epoch();
 
@@ -136,7 +136,7 @@ impl NetworkHandler {
                         }),
                     DAGMessage::CertifiedNodeMsg(certified_node_msg) => {
                         match self.state_sync_trigger.check(certified_node_msg).await? {
-                            StateSyncStatus::Synced(Some(certified_node_msg)) => self
+                            SyncOutcome::Synced(Some(certified_node_msg)) => self
                                 .dag_driver
                                 .process(certified_node_msg.certified_node())
                                 .await
@@ -147,8 +147,8 @@ impl NetworkHandler {
                                             DAGError::DagDriverError(err)
                                         })
                                 }),
-                            status @ (StateSyncStatus::NeedsSync(_)
-                            | StateSyncStatus::EpochEnds) => return Ok(status),
+                            status @ (SyncOutcome::NeedsSync(_)
+                            | SyncOutcome::EpochEnds) => return Ok(status),
                             _ => unreachable!(),
                         }
                     },
@@ -188,6 +188,6 @@ impl NetworkHandler {
             .send(rpc_response)
             .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))?;
 
-        Ok(StateSyncStatus::Synced(None))
+        Ok(SyncOutcome::Synced(None))
     }
 }

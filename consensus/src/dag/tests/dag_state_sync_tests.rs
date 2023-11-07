@@ -198,7 +198,7 @@ async fn test_dag_state_sync() {
     };
 
     let (request, responders, sync_dag_store) =
-        state_sync.build_sync_to_request(&sync_node_li, slow_dag.clone(), 0);
+        state_sync.build_request(&sync_node_li, slow_dag.clone(), 0);
 
     let sync_result = state_sync
         .sync_dag_to(
