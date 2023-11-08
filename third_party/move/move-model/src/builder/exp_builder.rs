@@ -2954,6 +2954,45 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
+    // return the indices of fields that can be left in place during transforming pack exprs
+    fn in_order_fields<T>(
+        &mut self,
+        field_decls: &BTreeMap<Symbol, (Loc, usize, Type)>,
+        fields: &EA::Fields<T>,
+    ) -> BTreeSet<usize> {
+        // maps def_idx to exp_idx
+        let mut permutation = BTreeMap::new();
+        for (_, name, (exp_idx, _)) in fields.iter() {
+            let field_name = self.symbol_pool().make(name);
+            let (_, def_idx, _) = field_decls.get(&field_name).unwrap();
+            permutation.insert(*def_idx, *exp_idx);
+        }
+        let permutation = permutation
+            .into_iter()
+            .sorted_by_key(|(i, _)| *i)
+            .map(|(_, value)| value)
+            .collect_vec();
+        let mut in_order_fields = BTreeSet::new();
+        if !permutation.is_empty() {
+            let mut prev = permutation[0];
+            in_order_fields.insert(0);
+            for (i, cur) in permutation.into_iter().enumerate().skip(1) {
+                if cur < prev {
+                    continue;
+                } else if cur == prev + 1 {
+                    in_order_fields.insert(i);
+                    prev = cur;
+                } else {
+                    // cur > prev + 1
+                    prev = cur;
+                    in_order_fields = BTreeSet::new();
+                    in_order_fields.insert(i);
+                }
+            }
+        }
+        in_order_fields
+    }
+
     // given pack<S>{ f_p(1): e_1, ... }, where p is a permutation of the fields
     // return the struct id of S,
     // (.f_p(1), e_1'), (.f_p(1), e_2') ... where e_i' is e_i translated
