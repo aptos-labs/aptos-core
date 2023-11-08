@@ -2524,6 +2524,33 @@ impl GlobalValueImpl {
         }
     }
 
+    fn as_effect(&mut self) -> Option<Op<ValueImpl>> {
+        let (ret, new_val) = match self {
+            Self::None => (None, Self::None),
+            Self::Deleted => (Some(Op::Delete), Self::Deleted),
+            Self::Fresh { fields } => {
+                (
+                    Some(Op::New(ValueImpl::Container(Container::Struct(fields.clone())))),
+                    Self::Cached { fields: fields.clone(), status: Rc::new(RefCell::new(GlobalDataStatus::Clean)) }
+                )
+            },
+            Self::Cached { fields, status } => match &*status.borrow() {
+                GlobalDataStatus::Dirty => {
+                    (
+                        Some(Op::Modify(ValueImpl::Container(Container::Struct(fields.clone())))),
+                        Self::Cached { fields: fields.clone(), status: Rc::new(RefCell::new(GlobalDataStatus::Clean)) }
+                    )
+                },
+                GlobalDataStatus::Clean => (
+                    None,
+                    Self::Cached { fields: fields.clone(), status: Rc::new(RefCell::new(GlobalDataStatus::Clean)) }
+                )
+            },
+        };
+        std::mem::replace(self, new_val);
+        ret
+    }
+
     fn is_mutated(&self) -> bool {
         match self {
             Self::None => false,
@@ -2568,6 +2595,10 @@ impl GlobalValue {
 
     pub fn into_effect(self) -> Option<Op<Value>> {
         self.0.into_effect().map(|op| op.map(Value))
+    }
+
+    pub fn as_effect(&mut self) -> Option<Op<Value>> {
+        self.0.as_effect().map(|op| op.map(Value))
     }
 
     pub fn into_effect_with_layout(

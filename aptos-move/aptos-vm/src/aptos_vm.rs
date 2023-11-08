@@ -528,7 +528,7 @@ impl AptosVM {
 
     fn charge_change_set_and_respawn_session<'r, 'l>(
         &'l self,
-        session: SessionExt,
+        mut session: SessionExt,
         resolver: &'r impl AptosMoveResolver,
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
@@ -557,10 +557,11 @@ impl AptosVM {
         if !self.0.get_features().is_storage_deletion_refund_enabled() {
             storage_refund = 0.into();
         }
+        let data_cache = session.into_data_cache();
 
         // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
-        RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
+        RespawnedSession::spawn_from_existing_session(self, session_id, data_cache, resolver, change_set, storage_refund)
     }
 
     // Execute a multisig transaction:
@@ -1123,8 +1124,8 @@ impl AptosVM {
             // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
-            resolver.release_resource_group_cache();
-            session = self.0.new_session(resolver, SessionId::txn(txn));
+            // resolver.release_resource_group_cache();
+            // session = self.0.new_session(resolver, SessionId::txn(txn));
         }
 
         if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {

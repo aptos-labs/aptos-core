@@ -116,13 +116,12 @@ impl<'a> NativeTableContext<'a> {
     }
 
     /// Computes the change set from a NativeTableContext.
-    pub fn into_change_set(self) -> PartialVMResult<TableChangeSet> {
-        let NativeTableContext { table_data, .. } = self;
+    pub fn into_change_set(&mut self) -> PartialVMResult<TableChangeSet> {
         let TableData {
             new_tables,
             removed_tables,
             tables,
-        } = table_data.into_inner();
+        } = self.table_data.replace(TableData::default());
         let mut changes = BTreeMap::new();
         for (handle, table) in tables {
             let Table {

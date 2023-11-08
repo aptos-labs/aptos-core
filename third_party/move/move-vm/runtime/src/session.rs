@@ -18,7 +18,7 @@ use move_core_types::{
     gas_algebra::NumBytes,
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
+    value::MoveTypeLayout, resolver::MoveResolver,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -264,8 +264,8 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     pub fn finish_with_custom_effects<Resource>(
-        self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        mut self,
+        resource_converter: &dyn Fn(Value, &MoveTypeLayout, bool) -> PartialVMResult<Resource>,
     ) -> VMResult<Changes<Bytes, Resource>> {
         self.data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
@@ -286,18 +286,14 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     pub fn finish_with_extensions_with_custom_effects<Resource>(
-        self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
-    ) -> VMResult<(Changes<Bytes, Resource>, NativeContextExtensions<'r>)> {
-        let Session {
-            data_cache,
-            native_extensions,
-            ..
-        } = self;
-        let change_set = data_cache
+        &mut self,
+        resource_converter: &dyn Fn(Value, &MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+    ) -> VMResult<(Changes<Bytes, Resource>, &mut NativeContextExtensions<'r>)> {
+        let change_set = self
+            .data_cache
             .into_custom_effects(resource_converter, self.move_vm.runtime.loader())
             .map_err(|e| e.finish(Location::Undefined))?;
-        Ok((change_set, native_extensions))
+        Ok((change_set, &mut self.native_extensions))
     }
 
     /// Try to load a resource from remote storage and create a corresponding GlobalValue
@@ -416,6 +412,14 @@ impl<'r, 'l> Session<'r, 'l> {
 
     pub fn get_vm_config(&self) -> &'l VMConfig {
         self.move_vm.runtime.loader().vm_config()
+    }
+
+    pub fn into_inner(self) -> (&'l MoveVM, TransactionDataCache<'r>, NativeContextExtensions<'r>) {
+        (self.move_vm, self.data_cache, self.native_extensions)
+    }
+
+    pub fn new(move_vm: &'l MoveVM, data_cache: TransactionDataCache<'r>, native_extensions: NativeContextExtensions<'r>) -> Self {
+        Self { move_vm, data_cache, native_extensions }
     }
 }
 

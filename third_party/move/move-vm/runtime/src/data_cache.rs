@@ -51,7 +51,7 @@ impl AccountDataCache {
 /// The Move VM takes a `DataStore` in input and this is the default and correct implementation
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
-pub(crate) struct TransactionDataCache<'r> {
+pub struct TransactionDataCache<'r> {
     remote: &'r dyn MoveResolver,
     account_map: BTreeMap<AccountAddress, AccountDataCache>,
 }
@@ -70,11 +70,11 @@ impl<'r> TransactionDataCache<'r> {
     /// published modules.
     ///
     /// Gives all proper guarantees on lifetime of global data as well.
-    pub(crate) fn into_effects(self, loader: &Loader) -> PartialVMResult<ChangeSet> {
+    pub(crate) fn into_effects(mut self, loader: &Loader) -> PartialVMResult<ChangeSet> {
         let resource_converter =
-            |value: Value, layout: MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
+            |value: Value, layout: &MoveTypeLayout, _: bool| -> PartialVMResult<Bytes> {
                 value
-                    .simple_serialize(&layout)
+                    .simple_serialize(layout)
                     .map(Into::into)
                     .ok_or_else(|| {
                         PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
@@ -87,33 +87,33 @@ impl<'r> TransactionDataCache<'r> {
     /// Same like `into_effects`, but also allows clients to select the format of
     /// produced effects for resources.
     pub(crate) fn into_custom_effects<Resource>(
-        self,
-        resource_converter: &dyn Fn(Value, MoveTypeLayout, bool) -> PartialVMResult<Resource>,
+        &mut self,
+        resource_converter: &dyn Fn(Value, &MoveTypeLayout, bool) -> PartialVMResult<Resource>,
         loader: &Loader,
     ) -> PartialVMResult<Changes<Bytes, Resource>> {
         let mut change_set = Changes::<Bytes, Resource>::new();
-        for (addr, account_data_cache) in self.account_map.into_iter() {
+        for (addr, account_data_cache) in self.account_map.iter_mut() {
             let mut modules = BTreeMap::new();
-            for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map {
-                let op = if is_republishing {
-                    Op::Modify(module_blob)
+            for (module_name, (module_blob, is_republishing)) in account_data_cache.module_map.iter() {
+                let op = if *is_republishing {
+                    Op::Modify(module_blob.clone())
                 } else {
-                    Op::New(module_blob)
+                    Op::New(module_blob.clone())
                 };
-                modules.insert(module_name, op);
+                modules.insert(module_name.to_owned(), op);
             }
 
             let mut resources = BTreeMap::new();
-            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map {
-                if let Some(op) = gv.into_effect_with_layout(layout) {
-                    let struct_tag = match loader.type_to_type_tag(&ty)? {
+            for (ty, (layout, gv, has_aggregator_lifting)) in account_data_cache.data_map.iter_mut() {
+                if let Some(op) = gv.as_effect() {
+                    let struct_tag = match loader.type_to_type_tag(ty)? {
                         TypeTag::Struct(struct_tag) => *struct_tag,
                         _ => return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)),
                     };
                     resources.insert(
                         struct_tag,
-                        op.and_then(|(value, layout)| {
-                            resource_converter(value, layout, has_aggregator_lifting)
+                        op.and_then(|value| {
+                            resource_converter(value, layout, *has_aggregator_lifting)
                         })?,
                     );
                 }
@@ -121,7 +121,7 @@ impl<'r> TransactionDataCache<'r> {
             if !modules.is_empty() || !resources.is_empty() {
                 change_set
                     .add_account_changeset(
-                        addr,
+                        *addr,
                         AccountChanges::from_modules_resources(modules, resources),
                     )
                     .expect("accounts should be unique");
@@ -297,5 +297,10 @@ impl<'r> TransactionDataCache<'r> {
                 PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
             })?
             .is_some())
+    }
+
+    pub fn change_resolver<'a>(self, remote: &'a dyn MoveResolver) -> TransactionDataCache<'a> {
+        let TransactionDataCache { account_map, ..} = self;
+        TransactionDataCache { remote, account_map }
     }
 }

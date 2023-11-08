@@ -69,6 +69,19 @@ impl MoveVM {
         }
     }
 
+        /// Create a new session, as in `new_session`, but provide native context extensions.
+        pub fn new_session_with_extensions_and_cache<'r>(
+            &self,
+            data_cache: TransactionDataCache<'r>,
+            native_extensions: NativeContextExtensions<'r>,
+        ) -> Session<'r, '_> {
+            Session {
+                move_vm: self,
+                data_cache,
+                native_extensions,
+            }
+        }
+
     /// Load a module into VM's code cache
     pub fn load_module(
         &self,

@@ -39,6 +39,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use move_vm_runtime::data_cache::TransactionDataCache;
 use std::{
     collections::{BTreeMap, HashSet},
     sync::Arc,
@@ -78,6 +79,29 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
             session_builder: |resolver| Some(vm.0.new_session(resolver, session_id)),
+            storage_refund,
+        }
+        .build())
+    }
+
+    pub fn spawn_from_existing_session<'a>(
+        vm: &'l AptosVM,
+        session_id: SessionId,
+        data_cache: TransactionDataCache<'a>,
+        base: &'r dyn AptosMoveResolver,
+        previous_session_change_set: VMChangeSet,
+        storage_refund: Fee,
+    ) -> Result<Self, VMStatus> {
+        let executor_view = ExecutorViewWithChangeSet::new(
+            base.as_executor_view(),
+            base.as_resource_group_view(),
+            previous_session_change_set,
+        );
+
+        Ok(RespawnedSessionBuilder {
+            executor_view,
+            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
+            session_builder: |resolver| Some(vm.0.move_vm.new_session_with_data(resolver, data_cache.change_resolver(resolver), session_id)),
             storage_refund,
         }
         .build())

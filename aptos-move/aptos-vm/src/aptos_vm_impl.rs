@@ -54,7 +54,7 @@ pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
 /// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
-    move_vm: MoveVmExt,
+    pub(crate) move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
     storage_gas_params: Result<StorageGasParameters, String>,
@@ -693,7 +693,7 @@ impl<'a> AptosVMInternals<'a> {
 
 pub(crate) fn get_transaction_output<A: AccessPathCache>(
     ap_cache: &mut A,
-    session: SessionExt,
+    mut session: SessionExt,
     fee_statement: FeeStatement,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,

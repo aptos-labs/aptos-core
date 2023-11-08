@@ -32,7 +32,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
-use move_vm_runtime::{move_vm::MoveVM, session::Session};
+use move_vm_runtime::{move_vm::MoveVM, session::Session, data_cache::TransactionDataCache};
 use move_vm_types::values::Value;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -156,20 +156,20 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     }
 
     pub fn finish<C: AccessPathCache>(
-        self,
+        &mut self,
         ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
-                                  layout: MoveTypeLayout,
+                                  layout: &MoveTypeLayout,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
             value
-                .simple_serialize(&layout)
+                .simple_serialize(layout)
                 .map(Into::into)
-                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
+                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout.clone()))))
                 .ok_or_else(|| {
                     PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                         .with_message(format!("Error when serializing resource {}.", value))
@@ -182,12 +182,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let (change_set, resource_group_change_set) =
             Self::split_and_merge_resource_groups(move_vm, self.remote, change_set, ap_cache)?;
 
-        let table_context: NativeTableContext = extensions.remove();
+        let mut table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
-        let aggregator_context: NativeAggregatorContext = extensions.remove();
+        let mut aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context
             .into_change_set()
             .map_err(|e| PartialVMError::from(e).finish(Location::Undefined))?;
@@ -213,6 +213,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
 
         Ok(change_set)
+    }
+
+    pub fn into_data_cache(self) -> TransactionDataCache<'r> {
+        self.inner.into_inner().1
     }
 
     pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {

@@ -75,13 +75,10 @@ impl<'a> NativeAggregatorContext<'a> {
 
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
-    pub fn into_change_set(self) -> Result<AggregatorChangeSet, PanicError> {
-        let NativeAggregatorContext {
-            aggregator_v1_data,
-            delayed_field_data,
-            ..
-        } = self;
-        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into_inner().into();
+    pub fn into_change_set(&mut self) -> Result<AggregatorChangeSet, PanicError> {
+        let aggregator_v1_data = self.aggregator_v1_data.replace(AggregatorData::default());
+        let delayed_field_data = self.delayed_field_data.replace(DelayedFieldData::default());
+        let (_, destroyed_aggregators, aggregators) = aggregator_v1_data.into();
 
         let mut aggregator_v1_changes = BTreeMap::new();
 
@@ -112,7 +109,7 @@ impl<'a> NativeAggregatorContext<'a> {
             aggregator_v1_changes.insert(id.0, AggregatorChangeV1::Delete);
         }
 
-        let delayed_field_changes = delayed_field_data.into_inner().into();
+        let delayed_field_changes = delayed_field_data.into();
         let delayed_write_set_keys = delayed_field_changes
             .keys()
             .cloned()
