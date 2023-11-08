@@ -74,22 +74,6 @@ If you haven't yet, make sure to read the introductory [custom processor guide](
 
 You can also check out the python-specific broad overview of how to create an indexer processor [here](https://github.com/aptos-labs/aptos-indexer-processors/tree/main/python).
 
-<!-- TODO: Move the above two docs into the docs site. -->
-
-At the very least, make sure to install these tools and setup your poetry environment:
-
-```shell
-pip install grpcio-tools
-poetry install
-
-python3 -m grpc_tools.protoc --proto_path=./proto --python_out=python --pyi_out=python --grpc_python_out=python  \
-          proto/aptos/bigquery_schema/v1/transaction.proto  \
-          proto/aptos/indexer/v1/raw_data.proto \
-          proto/aptos/internal/fullnode/v1/fullnode_data.proto \
-          proto/aptos/transaction/v1/transaction.proto \
-          proto/aptos/util/timestamp/timestamp.proto
-```
-
 ## Configure your indexer processor
 
 Now let's setup the configuration details for the actual indexer processor we're going to use.
@@ -100,7 +84,6 @@ Copy the contents below and save it to a file called `config.yaml`. Save it in t
 
 ```
 - indexer
-    - proto
     - python
         - aptos_ambassador_token
         - aptos-tontine
