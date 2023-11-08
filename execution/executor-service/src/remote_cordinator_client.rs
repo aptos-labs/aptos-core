@@ -4,7 +4,7 @@ use crate::{
     metrics::REMOTE_EXECUTOR_TIMER, remote_state_view::RemoteStateViewClient, ExecuteBlockCommand,
     RemoteExecutionRequest, RemoteExecutionResult,
 };
-use aptos_secure_net::network_controller::{Message, NetworkController};
+use aptos_secure_net::network_controller::{Message, MessageType, NetworkController};
 use aptos_types::{
     block_executor::partitioner::ShardId, state_store::state_key::StateKey,
     transaction::TransactionOutput, vm_status::VMStatus,
@@ -16,12 +16,14 @@ use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
 use std::sync::atomic::AtomicU64;
+use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
     command_rx: Receiver<Message>,
-    result_tx: Sender<Message>,
+    //result_tx: Sender<Message>,
+    result_tx: OutboundRpcHelper,
     shard_id: ShardId,
     cmd_rx_msg_duration_since_epoch: AtomicU64,
 }
@@ -35,8 +37,8 @@ impl RemoteCoordinatorClient {
         let execute_command_type = format!("execute_command_{}", shard_id);
         let execute_result_type = format!("execute_result_{}", shard_id);
         let command_rx = controller.create_inbound_channel(execute_command_type);
-        let result_tx =
-            controller.create_outbound_channel(coordinator_address, execute_result_type);
+        let result_tx = OutboundRpcHelper::new(controller.get_self_addr(), coordinator_address);
+            //controller.create_outbound_channel(coordinator_address, execute_result_type);
 
         let state_view_client =
             RemoteStateViewClient::new(shard_id, controller, coordinator_address);
@@ -120,13 +122,14 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
         }
     }
 
-    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
+    fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
+        let execute_result_type = format!("execute_result_{}", self.shard_id);
         let duration_since_epoch = self.cmd_rx_msg_duration_since_epoch.load(std::sync::atomic::Ordering::Relaxed);
         let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["6_results_tx_msg_shard_send"]).observe(delta as f64);
         let remote_execution_result = RemoteExecutionResult::new(result);
         let output_message = bcs::to_bytes(&remote_execution_result).unwrap();
-        self.result_tx.send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0)).unwrap();
+        self.result_tx.send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0), &MessageType::new(execute_result_type));
     }
 }
