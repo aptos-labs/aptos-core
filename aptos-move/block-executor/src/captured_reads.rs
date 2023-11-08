@@ -319,8 +319,7 @@ impl<T: Transaction> CapturedReads<T> {
             .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
     }
 
-    // Return an iterator over the captured group reads
-    // that contain a delayed field
+    // Return an iterator over the captured group reads that contain a delayed field
     pub(crate) fn get_group_read_values_with_delayed_fields(
         &self,
     ) -> impl Iterator<Item = (&T::Key, &GroupRead<T>)> {

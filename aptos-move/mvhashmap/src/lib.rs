@@ -71,12 +71,6 @@ impl<
         &self.group_data
     }
 
-    /// Contains data representing resource groups, or more generically, internally
-    /// containing different values mapped to tags of type T.
-    pub fn group_data_mut(&mut self) -> &mut VersionedGroupData<K, T, V> {
-        &mut self.group_data
-    }
-
     pub fn delayed_fields(&self) -> &VersionedDelayedFields<I> {
         &self.delayed_fields
     }

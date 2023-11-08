@@ -1833,13 +1833,6 @@ mod test {
     #[derive(Clone, Debug)]
     struct TestTransactionType {}
 
-    // #[derive(Debug, PartialEq, Eq)]
-    // struct ValueType {
-    //     /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
-    //     bytes: Option<Bytes>,
-    //     metadata: StateValueMetadataKind,
-    // }
-
     impl BlockExecutableTransaction for TestTransactionType {
         type Event = MockEvent;
         type Identifier = DelayedFieldID;

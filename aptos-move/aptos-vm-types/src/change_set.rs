@@ -728,16 +728,7 @@ impl VMChangeSet {
             if skip.contains_key(&key) {
                 continue;
             }
-            match reads_needing_exchange.entry(key) {
-                Occupied(entry) => {
-                    // When squashing, reads should always be identical.
-                    // TODO[agg_v2](fix) remove asssertion, as this should always hold.
-                    assert_eq!(entry.get(), &additional_value);
-                },
-                Vacant(entry) => {
-                    entry.insert(additional_value);
-                },
-            }
+            reads_needing_exchange.insert(key, additional_value);
         }
         Ok(())
     }
@@ -754,16 +745,7 @@ impl VMChangeSet {
             if skip.contains_key(&key) {
                 continue;
             }
-            match group_reads_needing_exchange.entry(key) {
-                Occupied(entry) => {
-                    // When squashing, reads should always be identical.
-                    // TODO[agg_v2](fix) remove asssertion, as this should always hold.
-                    assert_eq!(entry.get(), &additional_value);
-                },
-                Vacant(entry) => {
-                    entry.insert(additional_value);
-                },
-            }
+            group_reads_needing_exchange.insert(key, additional_value);
         }
         Ok(())
     }
