@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_compression::metrics::CompressionClient;
 use aptos_config::config::{NodeConfig, MAX_APPLICATION_MESSAGE_SIZE};
-use aptos_consensus_types::common::{TransactionInfo, TransactionSummary};
+use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
@@ -160,7 +160,7 @@ pub(crate) fn batch_add_signed_txn(
 }
 
 // Helper struct that keeps state between `.get_block` calls. Imitates work of Consensus.
-pub struct ConsensusMock(BTreeMap<TransactionSummary, TransactionInfo>);
+pub struct ConsensusMock(BTreeMap<TransactionSummary, TransactionInProgress>);
 
 impl ConsensusMock {
     pub(crate) fn new() -> Self {
@@ -176,7 +176,7 @@ impl ConsensusMock {
         let block = mempool.get_batch(max_txns, max_bytes, true, true, self.0.clone());
         block.iter().for_each(|t| {
             let txn_summary = TransactionSummary::new(t.sender(), t.sequence_number());
-            let txn_info = TransactionInfo::new(t.gas_unit_price());
+            let txn_info = TransactionInProgress::new(t.gas_unit_price());
             self.0.insert(txn_summary, txn_info);
         });
         block

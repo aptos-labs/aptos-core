@@ -43,20 +43,13 @@ impl fmt::Display for TransactionSummary {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct TransactionInProgress {
-    pub summary: TransactionSummary,
-    pub gas_unit_price: u64,
-}
-
 #[derive(Clone)]
-pub struct TransactionInfo {
-    // TODO: scope?
+pub struct TransactionInProgress {
     pub gas_unit_price: u64,
     pub count: u64,
 }
 
-impl TransactionInfo {
+impl TransactionInProgress {
     pub fn new(gas_unit_price: u64) -> Self {
         Self {
             gas_unit_price,
@@ -68,7 +61,6 @@ impl TransactionInfo {
         self.gas_unit_price
     }
 
-    // TODO: scope?
     pub fn decrement(&mut self) -> u64 {
         self.count -= 1;
         self.count

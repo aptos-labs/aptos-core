@@ -12,7 +12,7 @@ use crate::quorum_store::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{TransactionInfo, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary},
     proof_of_store::BatchId,
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -30,7 +30,7 @@ async fn queue_mempool_batch_response(
     txns: Vec<SignedTransaction>,
     max_size: usize,
     quorum_store_to_mempool_receiver: &mut Receiver<QuorumStoreRequest>,
-) -> BTreeMap<TransactionSummary, TransactionInfo> {
+) -> BTreeMap<TransactionSummary, TransactionInProgress> {
     if let QuorumStoreRequest::GetBatchRequest(
         _max_batch_size,
         _max_bytes,

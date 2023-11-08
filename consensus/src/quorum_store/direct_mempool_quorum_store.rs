@@ -4,7 +4,7 @@
 use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, TransactionInfo, TransactionSummary},
+    common::{Payload, PayloadFilter, TransactionInProgress, TransactionSummary},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
@@ -52,7 +52,7 @@ impl DirectMempoolQuorumStore {
         let (callback, callback_rcv) = oneshot::channel();
         let exclude_txns: BTreeMap<_, _> = exclude_txns
             .into_iter()
-            .map(|txn| (txn, TransactionInfo::new(0)))
+            .map(|txn| (txn, TransactionInProgress::new(0)))
             .collect();
         let msg = QuorumStoreRequest::GetBatchRequest(
             max_items,

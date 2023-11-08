@@ -15,7 +15,7 @@ use crate::{
     shared_mempool::types::MultiBucketTimelineIndexIds,
 };
 use aptos_config::config::NodeConfig;
-use aptos_consensus_types::common::{TransactionInfo, TransactionSummary};
+use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -234,7 +234,7 @@ impl Mempool {
         max_bytes: u64,
         return_non_full: bool,
         include_gas_upgraded: bool,
-        exclude_transactions: BTreeMap<TransactionSummary, TransactionInfo>,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
     ) -> Vec<SignedTransaction> {
         let start_time = Instant::now();
         let exclude_size = exclude_transactions.len();

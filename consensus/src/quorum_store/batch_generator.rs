@@ -12,14 +12,13 @@ use crate::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{TransactionInProgress, TransactionInfo, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary},
     proof_of_store::BatchId,
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
-use itertools::Itertools;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -47,8 +46,8 @@ pub struct BatchGenerator {
     db: Arc<dyn QuorumStoreStorage>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
-    batches_in_progress: HashMap<BatchId, Vec<TransactionInProgress>>,
-    txns_in_progress_sorted: BTreeMap<TransactionSummary, TransactionInfo>,
+    batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
+    txns_in_progress_sorted: BTreeMap<TransactionSummary, TransactionInProgress>,
     batch_expirations: TimeExpirations<BatchId>,
     latest_block_timestamp: u64,
     last_end_batch_time: Instant,
@@ -114,15 +113,14 @@ impl BatchGenerator {
 
         let txns_in_progress: Vec<_> = txns
             .iter()
-            .map(|txn| TransactionInProgress {
-                summary: TransactionSummary {
-                    sender: txn.sender(),
-                    sequence_number: txn.sequence_number(),
-                },
-                gas_unit_price: txn.gas_unit_price(),
+            .map(|txn| {
+                (
+                    TransactionSummary::new(txn.sender(), txn.sequence_number()),
+                    TransactionInProgress::new(txn.gas_unit_price()),
+                )
             })
-            .sorted()
             .collect();
+
         self.insert_batch_in_progress(batch_id, txns_in_progress);
         self.batch_expirations.add_item(batch_id, expiry_time);
 
@@ -224,31 +222,29 @@ impl BatchGenerator {
     fn insert_batch_in_progress(
         &mut self,
         batch_id: BatchId,
-        txns_in_progress: Vec<TransactionInProgress>,
+        txns_in_progress: Vec<(TransactionSummary, TransactionInProgress)>,
     ) {
-        for txn_in_progress in &txns_in_progress {
+        let mut txns = vec![];
+        for (summary, info) in txns_in_progress {
             let txn_info = self
                 .txns_in_progress_sorted
-                .entry(txn_in_progress.summary)
-                .or_insert_with(|| TransactionInfo::new(txn_in_progress.gas_unit_price));
+                .entry(summary)
+                .or_insert_with(|| TransactionInProgress::new(info.gas_unit_price));
             txn_info.increment();
-            txn_info.gas_unit_price = txn_in_progress.gas_unit_price.max(txn_info.gas_unit_price);
+            txn_info.gas_unit_price = info.gas_unit_price.max(txn_info.gas_unit_price);
+            txns.push(summary);
         }
-        self.batches_in_progress.insert(batch_id, txns_in_progress);
+        self.batches_in_progress.insert(batch_id, txns);
     }
 
     fn remove_batch_in_progress(&mut self, batch_id: &BatchId) -> bool {
         let removed = self.batches_in_progress.remove(batch_id);
         match removed {
-            Some(txns_in_progress) => {
-                for txn_in_progress in txns_in_progress {
-                    if let Some(mut txn_info) = self
-                        .txns_in_progress_sorted
-                        .remove(&txn_in_progress.summary)
-                    {
-                        if txn_info.decrement() > 0 {
-                            self.txns_in_progress_sorted
-                                .insert(txn_in_progress.summary, txn_info);
+            Some(txns) => {
+                for txn in txns {
+                    if let Some(mut info) = self.txns_in_progress_sorted.remove(&txn) {
+                        if info.decrement() > 0 {
+                            self.txns_in_progress_sorted.insert(txn, info);
                         }
                     }
                 }

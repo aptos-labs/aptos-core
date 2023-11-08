@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_config::config::NodeConfig;
-use aptos_consensus_types::common::{TransactionInProgress, TransactionInfo, TransactionSummary};
+use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_types::{
     mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
@@ -860,15 +860,11 @@ fn test_include_gas_upgraded() {
         TestTransaction::new(address_index, sequence_number, low_gas_price),
     )
     .unwrap();
-    let low_gas_txn = TransactionInProgress {
-        summary: TransactionSummary::new(
-            TestTransaction::get_address(address_index),
-            sequence_number,
-        ),
-        gas_unit_price: low_gas_price,
-    };
+
+    let low_gas_txn =
+        TransactionSummary::new(TestTransaction::get_address(address_index), sequence_number);
     let batch = pool.get_batch(10, 10240, true, true, btreemap! {
-        low_gas_txn.summary => TransactionInfo::new(low_gas_txn.gas_unit_price)
+        low_gas_txn => TransactionInProgress::new(low_gas_price)
     });
     assert_eq!(batch.len(), 0);
 
@@ -878,17 +874,12 @@ fn test_include_gas_upgraded() {
         TestTransaction::new(address_index, sequence_number, high_gas_price),
     )
     .unwrap();
-    let high_gas_txn = TransactionInProgress {
-        summary: TransactionSummary::new(
-            TestTransaction::get_address(address_index),
-            sequence_number,
-        ),
-        gas_unit_price: high_gas_price,
-    };
+    let high_gas_txn =
+        TransactionSummary::new(TestTransaction::get_address(address_index), sequence_number);
 
     // When gas upgraded is allowed and the low gas txn (but not the high gas txn) is excluded, will the high gas txn be included.
     let batch = pool.get_batch(10, 10240, true, true, btreemap! {
-        low_gas_txn.summary => TransactionInfo::new(low_gas_txn.gas_unit_price)
+        low_gas_txn => TransactionInProgress::new(low_gas_price)
     });
     assert_eq!(batch.len(), 1);
     assert_eq!(
@@ -899,27 +890,27 @@ fn test_include_gas_upgraded() {
     assert_eq!(batch[0].gas_unit_price(), high_gas_price);
     // In all other cases, the transaction will be excluded.
     let batch = pool.get_batch(10, 10240, true, false, btreemap! {
-        low_gas_txn.summary => TransactionInfo::new(low_gas_txn.gas_unit_price)
+        low_gas_txn => TransactionInProgress::new(low_gas_price)
     });
     assert_eq!(batch.len(), 0);
 
     let batch = pool.get_batch(10, 10240, true, true, btreemap! {
-        high_gas_txn.summary => TransactionInfo::new(high_gas_txn.gas_unit_price)
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
     });
     assert_eq!(batch.len(), 0);
     let batch = pool.get_batch(10, 10240, true, false, btreemap! {
-        high_gas_txn.summary => TransactionInfo::new(high_gas_txn.gas_unit_price)
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
     });
     assert_eq!(batch.len(), 0);
 
     let batch = pool.get_batch(10, 10240, true, true, btreemap! {
-        low_gas_txn.summary => TransactionInfo::new(low_gas_txn.gas_unit_price),
-        high_gas_txn.summary => TransactionInfo::new(high_gas_txn.gas_unit_price)
+        low_gas_txn => TransactionInProgress::new(low_gas_price),
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
     });
     assert_eq!(batch.len(), 0);
     let batch = pool.get_batch(10, 10240, true, false, btreemap! {
-        low_gas_txn.summary => TransactionInfo::new(low_gas_txn.gas_unit_price),
-        high_gas_txn.summary => TransactionInfo::new(high_gas_txn.gas_unit_price)
+        low_gas_txn => TransactionInProgress::new(low_gas_price),
+        high_gas_txn => TransactionInProgress::new(high_gas_price)
     });
     assert_eq!(batch.len(), 0);
 }

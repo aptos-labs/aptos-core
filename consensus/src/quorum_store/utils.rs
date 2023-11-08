@@ -3,7 +3,7 @@
 
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
-    common::{TransactionInfo, TransactionSummary},
+    common::{TransactionInProgress, TransactionSummary},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_logger::prelude::*;
@@ -104,7 +104,7 @@ impl MempoolProxy {
         &self,
         max_items: u64,
         max_bytes: u64,
-        exclude_transactions: BTreeMap<TransactionSummary, TransactionInfo>,
+        exclude_transactions: BTreeMap<TransactionSummary, TransactionInProgress>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
         let msg = QuorumStoreRequest::GetBatchRequest(
