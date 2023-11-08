@@ -2995,9 +2995,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     // given pack<S>{ f_p(1): e_1, ... }, where p is a permutation of the fields
     // return the struct id of S,
-    // (.f_p(1), e_1'), (.f_p(1), e_2') ... where e_i' is e_i translated
-    // and
-    // .f_q(1), .f_q(2), ... where q is the inverse of p
+    // (x, e) ...
+    // arg ...
+    // such that
+    // { let x = e; ...; pack(arg, ...) }
+    // can be the result of the transformation
     fn translate_exp_fields(
         &mut self,
         loc: &Loc,
