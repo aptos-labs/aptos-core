@@ -842,6 +842,10 @@ mod tests {
     use claims::{assert_err, assert_ok, assert_some_eq};
     use test_case::test_case;
 
+    const CREATE: u64 = 0;
+    const MODIFICATION: u64 = 1;
+    const DELETION: u64 = 2;
+
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{
             let group_write = GroupWrite::new($op, vec![], $s);
@@ -894,12 +898,12 @@ mod tests {
         let mut base_update = BTreeMap::new();
         base_update.insert(
             key_1.clone(),
-            GroupWrite::new(write_op_with_metadata(0, 100), vec![], 0),
+            GroupWrite::new(write_op_with_metadata(CREATE, 100), vec![], 0),
         );
         let mut additional_update = BTreeMap::new();
         additional_update.insert(
             key_2.clone(),
-            GroupWrite::new(write_op_with_metadata(0, 200), vec![], 0),
+            GroupWrite::new(write_op_with_metadata(CREATE, 200), vec![], 0),
         );
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -982,7 +986,7 @@ mod tests {
         base_update.insert(
             key.clone(),
             GroupWrite::new(
-                write_op_with_metadata(0, 100), // create
+                write_op_with_metadata(CREATE, 100), // create
                 vec![],
                 0,
             ),
@@ -990,7 +994,7 @@ mod tests {
         additional_update.insert(
             key.clone(),
             GroupWrite::new(
-                write_op_with_metadata(2, 200), // delete
+                write_op_with_metadata(DELETION, 200), // delete
                 vec![],
                 0,
             ),
@@ -1010,11 +1014,11 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
-        // TODO: Harcoding type layout to None. Test with layout = Some(..)
+        // TODO[agg_v2](test): Harcoding type layout to None. Test with layout = Some(..)
         base_update.insert(
             key_1.clone(),
             GroupWrite::new(
-                write_op_with_metadata(1, 100),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![
                     (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
                     (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
@@ -1025,7 +1029,7 @@ mod tests {
         additional_update.insert(
             key_1.clone(),
             GroupWrite::new(
-                write_op_with_metadata(1, 200),
+                write_op_with_metadata(MODIFICATION, 200),
                 vec![
                     (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
                     (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
@@ -1037,7 +1041,7 @@ mod tests {
         base_update.insert(
             key_2.clone(),
             GroupWrite::new(
-                write_op_with_metadata(1, 100),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![
                     (mock_tag_0(), (WriteOp::Deletion, None)),
                     (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
@@ -1049,7 +1053,7 @@ mod tests {
         additional_update.insert(
             key_2.clone(),
             GroupWrite::new(
-                write_op_with_metadata(1, 200),
+                write_op_with_metadata(MODIFICATION, 200),
                 vec![
                     (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
                     (mock_tag_1(), (WriteOp::Deletion, None)),
@@ -1089,7 +1093,7 @@ mod tests {
         let additional_update = BTreeMap::from([(
             key_2.clone(),
             GroupWrite::new(
-                write_op_with_metadata(1, 200),
+                write_op_with_metadata(MODIFICATION, 200),
                 vec![(mock_tag_1(), (WriteOp::Deletion, None))],
                 0,
             ),
