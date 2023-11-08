@@ -3,16 +3,10 @@
 [variant baseline]
 fun pack_unpack::pack($t0: u64, $t1: u64): pack_unpack::S {
      var $t2: pack_unpack::S
-     var $t3: u64
-     var $t4: pack_unpack::T
-     var $t5: pack_unpack::T
-     var $t6: u64
-  0: $t3 := move($t0)
-  1: $t6 := move($t1)
-  2: $t5 := pack pack_unpack::T($t6)
-  3: $t4 := move($t5)
-  4: $t2 := pack pack_unpack::S($t3, $t4)
-  5: return $t2
+     var $t3: pack_unpack::T
+  0: $t3 := pack pack_unpack::T($t1)
+  1: $t2 := pack pack_unpack::S($t0, $t3)
+  2: return $t2
 }
 
 
@@ -35,22 +29,13 @@ fun pack_unpack::unpack($t0: pack_unpack::S): (u64, u64) {
 [variant baseline]
 fun pack_unpack::pack($t0: u64, $t1: u64): pack_unpack::S {
      var $t2: pack_unpack::S
-     var $t3: u64
-     var $t4: pack_unpack::T
-     var $t5: pack_unpack::T
-     var $t6: u64
+     var $t3: pack_unpack::T
      # live vars: $t0, $t1
-  0: $t3 := move($t0)
-     # live vars: $t1, $t3
-  1: $t6 := move($t1)
-     # live vars: $t3, $t6
-  2: $t5 := pack pack_unpack::T($t6)
-     # live vars: $t3, $t5
-  3: $t4 := move($t5)
-     # live vars: $t3, $t4
-  4: $t2 := pack pack_unpack::S($t3, $t4)
+  0: $t3 := pack pack_unpack::T($t1)
+     # live vars: $t0, $t3
+  1: $t2 := pack pack_unpack::S($t0, $t3)
      # live vars: $t2
-  5: return $t2
+  2: return $t2
 }
 
 
@@ -86,19 +71,14 @@ struct S {
 }
 
 pack(Arg0: u64, Arg1: u64): S {
-L0:	loc2: T
 B0:
-	0: MoveLoc[0](Arg0: u64)
-	1: StLoc[2](loc0: u64)
-	2: MoveLoc[1](Arg1: u64)
-	3: StLoc[3](loc1: u64)
-	4: MoveLoc[3](loc1: u64)
-	5: Pack[0](T)
-	6: StLoc[4](loc2: T)
-	7: MoveLoc[2](loc0: u64)
-	8: MoveLoc[4](loc2: T)
-	9: Pack[1](S)
-	10: Ret
+	0: MoveLoc[1](Arg1: u64)
+	1: Pack[0](T)
+	2: StLoc[2](loc0: T)
+	3: MoveLoc[0](Arg0: u64)
+	4: MoveLoc[2](loc0: T)
+	5: Pack[1](S)
+	6: Ret
 }
 unpack(Arg0: S): u64 * u64 {
 L0:	loc1: u64

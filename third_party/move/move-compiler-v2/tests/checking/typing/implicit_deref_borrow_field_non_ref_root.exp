@@ -6,15 +6,9 @@ module 0x8675309::M {
     private fun t0(cond: bool,s: M::S) {
         select M::S.f(s);
         select M::S.f(if cond {
-          {
-            let .f: u64 = 0;
-            pack M::S(.f)
-          }
+          pack M::S(0)
         } else {
-          {
-            let .f: u64 = 1;
-            pack M::S(.f)
-          }
+          pack M::S(1)
         });
         Tuple()
     }

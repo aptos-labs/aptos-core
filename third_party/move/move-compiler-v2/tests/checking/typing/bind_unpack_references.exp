@@ -9,26 +9,11 @@ module 0x8675309::M {
     }
     private fun t0() {
         {
-          let M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S } = {
-            let .s1: M::S = {
-              let .f: u64 = 0;
-              pack M::S(.f)
-            };
-            {
-              let .s2: M::S = {
-                let .f: u64 = 1;
-                pack M::S(.f)
-              };
-              pack M::R(.s1, .s2)
-            }
-          };
+          let M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S } = pack M::R(pack M::S(0), pack M::S(1));
           f;
           s2;
           f: u64 = 0;
-          s2: M::S = {
-            let .f: u64 = 0;
-            pack M::S(.f)
-          };
+          s2: M::S = pack M::S(0);
           f;
           s2;
           Tuple()
@@ -36,26 +21,11 @@ module 0x8675309::M {
     }
     private fun t1() {
         {
-          let M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S } = Borrow(Immutable)({
-            let .s1: M::S = {
-              let .f: u64 = 0;
-              pack M::S(.f)
-            };
-            {
-              let .s2: M::S = {
-                let .f: u64 = 1;
-                pack M::S(.f)
-              };
-              pack M::R(.s1, .s2)
-            }
-          });
+          let M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S } = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
           f;
           s2;
           f: &u64 = Borrow(Immutable)(0);
-          s2: &M::S = Borrow(Immutable)({
-            let .f: u64 = 0;
-            pack M::S(.f)
-          });
+          s2: &M::S = Borrow(Immutable)(pack M::S(0));
           f;
           s2;
           Tuple()
@@ -63,26 +33,11 @@ module 0x8675309::M {
     }
     private fun t2() {
         {
-          let M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S } = Borrow(Mutable)({
-            let .s1: M::S = {
-              let .f: u64 = 0;
-              pack M::S(.f)
-            };
-            {
-              let .s2: M::S = {
-                let .f: u64 = 1;
-                pack M::S(.f)
-              };
-              pack M::R(.s1, .s2)
-            }
-          });
+          let M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S } = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
           f;
           s2;
           f: &mut u64 = Borrow(Mutable)(0);
-          s2: &mut M::S = Borrow(Mutable)({
-            let .f: u64 = 0;
-            pack M::S(.f)
-          });
+          s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
           f;
           s2;
           Tuple()

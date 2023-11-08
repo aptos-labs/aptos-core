@@ -12,10 +12,7 @@ module 0x8675309::M {
           let M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S };
           f: u64 = 0;
           f;
-          s2: M::S = {
-            let .f: u64 = 0;
-            pack M::S(.f)
-          };
+          s2: M::S = pack M::S(0);
           s2;
           Tuple()
         }
@@ -25,10 +22,7 @@ module 0x8675309::M {
           let M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S };
           f: &u64 = Borrow(Immutable)(0);
           f;
-          s2: &M::S = Borrow(Immutable)({
-            let .f: u64 = 0;
-            pack M::S(.f)
-          });
+          s2: &M::S = Borrow(Immutable)(pack M::S(0));
           s2;
           Tuple()
         }
@@ -38,10 +32,7 @@ module 0x8675309::M {
           let M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S };
           f: &mut u64 = Borrow(Mutable)(0);
           f;
-          s2: &mut M::S = Borrow(Mutable)({
-            let .f: u64 = 0;
-            pack M::S(.f)
-          });
+          s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
           s2;
           Tuple()
         }

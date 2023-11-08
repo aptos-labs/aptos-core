@@ -21,10 +21,7 @@ module 0x42::M {
         acquires M::Box<#0>(*)
         acquires M::Pair<M::S, M::R>(*)
      {
-        MoveTo<M::Box<M::R>>(s, {
-          let .f: M::R = pack M::R(false);
-          pack M::Box<M::R>(.f)
-        });
+        MoveTo<M::Box<M::R>>(s, pack M::Box<M::R>(pack M::R(false)));
         BorrowGlobal(Immutable)<M::Box<T>>(a1);
         BorrowGlobal(Mutable)<M::Box<M::Box<T>>>(a1);
         M::Pair<?11, ?12>{ f1: _, f2: _ } = MoveFrom<M::Pair<M::S, M::R>>(a1);

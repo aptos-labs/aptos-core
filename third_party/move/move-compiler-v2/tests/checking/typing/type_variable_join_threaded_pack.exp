@@ -34,13 +34,7 @@ module 0x2::M {
           {
             let x: u64 = Container::get<u64>(Borrow(Immutable)(v));
             {
-              let b: M::Box<u64> = {
-                let .f1: u64 = x;
-                {
-                  let .f2: u64 = x;
-                  pack M::Box<u64>(.f1, .f2)
-                }
-              };
+              let b: M::Box<u64> = pack M::Box<u64>(x, x);
               Container::put<u64>(Borrow(Mutable)(v), 0);
               b
             }

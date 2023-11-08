@@ -7,10 +7,7 @@ module 0x42::globals {
         exists<globals::R>(a)
     }
     private fun publish(s: &signer) {
-        MoveTo<globals::R>(s, {
-          let .f: u64 = 1;
-          pack globals::R(.f)
-        });
+        MoveTo<globals::R>(s, pack globals::R(1));
         Tuple()
     }
     private fun read(a: address): u64 {
@@ -53,12 +50,10 @@ fun globals::check($t0: address): bool {
 fun globals::publish($t0: &signer) {
      var $t1: globals::R
      var $t2: u64
-     var $t3: u64
-  0: $t3 := 1
-  1: $t2 := move($t3)
-  2: $t1 := pack globals::R($t2)
-  3: move_to<globals::R>($t0, $t1)
-  4: return ()
+  0: $t2 := 1
+  1: $t1 := pack globals::R($t2)
+  2: move_to<globals::R>($t0, $t1)
+  3: return ()
 }
 
 

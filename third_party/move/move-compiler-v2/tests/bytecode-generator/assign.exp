@@ -20,16 +20,7 @@ module 0x42::assign {
         Add<u64>(f, h)
     }
     private fun assign_struct(s: &mut assign::S) {
-        s = {
-          let .f: u64 = 42;
-          {
-            let .g: assign::T = {
-              let .h: u64 = 42;
-              pack assign::T(.h)
-            };
-            pack assign::S(.f, .g)
-          }
-        };
+        s = pack assign::S(42, pack assign::T(42));
         Tuple()
     }
     spec fun $assign_field(s: &mut assign::S,f: u64);
@@ -73,18 +64,12 @@ fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
 fun assign::assign_struct($t0: &mut assign::S) {
      var $t1: assign::S
      var $t2: u64
-     var $t3: u64
-     var $t4: assign::T
-     var $t5: assign::T
-     var $t6: u64
-     var $t7: u64
-  0: $t3 := 42
-  1: $t2 := move($t3)
-  2: $t7 := 42
-  3: $t6 := move($t7)
-  4: $t5 := pack assign::T($t6)
-  5: $t4 := move($t5)
-  6: $t1 := pack assign::S($t2, $t4)
-  7: write_ref($t0, $t1)
-  8: return ()
+     var $t3: assign::T
+     var $t4: u64
+  0: $t2 := 42
+  1: $t4 := 42
+  2: $t3 := pack assign::T($t4)
+  3: $t1 := pack assign::S($t2, $t3)
+  4: write_ref($t0, $t1)
+  5: return ()
 }

@@ -8,30 +8,18 @@ module 0x8675309::M {
     }
     private fun foo() {
         {
-          let _ = {
-            let .f: u64 = 0;
-            pack M::S(.f)
-          };
+          let _ = pack M::S(0);
           {
-            let M::R{ f: _ } = {
-              let .f: u64 = 0;
-              pack M::R(.f)
-            };
+            let M::R{ f: _ } = pack M::R(0);
             Tuple()
           }
         }
     }
     spec fun $foo() {
         {
-          let _ = {
-            let .f: u64 = 0;
-            pack M::S(.f)
-          };
+          let _ = pack M::S(0);
           {
-            let M::R{ f: _ } = {
-              let .f: u64 = 0;
-              pack M::R(.f)
-            };
+            let M::R{ f: _ } = pack M::R(0);
             Tuple()
           }
         }

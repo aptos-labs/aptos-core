@@ -7,13 +7,7 @@ module 0x8675309::M {
         dummy_field: bool,
     }
     private fun t0(): (u64, M::S, M::R<M::R<u64>>) {
-        Tuple(0, pack M::S(false), {
-          let .f: M::R<u64> = {
-            let .f: u64 = 1;
-            pack M::R<u64>(.f)
-          };
-          pack M::R<M::R<u64>>(.f)
-        })
+        Tuple(0, pack M::S(false), pack M::R<M::R<u64>>(pack M::R<u64>(1)))
     }
     private fun t1(s: &M::S,r: &mut M::R<u64>): (u64, &M::S, &mut M::R<u64>) {
         Tuple(0, s, r)
