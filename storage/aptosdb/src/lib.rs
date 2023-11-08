@@ -81,6 +81,8 @@ use aptos_config::config::{
 };
 use aptos_crypto::HashValue;
 use aptos_db_indexer::Indexer;
+#[cfg(feature = "indexer-async-v2")]
+use aptos_db_indexer_async_v2::IndexerAsyncV2;
 use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGER};
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -343,6 +345,8 @@ pub struct AptosDB {
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
     skip_index_and_usage: bool,
+    #[cfg(feature = "indexer-async-v2")]
+    indexer_async_v2: Option<IndexerAsyncV2>,
 }
 
 impl AptosDB {
@@ -401,6 +405,8 @@ impl AptosDB {
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
+            #[cfg(feature = "indexer-async-v2")]
+            indexer_async_v2: None,
         }
     }
 
@@ -443,6 +449,12 @@ impl AptosDB {
                 rocksdb_configs.index_db_config,
             )?;
         }
+
+        #[cfg(feature = "indexer-async-v2")]
+        myself.open_indexer_async_v2(
+            db_paths.default_root_path(),
+            rocksdb_configs.index_db_config,
+        )?;
 
         Ok(myself)
     }
@@ -510,6 +522,17 @@ impl AptosDB {
         )?;
 
         Ok((ledger_db, state_merkle_db, state_kv_db))
+    }
+
+    #[cfg(feature = "indexer-async-v2")]
+    fn open_indexer_async_v2(
+        &mut self,
+        db_root_path: impl AsRef<Path>,
+        rocksdb_config: RocksdbConfig,
+    ) -> Result<()> {
+        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config)?;
+        self.indexer_async_v2 = Some(indexer_async_v2);
+        return Ok(());
     }
 
     fn open_indexer(
@@ -866,11 +889,24 @@ impl AptosDB {
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        #[cfg(feature = "indexer-async-v2")]
+        return self.get_table_info_from_async_v2(handle);
+
+        self.get_table_info_from_indexer(handle)
+    }
+
+    #[cfg(feature = "indexer-async-v2")]
+    fn get_table_info_from_async_v2(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        match &self.indexer_async_v2 {
+            Some(indexer_async_v2) => indexer_async_v2.get_table_info_with_retry(handle),
+            None => Ok(None),
+        }
+    }
+
+    fn get_table_info_from_indexer(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
-            None => {
-                bail!("Indexer not enabled.");
-            },
+            None => bail!("Indexer not enabled."),
         }
     }
 
@@ -2134,6 +2170,12 @@ impl DbReader for AptosDB {
         self.indexer.is_some()
     }
 
+    /// Returns whether the indexer async v2 DB has been enabled or not
+    #[cfg(feature = "indexer-async-v2")]
+    fn indexer_async_v2_enabled(&self) -> bool {
+        self.indexer_async_v2.is_some()
+    }
+
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         gauged_api("get_state_storage_usage", || {
             if let Some(v) = version {
@@ -2145,6 +2187,21 @@ impl DbReader for AptosDB {
 }
 
 impl DbWriter for AptosDB {
+    #[cfg(feature = "indexer-async-v2")]
+    fn index(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        first_version: Version,
+        write_sets: &[&WriteSet],
+    ) -> Result<()> {
+        gauged_api("index", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.index(db_reader, first_version, write_sets))
+                .unwrap_or(Ok(()))
+        })
+    }
+
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.

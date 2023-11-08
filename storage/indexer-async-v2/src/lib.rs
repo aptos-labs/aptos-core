@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::convert::{QUERY_RETRIES, QUERY_RETRY_DELAY_MS};
-use anyhow::{bail, ensure, Result, format_err};
-use aptos_config::config::RocksdbConfig;
-use aptos_db_indexer::schema::{
-    column_families, table_info::TableInfoSchema,
+mod db;
+mod schema;
+
+use crate::{
+    db::INDEX_ASYNC_V2_DB_NAME,
+    schema::{column_families, table_info::TableInfoSchema},
 };
-use aptos_logger::info;
+use anyhow::{bail, ensure, Result};
+use aptos_config::config::RocksdbConfig;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_sdk::bcs;
+use aptos_storage_interface::{state_view::DbStateView, DbReader};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
@@ -21,6 +23,7 @@ use aptos_types::{
     transaction::Version,
     write_set::{WriteOp, WriteSet},
 };
+use aptos_vm::data_cache::AsMoveResolver;
 use bytes::Bytes;
 use move_core_types::{
     ident_str,
@@ -31,26 +34,27 @@ use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryInto,
+    sync::Arc,
 };
-use aptos_storage_interface::DbReader;
 
-pub const INDEXER_LOOKUP_DB_NAME: &str = "indexer_lookup_db";
+pub const QUERY_RETRIES: u32 = 5;
+pub const QUERY_RETRY_DELAY_MS: u64 = 500;
 
 #[derive(Debug)]
-pub struct IndexerLookupDB {
+pub struct IndexerAsyncV2 {
     db: DB,
 }
 
-impl IndexerLookupDB {
+impl IndexerAsyncV2 {
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
     ) -> Result<Self> {
-        let db_path = db_root_path.as_ref().join(INDEXER_LOOKUP_DB_NAME);
+        let db_path = db_root_path.as_ref().join(INDEX_ASYNC_V2_DB_NAME);
 
         let db = DB::open(
             db_path,
-            INDEXER_LOOKUP_DB_NAME,
+            "index_asnync_v2_db",
             column_families(),
             &gen_rocksdb_options(&rocksdb_config, false),
         )?;
@@ -58,13 +62,30 @@ impl IndexerLookupDB {
         Ok(Self { db })
     }
 
+    pub fn index(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        first_version: Version,
+        write_sets: &[&WriteSet],
+    ) -> Result<()> {
+        let last_version = first_version + write_sets.len() as Version;
+        let state_view = DbStateView {
+            db: db_reader,
+            version: Some(last_version),
+        };
+        let resolver = state_view.as_move_resolver();
+        let annotator = MoveValueAnnotator::new(&resolver);
+        self.index_with_annotator(&annotator, first_version, write_sets)
+    }
+
     pub fn index_with_annotator<R: MoveResolver>(
         &self,
-        annotator: &MoveValueAnnotator<'_, R>,
+        annotator: &MoveValueAnnotator<R>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
         let end_version = first_version + write_sets.len() as Version;
+
         let mut table_info_parser = TableInfoParser::new(self, annotator);
         for write_set in write_sets {
             for (state_key, write_op) in write_set.iter() {
@@ -73,52 +94,52 @@ impl IndexerLookupDB {
         }
 
         let mut batch = SchemaBatch::new();
-
         match table_info_parser.finish(&mut batch) {
-            Ok(_) => {
-                info!("table info batch finished processing");
-            },
+            Ok(_) => {},
             Err(err) => {
                 aptos_logger::error!(first_version = first_version, end_version = end_version, error = ?&err);
                 write_sets
-                .iter()
-                .enumerate()
-                .for_each(|(i, write_set)| {
-                    aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
-                });
+                    .iter()
+                    .enumerate()
+                    .for_each(|(i, write_set)| {
+                        aptos_logger::error!(version = first_version as usize + i, write_set = ?write_set);
+                    });
                 bail!(err);
             },
         };
         self.db.write_schemas(batch)?;
+
         Ok(())
     }
 
     pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        self.db.get::<TableInfoSchema>(&handle)
+    }
+
+    pub fn get_table_info_with_retry(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         let mut retried = 0;
         while retried < QUERY_RETRIES {
             retried += 1;
-            if let Ok(result) = self.db.get::<TableInfoSchema>(&handle) {
-                if let Some(table_info) = result {
-                    return Ok(Some(table_info));
-                }
+            if let Ok(Some(table_info)) = self.get_table_info(handle) {
+                return Ok(Some(table_info));
             }
             std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
         }
         Ok(None)
-    }    
+    }
 }
 
 struct TableInfoParser<'a, R> {
-    indexer: &'a IndexerLookupDB,
+    indexer_async_v2: &'a IndexerAsyncV2,
     annotator: &'a MoveValueAnnotator<'a, R>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
 impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
-    pub fn new(indexer: &'a IndexerLookupDB, annotator: &'a MoveValueAnnotator<R>) -> Self {
+    pub fn new(indexer_async_v2: &'a IndexerAsyncV2, annotator: &'a MoveValueAnnotator<R>) -> Self {
         Self {
-            indexer,
+            indexer_async_v2,
             annotator,
             result: HashMap::new(),
             pending_on: HashMap::new(),
@@ -240,16 +261,25 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match self.result.get(&handle) {
             Some(table_info) => Ok(Some(table_info.clone())),
-            None => self.indexer.get_table_info(handle),
+            None => self.indexer_async_v2.get_table_info(handle),
         }
     }
 
     fn finish(self, batch: &mut SchemaBatch) -> Result<bool> {
-        ensure!(
-            self.pending_on.is_empty(),
-            "There is still pending table items to parse due to unknown table info for table handles: {:?}",
-            self.pending_on.keys(),
-        );
+        let mut retries = 0;
+        while !self.pending_on.is_empty() {
+            if retries >= QUERY_RETRIES {
+                ensure!(
+                    self.pending_on.is_empty(),
+                    "There is still pending table items to parse due to unknown table info for table handles: {:?}",
+                    self.pending_on.keys(),
+                );
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(QUERY_RETRY_DELAY_MS));
+            retries += 1;
+        }
+
         if self.result.is_empty() {
             Ok(false)
         } else {
@@ -260,11 +290,5 @@ impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
                 })?;
             Ok(true)
         }
-    }
-}
-
-impl DbReader for IndexerLookupDB {
-    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
-        Self::get_table_info(self, handle)?.ok_or_else(|| format_err!("TableInfo for {:?}", handle))
     }
 }

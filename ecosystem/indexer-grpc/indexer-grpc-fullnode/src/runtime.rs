@@ -17,7 +17,7 @@ use aptos_protos::{
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::DbReaderWriter;
 use aptos_types::chain_id::ChainId;
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
@@ -32,7 +32,7 @@ pub const RETRY_TIME_MILLIS: u64 = 100;
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
-    db: Arc<dyn DbReader>,
+    db: DbReaderWriter,
     mp_sender: MempoolClientSender,
 ) -> Option<Runtime> {
     if !config.indexer_grpc.enabled {
@@ -50,7 +50,13 @@ pub fn bootstrap(
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
+        let context = Arc::new(Context::new(
+            chain_id,
+            db.reader.clone(),
+            mp_sender,
+            node_config,
+        ));
+
         let service_context = ServiceContext {
             context: context.clone(),
             processor_task_count,
@@ -60,8 +66,12 @@ pub fn bootstrap(
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
             service_context: service_context.clone(),
+            db_writer: db.writer.clone(),
         };
-        let localnet_data_server = LocalnetDataService { service_context };
+        let localnet_data_server = LocalnetDataService {
+            service_context,
+            db_writer: db.writer.clone(),
+        };
 
         let reflection_service = tonic_reflection::server::Builder::configure()
             // Note: It is critical that the file descriptor set is registered for every

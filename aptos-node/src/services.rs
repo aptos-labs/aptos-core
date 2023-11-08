@@ -12,8 +12,7 @@ use aptos_consensus::{
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
-// use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
-use aptos_indexer_grpc_fullnode_table_info::runtime::bootstrap as bootstrap_indexer_grpc;
+use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
@@ -38,7 +37,7 @@ const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
 /// receiver, and both the api and indexer runtimes.
 pub fn bootstrap_api_and_indexer(
     node_config: &NodeConfig,
-    aptos_db: Arc<dyn DbReader>,
+    db_rw: DbReaderWriter,
     chain_id: ChainId,
 ) -> anyhow::Result<(
     Receiver<MempoolClientRequest>,
@@ -55,7 +54,7 @@ pub fn bootstrap_api_and_indexer(
         Some(bootstrap_api(
             node_config,
             chain_id,
-            aptos_db.clone(),
+            db_rw.reader.clone(),
             mempool_client_sender.clone(),
         )?)
     } else {
@@ -66,13 +65,17 @@ pub fn bootstrap_api_and_indexer(
     let indexer_grpc = bootstrap_indexer_grpc(
         node_config,
         chain_id,
-        aptos_db.clone(),
+        db_rw.clone(),
         mempool_client_sender.clone(),
     );
 
     // Create the indexer runtime
-    let indexer_runtime =
-        indexer::bootstrap_indexer(node_config, chain_id, aptos_db, mempool_client_sender)?;
+    let indexer_runtime = indexer::bootstrap_indexer(
+        node_config,
+        chain_id,
+        db_rw.reader.clone(),
+        mempool_client_sender,
+    )?;
 
     Ok((
         mempool_client_receiver,

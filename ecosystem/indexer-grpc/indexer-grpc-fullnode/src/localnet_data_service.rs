@@ -7,8 +7,9 @@ use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     internal::fullnode::v1::transactions_from_node_response,
 };
+use aptos_storage_interface::DbWriter;
 use futures::Stream;
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -23,6 +24,7 @@ type TransactionResponseStream =
 
 pub struct LocalnetDataService {
     pub service_context: ServiceContext,
+    pub db_writer: Arc<dyn DbWriter>,
 }
 
 /// External service on the fullnode is for testing/local development only.
@@ -47,7 +49,7 @@ impl RawData for LocalnetDataService {
         // Creates a channel to send the stream to the client
         let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
-
+        let db_writer = self.db_writer.clone();
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
             let mut coordinator = IndexerStreamCoordinator::new(
@@ -60,9 +62,10 @@ impl RawData for LocalnetDataService {
                 output_batch_size,
                 tx.clone(),
             );
+            let db_writer = db_writer.clone();
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch().await;
+                let results = coordinator.process_next_batch(db_writer.clone()).await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
