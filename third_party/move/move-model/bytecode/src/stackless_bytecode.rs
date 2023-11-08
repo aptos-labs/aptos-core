@@ -138,15 +138,11 @@ impl Constant {
 /// operators.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operation {
+    // ==============================================================
+    // Core Bytecodes (part of the programming language)
+
     // User function
     Function(ModuleId, FunId, Vec<Type>),
-
-    // Markers for beginning and end of transformed
-    // opaque function calls (the function call is replaced
-    // by assumes/asserts/gotos, but it is necessary to
-    // add more assumes/asserts later in the pipeline.
-    OpaqueCallBegin(ModuleId, FunId, Vec<Type>),
-    OpaqueCallEnd(ModuleId, FunId, Vec<Type>),
 
     // Pack/Unpack
     Pack(ModuleId, StructId, Vec<Type>),
@@ -162,27 +158,12 @@ pub enum Operation {
     BorrowField(ModuleId, StructId, Vec<Type>, usize),
     BorrowGlobal(ModuleId, StructId, Vec<Type>),
 
-    // Get
-    GetField(ModuleId, StructId, Vec<Type>, usize),
-    GetGlobal(ModuleId, StructId, Vec<Type>),
-
     // Builtins
-    Uninit,
     Destroy,
     ReadRef,
     WriteRef,
     FreezeRef,
     Vector,
-    Havoc(HavocKind),
-    Stop,
-
-    // Memory model
-    IsParent(BorrowNode, BorrowEdge),
-    WriteBack(BorrowNode, BorrowEdge),
-    UnpackRef,
-    PackRef,
-    UnpackRefDeep,
-    PackRefDeep,
 
     // Unary
     CastU8,
@@ -212,6 +193,33 @@ pub enum Operation {
     Eq,
     Neq,
     CastU256,
+
+    // ==============================================================
+    // Extended Bytecodes (part of the verification IL)
+
+    // Markers for beginning and end of transformed
+    // opaque function calls (the function call is replaced
+    // by assumes/asserts/gotos, but it is necessary to
+    // add more assumes/asserts later in the pipeline.
+    OpaqueCallBegin(ModuleId, FunId, Vec<Type>),
+    OpaqueCallEnd(ModuleId, FunId, Vec<Type>),
+
+    // Memory model
+    IsParent(BorrowNode, BorrowEdge),
+    WriteBack(BorrowNode, BorrowEdge),
+    UnpackRef,
+    PackRef,
+    UnpackRefDeep,
+    PackRefDeep,
+
+    // Get shortcut
+    GetField(ModuleId, StructId, Vec<Type>, usize),
+    GetGlobal(ModuleId, StructId, Vec<Type>),
+
+    // Special ops
+    Uninit,
+    Havoc(HavocKind),
+    Stop,
 
     // Debugging
     TraceLocal(TempIndex),
