@@ -28,6 +28,8 @@ spec aptos_framework::consensus_config {
         use aptos_framework::staking_config;
         use aptos_framework::reconfiguration;
 
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         include reconfiguration::ReconfigureEnsures;

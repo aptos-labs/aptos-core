@@ -17,7 +17,8 @@ spec aptos_framework::execution_config {
         use aptos_framework::aptos_coin;
         use aptos_framework::reconfiguration;
 
-        // It caused 25s to verified in the local environment and timeout in the github unit test
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         let addr = signer::address_of(account);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include reconfiguration::ReconfigureEnsures;

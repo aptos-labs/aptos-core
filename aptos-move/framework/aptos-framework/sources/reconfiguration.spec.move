@@ -85,7 +85,8 @@ spec aptos_framework::reconfiguration {
         use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 120;
         requires exists<stake::ValidatorFees>(@aptos_framework);
 
         let success = !(chain_status::is_genesis() || timestamp::spec_now_microseconds() == 0 || !reconfiguration_enabled())
