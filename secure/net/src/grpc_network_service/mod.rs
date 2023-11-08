@@ -22,7 +22,7 @@ use tonic::{
     transport::{Channel, Server},
     Request, Response, Status,
 };
-use crate::network_controller::metrics::REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER;
+use crate::network_controller::metrics::{REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER, REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER};
 
 const MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 80;
 
@@ -117,32 +117,38 @@ impl NetworkMessageService for GRPCNetworkMessageServiceServerWrapper {
 
         if msg.start_ms_since_epoch.is_some() {
             let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-            let mut delta = 0.0;
+            let mut delta = 0;
             if curr_time > msg.start_ms_since_epoch.unwrap() {
-                delta = (curr_time - msg.start_ms_since_epoch.unwrap()) as f64;
+                delta = (curr_time - msg.start_ms_since_epoch.unwrap());
             }
             if message_type.get_type() == "remote_kv_request" {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta);
+                    .with_label_values(&["2_kv_req_coord_grpc_recv"]).observe(delta as f64);
             } else if message_type.get_type() == "remote_kv_response" {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                    .with_label_values(&["6_kv_resp_shard_grpc_recv"]).observe(delta);
+                    .with_label_values(&["6_kv_resp_shard_grpc_recv"]).observe(delta as f64);
             }
         }
 
         if let Some(handler) = self.inbound_handlers.lock().unwrap().get(&message_type) {
             if msg.start_ms_since_epoch.is_some() {
                 let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
-                let mut delta = 0.0;
+                let mut delta = 0;
                 if curr_time > msg.start_ms_since_epoch.unwrap() {
-                    delta = (curr_time - msg.start_ms_since_epoch.unwrap()) as f64;
+                    delta = (curr_time - msg.start_ms_since_epoch.unwrap());
                 }
                 if message_type.get_type() == "remote_kv_request" {
                     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta);
+                        .with_label_values(&["2_kv_req_coord_grpc_recv_got_inbound_lock"]).observe(delta as f64);
                 } else if message_type.get_type() == "remote_kv_response" {
                     REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
-                        .with_label_values(&["6_kv_resp_shard_grpc_recv_got_inbound_lock"]).observe(delta);
+                        .with_label_values(&["6_kv_resp_shard_grpc_recv_got_inbound_lock"]).observe(delta as f64);
+                } else if message_type.get_type().starts_with("execute_command_") {
+                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["4_cmd_tx_msg_grpc_recv"]).observe(delta as f64);
+                } else if message_type.get_type().starts_with("execute_result_") {
+                    REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                        .with_label_values(&["9_results_tx_msg_grpc_recv"]).observe(delta as f64);
                 }
             }
             // Send the message to the registered handler
@@ -205,6 +211,12 @@ impl GRPCNetworkMessageServiceClientWrapper {
             } else if mt.get_type() == "remote_kv_response" {
                 REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER
                     .with_label_values(&["5_kv_resp_coord_grpc_send"]).observe(delta);
+            } else if mt.get_type().starts_with("execute_command_") {
+                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["3_cmd_tx_msg_grpc_send"]).observe(delta);
+            } else if mt.get_type().starts_with("execute_result_") {
+                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["8_results_tx_msg_grpc_send"]).observe(delta as f64);
             }
         }
 

@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::SystemTime;
 use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec};
 use once_cell::sync::Lazy;
 
@@ -39,3 +40,24 @@ pub static REMOTE_EXECUTOR_RND_TRP_JRNY_TIMER: Lazy<HistogramVec> = Lazy::new(||
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
     ).unwrap()
 });
+
+pub static REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "remote_executor_cmd_results_rnd_trp_jrny_timer",
+        // metric description
+        " ",
+        // metric labels (dimensions)
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
+    ).unwrap()
+});
+
+pub fn get_delta_time(duration_since_epoch: u64) -> u64 {
+    let curr_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as u64;
+    let mut delta = 0;
+    if curr_time > duration_since_epoch {
+        delta = (curr_time - duration_since_epoch);
+    }
+    delta
+}
