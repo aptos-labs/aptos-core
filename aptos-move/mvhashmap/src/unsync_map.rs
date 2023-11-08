@@ -77,14 +77,10 @@ impl<
             .into_iter()
             .map(|(t, (v, maybe_layout))| (t, (Arc::new(v), maybe_layout)))
             .collect();
-        println!("set_group_base_values: {:?} => {:?}", group_key, base_map);
         assert!(
             self.group_cache
                 .borrow_mut()
-                .insert(
-                    group_key,
-                    RefCell::new(base_map)
-                )
+                .insert(group_key, RefCell::new(base_map))
                 .is_none(),
             "UnsyncMap group cache must be empty to provide base values"
         );
@@ -155,18 +151,6 @@ impl<
             (Occupied(mut entry), Modification) => {
                 entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
             },
-            // (Occupied(mut entry), Creation) => {
-            //     if entry.get().0.write_op_kind() == Deletion {
-            //         entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
-            //     } else {
-            //         println!("WriteOp kind {:?} not consistent with previous value at tag {:?}. l: {:?}, r: {:?}", v.write_op_kind(), value_tag, l, r);
-            //         bail!(
-            //             "WriteOp kind {:?} not consistent with previous value at tag {:?}",
-            //             v.write_op_kind(),
-            //             value_tag
-            //         );
-            //     }
-            // },
             (Vacant(entry), Creation) => {
                 entry.insert((Arc::new(v), UnsetOrLayout::Set(maybe_layout)));
             },
@@ -239,7 +223,10 @@ impl<
         value: V,
         layout: Option<Arc<MoveTypeLayout>>,
     ) {
-        println!("write_group_data: {:?} => {:?} => {:?}", group_key, value_tag, value);
+        println!(
+            "write_group_data: {:?} => {:?} => {:?}",
+            group_key, value_tag, value
+        );
         if value.write_op_kind() == WriteOpKind::Deletion {
             panic!();
         }

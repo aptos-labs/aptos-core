@@ -780,8 +780,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .captured_reads
             .borrow()
             .get_group_read_values_with_delayed_fields()
-            .map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>();
-        group_read_values_with_delayed_fields.into_iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect::<Vec<_>>();
+        group_read_values_with_delayed_fields
+            .into_iter()
             .filter(|(key, _)| !skip.contains(key))
             .flat_map(|(key, group_read)| {
                 let GroupRead { inner_reads, .. } = group_read;
@@ -1148,10 +1150,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        // println!(
-        //     "get_resource_from_group {:?} {:?} {:?}",
-        //     group_key, resource_tag, maybe_layout
-        // );
         let maybe_layout = maybe_layout.map(|layout| Arc::new(layout.clone()));
 
         let read_from_group_parallel =
@@ -1163,7 +1161,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                     .borrow()
                     .get_by_kind(group_key, Some(resource_tag), ReadKind::Value)
                 {
-                    // println!("answered_from_captured_reads");
                     return Ok(GroupReadResult::Value(
                         v.extract_raw_bytes(),
                         UnsetOrLayout::Set(layout),
@@ -1171,7 +1168,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 }
 
                 loop {
-                    // println!("answered_from_versioned_map");
                     match parallel_state.versioned_map.group_data().read_from_group(
                         group_key,
                         resource_tag,
@@ -1179,14 +1175,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                         UnsetOrLayout::Set(maybe_layout.clone()),
                     ) {
                         Ok((version, v, maybe_layout)) => {
-                            // println!("obtained_data_from_versioned_map");
                             let patched_v = match (v.as_state_value(), maybe_layout.clone()) {
                                 (Some(state_value), Some(layout)) => {
                                     let res = self.replace_values_with_identifiers(
                                         state_value,
                                         layout.as_ref(),
                                     );
-                                    // println!("replace_values_with_identifiers {:?}", res);
                                     match res {
                                         Ok((patched_value, _)) => Some(Arc::new(
                                             T::Value::from_state_value(Some(patched_value)),
@@ -1235,11 +1229,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                             return Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset));
                         },
                         Err(Uninitialized) => {
-                            // println!("unitialized_in_versioned_map");
                             return Ok(GroupReadResult::Uninitialized);
                         },
                         Err(TagNotFound) => {
-                            // println!("tag_not_found_in_versioned_map");
                             let data_read = DataRead::Versioned(
                                 Err(StorageVersion),
                                 Arc::<T::Value>::new(TransactionWrite::from_state_value(None)),
@@ -1257,7 +1249,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                             return Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset));
                         },
                         Err(Dependency(dep_idx)) => {
-                            println!("dependency_versioned_map");
                             if !wait_for_dependency(parallel_state.scheduler, self.txn_idx, dep_idx)
                             {
                                 bail!("Interrupted as block execution was halted");
@@ -1286,7 +1277,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                                     StateValue::new_legacy(bytes.clone()),
                                     layout.as_ref(),
                                 );
-                                println!("replace_values_with_identifiers_seq {:?}", res);
                                 match res {
                                     Ok((patched_state_value, _)) => {
                                         sequential_state.unsync_map.write_group_data(
@@ -1325,16 +1315,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                                 sequential_state.unsync_map.write_group_data(
                                     group_key.clone(),
                                     resource_tag.clone(),
-                                    TransactionWrite::from_state_value(
-                                        Some(StateValue::new_legacy(bytes.clone())),
-                                    ),
+                                    TransactionWrite::from_state_value(Some(
+                                        StateValue::new_legacy(bytes.clone()),
+                                    )),
                                     None,
                                 );
                                 Ok(GroupReadResult::Value(value, UnsetOrLayout::Set(None)))
                             },
-                            (None, _) => {
-                                Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset))
-                            }
+                            (None, _) => Ok(GroupReadResult::Value(None, UnsetOrLayout::Unset)),
                         }
                     },
                     GroupReadResult::Value(value, UnsetOrLayout::Set(maybe_layout)) => Ok(
@@ -1348,14 +1336,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => read_from_group_parallel(state)?,
             ViewState::Unsync(state) => {
-                println!("read_from_group_sequntial");
                 // TODO[agg_v2](fix): Should we push the group key into read set
                 // irresepctive of whether the read operation succeeds?
                 state.group_read_set.borrow_mut().insert(group_key.clone());
                 read_from_group_sequential(state)?
-                // state
-                //     .unsync_map
-                //     .read_from_group(group_key, resource_tag, maybe_layout.clone())
             },
         };
 
@@ -1366,11 +1350,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 ViewState::Sync(state) => read_from_group_parallel(state)?,
                 ViewState::Unsync(state) => {
                     // TODO[agg_v2](optimize): Cloning layout here to convert &layout to Arc<layout>
-                    println!("read_from_group_sequntial");
                     read_from_group_sequential(state)?
-                    // state
-                    //     .unsync_map
-                    //     .read_from_group(group_key, resource_tag, maybe_layout)
                 },
             };
         };

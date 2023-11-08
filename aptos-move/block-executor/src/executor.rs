@@ -532,7 +532,11 @@ where
                 }
             }
 
-            let process_finalized_group = |finalized_group: anyhow::Result<Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>>, metadata_is_deletion: bool| -> Result<_, _> {
+            let process_finalized_group = |finalized_group: anyhow::Result<
+                Vec<(T::Tag, (Arc<T::Value>, Option<Arc<MoveTypeLayout>>))>,
+            >,
+                                           metadata_is_deletion: bool|
+             -> Result<_, _> {
                 match finalized_group {
                     Ok(finalized_group) => {
                         // finalize_group already applies the deletions.
@@ -1100,10 +1104,6 @@ where
         }
 
         let num_txns = signature_verified_block.len();
-        println!(
-            "Executing transactions parallel in executor.rs {}",
-            num_txns
-        );
 
         let shared_commit_state = ExplicitSyncWrapper::new((
             FeeStatement::zero(),
@@ -1150,7 +1150,6 @@ where
             }
         });
         drop(timer);
-        println!("Initiating thread pool");
         self.executor_thread_pool.spawn(move || {
             // Explicit async drops.
             drop(last_input_output);
@@ -1158,7 +1157,6 @@ where
             // TODO: re-use the code cache.
             drop(versioned_cache);
         });
-        println!("Spawned threads");
         let (_, _, maybe_error) = shared_commit_state.into_inner();
         match maybe_error {
             Some(err) => Err(err),
@@ -1175,7 +1173,6 @@ where
         }
 
         for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
-            println!("Applying group write set in executor.rs {:?}, {:?} {:?}", group_key, metadata_op, group_ops);
             for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
                 unsync_map
                     .insert_group_op(&group_key, value_tag, group_op, maybe_layout)
@@ -1253,10 +1250,6 @@ where
         dynamic_change_set_optimizations_enabled: bool,
     ) -> Result<Vec<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
-        println!(
-            "Executing transactins in sequential in executor.rs, {}",
-            num_txns
-        );
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
         drop(init_timer);
@@ -1542,9 +1535,6 @@ where
 }
 
 fn resource_group_error(err_msg: String) -> PanicOr<IntentionalFallbackToSequential> {
-    use backtrace::Backtrace;
-    let backtrace = Backtrace::new();
-    println!("resource_group_error: {:?}", backtrace);
     error!("resource_group_error: {:?}", err_msg);
     PanicOr::Or(IntentionalFallbackToSequential::ResourceGroupError(err_msg))
 }

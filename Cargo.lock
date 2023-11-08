@@ -626,7 +626,6 @@ dependencies = [
  "aptos-vm-logging",
  "aptos-vm-types",
  "arc-swap",
- "backtrace",
  "bcs 0.1.4",
  "bytes",
  "claims",
