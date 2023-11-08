@@ -24,7 +24,6 @@ proptest! {
         s1 in access_specifier_strategy(4, 3),
         s2 in access_specifier_strategy(4, 3)
     ) {
-        //eprint!(".");
         if s1.enables(&access) && s2.enables(&access) {
             assert!(s1.join(&s2).enables(&access))
         } else {
@@ -42,7 +41,6 @@ proptest! {
         (access1, clause1) in  access_to_matching_specifier_clause(access_instance_strategy()),
         (access2, clause2) in  access_to_matching_specifier_clause(access_instance_strategy()),
     ) {
-        //eprint!(".");
         let clauses = vec![clause1, clause2];
         let incl = AccessSpecifier::Constraint(clauses.clone(), vec![]);
         let incl_excl = AccessSpecifier::Constraint(clauses.clone(), clauses.clone());

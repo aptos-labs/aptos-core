@@ -807,9 +807,12 @@ pub enum StatusCode {
     IO_LIMIT_REACHED = 4031,
     STORAGE_LIMIT_REACHED = 4032,
     TYPE_TAG_LIMIT_EXCEEDED = 4033,
+    // A resource was accessed in a way which is not permitted by the active access control
+    // specifier.
     ACCESS_DENIED = 4034,
+    // The stack of access control specifier has overflowed.
     ACCESS_STACK_LIMIT_EXCEEDED = 4035,
-    // Reserved error code for future use
+    // Reserved error code for future use. Always keep this buffer of well-defined new codes.
     RESERVED_RUNTIME_ERROR_1 = 4036,
     RESERVED_RUNTIME_ERROR_2 = 4037,
     RESERVED_RUNTIME_ERROR_3 = 4038,

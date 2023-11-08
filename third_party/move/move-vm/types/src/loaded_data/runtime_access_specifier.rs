@@ -156,7 +156,8 @@ impl AccessSpecifier {
                 // Inclusions are disjunctions. The join of two disjunctions is
                 //   (a + b) * (c + d) = a*(c + d) + b*(c + d) = a*c + a*d + b*c + b*d
                 // For the exclusions, we can simply concatenate them.
-                // TODO: this is quadratic and  need to be metered
+                // TODO: this is quadratic and  need to be metered, OR protected by some
+                //   bound.
                 let mut new_incls = vec![];
                 for incl in incls {
                     for other_incl in other_incls {
