@@ -5,7 +5,7 @@ use crate::{
     aggregator_v2::{initialize, AggV2TestHarness, AggregatorLocation, ElementType, UseType},
     assert_abort, assert_success,
     tests::common,
-    BlockSplit,
+    BlockSplit, SUCCESS,
 };
 use aptos_framework::natives::aggregator_natives::aggregator_v2::{
     EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
@@ -79,7 +79,7 @@ mod test_cases {
         let mut h = setup(DEFAULT_EXECUTOR_MODE, execution_enabled, 100);
 
         let init_txn = h.init(None, use_type, element_type, true);
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(0, init_txn)]);
+        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, init_txn)]);
 
         let addr = *h.account.address();
         let loc = |i| AggregatorLocation::new(addr, element_type, use_type, i);
@@ -88,7 +88,7 @@ mod test_cases {
 
         // Create many aggregators with deterministic limit.
         let txns = (0..block_size)
-            .map(|i| (0, h.new(&loc(i), (i as u128) * 100000)))
+            .map(|i| (SUCCESS, h.new(&loc(i), (i as u128) * 100000)))
             .collect();
         h.run_block_in_parts_and_check(BlockSplit::Whole, txns);
 
@@ -109,7 +109,7 @@ mod test_cases {
 
         // Now test all operations. To do that, make sure aggregator have values large enough.
         let txns = (0..block_size)
-            .map(|i| (0, h.add(&loc(i), (i as u128) * 1000)))
+            .map(|i| (SUCCESS, h.add(&loc(i), (i as u128) * 1000)))
             .collect();
 
         h.run_block_in_parts_and_check(BlockSplit::Whole, txns);
@@ -118,12 +118,12 @@ mod test_cases {
         let txns = (0..block_size)
             .map(|i| match i % 4 {
                 0 => (
-                    0,
+                    SUCCESS,
                     h.sub_add(&loc(i), (i as u128) * 1000, (i as u128) * 3000),
                 ),
-                1 => (0, h.materialize_and_add(&loc(i), (i as u128) * 1000)),
-                2 => (0, h.sub_and_materialize(&loc(i), (i as u128) * 1000)),
-                _ => (0, h.add(&loc(i), i as u128)),
+                1 => (SUCCESS, h.materialize_and_add(&loc(i), (i as u128) * 1000)),
+                2 => (SUCCESS, h.sub_and_materialize(&loc(i), (i as u128) * 1000)),
+                _ => (SUCCESS, h.add(&loc(i), i as u128)),
             })
             .collect();
         h.run_block_in_parts_and_check(BlockSplit::Whole, txns);
@@ -131,10 +131,10 @@ mod test_cases {
         // Finally, check values.
         let txns = (0..block_size)
             .map(|i| match i % 4 {
-                0 => (0, h.check(&loc(i), (i as u128) * 3000)),
-                1 => (0, h.check(&loc(i), (i as u128) * 2000)),
-                2 => (0, h.check(&loc(i), 0)),
-                _ => (0, h.check(&loc(i), (i as u128) * 1000 + (i as u128))),
+                0 => (SUCCESS, h.check(&loc(i), (i as u128) * 3000)),
+                1 => (SUCCESS, h.check(&loc(i), (i as u128) * 2000)),
+                2 => (SUCCESS, h.check(&loc(i), 0)),
+                _ => (SUCCESS, h.check(&loc(i), (i as u128) * 1000 + (i as u128))),
             })
             .collect();
         h.run_block_in_parts_and_check(BlockSplit::Whole, txns);
@@ -244,21 +244,21 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.new(&agg_loc, 1500)),
-            (0, h.add(&agg_loc, 400)), // 400
-            (0, h.materialize(&agg_loc)),
-            (0, h.add(&agg_loc, 500)), // 900
-            (0, h.check(&agg_loc, 900)),
-            (0, h.materialize_and_add(&agg_loc, 600)), // 1500
-            (0, h.materialize_and_sub(&agg_loc, 600)), // 900
-            (0, h.check(&agg_loc, 900)),
-            (0, h.sub_add(&agg_loc, 200, 300)), // 1000
-            (0, h.check(&agg_loc, 1000)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.new(&agg_loc, 1500)),
+            (SUCCESS, h.add(&agg_loc, 400)), // 400
+            (SUCCESS, h.materialize(&agg_loc)),
+            (SUCCESS, h.add(&agg_loc, 500)), // 900
+            (SUCCESS, h.check(&agg_loc, 900)),
+            (SUCCESS, h.materialize_and_add(&agg_loc, 600)), // 1500
+            (SUCCESS, h.materialize_and_sub(&agg_loc, 600)), // 900
+            (SUCCESS, h.check(&agg_loc, 900)),
+            (SUCCESS, h.sub_add(&agg_loc, 200, 300)), // 1000
+            (SUCCESS, h.check(&agg_loc, 1000)),
             // These 2 transactions fail, and should have no side-effects.
-            (0x02_0001, h.add_and_materialize(&agg_loc, 501)),
-            (0x02_0002, h.sub_and_materialize(&agg_loc, 1001)),
-            (0, h.check(&agg_loc, 1000)),
+            (EAGGREGATOR_OVERFLOW, h.add_and_materialize(&agg_loc, 501)),
+            (EAGGREGATOR_UNDERFLOW, h.sub_and_materialize(&agg_loc, 1001)),
+            (SUCCESS, h.check(&agg_loc, 1000)),
         ];
         h.run_block_in_parts_and_check(
             test_env.block_split,
@@ -294,30 +294,30 @@ proptest! {
         println!("agg_3_loc: {:?}", agg_3_loc);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.init(Some(&acc_2), use_type, element_type, true)),
-            (0, h.init(Some(&acc_3), use_type, element_type, true)),
-            (0, h.new_add(&agg_1_loc, 10, 5)),
-            (0, h.new_add(&agg_2_loc, 10, 5)),
-            (0, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
-            (0, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
-            (0, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
-            (0x02_0001, h.add(&agg_1_loc, 5)), // X
-            (0, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
-            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
-            (0, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
-            (0x02_0001, h.add_sub(&agg_1_loc, 3, 3)), // X
-            (0, h.sub(&agg_1_loc, 3)), // 7, 7, 6
-            (0, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
-            (0, h.check(&agg_2_loc, 9)),
-            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
-            (0, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
-            (0x02_0001, h.add(&agg_2_loc, 1)), // X
-            (0x02_0001, h.add_and_materialize(&agg_3_loc, 1)), // X
-            (0x02_0001, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
-            (0, h.check(&agg_1_loc, 7)),
-            (0, h.check(&agg_2_loc, 10)),
-            (0, h.check(&agg_3_loc, 10)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(Some(&acc_2), use_type, element_type, true)),
+            (SUCCESS, h.init(Some(&acc_3), use_type, element_type, true)),
+            (SUCCESS, h.new_add(&agg_1_loc, 10, 5)),
+            (SUCCESS, h.new_add(&agg_2_loc, 10, 5)),
+            (SUCCESS, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
+            (SUCCESS, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // 6, 6, 5
+            (SUCCESS, h.add_2(&agg_1_loc, &agg_3_loc, 1, 1)), // 7, 6, 6
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_1_loc, 5)), // X
+            (SUCCESS, h.add_sub(&agg_1_loc, 3, 3)), // 7, 6, 6
+            (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 3, 5)), // X
+            (SUCCESS, h.add_2(&agg_1_loc, &agg_2_loc, 3, 1)), // 10, 7, 6
+            (EAGGREGATOR_OVERFLOW, h.add_sub(&agg_1_loc, 3, 3)), // X
+            (SUCCESS, h.sub(&agg_1_loc, 3)), // 7, 7, 6
+            (SUCCESS, h.add_2(&agg_2_loc, &agg_3_loc, 2, 2)), // 7, 9, 8
+            (SUCCESS, h.check(&agg_2_loc, 9)),
+            (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 1, 2)), // X
+            (SUCCESS, h.add_2(&agg_2_loc, &agg_3_loc, 1, 2)), // 7, 10, 10
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_2_loc, 1)), // X
+            (EAGGREGATOR_OVERFLOW, h.add_and_materialize(&agg_3_loc, 1)), // X
+            (EAGGREGATOR_OVERFLOW, h.add_2(&agg_1_loc, &agg_2_loc, 1, 1)), // X
+            (SUCCESS, h.check(&agg_1_loc, 7)),
+            (SUCCESS, h.check(&agg_2_loc, 10)),
+            (SUCCESS, h.check(&agg_3_loc, 10)),
         ];
         h.run_block_in_parts_and_check(
             test_env.block_split,
@@ -346,11 +346,11 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.new(&agg_loc, 600)),
-            (0, h.add(&agg_loc, 400)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.new(&agg_loc, 600)),
+            (SUCCESS, h.add(&agg_loc, 400)),
             // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
-            (0x02_0002, h.sub(&agg_loc, 500))
+            (EAGGREGATOR_UNDERFLOW, h.sub(&agg_loc, 500))
         ];
         h.run_block_in_parts_and_check(
             test_env.block_split,
@@ -369,10 +369,10 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.new(&agg_loc, 600)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.new(&agg_loc, 600)),
             // Underflow on materialized value leads to abort with EAGGREGATOR_UNDERFLOW.
-            (0x02_0002, h.materialize_and_sub(&agg_loc, 400)),
+            (EAGGREGATOR_UNDERFLOW, h.materialize_and_sub(&agg_loc, 400)),
         ];
 
         h.run_block_in_parts_and_check(
@@ -392,10 +392,10 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.new_add(&agg_loc, 600, 400)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.new_add(&agg_loc, 600, 400)),
             // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
-            (0x02_0001, h.add(&agg_loc, 201))
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 201))
         ];
 
         h.run_block_in_parts_and_check(
@@ -415,10 +415,10 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.new(&agg_loc, 399)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.new(&agg_loc, 399)),
             // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
-            (0x02_0001, h.materialize_and_add(&agg_loc, 400)),
+            (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
         ];
 
         h.run_block_in_parts_and_check(
@@ -440,16 +440,16 @@ proptest! {
         let derived_snap_loc = AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
 
         let txns = vec![
-            (0, h.init(None, use_type, element_type, true)),
-            (0, h.init(None, use_type, element_type, false)),
-            (0, h.init(None, use_type, ElementType::String, false)),
-            (0, h.new_add(&agg_loc, 400, 100)),
-            (0, h.snapshot(&agg_loc, &snap_loc)),
-            (0, h.check_snapshot(&snap_loc, 100)),
-            (0, h.read_snapshot(&agg_loc)),
-            (0, h.add_and_read_snapshot_u128(&agg_loc, 100)),
-            (0, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
-            (0, h.check_snapshot(&derived_snap_loc, 1210013)),
+            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, false)),
+            (SUCCESS, h.init(None, use_type, ElementType::String, false)),
+            (SUCCESS, h.new_add(&agg_loc, 400, 100)),
+            (SUCCESS, h.snapshot(&agg_loc, &snap_loc)),
+            (SUCCESS, h.check_snapshot(&snap_loc, 100)),
+            (SUCCESS, h.read_snapshot(&agg_loc)),
+            (SUCCESS, h.add_and_read_snapshot_u128(&agg_loc, 100)),
+            (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
+            (SUCCESS, h.check_snapshot(&derived_snap_loc, 1210013)),
         ];
 
         h.run_block_in_parts_and_check(

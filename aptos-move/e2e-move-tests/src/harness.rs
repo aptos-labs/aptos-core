@@ -51,6 +51,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+// Code representing successful transaction, used for run_block_in_parts_and_check
+pub const SUCCESS: u64 = 0;
+
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
 
 static CACHED_BUILT_PACKAGES: Lazy<Mutex<HashMap<PathBuf, Arc<anyhow::Result<BuiltPackage>>>>> =
@@ -735,22 +738,22 @@ impl MoveHarness {
             );
             let outputs = harness.run_block(txns);
             for (idx, (error, status)) in errors.into_iter().zip(outputs.iter()).enumerate() {
-                if error > 0 {
-                    assert_abort_ref!(
-                        status,
-                        error,
-                        "Error code missmaptch on txn {} that should've failed, with block starting at {}. Expected {}, gotten {:?}",
-                        idx + offset,
-                        offset,
-                        error,
-                        status,
-                    );
-                } else {
+                if error == SUCCESS {
                     assert_success!(
                         status.clone(),
                         "Didn't succeed on txn {}, with block starting at {}",
                         idx + offset,
                         offset,
+                    );
+                } else {
+                    assert_abort_ref!(
+                        status,
+                        error,
+                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
+                        idx + offset,
+                        offset,
+                        error,
+                        status,
                     );
                 }
             }

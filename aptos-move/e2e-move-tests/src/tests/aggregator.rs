@@ -7,11 +7,14 @@ use crate::{
         materialize_and_sub, new, sub, sub_add, sub_and_materialize,
     },
     tests::common,
-    BlockSplit, MoveHarness,
+    BlockSplit, MoveHarness, SUCCESS,
 };
 use aptos_language_e2e_tests::account::Account;
 use proptest::prelude::*;
 use test_case::test_case;
+
+const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 fn setup() -> (MoveHarness, Account) {
     initialize(common::test_dir_path("aggregator.data/pack"))
@@ -25,7 +28,7 @@ fn test_aggregators_e2e(block_split: BlockSplit) {
 
     // Create many aggregators with deterministic limit.
     let txns = (0..block_size)
-        .map(|i| (0, new(&mut h, &acc, i, (i as u128) * 100000)))
+        .map(|i| (SUCCESS, new(&mut h, &acc, i, (i as u128) * 100000)))
         .collect();
     h.run_block_in_parts_and_check(block_split, txns);
 
@@ -33,11 +36,11 @@ fn test_aggregators_e2e(block_split: BlockSplit) {
     let failed_txns = (0..block_size)
         .map(|i| match i % 2 {
             0 => (
-                0x02_0001,
+                EAGGREGATOR_OVERFLOW,
                 materialize_and_add(&mut h, &acc, i, (i as u128) * 100000 + 1),
             ),
             _ => (
-                0x02_0002,
+                EAGGREGATOR_UNDERFLOW,
                 materialize_and_sub(&mut h, &acc, i, (i as u128) * 100000 + 1),
             ),
         })
@@ -46,14 +49,14 @@ fn test_aggregators_e2e(block_split: BlockSplit) {
 
     // Now test all operations. To do that, make sure aggregator have values large enough.
     let txns = (0..block_size)
-        .map(|i| (0, add(&mut h, &acc, i, (i as u128) * 1000)))
+        .map(|i| (SUCCESS, add(&mut h, &acc, i, (i as u128) * 1000)))
         .collect();
     h.run_block_in_parts_and_check(block_split, txns);
 
     // TODO: proptests with random transaction generator might be useful here.
     let txns = (0..block_size)
         .map(|i| {
-            (0, match i % 4 {
+            (SUCCESS, match i % 4 {
                 0 => sub_add(&mut h, &acc, i, (i as u128) * 1000, (i as u128) * 3000),
                 1 => materialize_and_add(&mut h, &acc, i, (i as u128) * 1000),
                 2 => sub_and_materialize(&mut h, &acc, i, (i as u128) * 1000),
@@ -66,7 +69,7 @@ fn test_aggregators_e2e(block_split: BlockSplit) {
     // Finally, check values.
     let txns = (0..block_size)
         .map(|i| {
-            (0, match i % 4 {
+            (SUCCESS, match i % 4 {
                 0 => check(&mut h, &acc, i, (i as u128) * 3000),
                 1 => check(&mut h, &acc, i, (i as u128) * 2000),
                 2 => check(&mut h, &acc, i, 0),
@@ -90,21 +93,21 @@ proptest! {
         let (mut h, acc) = setup();
 
         let txns = vec![
-            (0, new(&mut h, &acc, 0, 1500)),
-            (0, add(&mut h, &acc, 0, 400)), // 400
-            (0, materialize(&mut h, &acc, 0)),
-            (0, add(&mut h, &acc, 0, 500)), // 900
-            (0, check(&mut h, &acc, 0, 900)),
-            (0, materialize_and_add(&mut h, &acc, 0, 600)), // 1500
-            (0, materialize_and_sub(&mut h, &acc, 0, 600)), // 900
-            (0, check(&mut h, &acc, 0, 900)),
-            (0, sub_add(&mut h, &acc, 0, 200, 300)), // 1000
-            (0, check(&mut h, &acc, 0, 1000)),
+            (SUCCESS, new(&mut h, &acc, 0, 1500)),
+            (SUCCESS, add(&mut h, &acc, 0, 400)), // 400
+            (SUCCESS, materialize(&mut h, &acc, 0)),
+            (SUCCESS, add(&mut h, &acc, 0, 500)), // 900
+            (SUCCESS, check(&mut h, &acc, 0, 900)),
+            (SUCCESS, materialize_and_add(&mut h, &acc, 0, 600)), // 1500
+            (SUCCESS, materialize_and_sub(&mut h, &acc, 0, 600)), // 900
+            (SUCCESS, check(&mut h, &acc, 0, 900)),
+            (SUCCESS, sub_add(&mut h, &acc, 0, 200, 300)), // 1000
+            (SUCCESS, check(&mut h, &acc, 0, 1000)),
             // These 2 transactions fail, and should have no side-effects.
-            (0x02_0001, add_and_materialize(&mut h, &acc, 0, 501)),
-            (0x02_0002, sub_and_materialize(&mut h, &acc, 0, 1001)),
-            (0, check(&mut h, &acc, 0, 1000)),
-            (0, destroy(&mut h, &acc, 0)),
+            (EAGGREGATOR_OVERFLOW, add_and_materialize(&mut h, &acc, 0, 501)),
+            (EAGGREGATOR_UNDERFLOW, sub_and_materialize(&mut h, &acc, 0, 1001)),
+            (SUCCESS, check(&mut h, &acc, 0, 1000)),
+            (SUCCESS, destroy(&mut h, &acc, 0)),
             // Aggregator has been destroyed and we cannot add this delta.
             (25863, add(&mut h, &acc, 0, 1)),
         ];
@@ -118,12 +121,11 @@ proptest! {
         let (mut h, acc) = setup();
 
         let txns = vec![
-
-            (0, new(&mut h, &acc, 0, 600)),
-            (0, add(&mut h, &acc, 0, 400)),
+            (SUCCESS, new(&mut h, &acc, 0, 600)),
+            (SUCCESS, add(&mut h, &acc, 0, 400)),
             // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
-            // we cannot catch it, because we don't materialize it.
-            (0x02_0002, sub(&mut h, &acc, 0, 500)),
+            // We cannot catch it, because we don't materialize it.
+            (EAGGREGATOR_UNDERFLOW, sub(&mut h, &acc, 0, 500)),
         ];
 
         h.run_block_in_parts_and_check(block_split, txns);
@@ -134,10 +136,10 @@ proptest! {
         let (mut h, acc) = setup();
 
         let txns = vec![
-            (0, new(&mut h, &acc, 0, 600)),
+            (SUCCESS, new(&mut h, &acc, 0, 600)),
             // Underflow on materialized value leads to abort with EAGGREGATOR_UNDERFLOW.
-            // we can catch it, because we materialize it.
-            (0x02_0002, materialize_and_sub(&mut h, &acc, 0, 400)),
+            // We can catch it, because we materialize it.
+            (EAGGREGATOR_UNDERFLOW, materialize_and_sub(&mut h, &acc, 0, 400)),
         ];
 
         h.run_block_in_parts_and_check(block_split, txns);
@@ -149,11 +151,11 @@ proptest! {
         let (mut h, acc) = setup();
 
         let txns = vec![
-            (0, new(&mut h, &acc, 0, 600)),
-            (0, add(&mut h, &acc, 0, 400)),
+            (SUCCESS, new(&mut h, &acc, 0, 600)),
+            (SUCCESS, add(&mut h, &acc, 0, 400)),
             // Currently, this one will panic, instead of throwing this code.
-            // we cannot catch it, because we don't materialize it.
-            (0x02_0001, add(&mut h, &acc, 0, 201)),
+            // We cannot catch it, because we don't materialize it.
+            (EAGGREGATOR_OVERFLOW, add(&mut h, &acc, 0, 201)),
         ];
 
         h.run_block_in_parts_and_check(block_split, txns);
@@ -165,10 +167,10 @@ proptest! {
         let (mut h, acc) = setup();
 
         let txns = vec![
-            (0, new(&mut h, &acc, 0, 399)),
+            (SUCCESS, new(&mut h, &acc, 0, 399)),
             // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
-            // we can catch it, because we materialize it.
-            (0x02_0001, materialize_and_add(&mut h, &acc, 0, 400)),
+            // We can catch it, because we materialize it.
+            (EAGGREGATOR_OVERFLOW, materialize_and_add(&mut h, &acc, 0, 400)),
         ];
 
         h.run_block_in_parts_and_check(block_split, txns);
