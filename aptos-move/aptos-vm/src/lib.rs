@@ -169,11 +169,12 @@ pub trait VMExecutor: Send + Sync {
     ) -> Result<Vec<TransactionOutput>, VMStatus>;
 }
 
-/*
-/// Get the AccessPath to a resource stored under `address` with type name `tag`
-/// DNS
-fn create_access_path(address: AccountAddress, tag: StructTag) -> anyhow::Result<AccessPath> {
-    let resource_tag = ResourceKey::new(address, tag);
-    AccessPath::resource_access_path(resource_tag)
+/// This trait describes the VM's simulation interfaces.
+pub trait VMSimulator {
+    /// Executes a SignedTransaction without performing signature verification.
+    fn simulate_signed_transaction(
+        &self,
+        transaction: &SignedTransaction,
+        state_view: &impl StateView,
+    ) -> Result<TransactionOutput, VMStatus>;
 }
- */
