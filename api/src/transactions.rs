@@ -18,7 +18,7 @@ use crate::{
     },
     ApiTags,
 };
-use anyhow::{anyhow, Context as AnyhowContext};
+use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
     AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
@@ -30,7 +30,6 @@ use aptos_api_types::{
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_types::{
     account_config::CoinStoreResource,
-    account_view::AccountView,
     mempool_status::MempoolStatusCode,
     transaction::{
         EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
@@ -52,6 +51,7 @@ generate_error_response!(
     SubmitTransactionError,
     (400, BadRequest),
     (403, Forbidden),
+    (404, NotFound),
     (413, PayloadTooLarge),
     (500, Internal),
     (503, ServiceUnavailable),
@@ -470,36 +470,12 @@ impl TransactionsApi {
                     u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
 
                 // Retrieve account balance to determine max gas available
-                let account_state = context
-                    .get_account_state(
+                let coin_store = context
+                    .expect_resource_poem::<CoinStoreResource, SubmitTransactionError>(
                         signed_transaction.sender(),
                         ledger_info.version(),
                         &ledger_info,
-                    )?
-                    .ok_or_else(|| {
-                        SubmitTransactionError::bad_request_with_code(
-                            "Account not found",
-                            AptosErrorCode::InvalidInput,
-                            &ledger_info,
-                        )
-                    })?;
-                let coin_store: CoinStoreResource = account_state
-                    .get_coin_store_resource()
-                    .and_then(|inner| {
-                        inner.ok_or_else(|| {
-                            anyhow!(
-                                "No coin store found for account {}",
-                                signed_transaction.sender()
-                            )
-                        })
-                    })
-                    .map_err(|err| {
-                        SubmitTransactionError::internal_with_code(
-                            format!("Failed to get coin store resource {}", err),
-                            AptosErrorCode::InternalError,
-                            &ledger_info,
-                        )
-                    })?;
+                    )?;
 
                 let gas_unit_price =
                     estimated_gas_unit_price.unwrap_or_else(|| signed_transaction.gas_unit_price());

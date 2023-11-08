@@ -320,6 +320,13 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         self.executor_view.generate_delayed_field_id()
     }
 
+    fn validate_and_convert_delayed_field_id(
+        &self,
+        id: u64,
+    ) -> Result<Self::Identifier, PanicError> {
+        self.executor_view.validate_and_convert_delayed_field_id(id)
+    }
+
     fn get_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,

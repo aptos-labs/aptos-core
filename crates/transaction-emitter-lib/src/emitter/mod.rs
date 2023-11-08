@@ -274,6 +274,11 @@ impl EmitJobRequest {
         self
     }
 
+    pub fn set_mint_to_root(mut self) -> Self {
+        self.mint_to_root = true;
+        self
+    }
+
     pub fn calculate_mode_params(&self) -> EmitModeParams {
         let clients_count = self.rest_clients.len();
 

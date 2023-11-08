@@ -221,7 +221,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -349,6 +349,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "async-mutex",
+ "bcs 0.1.4",
  "futures",
  "http",
  "hyper",
@@ -818,6 +819,7 @@ dependencies = [
  "bytes",
  "chrono",
  "claims",
+ "clap 4.3.21",
  "dashmap",
  "fail 0.5.0",
  "futures",
@@ -1141,6 +1143,7 @@ name = "aptos-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-consensus",
  "aptos-db-tool",
  "aptos-logger",
  "aptos-move-debugger",
@@ -2499,6 +2502,7 @@ name = "aptos-move-debugger"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-meter",
  "aptos-gas-profiling",
@@ -2524,6 +2528,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "regex",
+ "reqwest",
  "tokio",
  "url",
 ]
@@ -2586,7 +2591,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a12014686fcb6122ab787a54b1280ae305cbc193#a12014686fcb6122ab787a54b1280ae305cbc193"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2d5cb211a89a8705674e9e1e741c841dd899c558#2d5cb211a89a8705674e9e1e741c841dd899c558"
 dependencies = [
  "chrono",
 ]
@@ -4212,9 +4217,9 @@ dependencies = [
 
 [[package]]
 name = "arbitrary"
-version = "1.3.1"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2e1373abdaa212b704512ec2bd8b26bd0b7d5c3f70117411a5d9a451383c859"
+checksum = "7d5a26814d8dcb93b0e5a0ff3c6d80a8843bafb21b39e8e18a6f05471870e110"
 dependencies = [
  "derive_arbitrary",
 ]
@@ -6294,9 +6299,9 @@ dependencies = [
 
 [[package]]
 name = "derive_arbitrary"
-version = "1.3.1"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e0efad4403bfc52dc201159c4b842a246a14b98c64b55dfd0f2d89729dfeb8"
+checksum = "67e77553c4162a157adbf834ebae5b415acbecbeafc7a74b0e886657506a7611"
 dependencies = [
  "proc-macro2 1.0.64",
  "quote 1.0.29",
@@ -7403,9 +7408,11 @@ version = "0.1.0"
 name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
- "aptos-consensus",
- "aptos-consensus-types",
+ "aptos-framework",
+ "aptos-language-e2e-tests",
  "aptos-types",
+ "aptos-vm",
+ "aptos-vm-genesis",
  "arbitrary",
  "bcs 0.1.4",
  "libfuzzer-sys",
@@ -7415,6 +7422,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "once_cell",
 ]
 
 [[package]]
@@ -11910,10 +11918,10 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a12014686fcb6122ab787a54b1280ae305cbc193#a12014686fcb6122ab787a54b1280ae305cbc193"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2d5cb211a89a8705674e9e1e741c841dd899c558#2d5cb211a89a8705674e9e1e741c841dd899c558"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a12014686fcb6122ab787a54b1280ae305cbc193)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2d5cb211a89a8705674e9e1e741c841dd899c558)",
  "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=14c8813c9a0c31437a679c2601d1c828060c4a3c)",
  "async-trait",
  "base64 0.13.0",
@@ -13422,7 +13430,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=a12014686fcb6122ab787a54b1280ae305cbc193#a12014686fcb6122ab787a54b1280ae305cbc193"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=2d5cb211a89a8705674e9e1e741c841dd899c558#2d5cb211a89a8705674e9e1e741c841dd899c558"
 dependencies = [
  "anyhow",
  "async-trait",

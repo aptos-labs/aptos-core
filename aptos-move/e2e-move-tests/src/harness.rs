@@ -39,6 +39,7 @@ use move_core_types::{
 use move_package::package_hooks::register_package_hooks;
 use once_cell::sync::Lazy;
 use project_root::get_project_root;
+use proptest::strategy::{BoxedStrategy, Just, Strategy};
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,
@@ -49,6 +50,9 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+
+// Code representing successful transaction, used for run_block_in_parts_and_check
+pub const SUCCESS: u64 = 0;
 
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
 
@@ -77,6 +81,13 @@ pub struct MoveHarness {
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
     default_gas_unit_price: u64,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum BlockSplit {
+    Whole,
+    SingleTxnPerBlock,
+    SplitIntoThree { first_len: usize, second_len: usize },
 }
 
 impl MoveHarness {
@@ -696,6 +707,116 @@ impl MoveHarness {
         self.executor
             .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
     }
+
+    /// Splits transactions into blocks based on passed `block_split``, and
+    /// checks whether each transaction aborted based on passed in
+    /// move abort code (if >0), or succeeded (if ==0).
+    /// `txn_block` is vector of (abort code, transaction) tuples.
+    ///
+    /// This is useful when testing that different block boundaries
+    /// work correctly.
+    pub fn run_block_in_parts_and_check(
+        &mut self,
+        block_split: BlockSplit,
+        txn_block: Vec<(u64, SignedTransaction)>,
+    ) -> Vec<TransactionStatus> {
+        fn run_and_check_block(
+            harness: &mut MoveHarness,
+            txn_block: Vec<(u64, SignedTransaction)>,
+            offset: usize,
+        ) -> Vec<TransactionStatus> {
+            use crate::assert_abort_ref;
+
+            if txn_block.is_empty() {
+                return vec![];
+            }
+            let (errors, txns): (Vec<_>, Vec<_>) = txn_block.into_iter().unzip();
+            println!(
+                "=== Running block from {} with {} tnx ===",
+                offset,
+                txns.len()
+            );
+            let outputs = harness.run_block(txns);
+            for (idx, (error, status)) in errors.into_iter().zip(outputs.iter()).enumerate() {
+                if error == SUCCESS {
+                    assert_success!(
+                        status.clone(),
+                        "Didn't succeed on txn {}, with block starting at {}",
+                        idx + offset,
+                        offset,
+                    );
+                } else {
+                    assert_abort_ref!(
+                        status,
+                        error,
+                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
+                        idx + offset,
+                        offset,
+                        error,
+                        status,
+                    );
+                }
+            }
+            outputs
+        }
+
+        match block_split {
+            BlockSplit::Whole => run_and_check_block(self, txn_block, 0),
+            BlockSplit::SingleTxnPerBlock => {
+                let mut outputs = vec![];
+                for (idx, (error, status)) in txn_block.into_iter().enumerate() {
+                    outputs.append(&mut run_and_check_block(self, vec![(error, status)], idx));
+                }
+                outputs
+            },
+            BlockSplit::SplitIntoThree {
+                first_len,
+                second_len,
+            } => {
+                assert!(first_len + second_len <= txn_block.len());
+                let (left, rest) = txn_block.split_at(first_len);
+                let (mid, right) = rest.split_at(second_len);
+
+                let mut outputs = vec![];
+                outputs.append(&mut run_and_check_block(self, left.to_vec(), 0));
+                outputs.append(&mut run_and_check_block(self, mid.to_vec(), first_len));
+                outputs.append(&mut run_and_check_block(
+                    self,
+                    right.to_vec(),
+                    first_len + second_len,
+                ));
+                outputs
+            },
+        }
+    }
+}
+
+impl BlockSplit {
+    pub fn arbitrary(len: usize) -> BoxedStrategy<BlockSplit> {
+        // skip last choice if lenght is not big enough for it.
+        (0..(if len > 1 { 3 } else { 2 }))
+            .prop_flat_map(move |enum_type| {
+                // making running a test with a full block likely
+                match enum_type {
+                    0 => Just(BlockSplit::Whole).boxed(),
+                    1 => Just(BlockSplit::SingleTxnPerBlock).boxed(),
+                    _ => {
+                        // First is non-empty, and not the whole block here: [1, len)
+                        (1usize..len)
+                            .prop_flat_map(move |first| {
+                                // Second is non-empty, but can finish the block: [1, len - first]
+                                (Just(first), 1usize..len - first + 1)
+                            })
+                            .prop_map(|(first, second)| BlockSplit::SplitIntoThree {
+                                first_len: first,
+                                second_len: second,
+                            })
+                            .boxed()
+                    },
+                }
+            })
+            .boxed()
+    }
 }
 
 impl Default for MoveHarness {
@@ -749,6 +870,7 @@ macro_rules! assert_success {
 }
 
 /// Helper to assert transaction aborts.
+/// TODO merge/replace with assert_abort_ref
 #[macro_export]
 macro_rules! assert_abort {
     // identity needs to be before pattern (both with and without message),
@@ -798,6 +920,7 @@ macro_rules! assert_abort {
 }
 
 /// Helper to assert transaction aborts.
+/// Takes reference, as then we can get a better error message.
 #[macro_export]
 macro_rules! assert_abort_ref {
     // identity needs to be before pattern (both with and without message),
