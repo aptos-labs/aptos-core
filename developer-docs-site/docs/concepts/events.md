@@ -18,7 +18,7 @@ example,
 /// 0xcafe::my_module_name
 /// An example module event struct denotes a coin transfer.
 #[event]
-struct TransferEvent has store, drop {
+struct TransferEvent has drop, store {
     sender: address,
     receiver: address,
     amount: u64
