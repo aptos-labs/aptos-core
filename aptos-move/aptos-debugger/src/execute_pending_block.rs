@@ -54,7 +54,16 @@ impl Command {
                 "Getting block {:?} from {block_rest_endpoint:?}.",
                 self.block_id
             );
-            todo!("Implement after we support dumping bcs format block from AdminService.");
+            let base_url =
+                Url::parse(&block_rest_endpoint)?.join("/debug/consensus/block?bcs=true")?;
+            let url = if let Some(block_id) = self.block_id {
+                base_url.join(&format!("&block_id={block_id:?}"))?
+            } else {
+                base_url
+            };
+            info!("GET {url:?}...");
+            let body = reqwest::get(url).await?.bytes().await?;
+            bcs::from_bytes(&body)?
         } else if let Some(consensus_db_path) = self.consensus_db_path {
             info!(
                 "Getting block {:?} from {consensus_db_path:?}.",

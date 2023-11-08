@@ -40,5 +40,6 @@ move-resource-viewer = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
