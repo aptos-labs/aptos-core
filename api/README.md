@@ -27,6 +27,7 @@ cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json
 3. Regenerate the TypeScript SDK client files based upon the new API spec:
 ```
 cd ecosystem/typescript/sdk
+pnpm install
 pnpm generate-client
 ```
 4. Manually update the helper methods in the TypeScript SDK in: `ecosystem/typescript/sdk/src/aptos_client.ts`. Note: This is necessary because we wrap the generated client, so the docs on the methods in that file are written by hand. For example, if you change `/accounts/<addr>/resources` in the API, the `getAccountResources` method in the generated client will be different. You must therefore then change `getAccountResources` in `ecosystem/typescript/sdk/src/aptos_client.ts`, which wraps the generated method.
