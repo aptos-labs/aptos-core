@@ -842,9 +842,9 @@ mod tests {
     use claims::{assert_err, assert_ok, assert_some_eq};
     use test_case::test_case;
 
-    const CREATE: u64 = 0;
-    const MODIFICATION: u64 = 1;
-    const DELETION: u64 = 2;
+    const CREATE: u8 = 0;
+    const MODIFICATION: u8 = 1;
+    const DELETION: u8 = 2;
 
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{

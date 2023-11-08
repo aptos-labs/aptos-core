@@ -36,7 +36,7 @@ use aptos_vm_types::{
 use bytes::Bytes;
 use move_core_types::{
     language_storage::StructTag,
-    value::MoveTypeLayout,
+    value::{layout_matches, MoveTypeLayout},
     vm_status::{err_msg, StatusCode, VMStatus},
 };
 use std::{
@@ -306,14 +306,19 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
     ) -> anyhow::Result<Option<Bytes>> {
-        // TODO[agg_v2](test): resource_group_write_set also contains a layout. What to do with it?
-        if let Some((write_op, _layout)) = self
+        if let Some((write_op, layout)) = self
             .change_set
             .resource_group_write_set()
             .get(group_key)
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            Ok(write_op.extract_raw_bytes())
+            if layout_matches(maybe_layout, layout.as_deref()) {
+                Ok(write_op.extract_raw_bytes())
+            } else {
+                //TODO[agg_v2](fix): What should be the error here?
+                //`get_resource_from_group` doesn't specify any error type
+                Ok(None)
+            }
         } else {
             self.base_resource_group_view.get_resource_from_group(
                 group_key,

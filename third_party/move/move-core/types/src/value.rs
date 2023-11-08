@@ -195,6 +195,15 @@ impl MoveValue {
     }
 }
 
+// Sporadically checks if the given two input type layouts match
+pub fn layout_matches(
+    layout_1: Option<&MoveTypeLayout>,
+    layout_2: Option<&MoveTypeLayout>,
+) -> bool {
+    //TODO[agg_v2](optimize): Don't compare the layouts everytime. Do this operation sporadically
+    layout_1 == layout_2
+}
+
 pub fn serialize_values<'a, I>(vals: I) -> Vec<Vec<u8>>
 where
     I: IntoIterator<Item = &'a MoveValue>,
