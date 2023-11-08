@@ -10,17 +10,21 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-// The maximum message size per state sync message
-const MAX_MESSAGE_SIZE: usize = 60 * 1024 * 1024; /* 60 MiB */
+// The maximum message size per state sync message. We set this to 20MiB.
+// 20k P2P transaction write-sets is around 10MiB on the wire (after compression)
+// and roughly double that (20MiB) before compression. This will allow us to
+// fetch at most 20k P2P transaction write-sets per request before we fallback
+// to execution.
+const MAX_MESSAGE_SIZE: usize = 20 * 1024 * 1024; /* 20 MiB */
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-const MAX_TRANSACTION_CHUNK_SIZE: u64 = 30_000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 30_000;
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 20_000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 20_000;
 
 // The maximum number of concurrent requests to send
-const MAX_CONCURRENT_REQUESTS: u64 = 6;
+const MAX_CONCURRENT_REQUESTS: u64 = 3; // This is doubled for validators and VFNs. So 6.
 const MAX_CONCURRENT_STATE_REQUESTS: u64 = 6;
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
@@ -135,7 +139,7 @@ impl Default for StateSyncDriverConfig {
             progress_check_interval_ms: 50,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 100,
-            max_num_stream_timeouts: 18,
+            max_num_stream_timeouts: 24,
             max_pending_data_chunks: 500,
             max_stream_wait_time_ms: 5000,
             mempool_commit_ack_timeout_ms: 5000, // 5 seconds
@@ -346,7 +350,7 @@ impl Default for AptosDataClientConfig {
             min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
             min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
             optimistic_fetch_timeout_ms: 10_000, // 10 seconds
-            response_timeout_ms: 30,        // 30 seconds
+            response_timeout_ms: 120_000,             // 120 seconds
             subscription_response_timeout_ms: 60_000, // 60 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
