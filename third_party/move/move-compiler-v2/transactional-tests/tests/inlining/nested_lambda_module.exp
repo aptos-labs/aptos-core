@@ -1,0 +1,71 @@
+comparison between v1 and v2 failed:
+= processed 3 tasks
+= 
++ task 1 'publish'. lines 8-15:
++ Error: compilation errors:
++  bug: not yet implemented: 0x60000055a180 : Invoke(NodeId(7), 0x60000055a100 : LocalVar(NodeId(6), Symbol(64)), [0x60000055a000 : Temporary(NodeId(4), 1), 0x60000055a080 : Temporary(NodeId(5), 2)])
++ Backtrace: Backtrace [
++     { fn: "std::backtrace_rs::backtrace::libunwind::trace", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/../../backtrace/src/backtrace/libunwind.rs", line: 93 },
++     { fn: "std::backtrace_rs::backtrace::trace_unsynchronized", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/../../backtrace/src/backtrace/mod.rs", line: 66 },
++     { fn: "std::backtrace::Backtrace::create", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/backtrace.rs", line: 332 },
++     { fn: "move_model::model::GlobalEnv::add_backtrace", file: "/Users/brm/code/aptos-core/third_party/move/move-model/src/model.rs", line: 769 },
++     { fn: "move_model::model::GlobalEnv::diag", file: "/Users/brm/code/aptos-core/third_party/move/move-model/src/model.rs", line: 802 },
++     { fn: "move_compiler_v2::bytecode_generator::Generator::diag", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler-v2/src/bytecode_generator.rs", line: 283 },
++     { fn: "move_compiler_v2::bytecode_generator::Generator::internal_error", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler-v2/src/bytecode_generator.rs", line: 277 },
++     { fn: "move_compiler_v2::bytecode_generator::Generator::gen", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler-v2/src/bytecode_generator.rs", line: 413 },
++     { fn: "move_compiler_v2::bytecode_generator::generate_bytecode", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler-v2/src/bytecode_generator.rs", line: 60 },
++     { fn: "move_compiler_v2::run_bytecode_gen", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler-v2/src/lib.rs", line: 141 },
++     { fn: "move_compiler_v2::run_move_compiler", file: "/Users/brm/code/aptos-core/third_party/move/move-compiler-v2/src/lib.rs", line: 64 },
++     { fn: "move_transactional_test_runner::framework::compile_source_unit_v2", file: "/Users/brm/code/aptos-core/third_party/move/testing-infra/transactional-test-runner/src/framework.rs", line: 705 },
++     { fn: "move_transactional_test_runner::framework::MoveTestAdapter::compile_module", file: "/Users/brm/code/aptos-core/third_party/move/testing-infra/transactional-test-runner/src/framework.rs", line: 202 },
++     { fn: "move_transactional_test_runner::framework::MoveTestAdapter::handle_command", file: "/Users/brm/code/aptos-core/third_party/move/testing-infra/transactional-test-runner/src/framework.rs", line: 354 },
++     { fn: "move_transactional_test_runner::framework::handle_known_task", file: "/Users/brm/code/aptos-core/third_party/move/testing-infra/transactional-test-runner/src/framework.rs", line: 942 },
++     { fn: "move_transactional_test_runner::framework::run_test_impl", file: "/Users/brm/code/aptos-core/third_party/move/testing-infra/transactional-test-runner/src/framework.rs", line: 879 },
++     { fn: "move_transactional_test_runner::vm_test_harness::run_test_with_config", file: "/Users/brm/code/aptos-core/third_party/move/testing-infra/transactional-test-runner/src/vm_test_harness.rs", line: 447 },
++     { fn: "tests::run", file: "./tests/tests.rs", line: 22 },
++     { fn: "datatest_stable::runner::Requirements::expand::{{closure}}::{{closure}}", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/datatest-stable-0.1.3/src/runner.rs", line: 59 },
++     { fn: "libtest_mimic::Trial::test::{{closure}}", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 110 },
++     { fn: "core::ops::function::FnOnce::call_once{{vtable.shim}}", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/core/src/ops/function.rs", line: 250 },
++     { fn: "<alloc::boxed::Box<F,A> as core::ops::function::FnOnce<Args>>::call_once", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/alloc/src/boxed.rs", line: 1993 },
++     { fn: "libtest_mimic::run_single::{{closure}}", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 500 },
++     { fn: "<core::panic::unwind_safe::AssertUnwindSafe<F> as core::ops::function::FnOnce<()>>::call_once", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/core/src/panic/unwind_safe.rs", line: 271 },
++     { fn: "std::panicking::try::do_call", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panicking.rs", line: 500 },
++     { fn: "___rust_try" },
++     { fn: "std::panicking::try", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panicking.rs", line: 464 },
++     { fn: "std::panic::catch_unwind", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panic.rs", line: 142 },
++     { fn: "libtest_mimic::run_single", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 500 },
++     { fn: "libtest_mimic::run", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/libtest-mimic-0.5.2/src/lib.rs", line: 452 },
++     { fn: "datatest_stable::runner::runner", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/datatest-stable-0.1.3/src/runner.rs", line: 17 },
++     { fn: "tests::main", file: "/Users/brm/.cargo/registry/src/index.crates.io-6f17d22bba15001f/datatest-stable-0.1.3/src/macros.rs", line: 25 },
++     { fn: "core::ops::function::FnOnce::call_once", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/core/src/ops/function.rs", line: 250 },
++     { fn: "std::sys_common::backtrace::__rust_begin_short_backtrace", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/sys_common/backtrace.rs", line: 135 },
++     { fn: "std::rt::lang_start::{{closure}}", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/rt.rs", line: 166 },
++     { fn: "core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/core/src/ops/function.rs", line: 284 },
++     { fn: "std::panicking::try::do_call", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panicking.rs", line: 500 },
++     { fn: "std::panicking::try", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panicking.rs", line: 464 },
++     { fn: "std::panic::catch_unwind", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panic.rs", line: 142 },
++     { fn: "std::rt::lang_start_internal::{{closure}}", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/rt.rs", line: 148 },
++     { fn: "std::panicking::try::do_call", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panicking.rs", line: 500 },
++     { fn: "std::panicking::try", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panicking.rs", line: 464 },
++     { fn: "std::panic::catch_unwind", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/panic.rs", line: 142 },
++     { fn: "std::rt::lang_start_internal", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/rt.rs", line: 148 },
++     { fn: "std::rt::lang_start", file: "/rustc/d5c2e9c342b358556da91d61ed4133f6f50fc0c3/library/std/src/rt.rs", line: 165 },
++     { fn: "_main" },
++ ]
++   ┌─ /var/folders/hx/_s_6fyh529bgmvl6z4m8m9fm0000gn/T/.tmp1dESav:4:9
++   │
++ 4 │         f(x, y)
++   │         ^^^^^^^
++ 
++ 
++ 
+= task 2 'run'. lines 17-17:
+- return values: 3
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
+= 

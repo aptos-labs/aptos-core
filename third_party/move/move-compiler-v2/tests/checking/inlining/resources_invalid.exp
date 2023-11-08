@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: The type argument to `exists` and `global` must be a struct type but `T` is not
+  ┌─ tests/checking/inlining/resources_invalid.move:8:9
+  │
+8 │         borrow_global<T>(ref.addr)
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
