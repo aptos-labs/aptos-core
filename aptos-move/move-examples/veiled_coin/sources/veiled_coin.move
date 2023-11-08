@@ -120,7 +120,7 @@ module veiled_coin::veiled_coin {
 
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
 
     use veiled_coin::helpers;
     use veiled_coin::sigma_protos;
@@ -130,10 +130,10 @@ module veiled_coin::veiled_coin {
     //
 
     /// The range proof system does not support proofs for any number \in [0, 2^{32})
-    const ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE : u64 = 1;
+    const ERANGE_PROOF_SYSTEM_HAS_INSUFFICIENT_RANGE: u64 = 1;
 
     /// A range proof failed to verify.
-    const ERANGE_PROOF_VERIFICATION_FAILED : u64 = 2;
+    const ERANGE_PROOF_VERIFICATION_FAILED: u64 = 2;
 
     /// Account already has `VeiledCoinStore<CoinType>` registered.
     const EVEILED_COIN_STORE_ALREADY_PUBLISHED: u64 = 3;
@@ -186,19 +186,21 @@ module veiled_coin::veiled_coin {
     struct VeiledCoinStore<phantom CoinType> has key {
         /// A ElGamal ciphertext of a value $v \in [0, 2^{32})$, an invariant that is enforced throughout the code.
         veiled_balance: elgamal::CompressedCiphertext,
-        deposit_events: EventHandle<DepositEvent>,
-        withdraw_events: EventHandle<WithdrawEvent>,
         pk: elgamal::CompressedPubkey,
     }
 
+    #[event]
     /// Event emitted when some amount of veiled coins were deposited into an account.
-    struct DepositEvent has drop, store {
+    struct Deposit has drop, store {
         // We cannot leak any information about how much has been deposited.
+        user: address
     }
 
+    #[event]
     /// Event emitted when some amount of veiled coins were withdrawn from an account.
-    struct WithdrawEvent has drop, store {
+    struct Withdraw has drop, store {
         // We cannot leak any information about how much has been withdrawn.
+        user: address
     }
 
     /// Holds an `account::SignerCapability` for the resource account created when initializing this module. This
@@ -334,7 +336,14 @@ module veiled_coin::veiled_coin {
         zkrp_new_balance: vector<u8>,
         withdraw_subproof: vector<u8>) acquires VeiledCoinStore, VeiledCoinMinter
     {
-        unveil_to<CoinType>(sender, signer::address_of(sender), amount, comm_new_balance, zkrp_new_balance, withdraw_subproof)
+        unveil_to<CoinType>(
+            sender,
+            signer::address_of(sender),
+            amount,
+            comm_new_balance,
+            zkrp_new_balance,
+            withdraw_subproof
+        )
     }
 
     /// Sends a *veiled* amount from `sender` to `recipient`. After this call, the veiled balances of both the `sender`
@@ -491,8 +500,6 @@ module veiled_coin::veiled_coin {
 
         let coin_store = VeiledCoinStore<CoinType> {
             veiled_balance: helpers::get_veiled_balance_zero_ciphertext(),
-            deposit_events: account::new_event_handle<DepositEvent>(user),
-            withdraw_events: account::new_event_handle<WithdrawEvent>(user),
             pk,
         };
         move_to(user, coin_store);
@@ -520,9 +527,8 @@ module veiled_coin::veiled_coin {
         let VeiledCoin<CoinType> { veiled_amount: _ } = coin;
 
         // Once successful, emit an event that a veiled deposit occurred.
-        event::emit_event<DepositEvent>(
-            &mut veiled_coin_store.deposit_events,
-            DepositEvent {},
+        event::emit(
+            Deposit { user: to_addr },
         );
     }
 
@@ -574,9 +580,8 @@ module veiled_coin::veiled_coin {
         veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Emit event to indicate a veiled withdrawal occurred
-        event::emit_event<WithdrawEvent>(
-            &mut veiled_coin_store.withdraw_events,
-            WithdrawEvent { },
+        event::emit(
+            Withdraw { user: addr },
         );
 
         // Withdraw normal `Coin`'s from the resource account and deposit them in the recipient's
@@ -634,9 +639,8 @@ module veiled_coin::veiled_coin {
         sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
-        event::emit_event<WithdrawEvent>(
-            &mut sender_veiled_coin_store.withdraw_events,
-            WithdrawEvent { },
+        event::emit<Withdraw>(
+            Withdraw { user: sender_addr },
         );
 
         // Create a new veiled coin for the recipient.

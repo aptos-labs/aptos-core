@@ -97,7 +97,7 @@ module mint_nft::create_nft_getting_production_ready {
     use std::string::{Self, String};
     use std::vector;
     use aptos_framework::account;
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_std::ed25519;
     use aptos_token::token::{Self, TokenDataId};
@@ -106,8 +106,9 @@ module mint_nft::create_nft_getting_production_ready {
     use aptos_framework::account::create_account_for_test;
     use aptos_std::ed25519::ValidatedPublicKey;
 
+    #[event]
     // This struct stores the token receiver's address and token_data_id in the event of token minting
-    struct TokenMintingEvent has drop, store {
+    struct TokenMinting has drop, store {
         token_receiver_address: address,
         token_data_id: TokenDataId,
     }
@@ -119,7 +120,6 @@ module mint_nft::create_nft_getting_production_ready {
         token_data_id: TokenDataId,
         expiration_timestamp: u64,
         minting_enabled: bool,
-        token_minting_events: EventHandle<TokenMintingEvent>,
     }
 
     // This struct stores the challenge message that proves that the resource signer wants to mint this token
@@ -156,7 +156,14 @@ module mint_nft::create_nft_getting_production_ready {
         let mutate_setting = vector<bool>[ false, false, false ];
 
         // Create the nft collection.
-        token::create_collection(resource_signer, collection_name, description, collection_uri, maximum_supply, mutate_setting);
+        token::create_collection(
+            resource_signer,
+            collection_name,
+            description,
+            collection_uri,
+            maximum_supply,
+            mutate_setting
+        );
 
         // Create a token data id to specify the token to be minted.
         let token_data_id = token::create_tokendata(
@@ -197,7 +204,6 @@ module mint_nft::create_nft_getting_production_ready {
             token_data_id,
             expiration_timestamp: 10000000000,
             minting_enabled: true,
-            token_minting_events: account::new_event_handle<TokenMintingEvent>(resource_signer),
         });
     }
 
@@ -209,20 +215,27 @@ module mint_nft::create_nft_getting_production_ready {
 
         // get the collection minter and check if the collection minting is disabled or expired
         let module_data = borrow_global_mut<ModuleData>(@mint_nft);
-        assert!(timestamp::now_seconds() < module_data.expiration_timestamp, error::permission_denied(ECOLLECTION_EXPIRED));
+        assert!(
+            timestamp::now_seconds() < module_data.expiration_timestamp,
+            error::permission_denied(ECOLLECTION_EXPIRED)
+        );
         assert!(module_data.minting_enabled, error::permission_denied(EMINTING_DISABLED));
 
         // verify that the `mint_proof_signature` is valid against the admin's public key
-        verify_proof_of_knowledge(receiver_addr, mint_proof_signature, module_data.token_data_id, module_data.public_key);
+        verify_proof_of_knowledge(
+            receiver_addr,
+            mint_proof_signature,
+            module_data.token_data_id,
+            module_data.public_key
+        );
 
         // mint token to the receiver
         let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
         let token_id = token::mint_token(&resource_signer, module_data.token_data_id, 1);
         token::direct_transfer(&resource_signer, receiver, token_id, 1);
 
-        event::emit_event<TokenMintingEvent>(
-            &mut module_data.token_minting_events,
-            TokenMintingEvent {
+        event::emit(
+            TokenMinting {
                 token_receiver_address: receiver_addr,
                 token_data_id: module_data.token_data_id,
             }
@@ -269,7 +282,12 @@ module mint_nft::create_nft_getting_production_ready {
     }
 
     /// Verify that the collection token minter intends to mint the given token_data_id to the receiver
-    fun verify_proof_of_knowledge(receiver_addr: address, mint_proof_signature: vector<u8>, token_data_id: TokenDataId, public_key: ValidatedPublicKey) {
+    fun verify_proof_of_knowledge(
+        receiver_addr: address,
+        mint_proof_signature: vector<u8>,
+        token_data_id: TokenDataId,
+        public_key: ValidatedPublicKey
+    ) {
         let sequence_number = account::get_sequence_number(receiver_addr);
 
         let proof_challenge = MintProofChallenge {
@@ -280,7 +298,10 @@ module mint_nft::create_nft_getting_production_ready {
 
         let signature = ed25519::new_signature_from_bytes(mint_proof_signature);
         let unvalidated_public_key = ed25519::public_key_to_unvalidated(&public_key);
-        assert!(ed25519::signature_verify_strict_t(&signature, &unvalidated_public_key, proof_challenge), error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
+        assert!(
+            ed25519::signature_verify_strict_t(&signature, &unvalidated_public_key, proof_challenge),
+            error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE)
+        );
     }
 
     //
@@ -314,8 +335,20 @@ module mint_nft::create_nft_getting_production_ready {
         create_account_for_test(signer::address_of(nft_receiver));
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, nft_receiver2 = @0x234, aptos_framework = @aptos_framework)]
-    public entry fun test_happy_path(origin_account: signer, resource_account: signer, nft_receiver: signer, nft_receiver2: signer, aptos_framework: signer) acquires ModuleData {
+    #[test (
+        origin_account = @0xcafe,
+        resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
+        nft_receiver = @0x123,
+        nft_receiver2 = @0x234,
+        aptos_framework = @aptos_framework
+    )]
+    public entry fun test_happy_path(
+        origin_account: signer,
+        resource_account: signer,
+        nft_receiver: signer,
+        nft_receiver2: signer,
+        aptos_framework: signer
+    ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
@@ -334,7 +367,12 @@ module mint_nft::create_nft_getting_production_ready {
         let module_data = borrow_global_mut<ModuleData>(@mint_nft);
         let resource_signer = account::create_signer_with_capability(&module_data.signer_cap);
         let resource_signer_addr = signer::address_of(&resource_signer);
-        let token_id = token::create_token_id_raw(resource_signer_addr, string::utf8(b"Collection name"), string::utf8(b"Token name"), 1);
+        let token_id = token::create_token_id_raw(
+            resource_signer_addr,
+            string::utf8(b"Collection name"),
+            string::utf8(b"Token name"),
+            1
+        );
         let new_token = token::withdraw_token(&nft_receiver, token_id, 1);
 
         // put the token back since a token isn't droppable
@@ -354,14 +392,29 @@ module mint_nft::create_nft_getting_production_ready {
         mint_event_ticket(&nft_receiver2, ed25519::signature_to_bytes(&sig2));
 
         //  check the property version is properly updated
-        let token_id2 = token::create_token_id_raw(resource_signer_addr, string::utf8(b"Collection name"), string::utf8(b"Token name"), 2);
+        let token_id2 = token::create_token_id_raw(
+            resource_signer_addr,
+            string::utf8(b"Collection name"),
+            string::utf8(b"Token name"),
+            2
+        );
         let new_token2 = token::withdraw_token(&nft_receiver2, token_id2, 1);
         token::deposit_token(&nft_receiver2, new_token2);
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (
+        origin_account = @0xcafe,
+        resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
+        nft_receiver = @0x123,
+        aptos_framework = @aptos_framework
+    )]
     #[expected_failure(abort_code = 0x50002, location = mint_nft::create_nft_getting_production_ready)]
-    public entry fun test_minting_expired(origin_account: signer, resource_account: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
+    public entry fun test_minting_expired(
+        origin_account: signer,
+        resource_account: signer,
+        nft_receiver: signer,
+        aptos_framework: signer
+    ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 100000000001);
         let receiver_addr = signer::address_of(&nft_receiver);
@@ -374,9 +427,21 @@ module mint_nft::create_nft_getting_production_ready {
         mint_event_ticket(&nft_receiver, ed25519::signature_to_bytes(&sig));
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, admin = @admin_addr, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (
+        origin_account = @0xcafe,
+        resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
+        admin = @admin_addr,
+        nft_receiver = @0x123,
+        aptos_framework = @aptos_framework
+    )]
     #[expected_failure(abort_code = 0x50002, location = mint_nft::create_nft_getting_production_ready)]
-    public entry fun test_update_expiration_time(origin_account: signer, resource_account: signer, admin: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
+    public entry fun test_update_expiration_time(
+        origin_account: signer,
+        resource_account: signer,
+        admin: signer,
+        nft_receiver: signer,
+        aptos_framework: signer
+    ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
@@ -393,9 +458,21 @@ module mint_nft::create_nft_getting_production_ready {
         mint_event_ticket(&nft_receiver, ed25519::signature_to_bytes(&sig));
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, admin = @admin_addr, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (
+        origin_account = @0xcafe,
+        resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
+        admin = @admin_addr,
+        nft_receiver = @0x123,
+        aptos_framework = @aptos_framework
+    )]
     #[expected_failure(abort_code = 0x50003, location = mint_nft::create_nft_getting_production_ready)]
-    public entry fun test_update_minting_enabled(origin_account: signer, resource_account: signer, admin: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
+    public entry fun test_update_minting_enabled(
+        origin_account: signer,
+        resource_account: signer,
+        admin: signer,
+        nft_receiver: signer,
+        aptos_framework: signer
+    ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
@@ -412,9 +489,19 @@ module mint_nft::create_nft_getting_production_ready {
         mint_event_ticket(&nft_receiver, ed25519::signature_to_bytes(&sig));
     }
 
-    #[test (origin_account = @0xcafe, resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5, nft_receiver = @0x123, aptos_framework = @aptos_framework)]
+    #[test (
+        origin_account = @0xcafe,
+        resource_account = @0xc3bb8488ab1a5815a9d543d7e41b0e0df46a7396f89b22821f07a4362f75ddc5,
+        nft_receiver = @0x123,
+        aptos_framework = @aptos_framework
+    )]
     #[expected_failure(abort_code = 0x10006, location = mint_nft::create_nft_getting_production_ready)]
-    public entry fun test_invalid_signature(origin_account: signer, resource_account: signer, nft_receiver: signer, aptos_framework: signer) acquires ModuleData {
+    public entry fun test_invalid_signature(
+        origin_account: signer,
+        resource_account: signer,
+        nft_receiver: signer,
+        aptos_framework: signer
+    ) acquires ModuleData {
         let (admin_sk, admin_pk) = ed25519::generate_keys();
         set_up_test(origin_account, &resource_account, &admin_pk, aptos_framework, &nft_receiver, 10);
         let receiver_addr = signer::address_of(&nft_receiver);
