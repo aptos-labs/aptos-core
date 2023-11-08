@@ -483,7 +483,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .group_reads_needing_exchange
             .into_iter()
             .filter(|(state_key, _)| !resource_group_write_set.contains_key(state_key))
-            .map(|(state_key, (metadata_op, group_size))| (state_key, (metadata_op, group_size)))
             .collect();
 
         VMChangeSet::new(

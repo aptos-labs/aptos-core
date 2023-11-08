@@ -64,7 +64,8 @@ impl GroupWrite {
     ) -> Self {
         assert!(
             metadata_op.bytes().is_none() || metadata_op.bytes().unwrap().is_empty(),
-            "Metadata op should have empty bytes. metadata_op: {:?}", metadata_op
+            "Metadata op should have empty bytes. metadata_op: {:?}",
+            metadata_op
         );
         for (_tag, (v, _layout)) in &inner_ops {
             assert_none!(v.metadata(), "Group inner ops must have no metadata");

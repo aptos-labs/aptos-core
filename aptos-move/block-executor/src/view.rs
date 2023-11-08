@@ -816,13 +816,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     if let Ok(GroupReadResult::Size(group_size)) =
                         parallel_state.read_group_size(&key, self.txn_idx)
                     {
-                        return Some(Ok((
-                            key.clone(),
-                            (
-                                TransactionWrite::from_state_value(maybe_metadata),
-                                group_size,
-                            ),
-                        )));
+                        let metadata_op: T::Value =
+                            TransactionWrite::from_state_value(maybe_metadata);
+                        if let Some(metadata_op) = metadata_op.convert_read_to_modification() {
+                            return Some(Ok((key.clone(), (metadata_op, group_size))));
+                        }
                     }
                 }
                 // TODO[agg_v2](fix): Is this a code invariant error?
@@ -867,10 +865,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         if let Ok(GroupReadResult::Size(group_size)) =
                             unsync_map.get_group_size(key)
                         {
-                            return Some(Ok((
-                                key.clone(),
-                                (metadata.as_ref().clone(), group_size),
-                            )));
+                            if let Some(metadata_op) =
+                                metadata.as_ref().clone().convert_read_to_modification()
+                            {
+                                return Some(Ok((key.clone(), (metadata_op, group_size))));
+                            }
                         }
                     }
                     // TODO[agg_v2](fix): Is this a code invariant error?
