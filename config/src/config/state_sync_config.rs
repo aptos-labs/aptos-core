@@ -135,7 +135,7 @@ impl Default for StateSyncDriverConfig {
             progress_check_interval_ms: 50,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 100,
-            max_num_stream_timeouts: 12,
+            max_num_stream_timeouts: 18,
             max_pending_data_chunks: 500,
             max_stream_wait_time_ms: 5000,
             mempool_commit_ack_timeout_ms: 5000, // 5 seconds
@@ -346,7 +346,7 @@ impl Default for AptosDataClientConfig {
             min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
             min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
             optimistic_fetch_timeout_ms: 10_000, // 10 seconds
-            response_timeout_ms: 120_000,        // 120 seconds
+            response_timeout_ms: 30,        // 30 seconds
             subscription_response_timeout_ms: 60_000, // 60 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
