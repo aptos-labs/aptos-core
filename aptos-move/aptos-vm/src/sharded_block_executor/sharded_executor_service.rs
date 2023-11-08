@@ -32,13 +32,13 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
     num_shards: usize,
     executor_thread_pool: Arc<rayon::ThreadPool>,
-    coordinator_client: Arc<dyn CoordinatorClient<S>>,
+    coordinator_client: Arc<Mutex<dyn CoordinatorClient<S>>>,
     cross_shard_client: Arc<dyn CrossShardClient>,
 }
 
@@ -47,7 +47,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         shard_id: ShardId,
         num_shards: usize,
         num_threads: usize,
-        coordinator_client: Arc<dyn CoordinatorClient<S>>,
+        coordinator_client: Arc<Mutex<dyn CoordinatorClient<S>>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
@@ -201,7 +201,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         Ok(result)
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) {
         trace!(
             "Shard starting, shard_id={}, num_shards={}.",
             self.shard_id,
@@ -209,7 +209,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
         );
         let mut num_txns = 0;
         loop {
-            let command = self.coordinator_client.receive_execute_command();
+            let command = self.coordinator_client.lock().unwrap().receive_execute_command();
             match command {
                 ExecutorShardCommand::ExecuteSubBlocks(
                     state_view,
@@ -244,7 +244,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     let _result_tx_timer = SHARDED_EXECUTOR_SERVICE_SECONDS
                         .with_label_values(&[&self.shard_id.to_string(), "result_tx"])
                         .start_timer();
-                    self.coordinator_client.send_execution_result(ret);
+                    self.coordinator_client.lock().unwrap().send_execution_result(ret);
                 },
                 ExecutorShardCommand::Stop => {
                     break;

@@ -9,5 +9,5 @@ use move_core_types::vm_status::VMStatus;
 pub trait CoordinatorClient<S: StateView + Sync + Send + 'static>: Send + Sync {
     fn receive_execute_command(&self) -> ExecutorShardCommand<S>;
 
-    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
+    fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>);
 }

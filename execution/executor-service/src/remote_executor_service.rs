@@ -9,13 +9,14 @@ use aptos_secure_net::network_controller::NetworkController;
 use aptos_types::block_executor::partitioner::ShardId;
 use aptos_vm::sharded_block_executor::sharded_executor_service::ShardedExecutorService;
 use std::{net::SocketAddr, sync::Arc, thread};
+use std::sync::Mutex;
 
 /// A service that provides support for remote execution. Essentially, it reads a request from
 /// the remote executor client and executes the block locally and returns the result.
 pub struct ExecutorService {
     shard_id: ShardId,
     controller: NetworkController,
-    executor_service: Arc<ShardedExecutorService<RemoteStateViewClient>>,
+    executor_service: Arc<Mutex<ShardedExecutorService<RemoteStateViewClient>>>,
 }
 
 impl ExecutorService {
@@ -29,23 +30,23 @@ impl ExecutorService {
     ) -> Self {
         let service_name = format!("executor_service-{}", shard_id);
         let mut controller = NetworkController::new(service_name, self_address, 5000);
-        let coordinator_client = Arc::new(RemoteCoordinatorClient::new(
+        let coordinator_client = Arc::new(Mutex::new(RemoteCoordinatorClient::new(
             shard_id,
             &mut controller,
             coordinator_address,
-        ));
+        )));
         let cross_shard_client = Arc::new(RemoteCrossShardClient::new(
             &mut controller,
             remote_shard_addresses,
         ));
 
-        let executor_service = Arc::new(ShardedExecutorService::new(
+        let executor_service = Arc::new(Mutex::new(ShardedExecutorService::new(
             shard_id,
             num_shards,
             num_threads,
             coordinator_client,
             cross_shard_client,
-        ));
+        )));
 
         Self {
             shard_id,
@@ -61,7 +62,7 @@ impl ExecutorService {
         let executor_service_clone = self.executor_service.clone();
         builder
             .spawn(move || {
-                executor_service_clone.start();
+                executor_service_clone.lock().unwrap().start();
             })
             .expect("Failed to spawn thread");
     }

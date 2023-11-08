@@ -27,6 +27,7 @@ use aptos_types::{
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
+use std::sync::Mutex;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -44,14 +45,14 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
         result_tx: Sender<Result<Vec<Vec<TransactionOutput>>, VMStatus>>,
         cross_shard_client: LocalCrossShardClient,
     ) -> Self {
-        let coordinator_client = Arc::new(LocalCoordinatorClient::new(command_rx, result_tx));
-        let executor_service = Arc::new(ShardedExecutorService::new(
+        let coordinator_client = Arc::new(Mutex::new(LocalCoordinatorClient::new(command_rx, result_tx)));
+        let mut executor_service = ShardedExecutorService::new(
             shard_id,
             num_shards,
             num_threads,
             coordinator_client,
             Arc::new(cross_shard_client),
-        ));
+        );
         let join_handle = thread::Builder::new()
             .name(format!("executor-shard-{}", shard_id))
             .spawn(move || executor_service.start())
@@ -265,7 +266,7 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
         self.command_rx.recv().unwrap()
     }
 
-    fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
+    fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
         self.result_tx.send(result).unwrap()
     }
 }
