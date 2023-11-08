@@ -259,6 +259,8 @@ impl Mempool {
             }
         }
 
+        let mut duplicated = 0;
+
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
         // with increasing gas price (e.g. user submits transactions with sequence number 1, 2
@@ -274,6 +276,7 @@ impl Mempool {
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
             if seen.contains_key(&TxnPointer::from(txn)) {
+                duplicated += 1;
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
@@ -293,7 +296,7 @@ impl Mempool {
                 // check if we can now include some transactions
                 // that were skipped before for given account
                 let mut skipped_txn = TxnPointer::new(txn.address, tx_seq + 1);
-                while skipped.contains(&skipped_txn) {
+                while skipped.remove(&skipped_txn) {
                     seen.insert(skipped_txn, txn.gas_ranking_score);
                     result.push(skipped_txn);
                     if (result.len() as u64) == max_txns {
@@ -341,6 +344,8 @@ impl Mempool {
                 byte_size = total_bytes,
                 block_size = block.len(),
                 return_non_full = return_non_full,
+                duplicated = duplicated,
+                skipped = skipped.len(),
             );
         } else {
             trace!(
