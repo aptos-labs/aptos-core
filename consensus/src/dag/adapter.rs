@@ -139,6 +139,8 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 parents_bitvec.set(*idx as u16);
             }
         }
+        let parent_timestamp = self.parent_block_info.read().timestamp_usecs();
+        let block_timestamp = timestamp.max(parent_timestamp.checked_add(1).expect("must add"));
 
         NUM_NODES_PER_BLOCK.observe(ordered_nodes.len() as f64);
         let rounds_between = {
@@ -158,7 +160,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             Block::new_for_dag(
                 epoch,
                 round,
-                timestamp,
+                block_timestamp,
                 payload,
                 author,
                 failed_author,
