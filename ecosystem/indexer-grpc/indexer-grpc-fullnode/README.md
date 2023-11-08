@@ -1,4 +1,4 @@
-# Aptos Indexer GRPC on Fullnode
+# Aptos Indexer GRPC Table on Fullnode
 
 This opens a GRPC endpoint on the indexer. A client (e.g. worker) connects to the endpoint and makes a request. The GRPC endpoint would maintain a stream and sends transactions back to the client on a batch basis. Note that transactions within a batch may be out of order. 
 
@@ -21,7 +21,7 @@ Follow instructions on how to run a fullnode against an existing network.
       address: 0.0.0.0:50051
       processor_task_count: 10
       processor_batch_size: 100
-      output_batch_size: 100```
+      output_batch_size: 100
 * Run fullnode `cargo run -p aptos-node --release -- -f ./fullnode.yaml`
 
 ### 2) Test with GCURL

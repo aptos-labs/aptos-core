@@ -446,6 +446,9 @@ pub trait DbReader: Send + Sync {
         /// Returns whether the internal indexer DB has been enabled or not
         fn indexer_enabled(&self) -> bool;
 
+        /// Returns whether the internal indexer async v2 DB has been enabled or not
+        fn indexer_async_v2_enabled(&self) -> bool;
+
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
     ); // end delegated
@@ -555,6 +558,15 @@ pub trait DbWriter: Send + Sync {
         latest_in_memory_state: StateDelta,
         state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
+    ) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn index(
+        &self,
+        db_reader: Arc<dyn DbReader>,
+        first_version: Version,
+        write_sets: &[&WriteSet],
     ) -> Result<()> {
         unimplemented!()
     }

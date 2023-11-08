@@ -21,6 +21,9 @@ use aptos_protos::{
     },
     transaction::v1::Transaction as TransactionPB,
 };
+use aptos_storage_interface::DbWriter;
+#[cfg(feature = "indexer-async-v2")]
+use aptos_types::write_set::WriteSet;
 use aptos_vm::data_cache::AsMoveResolver;
 use std::{
     sync::Arc,
@@ -79,22 +82,25 @@ impl IndexerStreamCoordinator {
     /// 2. Convert transactions to rust objects (for example stringifying move structs into json)
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
-    pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+    pub async fn process_next_batch(
+        &mut self,
+        db_writer: Arc<dyn DbWriter>,
+    ) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
         let batches = self.get_batches().await;
         let output_batch_size = self.output_batch_size;
-
         for batch in batches {
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
             let transaction_sender = self.transactions_sender.clone();
-
+            let db_writer = db_writer.clone();
             let task = tokio::spawn(async move {
                 // Fetch and convert transactions from API
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
-                let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
+                let api_txns =
+                    Self::convert_to_api_txns(context, raw_txns, db_writer.clone()).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 let end_txn_timestamp = pb_txns.last().unwrap().timestamp.clone();
@@ -249,6 +255,7 @@ impl IndexerStreamCoordinator {
     async fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
+        _db_writer: Arc<dyn DbWriter>,
     ) -> Vec<APITransaction> {
         if raw_txns.is_empty() {
             return vec![];
@@ -259,6 +266,16 @@ impl IndexerStreamCoordinator {
         let state_view = context.latest_state_view().unwrap();
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(context.db.clone());
+
+        #[cfg(feature = "indexer-async-v2")]
+        {
+            let write_sets: Vec<WriteSet> =
+                raw_txns.iter().map(|txn| txn.changes.clone()).collect();
+            let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+            let _ = _db_writer
+                .clone()
+                .index(context.db.clone(), first_version, &write_sets_slice);
+        }
 
         // Enrich data with block metadata
         let (_, _, block_event) = context

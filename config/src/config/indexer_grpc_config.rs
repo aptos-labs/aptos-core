@@ -63,18 +63,18 @@ impl ConfigSanitizer for IndexerGrpcConfig {
         _node_type: NodeType,
         _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
-        // let sanitizer_name = Self::get_sanitizer_name();
+        let sanitizer_name = Self::get_sanitizer_name();
 
         if !node_config.indexer_grpc.enabled {
             return Ok(());
         }
 
-        // if !node_config.storage.enable_indexer {
-        //     return Err(Error::ConfigSanitizerFailed(
-        //         sanitizer_name,
-        //         "storage.enable_indexer must be true if indexer_grpc.enabled is true".to_string(),
-        //     ));
-        // }
+        if !node_config.storage.enable_indexer && !cfg!(feature = "indexer-async-v2") {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "storage.enable_indexer or feature flag indexer-async-v2 must be true if indexer_grpc.enabled is true".to_string(),
+            ));
+        }
         Ok(())
     }
 }
