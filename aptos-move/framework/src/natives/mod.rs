@@ -11,7 +11,6 @@ pub mod cryptography;
 pub mod debug;
 pub mod event;
 pub mod hash;
-mod helpers;
 pub mod object;
 pub mod state_storage;
 pub mod string_utils;
