@@ -489,11 +489,11 @@ mod test {
         }
         assert_eq!(
             map.read_from_group(&ap, &0),
-            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
+            GroupReadResult::Value(None, UnsetOrLayout::Unset)
         );
         assert_eq!(
             map.read_from_group(&ap, &6),
-            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
+            GroupReadResult::Value(None, UnsetOrLayout::Unset)
         );
 
         assert_ok!(map.insert_group_op(&ap, 1, TestValue::deletion(), None));
@@ -502,7 +502,7 @@ mod test {
 
         assert_eq!(
             map.read_from_group(&ap, &1),
-            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
+            GroupReadResult::Value(None, UnsetOrLayout::Unset)
         );
         assert_eq!(
             map.read_from_group(&ap, &3),
@@ -522,7 +522,7 @@ mod test {
         // others unaffected.
         assert_eq!(
             map.read_from_group(&ap, &0),
-            GroupReadResult::Value(None, UnsetOrLayout::Set(None))
+            GroupReadResult::Value(None, UnsetOrLayout::Unset)
         );
         assert_eq!(
             map.read_from_group(&ap, &2),

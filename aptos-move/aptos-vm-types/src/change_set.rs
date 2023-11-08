@@ -62,11 +62,11 @@ impl GroupWrite {
         inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
         group_size: u64,
     ) -> Self {
-        // assert!(
-        //     metadata_op.bytes().is_none() || metadata_op.bytes().unwrap().is_empty(),
-        //     "Metadata op should have empty bytes. metadata_op: {:?}",
-        //     metadata_op
-        // );
+        assert!(
+            metadata_op.bytes().is_none() || metadata_op.bytes().unwrap().is_empty(),
+            "Metadata op should have empty bytes. metadata_op: {:?}",
+            metadata_op
+        );
         for (_tag, (v, _layout)) in &inner_ops {
             assert_none!(v.metadata(), "Group inner ops must have no metadata");
         }
@@ -835,16 +835,31 @@ impl VMChangeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::utils::{
-        mock_tag_0, mock_tag_1, mock_tag_2, raw_metadata, write_op_with_metadata,
-    };
+    use crate::tests::utils::{mock_tag_0, mock_tag_1, mock_tag_2, raw_metadata};
     use bytes::Bytes;
     use claims::{assert_err, assert_ok, assert_some_eq};
     use test_case::test_case;
 
-    const CREATE: u8 = 0;
+    const CREATION: u8 = 0;
     const MODIFICATION: u8 = 1;
     const DELETION: u8 = 2;
+
+    pub(crate) fn write_op_with_metadata(type_idx: u8, v: u128) -> WriteOp {
+        match type_idx {
+            0 => WriteOp::CreationWithMetadata {
+                data: vec![].into(),
+                metadata: raw_metadata(v as u64),
+            },
+            1 => WriteOp::ModificationWithMetadata {
+                data: vec![].into(),
+                metadata: raw_metadata(v as u64),
+            },
+            2 => WriteOp::DeletionWithMetadata {
+                metadata: raw_metadata(v as u64),
+            },
+            _ => unreachable!("Wrong type index for test"),
+        }
+    }
 
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{
@@ -898,12 +913,12 @@ mod tests {
         let mut base_update = BTreeMap::new();
         base_update.insert(
             key_1.clone(),
-            GroupWrite::new(write_op_with_metadata(CREATE, 100), vec![], 0),
+            GroupWrite::new(write_op_with_metadata(CREATION, 100), vec![], 0),
         );
         let mut additional_update = BTreeMap::new();
         additional_update.insert(
             key_2.clone(),
-            GroupWrite::new(write_op_with_metadata(CREATE, 200), vec![], 0),
+            GroupWrite::new(write_op_with_metadata(CREATION, 200), vec![], 0),
         );
 
         assert_ok!(VMChangeSet::squash_group_writes(
@@ -986,7 +1001,7 @@ mod tests {
         base_update.insert(
             key.clone(),
             GroupWrite::new(
-                write_op_with_metadata(CREATE, 100), // create
+                write_op_with_metadata(CREATION, 100), // create
                 vec![],
                 0,
             ),
