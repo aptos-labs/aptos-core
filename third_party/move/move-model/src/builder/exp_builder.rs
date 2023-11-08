@@ -3023,6 +3023,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         self.check_missing_or_undeclared_fields(loc, struct_name, &field_decls, fields)?;
 
+        let in_order_fields = self.in_order_fields(&field_decls, fields);
         // maps i to (x_i, e_i) where i is the expression idx, i.e., idx of the field exp in the pack exp
         let mut bindings = BTreeMap::new();
         // maps i to x_i where i is the field definition idx, i.e., idx of the field in the struct definition
@@ -3032,14 +3033,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let (_, def_idx, field_ty) = field_decls.get(&field_name).unwrap();
             let field_ty = field_ty.instantiate(&instantiation);
             let translated_field_exp = self.translate_exp(field_exp, &field_ty);
-            // starts with . to avoid shadowing
-            let var_name = self
-                .symbol_pool()
-                .make(&format!(".{}", field_name.display(self.symbol_pool())));
-            let var = Pattern::Var(translated_field_exp.node_id(), var_name);
-            let arg = ExpData::LocalVar(translated_field_exp.node_id(), var_name);
-            args.insert(*def_idx, arg);
-            bindings.insert(*exp_idx, (var, translated_field_exp));
+            if in_order_fields.contains(def_idx) {
+                args.insert(*def_idx, translated_field_exp);
+            } else {
+                // starts with $ for internal generated vars
+                let var_name = self
+                    .symbol_pool()
+                    .make(&format!("${}", field_name.display(self.symbol_pool())));
+                let var = Pattern::Var(translated_field_exp.node_id(), var_name);
+                let arg = ExpData::LocalVar(translated_field_exp.node_id(), var_name);
+                args.insert(*def_idx, arg);
+                bindings.insert(*exp_idx, (var, translated_field_exp));
+            }
         }
 
         let struct_id = struct_entry
