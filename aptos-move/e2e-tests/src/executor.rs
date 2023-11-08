@@ -81,6 +81,8 @@ static RNG_SEED: [u8; 32] = [9u8; 32];
 
 const ENV_TRACE_DIR: &str = "TRACE";
 
+// Enables running parallel, in addition to sequential, in a
+// BothComparison mode.
 const ENV_ENABLE_PARALLEL: &str = "E2E_PARALLEL_EXEC";
 
 /// Directory structure of the trace dir
