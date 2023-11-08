@@ -85,9 +85,7 @@ use std::{
 pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
     // Start with targets.
     let mut todo = BTreeSet::new();
-    // While we're iterating, pick up the qualified names of all target inlined functions for deletion later,
-    // and error on inline functions lacking a body to inline.
-    let mut target_inline_funs = BTreeSet::new();
+    // While we're iterating, error on any target inline functions lacking a body to inline.
     let mut has_error: bool = false;
     for module in env.get_modules() {
         if module.is_target() {
@@ -95,10 +93,7 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
                 let id = func.get_qualified_id();
                 if func.is_inline() {
                     let func_def = func.get_def();
-                    if func_def.deref().is_some() {
-                        // Only try to inline functions with a body.
-                        target_inline_funs.insert(id);
-                    } else {
+                    if !func_def.deref().is_some() {
                         has_error = true;
                         let func_loc = func.get_loc();
                         let func_name = func.get_name_str();
@@ -175,8 +170,21 @@ pub fn run_inlining(env: &mut GlobalEnv, debug: bool) {
         }
     }
 
-    // Remove all target inline functions from the program
-    env.filter_functions(|fun_id: &QualifiedId<FunId>| target_inline_funs.contains(fun_id));
+    // Pick up the qualified names of all inlined functions with bodies for deletion.
+    let mut inline_funs = BTreeSet::new();
+    for module in env.get_modules() {
+        for func in module.get_functions() {
+            let id = func.get_qualified_id();
+            if func.is_inline() {
+                let func_def = func.get_def();
+                if func_def.deref().is_some() {
+                    // Only delete functions with a body.
+                    inline_funs.insert(id);
+                }
+            }
+        }
+    }
+    env.filter_functions(|fun_id: &QualifiedId<FunId>| inline_funs.contains(fun_id));
 }
 
 /// Helper functions for inlining driver
@@ -425,7 +433,7 @@ impl<'env> Inliner<'env> {
                 "No body found for function {} in try_inlining_in",
                 func_env.get_full_name_str()
             );
-            self.env.diag(Severity::Bug, &loc, msg.as_str());
+            self.env.diag(Severity::Error, &loc, msg.as_str());
         }
     }
 }

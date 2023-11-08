@@ -1,23 +1,6 @@
-comparison between v1 and v2 failed:
-= processed 3 tasks
-= 
-+ task 1 'publish'. lines 15-25:
-+ Error: compilation errors:
-+  bug: not yet implemented: 0x600003a0b080 : Invoke(NodeId(1314), 0x600003a0b000 : LocalVar(NodeId(1313), Symbol(87)), [0x600003a0af80 : Call(NodeId(1312), MoveFunction(ModuleId(1), FunId(Symbol(148))), [0x600003a0af00 : Call(NodeId(1311), Borrow(Mutable), [0x600003a0ae80 : Temporary(NodeId(1310), 0)])])])
-+   ┌─ /var/folders/hx/_s_6fyh529bgmvl6z4m8m9fm0000gn/T/.tmpaBP0ou:7:26
-+   │
-+ 7 │             option::some(f(option::extract(&mut t)))
-+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-+ 
-+ 
-+ 
-= task 2 'run'. lines 27-27:
-- return values: 2
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-= 
+processed 3 tasks
+
+task 2 'run'. lines 27-27:
+return values: 2
+
+==> Compiler v2 delivered same results!
