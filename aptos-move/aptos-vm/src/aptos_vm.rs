@@ -111,6 +111,7 @@ pub fn allow_module_bundle_for_test() {
 }
 
 pub struct AptosVM {
+    is_simulation: bool,
     // TODO: Remove implementation and move it to this file.
     pub(crate) vm_impl: AptosVMImpl,
 }
@@ -136,8 +137,14 @@ pub(crate) fn discard_error_vm_status(vm_status: VMStatus) -> (VMStatus, VMOutpu
 impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         Self {
+            is_simulation: false,
             vm_impl: AptosVMImpl::new(resolver),
         }
+    }
+
+    pub fn for_simulation(mut self) -> Self {
+        self.is_simulation = true;
+        self
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -1093,25 +1100,29 @@ impl AptosVM {
         )))
     }
 
-    fn validate_signature_checked_transaction(
+    fn validate_signed_transaction(
         &self,
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
         transaction: &SignedTransaction,
-        allow_too_new: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        self.check_transaction_format(transaction)?;
-
-        let prologue_status = self.run_prologue(session, resolver, transaction, log_context);
-        match prologue_status {
-            Err(err)
-                if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>
-            {
-                Err(err)
-            },
-            _ => Ok(()),
+        // Check transaction format.
+        if transaction.contains_duplicate_signers() {
+            return Err(VMStatus::error(
+                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
+                None,
+            ));
         }
+
+        let txn_data = TransactionMetadata::new(transaction);
+        self.run_prologue_with_payload(
+            session,
+            resolver,
+            transaction.payload(),
+            &txn_data,
+            log_context,
+        )
     }
 
     fn execute_user_transaction_impl(
@@ -1123,13 +1134,8 @@ impl AptosVM {
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
         let mut session = self.vm_impl.new_session(resolver, SessionId::prologue(txn));
-        if let Err(err) = self.validate_signature_checked_transaction(
-            &mut session,
-            resolver,
-            txn,
-            false,
-            log_context,
-        ) {
+        if let Err(err) = self.validate_signed_transaction(&mut session, resolver, txn, log_context)
+        {
             return discard_error_vm_status(err);
         };
 
@@ -1480,7 +1486,7 @@ impl AptosVM {
         state_view: &impl StateView,
     ) -> (VMStatus, TransactionOutput) {
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(&resolver).for_simulation();
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -1550,8 +1556,6 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        // Whether the prologue is run as part of tx simulation.
-        is_simulation: bool,
     ) -> Result<(), VMStatus> {
         match payload {
             TransactionPayload::Script(_) => {
@@ -1575,7 +1579,7 @@ impl AptosVM {
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.
-                if !is_simulation {
+                if !self.is_simulation {
                     self.vm_impl.run_multisig_prologue(
                         session,
                         txn_data,
@@ -1597,35 +1601,6 @@ impl AptosVM {
                     .run_module_prologue(session, txn_data, log_context)
             },
         }
-    }
-
-    fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
-        if txn.contains_duplicate_signers() {
-            return Err(VMStatus::error(
-                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
-                None,
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn run_prologue(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        transaction: &SignedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let txn_data = TransactionMetadata::new(transaction);
-        self.run_prologue_with_payload(
-            session,
-            resolver,
-            transaction.payload(),
-            &txn_data,
-            log_context,
-            false,
-        )
     }
 
     pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
@@ -1865,25 +1840,19 @@ impl VMValidator for AptosVM {
         let mut session = self
             .vm_impl
             .new_session(&resolver, SessionId::prologue(&txn));
-        let validation_result = self.validate_signature_checked_transaction(
-            &mut session,
-            &resolver,
-            &txn,
-            true,
-            &log_context,
-        );
 
         // Increment the counter for transactions verified.
-        let (counter_label, result) = match validation_result {
-            Ok(_) => (
-                "success",
-                VMValidatorResult::new(None, txn.gas_unit_price()),
-            ),
-            Err(err) => (
-                "failure",
-                VMValidatorResult::new(Some(err.status_code()), 0),
-            ),
-        };
+        let (counter_label, result) =
+            match self.validate_signed_transaction(&mut session, &resolver, &txn, &log_context) {
+                Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
+                    "failure",
+                    VMValidatorResult::new(Some(err.status_code()), 0),
+                ),
+                _ => (
+                    "success",
+                    VMValidatorResult::new(None, txn.gas_unit_price()),
+                ),
+            };
 
         TRANSACTIONS_VALIDATED
             .with_label_values(&[counter_label])
@@ -1894,25 +1863,6 @@ impl VMValidator for AptosVM {
 }
 
 impl AptosSimulationVM {
-    fn validate_simulated_transaction(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        transaction: &SignedTransaction,
-        txn_data: &TransactionMetadata,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        self.0.check_transaction_format(transaction)?;
-        self.0.run_prologue_with_payload(
-            session,
-            resolver,
-            transaction.payload(),
-            txn_data,
-            log_context,
-            true,
-        )
-    }
-
     fn simulate_signed_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1932,7 +1882,8 @@ impl AptosSimulationVM {
             .vm_impl
             .new_session(resolver, SessionId::txn_meta(&txn_data));
         if let Err(err) =
-            self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
+            self.0
+                .validate_signed_transaction(&mut session, resolver, txn, log_context)
         {
             return discard_error_vm_status(err);
         };
