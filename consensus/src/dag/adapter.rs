@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK};
 use crate::{
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     counters::update_counters_for_committed_blocks,
@@ -138,6 +139,20 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 parents_bitvec.set(*idx as u16);
             }
         }
+
+        NUM_NODES_PER_BLOCK.observe(ordered_nodes.len() as f64);
+        let rounds_between = {
+            let anchor_node = ordered_nodes
+                .first()
+                .map(|node| node.round())
+                .unwrap_or_default();
+            let lowest_round_node = ordered_nodes
+                .last()
+                .map(|node| node.round())
+                .unwrap_or_default();
+            anchor_node.saturating_sub(lowest_round_node)
+        };
+        NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
 
         let block = ExecutedBlock::new(
             Block::new_for_dag(
