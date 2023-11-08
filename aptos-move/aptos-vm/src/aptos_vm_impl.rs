@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache,
     counters::TIMER,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionExt, SessionId},
@@ -49,8 +48,6 @@ use move_core_types::{
 use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::sync::Arc;
-
-pub const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
 
 /// A wrapper to make VMRuntime standalone
 pub struct AptosVMImpl {
@@ -250,6 +247,7 @@ impl AptosVMImpl {
                             .any(|(_, hash)| hash == txn_data.script_hash)
                     })
                     .unwrap_or(false);
+                const MAXIMUM_APPROVED_TRANSACTION_SIZE: u64 = 1024 * 1024;
                 valid
                     // If it is valid ensure that it is only the approved payload that exceeds the
                     // maximum. The (unknown) user input should be restricted to the original
@@ -683,14 +681,13 @@ impl<'a> AptosVMInternals<'a> {
     }
 }
 
-pub(crate) fn get_transaction_output<A: AccessPathCache>(
-    ap_cache: &mut A,
+pub(crate) fn get_transaction_output(
     session: SessionExt,
     fee_statement: FeeStatement,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
 ) -> Result<VMOutput, VMStatus> {
-    let change_set = session.finish(ap_cache, change_set_configs)?;
+    let change_set = session.finish(change_set_configs)?;
 
     Ok(VMOutput::new(
         change_set,

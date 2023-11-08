@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache,
     data_cache::get_resource_group_from_metadata,
     move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
     transaction_metadata::TransactionMetadata,
@@ -16,6 +15,7 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
+    access_path::AccessPath,
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
     on_chain_config::Features,
@@ -155,11 +155,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         }
     }
 
-    pub fn finish<C: AccessPathCache>(
-        self,
-        ap_cache: &mut C,
-        configs: &ChangeSetConfigs,
-    ) -> VMResult<VMChangeSet> {
+    pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<VMChangeSet> {
         let move_vm = self.inner.get_move_vm();
 
         let resource_converter = |value: Value,
@@ -180,7 +176,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set, ap_cache)?;
+            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -207,7 +203,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             events,
             table_change_set,
             aggregator_change_set,
-            ap_cache,
             configs,
         )
         .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
@@ -295,11 +290,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into the a single op corresponding to the whole resource group (V0).
     /// TODO[agg_v2](fix) Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
-    fn split_and_merge_resource_groups<C: AccessPathCache>(
+    fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
         change_set: ChangeSet,
-        ap_cache: &mut C,
     ) -> VMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
@@ -356,9 +350,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 .map_err(|_| common_error())?;
 
             for (resource_group_tag, resources) in resource_groups {
-                let state_key = StateKey::access_path(
-                    ap_cache.get_resource_group_path(addr, resource_group_tag),
-                );
+                let state_key = StateKey::access_path(AccessPath::resource_group_access_path(
+                    addr,
+                    resource_group_tag,
+                ));
                 match &mut resource_group_change_set {
                     ResourceGroupChangeSet::V0(v0_changes) => {
                         let source_data = maybe_resource_group_cache
@@ -395,14 +390,13 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         Ok((change_set_filtered, resource_group_change_set))
     }
 
-    pub(crate) fn convert_change_set<C: AccessPathCache>(
+    pub(crate) fn convert_change_set(
         woc: &WriteOpConverter,
         change_set: ChangeSet,
         resource_group_change_set: ResourceGroupChangeSet,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
-        ap_cache: &mut C,
         configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
         let mut resource_write_set = BTreeMap::new();
@@ -414,7 +408,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_and_layout_op) in resources {
-                let state_key = StateKey::access_path(ap_cache.get_resource_path(addr, struct_tag));
+                let state_key = StateKey::access_path(
+                    AccessPath::resource_access_path(addr, struct_tag)
+                        .unwrap_or_else(|_| AccessPath::undefined()),
+                );
                 let op = woc.convert_resource(
                     &state_key,
                     blob_and_layout_op,
@@ -425,8 +422,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
 
             for (name, blob_op) in modules {
-                let state_key =
-                    StateKey::access_path(ap_cache.get_module_path(ModuleId::new(addr, name)));
+                let state_key = StateKey::access_path(AccessPath::from(&ModuleId::new(addr, name)));
                 let op = woc.convert_module(&state_key, blob_op, false)?;
                 module_write_set.insert(state_key, op);
             }

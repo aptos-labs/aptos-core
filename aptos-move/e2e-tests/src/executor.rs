@@ -892,10 +892,9 @@ impl FakeExecutor {
                 }
             }
             let change_set = session
-                .finish(
-                    &mut (),
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                )
+                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                    LATEST_GAS_FEATURE_VERSION,
+                ))
                 .expect("Failed to generate txn effects");
             change_set
                 .try_into_storage_change_set()
@@ -956,10 +955,9 @@ impl FakeExecutor {
                     )
                 });
             let change_set = session
-                .finish(
-                    &mut (),
-                    &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-                )
+                .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                    LATEST_GAS_FEATURE_VERSION,
+                ))
                 .expect("Failed to generate txn effects");
             change_set
                 .try_into_storage_change_set()
@@ -1013,10 +1011,9 @@ impl FakeExecutor {
             .map_err(|e| e.into_vm_status())?;
 
         let change_set = session
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .expect("Failed to generate txn effects");
         // TODO: Support deltas in fake executor.
         let (write_set, events) = change_set

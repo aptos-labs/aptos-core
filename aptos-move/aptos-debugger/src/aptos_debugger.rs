@@ -244,10 +244,9 @@ impl AptosDebugger {
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         Ok(change_set)
     }

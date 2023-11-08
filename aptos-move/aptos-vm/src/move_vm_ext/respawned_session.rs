@@ -91,9 +91,8 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         mut self,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<VMChangeSet, VMStatus> {
-        let additional_change_set = self.with_session_mut(|session| {
-            session.take().unwrap().finish(&mut (), change_set_configs)
-        })?;
+        let additional_change_set =
+            self.with_session_mut(|session| session.take().unwrap().finish(change_set_configs))?;
         if additional_change_set.has_creation() {
             // After respawning, for example, in the epilogue, there shouldn't be new slots
             // created, otherwise there's a potential vulnerability like this:

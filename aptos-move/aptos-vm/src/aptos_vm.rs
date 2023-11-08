@@ -350,14 +350,9 @@ impl AptosVM {
                 ) {
                     return discard_error_vm_status(e);
                 }
-                let txn_output = get_transaction_output(
-                    &mut (),
-                    session,
-                    fee_statement,
-                    status,
-                    change_set_configs,
-                )
-                .unwrap_or_else(|e| discard_error_vm_status(e).1);
+                let txn_output =
+                    get_transaction_output(session, fee_statement, status, change_set_configs)
+                        .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
             },
             TransactionStatus::Discard(status) => {
@@ -529,7 +524,7 @@ impl AptosVM {
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
-        let mut change_set = session.finish(&mut (), change_set_configs)?;
+        let mut change_set = session.finish(change_set_configs)?;
 
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
@@ -1398,7 +1393,7 @@ impl AptosVM {
                     args,
                     &mut gas_meter,
                 ));
-                Ok(tmp_session.finish(&mut (), &change_set_configs)?)
+                Ok(tmp_session.finish(&change_set_configs)?)
             },
         }
     }
@@ -1525,7 +1520,6 @@ impl AptosVM {
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = get_transaction_output(
-            &mut (),
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
