@@ -775,12 +775,6 @@ impl SignedTransaction {
         Ok(())
     }
 
-    /// Checks that the signature of given transaction inplace. Returns `Ok(())` if
-    /// the signature is valid.
-    pub fn signature_is_valid(&self) -> bool {
-        self.authenticator.verify(&self.raw_txn).is_ok()
-    }
-
     pub fn contains_duplicate_signers(&self) -> bool {
         let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
         all_signer_addresses.push(self.sender());
