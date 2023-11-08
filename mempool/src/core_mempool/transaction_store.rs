@@ -25,13 +25,22 @@ use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
     transaction::SignedTransaction,
 };
+use dashmap::DashMap;
+use itertools::Itertools;
 use std::{
     cmp::max,
     collections::HashMap,
     mem::size_of,
     ops::Bound,
-    time::{Duration, SystemTime},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+#[derive(Debug)]
+pub enum TraceEvent {
+    Insert,
+    PullAttempt,
+    Pull,
+}
 
 /// Estimated per-txn overhead of indexes. Needs to be updated if additional indexes are added.
 pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::index::OrderedQueueKey>() // priority_index
@@ -69,6 +78,8 @@ pub struct TransactionStore {
     size_bytes: usize,
     // keeps track of txns that were resubmitted with higher gas
     gas_upgraded_index: HashMap<TxnPointer, u64>,
+    // Vec of (event, event time (ms)) for each txn
+    trace_index: DashMap<TxnPointer, Vec<(TraceEvent, u128)>>,
 
     // configuration
     capacity: usize,
@@ -101,6 +112,7 @@ impl TransactionStore {
             // estimated size in bytes
             size_bytes: 0,
             gas_upgraded_index: HashMap::new(),
+            trace_index: DashMap::new(),
 
             // configuration
             capacity: config.capacity,
@@ -277,6 +289,13 @@ impl TransactionStore {
                 self.gas_upgraded_index
                     .insert(TxnPointer::from(&txn), txn.get_gas_price());
             }
+            self.trace_index.insert(TxnPointer::from(&txn), vec![(
+                TraceEvent::Insert,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis(),
+            )]);
             txns.insert(txn_seq_num, txn);
             self.track_indices();
         }
@@ -545,6 +564,43 @@ impl TransactionStore {
         }
     }
 
+    pub fn trace_transaction(
+        &self,
+        account: &AccountAddress,
+        sequence_number: u64,
+        trace_event: TraceEvent,
+    ) {
+        if let Some(mut events) = self
+            .trace_index
+            .get_mut(&TxnPointer::new(*account, sequence_number))
+        {
+            events.push((
+                trace_event,
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis(),
+            ));
+        }
+    }
+
+    pub fn display_trace(&self, account: &AccountAddress, sequence_number: u64) -> String {
+        if let Some(events) = self
+            .trace_index
+            .get(&TxnPointer::new(*account, sequence_number))
+        {
+            if let Some((_, start_time)) = events.first() {
+                return events
+                    .iter()
+                    .map(|(event, time)| {
+                        format!("{:?}:{}", event, time.saturating_sub(*start_time))
+                    })
+                    .join(",");
+            }
+        }
+        "(EMPTY)".to_string()
+    }
+
     /// Removes transaction from all indexes. Only call after removing from main transactions DS.
     fn index_remove(&mut self, txn: &MempoolTransaction) {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
@@ -556,6 +612,7 @@ impl TransactionStore {
         self.hash_index.remove(&txn.get_committed_hash());
         self.size_bytes -= txn.get_estimated_bytes();
         self.gas_upgraded_index.remove(&TxnPointer::from(txn));
+        self.trace_index.remove(&TxnPointer::from(txn));
 
         // Remove account datastructures if there are no more transactions for the account.
         let address = &txn.get_sender();

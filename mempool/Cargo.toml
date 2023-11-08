@@ -35,6 +35,7 @@ aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }

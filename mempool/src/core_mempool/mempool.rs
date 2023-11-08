@@ -8,7 +8,7 @@ use crate::{
     core_mempool::{
         index::TxnPointer,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
-        transaction_store::TransactionStore,
+        transaction_store::{TraceEvent, TransactionStore},
     },
     counters,
     logging::{LogEntry, LogSchema, TxnsLog},
@@ -139,6 +139,28 @@ impl Mempool {
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             Self::log_txn_latency(insertion_info, bucket, stage);
+            if stage == counters::CONSENSUS_PULLED_LABEL {
+                self.transactions
+                    .trace_transaction(&account, sequence_number, TraceEvent::Pull);
+                if let Ok(elapsed) = insertion_info.insertion_time.elapsed() {
+                    if elapsed.as_secs() > 10 {
+                        debug!(
+                            LogSchema::new(LogEntry::SlowTransaction)
+                                .txns(TxnsLog::new_txn(account, sequence_number)),
+                            trace = self.transactions.display_trace(&account, sequence_number)
+                        );
+                    } else {
+                        sample!(
+                            SampleRate::Duration(Duration::from_secs(1)),
+                            debug!(
+                                LogSchema::new(LogEntry::TraceTransaction)
+                                    .txns(TxnsLog::new_txn(account, sequence_number)),
+                                trace = self.transactions.display_trace(&account, sequence_number)
+                            )
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -274,6 +296,11 @@ impl Mempool {
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
+            self.transactions.trace_transaction(
+                &txn.address,
+                txn.sequence_number.transaction_sequence_number,
+                TraceEvent::PullAttempt,
+            );
             txn_walked += 1;
             if seen.contains_key(&TxnPointer::from(txn)) {
                 duplicated += 1;
@@ -348,17 +375,20 @@ impl Mempool {
                 skipped = skipped.len(),
             );
         } else {
-            trace!(
-                LogSchema::new(LogEntry::GetBlock),
-                seen_consensus = seen_size,
-                walked = txn_walked,
-                seen_after = seen.len(),
-                // before size and non full check
-                result_size = result_size,
-                // before non full check
-                byte_size = total_bytes,
-                block_size = block.len(),
-                return_non_full = return_non_full,
+            sample!(
+                SampleRate::Duration(Duration::from_secs(1)),
+                debug!(
+                    LogSchema::new(LogEntry::GetBlock),
+                    seen_consensus = seen_size,
+                    walked = txn_walked,
+                    seen_after = seen.len(),
+                    // before size and non full check
+                    result_size = result_size,
+                    // before non full check
+                    byte_size = total_bytes,
+                    block_size = block.len(),
+                    return_non_full = return_non_full,
+                )
             );
         }
 
