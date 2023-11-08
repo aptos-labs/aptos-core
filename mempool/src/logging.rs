@@ -174,6 +174,7 @@ pub enum LogEntry {
     UnexpectedNetworkMsg,
     MempoolSnapshot,
     SlowTransaction,
+    SlowTransactionTraceAll,
     TraceTransaction,
 }
 

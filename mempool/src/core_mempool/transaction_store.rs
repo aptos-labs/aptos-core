@@ -584,6 +584,22 @@ impl TransactionStore {
         }
     }
 
+    pub fn all_trace(&self, account: &AccountAddress) -> Vec<String> {
+        if let Some(txns) = self.transactions.get(account) {
+            return txns
+                .iter()
+                .map(|(sequence_number, _)| {
+                    format!(
+                        "{}:{}",
+                        sequence_number,
+                        self.display_trace(account, *sequence_number)
+                    )
+                })
+                .collect();
+        }
+        vec![]
+    }
+
     pub fn display_trace(&self, account: &AccountAddress, sequence_number: u64) -> String {
         if let Some(events) = self
             .trace_index

@@ -149,6 +149,13 @@ impl Mempool {
                                 .txns(TxnsLog::new_txn(account, sequence_number)),
                             trace = self.transactions.display_trace(&account, sequence_number)
                         );
+                        for entry in self.transactions.all_trace(&account) {
+                            debug!(
+                                LogSchema::new(LogEntry::SlowTransactionTraceAll)
+                                    .txns(TxnsLog::new_txn(account, sequence_number)),
+                                trace = entry
+                            );
+                        }
                     } else {
                         sample!(
                             SampleRate::Duration(Duration::from_secs(1)),
