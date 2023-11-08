@@ -15,12 +15,15 @@ use aptos_vm::sharded_block_executor::{
 use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
+use std::sync::atomic::AtomicU64;
+use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
     command_rx: Receiver<Message>,
     result_tx: Sender<Message>,
     shard_id: ShardId,
+    cmd_rx_msg_duration_since_epoch: AtomicU64,
 }
 
 impl RemoteCoordinatorClient {
@@ -43,6 +46,7 @@ impl RemoteCoordinatorClient {
             command_rx,
             result_tx,
             shard_id,
+            cmd_rx_msg_duration_since_epoch: AtomicU64::new(0),
         }
     }
 
@@ -80,6 +84,10 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn receive_execute_command(&self) -> ExecutorShardCommand<RemoteStateViewClient> {
         match self.command_rx.recv() {
             Ok(message) => {
+                let delta = get_delta_time(message.start_ms_since_epoch.unwrap());
+                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["5_cmd_tx_msg_shard_recv"]).observe(delta as f64);
+                self.cmd_rx_msg_duration_since_epoch.store(message.start_ms_since_epoch.unwrap(), std::sync::atomic::Ordering::Relaxed);
                 let _rx_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&[&self.shard_id.to_string(), "cmd_rx"])
                     .start_timer();
@@ -113,8 +121,12 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     }
 
     fn send_execution_result(&self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
+        let duration_since_epoch = self.cmd_rx_msg_duration_since_epoch.load(std::sync::atomic::Ordering::Relaxed);
+        let delta = get_delta_time(duration_since_epoch);
+        REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+            .with_label_values(&["6_results_tx_msg_shard_send"]).observe(delta as f64);
         let remote_execution_result = RemoteExecutionResult::new(result);
         let output_message = bcs::to_bytes(&remote_execution_result).unwrap();
-        self.result_tx.send(Message::new(output_message)).unwrap();
+        self.result_tx.send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0)).unwrap();
     }
 }

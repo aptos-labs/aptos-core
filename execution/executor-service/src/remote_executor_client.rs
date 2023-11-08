@@ -25,8 +25,10 @@ use std::{
     thread,
 };
 use std::thread::JoinHandle;
+use std::time::SystemTime;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
+use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 
 pub static COORDINATOR_PORT: u16 = 52200;
@@ -181,11 +183,15 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         }*/
 
         let results: Vec<(usize, Vec<Vec<TransactionOutput>>)> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
-            let received_bytes = self.result_rxs[shard_id].recv().unwrap().to_bytes();
+            let received_msg = self.result_rxs[shard_id].recv().unwrap();
+            let delta = get_delta_time(received_msg.start_ms_since_epoch.unwrap());
+            REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                .with_label_values(&["9_1_results_tx_msg_remote_exe_recv"]).observe(delta as f64);
+
             let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
                 .with_label_values(&["0", "result_rx_bcs_deser"])
                 .start_timer();
-            let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
+            let result: RemoteExecutionResult = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
             drop(bcs_deser_timer);
             (shard_id, result.inner.unwrap())
         }).collect();
@@ -230,10 +236,14 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 .build()
                 .unwrap(),
         );
-        
+
         let cmd_tx_timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "cmd_tx_async"])
             .start_timer();
+
+        let duration_since_epoch = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap().as_millis() as u64;
 
         for (shard_id, _) in sub_blocks.into_iter().enumerate() {
             let senders = self.command_txs.clone();
@@ -251,8 +261,10 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
                 let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
                     .with_label_values(&["0", "cmd_tx_bcs_ser"])
                     .start_timer();
-                let msg = Message::new(bcs::to_bytes(&execution_request).unwrap());
+                let msg = Message::create_with_metadata(bcs::to_bytes(&execution_request).unwrap(), duration_since_epoch, 0, 0);
                 drop(bcs_ser_timer);
+                REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
+                    .with_label_values(&["1_cmd_tx_msg_send"]).observe(get_delta_time(duration_since_epoch) as f64);
                 senders[shard_id]
                     .lock()
                     .unwrap()
