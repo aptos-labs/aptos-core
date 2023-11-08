@@ -110,7 +110,6 @@ members = [
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
-    "ecosystem/indexer-grpc/indexer-grpc-fullnode-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
     "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
@@ -300,6 +299,7 @@ aptos-data-client = { path = "state-sync/aptos-data-client" }
 aptos-data-streaming-service = { path = "state-sync/data-streaming-service" }
 aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
+aptos-db-indexer-async-v2 = { path = "storage/indexer-async-v2" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
@@ -340,7 +340,6 @@ aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-d
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
 aptos-indexer-grpc-post-processor = { path = "ecosystem/indexer-grpc/indexer-grpc-post-processor" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
-aptos-indexer-grpc-fullnode-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }

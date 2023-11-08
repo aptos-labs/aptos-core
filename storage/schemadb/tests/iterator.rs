@@ -15,10 +15,10 @@ use rocksdb::DEFAULT_COLUMN_FAMILY_NAME;
 define_schema!(TestSchema, TestKey, TestValue, "TestCF");
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct TestKey(u32, u32, u32);
+struct TestKey(u32, u32, u32);
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct TestValue(u32);
+struct TestValue(u32);
 
 impl KeyCodec<TestSchema> for TestKey {
     fn encode_key(&self) -> Result<Vec<u8>> {
