@@ -11,7 +11,7 @@ to module events since v1.7.
 
 Since v1.7, Aptos Move released a new event framework, module events. Every event stream is identified by an event
 struct type instead of a handle.
-To define an event struct, just add attribute `#[event]` to a normal Move struct that has `store + copy` abilities. For
+To define an event struct, just add attribute `#[event]` to a normal Move struct that has `drop + store` abilities. For
 example,
 
 ```
