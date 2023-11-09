@@ -10,7 +10,7 @@ module aptos_framework::event {
     friend aptos_framework::account;
     friend aptos_framework::object;
 
-    /// Emit an event with payload `msg` by using `handle_ref`'s key and counter.
+    /// Emit a module event with payload `msg`.
     public fun emit<T: store + drop>(msg: T) {
         write_module_event_to_store<T>(msg);
     }

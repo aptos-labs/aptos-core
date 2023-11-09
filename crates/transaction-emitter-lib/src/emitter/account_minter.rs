@@ -382,6 +382,11 @@ impl<'t> AccountMinter<'t> {
                     e, i
                 )
             } else {
+                new_source_account.set_sequence_number(
+                    txn_executor
+                        .query_sequence_number(new_source_account.address())
+                        .await?,
+                );
                 info!(
                     "New source account created {}",
                     new_source_account.address()

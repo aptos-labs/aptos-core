@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::server::utils::{reply_with, reply_with_status, spawn_blocking};
-use anyhow::Error;
+use anyhow::{bail, Error};
 use aptos_consensus::{
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::quorum_store_db::QuorumStoreStorage, util::db_tool::extract_txns_from_block,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::info;
+use aptos_types::transaction::Transaction;
 use http::header::{HeaderValue, CONTENT_LENGTH};
 use hyper::{Body, Request, Response, StatusCode};
 use std::{collections::HashMap, sync::Arc};
@@ -75,7 +76,6 @@ pub async fn handle_dump_block_request(
     consensus_db: Arc<dyn PersistentLivenessStorage>,
     quorum_store_db: Arc<dyn QuorumStoreStorage>,
 ) -> hyper::Result<Response<Body>> {
-    // TODO(grao): Support bcs encoding.
     let query = req.uri().query().unwrap_or("");
     let query_pairs: HashMap<_, _> = url::form_urlencoded::parse(query.as_bytes()).collect();
 
@@ -87,6 +87,16 @@ pub async fn handle_dump_block_request(
         None => None,
     };
 
+    // TODO(grao): I'm lazy, only support this through query parameters, let me know if this need
+    // to be done through header.
+    let bcs: bool = match query_pairs.get("bcs") {
+        Some(val) => match val.parse() {
+            Ok(val) => val,
+            Err(err) => return Ok(reply_with_status(StatusCode::BAD_REQUEST, err.to_string())),
+        },
+        None => false,
+    };
+
     if let Some(block_id) = block_id {
         info!("Dumping block ({block_id:?}).");
     } else {
@@ -94,15 +104,18 @@ pub async fn handle_dump_block_request(
     }
 
     match spawn_blocking(move || {
-        dump_blocks(consensus_db.as_ref(), quorum_store_db.as_ref(), block_id)
+        if bcs {
+            dump_blocks_bcs(consensus_db.as_ref(), quorum_store_db.as_ref(), block_id)
+                .map(Into::<Body>::into)
+        } else {
+            dump_blocks(consensus_db.as_ref(), quorum_store_db.as_ref(), block_id).map(Into::into)
+        }
     })
     .await
     {
         Ok(result) => {
             info!("Finished dumping block(s).");
-            let headers: Vec<(_, HeaderValue)> =
-                vec![(CONTENT_LENGTH, HeaderValue::from(result.len()))];
-            Ok(reply_with(headers, result))
+            Ok(reply_with(vec![], result))
         },
         Err(e) => {
             info!("Failed to dump block(s): {e:?}");
@@ -200,4 +213,29 @@ fn dump_blocks(
     }
 
     Ok(body)
+}
+
+fn dump_blocks_bcs(
+    consensus_db: &dyn PersistentLivenessStorage,
+    quorum_store_db: &dyn QuorumStoreStorage,
+    block_id: Option<HashValue>,
+) -> anyhow::Result<Vec<u8>> {
+    let all_batches = quorum_store_db.get_all_batches()?;
+
+    let (_, _, blocks, _) = consensus_db.consensus_db().get_data()?;
+
+    let mut all_txns = Vec::new();
+    for block in blocks {
+        let id = block.id();
+        if block_id.is_none() || id == block_id.unwrap() {
+            match extract_txns_from_block(&block, &all_batches) {
+                Ok(txns) => {
+                    all_txns.extend(txns.into_iter().cloned().map(Transaction::UserTransaction));
+                },
+                Err(e) => bail!("Failed to extract txns from block ({id:?}): {e:?}."),
+            };
+        }
+    }
+
+    bcs::to_bytes(&all_txns).map_err(Error::msg)
 }
