@@ -52,6 +52,9 @@ pub enum ApiTags {
 
     /// View functions,
     View,
+
+    /// Get a batch of accounts
+    AccountsBatch,
 }
 
 // Note: Many of these exports are just for the test-context crate, which is
