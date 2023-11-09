@@ -11,12 +11,12 @@ use ff::Field;
 use group::Group;
 use std::ops::Mul;
 
-/// A dual code word polynomial $f$ of degree $n-t-1$ for checking that the evaluations of another
-/// polynomial at the roots-of-unity $p(\omega^i)$, \forall \in [0, n)$ encode a degree $\le t-1$
-/// polynomial.
+/// A dual code word polynomial $f$ of degree $n-t-1$ for checking that the $n$ evaluations of another
+/// polynomial (typically at the roots-of-unity $p(\omega^i)$, \forall \in [0, n)$) encode a degree
+/// $\le t-1$ polynomial.
 ///
-/// When `includes_zero` is true, there are `n - 1` (instead of `n`) roots of unity evaluations and
-/// an extra evaluation at zero.
+/// When `includes_zero` is true, $n-1$ of the $n$ evaluations are at the roots of unity and the $n$th
+/// evaluation is at zero.
 pub struct LowDegreeTest<'a> {
     /// Consider a degree-$(t-1)$ polynomial $p(X)$. Its "dual" polynomial $f(X)$ will be of degree
     /// $n - t - 1$, and will have $n - t$ coefficients.
