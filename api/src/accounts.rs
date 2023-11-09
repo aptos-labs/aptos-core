@@ -8,13 +8,17 @@ use crate::{
     failpoint::fail_point_poem,
     page::determine_limit,
     response::{
-        account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
-        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
+        account_not_found, api_forbidden, resource_not_found, struct_field_not_found,
+        BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+        InternalError,
     },
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode, MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64};
+use aptos_api_types::{
+    AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
+    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
+};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{AccountResource, ObjectGroupResource},
@@ -26,30 +30,15 @@ use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     resolver::MoveResolver,
 };
-use poem_openapi::{param::{Path, Query}, OpenApi, ApiRequest};
+use poem_openapi::{
+    param::{Path, Query},
+    OpenApi,
+};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
-use poem::web::Json;
-use crate::response::api_forbidden;
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
     pub context: Arc<Context>,
-}
-
-#[derive(ApiRequest)]
-pub enum GetAccountsBatchPost {
-    #[oai(content_type = "application/json")]
-    Json(Json<Vec<Path<Address>>>)
-}
-
-impl GetAccountsBatchPost {
-
-    pub fn into_inner(self) -> Vec<Path<Address>> {
-        match self {
-            Self::Json(json) => json.0,
-        }
-    }
-
 }
 
 #[OpenApi]
@@ -93,28 +82,32 @@ impl AccountsApi {
     /// address. Optionally, a ledger version can be specified. If the ledger
     /// version is not specified in the request, the latest ledger version is used.
     #[oai(
-    path = "/accounts/batch",
-    method = "post",
-    operation_id = "get_accounts_batch",
-    tag = "ApiTags::AccountsBatch"
+        path = "/accounts/batch",
+        method = "get",
+        operation_id = "get_accounts_batch",
+        tag = "ApiTags::AccountsBatch"
     )]
     async fn get_accounts_batch(
         &self,
         accept_type: AcceptType,
-        addresses: GetAccountsBatchPost,
+        // This `explode = false` part means you do
+        //   ?addresses=0x1,0x2,0x3
+        // instead of
+        //   ?addresses=0x1&addresses=0x2&addresses=0x3
+        #[oai(explode = false)] addresses: Query<Vec<Address>>,
         /// Ledger version to get state of account
         ///
         /// If not provided, it will be the latest version
         ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<Vec<Option<AccountData>>> {
+    ) -> BasicResultWith404<Vec<AccountData>> {
         self.context
             .check_api_output_enabled("Get accounts batch", &accept_type)?;
 
         let context = self.context.clone();
         api_spawn_blocking(move || {
             let mut accounts = Vec::new();
-            for address in &addresses.into_inner() {
-                let account = Account::new(context.clone(), address.0, ledger_version.0, None, None)?;
+            for address in addresses.0.into_iter() {
+                let account = Account::new(context.clone(), address, ledger_version.0, None, None)?;
                 match account.into_account_resource() {
                     Ok(account) => accounts.push(Some(account)),
                     Err(BasicErrorWith404::NotFound(..)) => accounts.push(None),
@@ -123,13 +116,13 @@ impl AccountsApi {
             }
             match accept_type {
                 AcceptType::Json => Err(api_forbidden(
-                    "Get get_accounts_batch is not supported for JSON.",
+                    "get_accounts_batch is not supported for JSON.",
                     "Please use BCS instead.",
                 )),
                 AcceptType::Bcs => {
                     let latest_ledger_info = context.get_latest_ledger_info()?;
                     BasicResponse::try_from_bcs((
-                                                    &accounts,
+                        &accounts,
                         &latest_ledger_info,
                         BasicResponseStatus::Ok,
                     ))
@@ -137,7 +130,7 @@ impl AccountsApi {
             }
             //Ok(accounts)
         })
-            .await
+        .await
     }
 
     /// Get account resources
