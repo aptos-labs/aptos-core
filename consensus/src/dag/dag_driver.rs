@@ -27,7 +27,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, PayloadFilter};
+use aptos_consensus_types::common::{Author, PayloadFilter, Payload};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
@@ -212,8 +212,8 @@ impl DagDriver {
         {
             Ok(payload) => payload,
             Err(e) => {
-                // TODO: return empty payload instead
-                panic!("error pulling payload: {}", e);
+                error!("error pulling payload: {}", e);
+                Payload::empty(false)
             },
         };
         // TODO: need to wait to pass median of parents timestamp
