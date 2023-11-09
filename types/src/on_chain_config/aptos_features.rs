@@ -51,6 +51,7 @@ pub enum FeatureFlag {
     RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
+    WEBAUTHN_SIGNATURE = 44,
 }
 
 /// Representation of features on chain as a bitset.
