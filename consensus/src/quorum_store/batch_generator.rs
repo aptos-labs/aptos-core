@@ -254,6 +254,16 @@ impl BatchGenerator {
         }
     }
 
+    #[cfg(test)]
+    pub fn remove_batch_in_progress_for_test(&mut self, batch_id: &BatchId) -> bool {
+        self.remove_batch_in_progress(batch_id)
+    }
+
+    #[cfg(test)]
+    pub fn txns_in_progress_sorted_len(&self) -> usize {
+        self.txns_in_progress_sorted.len()
+    }
+
     pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
         trace!(

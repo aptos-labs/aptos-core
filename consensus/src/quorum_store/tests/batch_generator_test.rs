@@ -548,3 +548,58 @@ async fn test_sender_max_num_batches_multi_buckets() {
         .unwrap()
         .unwrap();
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_batches_in_progress_same_txn_across_batches() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        QuorumStoreConfig::default(),
+        Arc::new(MockQuorumStoreDB::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    let join_handle = tokio::spawn(async move {
+        let signed_txns = create_vec_signed_transactions(3);
+        let first_one: Vec<_> = signed_txns.iter().take(1).cloned().collect();
+        let first_two: Vec<_> = signed_txns.iter().take(2).cloned().collect();
+        let first_three: Vec<_> = signed_txns.iter().take(3).cloned().collect();
+
+        // Add multiple of the same txns across batches (txn1: 3 times, txn2: 2 times, txn3: 1 time)
+        queue_mempool_batch_response(first_one, 100, &mut quorum_store_to_mempool_rx).await;
+        queue_mempool_batch_response(first_two, 100, &mut quorum_store_to_mempool_rx).await;
+        queue_mempool_batch_response(first_three, 100, &mut quorum_store_to_mempool_rx).await;
+    });
+
+    let first_one_result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(first_one_result.len(), 1);
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 1);
+
+    let first_two_result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(first_two_result.len(), 1);
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
+
+    let first_three_result = batch_generator.handle_scheduled_pull(300).await;
+    assert_eq!(first_three_result.len(), 1);
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 3);
+
+    timeout(Duration::from_millis(10_000), join_handle)
+        .await
+        .unwrap()
+        .unwrap();
+
+    // After all batches are complete, txns_in_progress_sorted will be empty.
+    batch_generator
+        .remove_batch_in_progress_for_test(&first_three_result.first().unwrap().batch_id());
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 2);
+    batch_generator
+        .remove_batch_in_progress_for_test(&first_two_result.first().unwrap().batch_id());
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 1);
+    batch_generator
+        .remove_batch_in_progress_for_test(&first_one_result.first().unwrap().batch_id());
+    assert_eq!(batch_generator.txns_in_progress_sorted_len(), 0);
+}
