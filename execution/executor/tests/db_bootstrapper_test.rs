@@ -75,7 +75,9 @@ fn test_empty_db() {
     assert!(trusted_state_change.is_epoch_change());
 
     // `maybe_bootstrap()` does nothing on non-empty DB.
-    assert!(!maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
+    assert!(maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint)
+        .unwrap()
+        .is_none());
 }
 
 fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &ValidatorSigner) {
@@ -113,12 +115,12 @@ fn get_demo_accounts() -> (
     let privkey1 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey1 = privkey1.public_key();
     let account1_auth_key = AuthenticationKey::ed25519(&pubkey1);
-    let account1 = account1_auth_key.derived_address();
+    let account1 = account1_auth_key.account_address();
 
     let privkey2 = Ed25519PrivateKey::generate(&mut rng);
     let pubkey2 = privkey2.public_key();
     let account2_auth_key = AuthenticationKey::ed25519(&pubkey2);
-    let account2 = account2_auth_key.derived_address();
+    let account2 = account2_auth_key.account_address();
 
     (account1, privkey1, account2, privkey2)
 }
@@ -279,7 +281,9 @@ fn test_new_genesis() {
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint).unwrap());
+    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint)
+        .unwrap()
+        .is_some());
     assert_eq!(waypoint.version(), 6);
 
     // Client bootable from waypoint.

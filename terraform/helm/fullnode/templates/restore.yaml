@@ -41,7 +41,7 @@ spec:
               echo "$CONTROLLER_UID" > /opt/aptos/data/restore-uid
           fi
           # start restore process
-          /usr/local/bin/aptos-db-tool restore bootstrap-db --concurrent-downloads {{ .config.concurrent_downloads }}{{ range .config.trusted_waypoints }} --trust-waypoint {{ . }}{{ end }} --target-db-dir /opt/aptos/data/db --metadata-cache-dir /tmp/aptos-restore-metadata --command-adapter-config /opt/aptos/etc/{{ .config.location }}.yaml
+          /usr/local/bin/aptos-debugger aptos-db restore bootstrap-db --concurrent-downloads {{ .config.concurrent_downloads }}{{ range .config.trusted_waypoints }} --trust-waypoint {{ . }}{{ end }} --target-db-dir /opt/aptos/data/db --metadata-cache-dir /tmp/aptos-restore-metadata --command-adapter-config /opt/aptos/etc/{{ .config.location }}.yaml
         env:
         - name: RUST_LOG
           value: "debug"

@@ -53,6 +53,10 @@
 /crates/aptos-logger @gregnazario @joshlind
 
 /crates/aptos-open-api @banool @gregnazario
+
+# Owners for the aptos-protos crate
+/crates/aptos-protos @banool @bowenyang007 @jillxuu @larry-aptos @rtso
+
 /crates/aptos-rest-client @banool @gregnazario
 
 # Owners for the `/aptos-rosetta` directory and related crates.
@@ -73,10 +77,7 @@
 /dashboards/ @aptos-labs/prod-eng
 
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
-/developer-docs-site/ @davidiw @gregnazario @saharct
-
-# Auto-reviewers for all Markdown changes including READMEs
-*.md @saharct
+/developer-docs-site/ @davidiw @gregnazario @banool
 
 # Owner for docs tutorials for the token_standard and related tutorials.
 /developer-docs-site/docs/tutorials @areshand @gregnazario

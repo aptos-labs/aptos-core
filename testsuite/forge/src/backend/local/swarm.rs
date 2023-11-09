@@ -7,18 +7,19 @@ use crate::{
     SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
-use aptos::common::types::EncodingType;
 use aptos_config::{
-    config::{NetworkConfig, NodeConfig},
+    config::{NetworkConfig, NodeConfig, OverrideNodeConfig, PersistableConfig},
     keys::ConfigKey,
     network_id::NetworkId,
 };
 use aptos_framework::ReleaseBundle;
-use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_genesis::builder::{
+    FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn, InitGenesisStakeFn,
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
-    crypto::ed25519::Ed25519PrivateKey,
+    crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType},
     types::{
         chain_id::ChainId, transaction::Transaction, waypoint::Waypoint, AccountKey, LocalAccount,
         PeerId,
@@ -111,6 +112,7 @@ impl LocalSwarm {
         versions: Arc<HashMap<Version, LocalVersion>>,
         initial_version: Option<Version>,
         init_config: Option<InitConfigFn>,
+        init_genesis_stake: Option<InitGenesisStakeFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
         genesis_framework: Option<ReleaseBundle>,
@@ -137,31 +139,30 @@ impl LocalSwarm {
                     .unwrap_or_else(|| aptos_cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
-            .with_init_config(Some(Arc::new(
-                move |index, config, genesis_stake_amount| {
-                    // for local tests, turn off parallel execution:
-                    config.execution.concurrency_level = 1;
+            .with_init_config(Some(Arc::new(move |index, config, base| {
+                // for local tests, turn off parallel execution:
+                config.execution.concurrency_level = 1;
 
-                    // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
-                    // which cause flakiness in tests.
-                    if number_of_validators.get() == 1 {
-                        // this delays empty block by (30-1) * 30ms
-                        config.consensus.quorum_store_poll_time_ms = 900;
-                        config
-                            .state_sync
-                            .state_sync_driver
-                            .enable_auto_bootstrapping = true;
-                        config
-                            .state_sync
-                            .state_sync_driver
-                            .max_connection_deadline_secs = 1;
-                    }
+                // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
+                // which cause flakiness in tests.
+                if number_of_validators.get() == 1 {
+                    // this delays empty block by (30-1) * 30ms
+                    config.consensus.quorum_store_poll_time_ms = 900;
+                    config
+                        .state_sync
+                        .state_sync_driver
+                        .enable_auto_bootstrapping = true;
+                    config
+                        .state_sync
+                        .state_sync_driver
+                        .max_connection_deadline_secs = 1;
+                }
 
-                    if let Some(init_config) = &init_config {
-                        (init_config)(index, config, genesis_stake_amount);
-                    }
-                },
-            )))
+                if let Some(init_config) = &init_config {
+                    (init_config)(index, config, base);
+                }
+            })))
+            .with_init_genesis_stake(init_genesis_stake)
             .with_init_genesis_config(init_genesis_config)
             .build(rng)?;
 
@@ -195,7 +196,9 @@ impl LocalSwarm {
         let public_networks = validators
             .values_mut()
             .map(|validator| {
-                let mut validator_config = validator.config().clone();
+                let mut validator_override_config =
+                    OverrideNodeConfig::load_config(validator.config_path())?;
+                let validator_config = validator_override_config.override_config_mut();
 
                 // Grab the public network config from the validator and insert it into the VFN's config
                 // The validator's public network identity is the same as the VFN's public network identity
@@ -209,10 +212,10 @@ impl LocalSwarm {
                         .expect("Validator should have a public network");
                     validator_config.full_node_networks.remove(i)
                 };
-
+                validator_config.set_data_dir(validator.base_dir());
+                *validator.config_mut() = validator_config.clone();
                 // Since the validator's config has changed we need to save it
-                validator_config.save_to_path(validator.config_path())?;
-                *validator.config_mut() = validator_config;
+                validator_override_config.save_config(validator.config_path())?;
 
                 Ok((validator.peer_id(), public_network))
             })
@@ -333,7 +336,7 @@ impl LocalSwarm {
     pub fn add_validator_fullnode(
         &mut self,
         version: &Version,
-        template: NodeConfig,
+        config: OverrideNodeConfig,
         validator_peer_id: PeerId,
     ) -> Result<PeerId> {
         let validator = self
@@ -356,7 +359,7 @@ impl LocalSwarm {
         let fullnode_config = FullnodeNodeConfig::validator_fullnode(
             name,
             self.dir.as_ref(),
-            template,
+            config,
             validator.config(),
             &self.genesis_waypoint,
             &self.genesis,
@@ -381,14 +384,14 @@ impl LocalSwarm {
         Ok(peer_id)
     }
 
-    fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
+    fn add_fullnode(&mut self, version: &Version, config: OverrideNodeConfig) -> Result<PeerId> {
         let name = self.node_name_counter.to_string();
         let index = self.node_name_counter;
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::public_fullnode(
             name,
             self.dir.as_ref(),
-            template,
+            config,
             &self.genesis_waypoint,
             &self.genesis,
         )?;
@@ -550,14 +553,18 @@ impl Swarm for LocalSwarm {
     fn add_validator_full_node(
         &mut self,
         version: &Version,
-        template: NodeConfig,
+        config: OverrideNodeConfig,
         id: PeerId,
     ) -> Result<PeerId> {
-        self.add_validator_fullnode(version, template, id)
+        self.add_validator_fullnode(version, config, id)
     }
 
-    async fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
-        self.add_fullnode(version, template)
+    async fn add_full_node(
+        &mut self,
+        version: &Version,
+        config: OverrideNodeConfig,
+    ) -> Result<PeerId> {
+        self.add_fullnode(version, config)
     }
 
     fn remove_full_node(&mut self, id: PeerId) -> Result<()> {

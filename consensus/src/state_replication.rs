@@ -5,6 +5,7 @@
 use crate::{
     error::{QuorumStoreError, StateSyncError},
     payload_manager::PayloadManager,
+    state_computer::StateComputeResultFut,
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
 };
@@ -56,7 +57,19 @@ pub trait StateComputer: Send + Sync {
         block: &Block,
         // The parent block root hash.
         parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult>;
+    ) -> ExecutorResult<StateComputeResult> {
+        self.schedule_compute(block, parent_block_id).await.await
+    }
+
+    async fn schedule_compute(
+        &self,
+        // The block that will be computed.
+        _block: &Block,
+        // The parent block root hash.
+        _parent_block_id: HashValue,
+    ) -> StateComputeResultFut {
+        unimplemented!("This state computer does not support scheduling");
+    }
 
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(

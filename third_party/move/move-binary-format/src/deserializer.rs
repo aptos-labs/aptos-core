@@ -7,20 +7,22 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, metadata::Metadata, state::VMState,
     vm_status::StatusCode,
 };
+use serde::Serialize;
 use std::{collections::HashSet, convert::TryInto, io::Read};
 
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        Self::deserialize_with_max_version(binary, VERSION_MAX)
+        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        Self::deserialize_with_config(binary, &config)
     }
 
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
-    pub fn deserialize_with_max_version(
+    pub fn deserialize_with_config(
         binary: &[u8],
-        max_binary_format_version: u32,
+        config: &DeserializerConfig,
     ) -> BinaryLoaderResult<Self> {
-        let script = deserialize_compiled_script(binary, max_binary_format_version)?;
+        let script = deserialize_compiled_script(binary, config)?;
         BoundsChecker::verify_script(&script)?;
         Ok(script)
     }
@@ -28,24 +30,26 @@ impl CompiledScript {
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        deserialize_compiled_script(binary, VERSION_MAX)
+        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        deserialize_compiled_script(binary, &config)
     }
 }
 
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        Self::deserialize_with_max_version(binary, VERSION_MAX)
+        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        Self::deserialize_with_config(binary, &config)
     }
 
     /// Deserialize a &[u8] slice into a `CompiledModule` instance, up to the specified version.
-    pub fn deserialize_with_max_version(
+    pub fn deserialize_with_config(
         binary: &[u8],
-        max_binary_format_version: u32,
+        config: &DeserializerConfig,
     ) -> BinaryLoaderResult<Self> {
         let prev_state = move_core_types::state::set_state(VMState::DESERIALIZER);
         let result = std::panic::catch_unwind(|| {
-            let module = deserialize_compiled_module(binary, max_binary_format_version)?;
+            let module = deserialize_compiled_module(binary, config)?;
             BoundsChecker::verify_module(&module)?;
 
             Ok(module)
@@ -63,7 +67,23 @@ impl CompiledModule {
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        deserialize_compiled_module(binary, VERSION_MAX)
+        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        deserialize_compiled_module(binary, &config)
+    }
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct DeserializerConfig {
+    max_binary_format_version: u32,
+    max_identifier_size: u64,
+}
+
+impl DeserializerConfig {
+    pub fn new(max_binary_format_version: u32, max_identifier_size: u64) -> Self {
+        Self {
+            max_binary_format_version,
+            max_identifier_size,
+        }
     }
 }
 
@@ -147,6 +167,24 @@ where
         // TODO: review this status code.
         let msg = "Failed to convert u64 to target integer type. This should not happen. Is the maximum value correct?".to_string();
         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg)
+    })
+}
+
+fn load_option<T>(
+    cursor: &mut VersionedCursor,
+    loader: impl Fn(&mut VersionedCursor) -> BinaryLoaderResult<T>,
+) -> BinaryLoaderResult<Option<T>> {
+    let is_some = SerializedOption::from_u8(load_u8(cursor)?)?;
+    if is_some {
+        Ok(Some(loader(cursor)?))
+    } else {
+        Ok(None)
+    }
+}
+
+fn load_u8(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
+    cursor.read_u8().map_err(|_| {
+        PartialVMError::new(StatusCode::MALFORMED).with_message("Unexpected EOF".to_string())
     })
 }
 
@@ -266,6 +304,10 @@ fn load_type_parameter_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult
     read_uleb_internal(cursor, TYPE_PARAMETER_COUNT_MAX)
 }
 
+fn load_access_specifier_count(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
+    read_uleb_internal(cursor, ACCESS_SPECIFIER_COUNT_MAX)
+}
+
 fn load_signature_size(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u64> {
     read_uleb_internal(cursor, SIGNATURE_SIZE_MAX)
 }
@@ -283,7 +325,7 @@ fn load_metadata_value_size(cursor: &mut VersionedCursor) -> BinaryLoaderResult<
 }
 
 fn load_identifier_size(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
-    read_uleb_internal(cursor, IDENTIFIER_SIZE_MAX)
+    read_uleb_internal(cursor, cursor.max_identifier_size())
 }
 
 fn load_type_parameter_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u16> {
@@ -313,10 +355,14 @@ fn load_local_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
 /// Module internal function that manages deserialization of transactions.
 fn deserialize_compiled_script(
     binary: &[u8],
-    max_binary_format_version: u32,
+    config: &DeserializerConfig,
 ) -> BinaryLoaderResult<CompiledScript> {
     let binary_len = binary.len();
-    let mut cursor = VersionedCursor::new(binary, max_binary_format_version)?;
+    let mut cursor = VersionedCursor::new(
+        binary,
+        config.max_binary_format_version,
+        config.max_identifier_size,
+    )?;
     let table_count = load_table_count(&mut cursor)?;
     let mut tables: Vec<Table> = Vec::new();
     read_tables(&mut cursor, table_count, &mut tables)?;
@@ -347,10 +393,14 @@ fn deserialize_compiled_script(
 /// Module internal function that manages deserialization of modules.
 fn deserialize_compiled_module(
     binary: &[u8],
-    max_binary_format_version: u32,
+    config: &DeserializerConfig,
 ) -> BinaryLoaderResult<CompiledModule> {
     let binary_len = binary.len();
-    let mut cursor = VersionedCursor::new(binary, max_binary_format_version)?;
+    let mut cursor = VersionedCursor::new(
+        binary,
+        config.max_binary_format_version,
+        config.max_identifier_size,
+    )?;
     let table_count = load_table_count(&mut cursor)?;
     let mut tables: Vec<Table> = Vec::new();
     read_tables(&mut cursor, table_count, &mut tables)?;
@@ -395,7 +445,7 @@ fn read_table(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Table> {
         Ok(kind) => kind,
         Err(_) => {
             return Err(PartialVMError::new(StatusCode::MALFORMED)
-                .with_message("Error reading table".to_string()))
+                .with_message("Error reading table".to_string()));
         },
     };
     let table_offset = load_table_offset(cursor)?;
@@ -752,12 +802,19 @@ fn load_function_handles(
         let type_parameters =
             load_ability_sets(&mut cursor, AbilitySetPosition::FunctionTypeParameters)?;
 
+        let accesses = if binary.version() >= VERSION_7 {
+            load_access_specifiers(&mut cursor)?
+        } else {
+            None
+        };
+
         function_handles.push(FunctionHandle {
             module,
             name,
             parameters,
             return_,
             type_parameters,
+            access_specifiers: accesses,
         });
     }
     Ok(())
@@ -942,11 +999,81 @@ fn load_signature_tokens(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Vec
     Ok(tokens)
 }
 
+fn load_access_specifiers(
+    cursor: &mut VersionedCursor,
+) -> BinaryLoaderResult<Option<Vec<AccessSpecifier>>> {
+    load_option(cursor, |cursor| {
+        let count = load_access_specifier_count(cursor)?;
+        let mut specs: Vec<AccessSpecifier> = Vec::with_capacity(count);
+        for _ in 0..count {
+            specs.push(load_access_specifier(cursor)?)
+        }
+        Ok(specs)
+    })
+}
+
+fn load_access_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AccessSpecifier> {
+    let kind = SerializedAccessKind::from_u8(load_u8(cursor)?)?;
+    let negated = SerializedBool::from_u8(load_u8(cursor)?)?;
+    let resource = load_resource_specifier(cursor)?;
+    let address = load_address_specifier(cursor)?;
+    Ok(AccessSpecifier {
+        kind,
+        negated,
+        resource,
+        address,
+    })
+}
+
+fn load_resource_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<ResourceSpecifier> {
+    use SerializedResourceSpecifier::*;
+    Ok(
+        match SerializedResourceSpecifier::from_u8(load_u8(cursor)?)? {
+            ANY => ResourceSpecifier::Any,
+            AT_ADDRESS => {
+                ResourceSpecifier::DeclaredAtAddress(load_address_identifier_index(cursor)?)
+            },
+            IN_MODULE => {
+                let module = load_module_handle_index(cursor)?;
+                ResourceSpecifier::DeclaredInModule(module)
+            },
+            RESOURCE => {
+                let handle = load_struct_handle_index(cursor)?;
+                ResourceSpecifier::Resource(handle)
+            },
+            RESOURCE_INSTANTIATION => {
+                let handle = load_struct_handle_index(cursor)?;
+                let sign = load_signature_index(cursor)?;
+                ResourceSpecifier::ResourceInstantiation(handle, sign)
+            },
+        },
+    )
+}
+
+fn load_address_specifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AddressSpecifier> {
+    use SerializedAddressSpecifier::*;
+    Ok(
+        match SerializedAddressSpecifier::from_u8(load_u8(cursor)?)? {
+            ANY => AddressSpecifier::Any,
+            LITERAL => AddressSpecifier::Literal(load_address_identifier_index(cursor)?),
+            PARAMETER => {
+                let parameter = load_local_index(cursor)?;
+                let handle = load_option(cursor, load_function_inst_index)?;
+                AddressSpecifier::Parameter(parameter, handle)
+            },
+        },
+    )
+}
+
 #[cfg(test)]
 pub fn load_signature_token_test_entry(
     cursor: std::io::Cursor<&[u8]>,
 ) -> BinaryLoaderResult<SignatureToken> {
-    load_signature_token(&mut VersionedCursor::new_for_test(VERSION_MAX, cursor))
+    load_signature_token(&mut VersionedCursor::new_for_test(
+        VERSION_MAX,
+        LEGACY_IDENTIFIER_SIZE_MAX,
+        cursor,
+    ))
 }
 
 /// Deserializes a `SignatureToken`.
@@ -1139,7 +1266,7 @@ fn load_ability_set(
             Ok(byte) => byte,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Unexpected EOF".to_string()))
+                    .with_message("Unexpected EOF".to_string()));
             },
         };
         match pos {
@@ -1232,7 +1359,7 @@ fn load_struct_defs(
             Ok(byte) => SerializedNativeStructFlag::from_u8(byte)?,
             Err(_) => {
                 return Err(PartialVMError::new(StatusCode::MALFORMED)
-                    .with_message("Invalid field info in struct".to_string()))
+                    .with_message("Invalid field info in struct".to_string()));
             },
         };
         let field_information = match field_information_flag {
@@ -1469,11 +1596,11 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                 if (cursor.version() < VERSION_6) =>
             {
                 return Err(
-                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Loading or casting u16, u32, u256 integers not supported in bytecode version {}",
-                        cursor.version()
-                    )),
-                );
+                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                            "Loading or casting u16, u32, u256 integers not supported in bytecode version {}",
+                            cursor.version()
+                        )),
+                    );
             },
             _ => (),
         };
@@ -1651,8 +1778,8 @@ impl SerializedType {
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
 pub enum DeprecatedNominalResourceFlag {
-    NOMINAL_RESOURCE        = 0x1,
-    NORMAL_STRUCT           = 0x2,
+    NOMINAL_RESOURCE    = 0x1,
+    NORMAL_STRUCT       = 0x2,
 }
 
 impl DeprecatedNominalResourceFlag {
@@ -1664,13 +1791,14 @@ impl DeprecatedNominalResourceFlag {
         }
     }
 }
+
 #[rustfmt::skip]
 #[allow(non_camel_case_types)]
 #[repr(u8)]
 enum DeprecatedKind {
-    ALL                     = 0x1,
-    COPYABLE                = 0x2,
-    RESOURCE                = 0x3,
+    ALL = 0x1,
+    COPYABLE = 0x2,
+    RESOURCE = 0x3,
 }
 
 impl DeprecatedKind {
@@ -1775,6 +1903,70 @@ impl Opcodes {
             0x4C => Ok(Opcodes::CAST_U32),
             0x4D => Ok(Opcodes::CAST_U256),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)),
+        }
+    }
+}
+
+impl SerializedBool {
+    fn from_u8(value: u8) -> BinaryLoaderResult<bool> {
+        match value {
+            0x1 => Ok(false),
+            0x2 => Ok(true),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed boolean".to_owned())),
+        }
+    }
+}
+
+impl SerializedOption {
+    /// Returns a boolean to indice NONE or SOME (NONE = false)
+    fn from_u8(value: u8) -> BinaryLoaderResult<bool> {
+        match value {
+            0x1 => Ok(false),
+            0x2 => Ok(true),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed option".to_owned())),
+        }
+    }
+}
+
+impl SerializedAccessKind {
+    fn from_u8(value: u8) -> BinaryLoaderResult<AccessKind> {
+        use AccessKind::*;
+        match value {
+            0x1 => Ok(Reads),
+            0x2 => Ok(Writes),
+            0x3 => Ok(Acquires),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed access kind".to_owned())),
+        }
+    }
+}
+
+impl SerializedResourceSpecifier {
+    fn from_u8(value: u8) -> BinaryLoaderResult<SerializedResourceSpecifier> {
+        use SerializedResourceSpecifier::*;
+        match value {
+            0x1 => Ok(ANY),
+            0x2 => Ok(AT_ADDRESS),
+            0x3 => Ok(IN_MODULE),
+            0x4 => Ok(RESOURCE),
+            0x5 => Ok(RESOURCE_INSTANTIATION),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed resource specifier".to_owned())),
+        }
+    }
+}
+
+impl SerializedAddressSpecifier {
+    fn from_u8(value: u8) -> BinaryLoaderResult<SerializedAddressSpecifier> {
+        use SerializedAddressSpecifier::*;
+        match value {
+            0x1 => Ok(ANY),
+            0x2 => Ok(LITERAL),
+            0x3 => Ok(PARAMETER),
+            _ => Err(PartialVMError::new(StatusCode::MALFORMED)
+                .with_message("malformed address specifier".to_owned())),
         }
     }
 }

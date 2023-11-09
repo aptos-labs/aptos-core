@@ -45,6 +45,7 @@ Bünz
 CANCELLED
 CDH
 CDN
+Choco
 CLI
 CMake
 CPU
@@ -77,6 +78,7 @@ DeleteRef
 Deref
 Destructuring
 Dev
+devs
 DevEx
 Devnet
 Diffie
@@ -150,6 +152,7 @@ GLTF
 GPU
 GPUs
 GRPC
+grpc
 GUID
 Gailly
 Garillot
@@ -244,6 +247,8 @@ Prover
 PureEdDSA
 PyPi
 Quickstart
+ratelimits
+RawTransaction
 RBAC
 README
 READMEs
@@ -251,9 +256,9 @@ RESTful
 RIPEMD
 RPC
 RTT
-RawTransaction
 Recategorized
 Reusability
+Reproducibility
 Ristretto
 Romailler
 Ruleset
@@ -597,6 +602,7 @@ subtype
 subtyping
 superset
 svg
+symlink
 synchronizer
 terraform
 testnet

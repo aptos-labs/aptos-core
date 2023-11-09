@@ -10,7 +10,7 @@ use crate::sharded_block_executor::{
     messages::CrossShardMsg,
     sharded_aggregator_service,
     sharded_executor_service::ShardedExecutorService,
-    ExecutorShardCommand,
+    ExecutorShardCommand, ShardedBlockExecutor,
 };
 use aptos_logger::trace;
 use aptos_state_view::StateView;
@@ -100,8 +100,8 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorService<S> {
             .unzip();
         let executor_shards = command_rxs
             .into_iter()
-            .zip(result_txs.into_iter())
-            .zip(cross_shard_msg_rxs.into_iter())
+            .zip(result_txs)
+            .zip(cross_shard_msg_rxs)
             .enumerate()
             .map(|(shard_id, ((command_rx, result_tx), cross_shard_rxs))| {
                 let cross_shard_client = LocalCrossShardClient::new(
@@ -145,6 +145,16 @@ impl<S: StateView + Sync + Send + 'static> LocalExecutorClient<S> {
             executor_services: executor_shards,
             global_executor,
         }
+    }
+
+    pub fn create_local_sharded_block_executor(
+        num_shards: usize,
+        num_threads: Option<usize>,
+    ) -> ShardedBlockExecutor<S, LocalExecutorClient<S>> {
+        ShardedBlockExecutor::new(LocalExecutorService::setup_local_executor_shards(
+            num_shards,
+            num_threads,
+        ))
     }
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
@@ -207,6 +217,8 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
 
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
+
+    fn shutdown(&mut self) {}
 }
 
 impl<S: StateView + Sync + Send + 'static> Drop for LocalExecutorClient<S> {

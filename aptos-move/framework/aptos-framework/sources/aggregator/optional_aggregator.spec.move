@@ -39,11 +39,17 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec sub(optional_aggregator: &mut OptionalAggregator, value: u128) {
+        include SubAbortsIf;
+        ensures ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) - value));
+    }
+
+    spec schema SubAbortsIf {
+        optional_aggregator: OptionalAggregator;
+        value: u128;
         aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
             < value);
         aborts_if !is_parallelizable(optional_aggregator) &&
             (option::borrow(optional_aggregator.integer).value < value);
-        ensures ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) - value));
     }
 
     spec read(optional_aggregator: &OptionalAggregator): u128 {
@@ -53,6 +59,13 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec add(optional_aggregator: &mut OptionalAggregator, value: u128) {
+        include AddAbortsIf;
+        ensures ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) + value));
+    }
+
+    spec schema AddAbortsIf {
+        optional_aggregator: OptionalAggregator;
+        value: u128;
         aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
             + value > aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator)));
         aborts_if is_parallelizable(optional_aggregator) && (aggregator::spec_aggregator_get_val(option::borrow(optional_aggregator.aggregator))
@@ -61,7 +74,6 @@ spec aptos_framework::optional_aggregator {
             (option::borrow(optional_aggregator.integer).value + value > MAX_U128);
         aborts_if !is_parallelizable(optional_aggregator) &&
             (value > (option::borrow(optional_aggregator.integer).limit - option::borrow(optional_aggregator.integer).value));
-        ensures ((optional_aggregator_value(optional_aggregator) == optional_aggregator_value(old(optional_aggregator)) + value));
     }
 
     spec switch(optional_aggregator: &mut OptionalAggregator) {

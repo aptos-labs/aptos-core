@@ -6,13 +6,12 @@ module marketplace::fee_schedule {
     use std::error;
     use std::signer;
     use std::string::{Self, String};
+    use aptos_std::math64;
 
     use aptos_std::type_info;
 
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, ExtendRef, Object};
-
-    use marketplace::events;
 
     /// FeeSchedule does not exist.
     const ENO_FEE_SCHEDULE: u64 = 1;
@@ -30,8 +29,6 @@ module marketplace::fee_schedule {
         fee_address: address,
         /// Ref for changing the configuration of the marketplace
         extend_ref: ExtendRef,
-        /// An event stream of changes to the fee schedule
-        mutation_events: EventHandle<MutationEvent>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -64,8 +61,10 @@ module marketplace::fee_schedule {
         numerator: u64,
     }
 
+    #[event]
     /// Event representing a change to the marketplace configuration
-    struct MutationEvent has drop, store {
+    struct Mutation has drop, store {
+        marketplace: address,
         /// The type info of the struct that was updated.
         updated_resource: String,
     }
@@ -133,10 +132,8 @@ module marketplace::fee_schedule {
         let marketplace = FeeSchedule {
             fee_address,
             extend_ref,
-            mutation_events: object::new_event_handle(&fee_schedule_signer),
         };
         move_to(&fee_schedule_signer, marketplace);
-        events::init(&fee_schedule_signer);
 
         (constructor_ref, fee_schedule_signer)
     }
@@ -157,7 +154,7 @@ module marketplace::fee_schedule {
         let fee_schedule_obj = borrow_global_mut<FeeSchedule>(fee_schedule_addr);
         fee_schedule_obj.fee_address = fee_address;
         let updated_resource = string::utf8(b"fee_address");
-        event::emit_event(&mut fee_schedule_obj.mutation_events, MutationEvent { updated_resource });
+        event::emit(Mutation { marketplace: fee_schedule_addr, updated_resource });
     }
 
     /// Remove any existing listing fees and set a fixed rate listing fee.
@@ -169,7 +166,7 @@ module marketplace::fee_schedule {
         let fee_schedule_signer = remove_listing_fee(creator, marketplace);
         move_to(&fee_schedule_signer, FixedRateListingFee { listing_fee: fee });
         let updated_resource = type_info::type_name<FixedRateListingFee>();
-        emit_mutation_event(signer::address_of(&fee_schedule_signer), updated_resource);
+        event::emit(Mutation { marketplace: signer::address_of(&fee_schedule_signer), updated_resource });
     }
 
     inline fun remove_listing_fee(
@@ -192,7 +189,7 @@ module marketplace::fee_schedule {
         let fee_schedule_signer = remove_bidding_fee(creator, marketplace);
         move_to(&fee_schedule_signer, FixedRateBiddingFee { bidding_fee: fee });
         let updated_resource = type_info::type_name<FixedRateListingFee>();
-        emit_mutation_event(signer::address_of(&fee_schedule_signer), updated_resource);
+        event::emit(Mutation { marketplace: signer::address_of(&fee_schedule_signer), updated_resource });
     }
 
     inline fun remove_bidding_fee(
@@ -215,7 +212,7 @@ module marketplace::fee_schedule {
         let fee_schedule_signer = remove_commission(creator, marketplace);
         move_to(&fee_schedule_signer, FixedRateCommission { commission });
         let updated_resource = type_info::type_name<FixedRateListingFee>();
-        emit_mutation_event(signer::address_of(&fee_schedule_signer), updated_resource);
+        event::emit(Mutation { marketplace: signer::address_of(&fee_schedule_signer), updated_resource });
     }
 
     /// Remove any existing commission and set a percentage rate commission.
@@ -237,7 +234,7 @@ module marketplace::fee_schedule {
         let fee_schedule_signer = remove_commission(creator, marketplace);
         move_to(&fee_schedule_signer, PercentageRateCommission { denominator, numerator });
         let updated_resource = type_info::type_name<FixedRateListingFee>();
-        emit_mutation_event(signer::address_of(&fee_schedule_signer), updated_resource);
+        event::emit(Mutation { marketplace: signer::address_of(&fee_schedule_signer), updated_resource });
     }
 
     inline fun remove_commission(
@@ -267,16 +264,7 @@ module marketplace::fee_schedule {
         (fee_schedule_signer, fee_schedule_addr)
     }
 
-    inline fun emit_mutation_event(
-        fee_schedule_addr: address,
-        updated_resource: String,
-    ) acquires FeeSchedule {
-        let marketplace = borrow_global_mut<FeeSchedule>(fee_schedule_addr);
-        event::emit_event(&mut marketplace.mutation_events, MutationEvent { updated_resource });
-    }
-
     // View functions
-
     #[view]
     public fun fee_address(marketplace: Object<FeeSchedule>): address acquires FeeSchedule {
         let fee_schedule_addr = assert_exists_internal(&marketplace);
@@ -319,7 +307,7 @@ module marketplace::fee_schedule {
             borrow_global<FixedRateCommission>(fee_schedule_addr).commission
         } else if (exists<PercentageRateCommission>(fee_schedule_addr)) {
             let fees = borrow_global<PercentageRateCommission>(fee_schedule_addr);
-            ((price as u128) * (fees.numerator as u128) / (fees.denominator as u128) as u64)
+            math64::mul_div(price, fees.numerator, fees.denominator)
         } else {
             0
         }

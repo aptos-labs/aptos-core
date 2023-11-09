@@ -124,6 +124,9 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
             .insert(txn_idx, CachePadded::new(Entry::new_write_from(data)));
     }
 
+    /// Adds a new executable to the multi-version data-structure. The executable is either
+    /// storage-version (and fixed) or uniquely identified by the (cryptographic) hash of the
+    /// module published during the block.
     pub fn store_executable(&self, key: &K, descriptor_hash: HashValue, executable: X) {
         let mut v = self.values.get_mut(key).expect("Path must exist");
         v.executables
@@ -131,6 +134,9 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
             .or_insert_with(|| Arc::new(executable));
     }
 
+    /// Fetches the latest module stored at the given key, either as in an executable form,
+    /// if already cached, or in a raw module format that the VM can convert to an executable.
+    /// The errors are returned if no module is found, or if a dependency is encountered.
     pub fn fetch_module(
         &self,
         key: &K,
@@ -152,7 +158,7 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite, X: Executable> VersionedModules<
 
     /// Delete an entry from transaction 'txn_idx' at access path 'key'. Will panic
     /// if the corresponding entry does not exist.
-    pub fn delete(&self, key: &K, txn_idx: TxnIndex) {
+    pub fn remove(&self, key: &K, txn_idx: TxnIndex) {
         // TODO: investigate logical deletion.
         let mut v = self.values.get_mut(key).expect("Path must exist");
         assert!(

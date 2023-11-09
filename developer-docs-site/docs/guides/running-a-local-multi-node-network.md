@@ -10,7 +10,7 @@ This guide describes how to run a local network with multiple validator nodes an
 :::tip Use only for test deployments
 The method described in this guide should be used only for test deployments of multi-node local networks. Do not use this guide for deploying in production environments. Currently this is the only guide for multi-node deployments.
 
-For deploying a local network with a single node, see [Running Local Testnet](../nodes/local-testnet/index.md) and [Local testnet development flow](local-testnet-dev-flow.md).
+For deploying a local network with a single node, see [Run a Local Development Network with the CLI](../guides/local-development-network.md).
 :::
 
 ## Before you proceed

@@ -13,7 +13,7 @@ pub mod test_utils;
 
 use anyhow::{anyhow, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, BUFFERED_STATE_TARGET_ITEMS,
+    RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
 };
 use aptos_crypto::HashValue;
@@ -67,9 +67,7 @@ pub struct RocksdbOpt {
     #[clap(long, hide(true), default_value_t = 1073741824)] // 1GB
     state_merkle_db_max_total_wal_size: u64,
     #[clap(long, hide(true))]
-    split_ledger_db: bool,
-    #[clap(long, hide(true))]
-    use_sharded_state_merkle_db: bool,
+    enable_storage_sharding: bool,
     #[clap(long, hide(true), default_value_t = 5000)]
     state_kv_db_max_open_files: i32,
     #[clap(long, hide(true), default_value_t = 1073741824)] // 1GB
@@ -97,9 +95,7 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_background_jobs: opt.max_background_jobs,
                 ..Default::default()
             },
-            split_ledger_db: opt.split_ledger_db,
-            use_sharded_state_merkle_db: opt.use_sharded_state_merkle_db,
-            skip_index_and_usage: false,
+            enable_storage_sharding: opt.enable_storage_sharding,
             state_kv_db_config: RocksdbConfig {
                 max_open_files: opt.state_kv_db_max_open_files,
                 max_total_wal_size: opt.state_kv_db_max_total_wal_size,
@@ -285,8 +281,9 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
         let replay_concurrency_level = opt.replay_concurrency_level.get();
         let run_mode = if let Some(db_dir) = &opt.db_dir {
             // for restore, we can always start state store with empty buffered_state since we will restore
+            // TODO(grao): Support path override here.
             let restore_handler = Arc::new(AptosDB::open_kv_only(
-                db_dir,
+                StorageDirPaths::from_path(db_dir),
                 false,                       /* read_only */
                 NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
                 opt.rocksdb_opt.clone().into(),

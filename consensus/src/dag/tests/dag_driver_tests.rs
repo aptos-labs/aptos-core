@@ -2,28 +2,34 @@
 
 use crate::{
     dag::{
-        anchor_election::RoundRobinAnchorElection,
-        dag_driver::{DagDriver, DagDriverError},
+        adapter::TLedgerInfoProvider,
+        anchor_election::{RoundRobinAnchorElection, TChainHealthBackoff},
+        dag_driver::DagDriver,
         dag_fetcher::DagFetcherService,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
-        dag_state_sync::DAG_WINDOW,
         dag_store::Dag,
+        errors::DagDriverError,
         order_rule::OrderRule,
+        round_state::{OptimisticResponsive, RoundState},
         tests::{
-            dag_test::MockStorage, helpers::new_certified_node, order_rule_tests::TestNotifier,
+            dag_test::MockStorage,
+            helpers::{new_certified_node, TEST_DAG_WINDOW},
+            order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage},
-        RpcHandler,
+        DAGRpcResult, RpcHandler,
     },
+    payload_manager::PayloadManager,
     test_utils::MockPayloadManager,
 };
-use aptos_consensus_types::common::Author;
+use aptos_config::config::{DagFetcherConfig, DagPayloadConfig};
+use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     validator_verifier::random_validator_verifier,
 };
 use async_trait::async_trait;
@@ -35,13 +41,13 @@ use tokio_retry::strategy::ExponentialBackoff;
 struct MockNetworkSender {}
 
 #[async_trait]
-impl RBNetworkSender<DAGMessage> for MockNetworkSender {
+impl RBNetworkSender<DAGMessage, DAGRpcResult> for MockNetworkSender {
     async fn send_rb_rpc(
         &self,
         _receiver: Author,
         _messagee: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 }
@@ -53,20 +59,48 @@ impl TDAGNetworkSender for MockNetworkSender {
         _receiver: Author,
         _message: DAGMessage,
         _timeout: Duration,
-    ) -> anyhow::Result<DAGMessage> {
+    ) -> anyhow::Result<DAGRpcResult> {
         unimplemented!()
     }
 
     /// Given a list of potential responders, sending rpc to get response from any of them and could
     /// fallback to more in case of failures.
     async fn send_rpc_with_fallbacks(
-        &self,
+        self: Arc<Self>,
         _responders: Vec<Author>,
         _message: DAGMessage,
         _retry_interval: Duration,
         _rpc_timeout: Duration,
+        _min_concurrent_responders: u32,
+        _max_concurrent_responders: u32,
     ) -> RpcWithFallback {
         unimplemented!()
+    }
+}
+
+struct MockLedgerInfoProvider {
+    latest_ledger_info: LedgerInfoWithSignatures,
+}
+
+impl TLedgerInfoProvider for MockLedgerInfoProvider {
+    fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures {
+        self.latest_ledger_info.clone()
+    }
+
+    fn get_highest_committed_anchor_round(&self) -> Round {
+        self.latest_ledger_info.ledger_info().round()
+    }
+}
+
+struct MockChainHealthBackoff {}
+
+impl TChainHealthBackoff for MockChainHealthBackoff {
+    fn get_round_backoff(&self, _round: Round) -> (f64, Option<Duration>) {
+        (1.0, None)
+    }
+
+    fn get_round_payload_limits(&self, _round: Round) -> (f64, Option<(u64, u64)>) {
+        (1.0, None)
     }
 }
 
@@ -80,12 +114,12 @@ async fn test_certified_node_handler() {
 
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(&signers, mock_ledger_info);
-    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info));
+    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
     let dag = Arc::new(RwLock::new(Dag::new(
         epoch_state.clone(),
         storage.clone(),
         0,
-        DAG_WINDOW,
+        TEST_DAG_WINDOW,
     )));
 
     let network_sender = Arc::new(MockNetworkSender {});
@@ -101,11 +135,12 @@ async fn test_certified_node_handler() {
     let (tx, _) = unbounded();
     let order_rule = OrderRule::new(
         epoch_state.clone(),
-        LedgerInfo::mock_genesis(None),
+        1,
         dag.clone(),
-        Box::new(RoundRobinAnchorElection::new(validators)),
-        Box::new(TestNotifier { tx }),
+        Arc::new(RoundRobinAnchorElection::new(validators)),
+        Arc::new(TestNotifier { tx }),
         storage.clone(),
+        TEST_DAG_WINDOW as Round,
     );
 
     let (_, fetch_requester, _, _) = DagFetcherService::new(
@@ -113,31 +148,47 @@ async fn test_certified_node_handler() {
         network_sender,
         dag.clone(),
         aptos_time_service::TimeService::mock(),
+        DagFetcherConfig::default(),
     );
     let fetch_requester = Arc::new(fetch_requester);
+
+    let ledger_info_provider = Arc::new(MockLedgerInfoProvider {
+        latest_ledger_info: mock_ledger_info,
+    });
+    let (round_tx, _round_rx) = tokio::sync::mpsc::channel(10);
+    let round_state = RoundState::new(
+        round_tx.clone(),
+        Box::new(OptimisticResponsive::new(round_tx)),
+    );
 
     let mut driver = DagDriver::new(
         signers[0].author(),
         epoch_state,
         dag,
+        Arc::new(PayloadManager::DirectMempool),
         Arc::new(MockPayloadManager::new(None)),
         rb,
         time_service,
         storage,
         order_rule,
         fetch_requester,
+        ledger_info_provider,
+        round_state,
+        TEST_DAG_WINDOW as Round,
+        DagPayloadConfig::default(),
+        Arc::new(MockChainHealthBackoff {}),
     );
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
-    assert_ok!(driver.process(first_round_node.clone()));
+    assert_ok!(driver.process(first_round_node.clone()).await);
     // expect an ack if the same message is sent again
-    assert_ok_eq!(driver.process(first_round_node), CertifiedAck::new(1));
+    assert_ok_eq!(driver.process(first_round_node).await, CertifiedAck::new(1));
 
     let parent_node = new_certified_node(1, signers[1].author(), vec![]);
     let invalid_node = new_certified_node(2, signers[0].author(), vec![parent_node.certificate()]);
     assert_eq!(
-        driver.process(invalid_node).unwrap_err().to_string(),
+        driver.process(invalid_node).await.unwrap_err().to_string(),
         DagDriverError::MissingParents.to_string()
     );
 }

@@ -69,9 +69,9 @@ impl LoggerConfig {
 
 impl ConfigSanitizer for LoggerConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         let sanitizer_name = Self::get_sanitizer_name();
         let logger_config = &node_config.logger;
@@ -100,7 +100,7 @@ impl ConfigOptimizer for LoggerConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let logger_config = &mut node_config.logger;
         let local_logger_config_yaml = &local_config_yaml["logger"];
@@ -142,7 +142,7 @@ mod tests {
             &mut node_config,
             &serde_yaml::from_str("{}").unwrap(), // An empty local config,
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(modified_config);
@@ -176,7 +176,7 @@ mod tests {
             &mut node_config,
             &local_config_yaml,
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap();
         assert!(!modified_config);
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn test_sanitize_missing_feature() {
         // Create a logger config with the tokio console port set
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             logger: LoggerConfig {
                 tokio_console_port: Some(100),
                 ..Default::default()
@@ -198,7 +198,7 @@ mod tests {
 
         // Verify that the config fails sanitization (the tokio-console feature is missing!)
         let error =
-            LoggerConfig::sanitize(&mut node_config, NodeType::Validator, ChainId::testnet())
+            LoggerConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::testnet()))
                 .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
     }

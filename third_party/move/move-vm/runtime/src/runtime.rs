@@ -34,6 +34,7 @@ use move_vm_types::{
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 
 /// An instantiation of the MoveVM.
+#[derive(Clone)]
 pub(crate) struct VMRuntime {
     loader: Loader,
 }
@@ -61,9 +62,9 @@ impl VMRuntime {
         let compiled_modules = match modules
             .iter()
             .map(|blob| {
-                CompiledModule::deserialize_with_max_version(
+                CompiledModule::deserialize_with_config(
                     blob,
-                    self.loader.vm_config().max_binary_format_version,
+                    &self.loader.vm_config().deserializer_config,
                 )
             })
             .collect::<PartialVMResult<Vec<_>>>()

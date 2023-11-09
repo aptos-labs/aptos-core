@@ -109,6 +109,7 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
 
+        pragma verify_duration_estimate = 200;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
 
@@ -714,6 +715,8 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::chain_status;
         requires chain_status::is_operating();
 
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // verify voting::resolve_proposal_v2
         include VotingIsProposalResolvableAbortsif;
 

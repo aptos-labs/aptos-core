@@ -315,15 +315,11 @@ impl ValidatorVerifier {
         Ok(())
     }
 
-    /// Ensure there is at least quorum_voting_power in the provided signatures and there
-    /// are only known authors. According to the threshold verification policy,
-    /// invalid public keys are not allowed.
-    pub fn check_voting_power<'a>(
+    /// Sum voting power for valid accounts, exiting early for unknown authors
+    pub fn sum_voting_power<'a>(
         &self,
         authors: impl Iterator<Item = &'a AccountAddress>,
-        check_super_majority: bool,
-    ) -> std::result::Result<(), VerifyError> {
-        // Add voting power for valid accounts, exiting early for unknown authors
+    ) -> std::result::Result<u128, VerifyError> {
         let mut aggregated_voting_power = 0;
         for account_address in authors {
             match self.get_voting_power(account_address) {
@@ -331,6 +327,18 @@ impl ValidatorVerifier {
                 None => return Err(VerifyError::UnknownAuthor),
             }
         }
+        Ok(aggregated_voting_power)
+    }
+
+    /// Ensure there is at least quorum_voting_power in the provided signatures and there
+    /// are only known authors. According to the threshold verification policy,
+    /// invalid public keys are not allowed.
+    pub fn check_voting_power<'a>(
+        &self,
+        authors: impl Iterator<Item = &'a AccountAddress>,
+        check_super_majority: bool,
+    ) -> std::result::Result<u128, VerifyError> {
+        let aggregated_voting_power = self.sum_voting_power(authors)?;
 
         let target = if check_super_majority {
             self.quorum_voting_power
@@ -344,7 +352,7 @@ impl ValidatorVerifier {
                 expected_voting_power: target,
             });
         }
-        Ok(())
+        Ok(aggregated_voting_power)
     }
 
     /// Returns the public key for this address.
@@ -546,7 +554,7 @@ mod tests {
             } else if i < majority {
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
-                    Ok(()),
+                    Ok(i as u128),
                 );
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
@@ -558,11 +566,11 @@ mod tests {
             } else {
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), false),
-                    Ok(()),
+                    Ok(i as u128),
                 );
                 assert_eq!(
                     validator_verifier.check_voting_power(author_to_signature_map.keys(), true),
-                    Ok(()),
+                    Ok(i as u128),
                 );
             }
             author_to_signature_map

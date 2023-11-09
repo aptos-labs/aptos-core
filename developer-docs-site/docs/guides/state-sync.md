@@ -124,7 +124,7 @@ node configuration file:
  state_sync:
      state_sync_driver:
          bootstrapping_mode: DownloadLatestStates
-         continuous_syncing_mode: ApplyTransactionOutputs
+         continuous_syncing_mode: ExecuteTransactionsOrApplyOutputs
 ```
 
 While your node is syncing, you'll be able to see the

@@ -13,6 +13,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(clippy::too_many_arguments)]
+#![allow(clippy::arc_with_non_send_sync)]
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -294,6 +295,14 @@ pub enum EntryFunctionCall {
     DelegationPoolReactivateStake {
         pool_address: AccountAddress,
         amount: u64,
+    },
+
+    /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
+    /// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+    /// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
+    /// one for each pool.
+    DelegationPoolSetBeneficiaryForOperator {
+        new_beneficiary: AccountAddress,
     },
 
     /// Allows an owner to change the delegated voter of the underlying stake pool.
@@ -687,7 +696,7 @@ pub enum EntryFunctionCall {
     /// Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
     /// at the end of the stake pool's lockup period before they can actually can withdraw_commission.
     ///
-    /// Only staker or operator can call this.
+    /// Only staker, operator or beneficiary can call this.
     StakingContractRequestCommission {
         staker: AccountAddress,
         operator: AccountAddress,
@@ -696,6 +705,13 @@ pub enum EntryFunctionCall {
     /// Convenient function to allow the staker to reset their stake pool's lockup period to start now.
     StakingContractResetLockup {
         operator: AccountAddress,
+    },
+
+    /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
+    /// beneficiary. To ensures payment to the current beneficiary, one should first call `distribute` before switching
+    /// the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
+    StakingContractSetBeneficiaryForOperator {
+        new_beneficiary: AccountAddress,
     },
 
     /// Allows staker to switch operator without going through the lenghthy process to unstake.
@@ -810,6 +826,11 @@ pub enum EntryFunctionCall {
     VestingSetBeneficiary {
         contract_address: AccountAddress,
         shareholder: AccountAddress,
+        new_beneficiary: AccountAddress,
+    },
+
+    /// Set the beneficiary for the operator.
+    VestingSetBeneficiaryForOperator {
         new_beneficiary: AccountAddress,
     },
 
@@ -1037,6 +1058,9 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_reactivate_stake(pool_address, amount),
+            DelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
+                delegation_pool_set_beneficiary_for_operator(new_beneficiary)
+            },
             DelegationPoolSetDelegatedVoter { new_voter } => {
                 delegation_pool_set_delegated_voter(new_voter)
             },
@@ -1288,6 +1312,9 @@ impl EntryFunctionCall {
                 staking_contract_request_commission(staker, operator)
             },
             StakingContractResetLockup { operator } => staking_contract_reset_lockup(operator),
+            StakingContractSetBeneficiaryForOperator { new_beneficiary } => {
+                staking_contract_set_beneficiary_for_operator(new_beneficiary)
+            },
             StakingContractSwitchOperator {
                 old_operator,
                 new_operator,
@@ -1359,6 +1386,9 @@ impl EntryFunctionCall {
                 shareholder,
                 new_beneficiary,
             } => vesting_set_beneficiary(contract_address, shareholder, new_beneficiary),
+            VestingSetBeneficiaryForOperator { new_beneficiary } => {
+                vesting_set_beneficiary_for_operator(new_beneficiary)
+            },
             VestingSetBeneficiaryResetter {
                 contract_address,
                 beneficiary_resetter,
@@ -2124,6 +2154,27 @@ pub fn delegation_pool_reactivate_stake(
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
+/// beneficiary. To ensures payment to the current beneficiary, one should first call `synchronize_delegation_pool`
+/// before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
+/// one for each pool.
+pub fn delegation_pool_set_beneficiary_for_operator(
+    new_beneficiary: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("set_beneficiary_for_operator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_beneficiary).unwrap()],
     ))
 }
 
@@ -3259,7 +3310,7 @@ pub fn staking_contract_distribute(
 /// Unlock commission amount from the stake pool. Operator needs to wait for the amount to become withdrawable
 /// at the end of the stake pool's lockup period before they can actually can withdraw_commission.
 ///
-/// Only staker or operator can call this.
+/// Only staker, operator or beneficiary can call this.
 pub fn staking_contract_request_commission(
     staker: AccountAddress,
     operator: AccountAddress,
@@ -3294,6 +3345,26 @@ pub fn staking_contract_reset_lockup(operator: AccountAddress) -> TransactionPay
         ident_str!("reset_lockup").to_owned(),
         vec![],
         vec![bcs::to_bytes(&operator).unwrap()],
+    ))
+}
+
+/// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
+/// beneficiary. To ensures payment to the current beneficiary, one should first call `distribute` before switching
+/// the beneficiary. An operator can set one beneficiary for staking contract pools, not a separate one for each pool.
+pub fn staking_contract_set_beneficiary_for_operator(
+    new_beneficiary: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("staking_contract").to_owned(),
+        ),
+        ident_str!("set_beneficiary_for_operator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_beneficiary).unwrap()],
     ))
 }
 
@@ -3704,6 +3775,22 @@ pub fn vesting_set_beneficiary(
             bcs::to_bytes(&shareholder).unwrap(),
             bcs::to_bytes(&new_beneficiary).unwrap(),
         ],
+    ))
+}
+
+/// Set the beneficiary for the operator.
+pub fn vesting_set_beneficiary_for_operator(new_beneficiary: AccountAddress) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("vesting").to_owned(),
+        ),
+        ident_str!("set_beneficiary_for_operator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&new_beneficiary).unwrap()],
     ))
 }
 
@@ -4308,6 +4395,18 @@ mod decoder {
             Some(EntryFunctionCall::DelegationPoolReactivateStake {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_set_beneficiary_for_operator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolSetBeneficiaryForOperator {
+                new_beneficiary: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -4980,6 +5079,20 @@ mod decoder {
         }
     }
 
+    pub fn staking_contract_set_beneficiary_for_operator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::StakingContractSetBeneficiaryForOperator {
+                    new_beneficiary: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn staking_contract_switch_operator(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5225,6 +5338,18 @@ mod decoder {
                 contract_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 shareholder: bcs::from_bytes(script.args().get(1)?).ok()?,
                 new_beneficiary: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn vesting_set_beneficiary_for_operator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VestingSetBeneficiaryForOperator {
+                new_beneficiary: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -5495,6 +5620,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_reactivate_stake),
         );
         map.insert(
+            "delegation_pool_set_beneficiary_for_operator".to_string(),
+            Box::new(decoder::delegation_pool_set_beneficiary_for_operator),
+        );
+        map.insert(
             "delegation_pool_set_delegated_voter".to_string(),
             Box::new(decoder::delegation_pool_set_delegated_voter),
         );
@@ -5704,6 +5833,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::staking_contract_reset_lockup),
         );
         map.insert(
+            "staking_contract_set_beneficiary_for_operator".to_string(),
+            Box::new(decoder::staking_contract_set_beneficiary_for_operator),
+        );
+        map.insert(
             "staking_contract_switch_operator".to_string(),
             Box::new(decoder::staking_contract_switch_operator),
         );
@@ -5786,6 +5919,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_set_beneficiary".to_string(),
             Box::new(decoder::vesting_set_beneficiary),
+        );
+        map.insert(
+            "vesting_set_beneficiary_for_operator".to_string(),
+            Box::new(decoder::vesting_set_beneficiary_for_operator),
         );
         map.insert(
             "vesting_set_beneficiary_resetter".to_string(),

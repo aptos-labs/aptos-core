@@ -4,9 +4,9 @@
 use crate::config::{
     node_config_loader::NodeType,
     utils::{are_failpoints_enabled, get_config_name},
-    ApiConfig, BaseConfig, ConsensusConfig, Error, ExecutionConfig, IndexerConfig,
-    IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig,
-    PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
+    AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, DagConsensusConfig, Error,
+    ExecutionConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
+    NetbenchConfig, NodeConfig, PeerMonitoringServiceConfig, StateSyncConfig, StorageConfig,
 };
 use aptos_types::chain_id::ChainId;
 use std::collections::HashSet;
@@ -27,9 +27,9 @@ pub trait ConfigSanitizer {
 
     /// Validate and process the config according to the given node type and chain ID
     fn sanitize(
-        _node_config: &mut NodeConfig,
+        _node_config: &NodeConfig,
         _node_type: NodeType,
-        _chain_id: ChainId,
+        _chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         unimplemented!("sanitize() must be implemented for each sanitizer!");
     }
@@ -37,22 +37,24 @@ pub trait ConfigSanitizer {
 
 impl ConfigSanitizer for NodeConfig {
     fn sanitize(
-        node_config: &mut NodeConfig,
+        node_config: &NodeConfig,
         node_type: NodeType,
-        chain_id: ChainId,
+        chain_id: Option<ChainId>,
     ) -> Result<(), Error> {
         // Sanitize all of the sub-configs
+        AdminServiceConfig::sanitize(node_config, node_type, chain_id)?;
         ApiConfig::sanitize(node_config, node_type, chain_id)?;
         BaseConfig::sanitize(node_config, node_type, chain_id)?;
         ConsensusConfig::sanitize(node_config, node_type, chain_id)?;
+        DagConsensusConfig::sanitize(node_config, node_type, chain_id)?;
         ExecutionConfig::sanitize(node_config, node_type, chain_id)?;
         sanitize_failpoints_config(node_config, node_type, chain_id)?;
         sanitize_fullnode_network_configs(node_config, node_type, chain_id)?;
-        IndexerConfig::sanitize(node_config, node_type, chain_id)?;
         IndexerGrpcConfig::sanitize(node_config, node_type, chain_id)?;
         InspectionServiceConfig::sanitize(node_config, node_type, chain_id)?;
         LoggerConfig::sanitize(node_config, node_type, chain_id)?;
         MempoolConfig::sanitize(node_config, node_type, chain_id)?;
+        NetbenchConfig::sanitize(node_config, node_type, chain_id)?;
         PeerMonitoringServiceConfig::sanitize(node_config, node_type, chain_id)?;
         StateSyncConfig::sanitize(node_config, node_type, chain_id)?;
         StorageConfig::sanitize(node_config, node_type, chain_id)?;
@@ -64,20 +66,22 @@ impl ConfigSanitizer for NodeConfig {
 
 /// Sanitize the failpoints config according to the node role and chain ID
 fn sanitize_failpoints_config(
-    node_config: &mut NodeConfig,
+    node_config: &NodeConfig,
     _node_type: NodeType,
-    chain_id: ChainId,
+    chain_id: Option<ChainId>,
 ) -> Result<(), Error> {
     let sanitizer_name = FAILPOINTS_SANITIZER_NAME.to_string();
     let failpoints = &node_config.failpoints;
 
     // Verify that failpoints are not enabled in mainnet
     let failpoints_enabled = are_failpoints_enabled();
-    if chain_id.is_mainnet() && failpoints_enabled {
-        return Err(Error::ConfigSanitizerFailed(
-            sanitizer_name,
-            "Failpoints are not supported on mainnet nodes!".into(),
-        ));
+    if let Some(chain_id) = chain_id {
+        if chain_id.is_mainnet() && failpoints_enabled {
+            return Err(Error::ConfigSanitizerFailed(
+                sanitizer_name,
+                "Failpoints are not supported on mainnet nodes!".into(),
+            ));
+        }
     }
 
     // Ensure that the failpoints config is populated appropriately
@@ -100,12 +104,12 @@ fn sanitize_failpoints_config(
 
 /// Sanitize the fullnode network configs according to the node role and chain ID
 fn sanitize_fullnode_network_configs(
-    node_config: &mut NodeConfig,
+    node_config: &NodeConfig,
     node_type: NodeType,
-    _chain_id: ChainId,
+    _chain_id: Option<ChainId>,
 ) -> Result<(), Error> {
     let sanitizer_name = FULLNODE_NETWORKS_SANITIZER_NAME.to_string();
-    let fullnode_networks = &mut node_config.full_node_networks;
+    let fullnode_networks = &node_config.full_node_networks;
 
     // Verify that the fullnode network configs are not empty for fullnodes
     if fullnode_networks.is_empty() && !node_type.is_validator() {
@@ -138,9 +142,6 @@ fn sanitize_fullnode_network_configs(
                 ),
             ));
         }
-
-        // Prepare the network id
-        fullnode_network_config.set_listen_address_and_prepare_identity()?;
     }
 
     Ok(())
@@ -148,12 +149,12 @@ fn sanitize_fullnode_network_configs(
 
 /// Sanitize the validator network config according to the node role and chain ID
 fn sanitize_validator_network_config(
-    node_config: &mut NodeConfig,
+    node_config: &NodeConfig,
     node_type: NodeType,
-    _chain_id: ChainId,
+    _chain_id: Option<ChainId>,
 ) -> Result<(), Error> {
     let sanitizer_name = VALIDATOR_NETWORK_SANITIZER_NAME.to_string();
-    let validator_network = &mut node_config.validator_network;
+    let validator_network = &node_config.validator_network;
 
     // Verify that the validator network config is not empty for validators
     if validator_network.is_none() && node_type.is_validator() {
@@ -188,9 +189,6 @@ fn sanitize_validator_network_config(
                 "Mutual authentication must be enabled for the validator network!".into(),
             ));
         }
-
-        // Prepare the network id
-        validator_network_config.set_listen_address_and_prepare_identity()?;
     }
 
     Ok(())
@@ -204,16 +202,16 @@ mod tests {
     #[test]
     fn test_sanitize_missing_pfn_network_configs() {
         // Create a PFN config with empty fullnode network configs
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             full_node_networks: vec![],
             ..Default::default()
         };
 
         // Sanitize the config and verify that it fails
         let error = sanitize_fullnode_network_configs(
-            &mut node_config,
+            &node_config,
             NodeType::PublicFullnode,
-            ChainId::mainnet(),
+            Some(ChainId::mainnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -222,16 +220,16 @@ mod tests {
     #[test]
     fn test_sanitize_missing_vfn_network_configs() {
         // Create a VFN config with empty fullnode network configs
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             full_node_networks: vec![],
             ..Default::default()
         };
 
         // Sanitize the PFN config and verify that it fails
         let error = sanitize_fullnode_network_configs(
-            &mut node_config,
+            &node_config,
             NodeType::ValidatorFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -240,7 +238,7 @@ mod tests {
     #[test]
     fn test_sanitize_validator_network_for_fullnode() {
         // Create a fullnode config that includes a validator network
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             full_node_networks: vec![NetworkConfig {
                 network_id: NetworkId::Validator,
                 ..Default::default()
@@ -250,9 +248,9 @@ mod tests {
 
         // Sanitize the config and verify that it fails
         let error = sanitize_fullnode_network_configs(
-            &mut node_config,
+            &node_config,
             NodeType::PublicFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -261,7 +259,7 @@ mod tests {
     #[test]
     fn test_sanitize_duplicate_fullnode_network_configs() {
         // Create a node config with multiple fullnode network configs with the same network id
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             full_node_networks: vec![
                 NetworkConfig {
                     network_id: NetworkId::Public,
@@ -277,9 +275,9 @@ mod tests {
 
         // Sanitize the config and verify that it fails
         let error = sanitize_fullnode_network_configs(
-            &mut node_config,
+            &node_config,
             NodeType::ValidatorFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -288,16 +286,16 @@ mod tests {
     #[test]
     fn test_sanitize_missing_validator_network_config() {
         // Create a node config with an empty validator network config
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             validator_network: None,
             ..Default::default()
         };
 
         // Sanitize the config and verify that it fails
         let error = sanitize_validator_network_config(
-            &mut node_config,
+            &node_config,
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -306,7 +304,7 @@ mod tests {
     #[test]
     fn test_sanitize_validator_network_fullnode() {
         // Create a validator network config
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             validator_network: Some(NetworkConfig {
                 network_id: NetworkId::Validator,
                 mutual_authentication: true,
@@ -317,9 +315,9 @@ mod tests {
 
         // Sanitize the config (for a fullnode) and verify that it fails
         let error = sanitize_validator_network_config(
-            &mut node_config,
+            &node_config,
             NodeType::PublicFullnode,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -328,7 +326,7 @@ mod tests {
     #[test]
     fn test_sanitize_validator_disabled_authentication() {
         // Create a validator config with disabled mutual authentication
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             validator_network: Some(NetworkConfig {
                 network_id: NetworkId::Validator,
                 mutual_authentication: false,
@@ -339,9 +337,9 @@ mod tests {
 
         // Sanitize the config and verify that it fails
         let error = sanitize_validator_network_config(
-            &mut node_config,
+            &node_config,
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
@@ -350,7 +348,7 @@ mod tests {
     #[test]
     fn test_sanitize_validator_incorrect_network_id() {
         // Create a validator config with the wrong network ID
-        let mut node_config = NodeConfig {
+        let node_config = NodeConfig {
             validator_network: Some(NetworkConfig {
                 network_id: NetworkId::Public,
                 ..Default::default()
@@ -360,9 +358,9 @@ mod tests {
 
         // Sanitize the config and verify that it fails
         let error = sanitize_validator_network_config(
-            &mut node_config,
+            &node_config,
             NodeType::Validator,
-            ChainId::testnet(),
+            Some(ChainId::testnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));

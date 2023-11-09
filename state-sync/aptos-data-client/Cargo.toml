@@ -26,10 +26,19 @@ aptos-storage-service-client = { workspace = true }
 aptos-storage-service-types = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
+arc-swap = { workspace = true }
 async-trait = { workspace = true }
+dashmap = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
-rand = { workspace = true }
+maplit = { workspace = true }
+ordered-float = { workspace = true }
+# Note: we cannot rely on the workspace version of rand because it's out-of-date
+# and does not provide the necessary interfaces for weighted sampling. Similarly,
+# it's not trivial to update rand on the workspace because of several dependency
+# issues (e.g., other outdated crate versions). This is why we fix the version here.
+# Eventually we'll need to update the workspace to use the latest version of rand.
+rand = "0.8.5"
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -38,6 +47,7 @@ tokio = { workspace = true }
 anyhow = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-peer-monitoring-service-types = { workspace = true }
 aptos-storage-service-server = { workspace = true }
 aptos-time-service = { workspace = true, features = ["async", "testing"] }
 async-trait = { workspace = true }

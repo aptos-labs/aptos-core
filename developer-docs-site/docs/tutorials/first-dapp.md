@@ -29,7 +29,7 @@ We recommend becoming familiar with the newer full source code documented in the
 
 ### Aptos Wallet
 
-Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp, such as, the the [Petra wallet extension](https://petra.app).
+Before starting this tutorial, you'll need a chrome extension wallet to interact with the dapp, such as, the [Petra wallet extension](https://petra.app).
 
 If you haven't installed the Petra wallet extension before:
 1. Open the Wallet and click **Create a new wallet**. Then click **Create account** to create an Aptos Account.

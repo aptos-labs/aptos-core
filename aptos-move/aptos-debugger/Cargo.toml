@@ -1,17 +1,20 @@
 [package]
-name = "aptos-debugger"
+name = "aptos-move-debugger"
 version = "0.1.0"
-authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "A tool to replay transactions on chain and to execute transactions locally with remote backend"
-repository = "https://github.com/aptos-labs/aptos-core"
-homepage = "https://aptoslabs.com"
-license = "Apache-2.0"
-publish = false
-edition = "2021"
-default-run = "aptos-debugger"
+description = "A tool to replay transactions on chain and to execute transactions locally."
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-consensus = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas-meter = { workspace = true }
 aptos-gas-profiling = { workspace = true }
@@ -37,8 +40,6 @@ move-resource-viewer = { workspace = true }
 move-vm-runtime = { workspace = true }
 move-vm-test-utils = { workspace = true }
 regex = { workspace = true }
+reqwest = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
-
-[[bin]]
-name = "bcs-txn-decoder"

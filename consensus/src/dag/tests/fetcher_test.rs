@@ -3,9 +3,8 @@
 use super::dag_test::MockStorage;
 use crate::dag::{
     dag_fetcher::FetchRequestHandler,
-    dag_state_sync::DAG_WINDOW,
     dag_store::Dag,
-    tests::helpers::new_certified_node,
+    tests::helpers::{new_certified_node, TEST_DAG_WINDOW},
     types::{DagSnapshotBitmask, FetchResponse, RemoteFetchRequest},
     RpcHandler,
 };
@@ -14,8 +13,8 @@ use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_
 use claims::assert_ok_eq;
 use std::sync::Arc;
 
-#[test]
-fn test_dag_fetcher_receiver() {
+#[tokio::test]
+async fn test_dag_fetcher_receiver() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
@@ -26,7 +25,7 @@ fn test_dag_fetcher_receiver() {
         epoch_state.clone(),
         storage,
         0,
-        DAG_WINDOW,
+        TEST_DAG_WINDOW,
     )));
 
     let mut fetcher = FetchRequestHandler::new(dag.clone(), epoch_state);
@@ -56,7 +55,7 @@ fn test_dag_fetcher_receiver() {
         DagSnapshotBitmask::new(1, vec![vec![true, false]]),
     );
     assert_ok_eq!(
-        fetcher.process(request),
+        fetcher.process(request).await,
         FetchResponse::new(1, vec![first_round_nodes[1].clone()])
     );
 }

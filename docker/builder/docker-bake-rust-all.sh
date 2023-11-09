@@ -6,8 +6,9 @@
 # You need to execute this from the repository root as working directory
 # E.g. docker/docker-bake-rust-all.sh
 # If you want to build a specific target only, run:
-#  docker/docker-bake-rust-all.sh <target>
-# E.g. docker/docker-bake-rust-all.sh indexer
+#   docker/docker-bake-rust-all.sh <target>
+# See targets in docker/builder/docker-bake-rust-all.hcl
+#   e.g. docker/docker-bake-rust-all.sh forge-images
 
 set -ex
 
@@ -53,7 +54,7 @@ echo "E.g. docker/builder/docker-bake-rust-all.sh forge-images"
 if [ "$CI" == "true" ]; then
   docker buildx bake --progress=plain --file docker/builder/docker-bake-rust-all.hcl --push $BUILD_TARGET
 else
-  docker buildx bake --file docker/builder/docker-bake-rust-all.hcl $BUILD_TARGET
+  docker buildx bake --file docker/builder/docker-bake-rust-all.hcl $BUILD_TARGET --load
 fi
 
 echo "Build complete. Docker buildx cache usage:"

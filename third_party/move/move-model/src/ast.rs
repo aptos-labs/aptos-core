@@ -16,7 +16,10 @@ use crate::{
 };
 use internment::LocalIntern;
 use itertools::Itertools;
-use move_binary_format::file_format::{CodeOffset, Visibility};
+use move_binary_format::{
+    file_format,
+    file_format::{CodeOffset, Visibility},
+};
 use move_core_types::account_address::AccountAddress;
 use num::BigInt;
 use std::{
@@ -71,6 +74,18 @@ pub enum AttributeValue {
 pub enum Attribute {
     Apply(NodeId, Symbol, Vec<Attribute>),
     Assign(NodeId, Symbol, AttributeValue),
+}
+
+impl Attribute {
+    pub fn name(&self) -> Symbol {
+        match self {
+            Attribute::Assign(_, s, _) | Attribute::Apply(_, s, _) => *s,
+        }
+    }
+
+    pub fn has(attrs: &[Attribute], pred: impl Fn(&Attribute) -> bool) -> bool {
+        attrs.iter().any(pred)
+    }
 }
 
 // =================================================================================================
@@ -370,6 +385,49 @@ pub struct UseDecl {
     pub alias: Option<Symbol>,
     /// A list of member uses, with optional aliasing.
     pub members: Vec<(Loc, Symbol, Option<Symbol>)>,
+}
+
+// =================================================================================================
+/// # Friend Declarations
+
+/// Represents a `friend` declaration in the source.
+#[derive(Debug, Clone)]
+pub struct FriendDecl {
+    /// Location covered by this declaration.
+    pub loc: Loc,
+    /// The name of the friend module.
+    pub module_name: ModuleName,
+    /// The resolved module id, if it is known.
+    pub module_id: Option<ModuleId>,
+}
+
+// =================================================================================================
+/// # Access Specifiers
+
+/// Access specifier
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AccessSpecifier {
+    pub loc: Loc,
+    pub kind: file_format::AccessKind,
+    pub negated: bool,
+    pub resource: (Loc, ResourceSpecifier),
+    pub address: (Loc, AddressSpecifier),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ResourceSpecifier {
+    Any,
+    DeclaredAtAddress(Address),
+    DeclaredInModule(ModuleId),
+    Resource(QualifiedInstId<StructId>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AddressSpecifier {
+    Any,
+    Address(Address),
+    Parameter(Symbol),
+    Call(QualifiedInstId<FunId>, Symbol),
 }
 
 // =================================================================================================

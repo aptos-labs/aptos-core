@@ -1,0 +1,20 @@
+[package]
+name = "aptos-drop-helper"
+description = "Aptos Drop Helper"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+aptos-experimental-runtimes = { workspace = true }
+aptos-infallible = { workspace = true }
+aptos-metrics-core = { workspace = true }
+once_cell = { workspace = true }
+threadpool = { workspace = true }

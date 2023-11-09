@@ -9,7 +9,8 @@ use crate::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
         commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
-        execution_phase::{ExecutionRequest, ExecutionResponse},
+        execution_schedule_phase::ExecutionRequest,
+        execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
         pipeline_phase::CountedRequest,
         signing_phase::{SigningRequest, SigningResponse},
@@ -83,8 +84,10 @@ pub struct BufferManager {
     // the roots point to the first *unprocessed* item.
     // None means no items ready to be processed (either all processed or no item finishes previous stage)
     execution_root: BufferItemRootType,
-    execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
-    execution_phase_rx: Receiver<ExecutionResponse>,
+    execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
+    execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
+    execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
+    execution_wait_phase_rx: Receiver<ExecutionResponse>,
 
     signing_root: BufferItemRootType,
     signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
@@ -120,8 +123,10 @@ pub struct BufferManager {
 impl BufferManager {
     pub fn new(
         author: Author,
-        execution_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
-        execution_phase_rx: Receiver<ExecutionResponse>,
+        execution_schedule_phase_tx: Sender<CountedRequest<ExecutionRequest>>,
+        execution_schedule_phase_rx: Receiver<ExecutionWaitRequest>,
+        execution_wait_phase_tx: Sender<CountedRequest<ExecutionWaitRequest>>,
+        execution_wait_phase_rx: Receiver<ExecutionResponse>,
         signing_phase_tx: Sender<CountedRequest<SigningRequest>>,
         signing_phase_rx: Receiver<SigningResponse>,
         commit_msg_tx: Arc<NetworkSender>,
@@ -146,8 +151,10 @@ impl BufferManager {
             buffer,
 
             execution_root: None,
-            execution_phase_tx,
-            execution_phase_rx,
+            execution_schedule_phase_tx,
+            execution_schedule_phase_rx,
+            execution_wait_phase_tx,
+            execution_wait_phase_rx,
 
             signing_root: None,
             signing_phase_tx,
@@ -208,7 +215,7 @@ impl BufferManager {
 
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
-    fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
+    async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
         let OrderedBlocks {
             ordered_blocks,
             ordered_proof,
@@ -220,6 +227,16 @@ impl BufferManager {
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
         );
+
+        let request = self.create_new_request(ExecutionRequest {
+            ordered_blocks: ordered_blocks.clone(),
+            lifetime_guard: self.create_new_request(()),
+        });
+        self.execution_schedule_phase_tx
+            .send(request)
+            .await
+            .expect("Failed to send execution schedule request");
+
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -237,19 +254,22 @@ impl BufferManager {
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
-        if self.execution_root.is_some() {
+        if self.execution_root.is_some() && cursor == self.execution_root {
+            // Schedule retry.
+            // NOTE: probably should schedule retry for all ordered blocks, but since execution error
+            // is not expected nor retryable in reality, I'd rather remove retrying or do it more
+            // properly than complicating it here.
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
-            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
-            if cursor == self.execution_root {
-                let sender = self.execution_phase_tx.clone();
-                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
-            } else {
-                self.execution_phase_tx
-                    .send(request)
-                    .await
-                    .expect("Failed to send execution request")
-            }
+            let request = self.create_new_request(ExecutionRequest {
+                ordered_blocks,
+                lifetime_guard: self.create_new_request(()),
+            });
+            let sender = self.execution_schedule_phase_tx.clone();
+            Self::spawn_retry_request(sender, request, Duration::from_millis(100));
         }
+        // Otherwise do nothing, because the execution wait phase is driven by the response of
+        // the execution schedule phase, which is in turn fed as soon as the ordered blocks
+        // come in.
     }
 
     /// Set the signing root to the first not signed item (Executed) and send execution request
@@ -374,6 +394,15 @@ impl BufferManager {
         info!("Reset finishes");
     }
 
+    async fn process_execution_schedule_response(&mut self, response: ExecutionWaitRequest) {
+        // pass through to the execution wait phase
+        let request = self.create_new_request(response);
+        self.execution_wait_phase_tx
+            .send(request)
+            .await
+            .expect("Failed to send execution wait request.");
+    }
+
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
@@ -394,6 +423,16 @@ impl BufferManager {
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
+        let current_item = self.buffer.get(&current_cursor);
+
+        if current_item.block_id() != block_id {
+            error!(
+                block_id = block_id,
+                expected_block_id = current_item.block_id(),
+                "Received result for unexpected block id. Ignoring."
+            );
+            return;
+        }
 
         // Handle reconfiguration timestamp reconciliation.
         // end epoch timestamp is set to the first block that causes the reconfiguration.
@@ -654,7 +693,7 @@ impl BufferManager {
             ::futures::select! {
                 blocks = self.block_rx.select_next_some() => {
                     monitor!("buffer_manager_process_ordered", {
-                    self.process_ordered_blocks(blocks);
+                    self.process_ordered_blocks(blocks).await;
                     if self.execution_root.is_none() {
                         self.advance_execution_root().await;
                     }});
@@ -663,8 +702,12 @@ impl BufferManager {
                     monitor!("buffer_manager_process_reset",
                     self.process_reset_request(reset_event).await);
                 },
-                response = self.execution_phase_rx.select_next_some() => {
-                    monitor!("buffer_manager_process_execution_response", {
+                response = self.execution_schedule_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_schedule_response", {
+                    self.process_execution_schedule_response(response).await;
+                })},
+                response = self.execution_wait_phase_rx.select_next_some() => {
+                    monitor!("buffer_manager_process_execution_wait_response", {
                     self.process_execution_response(response).await;
                     self.advance_execution_root().await;
                     if self.signing_root.is_none() {

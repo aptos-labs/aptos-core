@@ -22,6 +22,7 @@ use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, nibble::nibble_path::NibblePath,
     state_store::state_key::StateKeyTag,
 };
+use arr_macro::arr;
 use proptest::{collection::hash_map, prelude::*};
 use std::collections::HashMap;
 
@@ -309,13 +310,13 @@ pub fn test_get_state_snapshot_before() {
             &Node::Null,
         )
         .unwrap();
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .write_schemas(batch)
         .unwrap();
 
     assert_eq!(
-        db.state_merkle_db
+        db.state_merkle_db()
             .get_state_snapshot_version_before(4)
             .unwrap(),
         Some(2)
@@ -325,13 +326,13 @@ pub fn test_get_state_snapshot_before() {
     batch
         .delete::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(2))
         .unwrap();
-    db.state_merkle_db
+    db.state_merkle_db()
         .metadata_db()
         .write_schemas(batch)
         .unwrap();
 
     assert_eq!(
-        db.state_merkle_db
+        db.state_merkle_db()
             .get_state_snapshot_version_before(4)
             .unwrap(),
         Some(0)

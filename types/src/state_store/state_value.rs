@@ -35,6 +35,9 @@ pub enum StateValueMetadata {
     },
 }
 
+// To avoid nested options when fetching a resource and its metadata.
+pub type StateValueMetadataKind = Option<StateValueMetadata>;
+
 impl StateValueMetadata {
     pub fn new(deposit: u64, creation_time_usecs: &CurrentTimeMicroseconds) -> Self {
         Self::V0 {
@@ -148,10 +151,32 @@ impl StateValue {
         }
     }
 
+    /// Applies a bytes-to-bytes transformation on the state value contents,
+    /// leaving the state value metadata untouched.
+    pub fn map_bytes<F: FnOnce(Bytes) -> anyhow::Result<Bytes>>(
+        self,
+        f: F,
+    ) -> anyhow::Result<StateValue> {
+        Ok(StateValue::new_impl(match self.inner {
+            StateValueInner::V0(data) => StateValueInner::V0(f(data)?),
+            StateValueInner::WithMetadata { data, metadata } => StateValueInner::WithMetadata {
+                data: f(data)?,
+                metadata,
+            },
+        }))
+    }
+
     pub fn into_metadata(self) -> Option<StateValueMetadata> {
         match self.inner {
             StateValueInner::V0(_) => None,
             StateValueInner::WithMetadata { metadata, .. } => Some(metadata),
+        }
+    }
+
+    pub fn into(self) -> (Option<StateValueMetadata>, Bytes) {
+        match self.inner {
+            StateValueInner::V0(bytes) => (None, bytes),
+            StateValueInner::WithMetadata { data, metadata } => (Some(metadata), data),
         }
     }
 }

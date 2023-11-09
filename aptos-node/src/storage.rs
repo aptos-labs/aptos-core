@@ -1,44 +1,101 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
+use aptos_backup_service::start_backup_service;
 use aptos_config::{config::NodeConfig, utils::get_genesis_txn};
-use aptos_db::AptosDB;
+use aptos_db::{fast_sync_storage_wrapper::FastSyncStorageWrapper, AptosDB};
 use aptos_executor::db_bootstrapper::maybe_bootstrap;
 use aptos_logger::{debug, info};
 use aptos_storage_interface::{DbReader, DbReaderWriter};
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{ledger_info::LedgerInfoWithSignatures, waypoint::Waypoint};
 use aptos_vm::AptosVM;
-use std::{fs, net::SocketAddr, path::Path, sync::Arc, time::Instant};
+use either::Either;
+use std::{fs, path::Path, sync::Arc, time::Instant};
 use tokio::runtime::Runtime;
+
+pub(crate) fn maybe_apply_genesis(
+    db_rw: &DbReaderWriter,
+    node_config: &NodeConfig,
+) -> Result<Option<LedgerInfoWithSignatures>> {
+    let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
+    if let Some(genesis) = get_genesis_txn(node_config) {
+        let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
+            .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
+        Ok(ledger_info_opt)
+    } else {
+        info ! ("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
+        Ok(None)
+    }
+}
 
 #[cfg(not(feature = "consensus-only-perf-test"))]
 pub(crate) fn bootstrap_db(
-    aptos_db: AptosDB,
-    backup_service_address: SocketAddr,
-) -> (Arc<AptosDB>, DbReaderWriter, Option<Runtime>) {
-    use aptos_backup_service::start_backup_service;
+    node_config: &NodeConfig,
+) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
+    let (aptos_db_reader, db_rw, backup_service) =
+        match FastSyncStorageWrapper::initialize_dbs(node_config)? {
+            Either::Left(db) => {
+                let (db_arc, db_rw) = DbReaderWriter::wrap(db);
+                let db_backup_service = start_backup_service(
+                    node_config.storage.backup_service_address,
+                    db_arc.clone(),
+                );
+                maybe_apply_genesis(&db_rw, node_config)?;
+                (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
+            },
+            Either::Right(fast_sync_db_wrapper) => {
+                let temp_db = fast_sync_db_wrapper.get_temporary_db_with_genesis();
+                maybe_apply_genesis(&DbReaderWriter::from_arc(temp_db), node_config)?;
+                let (db_arc, db_rw) = DbReaderWriter::wrap(fast_sync_db_wrapper);
+                let fast_sync_db = db_arc.get_fast_sync_db();
+                // FastSyncDB requires ledger info at epoch 0 to establish provenance to genesis
+                let ledger_info = db_arc
+                    .get_temporary_db_with_genesis()
+                    .get_epoch_ending_ledger_info(0)
+                    .expect("Genesis ledger info must exist");
 
-    let (aptos_db, db_rw) = DbReaderWriter::wrap(aptos_db);
-    let db_backup_service = start_backup_service(backup_service_address, aptos_db.clone());
-    (aptos_db, db_rw, Some(db_backup_service))
+                if fast_sync_db
+                    .get_latest_ledger_info_option()
+                    .expect("should returns Ok results")
+                    .is_none()
+                {
+                    // it means the DB is empty and we need to
+                    // commit the genesis ledger info to the DB.
+                    fast_sync_db.commit_genesis_ledger_info(&ledger_info)?;
+                }
+
+                let db_backup_service =
+                    start_backup_service(node_config.storage.backup_service_address, fast_sync_db);
+
+                (db_arc as Arc<dyn DbReader>, db_rw, Some(db_backup_service))
+            },
+        };
+
+    Ok((aptos_db_reader, db_rw, backup_service))
 }
 
 /// In consensus-only mode, return a in-memory based [FakeAptosDB] and
 /// do not run the backup service.
 #[cfg(feature = "consensus-only-perf-test")]
 pub(crate) fn bootstrap_db(
-    aptos_db: AptosDB,
-    _backup_service_address: SocketAddr,
-) -> (
-    Arc<aptos_db::fake_aptosdb::FakeAptosDB>,
-    DbReaderWriter,
-    Option<Runtime>,
-) {
+    node_config: &NodeConfig,
+) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>)> {
     use aptos_db::fake_aptosdb::FakeAptosDB;
 
+    let aptos_db = AptosDB::open(
+        &node_config.storage.dir(),
+        false, /* readonly */
+        node_config.storage.storage_pruner_config,
+        node_config.storage.rocksdb_configs,
+        node_config.storage.enable_indexer,
+        node_config.storage.buffered_state_target_items,
+        node_config.storage.max_num_nodes_per_lru_cache_shard,
+    )
+    .map_err(|err| anyhow!("DB failed to open {}", err))?;
     let (aptos_db, db_rw) = DbReaderWriter::wrap(FakeAptosDB::new(aptos_db));
-    (aptos_db, db_rw, None)
+    maybe_apply_genesis(&db_rw, node_config)?;
+    Ok((aptos_db, db_rw, None))
 }
 
 /// Creates a RocksDb checkpoint for the consensus_db, state_sync_db,
@@ -62,11 +119,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
     AptosDB::create_checkpoint(
         &source_dir,
         &checkpoint_dir,
-        node_config.storage.rocksdb_configs.split_ledger_db,
-        node_config
-            .storage
-            .rocksdb_configs
-            .use_sharded_state_merkle_db,
+        node_config.storage.rocksdb_configs.enable_storage_sharding,
     )
     .expect("AptosDB checkpoint creation failed.");
 
@@ -87,7 +140,7 @@ fn create_rocksdb_checkpoint_and_change_working_dir(
 /// the various handles.
 pub fn initialize_database_and_checkpoints(
     node_config: &mut NodeConfig,
-) -> anyhow::Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>, Waypoint)> {
+) -> Result<(Arc<dyn DbReader>, DbReaderWriter, Option<Runtime>, Waypoint)> {
     // If required, create RocksDB checkpoints and change the working directory.
     // This is test-only.
     if let Some(working_dir) = node_config.base.working_dir.clone() {
@@ -96,28 +149,7 @@ pub fn initialize_database_and_checkpoints(
 
     // Open the database
     let instant = Instant::now();
-    let aptos_db = AptosDB::open(
-        &node_config.storage.dir(),
-        false, /* readonly */
-        node_config.storage.storage_pruner_config,
-        node_config.storage.rocksdb_configs,
-        node_config.storage.enable_indexer,
-        node_config.storage.buffered_state_target_items,
-        node_config.storage.max_num_nodes_per_lru_cache_shard,
-    )
-    .map_err(|err| anyhow!("DB failed to open {}", err))?;
-    let (aptos_db, db_rw, backup_service) =
-        bootstrap_db(aptos_db, node_config.storage.backup_service_address);
-
-    // TODO: handle non-genesis waypoints for state sync!
-    // If there's a genesis txn and waypoint, commit it if the result matches.
-    let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
-    if let Some(genesis) = get_genesis_txn(node_config) {
-        maybe_bootstrap::<AptosVM>(&db_rw, genesis, genesis_waypoint)
-            .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;
-    } else {
-        info!("Genesis txn not provided! This is fine only if you don't expect to apply it. Otherwise, the config is incorrect!");
-    }
+    let (aptos_db, db_rw, backup_service) = bootstrap_db(node_config)?;
 
     // Log the duration to open storage
     debug!(
@@ -125,5 +157,10 @@ pub fn initialize_database_and_checkpoints(
         instant.elapsed().as_millis()
     );
 
-    Ok((aptos_db, db_rw, backup_service, genesis_waypoint))
+    Ok((
+        aptos_db,
+        db_rw,
+        backup_service,
+        node_config.base.waypoint.genesis_waypoint(),
+    ))
 }

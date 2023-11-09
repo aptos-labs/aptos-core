@@ -9,6 +9,7 @@ use std::{
 };
 
 extern crate itertools;
+use crate::metrics::REMOTE_EXECUTOR_TIMER;
 use aptos_logger::trace;
 use aptos_state_view::{StateView, TStateView};
 use itertools::Itertools;
@@ -55,9 +56,13 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         *state_view_lock = Some(state_view);
     }
 
+    pub fn drop_state_view(&self) {
+        let mut state_view_lock = self.state_view.write().unwrap();
+        *state_view_lock = None;
+    }
+
     pub fn start(&self) {
-        loop {
-            let message = self.kv_rx.recv().unwrap();
+        while let Ok(message) = self.kv_rx.recv() {
             let state_view = self.state_view.clone();
             let kv_txs = self.kv_tx.clone();
             self.thread_pool.spawn(move || {
@@ -71,7 +76,16 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
         state_view: Arc<RwLock<Option<Arc<S>>>>,
         kv_tx: Arc<Vec<Sender<Message>>>,
     ) {
+        // we don't know the shard id until we deserialize the message, so lets default it to 0
+        let _timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_requests"])
+            .start_timer();
+        let bcs_deser_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_req_deser"])
+            .start_timer();
         let req: RemoteKVRequest = bcs::from_bytes(&message.data).unwrap();
+        drop(bcs_deser_timer);
+
         let (shard_id, state_keys) = req.into();
         trace!(
             "remote state view service - received request for shard {} with {} keys",
@@ -93,7 +107,11 @@ impl<S: StateView + Sync + Send + 'static> RemoteStateViewService<S> {
             .collect_vec();
         let len = resp.len();
         let resp = RemoteKVResponse::new(resp);
+        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&["0", "kv_resp_ser"])
+            .start_timer();
         let resp = bcs::to_bytes(&resp).unwrap();
+        drop(bcs_ser_timer);
         trace!(
             "remote state view service - sending response for shard {} with {} keys",
             shard_id,

@@ -38,6 +38,7 @@ fn unbalanced_stack_crash() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(1),
         type_parameters: vec![],
+        access_specifiers: None,
     };
 
     module.function_handles.push(fun_handle);
@@ -51,16 +52,13 @@ fn unbalanced_stack_crash() {
         .signatures
         .push(Signature(vec![Address, Bool, Address]));
 
-    module.identifiers.extend(
-        vec![
-            ident_str!("zf_hello_world").into(),
-            ident_str!("awldFnU18mlDKQfh6qNfBGx8X").into(),
-            ident_str!("aQPwJNHyAHpvJ").into(),
-            ident_str!("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
-            ident_str!("arYpsFa2fvrpPJ").into(),
-        ]
-        .into_iter(),
-    );
+    module.identifiers.extend(vec![
+        ident_str!("zf_hello_world").into(),
+        ident_str!("awldFnU18mlDKQfh6qNfBGx8X").into(),
+        ident_str!("aQPwJNHyAHpvJ").into(),
+        ident_str!("aT7ZphKTrKcYCwCebJySrmrKlckmnL5").into(),
+        ident_str!("arYpsFa2fvrpPJ").into(),
+    ]);
     module.address_identifiers.push(AccountAddress::random());
 
     module.constant_pool.push(Constant {
@@ -134,6 +132,7 @@ fn too_many_locals() {
             parameters: SignatureIndex(0),
             return_: SignatureIndex(0),
             type_parameters: vec![AbilitySet::ALL],
+            access_specifiers: None,
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -182,6 +181,7 @@ fn borrow_graph() {
             parameters: SignatureIndex(0),
             return_: SignatureIndex(0),
             type_parameters: vec![],
+            access_specifiers: None,
         }],
         field_handles: vec![],
         friend_decls: vec![],
@@ -278,6 +278,7 @@ fn indirect_code() {
             parameters: SignatureIndex(0),
             return_: SignatureIndex(0),
             type_parameters: vec![],
+            access_specifiers: None,
         }],
         field_handles: vec![],
         friend_decls: vec![],

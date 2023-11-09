@@ -321,6 +321,14 @@ const config = {
       {
         redirects: [
           {
+            to: "/tools/aptos-cli/install-cli",
+            from: "/releases/cli-release",
+          },
+          {
+            to: "/sdks/index",
+            from: "/releases/sdk-release",
+          },
+          {
             to: "/indexer/indexer-landing",
             from: "/integration/indexing",
           },
@@ -339,6 +347,14 @@ const config = {
           {
             to: "/aptos-white-paper",
             from: "/aptos-white-paper/aptos-white-paper-index/",
+          },
+          {
+            to: "/guides/local-development-network",
+            from: "/guides/local-testnet-dev-flow",
+          },
+          {
+            to: "/guides/local-development-network",
+            from: "/nodes/local-testnet/using-cli-to-run-a-local-testnet",
           },
           {
             to: "/guides/system-integrators-guide",

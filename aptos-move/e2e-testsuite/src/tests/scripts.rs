@@ -99,6 +99,7 @@ fn script_none_existing_module_dep() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
+        access_specifiers: None,
     };
     script.function_handles.push(fun_handle);
 
@@ -127,10 +128,10 @@ fn script_none_existing_module_dep() {
     }
     assert_eq!(
         status.status(),
-        //StatusCode::LINKER_ERROR
         Ok(ExecutionStatus::MiscellaneousError(Some(
             StatusCode::LINKER_ERROR
-        )))
+        ))),
+        "Linker Error: Transaction executed at a non-existent external module"
     );
     executor.apply_write_set(output.write_set());
 
@@ -177,6 +178,7 @@ fn script_non_existing_function_dep() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
+        access_specifiers: None,
     };
     script.function_handles.push(fun_handle);
 
@@ -257,6 +259,7 @@ fn script_bad_sig_function_dep() {
         parameters: SignatureIndex(0),
         return_: SignatureIndex(0),
         type_parameters: vec![],
+        access_specifiers: None,
     };
     script.function_handles.push(fun_handle);
 
@@ -352,7 +355,8 @@ fn script_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR))),
+        "Linker Error: Transaction executed at a non-existent external module"
     );
     executor.apply_write_set(output.write_set());
 
@@ -419,7 +423,8 @@ fn script_nested_type_argument_module_does_not_exist() {
     let status = output.status();
     assert_eq!(
         status,
-        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR)))
+        &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(LINKER_ERROR))),
+        "Linker Error: Transaction executed at a non-existent external module"
     );
     executor.apply_write_set(output.write_set());
 
@@ -463,6 +468,7 @@ fn forbid_script_emitting_events() {
         type_parameters: vec![
             AbilitySet::singleton(Ability::Store) | AbilitySet::singleton(Ability::Drop),
         ],
+        access_specifiers: None,
     });
     script.module_handles.push(ModuleHandle {
         address: AddressIdentifierIndex(0),

@@ -7,8 +7,9 @@ server_config:
       data_service_grpc_listen_address: 0.0.0.0:50053
       cert_path: /opt/aptos/certs/data-service-grpc-server.crt
       key_path: /opt/aptos/certs/data-service-grpc-server.key
-  whitelisted_auth_tokens: ["dummy_token"]
+  disable_auth_check: true
+  whitelisted_auth_tokens: []
   file_store_config:
     file_store_type: LocalFileStore
     local_file_store_path: /opt/aptos/file-store
-  redis_read_replica_address: 172.16.1.22:6379 # use a the read replica
+  redis_read_replica_address: redis://172.16.1.22:6379 # use a the read replica

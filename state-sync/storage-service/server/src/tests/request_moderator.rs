@@ -9,7 +9,6 @@ use aptos_config::{
     config::{PeerRole, StorageServiceConfig},
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_infallible::RwLock;
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::metadata::ConnectionState,
@@ -24,7 +23,8 @@ use aptos_storage_service_types::{
 use aptos_time_service::MockTimeService;
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress, PeerId};
 use claims::assert_matches;
-use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
+use dashmap::DashMap;
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn test_request_moderator_ignore_pfn() {
@@ -51,7 +51,7 @@ async fn test_request_moderator_ignore_pfn() {
     // Get the request moderator and verify the initial state
     let request_moderator = service.get_request_moderator();
     let unhealthy_peer_states = request_moderator.get_unhealthy_peer_states();
-    assert!(unhealthy_peer_states.read().is_empty());
+    assert!(unhealthy_peer_states.is_empty());
 
     // Spawn the server
     tokio::spawn(service.start());
@@ -105,22 +105,14 @@ async fn test_request_moderator_ignore_pfn() {
     }
 
     // Verify the unhealthy peer states
-    assert_eq!(unhealthy_peer_states.read().len(), 2);
+    assert_eq!(unhealthy_peer_states.len(), 2);
 
     // Verify the unhealthy peer state for the PFN
-    let unhealthy_pfn_state = unhealthy_peer_states
-        .read()
-        .get(&pfn_peer_network_id)
-        .cloned()
-        .unwrap();
+    let unhealthy_pfn_state = unhealthy_peer_states.get(&pfn_peer_network_id).unwrap();
     assert!(unhealthy_pfn_state.is_ignored());
 
     // Verify the unhealthy peer state for the VFN
-    let unhealthy_vfn_state = unhealthy_peer_states
-        .read()
-        .get(&vfn_peer_network_id)
-        .cloned()
-        .unwrap();
+    let unhealthy_vfn_state = unhealthy_peer_states.get(&vfn_peer_network_id).unwrap();
     assert!(!unhealthy_vfn_state.is_ignored());
 }
 
@@ -198,12 +190,10 @@ async fn test_request_moderator_increase_time() {
         );
 
         // Verify the peer is now ignored
-        let unhealthy_peer_state = unhealthy_peer_states
-            .read()
+        assert!(unhealthy_peer_states
             .get(&peer_network_id)
-            .cloned()
-            .unwrap();
-        assert!(unhealthy_peer_state.is_ignored());
+            .unwrap()
+            .is_ignored());
 
         // Wait until the peer is no longer ignored
         wait_for_request_moderator_to_unblock_peer(
@@ -243,7 +233,7 @@ async fn test_request_moderator_peer_garbage_collect() {
     let unhealthy_peer_states = request_moderator.get_unhealthy_peer_states();
 
     // Connect multiple peers
-    let peer_network_ids = vec![
+    let peer_network_ids = [
         PeerNetworkId::new(NetworkId::Validator, PeerId::random()),
         PeerNetworkId::new(NetworkId::Vfn, PeerId::random()),
         PeerNetworkId::new(NetworkId::Public, PeerId::random()),
@@ -272,11 +262,11 @@ async fn test_request_moderator_peer_garbage_collect() {
         .unwrap_err();
 
         // Verify the peer is now tracked as unhealthy
-        assert!(unhealthy_peer_states.read().contains_key(peer_network_id));
+        assert!(unhealthy_peer_states.contains_key(peer_network_id));
     }
 
     // Verify that only the first two peers are being tracked
-    assert_eq!(unhealthy_peer_states.read().len(), 2);
+    assert_eq!(unhealthy_peer_states.len(), 2);
 
     // Disconnect the first peer
     peers_and_metadata
@@ -292,7 +282,7 @@ async fn test_request_moderator_peer_garbage_collect() {
     .await;
 
     // Verify that only the second peer is being tracked
-    assert_eq!(unhealthy_peer_states.read().len(), 1);
+    assert_eq!(unhealthy_peer_states.len(), 1);
 
     // Disconnect the second peer
     peers_and_metadata
@@ -308,7 +298,7 @@ async fn test_request_moderator_peer_garbage_collect() {
     .await;
 
     // Verify that no peer is being tracked
-    assert!(unhealthy_peer_states.read().is_empty());
+    assert!(unhealthy_peer_states.is_empty());
 
     // Reconnect the first peer
     peers_and_metadata
@@ -325,9 +315,7 @@ async fn test_request_moderator_peer_garbage_collect() {
     .unwrap_err();
 
     // Verify the peer is now tracked as unhealthy
-    assert!(unhealthy_peer_states
-        .read()
-        .contains_key(&peer_network_ids[0]));
+    assert!(unhealthy_peer_states.contains_key(&peer_network_ids[0]));
 
     // Process enough invalid requests to ignore the third peer
     for _ in 0..max_invalid_requests_per_peer {
@@ -341,9 +329,8 @@ async fn test_request_moderator_peer_garbage_collect() {
     }
 
     // Verify the third peer is now tracked and blocked
-    assert_eq!(unhealthy_peer_states.read().len(), 2);
+    assert_eq!(unhealthy_peer_states.len(), 2);
     assert!(unhealthy_peer_states
-        .read()
         .get(&peer_network_ids[2])
         .unwrap()
         .is_ignored());
@@ -362,10 +349,8 @@ async fn test_request_moderator_peer_garbage_collect() {
     .await;
 
     // Verify that the peer is no longer being tracked
-    assert!(!unhealthy_peer_states
-        .read()
-        .contains_key(&peer_network_ids[2]));
-    assert_eq!(unhealthy_peer_states.read().len(), 1);
+    assert!(!unhealthy_peer_states.contains_key(&peer_network_ids[2]));
+    assert_eq!(unhealthy_peer_states.len(), 1);
 }
 
 /// Advances the given timer by the amount of time it takes to refresh the moderator
@@ -421,7 +406,7 @@ async fn send_invalid_transaction_request(
 
 /// Waits for the request moderator to garbage collect the peer state
 async fn wait_for_request_moderator_to_garbage_collect(
-    unhealthy_peer_states: Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>>,
+    unhealthy_peer_states: Arc<DashMap<PeerNetworkId, UnhealthyPeerState>>,
     mock_time: &MockTimeService,
     peer_network_id: &PeerNetworkId,
 ) {
@@ -432,7 +417,7 @@ async fn wait_for_request_moderator_to_garbage_collect(
             advance_moderator_refresh_time(mock_time).await;
 
             // Check if the peer is still being tracked
-            if !unhealthy_peer_states.read().contains_key(peer_network_id) {
+            if !unhealthy_peer_states.contains_key(peer_network_id) {
                 return; // The peer has been garbage collected
             }
 
@@ -452,7 +437,7 @@ async fn wait_for_request_moderator_to_garbage_collect(
 /// Waits for the request moderator to refresh the peer state
 /// and stop ignoring the specified peer.
 async fn wait_for_request_moderator_to_unblock_peer(
-    unhealthy_peer_states: Arc<RwLock<HashMap<PeerNetworkId, UnhealthyPeerState>>>,
+    unhealthy_peer_states: Arc<DashMap<PeerNetworkId, UnhealthyPeerState>>,
     mock_time: &MockTimeService,
     peer_network_id: &PeerNetworkId,
     min_time_to_ignore_peers_secs: u64,
@@ -469,11 +454,7 @@ async fn wait_for_request_moderator_to_unblock_peer(
             advance_moderator_refresh_time(mock_time).await;
 
             // Check if the peer is still being ignored
-            let unhealthy_peer_state = unhealthy_peer_states
-                .read()
-                .get(peer_network_id)
-                .cloned()
-                .unwrap();
+            let unhealthy_peer_state = unhealthy_peer_states.get(peer_network_id).unwrap();
             if !unhealthy_peer_state.is_ignored() {
                 return; // The peer is no longer being ignored
             }

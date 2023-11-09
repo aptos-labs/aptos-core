@@ -9,7 +9,7 @@ use crate::sharded_block_executor::{
     },
     executor_client::ExecutorClient,
 };
-use aptos_logger::{info, trace};
+use aptos_logger::info;
 use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::partitioner::{PartitionedTransactions, SubBlocksForShard},
@@ -30,10 +30,6 @@ pub mod messages;
 pub mod remote_state_value;
 pub mod sharded_aggregator_service;
 pub mod sharded_executor_service;
-#[cfg(test)]
-mod test_utils;
-#[cfg(test)]
-mod tests;
 
 /// Coordinator for sharded block executors that manages multiple shards and aggregates the results.
 pub struct ShardedBlockExecutor<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> {
@@ -95,7 +91,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             )?
             .into_inner();
         // wait for all remote executors to send the result back and append them in order by shard id
-        trace!("ShardedBlockExecutor Received all results");
+        info!("ShardedBlockExecutor Received all results");
         let _aggregation_timer = SHARDED_EXECUTION_RESULT_AGGREGATION_SECONDS.start_timer();
         let num_rounds = sharded_output[0].len();
         let mut aggregated_results = vec![];
@@ -115,5 +111,9 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         aggregated_results.extend(global_output);
 
         Ok(aggregated_results)
+    }
+
+    pub fn shutdown(&mut self) {
+        self.executor_client.shutdown();
     }
 }

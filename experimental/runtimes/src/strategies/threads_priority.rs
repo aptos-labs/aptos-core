@@ -10,6 +10,7 @@ pub(crate) struct ThreadsPriorityThreadManager {
     non_exe_threads: ThreadPool,
     high_pri_io_threads: ThreadPool,
     io_threads: ThreadPool,
+    background_threads: ThreadPool,
 }
 
 impl ThreadsPriorityThreadManager {
@@ -39,11 +40,18 @@ impl ThreadsPriorityThreadManager {
             set_thread_nice_value(1),
         );
 
+        let background_threads = spawn_rayon_thread_pool_with_start_hook(
+            "background".into(),
+            Some(32),
+            set_thread_nice_value(20),
+        );
+
         Self {
             exe_threads,
             non_exe_threads,
             high_pri_io_threads,
             io_threads,
+            background_threads,
         }
     }
 }
@@ -63,5 +71,9 @@ impl<'a> ThreadManager<'a> for ThreadsPriorityThreadManager {
 
     fn get_high_pri_io_pool(&'a self) -> &'a ThreadPool {
         &self.high_pri_io_threads
+    }
+
+    fn get_background_pool(&'a self) -> &'a ThreadPool {
+        &self.background_threads
     }
 }

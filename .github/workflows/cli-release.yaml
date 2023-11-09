@@ -18,7 +18,7 @@ on:
         type: boolean
         required: false
         default: true
-        description: "If true, the release will not be created"
+        description: "Dry run - If checked, the release will not be created"
 
 jobs:
   build-ubuntu20-binary:
@@ -53,21 +53,6 @@ jobs:
           name: cli-builds
           path: aptos-cli-*.zip
 
-  build-os-x-binary:
-    name: "Build OS X binary"
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ github.event.inputs.source_git_ref_override }}
-      - name: Build CLI
-        run: scripts/cli/build_cli_release.sh "MacOSX"
-      - name: Upload Binary
-        uses: actions/upload-artifact@v3
-        with:
-          name: cli-builds
-          path: aptos-cli-*.zip
-
   build-windows-binary:
     name: "Build Windows binary"
     runs-on: windows-latest
@@ -88,7 +73,6 @@ jobs:
     needs:
       - build-ubuntu20-binary
       - build-ubuntu22-binary
-      - build-os-x-binary
       - build-windows-binary
     runs-on: ubuntu-latest
     permissions:
@@ -109,3 +93,24 @@ jobs:
           title: "${{ format('Aptos CLI Release v{0}', inputs.release_version) }}"
           files: |
             aptos-cli-*.zip
+
+  bump-homebrew-version-pr:
+    name: "Make PR to bump version in Homebrew"
+    needs:
+      - release-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: aptos
+          tag-name: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
+          base-branch: master
+          create-pullrequest: true
+          commit-message: |
+            {{formulaName}} {{version}}
+
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+
+            From CLI release run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          COMMITTER_TOKEN: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_CORE_HOMEBREW_BUMPER }}

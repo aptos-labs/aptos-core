@@ -5,23 +5,26 @@ use crate::{
     global_summary::{AdvertisedData, GlobalDataSummary, OptimalChunkSizes},
     interface::ResponseError,
     logging::{LogEntry, LogEvent, LogSchema},
+    metrics,
 };
-use aptos_config::{
-    config::{AptosDataClientConfig, BaseConfig},
-    network_id::{NetworkId, PeerNetworkId},
-};
+use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
 use aptos_logger::prelude::*;
-use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };
-use itertools::Itertools;
+use aptos_time_service::TimeService;
+use dashmap::DashMap;
 use std::{
     cmp::min,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     sync::Arc,
+    time::Duration,
 };
+
+// Useful constants
+const LOGS_FREQUENCY_SECS: u64 = 120; // 2 minutes
+const METRICS_FREQUENCY_SECS: u64 = 15; // 15 seconds
+const NUM_PEER_BUCKETS_FOR_METRICS: u8 = 4; // To avoid metric explosion, we bucket peers into groups
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
@@ -36,7 +39,7 @@ const MALICIOUS_MULTIPLIER: f64 = 0.8;
 /// Ignore a peer when their score dips below this threshold.
 const IGNORE_PEER_THRESHOLD: f64 = 25.0;
 
-pub(crate) enum ErrorType {
+pub enum ErrorType {
     /// A response or error that's not actively malicious but also doesn't help
     /// us make progress, e.g., timeouts, remote errors, invalid data, etc...
     NotUseful,
@@ -58,6 +61,10 @@ impl From<ResponseError> for ErrorType {
 
 #[derive(Clone, Debug)]
 pub struct PeerState {
+    /// The number of responses received from this peer (by data request label)
+    received_responses_by_type: Arc<DashMap<String, u64>>,
+    /// The number of requests sent to this peer (by data request label)
+    sent_requests_by_type: Arc<DashMap<String, u64>>,
     /// The latest observed advertised data for this peer, or `None` if we
     /// haven't polled them yet.
     storage_summary: Option<StorageServerSummary>,
@@ -68,6 +75,8 @@ pub struct PeerState {
 impl Default for PeerState {
     fn default() -> Self {
         Self {
+            received_responses_by_type: Arc::new(DashMap::new()),
+            sent_requests_by_type: Arc::new(DashMap::new()),
             storage_summary: None,
             score: STARTING_SCORE,
         }
@@ -75,13 +84,53 @@ impl Default for PeerState {
 }
 
 impl PeerState {
-    /// Updates the storage summary for the peer
-    fn update_storage_summary(&mut self, storage_summary: StorageServerSummary) {
-        self.storage_summary = Some(storage_summary);
+    /// Increments the received response counter for the given label
+    fn increment_received_response_counter(&mut self, response_label: String) {
+        self.received_responses_by_type
+            .entry(response_label)
+            .and_modify(|counter| *counter += 1)
+            .or_insert(1);
+    }
+
+    /// Increments the sent request counter for the given label
+    fn increment_sent_request_counter(&mut self, request_label: String) {
+        self.sent_requests_by_type
+            .entry(request_label)
+            .and_modify(|counter| *counter += 1)
+            .or_insert(1);
+    }
+
+    /// Returns the peer's score
+    pub fn get_score(&self) -> f64 {
+        self.score
+    }
+
+    /// Returns the storage summary for the peer
+    pub fn get_storage_summary(&self) -> Option<StorageServerSummary> {
+        self.storage_summary.clone()
+    }
+
+    /// Returns a sorted copy of the sent requests by type map
+    pub fn get_sent_requests_by_type(&self) -> BTreeMap<String, u64> {
+        let mut sorted_requests_by_type = BTreeMap::new();
+        for sent_request in self.sent_requests_by_type.iter() {
+            sorted_requests_by_type.insert(sent_request.key().clone(), *sent_request.value());
+        }
+        sorted_requests_by_type
+    }
+
+    /// Returns a sorted copy of the received responses by type map
+    pub fn get_received_responses_by_type(&self) -> BTreeMap<String, u64> {
+        let mut sorted_responses_by_type = BTreeMap::new();
+        for received_response in self.received_responses_by_type.iter() {
+            sorted_responses_by_type
+                .insert(received_response.key().clone(), *received_response.value());
+        }
+        sorted_responses_by_type
     }
 
     /// Returns the storage summary iff the peer is not below the ignore threshold
-    fn storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
+    pub(crate) fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
         if self.score <= IGNORE_PEER_THRESHOLD {
             None
         } else {
@@ -102,33 +151,26 @@ impl PeerState {
         };
         self.score = f64::max(self.score * multiplier, MIN_SCORE);
     }
+
+    /// Updates the storage summary for the peer
+    fn update_storage_summary(&mut self, storage_summary: StorageServerSummary) {
+        self.storage_summary = Some(storage_summary);
+    }
 }
 
 /// Contains all of the unbanned peers' most recent [`StorageServerSummary`] data
 /// advertisements and data-client internal metadata for scoring.
 #[derive(Clone, Debug)]
-pub(crate) struct PeerStates {
-    base_config: BaseConfig,
-    data_client_config: AptosDataClientConfig,
-    peer_to_state: HashMap<PeerNetworkId, PeerState>,
-    in_flight_priority_polls: HashSet<PeerNetworkId>, // The priority peers with in-flight polls
-    in_flight_regular_polls: HashSet<PeerNetworkId>,  // The regular peers with in-flight polls
-    peers_and_metadata: Arc<PeersAndMetadata>,
+pub struct PeerStates {
+    data_client_config: Arc<AptosDataClientConfig>,
+    peer_to_state: Arc<DashMap<PeerNetworkId, PeerState>>,
 }
 
 impl PeerStates {
-    pub fn new(
-        base_config: BaseConfig,
-        data_client_config: AptosDataClientConfig,
-        peers_and_metadata: Arc<PeersAndMetadata>,
-    ) -> Self {
+    pub fn new(data_client_config: Arc<AptosDataClientConfig>) -> Self {
         Self {
-            base_config,
             data_client_config,
-            peer_to_state: HashMap::new(),
-            in_flight_priority_polls: HashSet::new(),
-            in_flight_regular_polls: HashSet::new(),
-            peers_and_metadata,
+            peer_to_state: Arc::new(DashMap::new()),
         }
     }
 
@@ -137,6 +179,7 @@ impl PeerStates {
     pub fn can_service_request(
         &self,
         peer: &PeerNetworkId,
+        time_service: TimeService,
         request: &StorageServiceRequest,
     ) -> bool {
         // Storage services can always respond to data advertisement requests.
@@ -149,172 +192,138 @@ impl PeerStates {
         }
 
         // Check if the peer can service the request
-        self.peer_to_state
-            .get(peer)
-            .and_then(PeerState::storage_summary_if_not_ignored)
-            .map(|summary| summary.can_service(&self.data_client_config, request))
-            .unwrap_or(false)
+        if let Some(peer_state) = self.peer_to_state.get(peer) {
+            return match peer_state.get_storage_summary_if_not_ignored() {
+                Some(storage_summary) => {
+                    storage_summary.can_service(&self.data_client_config, time_service, request)
+                },
+                None => false, // The peer is temporarily ignored
+            };
+        }
+
+        // Otherwise, the request cannot be serviced
+        false
+    }
+
+    /// Increments the received response counter for the given peer
+    pub fn increment_received_response_counter(
+        &self,
+        peer: PeerNetworkId,
+        request: &StorageServiceRequest,
+    ) {
+        // Get the data request label
+        let response_label = request.data_request.get_label().into();
+
+        // Update the peer's counter
+        if let Some(mut entry) = self.peer_to_state.get_mut(&peer) {
+            entry.increment_received_response_counter(response_label);
+        }
+    }
+
+    /// Increments the sent request counter for the given peer
+    pub fn increment_sent_request_counter(
+        &self,
+        peer: PeerNetworkId,
+        request: &StorageServiceRequest,
+    ) {
+        // Get the data request label
+        let request_label = request.data_request.get_label().into();
+
+        // Update the peer's counter
+        if let Some(mut entry) = self.peer_to_state.get_mut(&peer) {
+            entry.increment_sent_request_counter(request_label);
+        }
+    }
+
+    /// Updates the logs and metrics for the peer request distributions
+    pub fn update_peer_request_logs_and_metrics(&self) {
+        // Periodically update the metrics
+        sample!(
+            SampleRate::Duration(Duration::from_secs(METRICS_FREQUENCY_SECS)),
+            update_peer_request_metrics(self.peer_to_state.clone());
+        );
+
+        // Periodically update the logs
+        sample!(
+            SampleRate::Duration(Duration::from_secs(LOGS_FREQUENCY_SECS)),
+            update_peer_request_logs(self.peer_to_state.clone());
+        );
     }
 
     /// Updates the score of the peer according to a successful operation
-    pub fn update_score_success(&mut self, peer: PeerNetworkId) {
-        let old_score = self.peer_to_state.entry(peer).or_default().score;
-        self.peer_to_state
-            .entry(peer)
-            .or_default()
-            .update_score_success();
-        let new_score = self.peer_to_state.entry(peer).or_default().score;
-        if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PeerNoLongerIgnored)
-                    .message("Peer will no longer be ignored")
-                    .peer(&peer))
-            );
+    pub fn update_score_success(&self, peer: PeerNetworkId) {
+        if let Some(mut entry) = self.peer_to_state.get_mut(&peer) {
+            // Get the peer's old score
+            let old_score = entry.score;
+
+            // Update the peer's score with a successful operation
+            entry.update_score_success();
+
+            // Log if the peer is no longer ignored
+            let new_score = entry.score;
+            if old_score <= IGNORE_PEER_THRESHOLD && new_score > IGNORE_PEER_THRESHOLD {
+                info!(
+                    (LogSchema::new(LogEntry::PeerStates)
+                        .event(LogEvent::PeerNoLongerIgnored)
+                        .message("Peer will no longer be ignored")
+                        .peer(&peer))
+                );
+            }
         }
     }
 
     /// Updates the score of the peer according to an error
-    pub fn update_score_error(&mut self, peer: PeerNetworkId, error: ErrorType) {
-        let old_score = self.peer_to_state.entry(peer).or_default().score;
-        self.peer_to_state
-            .entry(peer)
-            .or_default()
-            .update_score_error(error);
-        let new_score = self.peer_to_state.entry(peer).or_default().score;
-        if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PeerIgnored)
-                    .message("Peer will be ignored")
-                    .peer(&peer))
-            );
-        }
-    }
+    pub fn update_score_error(&self, peer: PeerNetworkId, error: ErrorType) {
+        if let Some(mut entry) = self.peer_to_state.get_mut(&peer) {
+            // Get the peer's old score
+            let old_score = entry.score;
 
-    /// Returns the number of in-flight priority polls
-    pub fn num_in_flight_priority_polls(&self) -> u64 {
-        self.in_flight_priority_polls.len() as u64
-    }
+            // Update the peer's score with an error
+            entry.update_score_error(error);
 
-    /// Returns the number of in-flight regular polls
-    pub fn num_in_flight_regular_polls(&self) -> u64 {
-        self.in_flight_regular_polls.len() as u64
-    }
-
-    /// Returns true iff there is an existing in-flight request
-    pub fn existing_in_flight_request(&self, peer: &PeerNetworkId) -> bool {
-        self.in_flight_priority_polls.contains(peer) || self.in_flight_regular_polls.contains(peer)
-    }
-
-    /// Marks an in-flight request as started for the specified peer
-    pub fn new_in_flight_request(&mut self, peer: &PeerNetworkId) {
-        // Get the current in-flight polls
-        let is_priority_peer = self.is_priority_peer(peer);
-        let in_flight_polls = if is_priority_peer {
-            &mut self.in_flight_priority_polls
-        } else {
-            &mut self.in_flight_regular_polls
-        };
-
-        // Insert the new peer
-        if !in_flight_polls.insert(*peer) {
-            error!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message(&format!(
-                        "Peer already found with an in-flight poll! Priority: {:?}",
-                        is_priority_peer
-                    ))
-                    .peer(peer))
-            );
-        }
-    }
-
-    /// Marks the pending in-flight request as complete for the specified peer
-    pub fn mark_in_flight_request_complete(&mut self, peer: &PeerNetworkId) {
-        // The priority of the peer might have changed since we
-        // last polled it, so we attempt to remove it from both
-        // the regular and priority in-flight requests.
-        if !self.in_flight_priority_polls.remove(peer) && !self.in_flight_regular_polls.remove(peer)
-        {
-            error!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message("Peer not found with an in-flight poll!")
-                    .peer(peer))
-            );
-        }
-    }
-
-    /// Returns true iff the given peer is high-priority.
-    ///
-    /// TODO(joshlind): make this less hacky using network topological awareness.
-    pub fn is_priority_peer(&self, peer: &PeerNetworkId) -> bool {
-        // Validators should only prioritize other validators
-        let peer_network_id = peer.network_id();
-        if self.base_config.role.is_validator() {
-            return peer_network_id.is_validator_network();
-        }
-
-        // VFNs should only prioritize validators
-        if self
-            .peers_and_metadata
-            .get_registered_networks()
-            .contains(&NetworkId::Vfn)
-        {
-            return peer_network_id.is_vfn_network();
-        }
-
-        // PFNs should only prioritize outbound connections (this targets seed peers and VFNs)
-        match self.peers_and_metadata.get_metadata_for_peer(*peer) {
-            Ok(peer_metadata) => {
-                if peer_metadata.get_connection_metadata().origin == ConnectionOrigin::Outbound {
-                    return true;
-                }
-            },
-            Err(error) => {
-                warn!(
+            // Log if the peer is now ignored
+            let new_score = entry.score;
+            if old_score > IGNORE_PEER_THRESHOLD && new_score <= IGNORE_PEER_THRESHOLD {
+                info!(
                     (LogSchema::new(LogEntry::PeerStates)
-                        .event(LogEvent::PriorityAndRegularPeers)
-                        .message(&format!(
-                            "Unable to locate metadata for peer! Error: {:?}",
-                            error
-                        ))
-                        .peer(peer))
+                        .event(LogEvent::PeerIgnored)
+                        .message("Peer will be ignored")
+                        .peer(&peer))
                 );
-            },
+            }
         }
-
-        false
     }
 
     /// Updates the storage summary for the given peer
-    pub fn update_summary(&mut self, peer: PeerNetworkId, summary: StorageServerSummary) {
+    pub fn update_summary(&self, peer: PeerNetworkId, storage_summary: StorageServerSummary) {
         self.peer_to_state
             .entry(peer)
             .or_default()
-            .update_storage_summary(summary);
+            .update_storage_summary(storage_summary);
     }
 
     /// Garbage collects the peer states to remove data for disconnected peers
-    pub fn garbage_collect_peer_states(&mut self, connected_peers: Vec<PeerNetworkId>) {
+    pub fn garbage_collect_peer_states(&self, connected_peers: HashSet<PeerNetworkId>) {
         self.peer_to_state
             .retain(|peer_network_id, _| connected_peers.contains(peer_network_id));
     }
 
     /// Calculates a global data summary using all known storage summaries
-    pub fn calculate_aggregate_summary(&self) -> GlobalDataSummary {
-        // Only include likely-not-malicious peers in the data summary aggregation
-        let summaries: Vec<StorageServerSummary> = self
+    pub fn calculate_global_data_summary(&self) -> GlobalDataSummary {
+        // Gather all storage summaries, but exclude peers that are ignored
+        let storage_summaries: Vec<StorageServerSummary> = self
             .peer_to_state
-            .values()
-            .filter_map(PeerState::storage_summary_if_not_ignored)
-            .cloned()
+            .iter()
+            .filter_map(|peer_state| {
+                peer_state
+                    .value()
+                    .get_storage_summary_if_not_ignored()
+                    .cloned()
+            })
             .collect();
 
         // If we have no peers, return an empty global summary
-        if summaries.is_empty() {
+        if storage_summaries.is_empty() {
             return GlobalDataSummary::empty();
         }
 
@@ -324,7 +333,7 @@ impl PeerStates {
         let mut max_state_chunk_sizes = vec![];
         let mut max_transaction_chunk_sizes = vec![];
         let mut max_transaction_output_chunk_sizes = vec![];
-        for summary in summaries {
+        for summary in storage_summaries {
             // Collect aggregate data advertisements
             if let Some(epoch_ending_ledger_infos) = summary.data_summary.epoch_ending_ledger_infos
             {
@@ -371,9 +380,8 @@ impl PeerStates {
         }
     }
 
-    #[cfg(test)]
-    /// Returns a copy of the peer to states map for test purposes
-    pub fn get_peer_to_states(&self) -> HashMap<PeerNetworkId, PeerState> {
+    /// Returns the peer to states map
+    pub fn get_peer_to_states(&self) -> Arc<DashMap<PeerNetworkId, PeerState>> {
         self.peer_to_state.clone()
     }
 }
@@ -418,4 +426,98 @@ fn median_or_max<T: Ord + Copy>(mut values: Vec<T>, max_value: T) -> T {
 
     // Return median or max
     min(median.unwrap_or(max_value), max_value)
+}
+
+/// Returns the bucket ID for the given peer. This is useful
+/// for grouping peers together to avoid metric explosion.
+pub fn get_bucket_id_for_peer(peer: PeerNetworkId) -> u8 {
+    let peer_id_bytes = peer.peer_id().into_bytes();
+    peer_id_bytes[0] % NUM_PEER_BUCKETS_FOR_METRICS
+}
+
+/// Updates the logs for the peer requests and responses by bucket
+fn update_peer_request_logs(peer_to_state: Arc<DashMap<PeerNetworkId, PeerState>>) {
+    // Collect the peer request and response counts
+    let mut request_and_response_counts = vec![];
+    for peer_state_entry in peer_to_state.iter() {
+        // Get the peer and request data
+        let peer = *peer_state_entry.key();
+        let peer_bucket_id = get_bucket_id_for_peer(peer);
+        let sent_requests_by_type = peer_state_entry.get_sent_requests_by_type();
+        let received_responses_by_type = peer_state_entry.get_received_responses_by_type();
+
+        // Collect the request and response counts
+        let peer_and_requests_string = format!(
+            "Peer: {:?}, Bucket ID: {:?}, Sent request counts: {:?}, Received response counts: {:?}",
+            peer, peer_bucket_id, sent_requests_by_type, received_responses_by_type
+        );
+        request_and_response_counts.push(peer_and_requests_string);
+    }
+
+    // Log the peer request and response counts
+    info!(LogSchema::new(LogEntry::PeerStates)
+        .event(LogEvent::PeerRequestResponseCounts)
+        .message(&format!(
+            "Peer request and response counts: {:?}",
+            request_and_response_counts
+        )));
+}
+
+/// Updates the metrics for the peer requests and responses by bucket
+fn update_peer_request_metrics(peer_to_state: Arc<DashMap<PeerNetworkId, PeerState>>) {
+    // Aggregate all request and response counts by peer bucket
+    let mut sent_requests_by_peer_bucket: BTreeMap<u8, BTreeMap<String, u64>> = BTreeMap::new();
+    let mut received_responses_by_peer_bucket: BTreeMap<u8, BTreeMap<String, u64>> =
+        BTreeMap::new();
+    for peer_state_entry in peer_to_state.iter() {
+        // Get the peer and request data
+        let peer = *peer_state_entry.key();
+        let peer_bucket_id = get_bucket_id_for_peer(peer);
+        let sent_requests_by_type = peer_state_entry.get_sent_requests_by_type();
+        let received_responses_by_type = peer_state_entry.get_received_responses_by_type();
+
+        // Aggregate the sent request counts by peer bucket
+        let sent_requests_by_bucket = sent_requests_by_peer_bucket
+            .entry(peer_bucket_id)
+            .or_default();
+        for (request_label, count) in sent_requests_by_type.iter() {
+            *sent_requests_by_bucket
+                .entry(request_label.clone())
+                .or_default() += count;
+        }
+
+        // Aggregate the received response counts by peer bucket
+        let received_responses_by_bucket = received_responses_by_peer_bucket
+            .entry(peer_bucket_id)
+            .or_default();
+        for (response_label, count) in received_responses_by_type.iter() {
+            *received_responses_by_bucket
+                .entry(response_label.clone())
+                .or_default() += count;
+        }
+    }
+
+    // Update the sent request metrics
+    for (peer_bucket_id, sent_requests_by_type) in sent_requests_by_peer_bucket.iter() {
+        for (request_label, count) in sent_requests_by_type.iter() {
+            metrics::set_gauge_for_bucket(
+                &metrics::SENT_REQUESTS_BY_PEER_BUCKET,
+                &peer_bucket_id.to_string(),
+                request_label,
+                *count,
+            );
+        }
+    }
+
+    // Update the received response metrics
+    for (peer_bucket_id, received_responses_by_type) in received_responses_by_peer_bucket.iter() {
+        for (response_label, count) in received_responses_by_type.iter() {
+            metrics::set_gauge_for_bucket(
+                &metrics::RECEIVED_RESPONSES_BY_PEER_BUCKET,
+                &peer_bucket_id.to_string(),
+                response_label,
+                *count,
+            );
+        }
+    }
 }

@@ -9,11 +9,15 @@ use crate::{
         MAX_CATCH_UP_WAIT_SECS, MAX_HEALTHY_WAIT_SECS,
     },
 };
-use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
+use aptos_config::config::{
+    BootstrappingMode, ContinuousSyncingMode, NodeConfig, OverrideNodeConfig,
+};
+use aptos_db::AptosDB;
 use aptos_forge::{LocalSwarm, Node, NodeExt, Swarm, SwarmExt};
 use aptos_inspection_service::inspection_client::InspectionClient;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::LocalAccount;
+use aptos_storage_interface::DbReader;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use std::{
     sync::Arc,
@@ -228,7 +232,7 @@ async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) 
     let vfn_peer_id = swarm
         .add_validator_fullnode(
             &swarm.versions().max().unwrap(),
-            full_node_config,
+            OverrideNodeConfig::new_with_default_base(full_node_config),
             validator_peer_id,
         )
         .unwrap();
@@ -576,7 +580,7 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
     for validator in swarm.validators() {
         // Verify the oldest ledger info
         let validator_rest_client = validator.rest_client();
-        verify_oldest_version_after_fast_sync(validator_rest_client, true).await;
+        verify_oldest_version_after_fast_sync(validator_rest_client.clone(), true).await;
 
         // Verify the pruning metrics
         let inspection_client = validator.inspection_client();
@@ -595,12 +599,21 @@ async fn perform_full_node_bootstrap_state_snapshot(epoch_changes: bool) {
     // Verify the oldest ledger info and pruning metrics for the fullnode
     if epoch_changes {
         // Verify the oldest ledger info
-        let vfn_rest_client = swarm.fullnode_mut(vfn_peer_id).unwrap().rest_client();
-        verify_oldest_version_after_fast_sync(vfn_rest_client, false).await;
-
+        let fullnode = swarm.fullnode_mut(vfn_peer_id).unwrap();
+        let vfn_rest_client = fullnode.rest_client();
+        let db_path = fullnode.config().base.data_dir.as_path();
+        verify_oldest_version_after_fast_sync(vfn_rest_client.clone(), false).await;
         // Verify the fullnode pruning metrics
-        let inspection_client = swarm.fullnode(vfn_peer_id).unwrap().inspection_client();
+        let inspection_client = fullnode.inspection_client();
         verify_pruning_metrics_after_fast_sync(inspection_client, false).await;
+        // verify ledger info exists at version 0
+        let mut db_path_buf = db_path.to_path_buf();
+        db_path_buf.push("db");
+        fullnode.stop(); // stop the fullnode to avoid db contention
+        let aptos_db = AptosDB::new_for_test(db_path_buf.as_path());
+        aptos_db
+            .get_epoch_ending_ledger_info(0)
+            .expect("Ledgerinfo should exist at version 0");
     }
 }
 

@@ -2,15 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::counters::GET_NEXT_TASK_SECONDS;
+use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
 use aptos_infallible::Mutex;
-use aptos_mvhashmap::types::{Incarnation, TxnIndex, Version};
+use aptos_mvhashmap::types::{Incarnation, TxnIndex};
+use concurrent_queue::{ConcurrentQueue, PopError};
 use crossbeam::utils::CachePadded;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use std::{
     cmp::{max, min},
-    hint,
-    ops::DerefMut,
     sync::{
         atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
         Arc, Condvar,
@@ -20,6 +19,35 @@ use std::{
 const TXN_IDX_MASK: u64 = (1 << 32) - 1;
 
 pub type Wave = u32;
+
+#[derive(Debug)]
+pub struct ArmedLock {
+    // Last bit:   1 -> unlocked; 0 -> locked
+    // Second bit: 1 -> there's work; 0 -> no work
+    locked: AtomicU64,
+}
+
+impl ArmedLock {
+    pub fn new() -> Self {
+        Self {
+            locked: AtomicU64::new(3),
+        }
+    }
+
+    pub fn try_lock(&self) -> bool {
+        self.locked
+            .compare_exchange_weak(3, 0, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+    }
+
+    pub fn unlock(&self) {
+        self.locked.fetch_or(1, Ordering::Release);
+    }
+
+    pub fn arm(&self) {
+        self.locked.fetch_or(2, Ordering::Release);
+    }
+}
 
 #[derive(Debug)]
 pub enum DependencyStatus {
@@ -54,8 +82,8 @@ pub enum ExecutionTaskType {
 /// there are no more tasks and the scheduler is done.
 #[derive(Debug)]
 pub enum SchedulerTask {
-    ExecutionTask(Version, ExecutionTaskType),
-    ValidationTask(Version, Wave),
+    ExecutionTask(TxnIndex, Incarnation, ExecutionTaskType),
+    ValidationTask(TxnIndex, Incarnation, Wave),
     NoTask,
     Done,
 }
@@ -88,7 +116,6 @@ pub enum SchedulerTask {
 /// 'ExecutionHalted' is a transaction status marking that parallel execution is halted, due to
 /// reasons such as module r/w intersection or exceeding per-block gas limit. It is safe to ignore
 /// this status during the transaction invariant checks, e.g., suspend(), resume(), set_executed_status().
-/// When 'resolve_condvar' is called, all txns' statuses become ExecutionHalted.
 ///
 /// Status transition diagram:
 /// Ready(i)                                                                               ---
@@ -96,7 +123,7 @@ pub enum SchedulerTask {
 ///    |                                                                                     |
 ///    ↓         suspend (waiting on dependency)                resume                       |
 /// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i)          |
-///    |                                                                                     | resolve_condvar
+///    |                                                                                     | halt_transaction_execution
 ///    |  finish_execution                                                                   |-----------------> ExecutionHalted
 ///    ↓                                                                                     |
 /// Executed(i) (pending for (re)validations) ---------------------------> Committed(i)      |
@@ -111,6 +138,8 @@ enum ExecutionStatus {
     Executing(Incarnation),
     Suspended(Incarnation, DependencyCondvar),
     Executed(Incarnation),
+    // TODO[agg_v2](cleanup): rename to Finalized or ReadyToCommit / CommitReady?
+    // it gets committed later, without scheduler tracking.
     Committed(Incarnation),
     Aborting(Incarnation),
     ExecutionHalted,
@@ -198,6 +227,10 @@ impl ValidationStatus {
     }
 }
 
+pub trait TWaitForDependency {
+    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_txn_idx: TxnIndex) -> DependencyResult;
+}
+
 pub struct Scheduler {
     /// Number of txns to execute, immutable.
     num_txns: TxnIndex,
@@ -210,7 +243,7 @@ pub struct Scheduler {
 
     /// Next transaction to commit, and sweeping lower bound on the wave of a validation that must
     /// be successful in order to commit the next transaction.
-    commit_state: CachePadded<Mutex<(TxnIndex, Wave)>>,
+    commit_state: CachePadded<ExplicitSyncWrapper<(TxnIndex, Wave)>>,
 
     // Note: with each thread reading both counters when deciding the next task, and being able
     // to choose either execution or validation task, separately padding these indices may increase
@@ -238,6 +271,12 @@ pub struct Scheduler {
 
     /// Shared marker that is set when a thread detects that all txns can be committed.
     done_marker: CachePadded<AtomicBool>,
+
+    has_halted: CachePadded<AtomicBool>,
+
+    queueing_commits_lock: CachePadded<ArmedLock>,
+
+    commit_queue: ConcurrentQueue<u32>,
 }
 
 /// Public Interfaces for the Scheduler
@@ -259,10 +298,13 @@ impl Scheduler {
                     ))
                 })
                 .collect(),
-            commit_state: CachePadded::new(Mutex::new((0, 0))),
+            commit_state: CachePadded::new(ExplicitSyncWrapper::new((0, 0))),
             execution_idx: AtomicU32::new(0),
             validation_idx: AtomicU64::new(0),
             done_marker: CachePadded::new(AtomicBool::new(false)),
+            has_halted: CachePadded::new(AtomicBool::new(false)),
+            queueing_commits_lock: CachePadded::new(ArmedLock::new()),
+            commit_queue: ConcurrentQueue::<u32>::bounded(num_txns as usize),
         }
     }
 
@@ -270,54 +312,85 @@ impl Scheduler {
         self.num_txns
     }
 
+    pub fn add_to_commit_queue(&self, txn_idx: u32) {
+        self.commit_queue
+            .push(txn_idx)
+            .expect("Pushing to the commit_queue should never fail");
+    }
+
+    pub fn pop_from_commit_queue(&self) -> Result<u32, PopError> {
+        self.commit_queue.pop()
+    }
+
+    pub fn queueing_commits_mark_done(&self) {
+        self.queueing_commits_lock.unlock()
+    }
+
+    pub fn queueing_commits_arm(&self) {
+        self.queueing_commits_lock.arm()
+    }
+
+    pub fn should_coordinate_commits(&self) -> bool {
+        self.queueing_commits_lock.try_lock()
+    }
+
     /// If successful, returns Some(TxnIndex), the index of committed transaction.
-    /// The current implementation has one dedicated thread to try_commit.
-    /// Should not be called after the last transaction is committed.
-    pub fn try_commit(&self) -> Option<TxnIndex> {
-        let mut commit_state_mutex = self.commit_state.lock();
-        let commit_state = commit_state_mutex.deref_mut();
-        let (commit_idx, commit_wave) = (&mut commit_state.0, &mut commit_state.1);
+    pub fn try_commit(&self) -> Option<(TxnIndex, Incarnation)> {
+        let mut commit_state = self.commit_state.acquire();
+        let (commit_idx, commit_wave) = commit_state.dereference_mut();
 
-        if let Some(validation_status) = self.txn_status[*commit_idx as usize].1.try_read() {
-            // Acquired the validation status read lock.
-            if let Some(status) = self.txn_status[*commit_idx as usize]
-                .0
-                .try_upgradable_read()
-            {
-                // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
-                if let ExecutionStatus::Executed(incarnation) = *status {
-                    // Status is executed and we are holding the lock.
+        if *commit_idx == self.num_txns {
+            return None;
+        }
 
-                    // Note we update the wave inside commit_state only with max_triggered_wave,
-                    // since max_triggered_wave records the new wave when validation index is
-                    // decreased thus affecting all later txns as well,
-                    // while required_wave only records the new wave for one single txn.
-                    *commit_wave = max(*commit_wave, validation_status.max_triggered_wave);
-                    if let Some(validated_wave) = validation_status.maybe_max_validated_wave {
-                        if validated_wave >= max(*commit_wave, validation_status.required_wave) {
-                            let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
-                            // Upgrade the execution status read lock to write lock.
-                            // Can commit.
-                            *status_write = ExecutionStatus::Committed(incarnation);
+        let validation_status = self.txn_status[*commit_idx as usize].1.read();
 
-                            *commit_idx += 1;
-                            if *commit_idx == self.num_txns {
-                                // All txns have been committed, the parallel execution can finish.
-                                self.done_marker.store(true, Ordering::SeqCst);
-                            }
-                            return Some(*commit_idx - 1);
+        // Acquired the validation status read lock.
+        if let Some(status) = self.txn_status[*commit_idx as usize]
+            .0
+            .try_upgradable_read()
+        {
+            // Acquired the execution status read lock, which can be upgrade to write lock if necessary.
+            if let ExecutionStatus::Executed(incarnation) = *status {
+                // Status is executed and we are holding the lock.
+
+                // Note we update the wave inside commit_state only with max_triggered_wave,
+                // since max_triggered_wave records the new wave when validation index is
+                // decreased thus affecting all later txns as well,
+                // while required_wave only records the new wave for one single txn.
+                *commit_wave = max(*commit_wave, validation_status.max_triggered_wave);
+                if let Some(validated_wave) = validation_status.maybe_max_validated_wave {
+                    if validated_wave >= max(*commit_wave, validation_status.required_wave) {
+                        let mut status_write = RwLockUpgradableReadGuard::upgrade(status);
+                        // Upgrade the execution status read lock to write lock.
+                        // Can commit.
+                        *status_write = ExecutionStatus::Committed(incarnation);
+
+                        *commit_idx += 1;
+                        if *commit_idx == self.num_txns {
+                            // All txns have been committed, the parallel execution can finish.
+                            self.done_marker.store(true, Ordering::SeqCst);
                         }
+                        return Some((*commit_idx - 1, incarnation));
                     }
                 }
             }
+
+            // Transaction needs to be at least [re]validated, and possibly also executed.
+            // Once that happens, we will `arm` the queueing_commit.
+            // Concurrency correctness - Both locks are held here.
+            return None;
         }
+
+        self.queueing_commits_arm();
+
         None
     }
 
     #[cfg(test)]
     /// Return the TxnIndex and Wave of current commit index
     pub fn commit_state(&self) -> (TxnIndex, u32) {
-        let commit_state = self.commit_state.lock();
+        let commit_state = self.commit_state.dereference();
         (commit_state.0, commit_state.1)
     }
 
@@ -342,8 +415,7 @@ impl Scheduler {
     }
 
     /// Return the next task for the thread.
-    pub fn next_task(&self, committing: bool) -> SchedulerTask {
-        let _timer = GET_NEXT_TASK_SECONDS.start_timer();
+    pub fn next_task(&self) -> SchedulerTask {
         loop {
             if self.done() {
                 // No more tasks.
@@ -352,53 +424,195 @@ impl Scheduler {
 
             let (idx_to_validate, wave) =
                 Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
+
             let idx_to_execute = self.execution_idx.load(Ordering::Acquire);
 
             let prefer_validate = idx_to_validate < min(idx_to_execute, self.num_txns)
                 && !self.never_executed(idx_to_validate);
 
             if !prefer_validate && idx_to_execute >= self.num_txns {
-                return if self.done() {
-                    // Check again to avoid commit delay due to a race.
-                    SchedulerTask::Done
-                } else {
-                    if !committing {
-                        // Avoid pointlessly spinning, and give priority to other threads
-                        // that may be working to finish the remaining tasks.
-                        // We don't want to hint on the thread that is committing
-                        // because it may have work to do (to commit) even if there
-                        // is no more conventional (validation and execution tasks) work.
-                        hint::spin_loop();
-                    }
-                    SchedulerTask::NoTask
-                };
+                return SchedulerTask::NoTask;
             }
 
             if prefer_validate {
-                if let Some((version_to_validate, wave)) =
+                if let Some((txn_idx, incarnation, wave)) =
                     self.try_validate_next_version(idx_to_validate, wave)
                 {
-                    return SchedulerTask::ValidationTask(version_to_validate, wave);
+                    return SchedulerTask::ValidationTask(txn_idx, incarnation, wave);
                 }
-            } else if let Some((version_to_execute, execution_task_type)) =
-                self.try_execute_next_version()
-            {
-                return SchedulerTask::ExecutionTask(version_to_execute, execution_task_type);
+            }
+
+            if idx_to_execute < self.num_txns {
+                if let Some((txn_idx, incarnation, execution_task_type)) =
+                    self.try_execute_next_version()
+                {
+                    return SchedulerTask::ExecutionTask(txn_idx, incarnation, execution_task_type);
+                }
             }
         }
     }
 
+    pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
+        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        validation_status.maybe_max_validated_wave = Some(
+            validation_status
+                .maybe_max_validated_wave
+                .map_or(wave, |prev_wave| max(prev_wave, wave)),
+        );
+    }
+
+    fn wake_dependencies_after_execution(&self, txn_idx: TxnIndex) {
+        let txn_deps: Vec<TxnIndex> = {
+            let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
+            // Holding the lock, take dependency vector.
+            std::mem::take(&mut stored_deps)
+        };
+
+        // Mark dependencies as resolved and find the minimum index among them.
+        let min_dep = txn_deps
+            .into_iter()
+            .map(|dep| {
+                // Mark the status of dependencies as 'Ready' since dependency on
+                // transaction txn_idx is now resolved.
+                self.resume(dep);
+
+                dep
+            })
+            .min();
+        if let Some(execution_target_idx) = min_dep {
+            // Decrease the execution index as necessary to ensure resolved dependencies
+            // get a chance to be re-executed.
+            self.execution_idx
+                .fetch_min(execution_target_idx, Ordering::SeqCst);
+        }
+    }
+
+    /// After txn is executed, schedule its dependencies for re-execution.
+    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
+    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
+    /// return a validation task of the transaction to the caller (otherwise NoTask).
+    pub fn finish_execution(
+        &self,
+        txn_idx: TxnIndex,
+        incarnation: Incarnation,
+        revalidate_suffix: bool,
+    ) -> SchedulerTask {
+        // Note: It is preferable to hold the validation lock throughout the finish_execution,
+        // in particular before updating execution status. The point was that we don't want
+        // any validation to come before the validation status is correspondingly updated.
+        // It may be possible to make work more granular, but shouldn't make performance
+        // difference and like this correctness argument is much easier to see, in fact also
+        // the reason why we grab write lock directly, and never release it during the whole function.
+        // So even validation status readers have to wait if they somehow end up at the same index.
+        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
+        self.set_executed_status(txn_idx, incarnation);
+
+        self.wake_dependencies_after_execution(txn_idx);
+
+        let (cur_val_idx, mut cur_wave) =
+            Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
+
+        // Needs to be re-validated in a new wave
+        if cur_val_idx > txn_idx {
+            if revalidate_suffix {
+                // The transaction execution required revalidating all higher txns (not
+                // only itself), currently happens when incarnation writes to a new path
+                // (w.r.t. the write-set of its previous completed incarnation).
+                if let Some(wave) = self.decrease_validation_idx(txn_idx + 1) {
+                    cur_wave = wave;
+                };
+            }
+            // Update the minimum wave this txn needs to pass.
+            validation_status.required_wave = cur_wave;
+            return SchedulerTask::ValidationTask(txn_idx, incarnation, cur_wave);
+        }
+
+        SchedulerTask::NoTask
+    }
+
+    pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) {
+        // We have exclusivity on this transaction.
+
+        self.wake_dependencies_after_execution(txn_idx);
+
+        // We skipped decreasing validation index when invalidating, as we were
+        // executing it immediately, and are doing so now (unconditionally).
+        self.decrease_validation_idx(txn_idx + 1);
+    }
+
+    /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
+    /// may return a re-execution task back to the caller (otherwise, NoTask).
+    pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
+        {
+            // acquire exclusive lock on the validation status of txn_idx, and hold the lock
+            // while calling decrease_validation_idx below. Otherwise, this thread might get
+            // suspended after setting aborted ( = ready) status, and other threads might finish
+            // re-executing, then commit txn_idx, and potentially commit txn_idx + 1 before
+            // decrease_validation_idx would be able to set max_triggered_wave.
+            //
+            // Also, as a convention, we always acquire validation status lock before execution
+            // status lock, as we have to have a consistent order and this order is easier to
+            // provide correctness between finish_execution & try_commit.
+            let _validation_status = self.txn_status[txn_idx as usize].1.write();
+
+            self.set_aborted_status(txn_idx, incarnation);
+
+            // Schedule higher txns for validation, skipping txn_idx itself (needs to be
+            // re-executed first).
+            self.decrease_validation_idx(txn_idx + 1);
+
+            // Can release the lock early.
+        }
+
+        // txn_idx must be re-executed, and if execution_idx is lower, it will be.
+        if self.execution_idx.load(Ordering::Acquire) > txn_idx {
+            // Optimization: execution_idx is higher than txn_idx, but decreasing it may
+            // lead to wasted work for all indices between txn_idx and execution_idx.
+            // Instead, attempt to create a new incarnation and return the corresponding
+            // re-execution task back to the caller. If incarnation fails, there is
+            // nothing to do, as another thread must have succeeded to incarnate and
+            // obtain the task for re-execution.
+            if let Some((new_incarnation, execution_task_type)) = self.try_incarnate(txn_idx) {
+                return SchedulerTask::ExecutionTask(txn_idx, new_incarnation, execution_task_type);
+            }
+        }
+
+        SchedulerTask::NoTask
+    }
+
+    /// This function can halt the BlockSTM early, even if there are unfinished tasks.
+    /// It will set the done_marker to be true, resolve all pending dependencies.
+    ///
+    /// Currently there are 4 scenarios to early halt the BlockSTM execution.
+    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
+    /// 2. There is a txn with VM execution status Abort.
+    /// 3. There is a txn with VM execution status SkipRest.
+    /// 4. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.
+    ///
+    /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
+    /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.
+    pub fn halt(&self) -> bool {
+        // The first thread that sets done_marker to be true will be reponsible for
+        // resolving the conditional variables, to help other theads that may be pending
+        // on the read dependency. See the comment of the function halt_transaction_execution().
+        if !self.done_marker.swap(true, Ordering::SeqCst) {
+            for txn_idx in 0..self.num_txns {
+                self.halt_transaction_execution(txn_idx);
+            }
+        }
+
+        !self.has_halted.swap(true, Ordering::SeqCst)
+    }
+}
+
+impl TWaitForDependency for Scheduler {
     /// When a txn depends on another txn, adds it to the dependency list of the other txn.
     /// Returns true if successful, or false, if the dependency got resolved in the meantime.
     /// If true is returned, Scheduler guarantees that later (dep_txn_idx will finish execution)
     /// transaction txn_idx will be resumed, and corresponding execution task created.
     /// If false is returned, it is caller's responsibility to repeat the read that caused the
     /// dependency and continue the ongoing execution of txn_idx.
-    pub fn wait_for_dependency(
-        &self,
-        txn_idx: TxnIndex,
-        dep_txn_idx: TxnIndex,
-    ) -> DependencyResult {
+    fn wait_for_dependency(&self, txn_idx: TxnIndex, dep_txn_idx: TxnIndex) -> DependencyResult {
         // Note: Could pre-check that txn dep_txn_idx isn't in an executed state, but the caller
         // usually has just observed the read dependency.
 
@@ -440,152 +654,14 @@ impl Scheduler {
 
         DependencyResult::Dependency(dep_condvar)
     }
+}
 
-    pub fn finish_validation(&self, txn_idx: TxnIndex, wave: Wave) {
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        validation_status.maybe_max_validated_wave = Some(
-            validation_status
-                .maybe_max_validated_wave
-                .map_or(wave, |prev_wave| max(prev_wave, wave)),
-        );
-    }
-
-    /// After txn is executed, schedule its dependencies for re-execution.
-    /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
-    /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
-    /// return a validation task of the transaction to the caller (otherwise NoTask).
-    pub fn finish_execution(
-        &self,
-        txn_idx: TxnIndex,
-        incarnation: Incarnation,
-        revalidate_suffix: bool,
-    ) -> SchedulerTask {
-        // Note: It is preferable to hold the validation lock throughout the finish_execution,
-        // in particular before updating execution status. The point was that we don't want
-        // any validation to come before the validation status is correspondingly updated.
-        // It may be possible to make work more granular, but shouldn't make performance
-        // difference and like this correctness argument is much easier to see, in fact also
-        // the reason why we grab write lock directly, and never release it during the whole function.
-        // So even validation status readers have to wait if they somehow end up at the same index.
-        let mut validation_status = self.txn_status[txn_idx as usize].1.write();
-        self.set_executed_status(txn_idx, incarnation);
-
-        let txn_deps: Vec<TxnIndex> = {
-            let mut stored_deps = self.txn_dependency[txn_idx as usize].lock();
-            // Holding the lock, take dependency vector.
-            std::mem::take(&mut stored_deps)
-        };
-
-        // Mark dependencies as resolved and find the minimum index among them.
-        let min_dep = txn_deps
-            .into_iter()
-            .map(|dep| {
-                // Mark the status of dependencies as 'Ready' since dependency on
-                // transaction txn_idx is now resolved.
-                self.resume(dep);
-
-                dep
-            })
-            .min();
-        if let Some(execution_target_idx) = min_dep {
-            // Decrease the execution index as necessary to ensure resolved dependencies
-            // get a chance to be re-executed.
-            self.execution_idx
-                .fetch_min(execution_target_idx, Ordering::SeqCst);
-        }
-
-        let (cur_val_idx, mut cur_wave) =
-            Self::unpack_validation_idx(self.validation_idx.load(Ordering::Acquire));
-
-        // If validation_idx is already lower than txn_idx, all required transactions will be
-        // considered for validation, and there is nothing to do.
-        if cur_val_idx > txn_idx {
-            if revalidate_suffix {
-                // The transaction execution required revalidating all higher txns (not
-                // only itself), currently happens when incarnation writes to a new path
-                // (w.r.t. the write-set of its previous completed incarnation).
-                if let Some(wave) = self.decrease_validation_idx(txn_idx + 1) {
-                    cur_wave = wave;
-                };
-            }
-            // Update the minimum wave this txn needs to pass.
-            validation_status.required_wave = cur_wave;
-            return SchedulerTask::ValidationTask((txn_idx, incarnation), cur_wave);
-        }
-
-        SchedulerTask::NoTask
-    }
-
-    /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
-    /// may return a re-execution task back to the caller (otherwise, NoTask).
-    pub fn finish_abort(&self, txn_idx: TxnIndex, incarnation: Incarnation) -> SchedulerTask {
-        {
-            // acquire exclusive lock on the validation status of txn_idx, and hold the lock
-            // while calling decrease_validation_idx below. Otherwise, this thread might get
-            // suspended after setting aborted ( = ready) status, and other threads might finish
-            // re-executing, then commit txn_idx, and potentially commit txn_idx + 1 before
-            // decrease_validation_idx would be able to set max_triggered_wave.
-            //
-            // Also, as a convention, we always acquire validation status lock before execution
-            // status lock, as we have to have a consistent order and this order is easier to
-            // provide correctness between finish_execution & try_commit.
-            let _validation_status = self.txn_status[txn_idx as usize].1.write();
-
-            self.set_aborted_status(txn_idx, incarnation);
-
-            // Schedule higher txns for validation, skipping txn_idx itself (needs to be
-            // re-executed first).
-            self.decrease_validation_idx(txn_idx + 1);
-
-            // can release the lock early.
-        }
-
-        // txn_idx must be re-executed, and if execution_idx is lower, it will be.
-        if self.execution_idx.load(Ordering::Acquire) > txn_idx {
-            // Optimization: execution_idx is higher than txn_idx, but decreasing it may
-            // lead to wasted work for all indices between txn_idx and execution_idx.
-            // Instead, attempt to create a new incarnation and return the corresponding
-            // re-execution task back to the caller. If incarnation fails, there is
-            // nothing to do, as another thread must have succeeded to incarnate and
-            // obtain the task for re-execution.
-            if let Some((new_incarnation, execution_task_type)) = self.try_incarnate(txn_idx) {
-                return SchedulerTask::ExecutionTask(
-                    (txn_idx, new_incarnation),
-                    execution_task_type,
-                );
-            }
-        }
-
-        SchedulerTask::NoTask
-    }
-
-    /// This function can halt the BlockSTM early, even if there are unfinished tasks.
-    /// It will set the done_marker to be true, resolve all pending dependencies.
-    ///
-    /// Currently there are 4 scenarios to early halt the BlockSTM execution.
-    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
-    /// 2. There is a txn with VM execution status Abort.
-    /// 3. There is a txn with VM execution status SkipRest.
-    /// 4. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.
-    ///
-    /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
-    /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.
-    pub fn halt(&self) {
-        // The first thread that sets done_marker to be true will be reponsible for
-        // resolving the conditional variables, to help other theads that may be pending
-        // on the read dependency. See the comment of the function resolve_condvar().
-        if !self.done_marker.swap(true, Ordering::SeqCst) {
-            for txn_idx in 0..self.num_txns {
-                self.resolve_condvar(txn_idx);
-            }
-        }
-    }
-
-    /// When early halt the BlockSTM, some of the threads
-    /// may still be working on execution, and waiting for dependency (indicated by the condition variable `condvar`).
-    /// Therefore the commit thread needs to wake up all such pending threads, by sending notification to the condition
-    /// variable and setting the lock variables properly.
-    pub fn resolve_condvar(&self, txn_idx: TxnIndex) {
+/// Private functions of the Scheduler
+impl Scheduler {
+    /// Helper function to be called from Scheduler::halt(); Sets the
+    /// transaction status to Halted. If the transaction is suspended,
+    /// it will wake it up.
+    fn halt_transaction_execution(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
         {
             // Only transactions with status Suspended or Ready may have the condition variable of pending threads.
@@ -593,22 +669,19 @@ impl Scheduler {
                 ExecutionStatus::Suspended(_, condvar)
                 | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*(condvar.clone());
-                    // Mark parallel execution halted due to reasons like module r/w intersection.
-                    *lock.lock() = DependencyStatus::ExecutionHalted;
-                    // Wake up the process waiting for dependency.
+
+                    let mut lock = lock.lock();
+                    *lock = DependencyStatus::ExecutionHalted;
                     cvar.notify_one();
                 },
                 _ => (),
             }
-            // Set the all transactions' status to be ExecutionHalted.
-            // Then any dependency read (wait_for_dependency) will immediately return and abort the VM execution.
+
+            // Makes sure that the txn never gets suspended
             *status = ExecutionStatus::ExecutionHalted;
         }
     }
-}
 
-/// Private functions of the Scheduler
-impl Scheduler {
     fn unpack_validation_idx(validation_idx: u64) -> (TxnIndex, Wave) {
         (
             (validation_idx & TXN_IDX_MASK) as TxnIndex,
@@ -616,17 +689,26 @@ impl Scheduler {
         )
     }
 
+    fn pack_into_validation_index(idx: TxnIndex, wave: Wave) -> u64 {
+        (idx as u64) | ((wave as u64) << 32)
+    }
+
+    fn next_validation_index(idx: u64) -> u64 {
+        idx + 1
+    }
+
     /// Decreases the validation index, adjusting the wave and validation status as needed.
     fn decrease_validation_idx(&self, target_idx: TxnIndex) -> Option<Wave> {
         // We only call with txn_idx + 1, so it can equal num_txns, but not be strictly larger.
         debug_assert!(target_idx <= self.num_txns);
-        if target_idx >= self.num_txns {
+
+        if target_idx == self.num_txns {
             return None;
         }
 
         if let Ok(prev_val_idx) =
             self.validation_idx
-                .fetch_update(Ordering::Acquire, Ordering::SeqCst, |val_idx| {
+                .fetch_update(Ordering::SeqCst, Ordering::Acquire, |val_idx| {
                     let (txn_idx, wave) = Self::unpack_validation_idx(val_idx);
                     if txn_idx > target_idx {
                         let mut validation_status = self.txn_status[target_idx as usize].1.write();
@@ -638,8 +720,7 @@ impl Scheduler {
                         validation_status.max_triggered_wave =
                             max(validation_status.max_triggered_wave, wave + 1);
 
-                        // Pack into validation index.
-                        Some((target_idx as u64) | ((wave as u64 + 1) << 32))
+                        Some(Self::pack_into_validation_index(target_idx, wave + 1))
                     } else {
                         None
                     }
@@ -726,22 +807,22 @@ impl Scheduler {
         &self,
         idx_to_validate: TxnIndex,
         wave: Wave,
-    ) -> Option<(Version, Wave)> {
+    ) -> Option<(TxnIndex, Incarnation, Wave)> {
         // We do compare-and-swap here instead of fetch-and-increment as for execution index
         // because we would like to not validate transactions when lower indices are in the
         // 'never_executed' state (to avoid unnecessarily reducing validation index and creating
         // redundant validation tasks). This is checked in the caller (in 'next_task' function),
         // but if we used fetch-and-increment, two threads can arrive in a cloned state and
         // both increment, effectively skipping over the 'never_executed' transaction index.
-        let validation_idx = (idx_to_validate as u64) | ((wave as u64) << 32);
-        let new_validation_idx = ((idx_to_validate + 1) as u64) | ((wave as u64) << 32);
+        let curr_validation_idx = Self::pack_into_validation_index(idx_to_validate, wave);
+        let next_validation_idx = Self::next_validation_index(curr_validation_idx);
         if self
             .validation_idx
             .compare_exchange(
-                validation_idx,
-                new_validation_idx,
-                Ordering::Acquire,
+                curr_validation_idx,
+                next_validation_idx,
                 Ordering::SeqCst,
+                Ordering::Acquire,
             )
             .is_ok()
         {
@@ -750,7 +831,7 @@ impl Scheduler {
             // return version and wave for validation task, otherwise None.
             return self
                 .is_executed(idx_to_validate, false)
-                .map(|incarnation| ((idx_to_validate, incarnation), wave));
+                .map(|incarnation| (idx_to_validate, incarnation, wave));
         }
 
         None
@@ -763,7 +844,7 @@ impl Scheduler {
     /// to create the next incarnation (should happen exactly once), and if successful,
     /// return the version to the caller for the corresponding ExecutionTask.
     /// - Otherwise, return None.
-    fn try_execute_next_version(&self) -> Option<(Version, ExecutionTaskType)> {
+    fn try_execute_next_version(&self) -> Option<(TxnIndex, Incarnation, ExecutionTaskType)> {
         let idx_to_execute = self.execution_idx.fetch_add(1, Ordering::SeqCst);
 
         if idx_to_execute >= self.num_txns {
@@ -774,7 +855,7 @@ impl Scheduler {
         // return version for execution task, otherwise None.
         self.try_incarnate(idx_to_execute)
             .map(|(incarnation, execution_task_type)| {
-                ((idx_to_execute, incarnation), execution_task_type)
+                (idx_to_execute, incarnation, execution_task_type)
             })
     }
 

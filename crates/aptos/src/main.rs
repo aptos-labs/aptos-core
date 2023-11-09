@@ -11,16 +11,26 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 use aptos::{move_tool, Tool};
 use clap::Parser;
-use std::process::exit;
+use std::{process::exit, time::Duration};
 
-#[tokio::main]
-async fn main() {
-    // Register hooks
+fn main() {
+    // Register hooks.
     move_tool::register_package_hooks();
-    // Run the corresponding tools
-    let result = Tool::parse().execute().await;
 
-    // At this point, we'll want to print and determine whether to exit for an error code
+    // Create a runtime.
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    // Run the corresponding tool.
+    let result = runtime.block_on(Tool::parse().execute());
+
+    // Shutdown the runtime with a timeout. We do this to make sure that we don't sit
+    // here waiting forever waiting for tasks that sometimes don't want to exit on
+    // their own (e.g. telemetry, containers spawned by the local testnet, etc).
+    runtime.shutdown_timeout(Duration::from_millis(50));
+
     match result {
         Ok(inner) => println!("{}", inner),
         Err(inner) => {

@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::config::{
-    config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
+    config_optimizer::ConfigOptimizer, node_config_loader::NodeType, Error, NodeConfig,
 };
 use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::fmt::{Debug, Formatter};
 
 // Useful indexer environment variables
@@ -115,20 +116,25 @@ impl Debug for IndexerConfig {
     }
 }
 
-impl ConfigSanitizer for IndexerConfig {
-    fn sanitize(
+impl ConfigOptimizer for IndexerConfig {
+    fn optimize(
         node_config: &mut NodeConfig,
+        _local_config_yaml: &Value,
         _node_type: NodeType,
-        _chain_id: ChainId,
-    ) -> Result<(), Error> {
+        _chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
+        // If the indexer is not enabled, there's nothing to do
         let indexer_config = &mut node_config.indexer;
-
-        // If the indexer is not enabled, there's nothing to validate
         if !indexer_config.enabled {
-            return Ok(());
+            return Ok(false);
         }
 
-        // Verify the postgres uri
+        // TODO: we really shouldn't be overriding the configs if they are
+        // specified in the local node config file. This optimizer should
+        // migrate to the pattern used by other optimizers, but for now, we'll
+        // just keep the legacy behaviour to avoid breaking anything.
+
+        // Verify and set the postgres uri
         indexer_config.postgres_uri = env_var_or_default(
             INDEXER_DATABASE_URL,
             indexer_config.postgres_uri.clone(),
@@ -138,7 +144,7 @@ impl ConfigSanitizer for IndexerConfig {
             )),
         );
 
-        // Verify the processor
+        // Verify and set the processor
         indexer_config.processor = env_var_or_default(
             PROCESSOR_NAME,
             indexer_config
@@ -148,7 +154,7 @@ impl ConfigSanitizer for IndexerConfig {
             None,
         );
 
-        // Verify the starting version
+        // Verify and set the starting version
         indexer_config.starting_version = match std::env::var(STARTING_VERSION).ok() {
             None => indexer_config.starting_version,
             Some(starting_version) => match starting_version.parse::<u64>() {
@@ -189,7 +195,7 @@ impl ConfigSanitizer for IndexerConfig {
             None,
         );
 
-        Ok(())
+        Ok(true)
     }
 }
 
