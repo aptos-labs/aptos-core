@@ -167,7 +167,7 @@ impl Default for EmitJobRequest {
             expected_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             prompt_before_spending: false,
             coordination_delay_between_instances: Duration::from_secs(0),
-            latency_polling_interval: Duration::from_millis(300),
+            latency_polling_interval: Duration::from_secs(10),
             account_minter_seed: None,
             coins_per_account_override: None,
         }
