@@ -53,7 +53,7 @@ fn handle_panic(panic_info: &PanicInfo<'_>) {
     if state::get_state() == VMState::VERIFIER || state::get_state() == VMState::DESERIALIZER {
         return;
     }
-
+    eprintln!("The process panicked at:\n{}", panic_info);
     // Kill the process
     process::exit(12);
 }
