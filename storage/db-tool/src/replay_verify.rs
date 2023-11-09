@@ -63,7 +63,7 @@ const RETRY_ATTEMPT: u8 = 5;
 
 impl Opt {
     pub async fn run(self) -> Result<()> {
-        let restore_handler = Arc::new(AptosDB::open(
+        let restore_handler = Arc::new(AptosDB::open_kv_only(
             StorageDirPaths::from_path(self.db_dir),
             false,                       /* read_only */
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */

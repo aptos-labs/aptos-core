@@ -52,6 +52,7 @@ byteorder = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 claims = { workspace = true }
+clap = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
@@ -70,6 +71,7 @@ scopeguard = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

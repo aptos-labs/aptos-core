@@ -47,13 +47,13 @@ pub fn maybe_bootstrap<V: VMExecutor>(
     db: &DbReaderWriter,
     genesis_txn: &Transaction,
     waypoint: Waypoint,
-) -> Result<bool> {
+) -> Result<Option<LedgerInfoWithSignatures>> {
     let executed_trees = db.reader.get_latest_executed_trees()?;
     // if the waypoint is not targeted with the genesis txn, it may be either already bootstrapped, or
     // aiming for state sync to catch up.
     if executed_trees.version().map_or(0, |v| v + 1) != waypoint.version() {
         info!(waypoint = %waypoint, "Skip genesis txn.");
-        return Ok(false);
+        return Ok(None);
     }
 
     let committer = calculate_genesis::<V>(db, executed_trees, genesis_txn)?;
@@ -63,8 +63,9 @@ pub fn maybe_bootstrap<V: VMExecutor>(
         waypoint,
         committer.waypoint(),
     );
+    let ledger_info = committer.output.ledger_info.clone();
     committer.commit()?;
-    Ok(true)
+    Ok(ledger_info)
 }
 
 pub struct GenesisCommitter {

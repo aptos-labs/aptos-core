@@ -74,6 +74,12 @@ impl TimeService for SimulatedTimeService {
     }
 }
 
+impl Default for SimulatedTimeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimulatedTimeService {
     /// Creates new SimulatedTimeService in disabled state (time not running)
     pub fn new() -> SimulatedTimeService {

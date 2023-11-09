@@ -188,7 +188,9 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let aggregator_context: NativeAggregatorContext = extensions.remove();
-        let aggregator_change_set = aggregator_context.into_change_set();
+        let aggregator_change_set = aggregator_context
+            .into_change_set()
+            .map_err(|e| PartialVMError::from(e).finish(Location::Undefined))?;
 
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
@@ -408,7 +410,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let mut module_write_set = BTreeMap::new();
         let mut aggregator_v1_write_set = BTreeMap::new();
         let mut aggregator_v1_delta_set = BTreeMap::new();
-        let mut delayed_field_change_set = BTreeMap::new();
 
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
@@ -471,9 +472,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             }
         }
 
-        for (id, change) in aggregator_change_set.delayed_field_changes {
-            delayed_field_change_set.insert(id, change);
-        }
+        // We need to remove values that are already in the writes.
+        let reads_needing_exchange = aggregator_change_set
+            .reads_needing_exchange
+            .into_iter()
+            .filter(|(state_key, _)| !resource_write_set.contains_key(state_key))
+            .collect();
 
         VMChangeSet::new(
             resource_write_set,
@@ -481,7 +485,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            delayed_field_change_set,
+            aggregator_change_set.delayed_field_changes,
+            reads_needing_exchange,
             events,
             configs,
         )

@@ -14,9 +14,8 @@
  * 4. Once the lockup has expired, the recipient can call claim to get the unlocked tokens.
  **/
 module defi::locked_coins {
-    use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin};
-    use aptos_framework::event::{Self, EventHandle};
+    use aptos_framework::event;
     use aptos_framework::timestamp;
     use aptos_std::table::{Self, Table};
     use std::error;
@@ -38,35 +37,38 @@ module defi::locked_coins {
         withdrawal_address: address,
         // Number of locks that have not yet been claimed.
         total_locks: u64,
-
-        cancel_lockup_events: EventHandle<CancelLockupEvent>,
-        claim_events: EventHandle<ClaimEvent>,
-        update_lockup_events: EventHandle<UpdateLockupEvent>,
-        update_withdrawal_address_events: EventHandle<UpdateWithdrawalAddressEvent>,
     }
 
+    #[event]
     /// Event emitted when a lock is canceled.
-    struct CancelLockupEvent has drop, store {
+    struct CancelLockup has drop, store {
+        sponsor: address,
         recipient: address,
         amount: u64,
     }
 
+    #[event]
     /// Event emitted when a recipient claims unlocked coins.
-    struct ClaimEvent has drop, store {
+    struct Claim has drop, store {
+        sponsor: address,
         recipient: address,
         amount: u64,
         claimed_time_secs: u64,
     }
 
+    #[event]
     /// Event emitted when lockup is updated for an existing lock.
-    struct UpdateLockupEvent has drop, store {
+    struct UpdateLockup has drop, store {
+        sponsor: address,
         recipient: address,
         old_unlock_time_secs: u64,
         new_unlock_time_secs: u64,
     }
 
+    #[event]
     /// Event emitted when withdrawal address is updated.
-    struct UpdateWithdrawalAddressEvent has drop, store {
+    struct UpdateWithdrawalAddress has drop, store {
+        sponsor: address,
         old_withdrawal_address: address,
         new_withdrawal_address: address,
     }
@@ -126,11 +128,6 @@ module defi::locked_coins {
             locks: table::new<address, Lock<CoinType>>(),
             withdrawal_address,
             total_locks: 0,
-
-            cancel_lockup_events: account::new_event_handle<CancelLockupEvent>(sponsor),
-            claim_events: account::new_event_handle<ClaimEvent>(sponsor),
-            update_lockup_events: account::new_event_handle<UpdateLockupEvent>(sponsor),
-            update_withdrawal_address_events: account::new_event_handle<UpdateWithdrawalAddressEvent>(sponsor),
         })
     }
 
@@ -145,7 +142,8 @@ module defi::locked_coins {
         let old_withdrawal_address = locks.withdrawal_address;
         locks.withdrawal_address = new_withdrawal_address;
 
-        event::emit_event(&mut locks.update_withdrawal_address_events, UpdateWithdrawalAddressEvent {
+        event::emit(UpdateWithdrawalAddress {
+            sponsor: sponsor_address,
             old_withdrawal_address,
             new_withdrawal_address,
         });
@@ -197,7 +195,8 @@ module defi::locked_coins {
         // This would fail if the recipient account is not registered to receive CoinType.
         coin::deposit(recipient_address, coins);
 
-        event::emit_event(&mut locks.claim_events, ClaimEvent {
+        event::emit(Claim {
+            sponsor,
             recipient: recipient_address,
             amount,
             claimed_time_secs: now_secs,
@@ -227,7 +226,8 @@ module defi::locked_coins {
         let old_unlock_time_secs = lock.unlock_time_secs;
         lock.unlock_time_secs = new_unlock_time_secs;
 
-        event::emit_event(&mut locks.update_lockup_events, UpdateLockupEvent {
+        event::emit(UpdateLockup {
+            sponsor: sponsor_address,
             recipient,
             old_unlock_time_secs,
             new_unlock_time_secs,
@@ -257,11 +257,18 @@ module defi::locked_coins {
         let amount = coin::value(&coins);
         coin::deposit(locks.withdrawal_address, coins);
 
-        event::emit_event(&mut locks.cancel_lockup_events, CancelLockupEvent { recipient, amount });
+        event::emit(
+            CancelLockup {
+                sponsor: sponsor_address,
+                recipient,
+                amount
+            });
     }
 
     #[test_only]
     use std::string;
+    #[test_only]
+    use aptos_framework::account;
     #[test_only]
     use aptos_framework::coin::BurnCapability;
     #[test_only]
@@ -371,7 +378,12 @@ module defi::locked_coins {
         let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, sponsor_address);
-        batch_add_locked_coins<AptosCoin>(sponsor, vector[recipient_1_addr, recipient_2_addr], vector[1000, 1000], 1000);
+        batch_add_locked_coins<AptosCoin>(
+            sponsor,
+            vector[recipient_1_addr, recipient_2_addr],
+            vector[1000, 1000],
+            1000
+        );
         assert!(claim_time_secs<AptosCoin>(sponsor_addr, recipient_1_addr) == 1000, 0);
         assert!(claim_time_secs<AptosCoin>(sponsor_addr, recipient_2_addr) == 1000, 0);
         // Extend lockup.
@@ -427,7 +439,12 @@ module defi::locked_coins {
         let burn_cap = setup(aptos_framework, sponsor);
         let sponsor_address = signer::address_of(sponsor);
         initialize_sponsor<AptosCoin>(sponsor, withdrawal_addr);
-        batch_add_locked_coins<AptosCoin>(sponsor, vector[recipient_1_addr, recipient_2_addr], vector[1000, 1000], 1000);
+        batch_add_locked_coins<AptosCoin>(
+            sponsor,
+            vector[recipient_1_addr, recipient_2_addr],
+            vector[1000, 1000],
+            1000
+        );
         batch_cancel_lockup<AptosCoin>(sponsor, vector[recipient_1_addr, recipient_2_addr]);
         let locks = borrow_global_mut<Locks<AptosCoin>>(sponsor_address);
         assert!(!table::contains(&locks.locks, recipient_1_addr), 0);

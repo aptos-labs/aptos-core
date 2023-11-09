@@ -142,7 +142,7 @@ module aptos_framework::account {
     const ENO_VALID_FRAMEWORK_RESERVED_ADDRESS: u64 = 11;
     /// Specified scheme required to proceed with the smart contract operation - can only be ED25519_SCHEME(0) OR MULTI_ED25519_SCHEME(1)
     const EINVALID_SCHEME: u64 = 12;
-    /// Abort the transaction if the expected originating address is different from the originating addres on-chain
+    /// Abort the transaction if the expected originating address is different from the originating address on-chain
     const EINVALID_ORIGINATING_ADDRESS: u64 = 13;
     /// The signer capability offer doesn't exist at the given address
     const ENO_SUCH_SIGNER_CAPABILITY: u64 = 14;

@@ -6,10 +6,7 @@ on:
   schedule:
     - cron: "0 0 * * *"
   pull_request:
-    types: [labeled, opened, synchronize, reopened]
-  push:
-    branches:
-      - main
+    types: [labeled]
   workflow_dispatch:
   workflow_call:
 
@@ -25,9 +22,11 @@ concurrency:
 
 jobs:
   rust-unit-coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule'
-    # Note the tests run slowly due to instrutmentation. It takes CI ~8 hrs
-    timeout-minutes: 600
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
+      ${{ github.event_name == 'schedule' && github.ref_name == 'main' }}
+    # Note the tests run slowly due to instrutmentation. It takes CI 10 hrs
+    timeout-minutes: 720
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -39,7 +38,7 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 16 --output-path lcov_unit.info -vv
+      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude aptos-testcases --lcov --jobs 32 --output-path lcov_unit.info -vv
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - uses: actions/upload-artifact@v3
@@ -48,7 +47,9 @@ jobs:
           path: lcov_unit.info
 
   rust-smoke-coverage:
-    if: contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') || ${{ github.event_name }} == 'schedule'
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
+      ${{ github.event_name == 'schedule' && github.ref_name == 'main' }}
     timeout-minutes: 240
     runs-on: high-perf-docker
     steps:

@@ -75,7 +75,7 @@ pub struct ModuleGenerator {
     pub source_map: SourceMap,
 }
 
-/// Immutable context for a module code generation, seperated from the mutable generator
+/// Immutable context for a module code generation, separated from the mutable generator
 /// state to reduce borrow conflicts.
 #[derive(Debug, Clone)]
 pub struct ModuleContext<'env> {
