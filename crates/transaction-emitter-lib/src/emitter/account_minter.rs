@@ -128,7 +128,7 @@ impl<'t> AccountMinter<'t> {
             .get_account_balance(self.source_account.address())
             .await?;
         if req.mint_to_root {
-            if balance.checked_add(coins_for_source).is_some() {
+            if balance.checked_add(coins_for_source).is_some() && balance < 10 * coins_for_source {
                 info!(
                     "Mint account {} current balance is {}, minting additional {} coins",
                     self.source_account.address(),
