@@ -882,6 +882,7 @@ export enum AnyPublicKey_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
+  TYPE_SECP256R1_ECDSA = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -896,6 +897,9 @@ export function anyPublicKey_TypeFromJSON(object: any): AnyPublicKey_Type {
     case 2:
     case "TYPE_SECP256K1_ECDSA":
       return AnyPublicKey_Type.TYPE_SECP256K1_ECDSA;
+    case 3:
+    case "TYPE_SECP256R1_ECDSA":
+      return AnyPublicKey_Type.TYPE_SECP256R1_ECDSA;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -911,6 +915,8 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
       return "TYPE_ED25519";
     case AnyPublicKey_Type.TYPE_SECP256K1_ECDSA:
       return "TYPE_SECP256K1_ECDSA";
+    case AnyPublicKey_Type.TYPE_SECP256R1_ECDSA:
+      return "TYPE_SECP256R1_ECDSA";
     case AnyPublicKey_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -919,13 +925,16 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
 
 export interface AnySignature {
   type?: AnySignature_Type | undefined;
-  signature?: Uint8Array | undefined;
+  ed25519?: Ed25519 | undefined;
+  secp256k1Ecdsa?: Secp256k1Ecdsa | undefined;
+  webauthn?: WebAuthn | undefined;
 }
 
 export enum AnySignature_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
+  TYPE_WEBAUTHN = 3,
   UNRECOGNIZED = -1,
 }
 
@@ -940,6 +949,9 @@ export function anySignature_TypeFromJSON(object: any): AnySignature_Type {
     case 2:
     case "TYPE_SECP256K1_ECDSA":
       return AnySignature_Type.TYPE_SECP256K1_ECDSA;
+    case 3:
+    case "TYPE_WEBAUTHN":
+      return AnySignature_Type.TYPE_WEBAUTHN;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -955,10 +967,24 @@ export function anySignature_TypeToJSON(object: AnySignature_Type): string {
       return "TYPE_ED25519";
     case AnySignature_Type.TYPE_SECP256K1_ECDSA:
       return "TYPE_SECP256K1_ECDSA";
+    case AnySignature_Type.TYPE_WEBAUTHN:
+      return "TYPE_WEBAUTHN";
     case AnySignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
+}
+
+export interface Ed25519 {
+  signature?: Uint8Array | undefined;
+}
+
+export interface Secp256k1Ecdsa {
+  signature?: Uint8Array | undefined;
+}
+
+export interface WebAuthn {
+  signature?: Uint8Array | undefined;
 }
 
 export interface SingleKeySignature {
@@ -7789,7 +7815,7 @@ export const AnyPublicKey = {
 };
 
 function createBaseAnySignature(): AnySignature {
-  return { type: 0, signature: new Uint8Array(0) };
+  return { type: 0, ed25519: undefined, secp256k1Ecdsa: undefined, webauthn: undefined };
 }
 
 export const AnySignature = {
@@ -7797,8 +7823,14 @@ export const AnySignature = {
     if (message.type !== undefined && message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
-    if (message.signature !== undefined && message.signature.length !== 0) {
-      writer.uint32(18).bytes(message.signature);
+    if (message.ed25519 !== undefined) {
+      Ed25519.encode(message.ed25519, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.secp256k1Ecdsa !== undefined) {
+      Secp256k1Ecdsa.encode(message.secp256k1Ecdsa, writer.uint32(26).fork()).ldelim();
+    }
+    if (message.webauthn !== undefined) {
+      WebAuthn.encode(message.webauthn, writer.uint32(34).fork()).ldelim();
     }
     return writer;
   },
@@ -7822,7 +7854,21 @@ export const AnySignature = {
             break;
           }
 
-          message.signature = reader.bytes();
+          message.ed25519 = Ed25519.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.secp256k1Ecdsa = Secp256k1Ecdsa.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.webauthn = WebAuthn.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -7868,7 +7914,9 @@ export const AnySignature = {
   fromJSON(object: any): AnySignature {
     return {
       type: isSet(object.type) ? anySignature_TypeFromJSON(object.type) : 0,
-      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      ed25519: isSet(object.ed25519) ? Ed25519.fromJSON(object.ed25519) : undefined,
+      secp256k1Ecdsa: isSet(object.secp256k1Ecdsa) ? Secp256k1Ecdsa.fromJSON(object.secp256k1Ecdsa) : undefined,
+      webauthn: isSet(object.webauthn) ? WebAuthn.fromJSON(object.webauthn) : undefined,
     };
   },
 
@@ -7877,8 +7925,14 @@ export const AnySignature = {
     if (message.type !== undefined && message.type !== 0) {
       obj.type = anySignature_TypeToJSON(message.type);
     }
-    if (message.signature !== undefined && message.signature.length !== 0) {
-      obj.signature = base64FromBytes(message.signature);
+    if (message.ed25519 !== undefined) {
+      obj.ed25519 = Ed25519.toJSON(message.ed25519);
+    }
+    if (message.secp256k1Ecdsa !== undefined) {
+      obj.secp256k1Ecdsa = Secp256k1Ecdsa.toJSON(message.secp256k1Ecdsa);
+    }
+    if (message.webauthn !== undefined) {
+      obj.webauthn = WebAuthn.toJSON(message.webauthn);
     }
     return obj;
   },
@@ -7889,6 +7943,281 @@ export const AnySignature = {
   fromPartial(object: DeepPartial<AnySignature>): AnySignature {
     const message = createBaseAnySignature();
     message.type = object.type ?? 0;
+    message.ed25519 = (object.ed25519 !== undefined && object.ed25519 !== null)
+      ? Ed25519.fromPartial(object.ed25519)
+      : undefined;
+    message.secp256k1Ecdsa = (object.secp256k1Ecdsa !== undefined && object.secp256k1Ecdsa !== null)
+      ? Secp256k1Ecdsa.fromPartial(object.secp256k1Ecdsa)
+      : undefined;
+    message.webauthn = (object.webauthn !== undefined && object.webauthn !== null)
+      ? WebAuthn.fromPartial(object.webauthn)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseEd25519(): Ed25519 {
+  return { signature: new Uint8Array(0) };
+}
+
+export const Ed25519 = {
+  encode(message: Ed25519, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(10).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): Ed25519 {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEd25519();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<Ed25519, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<Ed25519 | Ed25519[]> | Iterable<Ed25519 | Ed25519[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [Ed25519.encode(p).finish()];
+        }
+      } else {
+        yield* [Ed25519.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, Ed25519>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<Ed25519> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [Ed25519.decode(p)];
+        }
+      } else {
+        yield* [Ed25519.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): Ed25519 {
+    return { signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0) };
+  },
+
+  toJSON(message: Ed25519): unknown {
+    const obj: any = {};
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Ed25519>): Ed25519 {
+    return Ed25519.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Ed25519>): Ed25519 {
+    const message = createBaseEd25519();
+    message.signature = object.signature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSecp256k1Ecdsa(): Secp256k1Ecdsa {
+  return { signature: new Uint8Array(0) };
+}
+
+export const Secp256k1Ecdsa = {
+  encode(message: Secp256k1Ecdsa, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(10).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): Secp256k1Ecdsa {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSecp256k1Ecdsa();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<Secp256k1Ecdsa, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<Secp256k1Ecdsa | Secp256k1Ecdsa[]> | Iterable<Secp256k1Ecdsa | Secp256k1Ecdsa[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [Secp256k1Ecdsa.encode(p).finish()];
+        }
+      } else {
+        yield* [Secp256k1Ecdsa.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, Secp256k1Ecdsa>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<Secp256k1Ecdsa> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [Secp256k1Ecdsa.decode(p)];
+        }
+      } else {
+        yield* [Secp256k1Ecdsa.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): Secp256k1Ecdsa {
+    return { signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0) };
+  },
+
+  toJSON(message: Secp256k1Ecdsa): unknown {
+    const obj: any = {};
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Secp256k1Ecdsa>): Secp256k1Ecdsa {
+    return Secp256k1Ecdsa.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Secp256k1Ecdsa>): Secp256k1Ecdsa {
+    const message = createBaseSecp256k1Ecdsa();
+    message.signature = object.signature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseWebAuthn(): WebAuthn {
+  return { signature: new Uint8Array(0) };
+}
+
+export const WebAuthn = {
+  encode(message: WebAuthn, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(10).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): WebAuthn {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWebAuthn();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<WebAuthn, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<WebAuthn | WebAuthn[]> | Iterable<WebAuthn | WebAuthn[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [WebAuthn.encode(p).finish()];
+        }
+      } else {
+        yield* [WebAuthn.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, WebAuthn>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<WebAuthn> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [WebAuthn.decode(p)];
+        }
+      } else {
+        yield* [WebAuthn.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): WebAuthn {
+    return { signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0) };
+  },
+
+  toJSON(message: WebAuthn): unknown {
+    const obj: any = {};
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WebAuthn>): WebAuthn {
+    return WebAuthn.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WebAuthn>): WebAuthn {
+    const message = createBaseWebAuthn();
     message.signature = object.signature ?? new Uint8Array(0);
     return message;
   },
