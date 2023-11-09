@@ -200,7 +200,7 @@ pub enum Operation {
     // Markers for beginning and end of transformed
     // opaque function calls (the function call is replaced
     // by assumes/asserts/gotos, but it is necessary to
-    // add more assumes/asserts later in the pipeline.
+    // add more assumes/asserts later in the pipeline).
     OpaqueCallBegin(ModuleId, FunId, Vec<Type>),
     OpaqueCallEnd(ModuleId, FunId, Vec<Type>),
 
