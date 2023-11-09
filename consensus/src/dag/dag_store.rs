@@ -356,6 +356,11 @@ impl Dag {
     pub(super) fn prune(&mut self) {
         let to_keep = self.nodes_by_round.split_off(&self.start_round);
         let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);
+        debug!(
+            "pruning dag. start round {}. pruning from {}",
+            self.start_round,
+            to_prune.first_key_value().map(|v| v.0).unwrap()
+        );
         let digests = to_prune
             .iter()
             .flat_map(|(_, round_ref)| round_ref.iter().flatten())
