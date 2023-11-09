@@ -109,7 +109,6 @@ mod access_path_cache;
 pub mod counters;
 pub mod data_cache;
 
-pub mod adapter_common;
 pub mod aptos_vm;
 mod aptos_vm_impl;
 pub mod block_executor;
