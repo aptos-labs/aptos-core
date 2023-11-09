@@ -22,7 +22,8 @@ To run the service we need to define a config file. We will start with this temp
 ```yaml
 health_check_port: 8084
 server_config:
-  processor_name: default_processor
+  processor_config:
+    type: default_processor
   postgres_connection_string: postgresql://postgres:@localhost:5432/indexer
   indexer_grpc_data_service_address: 127.0.0.1:50051
   indexer_grpc_http2_ping_interval_in_secs: 60
