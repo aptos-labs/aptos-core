@@ -10,7 +10,6 @@ use crate::{
 use anyhow::{bail, Error, Result};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     language_storage::{StructTag, TypeTag, CORE_CODE_ADDRESS},
     move_resource::MoveStructType,
@@ -30,15 +29,11 @@ pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     }))
 });
 
-/// This trait is used by block executor to abstractly represent an event.
-/// Block executor uses `get_event_data` to get the event data.
-/// Block executor then checks for the occurrences of aggregators and aggregatorsnapshots
-/// in the event data, processes them, and calls `update_event_data` to update the event data.
-pub trait ReadWriteEvent {
-    /// Returns the event data.
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]);
-    /// Updates the event data.
-    fn update_event_data(&mut self, event_data: Vec<u8>);
+/// This trait is used by block executor to abstractly represent an event,
+/// and update its data.
+pub trait TransactionEvent {
+    fn get_event_data(&self) -> &[u8];
+    fn set_event_data(&mut self, event_data: Vec<u8>);
 }
 
 /// Support versioning of the data structure.
@@ -48,25 +43,15 @@ pub enum ContractEvent {
     V2(ContractEventV2),
 }
 
-impl ReadWriteEvent for ContractEvent {
-    fn get_event_data(&self) -> (EventKey, u64, &TypeTag, &[u8]) {
+impl TransactionEvent for ContractEvent {
+    fn get_event_data(&self) -> &[u8] {
         match self {
-            ContractEvent::V1(event) => (
-                *event.key(),
-                event.sequence_number(),
-                event.type_tag(),
-                event.event_data(),
-            ),
-            ContractEvent::V2(event) => (
-                EventKey::new(0, AccountAddress::ZERO),
-                0,
-                event.type_tag(),
-                event.event_data(),
-            ),
+            ContractEvent::V1(event) => event.event_data(),
+            ContractEvent::V2(event) => event.event_data(),
         }
     }
 
-    fn update_event_data(&mut self, event_data: Vec<u8>) {
+    fn set_event_data(&mut self, event_data: Vec<u8>) {
         match self {
             ContractEvent::V1(event) => event.event_data = event_data,
             ContractEvent::V2(event) => event.event_data = event_data,

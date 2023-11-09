@@ -43,7 +43,6 @@ spec aptos_framework::coin {
         let addr = type_info::type_of<CoinType>().account_address;
         modifies global<CoinInfo<CoinType>>(addr);
         aborts_if (amount != 0) && !exists<CoinInfo<CoinType>>(addr);
-        include CoinAddAbortsIf<CoinType>;
         ensures supply<CoinType> == old(supply<CoinType>) + amount;
         ensures result.value == amount;
     }

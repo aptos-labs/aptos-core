@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, harness::MoveHarness};
+use crate::{assert_success, harness::MoveHarness, BlockSplit};
 use aptos_language_e2e_tests::{
     account::Account,
     executor::{ExecutorMode, FakeExecutor},
@@ -30,12 +30,14 @@ pub fn initialize(
             vec![
                 FeatureFlag::AGGREGATOR_V2_API,
                 FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+                FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
             ],
             vec![],
         );
     } else {
         harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);
@@ -47,6 +49,7 @@ pub fn initialize(
 
     AggV2TestHarness {
         harness,
+        comparison_harnesses: vec![],
         account,
         txn_accounts,
         txn_index: 0,
@@ -55,6 +58,7 @@ pub fn initialize(
 
 pub struct AggV2TestHarness {
     pub harness: MoveHarness,
+    pub comparison_harnesses: Vec<MoveHarness>,
     pub account: Account,
     pub txn_accounts: Vec<Account>,
     pub txn_index: usize,
@@ -130,29 +134,38 @@ impl AggregatorLocation {
     }
 }
 
-pub fn init(
-    harness: &mut MoveHarness,
-    account: &Account,
-    use_type: UseType,
-    element_type: ElementType,
-    aggregator: bool,
-) -> SignedTransaction {
-    harness.create_entry_function(
-        account,
-        str::parse(
-            if aggregator {
-                "0x1::aggregator_v2_test::init_aggregator"
-            } else {
-                "0x1::aggregator_v2_test::init_snapshot"
-            },
-        )
-        .unwrap(),
-        vec![element_type.get_type_tag()],
-        vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
-    )
-}
-
 impl AggV2TestHarness {
+    pub fn run_block_in_parts_and_check(
+        &mut self,
+        block_split: BlockSplit,
+        txn_block: Vec<(u64, SignedTransaction)>,
+    ) {
+        self.harness
+            .run_block_in_parts_and_check(block_split, txn_block);
+    }
+
+    pub fn init(
+        &mut self,
+        account: Option<&Account>,
+        use_type: UseType,
+        element_type: ElementType,
+        aggregator: bool,
+    ) -> SignedTransaction {
+        self.harness.create_entry_function(
+            account.unwrap_or(&self.account),
+            str::parse(
+                if aggregator {
+                    "0x1::aggregator_v2_test::init_aggregator"
+                } else {
+                    "0x1::aggregator_v2_test::init_snapshot"
+                },
+            )
+            .unwrap(),
+            vec![element_type.get_type_tag()],
+            vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
+        )
+    }
+
     fn create_entry_agg_func_with_args(
         &mut self,
         name: &str,

@@ -42,7 +42,7 @@ mod test_utils;
 #[cfg(test)]
 mod twins;
 mod txn_notifier;
-mod util;
+pub mod util;
 
 /// AptosBFT implementation
 pub mod consensus_provider;
@@ -52,8 +52,10 @@ mod execution_pipeline;
 /// AptosNet interface.
 pub mod network_interface;
 mod payload_manager;
+mod qc_aggregator;
 mod sender_aware_shuffler;
 mod transaction_deduper;
+mod transaction_filter;
 mod transaction_shuffler;
 mod txn_hash_and_authenticator_deduper;
 

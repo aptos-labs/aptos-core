@@ -130,7 +130,7 @@ trait AssertNoExternalStrongRef {
 
 impl<V: Send + Sync + 'static> AssertNoExternalStrongRef for SparseMerkleTree<V> {
     fn assert_no_external_strong_ref(&self) {
-        assert_subtree_sole_strong_ref(&self.inner.root);
+        assert_subtree_sole_strong_ref(self.inner.root());
     }
 }
 

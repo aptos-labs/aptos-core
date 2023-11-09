@@ -140,7 +140,7 @@ fun constant::test_constans() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v4294967295
+// Move bytecode v7
 module 42.constant {
 
 

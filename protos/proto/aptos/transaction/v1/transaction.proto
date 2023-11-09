@@ -403,7 +403,8 @@ message Signature {
     TYPE_MULTI_ED25519 = 2;
     TYPE_MULTI_AGENT = 3;
     TYPE_FEE_PAYER = 4;
-    TYPE_SINGLE_SENDER = 5;
+    TYPE_SINGLE_SENDER = 6;
+    reserved 5;
   }
 
   Type type = 1;
@@ -412,7 +413,8 @@ message Signature {
     MultiEd25519Signature multi_ed25519 = 3;
     MultiAgentSignature multi_agent = 4;
     FeePayerSignature fee_payer = 5;
-    SingleSender single_sender = 6;
+    // 6 is reserved.
+    SingleSender single_sender = 7;
   }
 }
 
@@ -489,15 +491,18 @@ message AccountSignature {
     TYPE_UNSPECIFIED = 0;
     TYPE_ED25519 = 1;
     TYPE_MULTI_ED25519 = 2;
-    TYPE_SINGLE_KEY = 3;
-    TYPE_MULTI_KEY = 4;
+    TYPE_SINGLE_KEY = 4;
+    TYPE_MULTI_KEY = 5;
+
+    reserved 3;
   }
 
   Type type = 1;
   oneof signature {
     Ed25519Signature ed25519 = 2;
     MultiEd25519Signature multi_ed25519 = 3;
-    SingleKeySignature single_key_signature = 4;
-    MultiKeySignature multi_key_signature = 5;
+    // 4 is reserved.
+    SingleKeySignature single_key_signature = 5;
+    MultiKeySignature multi_key_signature = 6;
   }
 }

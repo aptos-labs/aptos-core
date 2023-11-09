@@ -24,4 +24,13 @@ spec aptos_std::type_info {
 
     // The chain ID is modeled as an uninterpreted function.
     spec fun spec_chain_id_internal(): u8;
+
+    spec fun spec_size_of_val<T>(val_ref: T): u64 {
+        len(std::bcs::serialize(val_ref))
+    }
+
+    spec size_of_val<T>(val_ref: &T): u64 {
+        aborts_if false;
+        ensures result == spec_size_of_val<T>(val_ref);
+    }
 }

@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    adapter_common::{discard_error_output, discard_error_vm_status, VMAdapter},
     aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::expect_only_successful_execution,
-    move_vm_ext::{AptosMoveResolver, RespawnedSession, SessionExt, SessionId},
+    move_vm_ext::{
+        get_max_binary_format_version, AptosMoveResolver, RespawnedSession, SessionExt, SessionId,
+    },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -119,6 +120,12 @@ macro_rules! unwrap_or_discard {
             Err(e) => return discard_error_vm_status(e),
         }
     };
+}
+
+pub(crate) fn discard_error_vm_status(vm_status: VMStatus) -> (VMStatus, VMOutput) {
+    let vm_output =
+        VMOutput::empty_with_status(TransactionStatus::Discard(vm_status.status_code()));
+    (vm_status, vm_output)
 }
 
 impl AptosVM {
@@ -364,7 +371,7 @@ impl AptosVM {
                 (error_code, txn_output)
             },
             TransactionStatus::Discard(status) => {
-                (VMStatus::error(status, None), discard_error_output(status))
+                discard_error_vm_status(VMStatus::error(status, None))
             },
             TransactionStatus::Retry => unreachable!(),
         }
@@ -537,6 +544,12 @@ impl AptosVM {
         for (key, op) in change_set.write_set_iter() {
             gas_meter.charge_io_gas_for_write(key, op)?;
         }
+        // TODO[agg_v2](fix): Charge SnapshotDerived (string concat) based on lenght,
+        // as charge below charges based on non-exchanged writes (i.e. identifier being in the read_op)
+        // Do we want to charge delayed field changes also?
+        for (key, (read_op, _)) in change_set.reads_needing_delayed_field_exchange().iter() {
+            gas_meter.charge_io_gas_for_write(key, read_op)?;
+        }
         for (key, group_write) in change_set.resource_group_write_set().iter() {
             gas_meter.charge_io_gas_for_group_write(key, group_write)?;
         }
@@ -550,7 +563,7 @@ impl AptosVM {
             storage_refund = 0.into();
         }
 
-        // TODO(Gas): Charge for aggregator writes
+        // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
         RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
     }
@@ -855,15 +868,7 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = if self
-            .0
-            .get_features()
-            .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6)
-        {
-            6
-        } else {
-            5
-        };
+        let max_version = get_max_binary_format_version(self.0.get_features(), None);
         let max_identifier_size = if self
             .0
             .get_features()
@@ -1094,6 +1099,27 @@ impl AptosVM {
                 balance,
             ),
         )))
+    }
+
+    fn validate_signature_checked_transaction(
+        &self,
+        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
+        transaction: &SignedTransaction,
+        allow_too_new: bool,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        self.check_transaction_format(transaction)?;
+
+        let prologue_status = self.run_prologue(session, resolver, transaction, log_context);
+        match prologue_status {
+            Err(err)
+                if !allow_too_new || err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW =>
+            {
+                Err(err)
+            },
+            _ => Ok(()),
+        }
     }
 
     fn execute_user_transaction_impl(
@@ -1494,7 +1520,7 @@ impl AptosVM {
             )));
 
         let resolver = vm.as_move_resolver(&state_view);
-        let mut session = vm.new_session(&resolver, SessionId::Void);
+        let mut session = vm.0.new_session(&resolver, SessionId::Void);
 
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.0.extract_module_metadata(&module_id);
@@ -1569,6 +1595,161 @@ impl AptosVM {
                 self.0.run_module_prologue(session, txn_data, log_context)
             },
         }
+    }
+
+    fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
+        txn.check_signature()
+    }
+
+    fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
+        if txn.contains_duplicate_signers() {
+            return Err(VMStatus::error(
+                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
+                None,
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn run_prologue(
+        &self,
+        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
+        transaction: &SignedTransaction,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(), VMStatus> {
+        let txn_data = TransactionMetadata::new(transaction);
+        self.run_prologue_with_payload(
+            session,
+            resolver,
+            transaction.payload(),
+            &txn_data,
+            log_context,
+            false,
+        )
+    }
+
+    pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
+        let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
+        vm_output
+            .change_set()
+            .events()
+            .iter()
+            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
+    }
+
+    pub fn execute_single_transaction(
+        &self,
+        txn: &SignatureVerifiedTransaction,
+        resolver: &impl AptosMoveResolver,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+        if let SignatureVerifiedTransaction::Invalid(_) = txn {
+            let (vm_status, output) =
+                discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
+            return Ok((vm_status, output, None));
+        }
+
+        Ok(match txn.expect_valid() {
+            BlockMetadataTransaction(block_metadata) => {
+                fail_point!("aptos_vm::execution::block_metadata");
+                let (vm_status, output) =
+                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
+                (vm_status, output, Some("block_prologue".to_string()))
+            },
+            GenesisTransaction(write_set_payload) => {
+                let (vm_status, output) = self.process_waypoint_change_set(
+                    resolver,
+                    write_set_payload.clone(),
+                    log_context,
+                )?;
+                (vm_status, output, Some("waypoint_write_set".to_string()))
+            },
+            UserTransaction(txn) => {
+                fail_point!("aptos_vm::execution::user_transaction");
+                let sender = txn.sender().to_hex();
+                let _timer = TXN_TOTAL_SECONDS.start_timer();
+                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
+
+                if let StatusType::InvariantViolation = vm_status.status_type() {
+                    match vm_status.status_code() {
+                        // Type resolution failure can be triggered by user input when providing a bad type argument, skip this case.
+                        StatusCode::TYPE_RESOLUTION_FAILURE
+                        if vm_status.sub_status()
+                            == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {},
+                        // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
+                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
+                        | StatusCode::TYPE_RESOLUTION_FAILURE => {
+                            speculative_error!(
+                                log_context,
+                                format!(
+                                    "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                                    bcs::to_bytes::<SignedTransaction>(txn),
+                                    vm_status
+                                ),
+                            );
+                        },
+                        // Paranoid mode failure. We need to be alerted about this ASAP.
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                        if vm_status.sub_status()
+                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE) =>
+                            {
+                                error!(
+                                *log_context,
+                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(txn),
+                                vm_status,
+                            );
+                            },
+                        // Paranoid mode failure but with reference counting
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                        if vm_status.sub_status()
+                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
+                            {
+                                error!(
+                                *log_context,
+                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(txn),
+                                vm_status,
+                            );
+                            },
+                        // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
+                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
+                        // Ignore Storage Error as currently it sometimes wraps speculative errors
+                        // TODO[agg_v2](fix) propagate SPECULATIVE_EXECUTION_ABORT_ERROR correctly, and remove storage from valid errors here.
+                        StatusCode::STORAGE_ERROR => (),
+                        // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
+                        //
+                        // TODO: Add different counters for the error categories here.
+                        _ => {
+                            error!(
+                                *log_context,
+                                "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
+                                bcs::to_bytes::<SignedTransaction>(txn),
+                                vm_status,
+                            );
+                        },
+                    }
+                }
+
+                // Increment the counter for user transactions executed.
+                let counter_label = match output.status() {
+                    TransactionStatus::Keep(_) => Some("success"),
+                    TransactionStatus::Discard(_) => Some("discarded"),
+                    TransactionStatus::Retry => None,
+                };
+                if let Some(label) = counter_label {
+                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
+                }
+                (vm_status, output, Some(sender))
+            },
+            StateCheckpoint(_) => {
+                let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                let output = VMOutput::empty_with_status(status);
+                (VMStatus::Executed, output, Some("state_checkpoint".into()))
+            },
+        })
     }
 }
 
@@ -1712,180 +1893,6 @@ impl VMValidator for AptosVM {
     }
 }
 
-impl VMAdapter for AptosVM {
-    fn new_session<'r>(
-        &self,
-        resolver: &'r impl AptosMoveResolver,
-        session_id: SessionId,
-    ) -> SessionExt<'r, '_> {
-        self.0.new_session(resolver, session_id)
-    }
-
-    fn check_signature(&self, txn: SignedTransaction) -> Result<SignatureCheckedTransaction> {
-        if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
-            ..
-        } = &txn.authenticator_ref()
-        {
-            if self
-                .0
-                .get_features()
-                .is_enabled(FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL)
-            {
-                return txn.check_fee_payer_signature();
-            }
-        }
-        txn.check_signature()
-    }
-
-    fn check_transaction_format(&self, txn: &SignedTransaction) -> Result<(), VMStatus> {
-        if txn.contains_duplicate_signers() {
-            return Err(VMStatus::error(
-                StatusCode::SIGNERS_CONTAIN_DUPLICATES,
-                None,
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn run_prologue(
-        &self,
-        session: &mut SessionExt,
-        resolver: &impl AptosMoveResolver,
-        transaction: &SignedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(), VMStatus> {
-        let txn_data = TransactionMetadata::new(transaction);
-        self.run_prologue_with_payload(
-            session,
-            resolver,
-            transaction.payload(),
-            &txn_data,
-            log_context,
-            false,
-        )
-    }
-
-    fn should_restart_execution(vm_output: &VMOutput) -> bool {
-        let new_epoch_event_key = aptos_types::on_chain_config::new_epoch_event_key();
-        vm_output
-            .change_set()
-            .events()
-            .iter()
-            .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
-    }
-
-    fn execute_single_transaction(
-        &self,
-        txn: &SignatureVerifiedTransaction,
-        resolver: &impl AptosMoveResolver,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
-        if let SignatureVerifiedTransaction::Invalid(_) = txn {
-            let (vm_status, output) =
-                discard_error_vm_status(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
-            return Ok((vm_status, output, None));
-        }
-
-        Ok(match txn.expect_valid() {
-            BlockMetadataTransaction(block_metadata) => {
-                fail_point!("aptos_vm::execution::block_metadata");
-                let (vm_status, output) =
-                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
-                (vm_status, output, Some("block_prologue".to_string()))
-            },
-            GenesisTransaction(write_set_payload) => {
-                let (vm_status, output) = self.process_waypoint_change_set(
-                    resolver,
-                    write_set_payload.clone(),
-                    log_context,
-                )?;
-                (vm_status, output, Some("waypoint_write_set".to_string()))
-            },
-            UserTransaction(txn) => {
-                fail_point!("aptos_vm::execution::user_transaction");
-                let sender = txn.sender().to_hex();
-                let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
-
-                if let StatusType::InvariantViolation = vm_status.status_type() {
-                    match vm_status.status_code() {
-                        // Type resolution failure can be triggered by user input when providing a bad type argument, skip this case.
-                        StatusCode::TYPE_RESOLUTION_FAILURE
-                        if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {},
-                        // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
-                        StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
-                        | StatusCode::TYPE_RESOLUTION_FAILURE => {
-                            speculative_error!(
-                                log_context,
-                                format!(
-                                    "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                                    bcs::to_bytes::<SignedTransaction>(txn),
-                                    vm_status
-                                ),
-                            );
-                        },
-                        // Paranoid mode failure. We need to be alerted about this ASAP.
-                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-                        if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE) =>
-                            {
-                                error!(
-                                *log_context,
-                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
-                                vm_status,
-                            );
-                            },
-                        // Paranoid mode failure but with reference counting
-                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-                        if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
-                            {
-                                error!(
-                                *log_context,
-                                "[aptos_vm] Transaction breaking paranoid mode. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
-                                vm_status,
-                            );
-                        },
-                        // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
-                        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
-                        // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
-                        //
-                        // TODO: Add different counters for the error categories here.
-                        _ => {
-                            error!(
-                                *log_context,
-                                "[aptos_vm] Transaction breaking invariant violation. txn: {:?}, status: {:?}",
-                                bcs::to_bytes::<SignedTransaction>(txn),
-                                vm_status,
-                            );
-                        },
-                    }
-                }
-
-                // Increment the counter for user transactions executed.
-                let counter_label = match output.status() {
-                    TransactionStatus::Keep(_) => Some("success"),
-                    TransactionStatus::Discard(_) => Some("discarded"),
-                    TransactionStatus::Retry => None,
-                };
-                if let Some(label) = counter_label {
-                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
-                }
-                (vm_status, output, Some(sender))
-            },
-            StateCheckpoint(_) => {
-                let status = TransactionStatus::Keep(ExecutionStatus::Success);
-                let output = VMOutput::empty_with_status(status);
-                (VMStatus::Executed, output, Some("state_checkpoint".into()))
-            },
-        })
-    }
-}
-
 impl AptosSimulationVM {
     fn validate_simulated_transaction(
         &self,
@@ -1920,7 +1927,10 @@ impl AptosSimulationVM {
 
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session = self.0.new_session(resolver, SessionId::txn_meta(&txn_data));
+        let mut session = self
+            .0
+             .0
+            .new_session(resolver, SessionId::txn_meta(&txn_data));
         if let Err(err) =
             self.validate_simulated_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {

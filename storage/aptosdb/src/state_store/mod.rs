@@ -32,7 +32,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_executor_types::in_memory_state_calculator::InMemoryStateCalculator;
+use aptos_executor::components::in_memory_state_calculator_v2::InMemoryStateCalculatorV2;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::iterator::JellyfishMerkleIterator;
@@ -227,7 +227,7 @@ impl StateDb {
 
 impl DbReader for StateStore {
     fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
-        Ok(self.smt_ancestors.lock().get_youngest()?)
+        Ok(self.smt_ancestors.lock().get_youngest())
     }
 
     /// Returns the latest state snapshot strictly before `next_version` if any.
@@ -313,7 +313,7 @@ impl StateStore {
         empty_buffered_state_for_restore: bool,
         skip_usage: bool,
     ) -> Self {
-        if !hack_for_tests {
+        if !hack_for_tests && !empty_buffered_state_for_restore {
             Self::sync_commit_progress(
                 Arc::clone(&ledger_db),
                 Arc::clone(&state_kv_db),
@@ -466,7 +466,7 @@ impl StateStore {
 
         let latest_snapshot_version = state_db
             .state_merkle_db
-            .get_state_snapshot_version_before(num_transactions)
+            .get_state_snapshot_version_before(Version::MAX)
             .expect("Failed to query latest node on initialization.");
 
         info!(
@@ -545,12 +545,13 @@ impl StateStore {
                 .map(|(idx, _)| idx);
             latest_snapshot_state_view.prime_cache_by_write_set(&write_sets)?;
 
-            let calculator = InMemoryStateCalculator::new(
-                buffered_state.current_state(),
-                latest_snapshot_state_view.into_state_cache(),
-            );
-            let (updates_until_last_checkpoint, state_after_last_checkpoint) = calculator
-                .calculate_for_write_sets_after_snapshot(last_checkpoint_index, &write_sets)?;
+            let (updates_until_last_checkpoint, state_after_last_checkpoint) =
+                InMemoryStateCalculatorV2::calculate_for_write_sets_after_snapshot(
+                    buffered_state.current_state(),
+                    latest_snapshot_state_view.into_state_cache(),
+                    last_checkpoint_index,
+                    &write_sets,
+                )?;
 
             // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
             buffered_state.update(

@@ -108,21 +108,34 @@ impl VMOutput {
         resolver: &impl AggregatorV1Resolver,
     ) -> anyhow::Result<TransactionOutput, VMStatus> {
         let materialized_output = self.try_materialize(resolver)?;
-        debug_assert!(
+        Self::convert_to_transaction_output(materialized_output)
+    }
+
+    /// Same as `try_materialize` but also constructs `TransactionOutput`.
+    pub fn into_transaction_output(self) -> anyhow::Result<TransactionOutput, VMStatus> {
+        let (change_set, fee_statement, status) = self.unpack_with_fee_statement();
+        let materialized_output = VMOutput::new(change_set, fee_statement, status);
+        Self::convert_to_transaction_output(materialized_output)
+    }
+
+    fn convert_to_transaction_output(
+        materialized_output: VMOutput,
+    ) -> anyhow::Result<TransactionOutput, VMStatus> {
+        assert!(
             materialized_output
                 .change_set()
                 .aggregator_v1_delta_set()
                 .is_empty(),
             "Aggregator deltas must be empty after materialization."
         );
-        debug_assert!(
+        assert!(
             materialized_output
                 .change_set()
                 .delayed_field_change_set()
                 .is_empty(),
             "Delayed fields must be empty after materialization."
         );
-        debug_assert!(
+        assert!(
             materialized_output
                 .change_set()
                 .resource_group_write_set()
@@ -134,33 +147,6 @@ impl VMOutput {
         Ok(TransactionOutput::new(write_set, events, gas_used, status))
     }
 
-    /// Similar to `try_into_transaction_output` but deltas are materialized
-    /// externally by the caller beforehand.
-    pub fn into_transaction_output_with_materialized_deltas(
-        mut self,
-        materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
-    ) -> TransactionOutput {
-        assert_eq!(
-            materialized_aggregator_v1_deltas.len(),
-            self.change_set().aggregator_v1_delta_set().len(),
-            "Different number of materialized deltas and deltas in the output."
-        );
-        debug_assert!(
-            materialized_aggregator_v1_deltas
-                .iter()
-                .all(|(k, _)| self.change_set().aggregator_v1_delta_set().contains_key(k)),
-            "Materialized aggregator writes contain a key which does not exist in delta set."
-        );
-        self.change_set
-            .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
-
-        let (vm_change_set, gas_used, status) = self.unpack();
-        let (write_set, events) = vm_change_set
-            .into_storage_change_set_unchecked()
-            .into_inner();
-        TransactionOutput::new(write_set, events, gas_used, status)
-    }
-
     /// Updates the VMChangeSet based on the input aggregator v1 deltas, patched resource write set,
     /// patched events, and generates TransactionOutput
     pub fn into_transaction_output_with_materialized_write_set(
@@ -168,6 +154,7 @@ impl VMOutput {
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
         patched_resource_write_set: BTreeMap<StateKey, WriteOp>,
         patched_events: Vec<ContractEvent>,
+        combined_groups: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         assert_eq!(
             materialized_aggregator_v1_deltas.len(),
@@ -182,8 +169,10 @@ impl VMOutput {
         );
         self.change_set
             .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
-        self.change_set
-            .extend_resource_write_set(patched_resource_write_set.into_iter());
+        self.change_set.extend_resource_write_set(
+            patched_resource_write_set.into_iter(),
+            combined_groups.into_iter(),
+        );
 
         assert_eq!(
             patched_events.len(),
@@ -193,6 +182,8 @@ impl VMOutput {
         self.change_set.set_events(patched_events.into_iter());
         // TODO[agg_v2](cleanup) move drain to happen when getting what to materialize.
         let _ = self.change_set.drain_delayed_field_change_set();
+        let _ = self.change_set.drain_reads_needing_delayed_field_exchange();
+        let _ = self.change_set.drain_resource_group_write_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set

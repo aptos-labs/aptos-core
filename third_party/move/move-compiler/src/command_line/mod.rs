@@ -47,3 +47,5 @@ pub const MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG: &str = "Wdeprecation";
 
 pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS: &str = "WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS";
 pub const WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG: &str = "Wdeprecation-aptos";
+
+pub const V2_FLAG: &str = "v2";

@@ -201,6 +201,8 @@ impl<'r> TransactionDataCache<'r> {
                 },
             );
 
+            // TODO[agg_v2](fix) We need to propagate errors better, and handle them differently based on:
+            // - DELAYED_FIELDS_CODE_INVARIANT_ERROR, SPECULATIVE_EXECUTION_ABORT_ERROR or other.
             let (data, bytes_loaded) = resolved_result.map_err(|err| {
                 let msg = format!("Unexpected storage error: {:?}", err);
                 PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(msg)

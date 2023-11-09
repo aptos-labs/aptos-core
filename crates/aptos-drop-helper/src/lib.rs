@@ -9,4 +9,4 @@ pub mod async_drop_queue;
 mod metrics;
 
 pub static DEFAULT_DROPPER: Lazy<AsyncConcurrentDropper> =
-    Lazy::new(|| AsyncConcurrentDropper::new("default", 32));
+    Lazy::new(|| AsyncConcurrentDropper::new("default", 32, 8));

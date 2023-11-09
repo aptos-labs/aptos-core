@@ -1,0 +1,23 @@
+[package]
+name = "aptos-debugger"
+version = "0.1.0"
+description = "Debugging tools."
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-consensus = { workspace = true }
+aptos-db-tool = { workspace = true }
+aptos-logger = { workspace = true }
+aptos-move-debugger = { workspace = true }
+aptos-push-metrics = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
