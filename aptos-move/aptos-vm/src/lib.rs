@@ -108,7 +108,6 @@ pub mod counters;
 pub mod data_cache;
 
 pub mod aptos_vm;
-mod aptos_vm_impl;
 pub mod block_executor;
 mod errors;
 pub mod move_vm_ext;
