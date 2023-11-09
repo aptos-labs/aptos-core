@@ -15,7 +15,8 @@ use serde_yaml::Value;
 // and roughly double that (20MiB) before compression. This will allow us to
 // fetch at most 20k P2P transaction write-sets per request before we fallback
 // to execution.
-const MAX_MESSAGE_SIZE: usize = 20 * 1024 * 1024; /* 20 MiB */
+// const MAX_MESSAGE_SIZE: usize = 20 * 1024 * 1024; /* 20 MiB */
+const MAX_MESSAGE_SIZE: usize = 60 * 1024 * 1024; /* 60MiB: Ensure that we don't truncate chunks! */
 
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
@@ -139,7 +140,7 @@ impl Default for StateSyncDriverConfig {
             progress_check_interval_ms: 50,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 100,
-            max_num_stream_timeouts: 24,
+            max_num_stream_timeouts: 30, // 30 * 5 seconds = 180 seconds before stream times out
             max_pending_data_chunks: 500,
             max_stream_wait_time_ms: 5000,
             mempool_commit_ack_timeout_ms: 5000, // 5 seconds
@@ -350,7 +351,7 @@ impl Default for AptosDataClientConfig {
             min_peer_ratio_for_latency_filtering: 5, // Only filter if we have at least 5 potential peers per request
             min_peers_for_latency_filtering: 10, // Only filter if we have at least 10 total peers
             optimistic_fetch_timeout_ms: 10_000, // 10 seconds
-            response_timeout_ms: 120_000,             // 120 seconds
+            response_timeout_ms: 120_000,        // 120 seconds
             subscription_response_timeout_ms: 60_000, // 60 seconds (must be longer than a regular timeout because of pre-fetching)
             use_compression: true,
         }
