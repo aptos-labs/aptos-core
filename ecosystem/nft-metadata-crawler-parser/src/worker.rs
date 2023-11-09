@@ -587,6 +587,5 @@ impl Worker {
             "[NFT Metadata Crawler] {}",
             message
         );
-        panic!();
     }
 }
