@@ -15,12 +15,8 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    access_path::AccessPath,
-    block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
-    on_chain_config::Features,
-    state_store::state_key::StateKey,
-    transaction::{SignatureCheckedTransaction, SignedTransaction},
+    access_path::AccessPath, block_metadata::BlockMetadata, contract_event::ContractEvent,
+    on_chain_config::Features, state_store::state_key::StateKey,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::ChangeSetConfigs};
 use bytes::Bytes;
@@ -81,10 +77,6 @@ pub enum SessionId {
 }
 
 impl SessionId {
-    pub fn txn(txn: &SignedTransaction) -> Self {
-        Self::txn_meta(&TransactionMetadata::new(&txn.clone()))
-    }
-
     pub fn txn_meta(txn_data: &TransactionMetadata) -> Self {
         Self::Txn {
             sender: txn_data.sender,
@@ -103,20 +95,12 @@ impl SessionId {
         }
     }
 
-    pub fn prologue(txn: &SignedTransaction) -> Self {
-        Self::prologue_meta(&TransactionMetadata::new(&txn.clone()))
-    }
-
     pub fn prologue_meta(txn_data: &TransactionMetadata) -> Self {
         Self::Prologue {
             sender: txn_data.sender,
             sequence_number: txn_data.sequence_number,
             script_hash: txn_data.script_hash.clone(),
         }
-    }
-
-    pub fn epilogue(txn: &SignatureCheckedTransaction) -> Self {
-        Self::epilogue_meta(&TransactionMetadata::new(&txn.clone().into_inner()))
     }
 
     pub fn epilogue_meta(txn_data: &TransactionMetadata) -> Self {

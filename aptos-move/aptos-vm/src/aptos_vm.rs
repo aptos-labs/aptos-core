@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aptos_vm_impl::{get_transaction_output, AptosVMImpl, AptosVMInternals},
+    aptos_vm_impl::{get_transaction_output, AptosVMImpl},
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     counters::*,
     data_cache::{AsMoveResolver, StorageAdapter},
@@ -229,8 +229,11 @@ impl AptosVM {
         }
     }
 
-    pub fn internals(&self) -> AptosVMInternals {
-        AptosVMInternals::new(&self.vm_impl)
+    /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn gas_params(&self) -> Result<&aptos_gas_schedule::AptosGasParameters, VMStatus> {
+        let log_context = AdapterLogSchema::new(aptos_state_view::StateViewId::Miscellaneous, 0);
+        self.vm_impl.get_gas_parameters(&log_context)
     }
 
     /// Generates a transaction output for a transaction that encountered errors during the
@@ -1097,6 +1100,7 @@ impl AptosVM {
         session: &mut SessionExt,
         resolver: &impl AptosMoveResolver,
         transaction: &SignedTransaction,
+        transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
@@ -1107,12 +1111,11 @@ impl AptosVM {
             ));
         }
 
-        let txn_data = TransactionMetadata::new(transaction);
         self.run_prologue_with_payload(
             session,
             resolver,
             transaction.payload(),
-            &txn_data,
+            transaction_data,
             log_context,
         )
     }
@@ -1166,8 +1169,12 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
-        let mut session = self.vm_impl.new_session(resolver, SessionId::prologue(txn));
-        if let Err(err) = self.validate_signed_transaction(&mut session, resolver, txn, log_context)
+        let txn_data = TransactionMetadata::new(txn);
+        let mut session = self
+            .vm_impl
+            .new_session(resolver, SessionId::prologue_meta(&txn_data));
+        if let Err(err) =
+            self.validate_signed_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {
             return discard_error_vm_status(err);
         };
@@ -1181,7 +1188,9 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self.vm_impl.new_session(resolver, SessionId::txn(txn));
+            session = self
+                .vm_impl
+                .new_session(resolver, SessionId::txn_meta(&txn_data));
         }
 
         if let aptos_types::transaction::authenticator::TransactionAuthenticator::FeePayer {
@@ -1207,7 +1216,6 @@ impl AptosVM {
 
         let storage_gas_params =
             unwrap_or_discard!(self.vm_impl.get_storage_gas_parameters(log_context));
-        let txn_data = TransactionMetadata::new(txn);
 
         // We keep track of whether any newly published modules are loaded into the Vm's loader
         // cache as part of executing transactions. This would allow us to decide whether the cache
@@ -1866,24 +1874,30 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
+        let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
         let mut session = self
             .vm_impl
-            .new_session(&resolver, SessionId::prologue(&txn));
+            .new_session(&resolver, SessionId::prologue_meta(&txn_data));
 
         // Increment the counter for transactions verified.
-        let (counter_label, result) =
-            match self.validate_signed_transaction(&mut session, &resolver, &txn, &log_context) {
-                Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
-                    "failure",
-                    VMValidatorResult::new(Some(err.status_code()), 0),
-                ),
-                _ => (
-                    "success",
-                    VMValidatorResult::new(None, txn.gas_unit_price()),
-                ),
-            };
+        let (counter_label, result) = match self.validate_signed_transaction(
+            &mut session,
+            &resolver,
+            &txn,
+            &txn_data,
+            &log_context,
+        ) {
+            Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
+                "failure",
+                VMValidatorResult::new(Some(err.status_code()), 0),
+            ),
+            _ => (
+                "success",
+                VMValidatorResult::new(None, txn.gas_unit_price()),
+            ),
+        };
 
         TRANSACTIONS_VALIDATED
             .with_label_values(&[counter_label])

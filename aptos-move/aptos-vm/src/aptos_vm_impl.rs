@@ -19,16 +19,15 @@ use aptos_gas_algebra::{Gas, GasExpression};
 use aptos_gas_schedule::{
     AptosGasParameters, FromOnChainGasSchedule, MiscGasParameters, NativeGasParameters,
 };
-use aptos_logger::{enabled, prelude::*, Level};
+use aptos_logger::{enabled, Level};
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateViewId;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     chain_id::ChainId,
     fee_statement::FeeStatement,
     on_chain_config::{
         ApprovedExecutionHashes, ConfigStorage, ConfigurationResource, FeatureFlag, Features,
-        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, TimedFeaturesBuilder, Version,
+        GasSchedule, GasScheduleV2, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
     },
     transaction::{AbortInfo, ExecutionStatus, Multisig, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
@@ -55,7 +54,6 @@ pub struct AptosVMImpl {
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
     storage_gas_params: Result<StorageGasParameters, String>,
-    version: Option<Version>,
     features: Features,
     timed_features: TimedFeatures,
 }
@@ -160,14 +158,11 @@ impl AptosVMImpl {
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
-        let version = Version::fetch_config(resolver);
-
         Self {
             move_vm,
             gas_feature_version,
             gas_params,
             storage_gas_params,
-            version,
             features,
             timed_features,
         }
@@ -175,11 +170,6 @@ impl AptosVMImpl {
 
     pub(crate) fn mark_loader_cache_as_invalid(&self) {
         self.move_vm.mark_loader_cache_as_invalid();
-    }
-
-    /// Provides access to some internal APIs of the VM.
-    pub fn internals(&self) -> AptosVMInternals {
-        AptosVMInternals(self)
     }
 
     pub fn get_gas_parameters(
@@ -206,13 +196,6 @@ impl AptosVMImpl {
 
     pub fn get_gas_feature_version(&self) -> u64 {
         self.gas_feature_version
-    }
-
-    pub fn get_version(&self) -> Result<Version, VMStatus> {
-        self.version.clone().ok_or_else(|| {
-            alert!("VM Startup Failed. Version Not Found");
-            VMStatus::error(StatusCode::VM_STARTUP_FAILURE, None)
-        })
     }
 
     pub fn get_features(&self) -> &Features {
@@ -652,32 +635,6 @@ impl AptosVMImpl {
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.move_vm.new_session(resolver, session_id)
-    }
-}
-
-/// Internal APIs for the VM, primarily used for testing.
-#[derive(Clone, Copy)]
-pub struct AptosVMInternals<'a>(&'a AptosVMImpl);
-
-impl<'a> AptosVMInternals<'a> {
-    pub fn new(internal: &'a AptosVMImpl) -> Self {
-        Self(internal)
-    }
-
-    /// Returns the internal Move VM instance.
-    pub fn move_vm(self) -> &'a MoveVmExt {
-        &self.0.move_vm
-    }
-
-    /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_params(self) -> Result<&'a AptosGasParameters, VMStatus> {
-        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
-        self.0.get_gas_parameters(&log_context)
-    }
-
-    /// Returns the version of Move Runtime.
-    pub fn version(self) -> Result<Version, VMStatus> {
-        self.0.get_version()
     }
 }
 

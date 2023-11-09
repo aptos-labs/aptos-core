@@ -48,7 +48,6 @@ fn test_metadata_tracking() {
 
     let slot_fee = harness
         .new_vm()
-        .internals()
         .gas_params()
         .unwrap()
         .vm
