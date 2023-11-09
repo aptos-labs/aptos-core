@@ -220,6 +220,16 @@ impl Mempool {
         status
     }
 
+    fn was_seen(
+        txn_pointer: &TransactionSummary,
+        seen: &HashMap<TransactionSummary, u64>,
+        upgraded: &HashSet<&TransactionSummary>,
+        exclude_transactions: &BTreeMap<TransactionSummary, TransactionInProgress>,
+    ) -> bool {
+        seen.contains_key(txn_pointer)
+            || (!upgraded.contains(txn_pointer) && exclude_transactions.get(txn_pointer).is_some())
+    }
+
     /// Fetches next block of transactions for consensus.
     /// `return_non_full` - if false, only return transactions when max_txns or max_bytes is reached
     ///                     Should always be true for Quorum Store.
@@ -265,28 +275,26 @@ impl Mempool {
         // iterate over the queue of transactions based on gas price
         'main: for txn in self.transactions.iter_queue() {
             txn_walked += 1;
-            let txn_pointer = TxnPointer::from(txn);
-            if seen.contains_key(&txn_pointer)
-                || (!upgraded.contains(&txn_pointer)
-                    && exclude_transactions.get(&txn_pointer).is_some())
-            {
+            if Self::was_seen(
+                &TxnPointer::from(txn),
+                &seen,
+                &upgraded,
+                &exclude_transactions,
+            ) {
                 continue;
             }
             let tx_seq = txn.sequence_number.transaction_sequence_number;
             let account_sequence_number = self.transactions.get_sequence_number(&txn.address);
-            let seen_previous = {
-                if tx_seq == 0 {
-                    false
-                } else {
-                    let prev_pointer = TxnPointer::new(txn.address, tx_seq - 1);
-                    seen.contains_key(&prev_pointer)
-                        || (!upgraded.contains(&prev_pointer)
-                            && exclude_transactions.get(&prev_pointer).is_some())
-                }
-            };
+            let previous_txn_was_seen = tx_seq > 0
+                && Self::was_seen(
+                    &TxnPointer::new(txn.address, tx_seq - 1),
+                    &seen,
+                    &upgraded,
+                    &exclude_transactions,
+                );
             // include transaction if it's "next" for given account or
             // we've already sent its ancestor to Consensus.
-            if seen_previous || account_sequence_number == Some(&tx_seq) {
+            if previous_txn_was_seen || account_sequence_number == Some(&tx_seq) {
                 let ptr = TxnPointer::from(txn);
                 seen.insert(ptr, txn.gas_ranking_score);
                 result.push(ptr);
