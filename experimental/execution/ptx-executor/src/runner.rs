@@ -20,7 +20,7 @@ use aptos_types::{
     transaction::signature_verified_transaction::SignatureVerifiedTransaction,
     write_set::TransactionWrite,
 };
-use aptos_vm::{adapter_common::VMAdapter, AptosVM};
+use aptos_vm::AptosVM;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use rayon::Scope;
 use std::sync::mpsc::{channel, Receiver, Sender};
