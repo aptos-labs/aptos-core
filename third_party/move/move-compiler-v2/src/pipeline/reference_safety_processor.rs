@@ -2,7 +2,23 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Implements memory safety analysis
+//! Implements memory safety analysis.
+//!
+//! This is an intra functional, forward-directed data flow analysis over the domain
+//! of a so-called borrow graph. The borrow graph tracks the creation of references from
+//! root memory locations and derivation of other references, by recording an edge for each
+//! borrow relation. For example, if `s` is the memory location of a struct, then
+//! `&s.f` is represented by a node which is derived fromm `s`. The lifetime graph is
+//! a DAG (acyclic).
+//!
+//! The analysis essentially evaluates each instruction under the viewpoint of the current
+//! active borrow graph at the program point, to detect any conditions of non-safety. This
+//! includes specifically the following rules:
+//!
+//! (a) if immutable references to a location exist, no mutable references can exist
+//! (b) only one mutable reference can exist at time for the same location.
+//! (c) selection of fields leads to independent 'sub-locations': the above rules are
+//!     applying independently. So one can have `&s.f` and `&mut s.g` at the same time.
 
 use crate::pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset};
 use codespan_reporting::diagnostic::Severity;
@@ -34,13 +50,14 @@ use std::{
 // Program Analysis Domain
 
 /// Lifetime graph nodes represent information about memory locations, as well as nodes derived
-/// from that locations. For example, if `s` is the memory location of a struct, then
-/// `&s.f` is represented by a node which is derived fromm `s`. The lifetime graph is
-/// a DAG (acyclic).
+/// from that locations.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LifetimeNode {
+    /// Memory location associated with this node.
     location: MemoryLocation,
+    /// Outgoing edges to descendants.
     descendants: SetDomain<BorrowEdge>,
+    /// Backlinks to ancestors.
     ancestors: SetDomain<LifetimeLabel>,
 }
 
@@ -51,28 +68,42 @@ struct LifetimeLabel(usize);
 /// A memory location, either a global in storage or a local on the stack.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Debug)]
 enum MemoryLocation {
+    /// The associated memory is in global storage.
     Global(QualifiedInstId<StructId>),
+    /// The associated memory is a local on the stack.
     Local(TempIndex),
+    /// The associated memory has been reused, but the old value is still bound here to this node.
+    /// This happens after an update to the location.
     Replaced,
 }
 
 /// Represents an edge in the lifetime graph.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Debug)]
 struct BorrowEdge {
+    /// The kind of borrow edge.
     kind: BorrowEdgeKind,
+    /// Whether this edge is a mutable borrow
     is_mut: bool,
+    /// A location associated with the borrow. For Skip edges (see below), no location may be
+    /// present.
     loc: Option<Loc>,
+    /// Target of the edge.
     target: LifetimeLabel,
 }
 
 /// The different type of edges.
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Debug)]
 enum BorrowEdgeKind {
+    /// Borrows the local at the MemoryLocation in the source node.
     BorrowLocal,
+    /// Borrows the global at the MemoryLocation in the source node.
     BorrowGlobal,
+    /// Borrows a field from a reference.
     BorrowField(FieldId),
     #[allow(unused)]
+    /// Borrows an indexed position in a vector.
     BorrowIndex,
+    /// Calls an operation, where the incoming references are used to derive outgoing references.
     Call(Operation),
     /// The `Skip` edge is used for graph composition and glues two graph nodes together via
     /// connecting them. For more details see the implementation of the `LifetimeDomain`
@@ -83,6 +114,8 @@ enum BorrowEdgeKind {
 impl LifetimeLabel {
     /// Creates a new, unique and stable, life time label based on a code offset and
     /// a qualifier to distinguish multiple labels at the same code point.
+    /// Since the program analysis could run fixpoint loops, we need to ensure that
+    /// these labels are the same in each iteration.
     fn new(code_offset: CodeOffset, qualifier: u8) -> LifetimeLabel {
         LifetimeLabel(((code_offset as usize) << 8) | (qualifier as usize))
     }
@@ -96,6 +129,7 @@ impl LifetimeLabel {
 }
 
 impl BorrowEdge {
+    /// Shortcut to create an edge.
     fn new(kind: BorrowEdgeKind, is_mut: bool, loc: Option<Loc>, target: LifetimeLabel) -> Self {
         Self {
             kind,
@@ -107,7 +141,7 @@ impl BorrowEdge {
 }
 
 impl BorrowEdgeKind {
-    /// Determines whether the region derived from this edge as overlap with the region
+    /// Determines whether the region derived from this edge has overlap with the region
     /// of the other edge. Overlap can only be excluded for field edges.
     fn overlaps(&self, other: &BorrowEdgeKind) -> bool {
         use BorrowEdgeKind::*;
@@ -138,6 +172,8 @@ impl AbstractDomain for LifetimeNode {
 }
 
 impl AbstractDomain for LifetimeState {
+    /// The join operator of the dataflow analysis domain. This calls into `join_lable_map`
+    /// which does the work of graph gluing.
     fn join(&mut self, other: &Self) -> JoinResult {
         let mut change = self.graph.join(&other.graph);
 
@@ -161,7 +197,8 @@ impl AbstractDomain for LifetimeState {
 
 impl LifetimeState {
     /// Joins two maps with labels in their range. For overlapping keys, a new `Skip`
-    /// node is created and configured as a descendant of both label nodes.
+    /// node is created and configured as a descendant of both label nodes, gluing the
+    /// graphs together.
     fn join_label_map<A: Clone + Ord>(
         &mut self,
         map: &mut BTreeMap<A, LifetimeLabel>,
@@ -646,7 +683,7 @@ impl<'env> LifeTimeAnalysis<'env> {
     // ---------------------------------------------------------------------------------------------
     // Program Steps
 
-    /// Process an assign operation. This checks whether the source is currently borrowed and
+    /// Process an assign instruction. This checks whether the source is currently borrowed and
     /// rejects a move if so. Constructs a `Skip` edge in the lifetime graph if references
     /// are assigned.
     fn assign(
@@ -790,8 +827,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         }
     }
 
-    /// Check whether a local can be written. This is not allowed if its non-reference which
-    /// is borrowed.
+    /// Check whether a local can be written. This is only allowed if no borrowed references exist.
     fn check_write_local(
         &self,
         state: &LifetimeState,
@@ -814,8 +850,8 @@ impl<'env> LifeTimeAnalysis<'env> {
         }
     }
 
-    /// Process a borrow local. This checks whether the borrow is allowed and constructs a
-    /// borrow edge.
+    /// Process a borrow local instruction. This checks whether the borrow is allowed and
+    /// constructs a borrow edge.
     fn borrow_local(
         &self,
         state: &mut LifetimeState,
@@ -837,8 +873,8 @@ impl<'env> LifeTimeAnalysis<'env> {
         )
     }
 
-    /// Process a borrow global. This checks whether the borrow is allowed and constructs a
-    /// borrow edge.
+    /// Process a borrow global instruction. This checks whether the borrow is allowed and
+    /// constructs a borrow edge.
     fn borrow_global(
         &self,
         state: &mut LifetimeState,
@@ -860,8 +896,8 @@ impl<'env> LifeTimeAnalysis<'env> {
         )
     }
 
-    /// Process a borrow field. This checks whether the borrow is allowed and constructs a
-    /// borrow edge.
+    /// Process a borrow field instruction. This checks whether the borrow is allowed and
+    /// constructs a borrow edge.
     fn borrow_field(
         &self,
         state: &mut LifetimeState,
@@ -959,7 +995,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         }
     }
 
-    /// Move resource out of storage. It must not be borrowed.
+    /// Process a MoveFrom instruction.
     fn move_from(
         &self,
         state: &LifetimeState,
@@ -984,6 +1020,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         }
     }
 
+    /// Process a return instruction.
     fn return_(
         &self,
         state: &LifetimeState,
@@ -1028,7 +1065,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         }
     }
 
-    /// Read from a reference. In difference to `self.check_read_local`, this needs
+    /// Process a ReadRef instruction. In difference to `self.check_read_local`, this needs
     /// to check the value behind the reference.
     fn read_ref(
         &self,
@@ -1054,7 +1091,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         }
     }
 
-    /// Write to a reference. In difference to `self.check_write_local`, this needs
+    /// Process a WriteRef instruction. In difference to `self.check_write_local`, this needs
     /// to check the value behind the reference.
     fn write_ref(
         &self,
