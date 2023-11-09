@@ -1053,7 +1053,7 @@ only the exact script with matching hash can be successfully executed.
 Create a single-step or multi-step proposal with the backing <code>stake_pool</code>.
 @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
 only the exact script with matching hash can be successfully executed.
-Return proposal_id when a proposal is sucessfully created.
+Return proposal_id when a proposal is successfully created.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_create_proposal_v2_impl">create_proposal_v2_impl</a>(proposer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, stake_pool: <b>address</b>, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_location: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, metadata_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, is_multi_step_proposal: bool): u64
