@@ -20,7 +20,7 @@ use aptos_mempool::QuorumStoreRequest;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{btree_map::Entry, BTreeMap, HashMap},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -242,9 +242,10 @@ impl BatchGenerator {
         match removed {
             Some(txns) => {
                 for txn in txns {
-                    if let Some(mut info) = self.txns_in_progress_sorted.remove(&txn) {
-                        if info.decrement() > 0 {
-                            self.txns_in_progress_sorted.insert(txn, info);
+                    if let Entry::Occupied(mut o) = self.txns_in_progress_sorted.entry(txn) {
+                        let info = o.get_mut();
+                        if info.decrement() == 0 {
+                            o.remove();
                         }
                     }
                 }
@@ -276,7 +277,6 @@ impl BatchGenerator {
             .pull_internal(
                 max_count,
                 self.config.mempool_txn_pull_max_bytes,
-                // TODO: pass the actual BTreeMap
                 self.txns_in_progress_sorted.clone(),
             )
             .await

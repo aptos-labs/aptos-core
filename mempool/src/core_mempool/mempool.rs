@@ -251,7 +251,6 @@ impl Mempool {
             }
         }
         let gas_end_time = start_time.elapsed();
-        let gas_time = gas_end_time;
 
         let mut result = vec![];
         // Helper DS. Helps to mitigate scenarios where account submits several transactions
@@ -351,7 +350,7 @@ impl Mempool {
                 byte_size = total_bytes,
                 block_size = block.len(),
                 return_non_full = return_non_full,
-                gas_time_ms = gas_time.as_millis(),
+                gas_time_ms = gas_end_time.as_millis(),
                 result_time_ms = result_time.as_millis(),
                 block_time_ms = block_time.as_millis(),
             );
@@ -369,7 +368,7 @@ impl Mempool {
                     byte_size = total_bytes,
                     block_size = block.len(),
                     return_non_full = return_non_full,
-                    gas_time_ms = gas_time.as_millis(),
+                    gas_time_ms = gas_end_time.as_millis(),
                     result_time_ms = result_time.as_millis(),
                     block_time_ms = block_time.as_millis(),
                 )
