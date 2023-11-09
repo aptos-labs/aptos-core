@@ -2071,7 +2071,7 @@ Extract and return owner capability from the signing account.
 
 ## Function `deposit_owner_cap`
 
-Deposit <code>owner_cap</code> into <code><a href="account.md#0x1_account">account</a></code>. This requires <code><a href="account.md#0x1_account">account</a></code> to not already have owernship of another
+Deposit <code>owner_cap</code> into <code><a href="account.md#0x1_account">account</a></code>. This requires <code><a href="account.md#0x1_account">account</a></code> to not already have ownership of another
 staking pool.
 
 

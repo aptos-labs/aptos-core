@@ -60,10 +60,20 @@ pub struct Features {
 
 impl Default for Features {
     fn default() -> Self {
-        Features {
-            // TODO: for gods sake, make this based on the enum above
-            features: vec![0b00100000, 0b00100000, 0b10001100, 0b01100000, 0b00000000],
-        }
+        let mut features = Features {
+            features: vec![0; 5],
+        };
+
+        use FeatureFlag::*;
+        features.enable(VM_BINARY_FORMAT_V6);
+        features.enable(BLS12_381_STRUCTURES);
+        features.enable(SIGNATURE_CHECKER_V2);
+        features.enable(STORAGE_SLOT_METADATA);
+        features.enable(APTOS_UNIQUE_IDENTIFIERS);
+        features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
+        features.enable(AGGREGATOR_V2_API);
+
+        features
     }
 }
 
@@ -73,6 +83,16 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
+    fn enable(&mut self, flag: FeatureFlag) {
+        let byte_index = (flag as u64 / 8) as usize;
+        let bit_mask = 1 << (flag as u64 % 8);
+        while self.features.len() <= byte_index {
+            self.features.push(0);
+        }
+
+        self.features[byte_index] |= bit_mask;
+    }
+
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
         let val = flag as u64;
         let byte_index = (val / 8) as usize;
@@ -123,6 +143,3 @@ impl Features {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 }
-
-// --------------------------------------------------------------------------------------------
-// Code Publishing
