@@ -14,10 +14,7 @@ use crate::{
     ApiTags,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{
-    AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64,
-};
+use aptos_api_types::{AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode, MoveModuleId, MoveResource, MoveStructTag, StateKeyWrapper, U64};
 use aptos_types::{
     access_path::AccessPath,
     account_config::{AccountResource, ObjectGroupResource},
@@ -29,15 +26,30 @@ use move_core_types::{
     identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
     resolver::MoveResolver,
 };
-use poem_openapi::{
-    param::{Path, Query},
-    OpenApi,
-};
+use poem_openapi::{param::{Path, Query}, OpenApi, ApiRequest};
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
+use poem::web::Json;
+use crate::response::api_forbidden;
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {
     pub context: Arc<Context>,
+}
+
+#[derive(ApiRequest)]
+pub enum GetAccountsBatchPost {
+    #[oai(content_type = "application/json")]
+    Json(Json<Vec<Path<Address>>>)
+}
+
+impl GetAccountsBatchPost {
+
+    pub fn into_inner(self) -> Vec<Path<Address>> {
+        match self {
+            Self::Json(json) => json.0,
+        }
+    }
+
 }
 
 #[OpenApi]
@@ -73,6 +85,59 @@ impl AccountsApi {
             account.account(&accept_type)
         })
         .await
+    }
+
+    /// Get account
+    ///
+    /// Return the authentication key and the sequence number for an account
+    /// address. Optionally, a ledger version can be specified. If the ledger
+    /// version is not specified in the request, the latest ledger version is used.
+    #[oai(
+    path = "/accounts/batch",
+    method = "post",
+    operation_id = "get_accounts_batch",
+    tag = "ApiTags::AccountsBatch"
+    )]
+    async fn get_accounts_batch(
+        &self,
+        accept_type: AcceptType,
+        addresses: GetAccountsBatchPost,
+        /// Ledger version to get state of account
+        ///
+        /// If not provided, it will be the latest version
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<Vec<Option<AccountData>>> {
+        self.context
+            .check_api_output_enabled("Get accounts batch", &accept_type)?;
+
+        let context = self.context.clone();
+        api_spawn_blocking(move || {
+            let mut accounts = Vec::new();
+            for address in &addresses.into_inner() {
+                let account = Account::new(context.clone(), address.0, ledger_version.0, None, None)?;
+                match account.into_account_resource() {
+                    Ok(account) => accounts.push(Some(account)),
+                    Err(BasicErrorWith404::NotFound(..)) => accounts.push(None),
+                    Err(err) => return Err(err),
+                }
+            }
+            match accept_type {
+                AcceptType::Json => Err(api_forbidden(
+                    "Get get_accounts_batch is not supported for JSON.",
+                    "Please use BCS instead.",
+                )),
+                AcceptType::Bcs => {
+                    let latest_ledger_info = context.get_latest_ledger_info()?;
+                    BasicResponse::try_from_bcs((
+                                                    &accounts,
+                        &latest_ledger_info,
+                        BasicResponseStatus::Ok,
+                    ))
+                },
+            }
+            //Ok(accounts)
+        })
+            .await
     }
 
     /// Get account resources
@@ -255,6 +320,23 @@ impl Account {
                 BasicResponseStatus::Ok,
             )),
         }
+    }
+
+    pub fn into_account_resource(self) -> Result<AccountResource, BasicErrorWith404> {
+        // Retrieve the Account resource and convert it accordingly
+        let state_value = self.get_account_resource()?;
+
+        // Convert the AccountResource into the summary object AccountData
+        let account_resource: AccountResource = bcs::from_bytes(&state_value)
+            .context("Internal error deserializing response from DB")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &self.latest_ledger_info,
+                )
+            })?;
+        Ok(account_resource)
     }
 
     pub fn get_account_resource(&self) -> Result<Vec<u8>, BasicErrorWith404> {
