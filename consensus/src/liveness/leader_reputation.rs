@@ -619,14 +619,14 @@ impl LeaderReputation {
 
                 if counter_index == max(CHAIN_HEALTH_WINDOW_SIZES.len() - 2, 0) {
                     // Only emit this for one window value. Currently defaults to 100
-                    candidates.iter().for_each(|x| {
-                        if participants.contains(x) {
+                    candidates.iter().for_each(|author| {
+                        if participants.contains(author) {
                             CONSENSUS_PARTICIPATION_STATUS
-                                .with_label_values(&[&x.to_string()])
+                                .with_label_values(&[&author.to_hex()])
                                 .set(1_i64)
                         } else {
                             CONSENSUS_PARTICIPATION_STATUS
-                                .with_label_values(&[&x.to_string()])
+                                .with_label_values(&[&author.to_hex()])
                                 .set(0_i64)
                         }
                     });
