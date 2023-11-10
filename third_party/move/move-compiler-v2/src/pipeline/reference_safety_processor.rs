@@ -8,17 +8,29 @@
 //! of a so-called borrow graph. The borrow graph tracks the creation of references from
 //! root memory locations and derivation of other references, by recording an edge for each
 //! borrow relation. For example, if `s` is the memory location of a struct, then
-//! `&s.f` is represented by a node which is derived fromm `s`. The lifetime graph is
-//! a DAG (acyclic).
+//! `&s.f` is represented by a node which is derived fromm `s`, and those two nodes are
+//! connected by an edge labeled with `f`. The borrow graph is a DAG (acyclic).
 //!
-//! The analysis essentially evaluates each instruction under the viewpoint of the current
+//! Together with the borrow graph, a mapping from temporaries to graph nodes is maintained at
+//! each program point. These represent the currently active references into the borrowed data.
+//! All the _ancestors_ of those nodes are indirectly borrowed as well. Consider again `s` a
+//! struct, and assume ` let $t = &s.f` a field selection, then `$t` points to the node
+//! representing the reference to the field. However, the original `s` from which the field
+//! was selected, is also (indirectly) borrowed, as described by the borrow graph.
+//!
+//! The safety analysis essentially evaluates each instruction under the viewpoint of the current
 //! active borrow graph at the program point, to detect any conditions of non-safety. This
 //! includes specifically the following rules:
 //!
-//! (a) if immutable references to a location exist, no mutable references can exist
-//! (b) only one mutable reference can exist at time for the same location.
-//! (c) selection of fields leads to independent 'sub-locations': the above rules are
-//!     applying independently. So one can have `&s.f` and `&mut s.g` at the same time.
+//! (a) If immutable references to a location exist at a given program point, no mutable
+//!     references can co-exist.
+//! (b) Only one mutable reference can exist at time for the same location.
+//! (c) A location which is borrowed cannot be updated, and the value in it cannot be moved out.
+//! (d) References returned from a function call most be derived from parameters
+//!
+//! Hereby, selection of fields leads to independent 'sub-locations': the above rules are
+//! applying independently for such sub-locations. Thus one can have `&s.f` and `&mut s.g` at the
+//! same time.
 
 use crate::pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset};
 use codespan_reporting::diagnostic::Severity;
@@ -100,9 +112,6 @@ enum BorrowEdgeKind {
     BorrowGlobal,
     /// Borrows a field from a reference.
     BorrowField(FieldId),
-    #[allow(unused)]
-    /// Borrows an indexed position in a vector.
-    BorrowIndex,
     /// Calls an operation, where the incoming references are used to derive outgoing references.
     Call(Operation),
     /// The `Skip` edge is used for graph composition and glues two graph nodes together via
