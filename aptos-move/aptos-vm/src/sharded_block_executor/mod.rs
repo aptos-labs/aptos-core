@@ -129,7 +129,16 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
             "Block must be partitioned into {} sub-blocks",
             num_executor_shards
         );
-        let (sharded_output, global_output) = self
+
+        self
+            .executor_client
+            .execute_block_remote(
+                state_view,
+                transactions,
+                concurrency_level_per_shard,
+                maybe_block_gas_limit,
+            )
+        /*let (sharded_output, global_output) = self
             .executor_client
             .execute_block_remote(
                 state_view,
@@ -158,7 +167,7 @@ impl<S: StateView + Sync + Send + 'static, C: ExecutorClient<S>> ShardedBlockExe
         // Lastly append the global output
         aggregated_results.extend(global_output);
 
-        Ok(aggregated_results)
+        Ok(aggregated_results)*/
     }
 
 

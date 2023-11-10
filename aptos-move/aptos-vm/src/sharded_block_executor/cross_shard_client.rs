@@ -21,6 +21,8 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+use crossbeam_channel::Sender;
+use crate::sharded_block_executor::sharded_executor_service::TransactionIdxAndOutput;
 
 pub struct CrossShardCommitReceiver {}
 
@@ -58,6 +60,7 @@ pub struct CrossShardCommitSender {
     // The offset of the first transaction in the sub-block. This is used to convert the local index
     // in parallel execution to the global index.
     index_offset: TxnIndex,
+    stream_result_tx: Sender<TransactionIdxAndOutput>,
 }
 
 impl CrossShardCommitSender {
@@ -65,6 +68,7 @@ impl CrossShardCommitSender {
         shard_id: ShardId,
         cross_shard_client: Arc<dyn CrossShardClient>,
         sub_block: &SubBlock<AnalyzedTransaction>,
+        stream_result_tx: Sender<TransactionIdxAndOutput>,
     ) -> Self {
         let mut dependent_edges = HashMap::new();
         let mut num_dependent_edges = 0;
@@ -99,6 +103,7 @@ impl CrossShardCommitSender {
             cross_shard_client,
             dependent_edges,
             index_offset: sub_block.start_index as TxnIndex,
+            stream_result_tx
         }
     }
 
@@ -142,6 +147,7 @@ impl TransactionCommitHook for CrossShardCommitSender {
         if self.dependent_edges.contains_key(&global_txn_idx) {
             self.send_remote_update_for_success(global_txn_idx, txn_output);
         }
+        self.stream_result_tx.send(TransactionIdxAndOutput{ txn_idx: global_txn_idx, txn_output: txn_output.committed_output().clone()}).unwrap();
     }
 
     fn on_execution_aborted(&self, _txn_idx: TxnIndex) {

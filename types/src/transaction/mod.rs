@@ -973,6 +973,12 @@ pub enum TransactionStatus {
     Retry,
 }
 
+impl Default for TransactionStatus {
+    fn default() -> Self {
+        TransactionStatus::Retry
+    }
+}
+
 impl TransactionStatus {
     pub fn status(&self) -> Result<ExecutionStatus, StatusCode> {
         match self {
@@ -1088,7 +1094,7 @@ impl VMValidatorResult {
 }
 
 /// The output of executing a transaction.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionOutput {
     /// The list of writes this transaction intends to do.
     write_set: WriteSet,
