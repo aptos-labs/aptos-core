@@ -663,14 +663,21 @@ fn spawn_committer<
                         events: notification.committed_events,
                         transactions: notification.committed_transactions,
                     };
-                    utils::handle_committed_transactions(
-                        committed_transactions,
-                        storage.clone(),
-                        mempool_notification_handler.clone(),
-                        event_subscription_service.clone(),
-                        storage_service_notification_handler.clone(),
-                    )
-                    .await;
+                    let storage = storage.clone();
+                    let mempool_notification_handler = mempool_notification_handler.clone();
+                    let event_subscription_service = event_subscription_service.clone();
+                    let storage_service_notification_handler =
+                        storage_service_notification_handler.clone();
+                    tokio::task::spawn(async move {
+                        utils::handle_committed_transactions(
+                            committed_transactions,
+                            storage,
+                            mempool_notification_handler,
+                            event_subscription_service,
+                            storage_service_notification_handler,
+                        )
+                        .await;
+                    });
                 },
                 Err(error) => {
                     let error = format!("Failed to commit executed chunk! Error: {:?}", error);
