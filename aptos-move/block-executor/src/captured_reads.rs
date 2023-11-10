@@ -12,7 +12,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::{
     types::{
         MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError, StorageVersion, TxnIndex,
-        UnsetOrLayout, Version, ValueWithLayout,
+        ValueWithLayout, Version,
     },
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -149,7 +149,9 @@ impl<V: TransactionWrite> DataRead<V> {
         match value {
             // If value was never exchanged, then it can be the highest one without full value.
             ValueWithLayout::RawFromStorage(v) => DataRead::Metadata(v.as_state_value_metadata()),
-            ValueWithLayout::Exchanged(v, layout) => DataRead::Versioned(version, v.clone(), layout),
+            ValueWithLayout::Exchanged(v, layout) => {
+                DataRead::Versioned(version, v.clone(), layout)
+            },
         }
     }
 }
@@ -531,7 +533,7 @@ impl<T: Transaction> CapturedReads<T> {
     //     self.delayed_field_reads.keys()
     // }
 
-    pub(crate) fn validate_incorrect_use(&self) -> bool {
+    pub(crate) fn is_incorrect_use(&self) -> bool {
         self.incorrect_use
     }
 
@@ -587,10 +589,10 @@ impl<T: Transaction> CapturedReads<T> {
             }
 
             ret && group.inner_reads.iter().all(|(tag, r)| {
-                match group_map.read_from_group(key, tag, idx_to_validate, UnsetOrLayout::Unset) {
-                    Ok((version, v, layout)) => {
+                match group_map.fetch_tagged_data(key, tag, idx_to_validate) {
+                    Ok((version, v)) => {
                         matches!(
-                            DataRead::Versioned(version, v, layout).contains(r),
+                            DataRead::from_value_with_layout(version, v).contains(r),
                             DataReadComparison::Contains
                         )
                     },

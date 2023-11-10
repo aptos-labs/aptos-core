@@ -42,12 +42,12 @@ impl GroupSizeKind {
 }
 
 /// Utility method to compute the size of the group as GroupSizeKind::AsSum.
-pub fn group_size_as_sum<'a, T: Serialize>(
-    mut group: impl Iterator<Item = (T, &'a Bytes)>,
+pub fn group_size_as_sum<T: Serialize>(
+    mut group: impl Iterator<Item = (T, usize)>,
 ) -> anyhow::Result<u64> {
     group
         .try_fold(0, |len, (tag, res)| {
-            let delta = bcs::serialized_size(&tag)? + res.len();
+            let delta = bcs::serialized_size(&tag)? + res;
             Ok(len + delta as u64)
         })
         .map_err(|_: Error| anyhow::Error::msg("Resource group member tag serialization error"))
@@ -130,7 +130,9 @@ impl<'r> ResourceGroupAdapter<'r> {
         let group_size = match self.group_size_kind {
             GroupSizeKind::None => 0,
             GroupSizeKind::AsBlob => blob_len,
-            GroupSizeKind::AsSum => group_size_as_sum(group_data.iter())?,
+            GroupSizeKind::AsSum => {
+                group_size_as_sum(group_data.iter().map(|(t, v)| (t, v.len())))?
+            },
         };
         self.group_cache
             .borrow_mut()

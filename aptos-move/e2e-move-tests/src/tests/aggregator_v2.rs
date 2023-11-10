@@ -305,8 +305,8 @@ proptest! {
         // Cases are expensive, few cases is enough.
         // We will test a few more comprehensive tests more times, and the rest even fewer.
         // when trying to stress-test, increase (to 200 or more), and disable result cache.
-        cases: 10,
-        result_cache: prop::test_runner::basic_result_cache,
+        cases: 200,
+        // result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 
@@ -406,8 +406,8 @@ proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough for these
         // when trying to stress-test, increase (to 200 or more), and disable result cache.
-        cases: 5,
-        result_cache: prop::test_runner::basic_result_cache,
+        cases: 200,
+        // result_cache: prop::test_runner::basic_result_cache,
         .. ProptestConfig::default()
     })]
 

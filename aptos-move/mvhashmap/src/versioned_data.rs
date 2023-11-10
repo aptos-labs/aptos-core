@@ -2,7 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{Flag, Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout};
+use crate::types::{
+    Flag, Incarnation, MVDataError, MVDataOutput, ShiftedTxnIndex, TxnIndex, ValueWithLayout,
+};
 use anyhow::Result;
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::write_set::TransactionWrite;
@@ -53,10 +55,7 @@ pub struct VersionedData<K, V> {
 }
 
 impl<V> Entry<V> {
-    fn new_write_from(
-        incarnation: Incarnation,
-        value: ValueWithLayout<V>,
-    ) -> Entry<V> {
+    fn new_write_from(incarnation: Incarnation, value: ValueWithLayout<V>) -> Entry<V> {
         Entry {
             cell: EntryCell::Write(incarnation, value),
             flag: Flag::Done,
@@ -276,7 +275,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                             // Assert the length of bytes for efficiency (instead of full equality)
                             assert!(
                                 *i == 0
-                                && v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len())
+                                    && v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len())
                             )
                         },
                         (Exchanged(_, _), RawFromStorage(_)) => {
@@ -295,8 +294,12 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
                             // If maybe_layout is None, they are required to be identical
                             // If maybe_layout is Some, there might have been an exchange
                             // Assert the length of bytes for efficiency (instead of full equality)
-                            assert!(e_layout.is_some() == layout.is_some()
-                                && (layout.is_some() || v.bytes().map(|b| b.len()) == ev.bytes().map(|b| b.len())));
+                            assert!(
+                                e_layout.is_some() == layout.is_some()
+                                    && (layout.is_some()
+                                        || v.bytes().map(|b| b.len())
+                                            == ev.bytes().map(|b| b.len()))
+                            );
                         },
                         // (DoesntExist, DoesntExist) => {
                         // },
@@ -320,7 +323,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
-            CachePadded::new(Entry::new_write_from(incarnation, ValueWithLayout::Exchanged(Arc::new(data.0), data.1))),
+            CachePadded::new(Entry::new_write_from(
+                incarnation,
+                ValueWithLayout::Exchanged(Arc::new(data.0), data.1),
+            )),
         );
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.

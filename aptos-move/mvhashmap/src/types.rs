@@ -6,7 +6,10 @@ use aptos_aggregator::{
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_crypto::hash::HashValue;
-use aptos_types::executable::ExecutableDescriptor;
+use aptos_types::{
+    executable::ExecutableDescriptor,
+    write_set::{TransactionWrite, WriteOpKind},
+};
 use bytes::Bytes;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
@@ -65,13 +68,13 @@ pub enum MVModulesError {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum GroupReadResult {
-    Value(Option<Bytes>, UnsetOrLayout),
+    Value(Option<Bytes>, Option<Arc<MoveTypeLayout>>),
     Size(u64),
     Uninitialized,
 }
 
 impl GroupReadResult {
-    pub fn into_value(self) -> (Option<Bytes>, UnsetOrLayout) {
+    pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
         match self {
             GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
             _ => unreachable!("Expected a value"),
@@ -179,19 +182,38 @@ pub enum ValueWithLayout<V> {
     // We've used the optional layout, and applied exchange to the storage value.
     // The type layout is Some if there is a delayed field in the resource.
     // The type layout is None if there is no delayed field in the resource.
-    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>)
+    Exchanged(Arc<V>, Option<Arc<MoveTypeLayout>>),
 }
 
 impl<T> Clone for ValueWithLayout<T> {
     fn clone(&self) -> Self {
         match self {
-            ValueWithLayout::RawFromStorage(value) => ValueWithLayout::RawFromStorage(value.clone()),
-            ValueWithLayout::Exchanged(value, layout) => ValueWithLayout::Exchanged(value.clone(), layout.clone()),
+            ValueWithLayout::RawFromStorage(value) => {
+                ValueWithLayout::RawFromStorage(value.clone())
+            },
+            ValueWithLayout::Exchanged(value, layout) => {
+                ValueWithLayout::Exchanged(value.clone(), layout.clone())
+            },
         }
     }
 }
 
-impl<V> ValueWithLayout<V> {
+impl<V: TransactionWrite> ValueWithLayout<V> {
+    pub fn write_op_kind(&self) -> WriteOpKind {
+        match self {
+            ValueWithLayout::RawFromStorage(value) => value.write_op_kind(),
+            ValueWithLayout::Exchanged(value, _) => value.write_op_kind(),
+        }
+    }
+
+    pub fn bytes_len(&self) -> Option<usize> {
+        match self {
+            ValueWithLayout::RawFromStorage(value) | ValueWithLayout::Exchanged(value, _) => {
+                value.bytes().map(|b| b.len())
+            },
+        }
+    }
+
     pub fn extract_value_no_layout(&self) -> &Arc<V> {
         match self {
             ValueWithLayout::RawFromStorage(value) => value,
@@ -205,26 +227,6 @@ impl<V> ValueWithLayout<V> {
 pub enum UnknownOrLayout<'a> {
     Unknown,
     Known(Option<&'a MoveTypeLayout>),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum UnsetOrLayout {
-    // When the group is initialized, but the resource in the group is not read,
-    // the resource's type layout is unset
-    Unset,
-    // When the resource in the group is read and the tyep layout for the resource is set.
-    // The type layout is Some if there is a delayed field in the resource.
-    // The type layout is None if there is no delayed field in the resource.
-    Set(Option<Arc<MoveTypeLayout>>),
-}
-
-impl UnsetOrLayout {
-    pub fn convert_unset_to_none(&self) -> Option<Arc<MoveTypeLayout>> {
-        match self {
-            UnsetOrLayout::Unset => None,
-            UnsetOrLayout::Set(layout) => layout.clone(),
-        }
-    }
 }
 
 #[cfg(test)]
