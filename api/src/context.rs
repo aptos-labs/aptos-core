@@ -18,7 +18,7 @@ use aptos_api_types::{
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::{error, warn};
+use aptos_logger::prelude::*;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::TStateView;
 use aptos_storage_interface::{
@@ -53,7 +53,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
     sync::{Arc, RwLock, RwLockWriteGuard},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 // Context holds application scope context
@@ -226,10 +226,12 @@ impl Context {
             Err(err) => {
                 // when event index is disabled, we won't be able to search the NewBlock event stream.
                 // TODO(grao): evaluate adding dedicated block_height_by_version index
-                warn!(
-                    error = ?err,
-                    "Failed to query event indices, might be turned off. Ignoring.",
-                );
+                sample!(SampleRate::Duration(Duration::from_secs(60)), {
+                    warn!(
+                        error = ?err,
+                        "Failed to query event indices, might be turned off. Ignoring.",
+                    )
+                });
                 (maybe_oldest_version, 0, 0)
             },
         };
