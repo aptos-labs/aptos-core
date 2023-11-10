@@ -173,6 +173,9 @@ pub enum LogEntry {
     DBError,
     UnexpectedNetworkMsg,
     MempoolSnapshot,
+    SlowTransaction,
+    SlowTransactionTraceAll,
+    TraceTransaction,
 }
 
 #[derive(Clone, Copy, Serialize)]
