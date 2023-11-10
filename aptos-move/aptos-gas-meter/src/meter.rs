@@ -5,7 +5,7 @@ use crate::traits::{AptosGasMeter, GasAlgebra};
 use aptos_gas_algebra::{Fee, FeePerGasUnit};
 use aptos_gas_schedule::gas_params::{instr::*, txn::*};
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -488,7 +488,7 @@ where
         self.algebra.charge_storage_fee(amount, gas_unit_price)
     }
 
-    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()> {
+    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()> {
         let cost = self.storage_gas_params().pricing.io_gas_per_write(key, op);
 
         self.algebra
@@ -496,31 +496,15 @@ where
             .map_err(|e| e.finish(Location::Undefined))
     }
 
-    fn charge_io_gas_for_group_write(
-        &mut self,
-        key: &StateKey,
-        _metadata_op: &WriteOp,
-        maybe_group_size: Option<u64>,
-    ) -> VMResult<()> {
-        let cost = self
-            .storage_gas_params()
-            .pricing
-            .io_gas_per_group_write(key, maybe_group_size);
-
-        self.algebra
-            .charge_io(cost)
-            .map_err(|e| e.finish(Location::Undefined))
-    }
-
-    fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee {
+    fn storage_fee_for_state_slot(&self, op: &WriteOpSize) -> Fee {
         self.vm_gas_params().txn.storage_fee_for_slot(op)
     }
 
-    fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee {
+    fn storage_fee_refund_for_state_slot(&self, op: &WriteOpSize) -> Fee {
         self.vm_gas_params().txn.storage_fee_refund_for_slot(op)
     }
 
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee {
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee {
         self.vm_gas_params()
             .txn
             .storage_fee_for_bytes(key, maybe_value_size)

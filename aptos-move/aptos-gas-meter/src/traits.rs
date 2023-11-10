@@ -4,7 +4,7 @@
 use aptos_gas_algebra::{Fee, FeePerGasUnit, Gas, GasExpression, GasScalingFactor, Octa};
 use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::StorageGasParameters};
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
@@ -104,31 +104,16 @@ pub trait AptosGasMeter: MoveGasMeter {
     ///
     /// This is to be differentiated from the storage fee, which is meant to cover the long-term
     /// storage costs.
-    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOp) -> VMResult<()>;
-
-    /// Charges IO gas for a resource group write set item. Group writes contain encoded size
-    /// of the group instead of raw bytes in the WriteOp (the bytes are populated at the
-    /// end of block execution).
-    ///
-    /// This is to be differentiated from the storage fee, which is meant to cover the long-term
-    /// storage costs.
-    fn charge_io_gas_for_group_write(
-        &mut self,
-        key: &StateKey,
-        metadata_op: &WriteOp,
-        maybe_group_size: Option<u64>,
-    ) -> VMResult<()>;
+    fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()>;
 
     /// Calculates the storage fee for a state slot allocation.
-    fn storage_fee_for_state_slot(&self, op: &WriteOp) -> Fee;
+    fn storage_fee_for_state_slot(&self, op: &WriteOpSize) -> Fee;
 
     /// Calculates the storage fee refund for a state slot deallocation.
-    fn storage_fee_refund_for_state_slot(&self, op: &WriteOp) -> Fee;
+    fn storage_fee_refund_for_state_slot(&self, op: &WriteOpSize) -> Fee;
 
-    /// Calculates the storage fee for state byte, None value size corresponds to a deletion,
-    /// while Some(num_bytes) is the number of bytes contained in the creation/modification
-    /// WriteOp (or a GroupWrite for resource groups, which will be converted to a WriteOp).
-    fn storage_fee_for_state_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee;
+    /// Calculates the storage fee for state byte.
+    fn storage_fee_for_state_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee;
 
     /// Calculates the storage fee for an event.
     fn storage_fee_per_event(&self, event: &ContractEvent) -> Fee;
@@ -168,29 +153,13 @@ pub trait AptosGasMeter: MoveGasMeter {
         // Calculate the storage fees.
         let mut write_fee = Fee::new(0);
         let mut total_refund = Fee::new(0);
-        for (key, op) in change_set.write_set_iter_mut() {
-            let slot_fee = self.storage_fee_for_state_slot(op);
-            let refund = self.storage_fee_refund_for_state_slot(op);
-            let bytes_fee =
-                self.storage_fee_for_state_bytes(key, op.bytes().map(|data| data.len() as u64));
+        for (key, op_size, op_creation_metadata) in change_set.write_set_iter_mut() {
+            let slot_fee = self.storage_fee_for_state_slot(&op_size);
+            let refund = self.storage_fee_refund_for_state_slot(&op_size);
+            let bytes_fee = self.storage_fee_for_state_bytes(key, &op_size);
 
-            Self::maybe_record_storage_deposit(op, slot_fee);
+            Self::maybe_record_storage_deposit(op_creation_metadata, slot_fee);
             total_refund += refund;
-
-            write_fee += slot_fee + bytes_fee;
-        }
-
-        for (key, group_write) in change_set.group_write_set_iter_mut() {
-            let group_metadata_op = &mut group_write.metadata_op_mut();
-
-            let slot_fee = self.storage_fee_for_state_slot(group_metadata_op);
-            let refund = self.storage_fee_refund_for_state_slot(group_metadata_op);
-
-            Self::maybe_record_storage_deposit(group_metadata_op, slot_fee);
-            total_refund += refund;
-
-            let bytes_fee =
-                self.storage_fee_for_state_bytes(key, group_write.maybe_group_op_size());
 
             write_fee += slot_fee + bytes_fee;
         }
@@ -216,23 +185,11 @@ pub trait AptosGasMeter: MoveGasMeter {
 
     // The slot fee is refundable, we record it on the WriteOp itself and it'll end up in
     // the state DB.
-    fn maybe_record_storage_deposit(write_op: &mut WriteOp, slot_fee: Fee) {
-        use WriteOp::*;
-
-        match write_op {
-            CreationWithMetadata {
-                ref mut metadata,
-                data: _,
-            } => {
-                if !slot_fee.is_zero() {
-                    metadata.set_deposit(slot_fee.into())
-                }
-            },
-            Creation(..)
-            | Modification(..)
-            | Deletion
-            | ModificationWithMetadata { .. }
-            | DeletionWithMetadata { .. } => {},
+    fn maybe_record_storage_deposit(creation_metadata: Option<&mut StateValueMetadata>, slot_fee: Fee) {
+        if !slot_fee.is_zero() {
+            if let Some(metadata) = creation_metadata {
+                metadata.set_deposit(slot_fee.into())
+            }
         }
     }
 

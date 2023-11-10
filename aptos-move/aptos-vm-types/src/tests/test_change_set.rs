@@ -421,7 +421,7 @@ fn test_failed_conversion_to_change_set() {
     );
 
     // Unchecked conversion ignores deltas.
-    let storage_change_set = change_set.clone().into_storage_change_set_unchecked();
+    let storage_change_set = change_set.clone().into_storage_change_set_forced();
     assert_eq!(storage_change_set.write_set().clone().into_mut().len(), 1);
 
     let vm_status = change_set.try_into_storage_change_set();

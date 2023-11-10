@@ -10,7 +10,7 @@ use aptos_gas_algebra::{
     GasScalingFactor, GasUnit, NumSlots,
 };
 use aptos_types::{
-    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOp,
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::{WriteOp, WriteOpSize},
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -208,22 +208,20 @@ impl TransactionGasParameters {
         }
     }
 
-    pub fn storage_fee_refund_for_slot(&self, op: &WriteOp) -> Fee {
-        use WriteOp::*;
+    pub fn storage_fee_refund_for_slot(&self, op: &WriteOpSize) -> Fee {
+        use WriteOpSize::*;
 
         match op {
-            DeletionWithMetadata { metadata, .. } => Fee::new(metadata.deposit()),
+            DeletionWithDeposit(deposit) => Fee::new(*deposit),
             Creation(..)
-            | CreationWithMetadata { .. }
             | Modification(..)
-            | ModificationWithMetadata { .. }
             | Deletion => 0.into(),
         }
     }
 
     /// Maybe value size is None for deletion Ops.
-    pub fn storage_fee_for_bytes(&self, key: &StateKey, maybe_value_size: Option<u64>) -> Fee {
-        if let Some(value_size) = maybe_value_size {
+    pub fn storage_fee_for_bytes(&self, key: &StateKey, op: &WriteOpSize) -> Fee {
+        if let Some(value_size) = op.write_len() {
             let size = NumBytes::new(key.size() as u64) + NumBytes::new(value_size);
             if let Some(excess) = size.checked_sub(self.free_write_bytes_quota) {
                 return excess * self.storage_fee_per_excess_state_byte;

@@ -144,6 +144,34 @@ impl WriteOp {
     }
 }
 
+pub enum WriteOpSize {
+    Creation(u64),
+    Modification(u64),
+    Deletion,
+    DeletionWithDeposit(u64),
+}
+
+impl From<&WriteOp> for WriteOpSize {
+    fn from(value: &WriteOp) -> Self {
+        use WriteOp::*;
+        match value {
+            Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation(data.len() as u64),
+            Modification(data) | ModificationWithMetadata { data, .. } => WriteOpSize::Modification(data.len() as u64),
+            Deletion => WriteOpSize::Deletion,
+            DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit(metadata.deposit()),
+        }
+    }
+}
+
+impl WriteOpSize {
+    pub fn write_len(&self) -> Option<u64> {
+        match self {
+            WriteOpSize::Creation(size) | WriteOpSize::Modification(size) => Some(*size),
+            WriteOpSize::Deletion | WriteOpSize::DeletionWithDeposit { .. } => None,
+        }
+    }
+}
+
 pub trait TransactionWrite: Debug {
     fn bytes(&self) -> Option<&Bytes>;
 

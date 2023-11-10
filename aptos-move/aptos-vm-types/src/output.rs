@@ -152,9 +152,8 @@ impl VMOutput {
     pub fn into_transaction_output_with_materialized_write_set(
         mut self,
         materialized_aggregator_v1_deltas: Vec<(StateKey, WriteOp)>,
-        patched_resource_write_set: BTreeMap<StateKey, WriteOp>,
+        patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
-        combined_groups: Vec<(StateKey, WriteOp)>,
     ) -> TransactionOutput {
         assert_eq!(
             materialized_aggregator_v1_deltas.len(),
@@ -171,7 +170,6 @@ impl VMOutput {
             .extend_aggregator_v1_write_set(materialized_aggregator_v1_deltas.into_iter());
         self.change_set.extend_resource_write_set(
             patched_resource_write_set.into_iter(),
-            combined_groups.into_iter(),
         );
 
         assert_eq!(
@@ -182,15 +180,10 @@ impl VMOutput {
         self.change_set.set_events(patched_events.into_iter());
         // TODO[agg_v2](cleanup) move drain to happen when getting what to materialize.
         let _ = self.change_set.drain_delayed_field_change_set();
-        let _ = self.change_set.drain_reads_needing_delayed_field_exchange();
-        let _ = self
-            .change_set
-            .drain_group_reads_needing_delayed_field_exchange();
-        let _ = self.change_set.drain_resource_group_write_set();
 
         let (vm_change_set, gas_used, status) = self.unpack();
         let (write_set, events) = vm_change_set
-            .into_storage_change_set_unchecked()
+            .into_storage_change_set_forced()
             .into_inner();
         TransactionOutput::new(write_set, events, gas_used, status)
     }

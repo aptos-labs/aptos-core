@@ -9,7 +9,7 @@ use aptos_gas_schedule::{
 use aptos_types::{
     on_chain_config::{ConfigStorage, OnChainConfig, StorageGasSchedule},
     state_store::state_key::StateKey,
-    write_set::WriteOp,
+    write_set::{WriteOp, WriteOpSize},
 };
 use either::Either;
 use move_core_types::{
@@ -54,8 +54,8 @@ impl StoragePricingV1 {
             }
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
-        use aptos_types::write_set::WriteOp::*;
+    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOpSize) -> InternalGas {
+        use aptos_types::write_set::WriteOpSize::*;
 
         let mut cost = self.write_data_per_op * NumArgs::new(1);
 
@@ -69,14 +69,14 @@ impl StoragePricingV1 {
         }
 
         match op {
-            Creation(data) | CreationWithMetadata { data, .. } => {
+            Creation(value_size) => {
                 cost += self.write_data_per_new_item * NumArgs::new(1)
-                    + self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+                    + self.write_data_per_byte_in_val * NumBytes::new(*value_size);
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => {
-                cost += self.write_data_per_byte_in_val * NumBytes::new(data.len() as u64);
+            Modification(value_size) => {
+                cost += self.write_data_per_byte_in_val * NumBytes::new(*value_size);
             },
-            Deletion | DeletionWithMetadata { .. } => (),
+            Deletion => (),
         }
 
         cost
@@ -125,8 +125,8 @@ impl StoragePricingV2 {
         }
     }
 
-    fn write_op_size(&self, key: &StateKey, value: &[u8]) -> NumBytes {
-        let value_size = NumBytes::new(value.len() as u64);
+    fn write_op_size(&self, key: &StateKey, value_size: u64) -> NumBytes {
+        let value_size = NumBytes::new(value_size);
 
         if self.feature_version >= 3 {
             let key_size = NumBytes::new(key.size() as u64);
@@ -147,19 +147,19 @@ impl StoragePricingV2 {
         self.per_item_read * (NumArgs::from(1)) + self.per_byte_read * loaded
     }
 
-    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOp) -> InternalGas {
-        use aptos_types::write_set::WriteOp::*;
+    fn io_gas_per_write(&self, key: &StateKey, op: &WriteOpSize) -> InternalGas {
+        use aptos_types::write_set::WriteOpSize::*;
 
         match &op {
-            Creation(data) | CreationWithMetadata { data, .. } => {
+            Creation(value_size) => {
                 self.per_item_create * NumArgs::new(1)
-                    + self.write_op_size(key, data) * self.per_byte_create
+                    + self.write_op_size(key, *value_size) * self.per_byte_create
             },
-            Modification(data) | ModificationWithMetadata { data, .. } => {
+            Modification(value_size) => {
                 self.per_item_write * NumArgs::new(1)
-                    + self.write_op_size(key, data) * self.per_byte_write
+                    + self.write_op_size(key, *value_size) * self.per_byte_write
             },
-            Deletion | DeletionWithMetadata { .. } => 0.into(),
+            Deletion => 0.into(),
         }
     }
 }
@@ -191,34 +191,17 @@ impl StoragePricingV3 {
     fn io_gas_per_write(
         &self,
         key: &StateKey,
-        op: &WriteOp,
+        op: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        use WriteOp::*;
+        use WriteOpSize::*;
 
         match op {
-            Creation(data)
-            | CreationWithMetadata { data, .. }
-            | Modification(data)
-            | ModificationWithMetadata { data, .. } => Either::Left(
+            Creation(value_size)
+            | Modification(value_size) => Either::Left(
                 STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
-                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, data.len() as u64),
+                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, *value_size),
             ),
-            Deletion | DeletionWithMetadata { .. } => Either::Right(InternalGas::zero()),
-        }
-    }
-
-    fn io_gas_per_group_write(
-        &self,
-        key: &StateKey,
-        maybe_group_size: Option<u64>,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        match maybe_group_size {
-            Some(group_op_size) => Either::Left(
-                STORAGE_IO_PER_STATE_SLOT_WRITE * NumArgs::new(1)
-                    + STORAGE_IO_PER_STATE_BYTE_WRITE * self.write_op_size(key, group_op_size),
-            ),
-            // Deletion.
-            None => Either::Right(InternalGas::zero()),
+            Deletion => Either::Right(InternalGas::zero()),
         }
     }
 }
@@ -280,7 +263,7 @@ impl StoragePricing {
     pub fn io_gas_per_write(
         &self,
         key: &StateKey,
-        op: &WriteOp,
+        op: &WriteOpSize,
     ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
         use StoragePricing::*;
 
@@ -288,24 +271,6 @@ impl StoragePricing {
             V1(v1) => Either::Left(v1.io_gas_per_write(key, op)),
             V2(v2) => Either::Left(v2.io_gas_per_write(key, op)),
             V3(v3) => Either::Right(v3.io_gas_per_write(key, op)),
-        }
-    }
-
-    /// If group write size is provided, then the StateKey is for a resource group and the
-    /// WriteOp does not contain the raw data, and the provided size should be used instead.
-    pub fn io_gas_per_group_write(
-        &self,
-        key: &StateKey,
-        maybe_group_size: Option<u64>,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
-        use StoragePricing::*;
-
-        match self {
-            V3(v3) => {
-                Either::<InternalGas, _>::Right(v3.io_gas_per_group_write(key, maybe_group_size))
-            },
-            V2(_) => unreachable!("Group write handling unreachable for StoragePricing V2"),
-            V1(_) => unreachable!("Group write handling unreachable for StoragePricing V1"),
         }
     }
 }
@@ -400,8 +365,8 @@ impl CheckChangeSet for ChangeSetConfigs {
 
         let mut write_set_size = 0;
         for (key, op) in change_set.write_set_iter() {
-            if let Some(bytes) = op.bytes() {
-                let write_op_size = (bytes.len() + key.size()) as u64;
+            if let Some(len) = op.materialized_size().write_len() {
+                let write_op_size = len + (key.size() as u64);
                 if write_op_size > self.max_bytes_per_write_op {
                     return Err(VMStatus::error(ERR, None));
                 }

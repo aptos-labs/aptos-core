@@ -567,26 +567,7 @@ impl AptosVM {
         let mut change_set = session.finish(change_set_configs)?;
 
         for (key, op) in change_set.write_set_iter() {
-            gas_meter.charge_io_gas_for_write(key, op)?;
-        }
-        // TODO[agg_v2](fix): Charge SnapshotDerived (string concat) based on length,
-        // as charge below charges based on non-exchanged writes (i.e. identifier being in the read_op)
-        // Do we want to charge delayed field changes also?
-        for (key, (read_op, _)) in change_set.reads_needing_delayed_field_exchange().iter() {
-            gas_meter.charge_io_gas_for_write(key, read_op)?;
-        }
-        for (key, group_write) in change_set.resource_group_write_set().iter() {
-            gas_meter.charge_io_gas_for_group_write(
-                key,
-                &group_write.metadata_op,
-                group_write.maybe_group_op_size(),
-            )?;
-        }
-        for (key, (metadata_op, group_size)) in change_set
-            .group_reads_needing_delayed_field_exchange()
-            .iter()
-        {
-            gas_meter.charge_io_gas_for_group_write(key, metadata_op, Some(*group_size))?;
+            gas_meter.charge_io_gas_for_write(key, &op.materialized_size())?;
         }
 
         let mut storage_refund = gas_meter.process_storage_fee_for_all(

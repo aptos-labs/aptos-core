@@ -10,9 +10,9 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     contract_event::ContractEvent,
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::{state_key::{StateKey, StateKeyInner}, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
-    write_set::{TransactionWrite, WriteOp, WriteSetMut},
+    write_set::{TransactionWrite, WriteOp, WriteSetMut, WriteOpSize}, aggregator::PanicError,
 };
 use claims::assert_none;
 use move_binary_format::errors::{Location, PartialVMError};
@@ -31,8 +31,60 @@ use std::{
 };
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+enum AbstractResourceWriteOp {
+    Write(WriteOp),
+    WriteWithDelayedFields(WriteWithDelayedFields),
+    // Prior to adding a dedicated write-set for resource groups, all resource group
+    // updates are merged into a single WriteOp included in the resource_write_set.
+    WriteResourceGroup(GroupWrite),
+    // No writes in the resource, except for delayed field changes.
+    InPlaceDelayedFieldChange(InPlaceDelayedFieldChange),
+    // No writes in the resource group, except for delayed field changes.
+    ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChange),
+}
+
+impl AbstractResourceWriteOp {
+    pub fn try_into_concrete_write(self) -> Option<WriteOp> {
+        if let AbstractResourceWriteOp::Write(write_op) = self {
+            Some(write_op)
+        } else {
+            None
+        }
+    }
+
+    pub fn materialized_size(&self) -> WriteOpSize {
+        match self {
+            AbstractResourceWriteOp::Write(write) => write.into(),
+            AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields{ write_op, materialized_size, ..})
+            | AbstractResourceWriteOp::WriteResourceGroup(GroupWrite{metadata_op: write_op, maybe_group_op_size: materialized_size, ..}) => {
+                use WriteOp::*;
+                match write_op {
+                    Creation(data) | CreationWithMetadata { data, .. } => WriteOpSize::Creation(materialized_size.unwrap()),
+                    Modification(data) | ModificationWithMetadata { data, .. } => WriteOpSize::Modification(materialized_size.unwrap()),
+                    Deletion => WriteOpSize::Deletion,
+                    DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit(metadata.deposit()),
+                }
+            },
+            AbstractResourceWriteOp::InPlaceDelayedFieldChange(InPlaceDelayedFieldChange{ materialized_size, ..})
+            | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChange{ materialized_size, ..}) => WriteOpSize::Modification(*materialized_size),
+        }
+    }
+
+    pub fn get_creation_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
+        match self {
+            | AbstractResourceWriteOp::Write(WriteOp::CreationWithMetadata { metadata, .. })
+            | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields{write_op: WriteOp::CreationWithMetadata { metadata, .. }, ..})
+            | AbstractResourceWriteOp::WriteResourceGroup(GroupWrite{metadata_op: WriteOp::CreationWithMetadata { metadata, .. }, ..}) => {
+                Some(metadata)
+            },
+            _ => None,
+        }
+    }
+}
+
 /// Describes an update to a resource group granularly, with WriteOps to affected
 /// member resources of the group, as well as a separate WriteOp for metadata and size.
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct GroupWrite {
     /// Op of the correct kind (creation / modification / deletion) and metadata, and
     /// the size of the group after the updates encoded in the bytes (no bytes for
@@ -105,23 +157,42 @@ impl GroupWrite {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct WriteWithDelayedFields {
+    write_op: WriteOp,
+    layout: Arc<MoveTypeLayout>,
+    materialized_size: Option<u64>,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct InPlaceDelayedFieldChange {
+    layout: Arc<MoveTypeLayout>,
+    materialized_size: u64,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct ResourceGroupInPlaceDelayedFieldChange {
+    metadata_op: WriteOp,
+    materialized_size: u64,
+}
+
 /// A change set produced by the VM.
 ///
 /// **WARNING**: Just like VMOutput, this type should only be used inside the
 /// VM. For storage backends, use `ChangeSet`.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct VMChangeSet {
-    resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
-    // Prior to adding a dedicated write-set for resource groups, all resource group
-    // updates are merged into a single WriteOp included in the resource_write_set.
-    resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
+    resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
     module_write_set: BTreeMap<StateKey, WriteOp>,
+    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+
+    // Changes separated out from the writes, for better concurrency,
+    // materialized back into resources when transaction output is computed.
+    delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+
+    // TODO[agg_v1](cleanup) deprecate aggregator_v1 fields.
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
-    delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-    group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
-    events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
 macro_rules! squash_writes_pair {
@@ -144,18 +215,43 @@ impl VMChangeSet {
     pub fn empty() -> Self {
         Self {
             resource_write_set: BTreeMap::new(),
-            resource_group_write_set: BTreeMap::new(),
             module_write_set: BTreeMap::new(),
+            events: vec![],
+            delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
-            delayed_field_change_set: BTreeMap::new(),
-            reads_needing_delayed_field_exchange: BTreeMap::new(),
-            group_reads_needing_delayed_field_exchange: BTreeMap::new(),
-            events: vec![],
         }
     }
 
     pub fn new(
+        resource_write_set: BTreeMap<StateKey, AbstractResourceWriteOp>,
+        module_write_set: BTreeMap<StateKey, WriteOp>,
+        events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
+
+        // Changes separated out from the writes, for better concurrency,
+        // materialized back into resources when transaction output is computed.
+        delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
+
+        // TODO[agg_v1](cleanup) deprecate aggregator_v1 fields.
+        aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
+        aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+        checker: &dyn CheckChangeSet,
+    ) -> Result<Self, VMStatus> {
+        let change_set = Self {
+            resource_write_set,
+            module_write_set,
+            events,
+            delayed_field_change_set,
+            aggregator_v1_write_set,
+            aggregator_v1_delta_set,
+        };
+        // Returns an error if structure of the change set is not valid,
+        // e.g. the size in bytes is too large.
+        checker.check_change_set(&change_set)?;
+        Ok(change_set)
+    }
+
+    pub fn new_expanded(
         resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
         resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
         module_write_set: BTreeMap<StateKey, WriteOp>,
@@ -166,23 +262,28 @@ impl VMChangeSet {
         group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
-    ) -> anyhow::Result<Self, VMStatus> {
-        let change_set = Self {
-            resource_write_set,
-            resource_group_write_set,
+    ) -> Result<Self, VMStatus> {
+        Self::new(
+            resource_write_set.into_iter().map(|(k, (w, l))| {
+                if let Some(layout) = l {
+                    AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFields(w, layout, WriteOpSize::from(&w).into()))
+                } else {
+                    AbstractResourceWriteOp::Write(w)
+                }
+            }).chain(
+                resource_group_write_set.into_iter().map(|(k, w)| AbstractResourceWriteOp::WriteResourceGroup(w))
+            ).chain(
+                reads_needing_delayed_field_exchange.into_iter().map(|(k, (w, layout))| AbstractResourceWriteOp::InPlaceDelayedFieldChange(InPlaceDelayedFieldChange { layout, materialized_size: w.bytes().map(|b| b.len()).unwrap() }))
+            ).chain(
+                group_reads_needing_delayed_field_exchange.into_iter().map(|(k, (metadata_op, materialized_size))| AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChange { metadata_op, materialized_size }))
+            ).collect(),
             module_write_set,
+            events,
+            delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
-            delayed_field_change_set,
-            reads_needing_delayed_field_exchange,
-            group_reads_needing_delayed_field_exchange,
-            events,
-        };
-
-        // Returns an error if structure of the change set is not valid,
-        // e.g. the size in bytes is too large.
-        checker.check_change_set(&change_set)?;
-        Ok(change_set)
+            checker,
+        )
     }
 
     /// Builds a new change set from the storage representation.
@@ -219,56 +320,74 @@ impl VMChangeSet {
                 // we split MVHashMap into data and aggregators.
 
                 // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
-                resource_write_set.insert(state_key, (write_op, None));
+                resource_write_set.insert(state_key, AbstractResourceWriteOp::Write(write_op));
             }
         }
 
         // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
-            resource_write_set,
             // TODO[agg_v2](fix): do we use same or different capable flag for resource groups?
             // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_capable
             // context (i.e. if dynamic_change_set_optimizations_enabled is disabled)
-            resource_group_write_set: BTreeMap::new(),
+            resource_write_set,
             module_write_set,
+            delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
-            delayed_field_change_set: BTreeMap::new(),
-            reads_needing_delayed_field_exchange: BTreeMap::new(),
-            group_reads_needing_delayed_field_exchange: BTreeMap::new(),
             events,
         };
         checker.check_change_set(&change_set)?;
         Ok(change_set)
     }
 
-    pub(crate) fn into_storage_change_set_unchecked(self) -> StorageChangeSet {
+    pub(crate) fn into_storage_change_set_forced(self) -> StorageChangeSet {
+        self.try_into_storage_change_set()
+            .expect("Expected VMChangeSet to be valid and materialized")
+    }
+
+    /// Converts VM-native change set into its storage representation with fully
+    /// serialized changes. The conversion fails if:
+    /// - deltas are not materialized.
+    /// - resource group writes are not (combined &) converted to resource writes.
+    pub fn try_into_storage_change_set(self) -> Result<StorageChangeSet, PanicError> {
         // Converting VMChangeSet into TransactionOutput (i.e. storage change set), can
         // be done here only if dynamic_change_set_optimizations have not been used/produced
         // data into the output.
         // If they (DelayedField or ResourceGroup) have added data into the write set, translation
         // into output is more complicated, and needs to be done within BlockExecutor context
         // that knows how to deal with it.
-        assert!(self.delayed_field_change_set().is_empty());
-        assert!(self.resource_group_write_set().is_empty());
-        assert!(self.reads_needing_delayed_field_exchange().is_empty());
-        assert!(self.group_reads_needing_delayed_field_exchange().is_empty());
-
         let Self {
             resource_write_set,
-            resource_group_write_set: _,
             module_write_set,
             aggregator_v1_write_set,
-            aggregator_v1_delta_set: _,
-            delayed_field_change_set: _,
-            reads_needing_delayed_field_exchange: _,
-            group_reads_needing_delayed_field_exchange: _,
+            aggregator_v1_delta_set,
+            delayed_field_change_set,
             events,
         } = self;
 
+        if !aggregator_v1_delta_set.is_empty() {
+            return Err(code_invariant_error(
+                "Cannot convert from VMChangeSet with non-materialized Aggregator V1 deltas to ChangeSet.",
+            ));
+        }
+        if !delayed_field_change_set.is_empty() {
+            return Err(code_invariant_error(
+                "Cannot convert from VMChangeSet with non-materialized Delayed Field changes to ChangeSet.",
+            ));
+        }
+
         let mut write_set_mut = WriteSetMut::default();
-        write_set_mut.extend(resource_write_set.into_iter().map(|(k, (v, _))| (k, v)));
+        write_set_mut.extend(resource_write_set.into_iter().map(|(k, v)| Ok(
+            (
+                k,
+                v.try_into_concrete_write().ok_or_else(
+                    || code_invariant_error(
+                        "Cannot convert from VMChangeSet with non-materialized write set",
+                    )
+                )?
+            )
+        )).collect::<Result<Vec<_>, _>>()?);
         write_set_mut.extend(module_write_set);
         write_set_mut.extend(aggregator_v1_write_set);
 
@@ -276,45 +395,12 @@ impl VMChangeSet {
         let write_set = write_set_mut
             .freeze()
             .expect("Freezing a WriteSet does not fail.");
-        StorageChangeSet::new(write_set, events)
+        Ok(StorageChangeSet::new(write_set, events))
     }
 
-    /// Converts VM-native change set into its storage representation with fully
-    /// serialized changes. The conversion fails if:
-    /// - deltas are not materialized.
-    /// - resource group writes are not (combined &) converted to resource writes.
-    pub fn try_into_storage_change_set(self) -> anyhow::Result<StorageChangeSet, VMStatus> {
-        if !self.aggregator_v1_delta_set.is_empty() {
-            return Err(VMStatus::error(
-                StatusCode::DATA_FORMAT_ERROR,
-                err_msg(
-                    "Cannot convert from VMChangeSet with non-materialized Aggregator V1 deltas to ChangeSet.",
-                ),
-            ));
-        }
-        if !self.delayed_field_change_set.is_empty() {
-            return Err(VMStatus::error(
-                StatusCode::DATA_FORMAT_ERROR,
-                err_msg(
-                    "Cannot convert from VMChangeSet with non-materialized Delayed Field changes to ChangeSet.",
-                ),
-            ));
-        }
-        if !self.resource_group_write_set.is_empty() {
-            return Err(VMStatus::error(
-                StatusCode::DATA_FORMAT_ERROR,
-                err_msg(
-                    "Cannot convert from VMChangeSet with non-combined resource group changes.",
-                ),
-            ));
-        }
-        Ok(self.into_storage_change_set_unchecked())
-    }
-
-    pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
+    pub fn write_set_iter(&self) -> impl Iterator<Item = (&StateKey, &AbstractResourceWriteOp)> {
         self.resource_write_set()
             .iter()
-            .map(|(k, (v, _))| (k, v))
             .chain(self.module_write_set().iter())
             .chain(self.aggregator_v1_write_set().iter())
     }
@@ -325,32 +411,24 @@ impl VMChangeSet {
             + self.aggregator_v1_write_set().len()
     }
 
-    pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, &mut WriteOp)> {
+    pub fn write_set_iter_mut(&mut self) -> impl Iterator<Item = (&StateKey, WriteOpSize, Option<&mut StateValueMetadata>)> {
         self.resource_write_set
             .iter_mut()
-            .map(|(k, (v, _))| (k, v))
-            .chain(self.module_write_set.iter_mut())
-            .chain(self.aggregator_v1_write_set.iter_mut())
-    }
-
-    pub fn group_write_set_iter_mut(
-        &mut self,
-    ) -> impl Iterator<Item = (&StateKey, &mut GroupWrite)> {
-        self.resource_group_write_set.iter_mut()
+            .map(|(k, v)| (k, v.materialized_size(), v.get_creation_metadata_mut()))
+            .chain(
+                self.module_write_set.iter_mut()
+                    .chain(self.aggregator_v1_write_set.iter_mut())
+                    .map(|(k, v)| (k, WriteOpSize::from(v), match v {
+                        WriteOp::CreationWithMetadata{metadata, ..} => Some(metadata),
+                        _ => None,
+                    }))
+            )
     }
 
     pub fn resource_write_set(
         &self,
-    ) -> &BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)> {
+    ) -> &BTreeMap<StateKey, AbstractResourceWriteOp> {
         &self.resource_write_set
-    }
-
-    pub fn resource_group_write_set(&self) -> &BTreeMap<StateKey, GroupWrite> {
-        &self.resource_group_write_set
-    }
-
-    pub(crate) fn drain_resource_group_write_set(&mut self) -> BTreeMap<StateKey, GroupWrite> {
-        std::mem::take(&mut self.resource_group_write_set)
     }
 
     pub fn module_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
@@ -370,13 +448,34 @@ impl VMChangeSet {
     pub(crate) fn extend_resource_write_set(
         &mut self,
         patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
-        finalized_group_writes: impl Iterator<Item = (StateKey, WriteOp)>,
-    ) {
-        self.resource_write_set.extend(
-            patched_resource_writes
-                .chain(finalized_group_writes)
-                .map(|(k, v)| (k, (v, None))),
-        );
+    ) -> Result<(), PanicError> {
+        for (k, new_write) in patched_resource_writes {
+            match self.resource_write_set.entry(k) {
+                Occupied(mut o) => {
+                    if let AbstractResourceWriteOp::Write(w) = o.get() {
+                        return Err(code_invariant_error(format!(
+                            "Trying to patch the value that is already materialized: {:?}: {:?} into {:?}.", o.key(), w, new_write
+                        )));
+                    }
+
+                    let new_length = new_write.bytes().map(|b| b.len() as u64);
+                    let old_length = o.get().materialized_size().write_len();
+                    if new_length != old_length {
+                        return Err(code_invariant_error(format!(
+                            "Trying to patch the value that changed size during materialization: {:?}: {:?} into {:?}.", o.key(), old_length, new_length
+                        )));
+                    }
+
+                    o.insert(AbstractResourceWriteOp::Write(new_write));
+                },
+                Vacant(v) => {
+                    return Err(code_invariant_error(format!(
+                        "Cannot patch a resource which does not exist, for: {:?}.", v.key()
+                    )));
+                },
+            }
+        }
+        Ok(())
     }
 
     /// The events are set to the input events.
@@ -406,30 +505,6 @@ impl VMChangeSet {
         &self.delayed_field_change_set
     }
 
-    pub fn reads_needing_delayed_field_exchange(
-        &self,
-    ) -> &BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)> {
-        &self.reads_needing_delayed_field_exchange
-    }
-
-    pub fn group_reads_needing_delayed_field_exchange(
-        &self,
-    ) -> &BTreeMap<StateKey, (WriteOp, u64)> {
-        &self.group_reads_needing_delayed_field_exchange
-    }
-
-    pub(crate) fn drain_reads_needing_delayed_field_exchange(
-        &mut self,
-    ) -> BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)> {
-        std::mem::take(&mut self.reads_needing_delayed_field_exchange)
-    }
-
-    pub(crate) fn drain_group_reads_needing_delayed_field_exchange(
-        &mut self,
-    ) -> BTreeMap<StateKey, (WriteOp, u64)> {
-        std::mem::take(&mut self.group_reads_needing_delayed_field_exchange)
-    }
-
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         &self.events
     }
@@ -442,13 +517,10 @@ impl VMChangeSet {
     ) -> anyhow::Result<Self, VMStatus> {
         let Self {
             resource_write_set,
-            resource_group_write_set,
             module_write_set,
             mut aggregator_v1_write_set,
             aggregator_v1_delta_set,
             delayed_field_change_set,
-            reads_needing_delayed_field_exchange,
-            group_reads_needing_delayed_field_exchange,
             events,
         } = self;
 
@@ -469,13 +541,10 @@ impl VMChangeSet {
 
         Ok(Self {
             resource_write_set,
-            resource_group_write_set,
             module_write_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set: BTreeMap::new(),
             delayed_field_change_set,
-            reads_needing_delayed_field_exchange,
-            group_reads_needing_delayed_field_exchange,
             events,
         })
     }
