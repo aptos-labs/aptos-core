@@ -11,7 +11,6 @@ use super::{
     dag_store::Dag,
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
-    shutdown::{ShutdownHandle, ShutdownGroup},
     storage::DAGStorage,
     types::{CertifiedNodeMessage, DAGMessage},
     DAGRpcResult, ProofNotifier,
@@ -48,6 +47,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
+use futures::executor::block_on;
 use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
@@ -68,7 +68,6 @@ struct BootstrapBaseState {
 enum Mode {
     Active(ActiveMode),
     Sync(SyncMode),
-    Exit(ExitMode),
 }
 
 #[async_trait]
@@ -78,8 +77,7 @@ trait TDagMode {
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         bootstrapper: &DagBootstrapper,
-        shutdown_handle: &ShutdownGroup,
-    ) -> Mode;
+    ) -> Option<Mode>;
 }
 
 struct ActiveMode {
@@ -94,26 +92,24 @@ impl TDagMode for ActiveMode {
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         _bootstrapper: &DagBootstrapper,
-        shutdown_group: &ShutdownGroup,
-    ) -> Mode {
-        let (shutdown_handle, shutdown) = shutdown_group.new_child();
-
+    ) -> Option<Mode> {
         // Spawn the fetch service
-        let handle = tokio::spawn(self.fetch_service.start(shutdown));
+        let handle = tokio::spawn(self.fetch_service.start());
+        defer!({
+            // Signal and stop the fetch service
+            handle.abort();
+            let _ = block_on(handle);
+        });
 
         // Run the network handler until it returns with state sync status.
         let sync_status = self.handler.run(dag_rpc_rx).await;
 
-        // Signal and stop the fetch service
-        shutdown_handle.shutdown().await;
-        let _ = handle.await;
-
         match sync_status {
-            StateSyncStatus::NeedsSync(certified_node_msg) => Mode::Sync(SyncMode {
+            StateSyncStatus::NeedsSync(certified_node_msg) => Some(Mode::Sync(SyncMode {
                 certified_node_msg,
                 base_state: self.base_state,
-            }),
-            StateSyncStatus::EpochEnds => Mode::Exit(ExitMode {}),
+            })),
+            StateSyncStatus::EpochEnds => None,
             _ => unreachable!(),
         }
     }
@@ -130,8 +126,7 @@ impl TDagMode for SyncMode {
         self,
         _dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
         bootstrapper: &DagBootstrapper,
-        _shutdown_handle: &ShutdownGroup,
-    ) -> Mode {
+    ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
             bootstrapper.epoch_state.clone(),
             bootstrapper.time_service.clone(),
@@ -183,7 +178,7 @@ impl TDagMode for SyncMode {
             },
         };
 
-        if success {
+        let next_mode = if success {
             let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
             Mode::Active(ActiveMode {
                 handler: new_handler,
@@ -198,23 +193,8 @@ impl TDagMode for SyncMode {
                 fetch_service: new_fetch_service,
                 base_state: self.base_state,
             })
-        }
-    }
-}
-
-struct ExitMode {}
-
-#[async_trait]
-impl TDagMode for ExitMode {
-    async fn run(
-        self,
-        _dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
-        _bootstrapper: &DagBootstrapper,
-        _shutdown_handle: &ShutdownGroup,
-    ) -> Mode {
-        loop {
-            tokio::task::yield_now().await;
-        }
+        };
+        Some(next_mode)
     }
 }
 
@@ -498,16 +478,14 @@ impl DagBootstrapper {
             fetch_service,
             base_state,
         });
-        let shutdown_handle = ShutdownGroup::new();
         loop {
             select! {
                 biased;
                 Ok(ack_tx) = &mut shutdown_rx => {
-                    shutdown_handle.shutdown().await;
                     let _ = ack_tx.send(());
                     return;
                 },
-                next_mode = mode.run(&mut dag_rpc_rx, &self, &shutdown_handle) => {
+                Some(next_mode) = mode.run(&mut dag_rpc_rx, &self) => {
                     mode = next_mode
                 }
             }
@@ -532,8 +510,6 @@ pub(super) fn bootstrap_dag_for_test(
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
     UnboundedReceiver<OrderedBlocks>,
-    ShutdownGroup,
-    ShutdownHandle,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let bootstraper = DagBootstrapper::new(
@@ -561,16 +537,7 @@ pub(super) fn bootstrap_dag_for_test(
         let mut dag_rpc_rx = dag_rpc_rx;
         handler.run(&mut dag_rpc_rx).await
     });
-    let root_handle = ShutdownGroup::new();
-    let (child_handle, shutdown) = root_handle.new_child();
-    let df_handle = tokio::spawn(fetch_service.start(shutdown));
+    let df_handle = tokio::spawn(fetch_service.start());
 
-    (
-        dh_handle,
-        df_handle,
-        dag_rpc_tx,
-        ordered_nodes_rx,
-        root_handle,
-        child_handle,
-    )
+    (dh_handle, df_handle, dag_rpc_tx, ordered_nodes_rx)
 }

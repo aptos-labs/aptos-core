@@ -17,7 +17,6 @@ mod observability;
 mod order_rule;
 mod rb_handler;
 mod round_state;
-mod shutdown;
 mod storage;
 #[cfg(test)]
 mod tests;

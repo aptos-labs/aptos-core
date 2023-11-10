@@ -10,5 +10,4 @@ mod helpers;
 mod integration_tests;
 mod order_rule_tests;
 mod rb_handler_tests;
-mod shutdown;
 mod types_test;

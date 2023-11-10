@@ -2,11 +2,7 @@
 
 use super::dag_test;
 use crate::{
-    dag::{
-        bootstrap::bootstrap_dag_for_test,
-        dag_state_sync::StateSyncStatus,
-        shutdown::{ShutdownHandle, ShutdownGroup},
-    },
+    dag::{bootstrap::bootstrap_dag_for_test, dag_state_sync::StateSyncStatus},
     experimental::buffer_manager::OrderedBlocks,
     network::{IncomingDAGRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
@@ -48,8 +44,6 @@ use tokio::task::JoinHandle;
 struct DagBootstrapUnit {
     nh_task_handle: JoinHandle<StateSyncStatus>,
     df_task_handle: JoinHandle<()>,
-    root_handle: ShutdownGroup,
-    child_handle: ShutdownHandle,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
         Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
@@ -82,33 +76,25 @@ impl DagBootstrapUnit {
 
         let state_computer = Arc::new(EmptyStateComputer {});
 
-        let (
-            nh_abort_handle,
-            df_abort_handle,
-            dag_rpc_tx,
-            ordered_nodes_rx,
-            root_handle,
-            child_handle,
-        ) = bootstrap_dag_for_test(
-            self_peer,
-            signer,
-            Arc::new(epoch_state),
-            Arc::new(dag_storage),
-            network.clone(),
-            network.clone(),
-            network.clone(),
-            time_service,
-            payload_manager,
-            payload_client,
-            state_computer,
-        );
+        let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
+            bootstrap_dag_for_test(
+                self_peer,
+                signer,
+                Arc::new(epoch_state),
+                Arc::new(dag_storage),
+                network.clone(),
+                network.clone(),
+                network.clone(),
+                time_service,
+                payload_manager,
+                payload_client,
+                state_computer,
+            );
 
         (
             Self {
                 nh_task_handle: nh_abort_handle,
                 df_task_handle: df_abort_handle,
-                root_handle,
-                child_handle,
                 dag_rpc_tx,
                 network_events,
             },
