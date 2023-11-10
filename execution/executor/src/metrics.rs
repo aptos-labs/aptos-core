@@ -210,3 +210,11 @@ pub static APTOS_PROCESSED_USER_TRANSACTIONS_CORE_EVENTS: Lazy<IntCounterVec> = 
     )
     .unwrap()
 });
+
+pub static APTOS_PROCESSED_TXNS_OUTPUT_SIZE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_processed_txns_output_size",
+        "Total size of all trnsaction outputs thus far",
+    )
+    .unwrap()
+});
