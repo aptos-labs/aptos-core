@@ -96,11 +96,14 @@ impl EventStore {
     }
 
     pub fn get_txn_ver_by_seq_num(&self, event_key: &EventKey, seq_num: u64) -> Result<u64> {
+        bail!("Event indices not available on PreviewNet2.")
+        /*
         let (ver, _) = self
             .event_db
             .get::<EventByKeySchema>(&(*event_key, seq_num))?
             .ok_or_else(|| format_err!("Index entry should exist for seq_num {}", seq_num))?;
         Ok(ver)
+         */
     }
 
     pub fn get_event_by_key(
@@ -123,6 +126,8 @@ impl EventStore {
         ledger_version: Version,
         event_key: &EventKey,
     ) -> Result<Option<u64>> {
+        Ok(None)
+        /*
         let mut iter = self
             .event_db
             .iter::<EventByVersionSchema>(ReadOptions::default())?;
@@ -131,6 +136,7 @@ impl EventStore {
         Ok(iter.next().transpose()?.and_then(
             |((key, _version, seq), _idx)| if &key == event_key { Some(seq) } else { None },
         ))
+         */
     }
 
     /// Get the next sequence number for specified event key.
@@ -163,6 +169,8 @@ impl EventStore {
             u64,     // index among events for the same transaction
         )>,
     > {
+        Ok(vec![])
+        /*
         let mut iter = self
             .event_db
             .iter::<EventByKeySchema>(ReadOptions::default())?;
@@ -188,6 +196,7 @@ impl EventStore {
         }
 
         Ok(result)
+             */
     }
 
     fn lookup_event_by_key(
@@ -220,6 +229,8 @@ impl EventStore {
             u64,     // sequence number
         )>,
     > {
+        Ok(None)
+        /*
         let mut iter = self
             .event_db
             .iter::<EventByVersionSchema>(ReadOptions::default())?;
@@ -235,6 +246,7 @@ impl EventStore {
                 }
             },
         }
+             */
     }
 
     pub fn lookup_event_at_or_after_version(
@@ -248,6 +260,8 @@ impl EventStore {
             u64,     // sequence number
         )>,
     > {
+        Ok(None)
+        /*
         let mut iter = self
             .event_db
             .iter::<EventByVersionSchema>(ReadOptions::default())?;
@@ -263,6 +277,7 @@ impl EventStore {
                 }
             },
         }
+             */
     }
 
     pub fn lookup_event_after_version(
@@ -276,6 +291,8 @@ impl EventStore {
             u64,     // sequence number
         )>,
     > {
+        Ok(None)
+        /*
         let mut iter = self
             .event_db
             .iter::<EventByVersionSchema>(ReadOptions::default())?;
@@ -291,6 +308,7 @@ impl EventStore {
                 }
             },
         }
+             */
     }
 
     pub fn get_block_metadata(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
@@ -375,6 +393,8 @@ impl EventStore {
     where
         C: FnMut(&ContractEvent) -> Result<bool>,
     {
+        Ok(None)
+        /*
         let mut begin = 0u64;
         let mut end = match self.get_latest_sequence_number(ledger_version, event_key)? {
             Some(s) => s
@@ -405,6 +425,7 @@ impl EventStore {
         } else {
             Ok(Some(begin))
         }
+             */
     }
 
     /// Gets the version of the last transaction committed before timestamp,
@@ -415,6 +436,8 @@ impl EventStore {
         timestamp: u64,
         ledger_version: Version,
     ) -> Result<Version> {
+        bail!("Event indices not available on PreviewNet2.")
+        /*
         let event_key = new_block_event_key();
         let seq_at_or_after_ts = self.search_for_event_lower_bound(
             &event_key,
@@ -440,6 +463,7 @@ impl EventStore {
         version
             .checked_sub(1)
             .ok_or_else(|| format_err!("A block with non-zero seq num started at version 0."))
+         */
     }
 
     /// Prunes events by accumulator store for a range of version in [begin, end)

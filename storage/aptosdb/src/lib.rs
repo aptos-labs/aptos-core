@@ -1883,10 +1883,12 @@ impl DbReader for AptosDB {
                 Err(err) => {
                     // when event index is disabled, we won't be able to search the NewBlock event stream.
                     // TODO(grao): evaluate adding dedicated block_height_by_version index
-                    warn!(
-                        error = ?err,
-                        "Failed to fetch block timestamp, falling back to on-chain config.",
-                    );
+                    sample!(SampleRate::Duration(Duration::from_secs(60)), {
+                        warn!(
+                            error = ?err,
+                            "Failed to fetch block timestamp, falling back to on-chain config.",
+                        )
+                    });
                     let ts = self
                         .get_state_value_by_version(
                             &StateKey::access_path(CurrentTimeMicroseconds::access_path()?),
