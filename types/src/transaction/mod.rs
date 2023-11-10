@@ -33,6 +33,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
@@ -1520,9 +1521,11 @@ impl TransactionListWithProof {
         );
 
         // Verify the transaction hashes match those of the transaction infos
-        let transaction_hashes: Vec<_> = self.transactions.iter().map(CryptoHash::hash).collect();
-        itertools::zip_eq(transaction_hashes, &self.proof.transaction_infos)
-            .map(|(txn_hash, txn_info)| {
+        self.transactions
+            .par_iter()
+            .zip_eq(self.proof.transaction_infos.par_iter())
+            .map(|(txn, txn_info)| {
+                let txn_hash = CryptoHash::hash(txn);
                 ensure!(
                     txn_hash == txn_info.transaction_hash(),
                     "The hash of transaction does not match the transaction info in proof. \
@@ -1546,7 +1549,9 @@ impl TransactionListWithProof {
                 event_lists.len(),
                 self.transactions.len(),
             );
-            itertools::zip_eq(event_lists, &self.proof.transaction_infos)
+            event_lists
+                .into_par_iter()
+                .zip_eq(self.proof.transaction_infos.par_iter())
                 .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
                 .collect::<Result<Vec<_>>>()?;
         }
@@ -1621,10 +1626,7 @@ impl TransactionOutputListWithProof {
         );
 
         // Verify the events, status, gas used and transaction hashes.
-        itertools::zip_eq(
-            &self.transactions_and_outputs,
-            &self.proof.transaction_infos,
-        )
+        self.transactions_and_outputs.par_iter().zip_eq(self.proof.transaction_infos.par_iter())
         .map(|((txn, txn_output), txn_info)| {
             // Check the events against the expected events root hash
             verify_events_against_root_hash(&txn_output.events, txn_info)?;
