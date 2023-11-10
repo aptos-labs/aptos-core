@@ -28,6 +28,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use move_core_types::vm_status::VMStatus;
 use std::{sync::Arc, thread};
 use std::sync::Mutex;
+use crate::sharded_block_executor::sharded_executor_service::TransactionIdxAndOutput;
 
 /// Executor service that runs on local machine and waits for commands from the coordinator and executes
 /// them in parallel.
@@ -223,7 +224,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
         Ok(ShardedExecutionOutput::new(sharded_output, global_output))
     }
 
-    fn execute_block_remote(&self, state_view: Arc<S>, transactions: Arc<PartitionedTransactions>, concurrency_level_per_shard: usize, onchain_config: BlockExecutorConfigFromOnchain) -> Result<ShardedExecutionOutput, VMStatus> {
+    fn execute_block_remote(&self, state_view: Arc<S>, transactions: Arc<PartitionedTransactions>, concurrency_level_per_shard: usize, onchain_config: BlockExecutorConfigFromOnchain) -> Result<Vec<TransactionOutput>, VMStatus> {
         panic!("Not implemented for LocalExecutorClient");
     }
 
@@ -268,6 +269,10 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
 
     fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
         self.result_tx.send(result).unwrap()
+    }
+
+    fn send_single_execution_result(&mut self, txn_idx_output: TransactionIdxAndOutput) {
+        panic!("Not implemented for LocalCoordinatorClient");
     }
 }
 

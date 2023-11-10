@@ -16,8 +16,10 @@ use crossbeam_channel::{Receiver, Sender};
 use rayon::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
 use std::sync::atomic::AtomicU64;
+use aptos_logger::info;
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
+use aptos_vm::sharded_block_executor::sharded_executor_service::TransactionIdxAndOutput;
 
 pub struct RemoteCoordinatorClient {
     state_view_client: Arc<RemoteStateViewClient>,
@@ -125,11 +127,22 @@ impl CoordinatorClient<RemoteStateViewClient> for RemoteCoordinatorClient {
     fn send_execution_result(&mut self, result: Result<Vec<Vec<TransactionOutput>>, VMStatus>) {
         let execute_result_type = format!("execute_result_{}", self.shard_id);
         let duration_since_epoch = self.cmd_rx_msg_duration_since_epoch.load(std::sync::atomic::Ordering::Relaxed);
+        let remote_execution_result = RemoteExecutionResult::new(result);
+        let bcs_ser_timer = REMOTE_EXECUTOR_TIMER
+            .with_label_values(&[&self.shard_id.to_string(), "result_tx_bcs_ser"])
+            .start_timer();
+        let output_message = bcs::to_bytes(&remote_execution_result).unwrap();
+        drop(bcs_ser_timer);
         let delta = get_delta_time(duration_since_epoch);
         REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER
             .with_label_values(&["6_results_tx_msg_shard_send"]).observe(delta as f64);
-        let remote_execution_result = RemoteExecutionResult::new(result);
-        let output_message = bcs::to_bytes(&remote_execution_result).unwrap();
         self.result_tx.send(Message::create_with_metadata(output_message, duration_since_epoch, 0, 0), &MessageType::new(execute_result_type));
+    }
+
+    fn send_single_execution_result(&mut self, txn_idx_output: TransactionIdxAndOutput) {
+        //info!("Sending output to coordinator for txn_idx: {:?}", txn_idx_output.txn_idx);
+        let execute_result_type = format!("execute_result_{}", self.shard_id);
+        let output_message = bcs::to_bytes(&txn_idx_output).unwrap();
+        self.result_tx.send(Message::new(output_message), &MessageType::new(execute_result_type));
     }
 }

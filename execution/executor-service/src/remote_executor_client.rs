@@ -24,11 +24,13 @@ use std::{
     sync::{Arc, Mutex},
     thread,
 };
+use std::sync::atomic::AtomicU64;
 use std::thread::JoinHandle;
 use std::time::SystemTime;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use aptos_secure_net::grpc_network_service::outbound_rpc_helper::OutboundRpcHelper;
 use aptos_secure_net::network_controller::metrics::{get_delta_time, REMOTE_EXECUTOR_CMD_RESULTS_RND_TRP_JRNY_TIMER};
+use aptos_vm::sharded_block_executor::sharded_executor_service::TransactionIdxAndOutput;
 use crate::metrics::REMOTE_EXECUTOR_TIMER;
 
 pub static COORDINATOR_PORT: u16 = 52200;
@@ -168,14 +170,14 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
 
     fn get_output_from_shards(&self) -> Result<Vec<Vec<Vec<TransactionOutput>>>, VMStatus> {
         trace!("RemoteExecutorClient Waiting for results");
-        let thread_pool = Arc::new(
+        /*let thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
                 .num_threads(self.num_shards())
                 .build()
                 .unwrap(),
         );
 
-        /*let mut results = vec![];
+        let mut results = vec![];
         for rx in self.result_rxs.iter() {
             let received_bytes = rx.recv().unwrap().to_bytes();
             let result: RemoteExecutionResult = bcs::from_bytes(&received_bytes).unwrap();
@@ -205,6 +207,34 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
         }
         Ok(res)
     }
+
+    fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>) -> Result<Vec<TransactionOutput>, VMStatus> {
+        info!("expected outputs {:?} ", expected_outputs);
+        let results: Vec<Vec<TransactionIdxAndOutput>> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
+            let mut num_outputs_received: u64 = 0;
+            let mut outputs = vec![];
+            loop {
+                let received_msg = self.result_rxs[shard_id].recv().unwrap();
+                let result: TransactionIdxAndOutput = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
+                num_outputs_received += 1;
+                //info!("Streamed output from shard {}; txn_id {}", shard_id, result.txn_idx);
+                outputs.push(result);
+                if num_outputs_received == expected_outputs[shard_id] {
+                    break;
+                }
+            }
+            outputs
+        }).collect();
+
+        let mut aggregated_results: Vec<TransactionOutput> = vec![Default::default() ; expected_outputs.iter().sum::<u64>() as usize];
+        results.into_iter().for_each(|result| {
+            result.into_iter().for_each(|txn_output| {
+                aggregated_results[txn_output.txn_idx as usize] = txn_output.txn_output;
+            });
+        });
+
+        Ok(aggregated_results)
+    }
 }
 
 impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorClient<S> {
@@ -222,7 +252,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
         transactions: Arc<PartitionedTransactions>,
         concurrency_level_per_shard: usize,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<ShardedExecutionOutput, VMStatus> {
+    ) -> Result<Vec<TransactionOutput>, VMStatus> {
         trace!("RemoteExecutorClient Sending block to shards");
         self.state_view_service.set_state_view(state_view);
         let (sub_blocks, global_txns) = transactions.get_ref();
@@ -245,7 +275,9 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap().as_millis() as u64;
 
+        let mut expected_outputs = vec![0; self.num_shards()];
         for (shard_id, _) in sub_blocks.into_iter().enumerate() {
+            expected_outputs[shard_id] = transactions.get_ref().0[shard_id].num_txns() as u64;
             let senders = self.command_txs.clone();
             // TODO: Check if the function can get Arc<BlockExecutorConfigFromOnchain> instead.
             let onchain_config_clone = onchain_config.clone();
@@ -274,14 +306,17 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
 
         drop(cmd_tx_timer);
 
-        let execution_results = self.get_output_from_shards()?;
+        //let execution_results = self.get_output_from_shards()?;
+
+        let results = self.get_streamed_output_from_shards(expected_outputs);
 
         let timer = REMOTE_EXECUTOR_TIMER
             .with_label_values(&["0", "drop_state_view_finally"])
             .start_timer();
         self.state_view_service.drop_state_view();
         drop(timer);
-        Ok(ShardedExecutionOutput::new(execution_results, vec![]))
+        results
+        //Ok(ShardedExecutionOutput::new(execution_results, vec![]))
     }
 
     fn shutdown(&mut self) {
