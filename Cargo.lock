@@ -356,6 +356,7 @@ dependencies = [
  "lazy_static",
  "mime",
  "pprof",
+ "regex",
  "rstack-self",
  "tokio",
  "tokio-scoped",
