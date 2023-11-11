@@ -271,7 +271,7 @@ impl<S: StateView + Sync + Send + 'static> CoordinatorClient<S> for LocalCoordin
         self.result_tx.send(result).unwrap()
     }
 
-    fn send_single_execution_result(&mut self, txn_idx_output: TransactionIdxAndOutput) {
+    fn stream_execution_result(&mut self, txn_idx_output: Vec<TransactionIdxAndOutput>) {
         panic!("Not implemented for LocalCoordinatorClient");
     }
 }

@@ -209,16 +209,16 @@ impl<S: StateView + Sync + Send + 'static> RemoteExecutorClient<S> {
     }
 
     fn get_streamed_output_from_shards(&self, expected_outputs: Vec<u64>) -> Result<Vec<TransactionOutput>, VMStatus> {
-        info!("expected outputs {:?} ", expected_outputs);
+        //info!("expected outputs {:?} ", expected_outputs);
         let results: Vec<Vec<TransactionIdxAndOutput>> = (0..self.num_shards()).into_par_iter().map(|shard_id| {
             let mut num_outputs_received: u64 = 0;
             let mut outputs = vec![];
             loop {
                 let received_msg = self.result_rxs[shard_id].recv().unwrap();
-                let result: TransactionIdxAndOutput = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
-                num_outputs_received += 1;
+                let result: Vec<TransactionIdxAndOutput> = bcs::from_bytes(&received_msg.to_bytes()).unwrap();
+                num_outputs_received += result.len() as u64;
                 //info!("Streamed output from shard {}; txn_id {}", shard_id, result.txn_idx);
-                outputs.push(result);
+                outputs.extend(result);
                 if num_outputs_received == expected_outputs[shard_id] {
                     break;
                 }
